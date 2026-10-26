@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-26 — The owner is additive: a ZIP keeps its bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — An extension ZIP lands in the installer's namespace, `<owner>/<name>`, or on the
  *     owner's existing or released bare name; a cortex ZIP replaces the uploader's own cortex of that
  *     name (services/component-address.ts; owner namespaces wish, secaudit2026oct22).
@@ -487,8 +488,8 @@ async function handleExtensionUpload(
     const wantUpdate = meta.update === true;
     const wantActivate = meta.activate === true;
 
-    // The stored name lives in the installer's namespace (services/component-address.ts): the
-    // owner's own extension of this name, else `<owner>/<name>`, or a bare name they released.
+    // The record under that name, as before (services/component-address.ts): the bare record, else
+    // the owner's own `<owner>/<name>`; a new install keeps its bare name unless another account released it.
     const { existing } = await placeExtensionInstall(storage, ownerName, record);
     if (existing && !wantUpdate) {
         res.status(409).json({
@@ -667,11 +668,11 @@ async function handleCortexUpload(
         ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
     })) !== null;
 
-    // The uploader's own cortex of this name (services/component-address.ts): `<owner>/<name>` as
-    // written, or for a bare manifest name the uploader's own of that name.
+    // The cortex under that name (services/component-address.ts): `<owner>/<name>` as written, or for
+    // a bare manifest name the bare record as before, else the uploader's own of that name.
     const existing = isNamespacedName(incoming.name)
         ? await findCortex(storage, incoming.name)
-        : await ownComponent(n => storage.getCortexExtension(n), ownerName, incoming.name);
+        : (await storage.getCortexExtension(incoming.name)) ?? await ownComponent(n => storage.getCortexExtension(n), ownerName, incoming.name);
 
     // ── NEW NAME — services/cortex-lifecycle.ts, the same install POST /v1/cortex and the inline
     //    branch of aimeat_cortex_install run. It re-reads the manifest and applies the manifest and

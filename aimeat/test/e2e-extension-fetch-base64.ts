@@ -16,8 +16,6 @@
  *   FIRST FAIL: against the tree before this change `responseType` is ignored, so `base64` is
  *   absent and `arraybuffer` is accepted without a word.
  * @version-history
- *   2026-10-25 — The signed-out call and the other owner's PUT name the extension by its full name,
- *     as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-24 — Initial (jussil riistakartta, support thread 1ac0a199).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=extension-fetch-base64
@@ -137,13 +135,11 @@ await test('An answer past the 4 MB ceiling is refused with RESPONSE_TOO_LARGE',
 // are the credential and the record: nobody calls it signed out, and another owner cannot replace
 // its script with PUT /v1/extensions/{name}.
 await test('Signed out, the action is refused; another owner cannot replace its script (403)', async () => {
-    // The stored name is `<installer>/<short>`: anybody but A names the full one.
-    const extFull = `${A.name}/${EXT}`;
-    const anon = await json(`/v1/ext/${encodeURIComponent(extFull)}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'parkano.img', responseType: 'base64' }) });
+    const anon = await json(`/v1/ext/${EXT}/pull`, { method: 'POST', body: JSON.stringify({ port: FAR_PORT, file: 'parkano.img', responseType: 'base64' }) });
     assert(anon.status === 401, `signed out: expected 401, got ${anon.status}: ${JSON.stringify(anon.body?.error)}`);
     const X = await setupOwner('x');
     const other = { pull: 'export default async function(ctx, input){ return { status: 0, text: "taken", base64: null }; }' };
-    const take = await json(`/v1/extensions/${encodeURIComponent(extFull)}`, { method: 'PUT', headers: auth(X.token), body: JSON.stringify({ manifest, scripts: other }) });
+    const take = await json(`/v1/extensions/${EXT}`, { method: 'PUT', headers: auth(X.token), body: JSON.stringify({ manifest, scripts: other }) });
     assert(take.status === 403, `other owner update: expected 403, got ${take.status}: ${JSON.stringify(take.body?.error)}`);
     const r = await invoke({ file: 'parkano.img', responseType: 'base64' });
     assert(r.status === 200 && Buffer.from(r.body.data.base64 ?? '', 'base64').equals(IMG), `after the other owner's attempt: ${JSON.stringify(r.body).slice(0, 200)}`);

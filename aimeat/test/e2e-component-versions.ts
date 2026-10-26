@@ -9,10 +9,6 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=component-versions
  * @version-history
- *   v1.4.0 — 2026-10-25 — Names live in the owner's namespace: the served lib and every read by another
- *     account or nobody signed in name the owner; the owner keeps the bare name; the detail names the
- *     writer as the version list does, and a cortex version names the agent that wrote it (owner
- *     namespaces wish and lead 98, secaudit2026oct22).
  *   v1.3.0 — 2026-10-25 — GET /v1/extensions/:name/versions names the writing agent to every caller,
  *     which is public provenance (Jouni, 2026-10-25), and another account cannot write a version.
  *   v1.2.0 — 2026-10-25 — Another owner reads a private cortex's versions as 404 NOT_FOUND and is
@@ -33,10 +29,6 @@ const stamp = Date.now() % 100000;
 const owner = `verowna${stamp}`;
 const EXT = `verext${stamp}`;
 const CORTEX = `vercx${stamp}`;
-// Installs are stored in the owner's namespace (services/component-address.ts). The owner's own calls
-// keep the bare name; another account, a caller with no sign-in and a served lib address name the owner.
-const EXT_ENC = encodeURIComponent(`${owner}/${EXT}`);
-const CORTEX_ENC = encodeURIComponent(`${owner}/${CORTEX}`);
 const APP = 'ver-app.html';
 
 let passed = 0;
@@ -144,11 +136,11 @@ await test('a cortex keeps 1.0.0 and 1.1.0; the bare lib is the latest (no-cache
     const up = await json(`/v1/cortex/${CORTEX}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('1.1.0'), libs: cortexLib('1.1.0') }) }));
     assert(up.status === 200, `upsert ${up.status}: ${JSON.stringify(up.body).slice(0, 200)}`);
 
-    const bare = await raw(`/v1/cortex/${owner}/${CORTEX}/libs/v.js`);
+    const bare = await raw(`/v1/cortex/${CORTEX}/libs/v.js`);
     assert(bare.status === 200 && bare.text.includes("'1.1.0'") && /no-cache/.test(bare.cache), `bare lib: ${bare.status} ${bare.text} ${bare.cache}`);
-    const pinned = await raw(`/v1/cortex/${owner}/${CORTEX}@1.0.0/libs/v.js`);
+    const pinned = await raw(`/v1/cortex/${CORTEX}@1.0.0/libs/v.js`);
     assert(pinned.status === 200 && pinned.text.includes("'1.0.0'") && /immutable/.test(pinned.cache), `pinned lib: ${pinned.status} ${pinned.text} ${pinned.cache}`);
-    const missing = await raw(`/v1/cortex/${owner}/${CORTEX}@0.0.1/libs/v.js`);
+    const missing = await raw(`/v1/cortex/${CORTEX}@0.0.1/libs/v.js`);
     assert(missing.status === 404, `unknown cortex version expected 404, got ${missing.status}`);
 
     const { body: list } = await json(`/v1/cortex/${CORTEX}/versions`, auth(token));
@@ -158,12 +150,12 @@ await test('a cortex keeps 1.0.0 and 1.1.0; the bare lib is the latest (no-cache
 });
 
 await test('an app that pins a version shows the pin in the dependency map', async () => {
-    const html = `<!DOCTYPE html><html><head><script src="/v1/cortex/${owner}/${CORTEX}@1.0.0/libs/v.js"></script></head><body><script>fetch('/v1/ext/${EXT_ENC}@1.0.0/hello',{method:'POST'})</script></body></html>`;
+    const html = `<!DOCTYPE html><html><head><script src="/v1/cortex/${CORTEX}@1.0.0/libs/v.js"></script></head><body><script>fetch('/v1/ext/${EXT}@1.0.0/hello',{method:'POST'})</script></body></html>`;
     const pub = await json('/v1/apps', auth(token, { method: 'POST', body: JSON.stringify({ filename: APP, content: b64(html), name: 'Ver app', description: 'pins', category: 'utility' }) }));
     assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body).slice(0, 200)}`);
     const { body } = await json(`/v1/dependencies?app=${owner}/${APP}`, auth(token));
-    const cx = body.data.requires.cortex.find((c: any) => c.name === `${owner}/${CORTEX}`);
-    const ex = body.data.requires.extensions.find((e: any) => e.name === `${owner}/${EXT}`);
+    const cx = body.data.requires.cortex.find((c: any) => c.name === CORTEX);
+    const ex = body.data.requires.extensions.find((e: any) => e.name === EXT);
     assert(cx?.pinned === '1.0.0' && ex?.pinned === '1.0.0', `pins not recorded: ${JSON.stringify(body.data.requires)}`);
 });
 
@@ -198,9 +190,9 @@ await test('re-publishing a kept version with other code is refused, and the kep
 
     const cx = await json(`/v1/cortex/${CORTEX}`, auth(token, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('1.1.0'), libs: { 'v.js': "window.AIMEAT_VER = 'swapped';" } }) }));
     assert(cx.status === 409 && cx.body.error?.code === 'VERSION_EXISTS', `cortex re-publish: ${cx.status} ${says(cx).slice(0, 240)}`);
-    const lib = await raw(`/v1/cortex/${owner}/${CORTEX}@1.1.0/libs/v.js`);
+    const lib = await raw(`/v1/cortex/${CORTEX}@1.1.0/libs/v.js`);
     assert(lib.status === 200 && lib.text.includes("'1.1.0'"), `pinned lib after the refusal: ${lib.status} ${lib.text}`);
-    const bareLib = await raw(`/v1/cortex/${owner}/${CORTEX}/libs/v.js`);
+    const bareLib = await raw(`/v1/cortex/${CORTEX}/libs/v.js`);
     assert(bareLib.status === 200 && bareLib.text.includes("'1.1.0'"), `nothing was swapped at the bare address: ${bareLib.text}`);
 });
 
@@ -247,9 +239,9 @@ await test("the version list names the agent that wrote a version to every calle
     assert(viaAgent.status === 200 && viaAgent.body.data.versions[0].created_by === agent.gaii, `the owner's agent sees it too: ${JSON.stringify(viaAgent.body.data.versions[0])}`);
 
     const stranger = await makeOwner(`verownb${stamp}`);
-    const refused = await json(`/v1/extensions/${EXT_ENC}/actions/hello`, auth(stranger, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'theirs' }; }` }) }));
+    const refused = await json(`/v1/extensions/${EXT}/actions/hello`, auth(stranger, { method: 'PATCH', body: JSON.stringify({ scriptContent: `export default async function(ctx, input) { return { version: 'theirs' }; }` }) }));
     assert(refused.status === 403, `another account cannot write a version: ${refused.status}`);
-    const theirs = await json(`/v1/extensions/${EXT_ENC}/versions`, auth(stranger));
+    const theirs = await json(`/v1/extensions/${EXT}/versions`, auth(stranger));
     assert(theirs.status === 200, `another account still lists the versions: ${theirs.status}`);
     const top = theirs.body.data.versions[0];
     assert(top.created_by === agent.gaii, `another account sees which agent wrote the version: ${JSON.stringify(top)}`);
@@ -257,10 +249,10 @@ await test("the version list names the agent that wrote a version to every calle
         `version, created_at, bytes and call_url stay for every caller: ${JSON.stringify(top)}`);
 
     // The detail answers the same writer as the version list, to another account and to nobody signed in.
-    const detail = await json(`/v1/extensions/${EXT_ENC}`, auth(stranger));
+    const detail = await json(`/v1/extensions/${EXT}`, auth(stranger));
     assert(detail.status === 200 && detail.body.data.extension.installedByPrincipal === agent.gaii,
         `another account sees the writer on the detail: ${JSON.stringify(detail.body.data?.extension?.installedByPrincipal)}`);
-    const anon = await json(`/v1/extensions/${EXT_ENC}`);
+    const anon = await json(`/v1/extensions/${EXT}`);
     assert(anon.status === 200 && anon.body.data.extension.installedByPrincipal === agent.gaii,
         `the detail names the writer without a sign-in: ${JSON.stringify(anon.body.data?.extension?.installedByPrincipal)}`);
 });
@@ -280,16 +272,15 @@ await test('the cortex version list names the agent that wrote a version', async
 // caller cannot learn that it exists, who installed it or when its versions were made.
 await test('another owner reads a private cortex\'s versions as 404, the same answer as its detail', async () => {
     const other = await makeOwner(`verownd${stamp}`);
-    const detail = await json(`/v1/cortex/${CORTEX_ENC}`, auth(other));
+    const detail = await json(`/v1/cortex/${CORTEX}`, auth(other));
     assert(detail.status === 404, `precondition: the cortex is private, detail answered ${detail.status}`);
-    const list = await json(`/v1/cortex/${CORTEX_ENC}/versions`, auth(other));
+    const list = await json(`/v1/cortex/${CORTEX}/versions`, auth(other));
     assert(list.status === 404 && list.body.error?.code === 'NOT_FOUND', `expected 404 NOT_FOUND, got ${list.status} ${JSON.stringify(list.body).slice(0, 200)}`);
-    // The address names the owner, so the answer may repeat it; it says nothing the caller did not send.
-    assert(!/installed_?by|created_?by/i.test(JSON.stringify(list.body)), 'the answer names the installer');
+    assert(!JSON.stringify(list.body).includes(owner), 'the answer names the installer');
     // Nor may that owner deploy a version under the name: the upsert is refused, and the kept code stays.
-    const put = await json(`/v1/cortex/${CORTEX_ENC}`, auth(other, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('9.0.0'), libs: cortexLib('9.0.0') }) }));
+    const put = await json(`/v1/cortex/${CORTEX}`, auth(other, { method: 'PUT', body: JSON.stringify({ manifest: cortexManifest('9.0.0'), libs: cortexLib('9.0.0') }) }));
     assert(put.status === 403, `another owner's redeploy expected 403, got ${put.status} ${JSON.stringify(put.body).slice(0, 200)}`);
-    const bare = await raw(`/v1/cortex/${owner}/${CORTEX}/libs/v.js`);
+    const bare = await raw(`/v1/cortex/${CORTEX}/libs/v.js`);
     assert(!bare.text.includes("'9.0.0'"), `the refused redeploy changed the served lib: ${bare.text}`);
 });
 
@@ -307,7 +298,7 @@ await test('uninstalling drops the kept versions', async () => {
     assert(d2.status === 200, `delete cortex ${d2.status}`);
     const gone = await json(`/v1/ext/${EXT}@1.0.0/hello`, auth(token, { method: 'POST', body: '{}' }));
     assert(gone.status === 404, `pinned call after uninstall expected 404, got ${gone.status}`);
-    const lib = await raw(`/v1/cortex/${owner}/${CORTEX}@1.0.0/libs/v.js`);
+    const lib = await raw(`/v1/cortex/${CORTEX}@1.0.0/libs/v.js`);
     assert(lib.status === 404, `pinned lib after uninstall expected 404, got ${lib.status}`);
 });
 

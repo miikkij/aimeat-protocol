@@ -3,10 +3,6 @@
  * @description E2E tests for MCP extensions module — 2 tools + 1 resource.
  *   Tests extension listing, action invocation, and the extension details resource.
  * @version-history
- *   v1.6.0 — 2026-10-25 — Names live in the owner's namespace: the suite's installs are stored as
- *     `<owner>/<name>`; the owner keeps calling them by the bare name, another account names the owner,
- *     a bare name from another account reaches nothing of this owner's, and the same cortex manifest
- *     from another account lands in that account's namespace (owner namespaces wish, secaudit2026oct22).
  *   v1.5.0 — 2026-10-20 — Test 22b: aimeat_extension_unattended_reader names the agent that installed
  *     the extension and the address the person changes the setting at, and refuses another owner's
  *     agent without leaking an agent name (Jouni, 2026-10-20).
@@ -136,9 +132,6 @@ let clientSecret = '';
 
 // Extension state
 const extName = `mcp-ext-test-${Date.now()}`;
-// An install is stored in its owner's namespace (services/component-address.ts). The owner's own
-// calls keep using the bare name; anything another account reads names the owner.
-const extFull = `${ownerName}/${extName}`;
 
 // Minimal extension manifest + script for testing
 const testManifest = `
@@ -338,7 +331,7 @@ await test('3. Install extension via REST', async () => {
         body: JSON.stringify({ manifest: testManifest, scripts: testScripts }),
     });
     assert(status === 201, `install status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.extension.name === extFull, `name: ${body.data.extension.name}`);
+    assert(body.data.extension.name === extName, `name: ${body.data.extension.name}`);
     assert(body.data.extension.status === 'inactive', `status: ${body.data.extension.status}`);
 });
 
@@ -362,8 +355,8 @@ await test('5. aimeat_extension_list shows active extension', async () => {
     assert(body.result?.content?.[0]?.text !== undefined, 'has content');
     const result = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(result), 'result is array');
-    const ext = result.find((e: any) => e.name === extFull);
-    assert(ext !== undefined, `extension "${extFull}" in list`);
+    const ext = result.find((e: any) => e.name === extName);
+    assert(ext !== undefined, `extension "${extName}" in list`);
     assert(Array.isArray(ext.actions), 'has actions array');
     assert(ext.actions.some((a: any) => a.id === 'echo'), 'has echo action');
 });
@@ -439,7 +432,7 @@ await test('9b. aimeat_extension_invoke gives the action ctx.files (write + read
     assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
     const result = JSON.parse(body.result.content[0].text);
     assert(result.available === true, 'ctx.files is present over MCP');
-    assert(result.key === `ext/${extFull}/probe.txt`, `reserved ext/ prefix applied: ${result.key}`);
+    assert(result.key === `ext/${extName}/probe.txt`, `reserved ext/ prefix applied: ${result.key}`);
     assert(result.size === 12, `size: ${result.size}`);
     assert(result.readBack === payload, `read back what was written: ${result.readBack}`);
     assert(result.missing === null, 'missing ref reads as null');
@@ -471,7 +464,7 @@ await test('9c. Cross-owner notify is REFUSED without the target\'s consent', as
 await test('9d. Cross-owner notify DELIVERS once the target consents (extension_notify)', async () => {
   const grant = await json('/v1/consent', {
     method: 'POST', headers: { Authorization: `Bearer ${targetToken}` },
-    body: JSON.stringify({ data_pattern: `ext:${extFull}`, recipient: '*', purpose: 'extension_notify' }),
+    body: JSON.stringify({ data_pattern: `ext:${extName}`, recipient: '*', purpose: 'extension_notify' }),
   });
   assert(grant.status === 201 || grant.status === 200, `consent grant: ${grant.status} ${JSON.stringify(grant.body).slice(0, 200)}`);
 
@@ -493,7 +486,7 @@ await test('9d. Cross-owner notify DELIVERS once the target consents (extension_
   const bell = await json('/v1/notifications', { headers: { Authorization: `Bearer ${targetToken}` } });
   assert(bell.status === 200, `target notifications read: ${bell.status}`);
   const list = bell.body.data?.notifications ?? [];
-  assert(Array.isArray(list) && list.some((n: any) => n.body === 'kello soi' && n.source?.name === extFull),
+  assert(Array.isArray(list) && list.some((n: any) => n.body === 'kello soi' && n.source?.name === extName),
     `notification present for target: ${JSON.stringify(list).slice(0, 300)}`);
 });
 
@@ -558,7 +551,7 @@ await test('9f. A redeploy keeps the consent; a reinstall under the same name af
   // The person consents to the new install, and it delivers again.
   const grant = await json('/v1/consent', {
     method: 'POST', headers: { Authorization: `Bearer ${targetToken}` },
-    body: JSON.stringify({ data_pattern: `ext:${extFull}`, recipient: '*', purpose: 'extension_notify' }),
+    body: JSON.stringify({ data_pattern: `ext:${extName}`, recipient: '*', purpose: 'extension_notify' }),
   });
   assert(grant.status === 201 || grant.status === 200, `consent again: ${grant.status}`);
   assert(await notifyTarget('after consenting again', 115) === true, 'a consent to the new install does not deliver');
@@ -578,7 +571,7 @@ await test('11. Extension resource read returns details', async () => {
     const { body } = await mcpRpc('resources/read', { uri }, 201);
     assert(body.result?.contents?.[0]?.text !== undefined, 'has content');
     const detail = JSON.parse(body.result.contents[0].text);
-    assert(detail.name === extFull, `name: ${detail.name}`);
+    assert(detail.name === extName, `name: ${detail.name}`);
     assert(detail.status === 'active', `status: ${detail.status}`);
     assert(Array.isArray(detail.actions), 'has actions');
     assert(detail.actions.some((a: any) => a.id === 'echo'), 'has echo action');
@@ -604,8 +597,8 @@ await test('13. aimeat_extension_list does not show inactive extension', async (
     assert(body.result?.content?.[0]?.text !== undefined, 'has content');
     const result = JSON.parse(body.result.content[0].text);
     assert(Array.isArray(result), 'result is array');
-    const ext = result.find((e: any) => e.name === extFull);
-    assert(ext === undefined, `inactive extension "${extFull}" should not appear in list`);
+    const ext = result.find((e: any) => e.name === extName);
+    assert(ext === undefined, `inactive extension "${extName}" should not appear in list`);
 });
 
 await test('14. aimeat_extension_invoke returns error for inactive extension', async () => {
@@ -665,8 +658,8 @@ const lifeScripts = {
     }`,
 };
 
-const lifeJobId = `ext:${ownerName}/${lifeName}:newyear`;
-const lifeMemoryUrl = `/v1/memory/${encodeURIComponent(`ext:${ownerName}/${lifeName}`)}/probe`;
+const lifeJobId = `ext:${lifeName}:newyear`;
+const lifeMemoryUrl = `/v1/memory/${encodeURIComponent(`ext:${lifeName}`)}/probe`;
 
 async function extensionJobIds(): Promise<string[]> {
     const { body } = await json('/v1/schedules', { headers: { Authorization: `Bearer ${ownerToken}` } });
@@ -766,7 +759,7 @@ await test('20. aimeat_extension_delete takes the ext: namespace memory with it'
     const mem = await json(lifeMemoryUrl);
     assert(mem.status === 404, `ext memory must be gone after uninstall, got ${mem.status}`);
 
-    const gone = await json(`/v1/extensions/${encodeURIComponent(`${ownerName}/${lifeName}`)}`);
+    const gone = await json(`/v1/extensions/${lifeName}`);
     assert(gone.status === 404, `extension must be gone, got ${gone.status}`);
 });
 
@@ -889,18 +882,13 @@ await test('21. aimeat_extension_get include_source hands the installer\'s agent
 
 await test('22. Another owner\'s agent holding ext:write is refused the source, and still reads the record', async () => {
     strangerCall = await openSession(targetName, targetToken, 'mcpextstranger', ['ext:write', 'cortex:write', 'memory:read']);
-    // Another account names the extension with its owner (services/component-address.ts).
-    const srcFull = `${ownerName}/${srcName}`;
-    const refused = await strangerCall('aimeat_extension_get', { name: srcFull, include_source: true });
+    const refused = await strangerCall('aimeat_extension_get', { name: srcName, include_source: true });
     assert(refused.isError, `another owner read the source: ${refused.text.slice(0, 200)}`);
     assert(!refused.text.includes('first: true'), 'the refusal carries no script text');
 
-    const plain = await strangerCall('aimeat_extension_get', { name: srcFull });
+    const plain = await strangerCall('aimeat_extension_get', { name: srcName });
     assert(!plain.isError, `the record itself is readable: ${plain.text}`);
-    assert(plain.data.name === srcFull, `name: ${plain.data?.name}`);
-    // A bare name from another account names that account's own, and it has none.
-    const bare = await strangerCall('aimeat_extension_get', { name: srcName });
-    assert(bare.isError, `a bare name reached another account's extension: ${bare.text.slice(0, 200)}`);
+    assert(plain.data.name === srcName, `name: ${plain.data?.name}`);
 });
 
 await test('22b. aimeat_extension_unattended_reader names the installer and sends the person to the control', async () => {
@@ -920,7 +908,7 @@ await test('22b. aimeat_extension_unattended_reader names the installer and send
 
     // AND THE REFUSAL. Another owner's agent gets the same answer every other door of an installed
     // extension gives a stranger: not found, with no agent name in it.
-    const refused = await strangerCall!('aimeat_extension_unattended_reader', { name: `${ownerName}/${srcName}` });
+    const refused = await strangerCall!('aimeat_extension_unattended_reader', { name: srcName });
     assert(refused.isError, `another owner read whose agent installed this: ${refused.text.slice(0, 200)}`);
     assert(!refused.text.includes('#'), `and the refusal leaks no agent name: ${refused.text.slice(0, 200)}`);
 });
@@ -971,9 +959,7 @@ await test('24. aimeat_cortex_install names each lib\'s address, and that addres
     const inst = await asInstaller('aimeat_cortex_install', { manifest: cxManifest('1.0.0'), libs: { 'greeter.js': cxLibV1 } }, 410);
     assert(!inst.isError, `cortex install failed: ${inst.text}`);
     const url = inst.data.lib_urls?.['greeter.js'];
-    // The cortex is stored in its owner's namespace, and the address names both (services/component-address.ts).
-    assert(inst.data.name === `${ownerName}/${cxName}`, `stored in the owner's namespace: ${inst.data.name}`);
-    assert(typeof url === 'string' && url.endsWith(`/v1/cortex/${ownerName}/${cxName}/libs/greeter.js`),
+    assert(typeof url === 'string' && url.endsWith(`/v1/cortex/${encodeURIComponent(cxName)}/libs/greeter.js`),
         `lib_urls names the served address: ${JSON.stringify(inst.data.lib_urls)}`);
     cxLibPath = new URL(url).pathname;
 
@@ -1015,19 +1001,10 @@ await test('28. update:true without a manifest is refused instead of answering w
 
 await test('29. Another owner\'s agent holding cortex:write cannot replace the cortex, and the lib stays', async () => {
     assert(strangerCall !== null, 'the stranger session from test 22 exists');
-    // The same manifest from another account lands in that account's own namespace, never on this one.
     const r = await strangerCall!('aimeat_cortex_install', { manifest: cxManifest('9.9.9'), libs: { 'greeter.js': 'window.__cxProbe = "hijack";' }, update: true });
-    assert(r.isError || r.data?.name === `${targetName}/${cxName}`, `another owner's install did not land in its own namespace: ${r.text.slice(0, 200)}`);
+    assert(r.isError, `another owner replaced the cortex: ${r.text.slice(0, 200)}`);
     const served = await servedLib();
     assert(served.text === cxLibV2, `the served lib is untouched: ${served.text.slice(0, 80)}`);
-    // Named with the owner, the update is refused outright.
-    const named = await strangerCall!('aimeat_cortex_install', {
-        manifest: cxManifest('9.9.9').replace(`name: ${cxName}`, `name: ${ownerName}/${cxName}`),
-        libs: { 'greeter.js': 'window.__cxProbe = "hijack";' }, update: true,
-    });
-    assert(named.isError, `another owner replaced the cortex by its full name: ${named.text.slice(0, 200)}`);
-    assert((await servedLib()).text === cxLibV2, 'the served lib is untouched after the named attempt');
-    if (!r.isError) await strangerCall!('aimeat_cortex_delete', { name: cxName });
 
     const del = await asInstaller('aimeat_cortex_delete', { name: cxName }, 416);
     assert(!del.isError, `cleanup delete: ${del.text}`);

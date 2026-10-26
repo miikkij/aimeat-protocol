@@ -14,9 +14,6 @@
  *   - Phase 7: the skills bound to the apps travel, install bound to the installed copy, never
  *     overwrite the installer's own skill, update, and leave with the uninstall
  * @version-history
- *   v1.1.2 — 2026-10-25 — The apps load the owner's cortex as /v1/cortex/<owner>/<short>/libs/, and the
- *     cortex name, the dependency map and the expectations carry `<owner>/<short>`, as names live in the
- *     owner's namespace (secaudit2026oct22).
  *   v1.1.1 — 2026-10-13 — The shop's priced tool carries tollMorsels: from 4.0.0 POST /v1/memory refuses
  *     price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.1.0 — 2026-09-30 — Phase 7: a package carries the skills bound to its apps.
@@ -63,8 +60,6 @@ const stamp = Date.now() % 1000000;
 const ownerName = `composer${stamp}`;
 const otherName = `composerb${stamp}`;
 const CORTEX = `compose-kit-${stamp}`;
-// The installed cortex lives in the owner's namespace (services/component-address.ts).
-const CORTEX_FULL = `${ownerName}/${CORTEX}`;
 const APP_A = 'compose-shop.html';
 const APP_B = 'compose-admin.html';
 const APP_EXT = 'compose-needs-ext.html';
@@ -79,11 +74,10 @@ let instanceId = '';
 let installedShopFilename = '';
 
 // Both apps load the SAME cortex, which is what proves the dedup. The reference shape is the one
-// services/dependency-map.ts reads from the source at publish time. The owner's own cortex loads from
-// the owner's namespace; the bare form answers 404.
+// services/dependency-map.ts reads from the source at publish time.
 const htmlFor = (title: string) =>
     `<!DOCTYPE html><html><head><title>${title}</title>`
-    + `<script src="/v1/cortex/${ownerName}/${CORTEX}/libs/kit.js"></script>`
+    + `<script src="/v1/cortex/${CORTEX}/libs/kit.js"></script>`
     + `</head><body><h1>${title}</h1></body></html>`;
 
 // An app that calls an extension. Extensions are never packaged, so composing this must refuse.
@@ -120,7 +114,7 @@ spec:
         body: JSON.stringify({ manifest, libs: { 'kit.js': 'export const KIT_MARK = "compose-kit-v1";' } }),
     });
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
-    assert(body.data.name === CORTEX_FULL, `name ${body.data.name}`);
+    assert(body.data.name === CORTEX, `name ${body.data.name}`);
 
     // Installed is not served. A cortex arrives inactive, and until it is activated
     // /v1/cortex/<name>/libs/<file> answers 404 — which the publish gate reads as an app that would
@@ -130,7 +124,7 @@ spec:
     });
     assert(act.status === 200 || act.status === 201, `activate: ${act.status} ${JSON.stringify(act.body)}`);
 
-    const lib = await fetch(`${BASE}/v1/cortex/${ownerName}/${CORTEX}/libs/kit.js`);
+    const lib = await fetch(`${BASE}/v1/cortex/${encodeURIComponent(CORTEX)}/libs/kit.js`);
     assert(lib.status === 200, `the lib is served before any app claims to load it, got ${lib.status}`);
 });
 
@@ -159,8 +153,8 @@ await test('The dependency map saw the cortex in both apps', async () => {
     assert(apps.length === 2, `both apps listed, got ${apps.length}`);
     for (const a of apps) {
         const cortexNames = (a.requires?.cortex ?? []).map((c: any) => c.name);
-        assert(cortexNames.includes(CORTEX_FULL),
-            `${a.filename} requires ${CORTEX_FULL}, got ${JSON.stringify(cortexNames)}`);
+        assert(cortexNames.includes(CORTEX),
+            `${a.filename} requires ${CORTEX}, got ${JSON.stringify(cortexNames)}`);
     }
 });
 
@@ -244,7 +238,7 @@ await test('Compose says what the installing node must supply itself', async () 
     assert(Array.isArray(manifest.expects?.cortex), 'expects.cortex present');
     assert(Array.isArray(manifest.expects?.extensions), 'expects.extensions present');
     assert(Array.isArray(manifest.expects?.packs), 'expects.packs present');
-    assert(!manifest.expects.cortex.includes(CORTEX_FULL) && !manifest.expects.cortex.includes(CORTEX),
+    assert(!manifest.expects.cortex.includes(CORTEX),
         'the owner-installed cortex is packaged, so it is not an expectation');
 });
 
@@ -325,8 +319,8 @@ await test('An installed app is on the dependency map and has its own address', 
     const cortexNames = (shop.requires?.cortex ?? []).map((c: any) => c.name);
     assert(cortexNames.length > 0,
         `the installed app requires the cortex installed beside it, got ${JSON.stringify(shop.requires)}`);
-    assert(cortexNames.every((n: string) => n !== CORTEX && n !== CORTEX_FULL),
-        `and it points at THIS instance's copy, not the author's ${CORTEX_FULL}:${JSON.stringify(cortexNames)}`);
+    assert(cortexNames.every((n: string) => n !== CORTEX),
+        `and it points at THIS instance's copy, not the author's ${CORTEX}: ${JSON.stringify(cortexNames)}`);
 
     // publishApp assigns an address; the old path left an app reachable only through the apex.
     const sites = await json('/v1/subdomains', { headers: authed(otherToken) });
@@ -425,17 +419,16 @@ await test('The update applies, and the updated app still points at its own cort
     assert(res.status === 200, `the updated app is served, got ${res.status}`);
     const source = await res.text();
     assert(source.includes('v2-mark'), 'the new version of the bytes is what is served');
-    assert(!source.includes(`/v1/cortex/${CORTEX}/`) && !source.includes(`/v1/cortex/${CORTEX_FULL}/`),
-        `the updated app must NOT point at the author's cortex ${CORTEX_FULL}:${source.slice(0, 400)}`);
+    assert(!source.includes(`/v1/cortex/${CORTEX}/`),
+        `the updated app must NOT point at the author's cortex ${CORTEX}: ${source.slice(0, 400)}`);
     assert(/\/v1\/cortex\/[^/]+\/libs\/kit\.js/.test(source),
         `it still loads a cortex, under this instance's name: ${source.slice(0, 400)}`);
 });
 
 await test('A component the owner edited is reported, not overwritten', async () => {
-    // The installer edits their own copy of the shop app. It loads the author's cortex by its full
-    // address, because the bare short name answers 404 to the publish gate.
+    // The installer edits their own copy of the shop app.
     const edited = `<!DOCTYPE html><html><head><title>My Shop</title>`
-        + `<script src="/v1/cortex/${ownerName}/${CORTEX}/libs/kit.js"></script>`
+        + `<script src="/v1/cortex/${CORTEX}/libs/kit.js"></script>`
         + `</head><body><h1>MY OWN EDIT</h1></body></html>`;
     const pub = await json('/v1/apps', {
         method: 'POST',

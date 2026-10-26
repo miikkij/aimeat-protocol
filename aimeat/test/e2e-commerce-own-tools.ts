@@ -9,7 +9,6 @@
  *   the agent unmetered.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-commerce-own-tools
  * @version-history
- *   2026-10-25 — The capability is looked up as ext:<installer>/<name>:run and B's manifests bind A's extension by its full name, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-07 — Initial (wish-commerce-tool-catalog-includes-the-caller-s-own-unpriced-cal).
  *   v1.1.0 — 2026-10-12 — The 4.0.0 forms: the offered tools declare their pacing as tollMorsels and
  *     B's tool is checked by its toll_morsels (the price.morsels mirror is gone from the 4.0.0
@@ -102,15 +101,12 @@ await test('setup: A has a free tool on an installed extension, a priced tool an
     assert(inst.status === 200 || inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
     assert((await json(`/v1/extensions/${ext}/activate`, { method: 'POST', headers: auth(a.token), body: '{}' })).status === 200, 'activate');
     // The first account on a fresh test database is the operator, whose aggregation registers
-    // ext:<installer>/<name>:<action> as a capability.
+    // ext:<name>:<action> as a capability.
     const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(a.token) });
     assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)}`);
-    const fullActionId = `ext:${a.name}/${ext}:run`;
-    const cap = await json(`/v1/capabilities/${encodeURIComponent(fullActionId)}`);
+    const cap = await json(`/v1/capabilities/${encodeURIComponent(`ext:${ext}:run`)}`);
     assert(cap.status === 200, `capability ${cap.status}: ${JSON.stringify(cap.body?.error)}`);
 
-    // A's own manifests keep the bare binding (the node resolves it for the installer);
-    // B's manifests name A's extension by its full name.
     const actionId = `ext:${ext}:run`;
     await putManifest(a, A_FREE, 'public', [
         { name: 'free_call', description: 'A runs this for free', action_id: actionId, inputSchema: schema },
@@ -123,10 +119,10 @@ await test('setup: A has a free tool on an installed extension, a priced tool an
         { name: 'hidden_call', description: 'a private manifest', action_id: actionId, inputSchema: schema },
     ]);
     await putManifest(b, B_FREE, 'public', [
-        { name: 'b_free_call', description: 'B runs this for free', action_id: fullActionId, inputSchema: schema },
+        { name: 'b_free_call', description: 'B runs this for free', action_id: actionId, inputSchema: schema },
     ]);
     await putManifest(b, B_SHOP, 'public', [
-        { name: 'b_paid_call', description: 'B sells this', action_id: fullActionId, inputSchema: schema, tollMorsels: 2 },
+        { name: 'b_paid_call', description: 'B sells this', action_id: actionId, inputSchema: schema, tollMorsels: 2 },
     ]);
     // ext:invoke: the word the tool's backing extension action asks from 4.0.0 (REST scope gates).
     aAgent = await agentOf(a, ['exchange:write', 'ext:invoke']);
@@ -199,12 +195,6 @@ await test('the listed invoke URL runs A\'s free tool for A\'s agent, unmetered'
     assert(r.status === 200, `invoke ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body.data?.metered === false, `metered ${JSON.stringify(r.body.data?.metered)}`);
     assert(r.body.data?.result?.answer === 42, `result ${JSON.stringify(r.body.data?.result)}`);
-});
-
-await test('B names A\'s extension in full and still cannot uninstall it', async () => {
-    // B's manifests bind A's extension by its full name; binding it gives B no hold on the record.
-    const r = await json(`/v1/extensions/${encodeURIComponent(`${a.name}/${ext}`)}`, { method: 'DELETE', headers: auth(b.token) });
-    assert(r.status === 403, `B uninstalled A's extension: ${r.status} ${JSON.stringify(r.body?.error)}`);
 });
 
 console.log(`\ncommerce own tools E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

@@ -20,8 +20,6 @@
  *       is refused at save too — the second because such a step would green on any return at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflow-extension-step
  * @version-history
- *   v1.4.0 -- 2026-10-25 -- The extension's files and memory carry its stored name, `<owner>/<name>`
- *     (owner namespaces wish, secaudit2026oct22).
  *   v1.3.0 -- 2026-10-21 -- Test 13e: a run with no recorded principal (started before 2026-10-20) is
  *     not asked again; the owner's run of a workflow its deleted agent saved dispatches as before.
  *   v1.2.0 -- 2026-10-20 -- Tests 13a to 13d (secaudit 2026-10, v64): an agent saves and starts a run
@@ -88,8 +86,6 @@ async function mintAgent(who: { name: string; token: string }, name: string, sco
 console.log('\n=== Workflow extension step E2E (TARGET-063 A3) ===\n');
 
 const EXT = `wfext${Date.now()}`;
-/** The stored name: the install lives in its owner's namespace (services/component-address.ts). */
-const extKey = (): string => `${owner.name}/${EXT}`;
 /** Where the ENGINE lands the action's return value — the owner's namespace, so a signal can read it. */
 const RESULT_KEY = 'pkg.produce.result';
 /** Where the extension writes for ITSELF: `ext:{name}`, which owner-scope reads never reach. */
@@ -247,7 +243,7 @@ await test('4. THE FIX: the run executes the extension server-side and goes gree
   assert(run.status === 'done', `run status ${run.status}`);
 
   // The artefact is a real file under the OWNER — the same address a scheduled run would use.
-  const key = `ext/${extKey()}/rows.csv`;
+  const key = `ext/${EXT}/rows.csv`;
   const back = await json(`/v1/storage/${encodeURIComponent(key)}`, { headers: auth(owner.token) });
   assert(back.status === 200, `read back ${back.status}: ${JSON.stringify(back.body?.error)}`);
   assert(back.body._raw === CSV, 'the produced bytes');
@@ -267,7 +263,7 @@ await test('4b. What the extension wrote for ITSELF stays invisible to the workf
   // The reason result_to_key exists. `ext:{name}` is a namespace of its own; owner scope is the
   // owner GHII plus their agents and ecosystem apps (services/owner-memory.ts). A signal aimed at
   // the ext key can only ever read nothing, so a step gated that way would be permanently red.
-  const inExt = await json(`/v1/memory/${encodeURIComponent(`ext:${extKey()}`)}/${encodeURIComponent(OUT_MEMORY_KEY)}`);
+  const inExt = await json(`/v1/memory/${encodeURIComponent(`ext:${EXT}`)}/${encodeURIComponent(OUT_MEMORY_KEY)}`);
   assert(inExt.status === 200, `the extension DID write it, under ext: — ${inExt.status}`);
   const inOwner = await json(`/v1/memory/${encodeURIComponent(OUT_MEMORY_KEY)}`, { headers: auth(owner.token) });
   assert(inOwner.status === 404, `…and it is NOT in the owner's scope, got ${inOwner.status}`);
@@ -329,12 +325,12 @@ await test('6b. The host bridge refuses an absent argument instead of writing a 
   // on this line on both backends every night from then until the assertion was turned round, which
   // is the tripwire doing its job rather than a regression. Green again because the SOURCE was broken
   // and is fixed (testing rule: which of three a green test was).
-  const r = await json(`/v1/ext/${extKey()}/sloppy`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+  const r = await json(`/v1/ext/${EXT}/sloppy`, { method: 'POST', headers: auth(owner.token), body: '{}' });
   assert(r.status >= 400, `the action should fail, got ${r.status} ${JSON.stringify(r.body)}`);
   const msg = String(r.body?.error?.message ?? '');
   assert(/ctx\.files\.write: argument 1 is undefined/.test(msg), `the refusal should name the call and the argument, got: ${msg}`);
   // And nothing was written under the key the old bridge would have invented.
-  const ghost = await json(`/v1/storage/${encodeURIComponent(`ext/${extKey()}/undefined`)}`, { headers: auth(owner.token) });
+  const ghost = await json(`/v1/storage/${encodeURIComponent(`ext/${EXT}/undefined`)}`, { headers: auth(owner.token) });
   assert(ghost.status === 404, `a file keyed "undefined" exists: ${ghost.status}`);
 });
 
@@ -420,7 +416,7 @@ await test('9. The identity a workflow extension step runs under, vs the REST ro
   assert(run.steps.probe.state === 'green', `probe state ${run.steps.probe.state}`);
 
   const wf = (await json(`/v1/memory/${encodeURIComponent('pkg.probe.result')}`, { headers: auth(owner.token) })).body.data.value;
-  const rest = (await json(`/v1/ext/${extKey()}/probe`, { method: 'POST', headers: auth(owner.token), body: '{}' })).body.data;
+  const rest = (await json(`/v1/ext/${EXT}/probe`, { method: 'POST', headers: auth(owner.token), body: '{}' })).body.data;
 
   // SAME on both roads: the principal is the owner, and files are available.
   assert(wf.gaii === owner.gaii && rest.gaii === owner.gaii, `caller: wf=${wf.gaii} rest=${rest.gaii}`);

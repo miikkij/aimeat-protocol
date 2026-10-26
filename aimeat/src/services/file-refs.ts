@@ -27,6 +27,9 @@
  *   const h = await fileHandleFor(storage, config, `${ownerGhii}/${key}`, { gaii: agentGaii });
  *   if (h.access !== 'granted') return refuse(h.reason);
  * @version-history
+ *   v1.2.0 — 2026-10-26 — resolveFileRef reads the account's own extension file by its short key
+ *     `ext/<name>/...` as the stored `ext/<account>/<name>/...`, for the account and its agents, when
+ *     the key as written names no file (owner namespaces, secaudit2026oct22).
  *   v1.1.3 — 2026-10-24 — Comment only: a visitor from another node is refused a `members` file by
  *     authorizeRead itself, which now derives the visitor fact from the identity (secaudit2026oct22,
  *     members-tier-admits-federated-visitor).
@@ -48,6 +51,8 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { generateDownloadToken } from './download-token.js';
 import { fileTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { ownExtensionFileKey } from './component-address.js';
+import { localAccountName } from '../utils/gaii.js';
 
 /** A handle for one of the caller's OWN files may live an hour (parity with GET /v1/storage?mode=handle). */
 export const OWN_HANDLE_TTL_SECONDS = 3600;
@@ -127,13 +132,24 @@ export async function resolveFileRef(
     ref: string,
     accessor: FileRefAccessor,
 ): Promise<ResolvedFileRef> {
-    const { gaii, key } = parseFileRef(ref, accessor.gaii);
-    const canonical = fileRefFor(gaii, key);
+    const parsed = parseFileRef(ref, accessor.gaii);
+    const gaii = parsed.gaii;
+    let key = parsed.key;
     if (!key) {
-        return { access: 'missing', ref: canonical, ownerGaii: gaii, key, reason: 'empty_key' };
+        return { access: 'missing', ref: fileRefFor(gaii, key), ownerGaii: gaii, key, reason: 'empty_key' };
     }
 
-    const file = await storage.getStorageFile(gaii, key);
+    let file = await storage.getStorageFile(gaii, key);
+    // The account's own extension named by its short name (`ext/weather/...` for `alice/weather`) is
+    // stored under `ext/alice/weather/...` (services/component-address.ts). Read so for the account
+    // and its agents only, and only when the key as written names no file.
+    const account = localAccountName(gaii);
+    if (!file && accessor.owner === account) {
+        const stored = await ownExtensionFileKey(storage, key, account);
+        const found = stored ? await storage.getStorageFile(gaii, stored) : null;
+        if (found && stored) { file = found; key = stored; }
+    }
+    const canonical = fileRefFor(gaii, key);
     const own = gaii === accessor.gaii;
     if (!file) {
         return {

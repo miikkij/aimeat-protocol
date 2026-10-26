@@ -20,9 +20,6 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
- *   2026-10-25 — An extension's public memory is read at `ext:<installer>/<short>`; case 7 names A's
- *     install in full from B; case 8 asserts B's reinstall lands as `<b>/aijobmark`, the fire is
- *     refused and B's action does not run, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.12.0 — 2026-10-21 — 19e-19i: an image job's PICTURE meets the publish gate its record meets
  *     (secaudit 2026-10, ai-image public picture past the publish gate). 19e on the default node: an
  *     agent's public picture is public at once, as before. On the gated node: 19f an agent without
@@ -322,15 +319,6 @@ async function waitForState(owner: Owner, id: string, states: string[], ms = 20_
 
 async function readMemory(owner: Owner, key: string) {
     return json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(owner.token) });
-}
-
-/**
- * A public read of what an extension wrote with ctx.memory.set. An install lives in its installer's
- * namespace, so its memory owner is `ext:<installer>/<short>`. The installer still names it by the
- * short name everywhere else in this suite (on_done, /v1/ext/<short>/<action>).
- */
-async function readExtMemory(installer: Owner, short: string, key: string) {
-    return json(`/v1/memory/${encodeURIComponent(`ext:${installer.name}/${short}`)}/${key}`);
 }
 
 // ── extensions used by the callback cases ─────────────────────────────────────
@@ -699,10 +687,9 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     // ── 7. A callback naming another owner's extension ──
     await installExtension(a, 'aijobmark', 'mark', SCRIPT_MARK);
     await test('7. on_done naming an extension this account does not own is refused 403 at enqueue', async () => {
-        // B names A's install by its full name: B's bare short name would mean B's own (none).
         const r = await startJob(b, {
             prompt: 'x', result_key: 'aijob.b.callback',
-            on_done: { extension: `${a.name}/aijobmark`, action: 'mark' },
+            on_done: { extension: 'aijobmark', action: 'mark' },
         });
         assert(r.status === 403, `expected 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
         assert(r.body.error.code === 'AI_JOB_CALLBACK_FORBIDDEN', `code ${r.body.error.code}`);
@@ -724,7 +711,7 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(r.status === 202, `start ${r.status}: ${JSON.stringify(r.body?.error)}`);
         const done = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
         assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
-        const mark = await readExtMemory(a, 'aijobmark', 'callback.ran');
+        const mark = await json('/v1/memory/ext:aijobmark/callback.ran');
         assert(mark.status === 200, `the callback's own record ${mark.status}`);
         assert(mark.body.data.value.job_id === r.body.data.job_id, 'the callback was told which job');
         assert(mark.body.data.value.result_key === 'aijob.callback.result', 'and where the answer went');
@@ -742,7 +729,7 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         readJobId = r.body.data.job_id;
         const done = await waitForState(a, readJobId, ['done', 'failed']);
         assert(done.state === 'done', `state ${done.state}: ${JSON.stringify(done.error)}`);
-        const ran = await readExtMemory(a, 'aijobread', 'read.ran');
+        const ran = await json('/v1/memory/ext:aijobread/read.ran');
         assert(ran.status === 200, `the callback's own record ${ran.status}`);
         const v = ran.body.data.value;
         assert(v.result === STUB_CONTENT, `input.result: ${JSON.stringify(v.result)}`);
@@ -819,14 +806,14 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         // The first callback starts link 1 at depth 1, inside the limit, so the first job is done.
         const first = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
         assert(first.state === 'done', `the first job continued within the limit: ${first.state}`);
-        const attempt1 = await readExtMemory(a, 'aijobchain', 'chain.attempt1');
+        const attempt1 = await json('/v1/memory/ext:aijobchain/chain.attempt1');
         assert(attempt1.status === 200 && attempt1.body.data.value.ok === true, `link 1 started: ${JSON.stringify(attempt1.body?.data?.value)}`);
         // Link 1's callback tries depth 2, past the limit, so link 1 is the job that fails.
         const end = await waitForState(a, attempt1.body.data.value.job_id, ['done', 'failed']);
         assert(end.state === 'failed', `expected failed, got ${end.state}`);
         assert(end.chain_stopped === 'chain_too_deep', `chain_stopped ${end.chain_stopped}`);
         // The extension was handed a decision rather than a throw, so it could have degraded.
-        const attempt = await readExtMemory(a, 'aijobchain', 'chain.attempt2');
+        const attempt = await json('/v1/memory/ext:aijobchain/chain.attempt2');
         assert(attempt.status === 200, `the extension recorded what it was told: ${attempt.status}`);
         assert(attempt.body.data.value.ok === false, 'ctx.ai.start answered with a decision, not a throw');
         assert(attempt.body.data.value.code === 'AI_JOB_CHAIN_TOO_DEEP', `code ${attempt.body.data.value.code}`);
@@ -846,23 +833,16 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(held.length >= 1, 'the job is held in the provider call');
 
         // installedBy is decided at install, so a delete-and-reinstall by somebody else outlives the
-        // enqueue check. This is why there are two. Since names live in the installer's namespace,
-        // B's reinstall of the same short name lands as B's own `<b>/aijobmark` and never takes A's
-        // address: at fire A's short name reaches nothing, and B's action must not run in A's name.
+        // enqueue check. This is why there are two.
         const del = await json('/v1/extensions/aijobmark', { method: 'DELETE', headers: auth(a.token) });
         assert(del.status === 200, `delete ${del.status}: ${JSON.stringify(del.body?.error)}`);
         await installExtension(b, 'aijobmark', 'mark', SCRIPT_MARK);
-        const theirs = await json(`/v1/extensions/aijobmark`, { headers: auth(b.token) });
-        const theirName = theirs.body?.data?.extension?.name ?? theirs.body?.data?.name;
-        assert(theirName === `${b.name}/aijobmark`, `B's reinstall lands in B's namespace: ${JSON.stringify(theirName)}`);
 
         releaseHeld();
         const end = await waitForState(a, r.body.data.job_id, ['done', 'failed']);
         assert(end.state === 'failed', `expected failed, got ${end.state}`);
         assert(end.error?.code === 'AI_JOB_CALLBACK_FAILED', `code ${end.error?.code}`);
-        assert(/another owner|not found/i.test(end.error?.message ?? ''), `the refusal names the reason: ${end.error?.message}`);
-        const ranAsB = await readExtMemory(b, 'aijobmark', 'callback.ran');
-        assert(ranAsB.status === 404, `B's action must not run for A's job: ${ranAsB.status} ${JSON.stringify(ranAsB.body?.data?.value)}`);
+        assert(/another owner/i.test(end.error?.message ?? ''), `the refusal names the reason: ${end.error?.message}`);
     });
 
     // ── 15. Restart reconciliation ──
@@ -1503,7 +1483,7 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
     await installExtension(e, 'aijobinvoke', 'mark', SCRIPT_MARK);
     const aiOnly = await makeAgent(BASE, e, ['ai:use'], 'aijobaionly');
     const aiOnlyAsOwner: Owner = { name: e.name, gaii: aiOnly.gaii, token: aiOnly.token };
-    const marker = () => readExtMemory(e, 'aijobinvoke', 'callback.ran');
+    const marker = () => json('/v1/memory/ext:aijobinvoke/callback.ran');
 
     await test('21a. REST: an agent with ai:use and no ext:invoke is refused 403 SCOPE_DENIED for on_done, and the action never runs', async () => {
         const direct = await json('/v1/ext/aijobinvoke/mark', { method: 'POST', headers: auth(aiOnly.token), body: '{}' });

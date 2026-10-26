@@ -27,7 +27,6 @@
  *   - Phase 5: the provider side (consumers) and the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-exchange
  * @version-history
- *   2026-10-25 — The consumer names the provider's extension by its full name `<provider>/<name>` (filter, accept, contract_off, needs, a foreign bid), and the offering's `ext`, the call recipe and the bid's contract carry it, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.3.0 — 2026-10-17 — 6, 7: the exchange words are one-press, so an agent without them is listed
  *     the tools (permission ask, mcp/permission-ask-gate.ts) and every call is refused SCOPE_DENIED
  *     with the allow address; the fence is asserted on the call instead of on the list.
@@ -244,10 +243,6 @@ const APP_ID = 'mcpbriefapp';
 
 const provider = await makeOwner('xcprov');
 const consumer = await makeOwner('xccons');
-// The provider's extension by its full name, `<installer>/<name>` (services/component-address.ts):
-// the provider names its own by the short name, everybody else and every value the node reports
-// carries the full one.
-const EXT_FULL = `${provider.owner}/${EXT}`;
 
 // ext:invoke: tests 28 and 29 call aimeat_app_tool_invoke, which runs the tool's extension action and
 // from 4.0.0 is offered only to an agent holding that word as well.
@@ -320,7 +315,7 @@ await test('4. A need and a bid are seeded over REST, so the MCP reads have a re
     const n = await json('/v1/exchange/needs', {
         method: 'POST', headers: authed(consumerAgent),
         body: JSON.stringify({
-            ext: EXT_FULL, action: 'bidme', description: 'REST-seeded need, read back over MCP',
+            ext: EXT, action: 'bidme', description: 'REST-seeded need, read back over MCP',
             app_id: `${consumer.owner}/lookup-app`, budget_unit: 'money', budget_cap: 600000,
         }),
     });
@@ -396,9 +391,9 @@ await test('9. aimeat_exchange_offerings lists the market, and filters it by cap
     assert(all.data.offerings.some((o: any) => o.offeringId === extOfferingId),
         `the seeded listing must be in the market, got ${all.data.count} offerings`);
 
-    const filtered = await callTool(consumerSession, 'aimeat_exchange_offerings', { ext: EXT_FULL, action: 'validate', stats: true });
+    const filtered = await callTool(consumerSession, 'aimeat_exchange_offerings', { ext: EXT, action: 'validate', stats: true });
     assert(!filtered.isError, `filtered offerings refused: ${filtered.text.slice(0, 200)}`);
-    assert(filtered.data.offerings.length >= 1 && filtered.data.offerings.every((o: any) => o.ext === EXT_FULL),
+    assert(filtered.data.offerings.length >= 1 && filtered.data.offerings.every((o: any) => o.ext === EXT),
         `an ext+action filter must narrow the list: ${JSON.stringify(filtered.data.offerings.map((o: any) => o.ext))}`);
     assert(typeof filtered.data.offerings[0].stats?.totalCalls === 'number',
         `stats:true must fold usage into each row: ${JSON.stringify(filtered.data.offerings[0].stats)}`);
@@ -409,9 +404,7 @@ await test('10. aimeat_exchange_offering_get (ext-action branch) carries the sch
     assert(!out.isError, `offering_get refused: ${out.text.slice(0, 200)}`);
     assert(out.data.offering?.offeringId === extOfferingId, 'the tool must answer about the offering it was asked for');
     assert(out.data.capability?.output_schema?.properties, `the action's output schema: ${JSON.stringify(out.data.capability)}`);
-    // The full name travels as ONE path segment: `/v1/ext/<owner>/<name>/...` unencoded is also the
-    // instance form `<name>/<instance>`, so the recipe a buyer copies must not depend on that order.
-    assert(out.data.call_recipe?.url === `/v1/ext/${encodeURIComponent(EXT_FULL)}/validate`, `call recipe url: ${out.data.call_recipe?.url}`);
+    assert(out.data.call_recipe?.url === `/v1/ext/${EXT}/validate`, `call recipe url: ${out.data.call_recipe?.url}`);
     assert(String(out.data.call_recipe?.mcp ?? '').includes('aimeat_extension_invoke'),
         `an agent needs the tool call it would make: ${out.data.call_recipe?.mcp}`);
 
@@ -460,7 +453,7 @@ await test('13. aimeat_exchange_accept by offering_id mints the contract the RES
 });
 
 await test('14. aimeat_exchange_accept on the legacy ext+action branch mints its own contract ref', async () => {
-    const out = await callTool(consumerSession, 'aimeat_exchange_accept', { ext: EXT_FULL, action: 'legacy', cap_units: 30 });
+    const out = await callTool(consumerSession, 'aimeat_exchange_accept', { ext: EXT, action: 'legacy', cap_units: 30 });
     assert(!out.isError, `legacy accept refused: ${out.text.slice(0, 300)}`);
     const e = out.data.entitlement;
     assert(e.action === 'legacy', `the legacy contract: ${JSON.stringify(e)}`);
@@ -481,7 +474,7 @@ await test('15. Accept refuses what it cannot price: no coordinate, an unknown o
     assert(tooLow.isError && tooLow.text.includes('BUDGET_TOO_LOW'),
         `a cap below one call's price buys nothing and must say so: ${tooLow.text.slice(0, 200)}`);
 
-    const free = await callTool(consumerSession, 'aimeat_exchange_accept', { ext: EXT_FULL, action: 'unpriced' });
+    const free = await callTool(consumerSession, 'aimeat_exchange_accept', { ext: EXT, action: 'unpriced' });
     assert(free.isError && free.text.includes('NOT_PRICED'), `an unpriced action: ${free.text.slice(0, 200)}`);
 });
 
@@ -501,7 +494,7 @@ await test('16. aimeat_exchange_contracts lists exactly the caller\'s own two co
 });
 
 await test('17. aimeat_exchange_contract_off pauses a contract, and REST reads it as paused', async () => {
-    const out = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT_FULL, action: 'legacy', mode: 'pause' });
+    const out = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT, action: 'legacy', mode: 'pause' });
     assert(!out.isError, `pause refused: ${out.text.slice(0, 200)}`);
     assert(out.data.applied === true && out.data.mode === 'pause', `pause answer: ${JSON.stringify(out.data)}`);
 
@@ -511,10 +504,10 @@ await test('17. aimeat_exchange_contract_off pauses a contract, and REST reads i
 });
 
 await test('18. …revoke is the other mode, and a capability the caller never contracted is NOT_FOUND', async () => {
-    const rev = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT_FULL, action: 'legacy', mode: 'revoke' });
+    const rev = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT, action: 'legacy', mode: 'revoke' });
     assert(!rev.isError && rev.data.mode === 'revoke' && rev.data.applied === true, `revoke: ${rev.text.slice(0, 200)}`);
 
-    const stranger = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT_FULL, action: 'bidme', mode: 'pause' });
+    const stranger = await callTool(consumerSession, 'aimeat_exchange_contract_off', { ext: EXT, action: 'bidme', mode: 'pause' });
     assert(stranger.isError && stranger.text.includes('NOT_FOUND'),
         `switching off a contract you do not hold must be refused: ${stranger.text.slice(0, 200)}`);
 });
@@ -543,7 +536,7 @@ await test('20. aimeat_exchange_need_post writes a need REST then finds, with ma
     const out = await callTool(consumerSession, 'aimeat_exchange_need_post', {
         description: 'Need Finnish company lookups, posted over MCP',
         app_id: `${consumer.owner}/lookup-app`,
-        ext: EXT_FULL, action: 'validate',
+        ext: EXT, action: 'validate',
         usage_intent: 'Enriching a customer list the owner already holds',
         budget_unit: 'money', budget_cap: 500000, autonomy: 'supervised',
     });
@@ -565,7 +558,7 @@ await test('20. aimeat_exchange_need_post writes a need REST then finds, with ma
 await test('20a. aimeat_exchange_need_post with a morsel budget is stored and browsable on 3.x; 4.0.0 refuses it with MORSEL_PRICE_REMOVED and stores nothing', async () => {
     const description = `Morsel-budget need over MCP ${Date.now()}`;
     const out = await callTool(consumerSession, 'aimeat_exchange_need_post', {
-        description, app_id: `${consumer.owner}/lookup-app`, ext: EXT_FULL, action: 'validate',
+        description, app_id: `${consumer.owner}/lookup-app`, ext: EXT, action: 'validate',
         budget_unit: 'morsels', budget_cap: 50,
     });
     const rest = await json('/v1/exchange/needs?open=1');
@@ -596,7 +589,7 @@ await test('21. aimeat_exchange_bid bids with an action the caller\'s own extens
 });
 
 await test('22. …and refuses a bid on an extension the caller does not own, and on an unknown need', async () => {
-    const notMine = await callTool(consumerSession, 'aimeat_exchange_bid', { need_id: mcpNeedId, ext: EXT_FULL, action: 'validate' });
+    const notMine = await callTool(consumerSession, 'aimeat_exchange_bid', { need_id: mcpNeedId, ext: EXT, action: 'validate' });
     assert(notMine.isError && notMine.text.includes('FORBIDDEN'),
         `bidding with somebody else's extension must be refused: ${notMine.text.slice(0, 200)}`);
 
@@ -609,7 +602,7 @@ await test('23. aimeat_exchange_bid_accept mints the entitlement and matches the
         need_id: seededNeedId, bid_id: seededBidId, cap_units: 50,
     });
     assert(!out.isError, `bid_accept refused: ${out.text.slice(0, 300)}`);
-    assert(out.data.entitlement_id && out.data.ext === EXT_FULL && out.data.action === 'bidme',
+    assert(out.data.entitlement_id && out.data.ext === EXT && out.data.action === 'bidme',
         `the minted contract names the capability: ${JSON.stringify(out.data)}`);
 
     const mine = await json('/v1/exchange/needs?mine=1', { headers: authed(consumerAgent) });

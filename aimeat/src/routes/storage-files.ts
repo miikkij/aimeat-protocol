@@ -11,6 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-26 -- GET and HEAD /v1/storage/{key} (DELETE through removeStorageFile), and /v1/pub for the account's own namespace,
+ *     read the short `ext/<name>/...` of the account's own extension as its stored
+ *     `ext/<account>/<name>/...` when the key as written names no file (owner namespaces, secaudit2026oct22).
  *   2026-10-21 -- A handle for a public file asked for with no credential lives the owner's TTL again
  *     (3600 s), as before 2026-10-20; the version binding closes the hole, and the shorter life was
  *     not part of it. A download URL minted before the binding is served until it expires.
@@ -152,7 +155,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { authorizeRead } from '../services/access-guard.js';
 import { decodeStrictBase64 } from '../utils/base64.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
-import { resolveIdentity, isForeignPrincipal } from '../utils/gaii.js';
+import { resolveIdentity, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { isOrganismVisibilityWord, STORED_VISIBILITY_WORDS } from '../utils/visibility-words.js';
 import { isStoredVisibility } from '../services/organism-visibility.js';
 import { callerOf } from '../middleware/caller.js';
@@ -172,10 +175,15 @@ import { fileTarget } from '../services/classification/labels.js';
 import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.js';
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
+import { ownExtensionFileKey } from '../services/component-address.js';
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
     const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
+    /** The key as written, or, when it names no file and the account's own extension wrote it under
+     *  its stored name, `ext/<account>/<name>/...` for the short `ext/<name>/...` (component-address.ts). */
+    const fileKeyFor = async (account: string | undefined, gaii: string, key: string): Promise<string> =>
+        !account || await storage.getStorageFileMeta(gaii, key) ? key : (await ownExtensionFileKey(storage, key, account)) ?? key;
 
     /** How every download door reads its bytes: a range as a range, the whole file only when the
      *  whole file was asked for. Passed to serveStoredFile AFTER the authorization decision, which
@@ -465,7 +473,10 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // Non-public files can be accessed if caller has consent grant.
     router.get('/v1/pub/:gaii/{*key}', optionalAuth(), async (req, res) => {
         const gaii = req.params.gaii as string;
-        const key = extractKey(req.params);
+        // The account's own (and its agents') short-name address of its own extension's file; for
+        // anybody else the key is read as written.
+        const sameAccount = !!req.auth?.owner && !isAnonymousPrincipal(req.auth) && localAccountName(gaii) === req.auth.owner;
+        const key = await fileKeyFor(sameAccount ? req.auth!.owner : undefined, gaii, extractKey(req.params));
         // Metadata first, and the bytes only after the access decision below. The authorization
         // inputs — visibility, groupId, workspaceRef — all live in the metadata, so a request that
         // ends in 403 or 404 no longer reads a 25 MB file on its way there.
@@ -659,7 +670,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // Must be registered before GET to prevent Express auto-HEAD via GET handler
     router.head('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
-        const key = extractKey(req.params);
+        const key = await fileKeyFor(req.auth?.owner, gaii, extractKey(req.params));
         // This route is namespaced to the caller: the lookup above already scopes to `gaii`, so a
         // file belonging to anyone else is simply absent here. Cross-namespace reads (an agent
         // reading its owner's file, a group/workspace share) go through GET /v1/pub/:gaii/{key},
@@ -702,7 +713,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     // GET /v1/storage/{*key} — download file (agent auth)
     router.get('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
-        const key = extractKey(req.params);
+        const key = await fileKeyFor(req.auth?.owner, gaii, extractKey(req.params));
         // Namespaced to the caller (see the HEAD handler above): a file owned by anyone else is not
         // reachable here at all. The named alternative in the 404 is the whole point — an agent asked
         // for its OWNER's file by bare key and got a blank "not found" that read as data loss.

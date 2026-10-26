@@ -13,9 +13,6 @@
  *   security incident for it, once
  * @usage pnpm exec vitest run test/unit/cortex-bundled-names.test.ts
  * @version-history
- *   v1.1.0 — 2026-10-25 — An owner's cortex of a shipped name is stored as `<owner>/<name>` and never
- *     under the bare name, so the reservation no longer needs to refuse it (owner namespaces wish,
- *     secaudit2026oct22).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect } from 'vitest';
@@ -44,29 +41,29 @@ function emptyStorage() {
         setCortexLibFile: async (name: string, file: string) => { writes.push(`lib:${name}/${file}`); },
         saveComponentVersion: async () => {},
         replaceDependencyEdges: async () => {},
-        getReleasedComponentName: async () => null,
-        recordReleasedComponentName: async () => {},
-        deleteReleasedComponentName: async () => false,
     } as unknown as Storage;
     return { storage, writes };
 }
 
 describe('a shipped cortex name is the node\'s own', () => {
-    // Since names live in the owner's namespace (services/component-address.ts), an owner's install of
-    // a shipped name lands under `<owner>/<name>`: the bare name, which apps load the shipped library
-    // from, is never written.
-    it('installCortex puts an owner\'s cortex of a shipped name in the owner\'s namespace, never under the bare name', async () => {
+    it('installCortex refuses it to an owner while it has no record, and writes nothing', async () => {
         const { storage, writes } = emptyStorage();
         const out = await installCortex({ storage, config }, alice, { manifest: manifest('aimeat-charts', 'alice'), libs: { 'x.js': 'window.x=1' } });
-        expect(out.ok).toBe(true);
-        expect(writes).toEqual(['record:alice/aimeat-charts', 'lib:alice/aimeat-charts/x.js']);
+        expect(out.ok).toBe(false);
+        if (out.ok) return;
+        expect(out.refusal.status).toBe(409);
+        expect(out.refusal.code).toBe('NAME_RESERVED');
+        expect(out.refusal.message).toContain('alice-aimeat-charts');
+        expect(writes).toEqual([]);
     });
 
-    it('the PUT create branch does the same', async () => {
+    it('the PUT create branch refuses it the same way', async () => {
         const { storage, writes } = emptyStorage();
         const out = await upsertCortex({ storage, config }, alice, { name: 'aimeat-charts', manifest: manifest('aimeat-charts', 'alice'), libs: { 'x.js': 'window.x=1' } });
-        expect(out.ok).toBe(true);
-        expect(writes.every(w => w.includes('alice/aimeat-charts'))).toBe(true);
+        expect(out.ok).toBe(false);
+        if (out.ok) return;
+        expect(out.refusal.code).toBe('NAME_RESERVED');
+        expect(writes).toEqual([]);
     });
 
     it('an owner\'s own name still installs, and the operator may install a shipped name', async () => {

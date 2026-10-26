@@ -14,8 +14,6 @@
  *   cannot pay either. Every case sends the request with no Authorization header at all.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-visitor-actions
  * @version-history
- *   v1.1.0 — 2026-10-25 — A visitor and another reader call the extension by `<owner>/<name>`, the
- *     address an install carries since names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-7).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -72,10 +70,7 @@ const manifest = (name: string, extra: Record<string, unknown>[] = []) => JSON.s
   limits: { timeout_ms: 5000, max_api_calls: 10 },
 }, null, 2);
 
-// A visitor and a reader name the extension in full, `<owner>/<name>` (services/component-address.ts):
-// a bare name without a sign-in names only a shipped or older bare record.
-const extAddr = (): string => encodeURIComponent(`${owner.name}/${EXT}`);
-const visitor = (action: string, body: Record<string, unknown> = {}, path = `/v1/ext/${extAddr()}/${action}`) =>
+const visitor = (action: string, body: Record<string, unknown> = {}, path = `/v1/ext/${EXT}/${action}`) =>
   json(path, { method: 'POST', body: JSON.stringify(body) });
 
 console.log('\n=== Extension actions without an account (Comicland v3 A-7) ===\n');
@@ -118,7 +113,7 @@ await test('3. An action that does not say public still answers a visitor 401, a
 });
 
 await test('4. A signed-in reader on the public action runs as themselves, not as a visitor', async () => {
-  const r = await json(`/v1/ext/${extAddr()}/catalogue`, { method: 'POST', headers: auth(reader.token), body: '{}' });
+  const r = await json(`/v1/ext/${EXT}/catalogue`, { method: 'POST', headers: auth(reader.token), body: '{}' });
   assert(r.status === 200, `${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.anonymous === false && r.body.data.owner === reader.name, `caller ${JSON.stringify(r.body.data)}`);
 });
@@ -189,7 +184,7 @@ await test('11. Nobody can write the record through the memory routes, the accou
 });
 
 await test('12. An extension sees ctx.caller.adult: not verified for the reader, and for a visitor', async () => {
-  const signed = await json(`/v1/ext/${extAddr()}/catalogue`, { method: 'POST', headers: auth(reader.token), body: '{}' });
+  const signed = await json(`/v1/ext/${EXT}/catalogue`, { method: 'POST', headers: auth(reader.token), body: '{}' });
   assert(signed.body.data.adult?.verified === false && signed.body.data.adult.method === null, `reader ${JSON.stringify(signed.body.data.adult)}`);
   const anon = await visitor('catalogue');
   assert(anon.body.data.adult?.verified === false, `visitor ${JSON.stringify(anon.body.data.adult)}`);

@@ -45,6 +45,7 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-26 — The owner is additive: installCortex keeps the bare name and refuses another account's name 403 as before (Jouni, 2026-10-26).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): installCortex
  *     stores `<owner>/<name>` (or the owner's released bare name), a manifest name with another
  *     account's prefix goes into the installer's own with a warning, and removeCortex writes a bare
@@ -331,18 +332,21 @@ export async function installCortex(
             + `Use your own namespace "${caller.ownerName}" or "community".`);
     }
 
-    // The name lives in the installer's namespace (services/component-address.ts): `<owner>/<name>`,
-    // or a bare name this owner released and takes back. A manifest name carrying another account's
-    // prefix is installed under the installer's own, with a warning: that prefix is not theirs.
+    // The name stays the manifest's, as always; `<owner>/<name>` only when asked for in full or when
+    // another account released the bare name (services/component-address.ts). A manifest name
+    // carrying another account's prefix is installed under the installer's own, with a warning.
     const placed = await placeCortexInstall(storage, caller.ownerName, ext);
     if (placed.warning) (result.warnings ??= []).push(placed.warning);
+    // A name already held by another owner is refused BEFORE the lib write below. Install never
+    // replaces a record (createCortexExtension throws on a collision), but it does replace lib
+    // bytes, so without this the refusal arrives after the damage. No operator bypass: an operator
+    // gains nothing here except the ability to overwrite those bytes.
     if (placed.takenByOther) {
-        return refuse(409, 'CONFLICT', `"${ext.name}" is held by a cortex another account installed before names carried their owner. Give yours another name.`);
+        return refuse(403, 'FORBIDDEN', 'Not your extension');
     }
     // The same answer the insert below gives for a name this owner already holds, decided here so it
     // comes before the lib-content question: install never replaces, so for a duplicate the missing
-    // bytes are not the thing to fix. The insert stays the race-proof check for the name. Nobody else
-    // can hold a name in this owner's namespace, so another owner's record is never in the way.
+    // bytes are not the thing to fix. The insert stays the race-proof check for the name.
     if (placed.existing) {
         return refuse(409, 'CONFLICT', `Extension "${ext.name}" is already installed`);
     }

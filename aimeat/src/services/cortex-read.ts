@@ -11,13 +11,14 @@
  * @version-history
  *   v1.1.0 — 2026-10-25 — The name is read through services/component-address.ts: the detail like a
  *     call, the source (an owner's export) the caller's own first (owner namespaces wish, secaudit2026oct22).
+ *     The detail keeps `name` as the manifest gives it and adds `owner` and `full_name` (2026-10-26).
  *   v1.0.0 — 2026-09-27 — Initial (wish-app-toiminnot-ilman-mcp-ty-kalua-ja-ty-kalujen-m-r-n-hallint).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { canSeeCortex, type CortexCaller } from './cortex-lifecycle.js';
 import { listVersions } from './component-versions.js';
-import { findCortex } from './component-address.js';
+import { findCortex, withOwnerFields } from './component-address.js';
 
 export interface CortexReadRefusal { ok: false; status: 403 | 404; code: 'NOT_FOUND' | 'FORBIDDEN'; message: string }
 
@@ -39,7 +40,8 @@ export async function cortexDetail(
         ok: true,
         status: ext.status,
         data: {
-            name: ext.name,
+            // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+            ...(({ name: shown, owner, full_name }) => ({ name: shown, owner, full_name }))(withOwnerFields(ext)),
             namespace: ext.namespace,
             short_name: ext.shortName,
             api_version: ext.apiVersion,

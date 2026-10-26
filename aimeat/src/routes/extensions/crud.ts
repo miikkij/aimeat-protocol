@@ -6,6 +6,9 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-26 — The owner is additive: an install keeps its bare name, PUT and POST meet another
+ *     account's record as before, and every answer keeps `name` and adds `owner` and `full_name`
+ *     (Jouni, 2026-10-26; services/component-address.ts).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): an install is
  *     stored as `<owner>/<name>` (or the owner's existing or released bare name); `:name` takes
  *     `<owner>/<name>` encoded as one segment, the alias of a bare record, or a bare name (the detail
@@ -88,7 +91,7 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
 import {
-  findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment,
+  findExtension, ownComponent, placeExtensionInstall, installNameFor, splitComponentAddress, shortNameOf, addressSegment, withOwnerFields,
 } from '../../services/component-address.js';
 
 /**
@@ -96,9 +99,10 @@ import {
  * marker gone, as GET /v1/extensions/:name has always shown it. The install, update, activate and
  * deactivate doors returned the stored record, ciphertext and marker included.
  */
-function shownExtension<T extends { config?: Record<string, unknown> } | null | undefined>(ext: T): T {
+function shownExtension<T extends { name: string; installedBy?: string; config?: Record<string, unknown> } | null | undefined>(ext: T): T {
   if (!ext) return ext;
-  return { ...ext, config: maskSecretFields(ext.config, getExtSecretKeys(ext as unknown as Parameters<typeof getExtSecretKeys>[0])) };
+  // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+  return { ...withOwnerFields(ext), config: maskSecretFields(ext.config, getExtSecretKeys(ext as unknown as Parameters<typeof getExtSecretKeys>[0])) };
 }
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
@@ -125,7 +129,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const { visible } = await visibleAppRefs(storage, req.auth?.owner ? `${req.auth.owner}@${config.nodeId}` : undefined);
       res.json(success(config.nodeId, {
         extensions: extensions.map(ext => ({
-          name: ext.name,
+          // `name` as the manifest gives it, plus `owner` and `full_name` (services/component-address.ts).
+          ...(({ name, owner, full_name }) => ({ name, owner, full_name }))(withOwnerFields(ext)),
           version: ext.version,
           description: ext.description,
           author: ext.author,
@@ -277,15 +282,14 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
     try {
       const address = req.params.name as string;
       const { manifest: manifestYaml, scripts } = req.body as { manifest?: string; scripts?: Record<string, string> };
-      // A write names the caller's own extension (services/component-address.ts): `<owner>/<name>`
-      // as written, or for a bare name the caller's own of that name. An operator's bare name may
-      // still name a bare record another account holds, as before.
+      // The record under that name, as before: a bare name is the bare record (whoever holds it; the
+      // owner check below refuses another account's), else the caller's own `<caller>/<name>`; a full
+      // `<owner>/<name>` is that record or the alias of a bare one (services/component-address.ts).
       const callerOwner = req.auth!.owner as string;
       const target = splitComponentAddress(address);
       const existing = target
         ? await findExtension(storage, address)
-        : (await ownComponent(n => storage.getExtension(n), callerOwner, address))
-          ?? (await isOperatorCaller(storage, req.auth) ? await storage.getExtension(address) : null);
+        : (await storage.getExtension(address)) ?? (await ownComponent(n => storage.getExtension(n), callerOwner, address));
       if (!existing && target && target.owner !== callerOwner) {
         res.status(403).json(error(config.nodeId, 'NAMESPACE_DENIED',
           `"${address}" is in the namespace of the account "${target.owner}". Install it under your own name, "${callerOwner}/${target.name}".`));
@@ -324,9 +328,9 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
           `Manifest metadata.name "${record.name}" does not match URL name "${address}"`));
         return;
       }
-      // The stored name: the existing record's, or for a new one the installer's namespace (or a bare
-      // name the installer released and takes back).
-      name = existing ? existing.name : (await installNameFor(storage, 'extension', callerOwner, record.name)).name;
+      // The stored name: the existing record's, or for a new one the bare name as always (the
+      // installer's `<owner>/<name>` when asked for in full or when another account released the name).
+      name = existing ? existing.name : (await installNameFor(storage, 'extension', callerOwner, target ? address : record.name)).name;
       record.name = name;
 
       // The whole write — the install ceilings on a create, the secret carry-forward, the no-op
@@ -404,7 +408,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       res.json(success(config.nodeId, {
         extension: {
-          ...ext,
+          ...withOwnerFields(ext),
           // installedByPrincipal stays in the answer: which principal (the person or which of their
           // agents) wrote the code is public provenance, the same writer GET :name/versions names
           // (Jouni, 2026-10-25). The read authority says only whether this owner narrowed

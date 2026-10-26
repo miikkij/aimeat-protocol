@@ -8,7 +8,6 @@
  *   code, and the non-member's carried calls not moving.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-members-only-payments
  * @version-history
- *   2026-10-25 — The capability is looked up as ext:<installer>/<name>:<action>, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-10-01 — Initial (wish-members-only-refuses-a-non-member-before-checkout-or-a-contr).
  *   v1.1.1 — 2026-10-13 — The tool manifest carries its pacing as tollMorsels: from 4.0.0 POST /v1/memory
  *     refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
@@ -115,12 +114,11 @@ await test('setup: an app, its extension naming it, a priced tool, a member, and
         manifest, scripts: { [`${TOOL}.js`]: 'export default async function () { return { ok: true, answer: 42 }; }' } }) });
     assert(inst.status === 200 || inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
     assert((await json(`/v1/extensions/${ext}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
-    // The operator's capability aggregation registers ext:<installer>/<name>:<action>; the first
-    // account on a fresh test database is the operator. The installer's own tool manifest below keeps
-    // the bare binding, which the node resolves for that owner.
+    // The operator's capability aggregation registers ext:<name>:<action>; the first account on a
+    // fresh test database is the operator.
     const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(owner.token) });
     assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)}`);
-    const cap = await json(`/v1/capabilities/${encodeURIComponent(`ext:${owner.name}/${ext}:${TOOL}`)}`);
+    const cap = await json(`/v1/capabilities/${encodeURIComponent(`ext:${ext}:${TOOL}`)}`);
     assert(cap.status === 200, `capability ${cap.status}: ${JSON.stringify(cap.body?.error)}`);
 
     const schema = { type: 'object', properties: { q: { type: 'string' } } };

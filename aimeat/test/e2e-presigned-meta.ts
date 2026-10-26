@@ -19,8 +19,6 @@
  *      as proof of a new deployment. Phase 3 therefore reads the server back and INVOKES the action
  *      after every upsert — the response is exactly the thing that was lying.
  * @version-history
- *   v1.2.0 — 2026-10-25 — Another account's ZIP of the same manifest installs under that account's own
- *     name, `<other>/<name>`, and the victim's stays as it was (owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-07-26 — Prove the upsert by read-back + invoke (not by the response); Phase 4 adds
  *     malformed-manifest, non-ZIP and cross-owner cases.
  *   v1.0.0 — 2026-07-26 — Initial.
@@ -329,10 +327,7 @@ async function main() {
 
         const url = await presignedExtensionUrl({ update: true, as: otherToken });
         const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('9.9.9'), 'scripts/ping.js': PING_JS }));
-        // Names live in the owner's namespace (services/component-address.ts): the same manifest from
-        // another account installs under that account's own name and never reaches the victim's.
-        assert(r.status === 403 || (r.status === 200 && r.body.name === `${other}/${EXT}`),
-            `a cross-owner upsert reached another name: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.status === 403, `expected 403 for a cross-owner upsert, got ${r.status} ${JSON.stringify(r.body)}`);
 
         // And the victim's extension is untouched.
         const g = await json(`/v1/extensions/${EXT}`, { headers: { Authorization: `Bearer ${ownerToken}` } });

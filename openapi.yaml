@@ -4258,6 +4258,12 @@ components:
       properties:
         name:
           type: string
+        owner:
+          type: string
+          description: The installing account. Shown on the install, update and activation answers.
+        full_name:
+          type: string
+          description: '`<owner>/<name>`, the exact address of this extension (`/v1/ext/<owner>%2F<name>/...`).'
         version:
           type: string
         description:
@@ -50085,9 +50091,10 @@ paths:
       description: |
         Install an extension from its manifest and script bundle.
         Requires operator role.
-        The installed extension is named `<owner>/<metadata.name>` in the installing account's
-        namespace (since 2026-10-25; the answer's `extension.name`), or keeps the bare name the same
-        account released by an earlier uninstall. Only that account creates names under its prefix.
+        The extension keeps its `metadata.name` (the answer's `extension.name`), and the answer adds
+        `extension.owner` and `extension.full_name` (`<owner>/<name>`, the exact address). When another
+        account removed an extension of that name, the install is kept under `<owner>/<name>`, so the
+        old addresses never reach it; only the account that removed it takes the bare name back.
         With AIMEAT_EXT_INSTALL_ROLE=operator only the operator's account installs, its agents
         included; another account is refused 403 INSUFFICIENT_ROLE naming the setting and the operator.
         Manifest `config:` fields declared `type: secret` are encrypted at rest (AES-256-GCM,
@@ -50512,10 +50519,10 @@ paths:
         `x-aimeat-pay-token`, then retry this call with that header. Either one the caller cannot
         satisfy returns 402; the pacing goes back when the call is refused later or the script throws.
 
-        Names live in the owner's namespace: an extension installed since 2026-10-25 is named
-        `<owner>/<name>`, written here as one encoded segment (`alice%2Fweather`). A bare name is the
-        bare record when there is one (shipped, or installed before), else the signed-in caller's own
-        `<caller>/<name>`, so an author keeps calling an install by the name they typed.
+        The owner is part of the address too: `<owner>/<name>`, written here as one encoded segment
+        (`alice%2Fweather`), is the exact address. A bare name is the bare record when there is one,
+        else the signed-in caller's own `<caller>/<name>`, else the one account that holds that name
+        under its own account; two such accounts answer 409 AMBIGUOUS_NAME, naming both.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -52296,10 +52303,10 @@ paths:
       summary: Get cortex library file
       description: |
         Serve a cortex library file (no auth required). `name` is a stored cortex name, optionally
-        pinned (`name@1.2.0`). A cortex installed since 2026-10-25 is named `<owner>/<name>`: write
-        it as one encoded segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}.
-        A bare name serves what the node ships and cortexes installed before names carried their
-        owner; `system/<name>` serves a shipped one too.
+        pinned (`name@1.2.0`). `<owner>/<name>` is the exact address: write it as one encoded
+        segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}. A bare name
+        serves the bare record, else the one account's `<owner>/<name>`; a name its holder removed
+        serves nobody else's bytes. `system/<name>` serves a shipped one too.
       tags: [Cortex]
       parameters:
         - name: name
@@ -52323,10 +52330,9 @@ paths:
       operationId: getOwnedCortexLib
       summary: Get a library file of a cortex named `<owner>/<name>`
       description: |
-        The same file as GET /v1/cortex/{name}/libs/{libFile} for the cortex named `<owner>/<name>`,
-        which is how an install is named since 2026-10-25 (the install answer's `lib_urls` give this
-        address). `name` may be pinned (`ui@1.2.0`). No auth required. Only the account `owner`
-        creates names under its namespace, so a name it removes never serves another account's code.
+        The same file as GET /v1/cortex/{name}/libs/{libFile}, by the exact address `<owner>/<name>`:
+        the cortex `owner` keeps under its own account, or its bare cortex of that name. `name` may be
+        pinned (`ui@1.2.0`). No auth required.
       tags: [Cortex]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }

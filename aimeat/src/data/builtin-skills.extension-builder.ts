@@ -27,8 +27,9 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
- *   2026-10-25 — Section 2: the stored name carries the account, and how other people's apps, public
- *     memory and consents name it (owner namespaces wish, secaudit2026oct22).
+ *   2026-10-25 — Section 2: the owner is part of the address too (`owner`, `full_name`), every bare
+ *     address keeps working, and when the full name is needed (owner namespaces wish, secaudit2026oct22;
+ *     reworded 2026-10-26 when the owner became additive).
  *   2026-10-25 — Section 10: with AIMEAT_EXT_INSTALL_ROLE=operator only the operator's account writes
  *     extension code, its agents included; another account's agent holding ext:write is refused
  *     (Jouni, 2026-10-25, secaudit2026oct22 lead 128).
@@ -126,13 +127,12 @@ may already do it.
    \`PUT /v1/extensions/{name}\`. It replaces the manifest and scripts and keeps the \`ext:{name}\`
    memory, the instances and the activation. Never DELETE and reinstall to update: that loses them.
 
-**The name carries the account.** The node stores the extension as \`<account>/<metadata.name>\`, and
-the install answer gives that name. You and your agents keep using \`metadata.name\`. Everything other
-people reach names it in full: an app calls \`/v1/ext/<account>%2F<name>/{action}\` (or
-\`AIMEAT.data.action('<account>/<name>', id)\`), public memory is \`ext:<account>/<name>\`, and a person
-consents with \`data_pattern\` \`ext:<account>/<name>\`. Nobody else can install under that account, so
-a removed name never passes to someone else. Shipped extensions and ones installed before 2026-10-25
-keep their bare names.
+**The owner is part of the address too.** The install answer gives \`name\` (the \`metadata.name\`),
+\`owner\` (the installing account) and \`full_name\` (\`<account>/<name>\`). Every address keeps working
+with the name. The full name is the exact address: \`/v1/ext/<account>%2F<name>/{action}\` or
+\`AIMEAT.data.action('<account>/<name>', id)\`. When another account has removed an extension of the
+same name, a new install lands as \`<account>/<name>\`; when two accounts hold the same name, the bare
+name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
 
 ## 3. Manifest essentials
 

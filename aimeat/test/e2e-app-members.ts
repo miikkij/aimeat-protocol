@@ -7,9 +7,7 @@
  *   behind. A 200 proved none of them.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-members
  * @version-history
- *   2026-10-25 — A member, a stranger, a member's agent and a signed-out caller call the owner's
- *     extensions by their full name `<owner>/<short>`, as names live in the owner's namespace (secaudit2026oct22).
- *   v1.2.3 —2026-10-13 — The priced capabilities' manifests carry tollMorsels: from 4.0.0 POST
+ *   v1.2.3 — 2026-10-13 — The priced capabilities' manifests carry tollMorsels: from 4.0.0 POST
  *     /v1/memory refuses price.morsels on a tool manifest (MORSEL_PRICE_REMOVED).
  *   v1.2.2 — 2026-10-12 — The member's agent is approved with ext:invoke beside memory:read: it calls an
  *     extension action, which node 4.0.0 gates on that word (REST_SCOPE_GATES_ENFORCED_IN).
@@ -64,10 +62,7 @@ let member: Awaited<ReturnType<typeof setupOwner>>;
 let stranger: Awaited<ReturnType<typeof setupOwner>>;
 const APP = 'roster-demo.html';
 let appId = '';
-/** An extension the app owner installed, as a member, a stranger or a signed-out caller names it:
- *  `<owner>/<short>`, encoded as one path segment. The owner may still call it by its short name. */
-const ownerExt = (short: string) => encodeURIComponent(`${owner.name}/${short}`);
-const bell = async (t: string) =>((await json('/v1/notifications', { headers: auth(t) })).body.data.notifications as any[]) ?? [];
+const bell = async (t: string) => ((await json('/v1/notifications', { headers: auth(t) })).body.data.notifications as any[]) ?? [];
 
 await test('setup: an owner publishes an app, and two other accounts exist', async () => {
     owner = await setupOwner('own');
@@ -427,7 +422,7 @@ await test('setup: an extension declares which app it gates', async () => {
     assert((await json(`/v1/extensions/${gateExt}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
 });
 
-const whoami = async (token: string) => (await json(`/v1/ext/${ownerExt(gateExt)}/whoami`, { method: 'POST', headers: auth(token), body: '{}' })).body.data;
+const whoami = async (token: string) => (await json(`/v1/ext/${gateExt}/whoami`, { method: 'POST', headers: auth(token), body: '{}' })).body.data;
 
 await test('a stranger gets no role, and the roster never left the node to tell them so', async () => {
     const r = await whoami(stranger.token);
@@ -599,7 +594,7 @@ await test('a declared IAM spec generates a gate that installs and runs', async 
         `and names the capabilities it knows: ${JSON.stringify(props.permission.enum)}`);
 
     const call = async (token: string, body: Record<string, unknown>) =>
-        (await json(`/v1/ext/${ownerExt(gen.name)}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
 
     // The OWNER reaches everything without a roster row.
     const asOwner = await call(owner.token, { permission: 'write' });
@@ -622,7 +617,7 @@ await test('a declared IAM spec generates a gate that installs and runs', async 
         `a member is refused the irreversible command but still learns its tier: ${JSON.stringify(denied)}`);
 
     // Discovery: an agent asks what it may run rather than guessing from a catalogue.
-    const list = (await json(`/v1/ext/${ownerExt(gen.name)}/commands`, { method: 'POST', headers: auth(nobody.token), body: '{}' })).body.data;
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(nobody.token), body: '{}' })).body.data;
     assert(list.commands.length === 3, `all commands listed: ${list.commands.length}`);
     const purge = list.commands.find((c: any) => c.id === 'doc.purge');
     const write = list.commands.find((c: any) => c.id === 'doc.write');
@@ -684,7 +679,7 @@ await test('defaultRole: a signed-in stranger holds the public tier, an anonymou
 
     const stranger = await setupOwner('pub');
     const call = async (token: string, body: Record<string, unknown>) =>
-        (await json(`/v1/ext/${ownerExt(gen.name)}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
 
     // The whole point: on no roster row, and still holding the public tier.
     const guides = await call(stranger.token, { permission: 'guides' });
@@ -696,7 +691,7 @@ await test('defaultRole: a signed-in stranger holds the public tier, an anonymou
     assert(corpus.allowed === false, `the paid capability is still refused: ${JSON.stringify(corpus)}`);
 
     // Discovery agrees with the gate rather than listing everything as callable.
-    const list = (await json(`/v1/ext/${ownerExt(gen.name)}/commands`, { method: 'POST', headers: auth(stranger.token), body: '{}' })).body.data;
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(stranger.token), body: '{}' })).body.data;
     const byId = Object.fromEntries(list.commands.map((c: { id: string; allowed: boolean }) => [c.id, c.allowed]));
     assert(byId['guides.read'] === true && byId['corpus.search'] === false,
         `discovery marks the public one open and the paid one shut: ${JSON.stringify(byId)}`);
@@ -821,7 +816,7 @@ await test('the generated gate states its role vocabulary, and versions where it
 
     // The vocabulary itself.
     const stranger = await setupOwner('vocab');
-    const vocab = (await json(`/v1/ext/${ownerExt(gen.name)}/roles`, {
+    const vocab = (await json(`/v1/ext/${gen.name}/roles`, {
         method: 'POST', headers: auth(stranger.token), body: '{}',
     })).body.data;
     assert(!!vocab && !!vocab.roles, `the gate answers its vocabulary: ${JSON.stringify(vocab)}`);
@@ -838,7 +833,7 @@ await test('the generated gate states its role vocabulary, and versions where it
     // "Open" here means not owner-only, NOT anonymous: this node authenticates every extension call,
     // and a description that said otherwise would be the kind of false promise this target exists to
     // remove. A signed-in stranger reading it (above) is the actual guarantee.
-    const anon = await json(`/v1/ext/${ownerExt(gen.name)}/roles`, { method: 'POST', body: '{}' });
+    const anon = await json(`/v1/ext/${gen.name}/roles`, { method: 'POST', body: '{}' });
     assert(anon.status === 401, `an extension call still needs a principal: ${anon.status}`);
     const rosterAnon = await json(`/v1/apps/${owner.name}/${APP3}/members`);
     assert(rosterAnon.status === 401 || rosterAnon.status === 403,
@@ -928,7 +923,7 @@ await test('capabilities accumulate down the ladder: a member holds what a guest
         method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: ladderMember.name, role: 'member' }),
     });
     const call = async (body: Record<string, unknown>) =>
-        (await json(`/v1/ext/${ownerExt(gen.name)}/check`, { method: 'POST', headers: auth(ladderMember.token), body: JSON.stringify(body) })).body.data;
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(ladderMember.token), body: JSON.stringify(body) })).body.data;
 
     // The whole point: the paying tier is not locked out of the free one.
     const guides = await call({ permission: 'guides' });
@@ -937,13 +932,13 @@ await test('capabilities accumulate down the ladder: a member holds what a guest
     assert(corpus.allowed === true, `and its own tier too: ${JSON.stringify(corpus)}`);
 
     // The vocabulary states the accumulated set, so a UI painting from it agrees with the gate.
-    const vocab = (await json(`/v1/ext/${ownerExt(gen.name)}/roles`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
+    const vocab = (await json(`/v1/ext/${gen.name}/roles`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
     assert(vocab.roles.member.includes('guides') && vocab.roles.member.includes('corpus'),
         `the declared vocabulary accumulates too: ${JSON.stringify(vocab.roles)}`);
     assert(vocab.roles.guest.length === 1, `and a weaker tier gains nothing from a stronger one: ${JSON.stringify(vocab.roles.guest)}`);
 
     // Discovery agrees with the gate, which is what an agent reads before calling anything.
-    const list = (await json(`/v1/ext/${ownerExt(gen.name)}/commands`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
     const byId = Object.fromEntries(list.commands.map((c: { id: string; allowed: boolean }) => [c.id, c.allowed]));
     assert(byId['guides.read'] === true && byId['corpus.search'] === true,
         `discovery marks both open for a member: ${JSON.stringify(byId)}`);
@@ -1054,7 +1049,7 @@ await test('access members-only: an outsider holding an entitlement is refused, 
     });
 
     const call = async (token: string) =>
-        await json(`/v1/ext/${ownerExt(ext)}/${OFFER_A}`, { method: 'POST', headers: auth(token), body: '{}' });
+        await json(`/v1/ext/${ext}/${OFFER_A}`, { method: 'POST', headers: auth(token), body: '{}' });
 
     // MEMBERS-FREE (the default): both get in. The member is carried; the outsider settles theirs.
     await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
@@ -1117,7 +1112,7 @@ await test('access free: nobody pays, not the stranger and not the contract hold
     await json(`/v1/extensions/${fext}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' });
 
     const call = async (token: string) =>
-        await json(`/v1/ext/${ownerExt(fext)}/ask`, { method: 'POST', headers: auth(token), body: '{}' });
+        await json(`/v1/ext/${fext}/ask`, { method: 'POST', headers: auth(token), body: '{}' });
 
     // Priced by default: a stranger has to pay.
     const priced = await call(stranger.token);

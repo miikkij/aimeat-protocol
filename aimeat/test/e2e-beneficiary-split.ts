@@ -15,7 +15,6 @@
  *       split against someone else's revenue, and cannot release someone else's obligation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=beneficiary-split
  * @version-history
- *   2026-10-25 — The consumer accepts, calls and checks out the provider's extension by its full name `<provider>/<name>`, and reads its contract under that name, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
  *     paced action states `tollMorsels` instead of `commercial.payMorsels`, and the chain tool drops its
  *     `price: { morsels: 0 }`, which said nothing. Both forms are accepted by 3.x too.
@@ -149,13 +148,10 @@ await test('Setup: a provider with priced actions, a consumer, three would-be be
   assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
 });
 
-/** The extension's full name in the provider's namespace: how every other account names it. */
-const extFull = () => `${provider.name}/${EXT}`;
 const accept = (token: string, action: string, extra: Record<string, unknown> = {}) =>
-  json('/v1/exchange/entitlements', { method: 'POST', headers: auth(token), body: JSON.stringify({ ext: extFull(), action, contract_ref: 'c-bsplit', ...extra }) });
-/** The provider calls its own extension by the short name; anyone else by the encoded full name. */
+  json('/v1/exchange/entitlements', { method: 'POST', headers: auth(token), body: JSON.stringify({ ext: EXT, action, contract_ref: 'c-bsplit', ...extra }) });
 const invoke = (token: string, action: string, body: Record<string, unknown> = { hi: 1 }) =>
-  json(`/v1/ext/${token === provider.token ? EXT : encodeURIComponent(extFull())}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
+  json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 const declare = (token: string, body: Record<string, unknown>) =>
   json('/v1/commerce/beneficiary-splits', { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 const earnings = (token: string) => json('/v1/commerce/beneficiary/earnings', { headers: auth(token) });
@@ -247,12 +243,12 @@ await test('A settled call: the CONSUMER pays exactly the list price — a split
   // price" was asserted by a number that is the same whatever the buyer is charged. The buyer's real
   // charge is the spend meter on their contract.
   const morselsBefore = await balance(consumer.token);
-  const before = await contractSpend(consumer.token, extFull(), 'shared');
+  const before = await contractSpend(consumer.token, EXT, 'shared');
 
   const r = await invoke(consumer.token, 'shared');
   assert(r.status === 200, `call ${r.status}: ${JSON.stringify(r.body?.error)}`);
 
-  const after = await contractSpend(consumer.token, extFull(), 'shared');
+  const after = await contractSpend(consumer.token, EXT, 'shared');
   assert(after.spent - before.spent === PRICE,
     `the buyer was charged the list price ${PRICE} and the meter moved by ${after.spent - before.spent}`);
   assert(after.currency === 'EUR',
@@ -977,11 +973,11 @@ await test('USD: the buyer is charged in the currency the action is PRICED in', 
   assert(a.body.data.entitlement.price_per_call === USD_PRICE,
     `the USD price is authoritative: ${a.body.data.entitlement.price_per_call}`);
 
-  const before = await contractSpend(consumer.token, extFull(), 'sharedusd');
+  const before = await contractSpend(consumer.token, EXT, 'sharedusd');
   const r = await invoke(consumer.token, 'sharedusd');
   assert(r.status === 200, `usd call ${r.status}: ${JSON.stringify(r.body?.error)}`);
 
-  const after = await contractSpend(consumer.token, extFull(), 'sharedusd');
+  const after = await contractSpend(consumer.token, EXT, 'sharedusd');
   assert(after.spent - before.spent === USD_PRICE,
     `charged the USD list price ${USD_PRICE}, meter moved ${after.spent - before.spent}`);
   assert(after.currency === 'USD', `and in USD, not the file's usual EUR: ${after.currency}`);
@@ -1099,7 +1095,7 @@ if (!moneyRail) {
   await test('A one-off purchase of a priced action pays the payees the call names, out of the seller\'s net, once', async () => {
     // `dyn` carries the dynamic 100 % pool declared above.
     const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(consumer.token),
-      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: extFull(), tool: 'dyn' }] }) });
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'ext-call', app: EXT, tool: 'dyn' }] }) });
     assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
     const before = await accrued(alpha.token);
     const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
@@ -1110,7 +1106,7 @@ if (!moneyRail) {
     assert(typeof token === 'string' && token, 'a pay token');
     assert(await accrued(alpha.token) === before, 'the checkout books nobody: the call has not named its payees yet');
 
-    const call = await json(`/v1/ext/${encodeURIComponent(extFull())}/dyn`, { method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-pay-token': token }, body: JSON.stringify({ pay_to: alpha.ghii }) });
+    const call = await json(`/v1/ext/${EXT}/dyn`, { method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-pay-token': token }, body: JSON.stringify({ pay_to: alpha.ghii }) });
     assert(call.status === 200, `the paid call ${call.status}: ${JSON.stringify(call.body?.error)}`);
     assert(!('_revenue' in (call.body.data ?? {})), 'the buyer never sees the designation');
     assert(await accrued(alpha.token) === before + net, `alpha is owed the seller's whole net (${net}), got ${await accrued(alpha.token) - before}`);

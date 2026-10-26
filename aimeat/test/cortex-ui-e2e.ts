@@ -2,7 +2,6 @@
  * @file cortex-ui-e2e.ts
  * @description E2E tests for aimeat-ui cortex library (install, activate, serve, deactivate)
  * @version-history
- *   2026-10-25 — Phase 1 expects the owner's install to land as <owner>/<name> beside the shipped pack (201), checks the shipped bytes did not move, and removes the copy so the bare name below reaches the shipped pack, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.3.0 — 2026-08-16 — E2E quality, cortex-ui:158: every lifecycle call here was an operator call,
  *     because the suite's owner is the first on a cleared database, so the ownership guard on
  *     activate, deactivate and delete never had to answer for a plain owner. A second owner now gets
@@ -178,16 +177,10 @@ async function waitForBundledLib(name: string): Promise<string | null> {
   }
 }
 
-// Since 2026-10-25 a new install lives in the installer's own namespace (`<owner>/<name>`), so the
-// same POST is a 201 that creates the owner's OWN copy beside the shipped pack. What this phase
-// protects stays the same: the bytes served under the shipped name do not move. The owner's copy is
-// removed again at once, so the bare name in the phases below reaches the shipped pack and not the
-// operator's own copy (a bare name in a lifecycle call reads the caller's own first).
 for (const name of UI_CORTEXES) {
-  await test(`Install ${name} lands in the installer's own namespace, and the served bytes are untouched`, async () => {
+  await test(`Install ${name} is refused, and the served bytes are untouched`, async () => {
     const yaml = readFileSync(join(CORTEX_DIR, `${name}.yaml`), 'utf-8');
     const js = readFileSync(join(CORTEX_DIR, `${name}.js`), 'utf-8');
-    const full = `${OWNER_NAME}/${name}`;
 
     const bytesBefore = await waitForBundledLib(name);
 
@@ -197,25 +190,20 @@ for (const name of UI_CORTEXES) {
       body: JSON.stringify({ manifest: yaml, libs: { [`${name}.js`]: `/* not yours */\n${js}` } }),
     });
 
-    try {
-      if (r.status !== 201) {
-        throw new Error(`Expected 201 (a copy in the owner's namespace), got ${r.status}: ${JSON.stringify(r.body)}`);
-      }
-      if (bytesBefore === null) return;
-      if (r.body.data?.name !== full) {
-        throw new Error(`the install must land under ${full}, got ${r.body.data?.name}`);
-      }
-      const bytesAfter = await servedLib(name);
-      if (bytesAfter !== bytesBefore) {
-        throw new Error(`the owner's install changed the shipped pack's served bytes (${bytesBefore.length} → ${bytesAfter?.length ?? 'none'})`);
-      }
-    } finally {
-      if (r.status === 201 && bytesBefore !== null) {
-        const del = await json(`/v1/cortex/${encodeURIComponent(full)}`, {
-          method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` },
-        });
-        if (del.status !== 200) throw new Error(`removing the owner's copy ${full}: expected 200, got ${del.status}`);
-      }
+    if (bytesBefore === null) {
+      // Nothing came up under this name. On a node that ships no bundle the name is free and the
+      // install is a plain 201. A refusal here means the name is held by a record that never began
+      // serving, which is a seeding fault worth naming rather than passing over.
+      if (r.status === 201) return;
+      throw new Error(`${name} served nothing in ${SEED_WAIT_MS} ms and the install answered ${r.status}: the name is held by a pack that never became active`);
+    }
+
+    if (r.status !== 403) {
+      throw new Error(`Expected 403 (name held by system@node), got ${r.status}: ${JSON.stringify(r.body)}`);
+    }
+    const bytesAfter = await servedLib(name);
+    if (bytesAfter !== bytesBefore) {
+      throw new Error(`the refused install still changed the served bytes (${bytesBefore.length} → ${bytesAfter?.length ?? 'none'})`);
     }
   });
 }

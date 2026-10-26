@@ -26,9 +26,6 @@
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_SECRETS_APPROVALS_PORT,
  *   40675 by default.
  * @version-history
- *   v1.2.2 — 2026-10-25 — 12b names both extensions by their stored names too (merge of the approval standard with the owner namespaces, secaudit2026oct22).
- *   v1.2.1 — 2026-10-25 — Every call, approval and comparison names an install by its stored name,
- *     `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.2.0 — 2026-10-25 — 12b: the agent whose call asked hears Allow and Don't allow on its inbox
  *     (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-21 — Jouni's decisions: test 15, a host only on the owner's own living-hooks list
@@ -178,20 +175,14 @@ limits:
   timeout_ms: 5000
   max_api_calls: 5
 `;
-/** The stored name of each install, `<owner>/<name>` (services/component-address.ts), by the manifest's name. */
-const storedName = new Map<string, string>();
-/** The name another account and every request below use: the stored one. */
-const full = (name: string): string => storedName.get(name) ?? name;
-const addr = (name: string): string => encodeURIComponent(full(name));
 async function install(token: string, name: string, manifest = manifestFor(name)) {
     const r = await json('/v1/extensions', { method: 'POST', headers: auth(token), body: JSON.stringify({ manifest, scripts: { 'actions/probe.js': PROBE_JS, 'actions/fixed.js': FIXED_JS } }) });
     assert(r.status === 201, `install ${name} ${r.status}: ${JSON.stringify(r.body?.error)}`);
-    storedName.set(name, r.body.data.extension.name);
     const a = await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(token) });
     assert(a.status === 200, `activate ${name} ${a.status}: ${JSON.stringify(a.body?.error)}`);
 }
 async function probe(ext: string, token: string, url: string, secret: string): Promise<{ status: number; failed: string | null }> {
-    const r = await json(`/v1/ext/${addr(ext)}/probe`, { method: 'POST', headers: auth(token), body: JSON.stringify({ url, secret }) });
+    const r = await json(`/v1/ext/${ext}/probe`, { method: 'POST', headers: auth(token), body: JSON.stringify({ url, secret }) });
     assert(r.status === 200, `invoke ${ext} ${r.status}: ${JSON.stringify(r.body?.error)}`);
     return r.body.data?.result ?? r.body.data;
 }
@@ -228,7 +219,7 @@ const FOREIGN_EXT = `sap-foreign-${STAMP}`;
 
 await test('1. uses_secrets is stored and public with the extension; a host with a scheme is refused at install', async () => {
     await install(owner.token, OWN_EXT);
-    const r = await json(`/v1/extensions/${addr(OWN_EXT)}`);
+    const r = await json(`/v1/extensions/${OWN_EXT}`);
     const uses = r.body.data?.extension?.uses_secrets ?? [];
     const one = uses.find((u: any) => u.name === 'K_APP');
     assert(one && JSON.stringify(one.hosts) === JSON.stringify([RECEIVER_HOST]) && one.why === WHY, `uses_secrets: ${JSON.stringify(uses)}`);
@@ -257,7 +248,7 @@ await test("3. OLD USE: the owner's chat agent, without secrets:manage, binds on
     assert(out.failed === null, `refused: ${out.failed}`);
     assert(arrived('/chat')[0]?.key === 'zz-chat-zz', `the receiver got: ${JSON.stringify(deliveries)}`);
     const row = await rowOf(owner.token, 'K_CHAT');
-    assert(row.hostBinding?.by === chatAgent.gaii && row.hostBinding.extension === full(OWN_EXT), `binding: ${JSON.stringify(row)}`);
+    assert(row.hostBinding?.by === chatAgent.gaii && row.hostBinding.extension === OWN_EXT, `binding: ${JSON.stringify(row)}`);
 });
 
 await test('4. OLD USE: an unattended workflow step binds on first use to the declared host', async () => {
@@ -294,7 +285,7 @@ await test('5. HOLE: a host the extension did not declare is refused, nothing is
     const out = await probe(OWN_EXT, chatAgent.token, `${OTHER}/undeclared`, 'K_UNDECL');
     assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:'), `not refused: ${JSON.stringify(out)}`);
     const link = allowLink(out.failed);
-    assert(!!link && link.secret === 'K_UNDECL' && link.extension === full(OWN_EXT) && link.host === `localhost:${RECEIVER_PORT}`, `no allow page in: ${out.failed}`);
+    assert(!!link && link.secret === 'K_UNDECL' && link.extension === OWN_EXT && link.host === `localhost:${RECEIVER_PORT}`, `no allow page in: ${out.failed}`);
     assert(deliveries.length === 0, `${deliveries.length} request(s) arrived`);
     assert(await refusedUnbound(owner.token, 'K_UNDECL'), 'the secret was bound');
 });
@@ -315,7 +306,7 @@ await test("7. HOLE: another account's extension never binds, even declared and 
     assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:') && out.failed.includes(stranger.name)
         && out.failed.includes(", to read the shop's orders") && !out.failed.includes('to to '), `not refused with the installer and why, said once: ${JSON.stringify(out)}`);
     foreignLink = allowLink(out.failed);
-    assert(!!foreignLink && foreignLink.extension === full(FOREIGN_EXT), `no allow page in: ${out.failed}`);
+    assert(!!foreignLink && foreignLink.extension === FOREIGN_EXT, `no allow page in: ${out.failed}`);
     assert(deliveries.length === 0 && await refusedUnbound(owner.token, 'K_FOREIGN'), 'sent or bound');
 });
 
@@ -331,33 +322,33 @@ await test('8b. the notice also carries Don\'t allow, which answers the same que
     const ask = (n.body?.data?.notifications ?? []).find((x: any) => x.type === 'secret_use_ask' && String(x.body ?? '').includes(FOREIGN_EXT));
     const deny = (ask?.actions ?? []).find((a: any) => a.id === 'deny');
     assert(!!deny && String(deny.endpoint) === '/v1/secrets/K_FOREIGN/approvals/decline'
-        && deny.body?.extension === full(FOREIGN_EXT) && deny.body?.host === RECEIVER_HOST, `no Don't allow: ${JSON.stringify(ask?.actions)}`);
+        && deny.body?.extension === FOREIGN_EXT && deny.body?.host === RECEIVER_HOST, `no Don't allow: ${JSON.stringify(ask?.actions)}`);
 });
 
 await test('9. only the owner in person reads and answers the question', async () => {
-    const q = `extension=${encodeURIComponent(full(FOREIGN_EXT))}&host=${encodeURIComponent(RECEIVER_HOST)}`;
+    const q = `extension=${encodeURIComponent(FOREIGN_EXT)}&host=${encodeURIComponent(RECEIVER_HOST)}`;
     const asAgent = await json(`/v1/secrets/K_FOREIGN/approval?${q}`, { headers: auth(chatAgent.token) });
     assert(asAgent.status === 403, `an agent read the question: ${asAgent.status}`);
     const view = await json(`/v1/secrets/K_FOREIGN/approval?${q}`, { headers: auth(owner.token) });
     assert(view.status === 200 && view.body.data.installer === stranger.name && view.body.data.why === WHY
         && view.body.data.approved_at === null, `view: ${view.status} ${JSON.stringify(view.body)}`);
-    const agentAllow = await json('/v1/secrets/K_FOREIGN/approvals', { method: 'POST', headers: auth(chatAgent.token), body: JSON.stringify({ extension: full(FOREIGN_EXT), host: RECEIVER_HOST }) });
+    const agentAllow = await json('/v1/secrets/K_FOREIGN/approvals', { method: 'POST', headers: auth(chatAgent.token), body: JSON.stringify({ extension: FOREIGN_EXT, host: RECEIVER_HOST }) });
     assert(agentAllow.status === 403, `an agent allowed it: ${agentAllow.status}`);
 });
 
 await test("10. once the owner allows it, that extension reaches that host; the secret stays unbound", async () => {
-    const ok = await json('/v1/secrets/K_FOREIGN/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(FOREIGN_EXT), host: RECEIVER_HOST }) });
+    const ok = await json('/v1/secrets/K_FOREIGN/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: FOREIGN_EXT, host: RECEIVER_HOST }) });
     assert(ok.status === 200 && typeof ok.body.data.approval.approvedAt === 'string', `approve: ${ok.status} ${JSON.stringify(ok.body)}`);
     deliveries.length = 0;
     const out = await probe(FOREIGN_EXT, owner.token, `${RECEIVER}/foreign`, 'K_FOREIGN');
     assert(out.failed === null && arrived('/foreign')[0]?.key === 'zz-foreign-zz', `after approval: ${JSON.stringify(out)}`);
     const row = await rowOf(owner.token, 'K_FOREIGN');
-    assert(row.hosts.length === 0 && row.approvals.some((a: any) => a.extension === full(FOREIGN_EXT) && a.installer === stranger.name && a.approvedAt),
+    assert(row.hosts.length === 0 && row.approvals.some((a: any) => a.extension === FOREIGN_EXT && a.installer === stranger.name && a.approvedAt),
         `row: ${JSON.stringify(row)}`);
     // The allowed call counts as a use, as a bound one does (the stamp is written after the call).
     let used = row;
-    for (let i = 0; i < 20 && !(used.lastUsedAt && used.usedBy.includes(full(FOREIGN_EXT))); i++) { await sleep(100); used = await rowOf(owner.token, 'K_FOREIGN'); }
-    assert(typeof used.lastUsedAt === 'string' && used.usedBy.includes(full(FOREIGN_EXT)), `no use recorded: ${JSON.stringify(used)}`);
+    for (let i = 0; i < 20 && !(used.lastUsedAt && used.usedBy.includes(FOREIGN_EXT)); i++) { await sleep(100); used = await rowOf(owner.token, 'K_FOREIGN'); }
+    assert(typeof used.lastUsedAt === 'string' && used.usedBy.includes(FOREIGN_EXT), `no use recorded: ${JSON.stringify(used)}`);
 });
 
 await test('11. …and to no other host', async () => {
@@ -367,13 +358,13 @@ await test('11. …and to no other host', async () => {
 });
 
 await test('12. withdrawing the approval stops it, and a declined request is gone', async () => {
-    const q = new URLSearchParams({ extension: full(FOREIGN_EXT), installer: stranger.name, host: RECEIVER_HOST });
+    const q = new URLSearchParams({ extension: FOREIGN_EXT, installer: stranger.name, host: RECEIVER_HOST });
     const w = await json(`/v1/secrets/K_FOREIGN/approvals?${q}`, { method: 'DELETE', headers: auth(owner.token) });
     assert(w.status === 200, `withdraw: ${w.status} ${JSON.stringify(w.body)}`);
     deliveries.length = 0;
     const out = await probe(FOREIGN_EXT, owner.token, `${RECEIVER}/foreign`, 'K_FOREIGN');
     assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:') && deliveries.length === 0, `after withdraw: ${JSON.stringify(out)}`);
-    const d = await json('/v1/secrets/K_FOREIGN/approvals/decline', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(FOREIGN_EXT), host: RECEIVER_HOST }) });
+    const d = await json('/v1/secrets/K_FOREIGN/approvals/decline', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: FOREIGN_EXT, host: RECEIVER_HOST }) });
     assert(d.status === 200 && d.body.data.declined === true, `decline: ${JSON.stringify(d.body)}`);
     // Test 11's refusal filed its own request, for the other host; only this host's is declined.
     const left = (await rowOf(owner.token, 'K_FOREIGN')).approvals;
@@ -390,17 +381,17 @@ async function answersOn(token: string, contextId: string): Promise<any[]> {
 
 await test("12b. the agent whose call asked hears the owner's Allow and the owner's Don't allow (secaudit2026oct22, the approval standard)", async () => {
     // Test 6: the chat agent's call through the agent's own code asked about K_AGENTCODE.
-    const allowCtx = `secret-approval:K_AGENTCODE:${full(AGENT_EXT)}:${RECEIVER_HOST}`;
-    const ok = await json('/v1/secrets/K_AGENTCODE/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(AGENT_EXT), host: RECEIVER_HOST }) });
+    const allowCtx = `secret-approval:K_AGENTCODE:${AGENT_EXT}:${RECEIVER_HOST}`;
+    const ok = await json('/v1/secrets/K_AGENTCODE/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: AGENT_EXT, host: RECEIVER_HOST }) });
     assert(ok.status === 200, `approve: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
     const allowed = await answersOn(chatAgent.token, allowCtx);
     assert(allowed.length === 1 && allowed[0].parts?.[1]?.data?.outcome === 'allowed'
         && String(allowed[0].parts?.[0]?.text).includes('allowed'), `no Allow answer: ${JSON.stringify(allowed)}`);
     // Test 5: the chat agent's call to an undeclared host asked about K_UNDECL.
     const host = `localhost:${RECEIVER_PORT}`;
-    const no = await json('/v1/secrets/K_UNDECL/approvals/decline', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(OWN_EXT), host }) });
+    const no = await json('/v1/secrets/K_UNDECL/approvals/decline', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: OWN_EXT, host }) });
     assert(no.status === 200 && no.body.data.declined === true, `decline: ${JSON.stringify(no.body)}`);
-    const declined = await answersOn(chatAgent.token, `secret-approval:K_UNDECL:${full(OWN_EXT)}:${host}`);
+    const declined = await answersOn(chatAgent.token, `secret-approval:K_UNDECL:${OWN_EXT}:${host}`);
     assert(declined.length === 1 && declined[0].parts?.[1]?.data?.outcome === 'declined', `no Don't allow answer: ${JSON.stringify(declined)}`);
 });
 
@@ -513,7 +504,7 @@ await test('18. a declared host without a port covers that host on any port; a d
 await test("19. the list names the extensions that declare a secret before its first use", async () => {
     const r = await json('/v1/secrets', { headers: auth(owner.token) });
     const row = (r.body.data?.secrets ?? []).find((s: any) => s.name === 'K_PORTMISS');
-    assert(Array.isArray(row?.declaredBy) && row.declaredBy.includes(full(OWN_EXT)) && row.usedBy.length === 0 && row.lastUsedAt === null,
+    assert(Array.isArray(row?.declaredBy) && row.declaredBy.includes(OWN_EXT) && row.usedBy.length === 0 && row.lastUsedAt === null,
         `declaredBy: ${JSON.stringify(row)}`);
 });
 
@@ -550,10 +541,10 @@ await test('22. storing a value again or deleting the secret clears its waiting 
         const out = await probe(FOREIGN_EXT, owner.token, `${RECEIVER}/stale`, 'K_STALE');
         assert(typeof out.failed === 'string' && out.failed.startsWith('SECRET_HOST:'), `not refused: ${JSON.stringify(out)}`);
         const row = await rowOf(owner.token, 'K_STALE');
-        assert(row.approvals.some((a: any) => a.extension === full(FOREIGN_EXT) && !a.approvedAt), `no question filed: ${JSON.stringify(row)}`);
+        assert(row.approvals.some((a: any) => a.extension === FOREIGN_EXT && !a.approvedAt), `no question filed: ${JSON.stringify(row)}`);
     };
     const staleAllow = async () => {
-        const r = await json('/v1/secrets/K_STALE/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: full(FOREIGN_EXT), host: RECEIVER_HOST }) });
+        const r = await json('/v1/secrets/K_STALE/approvals', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ extension: FOREIGN_EXT, host: RECEIVER_HOST }) });
         assert(r.status === 404 && r.body.error?.code === 'APPROVAL_NOT_FOUND' && /nothing was allowed/.test(r.body.error.message),
             `a stale Allow: ${r.status} ${JSON.stringify(r.body?.error)}`);
         assert((await rowOf(owner.token, 'K_STALE')).approvals.length === 0, 'a stale Allow left an entry');
@@ -604,7 +595,7 @@ async function runFixedUnattended(ext: string, wf: string): Promise<{ status: nu
     }
     return (await json(`/v1/memory/${encodeURIComponent(resultKey)}`, { headers: auth(owner.token) })).body.data.value;
 }
-const markOf = async (name: string) => (await json(`/v1/extensions/${addr(name)}`)).body.data?.extension?.config?.[FIRST_USE_KEEP_KEY];
+const markOf = async (name: string) => (await json(`/v1/extensions/${name}`)).body.data?.extension?.config?.[FIRST_USE_KEEP_KEY];
 
 await test('23. OLD CODE: an extension a \'*\' agent wrote before the update binds on an app\'s first use and in an unattended run, as at HEAD', async () => {
     // Written before the update: no declaration, an agent without secrets:manage as its writer.
@@ -615,7 +606,7 @@ await test('23. OLD CODE: an extension a \'*\' agent wrote before the update bin
     const storage = await createStorage({ provider, sqlitePath: pinnedSqlitePath(), dbUrl: serverDbUrl() });
     await storage.deleteMemory(`system@${NODE_ID}`, FIRST_USE_KEEP_STEP_KEY);
     const step = await keepExtensionFirstUseOnce(storage, { nodeId: NODE_ID });
-    assert(step.ran && step.names.includes(full(MARK_EXT)) && step.names.includes(full(MARK_FOREIGN)) && !step.names.includes('living-hooks'),
+    assert(step.ran && step.names.includes(MARK_EXT) && step.names.includes(MARK_FOREIGN) && !step.names.includes('living-hooks'),
         `the step marked: ${JSON.stringify(step)}`);
     assert(typeof await markOf(MARK_EXT) === 'string', 'the record carries no mark');
     await store(owner.token, 'K_OLD', 'zz-old-zz');

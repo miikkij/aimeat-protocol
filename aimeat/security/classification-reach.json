@@ -552,9 +552,9 @@
     },
     "src/routes/memory/public-read.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the record passes presentMemory (the classification reader) after the visibility and access decision and before anything is answered."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review), checked: the record passes presentMemory (the classification reader) after the visibility and access decision and before anything is answered. The second read (2026-10-26) is the same record under the signed-in account's own extension memory owner `ext:<account>/<name>`; it is one of the two candidates for `stored`, which goes through the same gate and reader."
     },
     "src/routes/notifications.ts": {
       "reads": {
@@ -679,11 +679,11 @@
       "reads": {
         "readStorageFileRange": 1,
         "getStorageFile": 3,
-        "getStorageFileMeta": 4,
+        "getStorageFileMeta": 5,
         "listStorageFiles": 1,
         "generateDownloadToken": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it)."
+      "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
     },
     "src/routes/subdomain-origin-docs.ts": {
       "reads": {
@@ -1753,10 +1753,10 @@
     },
     "src/services/file-refs.ts": {
       "reads": {
-        "getStorageFile": 1,
+        "getStorageFile": 2,
         "generateDownloadToken": 1
       },
-      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one."
+      "why": "A classification loader (TARGET-082 V1): it loads and passes the reader it takes; every caller hands it one. The second read (2026-10-26) is the same lookup under the account's own extension file key; the file it finds passes the same access decision and reader."
     },
     "src/services/finance/accountant-access.ts": {
       "reads": {
@@ -2474,9 +2474,10 @@
     },
     "src/services/storage-file-write.ts": {
       "reads": {
-        "getStorageFile": 1
+        "getStorageFile": 2,
+        "getStorageFileMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete. 2026-10-26: the second getStorageFile is the same check under the account's own extension file key, and the getStorageFileMeta decides which key a visibility change names; neither hands content to a caller."
     },
     "src/services/structure-overview.ts": {
       "reads": {

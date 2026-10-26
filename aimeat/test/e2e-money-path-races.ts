@@ -28,7 +28,6 @@
  *   registers: Stripe's id for the UCP card, and a kept-card handler for the renewal.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-path-races
  * @version-history
- *   2026-10-25 — The renewal race's subscription names the extension `<owner>/<name>`, as names live in the owner's namespace (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-18 — Initial (wish-rahapolkujen-kilpatilanteet-kaksoismyynti-peruutus-ja-tilin-).
  */
@@ -349,8 +348,6 @@ await test('The node\'s own UCP records do not count against the seller\'s memor
 // ── A subscription's renewal and its cancel ──────────────────────────────────────────────────
 
 const EXT = `racesubs${stamp}`;
-// The stored name a subscription carries, `<owner>/<name>` (services/component-address.ts).
-const EXT_FULL = `${shop.name}/${EXT}`;
 await test('A subscription cancelled while its renewal is charging stays cancelled, and the renewal still extends it', async () => {
     const manifest = JSON.stringify({
         metadata: { name: EXT, version: '1.0.0', description: 'races e2e', author: 'e2e' },
@@ -367,20 +364,20 @@ await test('A subscription cancelled while its renewal is charging stays cancell
     const until = new Date(Date.now() + 86_400_000).toISOString();
     const now = new Date().toISOString();
     await storage.setMemory({
-        key: `${SUBSCRIPTION_PREFIX}${EXT_FULL}.monthly`, ownerGaii: consumer.ghii, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+        key: `${SUBSCRIPTION_PREFIX}${EXT}.monthly`, ownerGaii: consumer.ghii, visibility: 'private', tags: [], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
         value: {
-            ext: EXT_FULL, plan: 'monthly', title: 'Monthly', seller_ghii: shop.ghii, buyer_ghii: consumer.ghii, amount: 3990000, currency: 'EUR', period_days: 30,
+            ext: EXT, plan: 'monthly', title: 'Monthly', seller_ghii: shop.ghii, buyer_ghii: consumer.ghii, amount: 3990000, currency: 'EUR', period_days: 30,
             started_at: now, active_until: until, auto_renew: true, kept_payment: { handler: KEPT, customer: 'cus_race', payment_method: 'pm_race' }, updated_at: now,
         },
     });
     const started = new Promise<void>(r => { chargeStarted = r; });
     const [outcomes] = await Promise.all([
         runSubscriptionRenewals(storage, config),
-        (async () => { await started; await cancelSubscription(storage, consumer.ghii, EXT_FULL, 'monthly'); releaseCharge(); })(),
+        (async () => { await started; await cancelSubscription(storage, consumer.ghii, EXT, 'monthly'); releaseCharge(); })(),
     ]);
-    const mine = outcomes.find(o => o.ext === EXT_FULL);
+    const mine = outcomes.find(o => o.ext === EXT);
     assert(mine?.result === 'renewed' && renewalCharges.length === 1, `renewed once: ${JSON.stringify(mine)} charges ${renewalCharges.length}`);
-    const rec = (await storage.getMemory(consumer.ghii, `${SUBSCRIPTION_PREFIX}${EXT_FULL}.monthly`))!.value as { auto_renew: boolean; active_until: string };
+    const rec = (await storage.getMemory(consumer.ghii, `${SUBSCRIPTION_PREFIX}${EXT}.monthly`))!.value as { auto_renew: boolean; active_until: string };
     assert(rec.auto_renew === false, `the cancel made during the charge holds: auto_renew ${rec.auto_renew}`);
     assert(Date.parse(rec.active_until) === Date.parse(until) + 30 * 86_400_000, `the paid renewal extends the period: ${rec.active_until}`);
 });

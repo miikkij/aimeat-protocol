@@ -11,6 +11,7 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-26 — The owner is additive: aimeat_extension_install keeps the bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): install stores `<owner>/<name>` (or the owner's existing or released bare name), and every tool reads `name` as an address: the managing tools the caller's own first, get and invoke the bare record first (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install asks the install rule before it hands out an upload URL, and a refusal by the install role names the setting and the operator (secaudit2026oct22 lead 128).
  *   2026-10-25 — aimeat_extension_get answers installed_by_principal, the principal that wrote the code, as the REST detail does (secaudit2026oct22 lead 98, transparency).
@@ -406,16 +407,11 @@ export function registerExtensionsTools(
             const record = built.record;
             const scheduler = getActiveScheduler();
 
-            // The stored name lives in the installer's namespace (services/component-address.ts): the
-            // owner's own extension of this name if they have one, else `<owner>/<name>`, or a bare
-            // name they released and take back. An operator's update may still name a bare record
-            // another account holds, as before.
-            const shortName = record.name;
-            let { existing: existingExt } = await placeExtensionInstall(storage, callerOwner, record);
-            if (!existingExt && update && isOperator) {
-                const bare = await storage.getExtension(shortName);
-                if (bare) { existingExt = bare; record.name = bare.name; }
-            }
+            // The record under that name, as before (services/component-address.ts): the bare record,
+            // whoever holds it (the owner check below refuses another account's), else the caller's
+            // own `<owner>/<name>`; a new install keeps its bare name unless another account
+            // released it.
+            const { existing: existingExt } = await placeExtensionInstall(storage, callerOwner, record);
             const name = record.name;
             if (existingExt && !update) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed — pass update: true to upsert it in place (activation status and its ext: memory are preserved), or delete + reinstall.` }], isError: true };

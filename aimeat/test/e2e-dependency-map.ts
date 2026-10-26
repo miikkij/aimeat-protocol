@@ -10,7 +10,6 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dependency-map
  * @version-history
- *   2026-10-25 — The cortex is named `<ownerA>/<short>` in the map, the lists and the app's library address, as names live in the owner's namespace (secaudit2026oct22).
  *   v1.0.0 — 2026-09-03 — Initial (dependency map, slice 1; brief doc-mtkr34qa1dg1).
  *   v1.1.0 — 2026-09-03 — A library pack an app includes is an edge: ?pack=, requires.packs, the pack index used_by, and the edge goes with the app.
  */
@@ -22,9 +21,6 @@ const stamp = Date.now() % 100000;
 const ownerA = `depowna${stamp}`;
 const ownerB = `depownb${stamp}`;
 const CORTEX = `depcx${stamp}`;
-// The installer manages the cortex by its short name; the map, the lists and an app's library
-// address name it in the installer's namespace.
-const CORTEX_FULL = `${ownerA}/${CORTEX}`;
 const EXT = `depext${stamp}`;
 const APP = 'dep-app.html';
 const PARKED_APP = 'dep-parked.html';
@@ -51,7 +47,7 @@ const auth = (token: string, opts: RequestInit = {}): RequestInit =>
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 
 const APP_V1 = `<!DOCTYPE html><html><head>
-<script src="/v1/cortex/${CORTEX_FULL}/libs/dep.js"></script>
+<script src="/v1/cortex/${CORTEX}/libs/dep.js"></script>
 <script src="https://example.test/v1/cortex/aimeat-charts@1.1.2/libs/charts.js"></script>
 </head><body><script>
 fetch('/v1/ext/${EXT}/hello', { method: 'POST' });
@@ -98,7 +94,7 @@ await test('a cortex library that calls an extension gets its edge at install', 
     const act = await json(`/v1/cortex/${CORTEX}/activate`, auth(tokenA, { method: 'POST' }));
     assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body).slice(0, 160)}`);
     const { body: d } = await json(`/v1/dependencies?extension=${EXT}`, auth(tokenA));
-    assert(d.data.used_by.cortexes.some((c: any) => c.name === CORTEX_FULL && c.version === '1.0.0' && c.pinned === null), `cortex edge missing: ${JSON.stringify(d.data)}`);
+    assert(d.data.used_by.cortexes.some((c: any) => c.name === CORTEX && c.version === '1.0.0' && c.pinned === null), `cortex edge missing: ${JSON.stringify(d.data)}`);
 });
 
 await test('an app gets its edges from its bytes at publish: bare, pinned and declared', async () => {
@@ -108,7 +104,7 @@ await test('an app gets its edges from its bytes at publish: bare, pinned and de
     const r = d.data.requires;
     const cx = (n: string) => r.cortex.find((c: any) => c.name === n);
     const ex = (n: string) => r.extensions.find((e: any) => e.name === n);
-    assert(cx(CORTEX_FULL) && cx(CORTEX_FULL).pinned === null && cx(CORTEX_FULL).via === 'source', `bare cortex edge: ${JSON.stringify(r)}`);
+    assert(cx(CORTEX) && cx(CORTEX).pinned === null && cx(CORTEX).via === 'source', `bare cortex edge: ${JSON.stringify(r)}`);
     assert(cx('aimeat-charts') && cx('aimeat-charts').pinned === '1.1.2', `pinned cortex edge: ${JSON.stringify(r)}`);
     assert(cx('declared-cx') && cx('declared-cx').via === 'manifest', `declared cortex edge: ${JSON.stringify(r)}`);
     assert(ex(EXT) && ex(EXT).pinned === null, `bare extension edge: ${JSON.stringify(r)}`);
@@ -124,11 +120,11 @@ await test('the extension and cortex lists carry used_by, the app list carries r
     assert(d.data.used_by.cortexes.length === 1, 'cortex dependant missing');
     assert(Array.isArray(ext.data.extensions) && ext.data.extensions.every((e: any) => 'used_by' in e && 'installedBy' in e), 'extension list rows lack used_by/installedBy');
     const { body: cx } = await json('/v1/cortex', auth(tokenA));
-    const row = cx.data.extensions.find((e: any) => e.name === CORTEX_FULL);
+    const row = cx.data.extensions.find((e: any) => e.name === CORTEX);
     assert(row && row.used_by.apps === 1 && row.used_by.app_names[0] === `${ownerA}/${APP}`, `cortex list used_by: ${JSON.stringify(row?.used_by)}`);
     const { body: apps } = await json(`/v1/apps?q=Dep%20app`, auth(tokenA));
     const app = apps.data.apps.find((a: any) => a.filename === APP && a.owner === ownerA);
-    assert(app && app.requires.extensions.some((e: any) => e.name === EXT) && app.requires.cortex.some((c: any) => c.name === CORTEX_FULL), `app list requires: ${JSON.stringify(app?.requires)}`);
+    assert(app && app.requires.extensions.some((e: any) => e.name === EXT) && app.requires.cortex.some((c: any) => c.name === CORTEX), `app list requires: ${JSON.stringify(app?.requires)}`);
 });
 
 await test('the whole map lists what exists and who uses it', async () => {
@@ -148,13 +144,6 @@ await test('a republish replaces the edges; a cortex upsert replaces its own', a
     assert(up.status === 200, `upsert ${up.status}: ${JSON.stringify(up.body).slice(0, 200)}`);
     const { body: d2 } = await json(`/v1/dependencies?extension=${EXT}`, auth(tokenA));
     assert(d2.data.used_by.cortexes.length === 0, `cortex edge survived the upsert: ${JSON.stringify(d2.data.used_by)}`);
-});
-
-await test('another owner who names the cortex in full cannot replace it, so its edges stay its owner\'s', async () => {
-    const up = await json(`/v1/cortex/${encodeURIComponent(CORTEX_FULL)}`, auth(tokenB, { method: 'PUT', body: JSON.stringify({ manifest: CORTEX_MANIFEST(ownerA, '9.0.0'), libs: { 'dep.js': LIB_V1 } }) }));
-    assert(up.status === 403, `B replaced A's cortex: ${up.status} ${JSON.stringify(up.body?.error)}`);
-    const { body } = await json(`/v1/cortex/${encodeURIComponent(CORTEX_FULL)}`, auth(tokenA));
-    assert(body.data?.version === '1.1.0', `A's cortex stays at 1.1.0: ${JSON.stringify(body.data?.version)}`);
 });
 
 await test('a parked app is counted for a stranger and named only to its owner', async () => {
