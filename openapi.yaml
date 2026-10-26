@@ -76,7 +76,7 @@ info:
     records AI provenance whatever `AIMEAT_AI_PROVENANCE` says. Deprecated in 4.0.0 and removed in
     5.0.0: `sharing.morsel_price` on a knowledge package and `cost.morsels` on a capability, the old
     names of `toll_morsels`.
-  version: 4.1.2
+  version: 4.2.0
   x-aimeat-protocol: '2026-11'
   contact:
     name: Jouni Miikki
