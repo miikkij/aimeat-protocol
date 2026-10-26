@@ -168,7 +168,7 @@ import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
-import { getAgentSkillLinks } from '../services/skills.js';
+import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { readsAsOwner, ownerScopeView } from '../services/owner-scope-read.js';

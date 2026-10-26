@@ -18,7 +18,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
-import { getAgentSkillLinks } from '../skills.js';
+import { getAgentSkillLinks } from '../skill-agent-links.js';
 
 export interface AgentDataAccessOverview {
   directives: {

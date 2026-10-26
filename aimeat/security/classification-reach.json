@@ -2459,9 +2459,15 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
     },
+    "src/services/skill-agent-link-records.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-26, the node's own read, moved here from skills.ts unchanged: the owner's own agents.{name}.skills link record, read to list and rewrite an agent's skill refs; it holds refs and no skill content."
+    },
     "src/services/skills.ts": {
       "reads": {
-        "getMemory": 9,
+        "getMemory": 7,
         "listMemory": 8
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Skill bodies and manifests pass the reader (skill-reader.ts) in listing, resolve and pinned reads; publish, delete, visibility, version lists and links are the node's own."
