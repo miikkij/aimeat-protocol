@@ -6,6 +6,8 @@ build/
 .env.developer.override
 .env.test.*
 !.env.test.*.example
+# The Dify bridge's token and agent key (aimeat/tools/dify-bridge/src/connect-onboard.ts).
+.aimeat-dify/
 # Local rollback snapshots of .env (contain secrets) — never commit.
 .env.*-backup
 .env.*.bak

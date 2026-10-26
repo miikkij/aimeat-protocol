@@ -8,7 +8,14 @@
 #         AIMEAT_OWNER=alice ./aimeat-connect.sh
 # @env    AIMEAT_BASE_URL (default https://aimeat.io), AIMEAT_OWNER (required),
 #         AIMEAT_AGENT_NAME (default openhands), AIMEAT_SCOPES (default "*"),
-#         AIMEAT_SECRETS_FILE (default ./secrets/aimeat.env)
+#         AIMEAT_SECRETS_FILE (default ./secrets/aimeat.env),
+#         AIMEAT_KEY_FILE (default <secrets dir>/<agent>@<owner>.key)
+# @version-history
+#   2026-10-26 — Keeps the agent's private key of each approval beside the token (0600) and signs a
+#     reconnect's device request with it (`proof`), so the owner sees the agent coming back and not a
+#     takeover (secaudit2026oct22, unbound-reapproval-of-existing-agent). The default scope "*" is no
+#     longer glob-expanded into file names, and a python3 that does not run (the Windows Store alias)
+#     falls through to jq or node.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -30,10 +37,12 @@ if [ -z "$OWNER" ]; then
 fi
 [ -n "$OWNER" ] || { echo "ERROR: owner is required." >&2; exit 1; }
 
-# JSON helper — prefer python3 (ubiquitous in the OpenHands image), fall back to jq.
+# JSON helper — prefer python3 (ubiquitous in the OpenHands image), fall back to jq, then node.
+# python3 is run once rather than only looked up: on Windows the Store alias answers
+# `command -v python3` and then exits 49 without running anything.
 json() { # json <field>  (reads JSON on stdin, prints .field, empty if absent)
   local field="$1"
-  if command -v python3 >/dev/null 2>&1; then
+  if python3 -c '' >/dev/null 2>&1; then
     python3 -c 'import sys,json
 try:
     d=json.load(sys.stdin)
@@ -45,22 +54,54 @@ v=d.get(sys.argv[1]) if isinstance(d,dict) else None
 print(v if v is not None else "")' "$field"
   elif command -v jq >/dev/null 2>&1; then
     jq -r --arg f "$field" '(.data // .) | .[$f] // empty'
+  elif command -v node >/dev/null 2>&1; then
+    node -e 'let s="";process.stdin.on("data",c=>s+=c).on("end",()=>{let d;try{d=JSON.parse(s)}catch{return}
+if(d&&typeof d==="object"&&d.data&&typeof d.data==="object")d=d.data;
+const v=d&&typeof d==="object"?d[process.argv[1]]:undefined;process.stdout.write(v==null?"":String(v)+"\n")})' "$field"
   else
-    echo "ERROR: need python3 or jq to parse JSON." >&2; exit 1
+    echo "ERROR: need python3, jq or node to parse JSON." >&2; exit 1
   fi
 }
 
-# Convert space-separated scopes to a JSON array.
+# Convert space-separated scopes to a JSON array. `read -a` splits without glob expansion: an
+# unquoted `for s in $SCOPES` turned the default "*" into the names of the files in the directory.
 scopes_json() {
-  local out="" s
-  for s in $SCOPES; do out="$out\"$s\","; done
+  local out="" s list
+  read -r -a list <<< "$SCOPES"
+  for s in "${list[@]}"; do out="$out\"$s\","; done
   echo "[${out%,}]"
+}
+
+# The agent's private key from its last approval, kept beside the token at 0600. A reconnect signs
+# its device request with it, so the owner sees this agent coming back rather than a new device
+# taking it over (aimeat/src/services/device-return-proof.ts). Signing needs openssl 3 with Ed25519;
+# without it, or without a key, the request goes without proof and the owner sees the takeover
+# screen, as before. No stored token is ever sent with the device request: the node refuses a dead one.
+KEY_FILE="${AIMEAT_KEY_FILE:-$(dirname "$SECRETS_FILE")/${AGENT_NAME}@${OWNER}.key}"
+
+return_proof_json() { # prints ,"proof":{...} or nothing
+  [ -s "$KEY_FILE" ] || return 0
+  command -v openssl >/dev/null 2>&1 || return 0
+  local dir signed_at sig
+  dir="$(mktemp -d)" || return 0
+  ( umask 077
+    # PKCS#8 DER prefix for a raw 32-byte Ed25519 seed, then the seed itself.
+    { printf '\x30\x2e\x02\x01\x00\x30\x05\x06\x03\x2b\x65\x70\x04\x22\x04\x20'; base64 -d < "$KEY_FILE"; } > "$dir/key.der" ) 2>/dev/null
+  signed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+  printf 'aimeat-device-return:v1\n%s\n%s\n%s' "$OWNER" "$AGENT_NAME" "$signed_at" > "$dir/msg"
+  if openssl pkeyutl -sign -rawin -keyform DER -inkey "$dir/key.der" -in "$dir/msg" -out "$dir/sig" >/dev/null 2>&1; then
+    sig="$(base64 < "$dir/sig" | tr -d '\r\n')"
+    printf ',"proof":{"signed_at":"%s","signature":"%s"}' "$signed_at" "$sig"
+  else
+    echo "WARNING: could not sign with $KEY_FILE; connecting without proof that this is the same agent." >&2
+  fi
+  rm -rf "$dir"
 }
 
 echo "==> Requesting device authorization for ${AGENT_NAME}#${OWNER} @ ${BASE_URL}"
 AUTHZ="$(curl -s -X POST "$BASE_URL/v1/agents/device-authorize" \
   -H "Content-Type: application/json" \
-  -d "{\"owner\":\"$OWNER\",\"agent_name\":\"$AGENT_NAME\",\"display_name\":\"OpenHands\",\"description\":\"AIMEAT-boosted OpenHands app builder\",\"scopes\":$(scopes_json)}")"
+  -d "{\"owner\":\"$OWNER\",\"agent_name\":\"$AGENT_NAME\",\"display_name\":\"OpenHands\",\"description\":\"AIMEAT-boosted OpenHands app builder\",\"scopes\":$(scopes_json)$(return_proof_json)}")"
 
 DEVICE_CODE="$(printf '%s' "$AUTHZ" | json device_code)"
 USER_CODE="$(printf '%s' "$AUTHZ" | json user_code)"
@@ -107,6 +148,7 @@ done
 
 GAII="$(printf '%s' "$RESP" | json gaii)"
 EXPIRES="$(printf '%s' "$RESP" | json expires_at)"
+PRIVATE_KEY="$(printf '%s' "$RESP" | json privateKey)"
 
 mkdir -p "$(dirname "$SECRETS_FILE")"
 umask 077
@@ -119,6 +161,13 @@ AIMEAT_AGENT_TOKEN=$TOKEN
 AIMEAT_TOKEN_EXPIRES_AT=$EXPIRES
 EOF
 chmod 600 "$SECRETS_FILE"
+# The key of this approval, in its own file so the env file sourced by render-config.sh and
+# postup.sh never carries it.
+if [ -n "$PRIVATE_KEY" ]; then
+  mkdir -p "$(dirname "$KEY_FILE")"
+  printf '%s\n' "$PRIVATE_KEY" > "$KEY_FILE"
+  chmod 600 "$KEY_FILE"
+fi
 
 echo
 echo "==> Connected as: $GAII"

@@ -26,6 +26,7 @@
  * @version-history v2.1.0 -- 2026-09-30 -- `--scopes a,b,c`: the permissions the agent asks for go into the device authorization request.
  * @version-history v2.1.1 -- 2026-10-14 -- Print the approval address with the user code (approvalUrl); the bare verification_uri opened the consent page on "Missing code parameter".
  * @version-history v2.3.0 -- 2026-10-25 -- The agent's private key of each approval is kept beside its token, and a reconnect signs the device-authorize request with it (`proof`), so the owner sees the agent coming back rather than a new device taking it over (services/device-return-proof.ts; secaudit2026oct22, lead 2150).
+ * @version-history v2.3.1 -- 2026-10-26 -- A stored token the node answers 401 is not sent with the device-authorize request: the node refuses a dead bearer, so a reconnect after the token expired (the path aimeat-crewai names for an expired token) failed with "Authorization request failed" before the owner saw anything (secaudit2026oct22, lead 2150 follow-up).
  * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  */
 import { AimeatClient } from './api-client.js';
@@ -274,6 +275,11 @@ export async function runAuth(args: AuthArgs): Promise<void> {
         outro(buildNextStepsMessage(buildAgentOnboardingInstruction()));
         return;
       }
+      // A stored token the node refused (expired or revoked) is not sent with the device request.
+      // The node refuses a dead bearer on every route (auth/middleware.ts), so the reconnect after
+      // an expired token failed before the owner saw a request. The request goes without it, with
+      // the proof below signed by the key this machine kept.
+      if (client.lastStatus === 401) client.setToken('');
     } catch {
       warn('Could not verify stored token. Starting fresh auth.');
     }

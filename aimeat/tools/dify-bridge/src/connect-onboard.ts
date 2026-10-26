@@ -11,15 +11,51 @@
  * @usage
  *   AIMEAT_BASE_URL=http://127.0.0.1:40050 OWNER=happyadmin AGENT_NAME=dify \
  *   pnpm exec node --import tsx tools/dify-bridge/src/connect-onboard.ts
+ *   The token and the agent's private key of the approval are kept in AIMEAT_DIFY_HOME (default
+ *   <cwd>/.aimeat-dify) as <agent>@<owner>.token and .key at 0600. A later run signs its device
+ *   request with that key (`proof`), so the owner sees the agent coming back and not a new device
+ *   taking it over (src/services/device-return-proof.ts). No stored token is sent with the device
+ *   request: the node refuses a dead one.
  * @version-history
+ *   v1.1.0 - 2026-10-26 - Keep the token and the agent's key, and sign a reconnect with the key
+ *     (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.0.0 - 2026-06-05 - Initial (Dify integration prototype).
  */
+import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { sign } from '../../../src/auth/keypair.js';
+import { returnProofMessage } from '../../../src/services/device-return-proof.js';
+
 const env = (k: string, d = ''): string => process.env[k] ?? d;
 const BASE = env('AIMEAT_BASE_URL', 'http://127.0.0.1:40050').replace(/\/+$/, '');
 const OWNER = env('OWNER');
 const AGENT = env('AGENT_NAME', 'dify');
 const PLATFORM = env('PLATFORM', 'dify');
 const POLL_TIMEOUT_SEC = parseInt(env('POLL_TIMEOUT_SEC', '600'), 10);
+const HOME = env('AIMEAT_DIFY_HOME', join(process.cwd(), '.aimeat-dify'));
+const keyFile = () => join(HOME, `${AGENT}@${OWNER}.key`);
+const tokenFile = () => join(HOME, `${AGENT}@${OWNER}.token`);
+
+/** A file only its owner reads (0600), in a folder only its owner opens (0700). */
+function writePrivate(path: string, text: string): void {
+  mkdirSync(HOME, { recursive: true, mode: 0o700 });
+  writeFileSync(path, text, { encoding: 'utf-8', mode: 0o600 });
+  chmodSync(path, 0o600);
+}
+
+/** The proof that this run is the agent coming back, signed with the key its last approval gave it. */
+async function returnProof(): Promise<{ signed_at: string; signature: string } | undefined> {
+  if (!existsSync(keyFile())) return undefined;
+  const key = readFileSync(keyFile(), 'utf-8').trim();
+  if (!key) return undefined;
+  const signedAt = new Date().toISOString();
+  try {
+    return { signed_at: signedAt, signature: await sign(key, returnProofMessage(OWNER, AGENT, signedAt)) };
+  } catch (e) {
+    console.warn(`  The key in ${keyFile()} could not sign (${(e as Error).message}); connecting without proof that this is the same agent.`);
+    return undefined;
+  }
+}
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -37,8 +73,10 @@ async function main(): Promise<void> {
 
   // 1) Agent connect — device authorization
   console.log(`\n[1/3] Registering agent "${AGENT}" for owner "${OWNER}" via device authorization...`);
+  const proof = await returnProof();
   const da = await call('POST', '/v1/agents/device-authorize', {
     agent_name: AGENT, display_name: 'Dify', description: 'Dify workflow runtime', owner: OWNER, mode: 'task-runner',
+    ...(proof ? { proof } : {}),
   });
   if (da.status !== 200) { console.error('device-authorize failed:', da.json?.error ?? da.json); process.exit(1); }
   const { device_code, user_code, verification_uri_complete, verification_uri } = da.json.data;
@@ -60,6 +98,8 @@ async function main(): Promise<void> {
     });
     if (tk.status === 200 && tk.json?.access_token) {
       token = tk.json.access_token; gaii = tk.json.gaii;
+      writePrivate(tokenFile(), token);
+      if (typeof tk.json.privateKey === 'string' && tk.json.privateKey) writePrivate(keyFile(), tk.json.privateKey);
       console.log(`  Approved. GAII = ${gaii}`);
       console.log(`  Scopes = ${(tk.json.scopes ?? []).join(', ')}`);
       break;
