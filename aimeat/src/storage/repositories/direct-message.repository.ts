@@ -7,6 +7,8 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.7.0 -- 2026-10-26 -- Reactions on a single message (addMessageReaction, removeMessageReaction,
+ *     listMessageReactions) and listDirectMessageCopies, which a reaction from another node checks against.
  *   v1.6.0 -- 2026-10-21 -- Group chat: updateConversation takes `invited` and `createdBy` (ConversationUpdate),
  *     and listConversationsInvitingMailbox lists the threads a mailbox is invited to.
  *   v1.5.0 -- 2026-09-13 -- ConversationSummary carries lastForeignAt, unreadToOwner and the opener (openedBy /
@@ -24,7 +26,7 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
 
-import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats, MessageReactionRecord } from '../interface.js';
 
 /** One row of the conversations list — the per-thread summary {@link DirectMessageRepository.listConversations}
  *  (and its batched sibling {@link DirectMessageRepository.listConversationsForOwners}) return. */
@@ -92,6 +94,19 @@ export interface DirectMessageRepository {
    * that exist; the caller indexes by `record.id` (the message id). Optional — falls back to a per-id loop.
    */
   getDirectMessagesByIds?(ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]>;
+  /** Every mailbox copy of one message on this node, whoever's mailbox holds it. A reaction from
+   *  another node names the message and the reactor, never the mailbox, so its check starts here. */
+  listDirectMessageCopies(id: string): Promise<DirectMessageRecord[]>;
+
+  // ── Reactions: one person's acknowledgement mark on one message ──
+  /** Give a mark. False when this reactor already gave this symbol on this message (nothing written). */
+  addMessageReaction(record: MessageReactionRecord): Promise<boolean>;
+  /** Take a mark back. False when there was none to take. */
+  removeMessageReaction(messageId: string, reaction: string, reactorGhii: string): Promise<boolean>;
+  /** The marks on these messages, oldest first, at most `opts.limit` rows (default 5000). Empty input
+   *  reads nothing. A thread page asks for at most 200 messages. */
+  listMessageReactions(messageIds: string[], opts?: { limit?: number }): Promise<MessageReactionRecord[]>;
+
   /** List a mailbox's inbound messages, newest first; returns total + unread count. */
   listInbox(ownerGhii: string, opts?: {
     unreadOnly?: boolean;

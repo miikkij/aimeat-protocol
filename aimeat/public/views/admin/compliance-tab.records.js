@@ -19,16 +19,22 @@
  * @structure RecordsGapsSection · RecordsSection · recordsCsv() · buildRecordsPrompt() · RecordsPromptSection
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v1.3.0 — 2026-10-26 — Every row of section 08 opens its gaps, each with the app or place it
+ *     names and a way to it; the registers row counts the node's drafts with the stored ones.
+ *   v1.2.0 — 2026-10-26 — The registers row says how many drafts the node made and nobody stored.
  *   v1.1.0 — 2026-10-24 — Every row of section 09 but the security classes opens its list, and a law
  *     row its questions (onOpen, compliance-tab.browse.js; C7.7).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvlftkh9zmc9, C7.3, C7.6).
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
 import { downloadBlob, toCsvBlob } from '/js/utils.js';
 import { getNodeUrl } from '/js/services/auth.js';
-import { gapRows } from '/views/profile/organisms/compliance-records.js';
+import { gapRows, gapName } from '/views/profile/organisms/compliance-records.js';
+import { placeHref } from './compliance-tab.item.js';
+import { Modal } from '/components/Modal.js';
 import { num } from './shared.js';
 import { Section } from '/components/Section.js';
 import { Readings } from '/components/Readings.js';
@@ -40,16 +46,56 @@ import { Columns } from '/components/Layout.js';
 
 const html = htm.bind(h);
 const R = (key, params) => t('admin.compliance.records.' + key, params);
-const W = (group, v) => tOr(`admin.compliance.records.${group}.${v}`, v);
+const O = (key, params) => t('admin.compliance.records.open.' + key, params);
+const W =(group, v) => tOr(`admin.compliance.records.${group}.${v}`, v);
 const lang = () => (document.documentElement.lang || 'en').slice(0, 2);
 
-/** Section 08: what the records leave open, one reading per kind. */
+/** The place one gap's evidence names, as the records dialog names places. */
+function gapPlace(ev) {
+  if (!ev) return null;
+  if (ev.scope === 'app' && ev.owner && ev.app) return { scope: 'app', owner: ev.owner, app: ev.app };
+  if (ev.scope === 'organism' && ev.organism_id) return { scope: 'organism', organism_id: ev.organism_id };
+  return null;
+}
+
+/** What one gap says in the reader's words: the families a map leaves unsaid, a law's open questions. */
+function gapWhy(g) {
+  const ev = g.evidence || {};
+  if (Array.isArray(ev.holds) && ev.holds.length) return R('gapHolds', { list: ev.holds.join(' · ') });
+  if (Array.isArray(ev.families) && ev.families.length) return R('gapFamilies', { list: ev.families.join(', ') });
+  if (g.kind === 'app-personal-data-unstated') return R('gapNoMap');
+  if (Array.isArray(ev.unanswered)) return R('unanswered', { n: num(ev.unanswered.length) });
+  return '';
+}
+
+/**
+ * Section 08: what the records leave open, one reading per kind, and each kind opens the list of
+ * its gaps: the app, shared place or law each one names, what it leaves open, and the way to the
+ * app's own page, where its data map says what it keeps (plan C1.6; Jouni, 2026-10-26: "miksi en
+ * pääse näkemään näitä listoja").
+ */
 export function RecordsGapsSection({ gaps }) {
-  const rows = gapRows(gaps);
+  const [open, setOpen] = useState(null);
+  const rows = gapRows(gaps).map(r => ({ ...r, mark: html`<${Action} small soft onClick=${() => setOpen(r.key)}>${O('open')}<//>` }));
+  const shown = (gaps || []).filter(g => g.kind === open);
   return html`
     <${Section} id="adm-cmp-08" num="08" title=${R('gapsTitle')}>
       ${rows.length === 0 ? html`<${Note} kind="quiet">${R('gapsNone')}<//>` : html`<${Readings} rows=${rows} />`}
-    <//>`;
+    <//>
+    ${open ? html`
+      <${Modal} open=${true} onClose=${() => setOpen(null)} size="lg" title=${tOr(`admin.compliance.records.kind.${open}`, open)} guard=${false}>
+        <${Readings} rows=${shown.map((g, i) => {
+          const place = gapPlace(g.evidence);
+          const href = place && placeHref(place);
+          return {
+            key: `${open}-${i}`,
+            name: gapName(g.evidence) || R('gapNode'),
+            why: gapWhy(g),
+            mark: href ? html`<${Action} small soft href=${href}>${O('openPlace.' + place.scope)}<//>` : null,
+            last: i === shown.length - 1,
+          };
+        })} />
+      <//>` : null}`;
 }
 
 /**
@@ -95,9 +141,10 @@ export function RecordsSection({ processing, registers, nodeId, onOpen }) {
       <${Columns}>
         <div>
           <${Readings} rows=${[
-            row('registers', R('registers'), R('registersWhy', {
+            row('registers', R('registers'), [R('registersWhy', {
               personal: num(reg.personal), node: num(reg.by_scope?.node ?? 0), organism: num(reg.by_scope?.organism ?? 0), app: num(reg.by_scope?.app ?? 0),
-            }), num(reg.total)),
+            }), reg.drafts?.total ? R('registersDrafts', { n: num(reg.drafts.total), node: num(reg.drafts.node), apps: num(reg.drafts.apps) }) : '']
+              .filter(Boolean).join(' '), num(reg.total + (reg.drafts?.total ?? 0))),
             row('domains', R('domains'), domains.length ? domains.map(([d, n]) => `${W('domain', d)} ${num(n)}`).join(' · ') : R('domainsNone'), num(domains.length)),
             row('requests', R('requests'), R('requestsWhy', { open: num(p.requests?.open ?? 0) }), num(p.requests?.total ?? 0)),
             row('breaches', R('breaches'), R('breachesWhy', { open: num(p.breaches?.open ?? 0) }), num(p.breaches?.total ?? 0)),

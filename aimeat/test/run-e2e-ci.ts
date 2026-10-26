@@ -835,6 +835,9 @@ const ALL_SUITES = [
     // A direct-message attachment crosses to another node, and to another person on one node, as the
     // file that was sent and as nothing else (secaudit 2026-10 wave 3, v81 and v82).
     'test/e2e-federation-dm-attachment-grant.ts',
+    // A mark on one direct message, on one node and across two real ones: the designed uses, the
+    // agent's wake-up, and the refusals, a forged mark from a peer among them (2026-10-26).
+    'test/e2e-message-reactions.ts',
     // A linked peer lists or writes a person's records here only with that person's sign-in consent,
     // and list-home, push-home and list-remote keep working, on two real nodes (secaudit 2026-10
     // wave 3, v70 and v71).

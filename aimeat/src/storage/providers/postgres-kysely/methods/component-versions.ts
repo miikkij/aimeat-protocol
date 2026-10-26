@@ -9,7 +9,7 @@
  *   getComponentVersion · deleteComponentVersions · recordReleasedComponentName ·
  *   getReleasedComponentName · deleteReleasedComponentName
  * @version-history
- *   v1.2.0 — 2026-10-25 — The released bare names, table "ReleasedComponentName" (migration 0119;
+ *   v1.2.0 — 2026-10-25 — The released bare names, table "ReleasedComponentName" (migration 0120;
  *     owner namespaces wish, secaudit2026oct22).
  *   v1.1.0 — 2026-09-24 — saveComponentVersion keeps a version once (ON CONFLICT DO NOTHING) and
  *     answers whether it stored this one. ON CONFLICT DO UPDATE let a re-publish replace the snapshot

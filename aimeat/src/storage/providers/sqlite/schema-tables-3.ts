@@ -6,6 +6,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   2026-10-26 — direct_message_reactions (acknowledgement marks on a message). Mirrors Postgres 0118.
  *   2026-09-23 — ai_decisions.provider, providerKind (fresh installs; schema.ts adds them to old ones)
  *   2026-09-20 — ai_decisions.rule, ruleVersion, outcome, keyScope (fresh installs; schema.ts adds
  *     them and their indexes to existing databases). Mirrors Postgres 0080.
@@ -417,6 +418,17 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_direct_messages_inbox ON direct_messages(ownerGhii, direction, createdAt);
     CREATE INDEX IF NOT EXISTS idx_direct_messages_convo ON direct_messages(ownerGhii, conversationId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_direct_messages_status ON direct_messages(status, origin);
+
+    -- ── Reactions: one person's acknowledgement mark on one message (mirrors Postgres 0118) ──
+    -- Keyed by the message id, which every mailbox copy shares, so one set of rows serves them all.
+    CREATE TABLE IF NOT EXISTS direct_message_reactions (
+      messageId    TEXT NOT NULL,
+      reaction     TEXT NOT NULL,
+      reactorGhii  TEXT NOT NULL,
+      byAgent      TEXT,
+      createdAt    TEXT NOT NULL,
+      PRIMARY KEY (messageId, reaction, reactorGhii)
+    );
 
     -- ── Group conversations (a thread with MORE than two participants) ──
     -- A row exists ONLY for a group thread. A two-party thread derives its id from the participant

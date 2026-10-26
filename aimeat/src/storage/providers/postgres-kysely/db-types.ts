@@ -1254,6 +1254,15 @@ export interface Conversation {
   updatedAt: Generated<Timestamp>;
 }
 
+/** Migration 0118: one person's acknowledgement mark on one message (services/message-reactions.ts). */
+export interface DirectMessageReaction {
+  byAgent: string | null;
+  createdAt: Generated<Timestamp>;
+  messageId: string;
+  reaction: string;
+  reactorGhii: string;
+}
+
 export interface DirectMessage {
   /** TARGET-058: the provenance record describing this message's body. NULL = unstated. */
   aiProvenanceId: string | null;
@@ -1445,7 +1454,7 @@ export interface ComponentVersion {
   createdBy: string;
 }
 
-/** 0119: a bare extension or cortex name released by uninstall, and the account that held it. */
+/** 0120: a bare extension or cortex name released by uninstall, and the account that held it. */
 export interface ReleasedComponentName {
   kind: string;
   name: string;
@@ -2209,7 +2218,7 @@ export interface SubdomainSite {
   kind: string;
   /** 'operator' | 'publisher'; null until classified (migration 0116). */
   origin: string | null;
-  /** ISO time the app this label served went away; null while it is there (migration 0118). */
+  /** ISO time the app this label served went away; null while it is there (migration 0119). */
   heldSince: string | null;
   subdomain: string;
   target: string;
@@ -2436,6 +2445,7 @@ export interface DB {
   Csm: Csm;
   DeviceAuth: DeviceAuth;
   DirectMessage: DirectMessage;
+  DirectMessageReaction: DirectMessageReaction;
   Dispute: Dispute;
   DisputeAudit: DisputeAudit;
   EcoAuth: EcoAuth;

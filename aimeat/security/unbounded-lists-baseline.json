@@ -21,6 +21,7 @@
     "listComponentVersions": "DEBT: ComponentVersionRepository.listComponentVersions(kind, name) returns every match for its scope, with no limit or cursor",
     "listConversations": "DEBT: DirectMessageRepository.listConversations(ownerGhii) returns every match for its scope, with no limit or cursor",
     "listConversationsForOwners": "DEBT: DirectMessageRepository.listConversationsForOwners(ownerGhiis) returns every match for its scope, with no limit or cursor",
+    "listDirectMessageCopies": "Cannot grow with the data: the copies of ONE message on this node, one per mailbox it was delivered to. A 1:1 message has two at most; a group thread at most one per participant, and a group holds at most 64 (MAX_GROUP_PARTICIPANTS, services/conversation-group.ts). Written 2026-10-26 (cc-jouni-inbox-speed).",
     "listConversationsForParticipant": "DEBT: DirectMessageRepository.listConversationsForParticipant(identity) returns every match for its scope, with no limit or cursor",
     "listDelegations": "DEBT: ConnectionRepository.listDelegations(connectionId) returns every match for its scope, with no limit or cursor",
     "listDeletedMemory": "DEBT: MemoryRepository.listDeletedMemory(ownerGaii) returns every match for its scope, with no limit or cursor",

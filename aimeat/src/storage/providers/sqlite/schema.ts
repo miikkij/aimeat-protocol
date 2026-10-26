@@ -12,7 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
- *   2026-10-25 — subdomain_sites.heldSince (migration 0118, secaudit2026oct22).
+ *   2026-10-25 — subdomain_sites.heldSince (migration 0119, secaudit2026oct22).
  *   2026-10-25 — subdomain_sites.origin (migration 0116, secaudit2026oct22).
  *   2026-10-18 — companies.frontPageAccess (migration 0106).
  *   2026-10-17 — direct_messages.sentByAgent and sentByAgentName (migration 0105).

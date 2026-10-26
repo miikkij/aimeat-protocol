@@ -263,6 +263,52 @@ await test('REPORT: the node-wide report carries processing, the gaps of every s
     assert((r.body.data.not_covered as Body[]).some(l => l.code === 'registers-are-statements'), 'limits');
 });
 
+// ─── The report sees the whole node: a parked app, a map that leaves personal data unsaid, an EU region ───
+await test('WHOLE NODE: a parked app with no map, a map row with no personal-data mark and an "EU/EEA" region all show as they are', async () => {
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Team</title></head><body>Team</body></html>';
+    const PARKED = `cmpparked${stamp % 1000000}.html`, MAPPED = `cmpmapped${stamp % 1000000}.html`;
+    for (const filename of [PARKED, MAPPED]) {
+        const p = await call('POST', '/v1/apps', carol.token, { filename, content: Buffer.from(html).toString('base64'), mime_type: 'text/html', name: 'Team', description: 'E2E' });
+        assert(p.status === 201, `publish ${filename}: ${p.status} ${JSON.stringify(p.body?.error)}`);
+    }
+    const park = await call('PATCH', `/v1/apps/${PARKED}`, carol.token, { parked: true });
+    assert(park.status === 200, `park: ${park.status} ${JSON.stringify(park.body?.error)}`);
+    // The shape a builder's AI wrote on a live node: rows that say what they are (isA) and never say personalData.
+    const row = (what: string, extra: Record<string, unknown>) => ({ what, holds: 'x', kind: 'register', usedFor: 'user-returns-to-read', where: 'extension-namespace', owner: 'extension', readers: 'the-app-itself', writers: ['an-extension-server-side'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', why: 'Here.', ...extra });
+    const m = await call('PUT', `/v1/datamap/apps/${carol.name}/${MAPPED}`, carol.token, {
+        spec: 'aimeat.datamap/2', what: 'Team contacts.', usedFor: 'Reaching colleagues.', form: 'group', arrangement: 'One extension.', machinery: [], leaves: ['A reminder goes to the colleague by email.'], elsewhere: [],
+        held: [row('team.people', { isA: 'schema:Person' }), row('team.notes', {})],
+    });
+    assert(m.status === 200, `data map: ${m.status} ${JSON.stringify(m.body?.error)}`);
+    const w = await call('PUT', '/v1/compliance/docs/processors', op.token, { items: [
+        { id: 'us-analytics', name: 'US analytics', service: 'analytics', country: 'United States' },
+        { id: 'azure-se', name: 'Microsoft Azure', service: 'hosting', country: 'Sweden Central (EU/EEA)' },
+    ] });
+    assert(w.status === 200, `processors: ${w.status} ${JSON.stringify(w.body?.error)}`);
+
+    const r = await call('GET', '/v1/admin/compliance/report', op.token);
+    assert(r.status === 200, `report: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const gaps = r.body.data.processing.gaps as Body[];
+    const forApp = (app: string, kind: string) => gaps.find(g => g.kind === kind && g.evidence?.app === app && g.evidence?.owner === carol.name);
+    assert(forApp(PARKED, 'app-personal-data-unstated'), `the parked app with no map: ${JSON.stringify(gaps.filter(g => g.evidence?.owner === carol.name))}`);
+    assert(forApp(MAPPED, 'app-personal-data-without-register'), 'a family that is schema:Person is personal data');
+    const unstated = forApp(MAPPED, 'app-personal-data-unstated');
+    assert(Array.isArray(unstated?.evidence?.families) && unstated.evidence.families.includes('team.notes') && !unstated.evidence.families.includes('team.people'),
+        `a family with no mark is unsaid: ${JSON.stringify(unstated)}`);
+    const transfers = (await call('GET', '/v1/compliance/docs/processors', op.token)).body.data.transfers as Body[];
+    assert(!transfers.some(t => t.processor === 'azure-se'), `an EU region is no transfer: ${JSON.stringify(transfers)}`);
+    assert(transfers.some(t => t.processor === 'us-analytics'), 'a US processor still is');
+    assert(!gaps.some(g => g.kind === 'transfer-without-basis' && g.evidence?.processor === 'azure-se'), 'no transfer gap for Sweden');
+    // The draft the node can make for that app is counted and listed, marked as a draft nobody stored.
+    const drafts = r.body.data.processing.registers.drafts;
+    assert(drafts?.apps >= 1 && drafts.total >= 1, `drafts counted: ${JSON.stringify(r.body.data.processing.registers)}`);
+    const all = await call('GET', '/v1/compliance/docs/registers?scope=all', op.token);
+    const draftPlace = (all.body.data.places as Body[]).find(p => p.place.app === MAPPED && p.place.owner === carol.name);
+    assert(draftPlace?.draft === true && draftPlace.may_write === false && draftPlace.items?.[0]?.type === 'personal', `the draft place: ${JSON.stringify(draftPlace)}`);
+    assert(JSON.stringify(draftPlace.items[0].recipients) === JSON.stringify(['A reminder goes to the colleague by email.']), `a sentence in leaves is the recipient: ${JSON.stringify(draftPlace.items[0].recipients)}`);
+    assert(!(all.body.data.places as Body[]).some(p => p.place.app === PARKED), 'an app with no map has no draft');
+});
+
 // ─── Every place at once, and one entry changed in place (C7.7) ───
 await test('ALL: the operator reads every place that keeps registers, each named, with may_write; anyone else is refused (403)', async () => {
     const r = await call('GET', '/v1/compliance/docs/registers?scope=all', op.token);

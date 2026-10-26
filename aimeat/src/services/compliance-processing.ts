@@ -13,6 +13,9 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.1.0 — 2026-10-26 — registers.drafts counts the registers the node can draft where none is
+ *     stored, so a node that stored none shows what it holds rather than 0.
+ *   v1.0.1 — 2026-10-25 — The limit app-scan-listed-only is gone: the scan reads every app now.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.5, C3.6, C4, C5, C6, C7).
  */
 import type { AimeatConfig } from '../config.js';
@@ -22,10 +25,15 @@ import { packStatus, type PackStatus } from './classification/packs.js';
 import { listDocs, readDoc } from './compliance-docs.js';
 import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } from './compliance-derived.js';
 import { nodeWideScopeGaps, type ScopeGap } from './compliance-scope-gaps.js';
+import { registerDrafts } from './compliance-register-drafts.js';
 import type { ComplianceRegister } from './compliance-docs-schemas.js';
 
 export interface ProcessingSummary {
-  registers: { total: number; personal: number; by_scope: { node: number; organism: number; app: number } };
+  registers: {
+    total: number; personal: number; by_scope: { node: number; organism: number; app: number };
+    /** Registers the node can draft where none is stored (compliance-register-drafts.ts): not stored, unreviewed. */
+    drafts: { total: number; node: number; app: number; apps: number };
+  };
   domains: Record<string, number>;
   requests: { open: number; total: number };
   breaches: { open: number; total: number };
@@ -48,10 +56,6 @@ export const PROCESSING_LIMITS = [
   {
     code: 'not-accredited',
     text: 'The TL and NATO label packs mark, recognise and restrict classified content. They do not make this node an accredited system (Katakri, Traficom approval, NATO accreditation).',
-  },
-  {
-    code: 'app-scan-listed-only',
-    text: 'The apps whose data maps are read here are the ones the catalogue lists, and any app with a stored register. An app that is parked or hidden is read only when it has a register.',
   },
   {
     code: 'federation-peers-not-processors',
@@ -82,12 +86,19 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
       for (const d of r.domains ?? []) domains[d] = (domains[d] ?? 0) + 1;
     }
   }
+  const draftPlaces = await registerDrafts(deps, regDocs);
+  const drafts = { total: 0, node: 0, app: 0, apps: 0 };
+  for (const d of draftPlaces) {
+    drafts.total += d.items.length;
+    drafts[d.scope.kind] += d.items.length;
+    if (d.scope.kind === 'app') drafts.apps++;
+  }
   const requests = reqDocs.flatMap(d => d.doc.items);
   const breaches = breachDocs.flatMap(d => d.doc.items);
   const processors = processorsView(derivedProcessors(config), storedProcessors.items);
   return {
     summary: {
-      registers: { total, personal, by_scope: byScope }, domains,
+      registers: { total, personal, by_scope: byScope, drafts }, domains,
       requests: { open: requests.filter(r => r.status === 'open').length, total: requests.length },
       breaches: { open: breaches.filter(b => b.status === 'open').length, total: breaches.length },
       dpias: dpiaDocs.reduce((n, d) => n + d.doc.items.length, 0),
