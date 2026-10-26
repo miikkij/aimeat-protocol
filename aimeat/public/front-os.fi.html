@@ -5,6 +5,8 @@
     translated (aimeat-writing skill; this page's register is technical, so node and agent
     stay as the terms its audience uses). Same skeleton, CSS and /front-os.js.
   @version-history
+    v1.0.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does, so the
+      root has WebMCP tools whichever front page it serves.
     v1.0.0 - 2026-08-19 - First Finnish version, matching front-os.html v1.0.0.
 -->
 <html lang="fi">
@@ -15,6 +17,8 @@
   <meta name="description" content="Avoin, itse isännöitävä tekoälyn käyttöjärjestelmä. Sinun agenttisi, sinun appisi, sinun muistisi, nodella, jonka omistat. Käyttöjärjestelmä on ilmainen; me myymme hyvin hoidetun noden." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <script src="/front-os.js" defer></script>
+  <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
+  <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <style>
     :root {
       --bg: #0a0e12;

@@ -9,6 +9,8 @@
     sibling: front-demo.fi.html. The only JS is /front-demo.js (same-origin, CSP-clean):
     live numbers, the app wall, and the signed-in "Your home" chip.
   @version-history
+    v1.2.1 - 2026-10-26 - Loads /v1/libs/aimeat-webmcp.js?expose=node, as spa.html does, so the
+      root has WebMCP tools whichever front page it serves.
     v1.2.0 - 2026-08-19 - Apps are called apps, per owner feedback: the machine metaphor out
       of every sentence, the vocabulary aligned with how the world already talks about
       AI-built apps (create by chatting, copy it and make it your own).
@@ -28,6 +30,8 @@
   <meta name="description" content="aimeat.io is the world's most honest demo: a fully working AIMEAT anyone can drive today, free. When you want your own, with nobody in it but you and the people you invite, the store is one door over." />
   <link rel="stylesheet" href="/lib/aimeat-fonts.css">
   <script src="/front-demo.js" defer></script>
+  <!-- WebMCP: the node-level tools for in-browser agents and readiness scanners (spa.html has the same line). -->
+  <script src="/v1/libs/aimeat-webmcp.js?expose=node" defer></script>
   <style>
     :root {
       --ink: #2b1230;

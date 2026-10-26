@@ -1170,6 +1170,8 @@ const ALL_SUITES = [
     // The people directory: consent gate, the semantic record, radius and keyword search.
     'test/e2e-directory-index.ts',
     'test/e2e-agent-readiness.ts',
+    // The ARD manifest: one document naming the MCP server, the API, the offered agents and the public skills.
+    'test/e2e-ard-manifest.ts',
     // What a search engine is told not to index: machine documents, signed-in views, the sitemap.
     'test/e2e-seo-noindex.ts',
     'test/e2e-transparency-page.ts',

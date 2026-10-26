@@ -14,10 +14,13 @@
  *   - GET /.well-known/agent-skills/index.json      — the discovery index ($schema + skills[])
  *   - GET /.well-known/agent-skills/:name/SKILL.md  — the canonical SKILL.md the digest covers
  *   - buildIndex() — registry scan -> RFC entries (name, type, description, url, digest)
+ *   - agentSkillsIndex() — the cached index, read by the route and by the ARD manifest (routes/ard-manifest.ts)
  * @usage
  *   import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
  *   app.use(agentSkillsDiscoveryRouter(config, storage));  // next to wellknownRouter
  * @version-history
+ *   v1.1.0 — 2026-10-26 — agentSkillsIndex() exports the cached index, so the ARD catalog lists the
+ *     same skills from the same cache entry (wish-ai-catalog-well-known-ai-catalog-json-ard).
  *   v1.0.0 — 2026-07-14 — Initial: Agent Skills Discovery RFC v0.2.0 index + SKILL.md serving
  */
 import { Router } from 'express';
@@ -81,6 +84,13 @@ async function buildIndex(
   return { $schema: INDEX_SCHEMA, skills };
 }
 
+/** The discovery index through the cache: a registry write invalidates the 'domain:skills' tag. */
+export function agentSkillsIndex(
+  config: AimeatConfig, storage: Storage,
+): Promise<{ $schema: string; skills: AgentSkillsIndexEntry[] }> {
+  return cached('agent-skills:index', TTL.catalogue, () => buildIndex(config, storage), ['domain:skills']);
+}
+
 export function agentSkillsDiscoveryRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -89,11 +99,7 @@ export function agentSkillsDiscoveryRouter(config: AimeatConfig, storage: Storag
   // so publishes/deletes reflect immediately; the TTL is only the backstop.
   router.get('/.well-known/agent-skills/index.json', async (_req, res) => {
     try {
-      const index = await cached(
-        'agent-skills:index', TTL.catalogue,
-        () => buildIndex(config, storage),
-        ['domain:skills'],
-      );
+      const index = await agentSkillsIndex(config, storage);
       res.set('Cache-Control', 'max-age=300');
       res.json(index);
     } catch (err) {

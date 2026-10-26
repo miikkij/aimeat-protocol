@@ -117,3 +117,7 @@ Disallow: /
 # cross-host entries in the index legitimate.
 Sitemap: {{BASE_URL}}/sitemap.xml
 Sitemap: {{BASE_URL}}/sitemap-index.xml
+
+# The ARD manifest (agenticresourcediscovery.org): the MCP server, the API, the offered agents and
+# the public skills in one document. /.well-known/ai-catalog.json answers the same document.
+Agentmap: {{BASE_URL}}/.well-known/ard.json
