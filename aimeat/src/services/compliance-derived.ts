@@ -21,6 +21,8 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.1.1 — 2026-10-26 — A map whose `leaves` are sentences gives those sentences as recipients
+ *     ("undefined → undefined" on innokas-outreach).
  *   v1.1.0 — 2026-10-25 — A map row with no personal-data mark is unsaid (or personal when it is
  *     schema:Person) instead of skipped, and its family is read from `key` too; a country written as
  *     a cloud region ("Sweden Central (EU/EEA)") is read for the member state in it.
@@ -121,7 +123,8 @@ export async function appRegisterDraft(
       title: `${map.what.slice(0, 120) || filename}`, type: 'personal', role: 'controller',
       purposeText: map.usedFor.slice(0, 2000) || undefined,
       dataCategories: personal.map(r => `${familyOf(r)}: ${r.holds}`.slice(0, 300)),
-      recipients: map.leaves.map(l => `${l.what} → ${l.to}`.slice(0, 300)),
+      // A map an AI wrote to its own shape names what leaves as plain sentences, not { what, to }.
+      recipients: map.leaves.map(l => (typeof l === 'string' ? l : `${l.what} → ${l.to}`).slice(0, 300)),
       retentionText: keptForever ? 'Kept until deleted (data map).' : undefined,
       containers: [{ kind: 'app', app: filename }], reviewEveryMonths: 12,
       answerSources: src(['type', 'purposeText', 'dataCategories', 'recipients', 'retentionText', 'containers']),

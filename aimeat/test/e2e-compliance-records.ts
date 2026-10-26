@@ -276,7 +276,7 @@ await test('WHOLE NODE: a parked app with no map, a map row with no personal-dat
     // The shape a builder's AI wrote on a live node: rows that say what they are (isA) and never say personalData.
     const row = (what: string, extra: Record<string, unknown>) => ({ what, holds: 'x', kind: 'register', usedFor: 'user-returns-to-read', where: 'extension-namespace', owner: 'extension', readers: 'the-app-itself', writers: ['an-extension-server-side'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', why: 'Here.', ...extra });
     const m = await call('PUT', `/v1/datamap/apps/${carol.name}/${MAPPED}`, carol.token, {
-        spec: 'aimeat.datamap/2', what: 'Team contacts.', usedFor: 'Reaching colleagues.', form: 'group', arrangement: 'One extension.', machinery: [], leaves: [], elsewhere: [],
+        spec: 'aimeat.datamap/2', what: 'Team contacts.', usedFor: 'Reaching colleagues.', form: 'group', arrangement: 'One extension.', machinery: [], leaves: ['A reminder goes to the colleague by email.'], elsewhere: [],
         held: [row('team.people', { isA: 'schema:Person' }), row('team.notes', {})],
     });
     assert(m.status === 200, `data map: ${m.status} ${JSON.stringify(m.body?.error)}`);
@@ -305,6 +305,7 @@ await test('WHOLE NODE: a parked app with no map, a map row with no personal-dat
     const all = await call('GET', '/v1/compliance/docs/registers?scope=all', op.token);
     const draftPlace = (all.body.data.places as Body[]).find(p => p.place.app === MAPPED && p.place.owner === carol.name);
     assert(draftPlace?.draft === true && draftPlace.may_write === false && draftPlace.items?.[0]?.type === 'personal', `the draft place: ${JSON.stringify(draftPlace)}`);
+    assert(JSON.stringify(draftPlace.items[0].recipients) === JSON.stringify(['A reminder goes to the colleague by email.']), `a sentence in leaves is the recipient: ${JSON.stringify(draftPlace.items[0].recipients)}`);
     assert(!(all.body.data.places as Body[]).some(p => p.place.app === PARKED), 'an app with no map has no draft');
 });
 
