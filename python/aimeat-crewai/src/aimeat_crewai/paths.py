@@ -25,6 +25,18 @@ def aimeat_home() -> Path:
     return Path(os.environ.get("AIMEAT_HOME") or (Path.cwd() / ".aimeat"))
 
 
+def home_is_explicit() -> bool:
+    """True when ``AIMEAT_HOME`` names the home, False when the home is the current folder's
+    ``.aimeat``. A folder somebody cloned or received can hold a ``.aimeat`` the person did not write,
+    so a caller that pairs a credential from elsewhere with this home's contents checks this first."""
+    return bool(os.environ.get("AIMEAT_HOME"))
+
+
+def connector_config_path() -> Path:
+    """The connector home's ``config.yaml``."""
+    return aimeat_home() / "config.yaml"
+
+
 _NODE_URL_LINE = re.compile(r"""^node_url:\s*['"]?([^'"\s#]+)""", re.MULTILINE)
 
 
@@ -36,7 +48,7 @@ def connector_node_url() -> str | None:
     rather than a YAML parser: one top-level scalar, and no dependency for it.
     """
     try:
-        text = (aimeat_home() / "config.yaml").read_text(encoding="utf-8")
+        text = connector_config_path().read_text(encoding="utf-8")
     except OSError:
         return None
     match = _NODE_URL_LINE.search(text)
