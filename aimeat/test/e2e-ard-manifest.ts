@@ -6,11 +6,15 @@
  *   checks the structure: specVersion, host, a non-empty entries array, and per entry an
  *   urn:air identifier, a displayName, a media type and exactly one of url or data), whose every
  *   url answers 200 to an anonymous reader, and which lists exactly the agents of the A2A directory
- *   and the skills of the Agent Skills index, so the three discovery documents cannot disagree.
+ *   and the skills of the Agent Skills index, so the three discovery documents cannot disagree. An
+ *   owner who is not the operator cannot publish a node-wide skill (403), so cannot fill the
+ *   manifest with entries of their own.
  * @version-history
  *   2026-10-26 — Initial (wish-ai-catalog-well-known-ai-catalog-json-ard).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ard-manifest
+
+import { registerOwner, tokenRoles } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -110,11 +114,29 @@ const URN = /^urn:air:[a-zA-Z0-9.-]+(:[a-zA-Z0-9._-]+)+$/;
         assert(meta.includes('/.well-known/ard.json'), 'the API catalog does not link ard.json');
     });
 
+    await test('FAILURE: an owner who is not the operator cannot put a skill into the manifest (403)', async () => {
+        // A fresh node makes its first account the operator, so the probe is the second one.
+        await registerOwner(BASE, `ardfirst${Date.now().toString(36)}`);
+        const owner = await registerOwner(BASE, `ard${Date.now().toString(36)}`);
+        assert(!tokenRoles(owner.token).includes('operator'), `the probe owner is an operator: ${tokenRoles(owner.token).join(',')}`);
+        const name = `ard-stuffing-${Date.now().toString(36)}`;
+        const skillMd = `---\nname: ${name}\ndescription: An owner tries to list this skill node-wide.\n---\n\n# ${name}\n`;
+        const r = await fetch(`${BASE}/v1/skills`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${owner.token}` },
+            body: JSON.stringify({ skill_md: skillMd, scope: 'node', visibility: 'public' }),
+        });
+        assert(r.status === 403, `a node-wide skill from an ordinary owner → ${r.status}`);
+        const after = await doc('/.well-known/ard.json');
+        assert(!after.body.includes(name), 'the refused skill is in the manifest');
+    });
+
     await test('FAILURE: a write to the manifest is not accepted', async () => {
+        const before = await doc('/.well-known/ard.json');
         const r = await fetch(`${BASE}/.well-known/ard.json`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"entries":[]}' });
         assert(r.status === 404 || r.status === 405, `POST → ${r.status}`);
         const after = await doc('/.well-known/ard.json');
-        assert(JSON.stringify(after.json) === JSON.stringify(ard.json), 'the manifest changed after a POST');
+        assert(JSON.stringify(after.json) === JSON.stringify(before.json), 'the manifest changed after a POST');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

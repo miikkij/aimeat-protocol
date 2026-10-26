@@ -14,8 +14,9 @@
  *   tasks/update and tasks/cancel acknowledge, and a cancel after the end leaves `completed`. A call
  *   that does not declare the extension, and a declaring call that finishes under a 10 s threshold,
  *   answer with the plain result. FAILURE MODES: tasks/get without the capability (-32021), another
- *   owner's agent asking for the task id (-32602 not found, its own namespace), and an unknown id
- *   (-32602) on get and cancel.
+ *   owner's agent asking for the task id (-32602 not found, its own namespace), a task record written
+ *   through memory by the agent or by the owner in person (refused: the prefix is service-owned, so
+ *   nothing can put a forged result into tasks/get), and an unknown id (-32602) on get and cancel.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-tasks
  * @version-history
  *   v1.0.0 — 2026-10-26 — Initial (wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
@@ -97,6 +98,7 @@ let operator = { name: '', token: '' };
 let agent: McpAgent;
 let bobAgent: McpAgent;
 let original: number | undefined;
+let aliceToken = '';
 let taskId = '';
 const key = `tasks/probe-${Date.now().toString(36)}`;
 
@@ -104,6 +106,7 @@ await test('Setup: an operator answers every declaring call with a task, an agen
     operator = await setupOperator(BASE, ADMIN_PASSWORD, `tasksop${Date.now().toString(36)}`);
     const alice = await registerOwner(BASE, `tasks${Date.now().toString(36)}a`);
     const bob = await registerOwner(BASE, `tasks${Date.now().toString(36)}b`);
+    aliceToken = alice.token;
     agent = await makeAgent(BASE, alice, ['memory:read', 'memory:write']);
     bobAgent = await makeAgent(BASE, bob, ['memory:read', 'memory:write']);
     original = await setTaskAfter(operator.token, 0);
@@ -173,6 +176,20 @@ await test('FAILURE: another owner\'s agent finds no such task', async () => {
     const r = await modern(bobAgent.token, 'tasks/get', { taskId }, true);
     assert(r.body?.error?.code === -32602, `bob's agent: ${JSON.stringify(r.body).slice(0, 300)}`);
     assert(r.body.result === undefined, 'no task state reached another principal');
+});
+
+await test('FAILURE: nobody writes a task record through memory, the owner in person included', async () => {
+    const forged = { taskId, status: 'completed', createdAt: new Date().toISOString(), lastUpdatedAt: new Date().toISOString(), ttlMs: 3_600_000, result: { content: [{ type: 'text', text: 'forged' }] } };
+    const viaMcp = await modern(agent.token, 'tools/call', { name: 'aimeat_memory_write', arguments: { key: `mcp.tasks.${taskId}`, value: forged } }, false);
+    assert(viaMcp.body?.result?.isError === true, `the agent wrote its own task record: ${JSON.stringify(viaMcp.body).slice(0, 300)}`);
+    const viaRest = await fetch(`${BASE}/v1/memory`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${aliceToken}` },
+        body: JSON.stringify({ key: `mcp.tasks.${taskId}`, value: forged }),
+    });
+    assert(viaRest.status === 403, `the owner wrote a task record over REST: ${viaRest.status}`);
+    const t = await modern(agent.token, 'tasks/get', { taskId }, true);
+    assert(!JSON.stringify(t.body).includes('forged'), 'a forged result reached tasks/get');
 });
 
 await test('FAILURE: an unknown task id answers -32602 on get and cancel', async () => {

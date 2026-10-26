@@ -1961,6 +1961,13 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: MCP grant records."
     },
+    "src/services/mcp-tasks.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Written 2026-10-26 (MCP Tasks extension), the node's own read: the service-owned task record (mcp.tasks.<id>) in the calling principal's own namespace, read back only to that principal. Its result is the answer of a tool call the same principal made, which the tool already read through its own classification path; the record is never sent to a model."
+    },
     "src/services/memory-bin.ts": {
       "reads": {
         "getMemory": 2,
