@@ -192,7 +192,7 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
   const draft = await appRegisterDraft(deps.storage, ownerGhii, scope.app);
   const personalRegs = regs.filter(r => r.type === 'personal' || r.type === 'pseudonymised');
   if (draft.register && !personalRegs.length) {
-    out.push({ kind: 'app-personal-data-without-register', detail: `The app ${scope.app} says in its data map that it keeps personal data (${draft.register.dataCategories?.length ?? 0} key families), and it has no register.`, evidence: at });
+    out.push({ kind: 'app-personal-data-without-register', detail: `The app ${scope.app} says in its data map that it keeps personal data (${draft.register.dataCategories?.length ?? 0} key families), and it has no register.`, evidence: { ...at, holds: draft.register.dataCategories ?? [] } });
   }
   if (!draft.hasMap) {
     out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} has no data map, so nothing says whether it keeps personal data or where it goes.`, evidence: { ...at, families: [] } });
