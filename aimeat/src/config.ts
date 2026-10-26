@@ -639,6 +639,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // How often that sweep looks. 10 s in production is plenty for a floor of 3 s; the E2E runner
     // pins 1 s so the expiry proof waits for the reap and not for the clock.
     mcpSessionSweepMs: Math.max(250, parseInt(process.env.AIMEAT_MCP_SESSION_SWEEP_MS ?? '10000', 10) || 10000),
+    // A slow tools/call of a client that declares the MCP Tasks extension becomes a task after this
+    // long (mcp/tasks-extension.ts). 0 answers every such call with a task at once.
+    mcpTaskAfterMs: Math.min(600_000, Math.max(0, parseInt(process.env.AIMEAT_MCP_TASK_AFTER_MS ?? '10000', 10) || 0)),
 
     // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
     // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.

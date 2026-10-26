@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26; MCP tasks, the ARD manifest and WebMCP on the static front pages on 2026-10-26.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -37,6 +37,15 @@
       "<code>/v1/mcp</code>, <code>POST /v1/mcp/register</code>, <code>mcp.unused_client_days</code>"
      ],
      "plain": "MCP server Claude, ChatGPT, Codex, Cursor, VS Code, Grok and other MCP clients can read and act on your node from the chat. The server advertises its available tools when the client connects. A client registers itself before the sign-in; a registration that no sign-in used is deleted after 30 days by a nightly cleanup, and one that someone signed in with stays. The operator sets the number of days, or 0 to keep all, from the Config tab or through chat. /v1/mcp, POST /v1/mcp/register, mcp.unused_client_days"
+    },
+    {
+     "slug": "g-1-long-tool-calls-do-not-time-out",
+     "cells": [
+      "<strong>Long tool calls do not time out</strong>",
+      "When your AI client supports MCP tasks, a tool call that is still running after 10 seconds answers at once with a task, the work goes on, and the client asks for the result when it is ready. A chat client that cuts a long wait (claude.ai's connectors stop after about four minutes) gets the result anyway. A call that finishes sooner answers as before, and a client without task support gets the ordinary answer. A task and its result stay readable to the agent that started it for one hour. The operator sets the wait, or 0 to make every such call a task, from the Config tab or through chat. Limits: the client must support the 2026-07-28 Tasks extension, and few do yet; a task never asks you a question in the middle; a cancel stops the result from being kept, not the work itself.",
+      "<code>/v1/mcp</code> (2026-07-28) · <code>tasks/get</code>, <code>tasks/update</code>, <code>tasks/cancel</code> · <code>mcp.task_after_ms</code>"
+     ],
+     "plain": "Long tool calls do not time out When your AI client supports MCP tasks, a tool call that is still running after 10 seconds answers at once with a task, the work goes on, and the client asks for the result when it is ready. A chat client that cuts a long wait (claude.ai's connectors stop after about four minutes) gets the result anyway. A call that finishes sooner answers as before, and a client without task support gets the ordinary answer. A task and its result stay readable to the agent that started it for one hour. The operator sets the wait, or 0 to make every such call a task, from the Config tab or through chat. Limits: the client must support the 2026-07-28 Tasks extension, and few do yet; a task never asks you a question in the middle; a cancel stops the result from being kept, not the work itself. /v1/mcp (2026-07-28) · tasks/get, tasks/update, tasks/cancel · mcp.task_after_ms"
     },
     {
      "slug": "g-1-purpose-sized-mcp-surfaces",
@@ -3845,10 +3854,10 @@
      "slug": "g-21-mcp",
      "cells": [
       "<strong>MCP</strong>",
-      "The main road for AIs. An AI client on the newest revision, 2026-07-28, and one on an older revision (back to 2024-10-07) connect to the same address and get the same tools. On 2026-07-28 every request stands on its own, with no session to open or lose; an open listen stream hears when the person changes the agent's permissions, and closes when the agent is removed. The Server Card states 2026-07-28 and lists every revision served. MCP Tasks on 2026-07-28 wait for the SDK.",
+      "The main road for AIs. An AI client on the newest revision, 2026-07-28, and one on an older revision (back to 2024-10-07) connect to the same address and get the same tools. On 2026-07-28 every request stands on its own, with no session to open or lose; an open listen stream hears when the person changes the agent's permissions, and closes when the agent is removed. The Server Card states 2026-07-28 and lists every revision served. On 2026-07-28 the node also speaks the Tasks extension (<code>io.modelcontextprotocol/tasks</code>): a slow tool call of a client that declares it answers with a task the client polls (section 1).",
       "<code>/v1/mcp</code>, <code>/v2/mcp/*</code>"
      ],
-     "plain": "MCP The main road for AIs. An AI client on the newest revision, 2026-07-28, and one on an older revision (back to 2024-10-07) connect to the same address and get the same tools. On 2026-07-28 every request stands on its own, with no session to open or lose; an open listen stream hears when the person changes the agent's permissions, and closes when the agent is removed. The Server Card states 2026-07-28 and lists every revision served. MCP Tasks on 2026-07-28 wait for the SDK. /v1/mcp, /v2/mcp/*"
+     "plain": "MCP The main road for AIs. An AI client on the newest revision, 2026-07-28, and one on an older revision (back to 2024-10-07) connect to the same address and get the same tools. On 2026-07-28 every request stands on its own, with no session to open or lose; an open listen stream hears when the person changes the agent's permissions, and closes when the agent is removed. The Server Card states 2026-07-28 and lists every revision served. On 2026-07-28 the node also speaks the Tasks extension (io.modelcontextprotocol/tasks): a slow tool call of a client that declares it answers with a task the client polls (section 1). /v1/mcp, /v2/mcp/*"
     },
     {
      "slug": "g-21-oauth-2-0-with-pkce-rfc-8707-resource-indicators-rfc-8414-and-rfc-9728-metadata-client-id-metadata-documents",
@@ -3899,10 +3908,19 @@
      "slug": "g-21-webmcp",
      "cells": [
       "<strong>WebMCP</strong>",
-      "An app's declared tools, in the page and over HTTP.",
-      "<code>/.well-known/webmcp.json</code>"
+      "An app's declared tools, in the page and over HTTP, and the node's own two tools (what is for sale, what this node is) on every front page, whichever one the operator chose.",
+      "<code>/.well-known/webmcp.json</code>, <code>/v1/libs/aimeat-webmcp.js</code>"
      ],
-     "plain": "WebMCP An app's declared tools, in the page and over HTTP. /.well-known/webmcp.json"
+     "plain": "WebMCP An app's declared tools, in the page and over HTTP, and the node's own two tools (what is for sale, what this node is) on every front page, whichever one the operator chose. /.well-known/webmcp.json, /v1/libs/aimeat-webmcp.js"
+    },
+    {
+     "slug": "g-21-ard-agentic-resource-discovery-ai-catalog",
+     "cells": [
+      "<strong>ARD (Agentic Resource Discovery), ai-catalog</strong>",
+      "One document that lists what an AI can use here: the MCP server, the API contract, each agent whose owner offers it, and each public skill. A search service or a crawler finds all of it in one read, and the same document answers at the older ai-catalog address that readiness checkers read. <code>robots.txt</code> and the API catalog point at it.",
+      "<code>/.well-known/ard.json</code>, <code>/.well-known/ai-catalog.json</code>"
+     ],
+     "plain": "ARD (Agentic Resource Discovery), ai-catalog One document that lists what an AI can use here: the MCP server, the API contract, each agent whose owner offers it, and each public skill. A search service or a crawler finds all of it in one read, and the same document answers at the older ai-catalog address that readiness checkers read. robots.txt and the API catalog point at it. /.well-known/ard.json, /.well-known/ai-catalog.json"
     },
     {
      "slug": "g-21-ucp-acp-x402",
@@ -4406,6 +4424,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 446
+  "rows": 448
  }
 }

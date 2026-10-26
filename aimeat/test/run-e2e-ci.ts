@@ -1072,6 +1072,8 @@ const ALL_SUITES = [
     // MCP 2026-07-28 beside the 2025 sessions on the same URLs: stateless requests, the header and
     // envelope refusals, and the listen stream's change notifications.
     'test/e2e-mcp-modern.ts',
+    // The MCP Tasks extension on that path: a task handle, tasks/get, update and cancel, and the refusals.
+    'test/e2e-mcp-tasks.ts',
     // Self-spawns its own server with the app origin ON (the shared one pins it OFF), the same
     // way e2e-app-origin does: an app's public address only exists when that flag is set.
     'test/e2e-mcp-orientation.ts',

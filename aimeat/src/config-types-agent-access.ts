@@ -29,6 +29,9 @@ export interface AgentAccessConfig {
   mcpSessionIdleMinutes: number;
   /** How often the idle sweep looks, in ms. Read once at boot; the E2E runner pins it to 1000. */
   mcpSessionSweepMs: number;
+  /** MCP Tasks extension (mcp/tasks-extension.ts): a tools/call from a client that declares the
+   *  extension and has not finished after this many ms answers with a task handle. 0 = at once. */
+  mcpTaskAfterMs: number;
 
   // Ecosystem application (GEAI) scope bounds — parallel to the agent knobs above, so an operator
   // can bound ecosystem connections independently of agents.

@@ -15,6 +15,9 @@
  *   switching it off makes every agent's scopes advisory, which whoever runs the node decides.
  * @structure ACCESS_CONFIG_FIELDS
  * @version-history
+ *   v1.1.0 — 2026-10-26 — mcp.task_after_ms (AIMEAT_MCP_TASK_AFTER_MS, default 10000, 0 = at once), mutable:
+ *     when a tool call of a client that declares the MCP Tasks extension answers with a task
+ *     (mcp/tasks-extension.ts). Read on every call, so a change takes effect at once.
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 // Typed by the keys alone, not AimeatConfig, which would close an import cycle through
@@ -32,7 +35,7 @@ type AccessKey = 'accessTtlSeconds' | 'refreshIdleDays' | 'refreshAbsoluteDays' 
   | 'ecoJwtTtlSeconds' | 'googleOAuthEnabled' | 'googleOAuthClientId' | 'googleOAuthClientSecret' | 'googleOAuthRedirectUri'
   | 'entraOAuthEnabled' | 'entraOAuthTenant' | 'entraOAuthClientId' | 'entraOAuthClientSecret' | 'entraOAuthRedirectUri'
   | 'casdoorOAuthEnabled' | 'casdoorOAuthEndpoint' | 'casdoorOAuthClientId' | 'casdoorOAuthClientSecret' | 'casdoorOAuthRedirectUri'
-  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes';
+  | 'defaultEcoScopes' | 'maxEcoScopes' | 'sameOwnerAutoApprove' | 'mcpEnforceScopes' | 'mcpTaskAfterMs';
 
 export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   // ── Token lifetimes ──
@@ -68,4 +71,5 @@ export const ACCESS_CONFIG_FIELDS: ConfigFieldShape<AccessKey>[] = [
   { key: 'maxEcoScopes', dotPath: 'scopes.max_eco_scopes', envVar: 'AIMEAT_MAX_ECO_SCOPES', type: 'object', list: true, validate: words, immutable: false, description: 'The most an ecosystem app may be granted; * allows any permission the owner approves' },
   { key: 'sameOwnerAutoApprove', dotPath: 'agents.same_owner_auto_approve', envVar: 'AIMEAT_SAME_OWNER_AUTO_APPROVE', type: 'boolean', validate: bool, immutable: false, description: 'An agent connected by its own owner, or by one of the owner\'s agents, is approved without a second press. Never across owners, never with more permissions' },
   { key: 'mcpEnforceScopes', dotPath: 'mcp.enforce_scopes', envVar: 'AIMEAT_MCP_ENFORCE_SCOPES', type: 'boolean', validate: bool, immutable: true, description: 'Refuse an MCP tool an agent holds no permission for. Off only logs the call, so every agent can use every tool. Set by whoever runs the node, in the environment' },
+  { key: 'mcpTaskAfterMs', dotPath: 'mcp.task_after_ms', envVar: 'AIMEAT_MCP_TASK_AFTER_MS', type: 'number', validate: v => whole(0)(v) && (v as number) <= 600000, immutable: false, description: 'A tool call from an AI client that supports MCP tasks and runs longer than this many milliseconds answers at once with a task the client checks later (0 = every such call)', range: '0-600000' },
 ];
