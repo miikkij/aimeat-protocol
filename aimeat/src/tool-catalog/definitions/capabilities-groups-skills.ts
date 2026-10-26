@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-26 — aimeat_capabilities_get says who is shown a private or not yet published capability (secaudit2026oct22).
  *   2026-10-25 — aimeat_share_list declares memory:read, the word its REST twins ask (secaudit2026oct22, aimeat_share_list:missing-memory-read).
  *   2026-10-20 — aimeat_knowledge_list, aimeat_knowledge_get and aimeat_knowledge_links declare memory:read, as aimeat_memory_read does (secaudit 2026-10, v56).
  *   2026-10-18 — aimeat_operator_agent_configure takes `clearance`, lowering only (plan doc-mvdipuyqraas, L2.3).
@@ -65,7 +66,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_capabilities_get',
-        description: 'Get full detail of a capability: input/output schemas, examples, usage instructions, dependencies, and trust signals. Call before aimeat_capabilities_invoke when you need the input shape.',
+        description: 'Get full detail of a capability: input/output schemas, examples, usage instructions, dependencies, and trust signals. Call before aimeat_capabilities_invoke when you need the input shape. A private capability or one not yet published (draft, waiting for review) is shown only to its owner, the owner\'s agents and the operator; to anyone else it is "not found".',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Get Capability', readOnlyHint: true },
