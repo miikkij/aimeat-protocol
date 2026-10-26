@@ -254,6 +254,51 @@ def test_effective_llm_choice_with_an_expired_token_sends_nothing(home: Path, no
     assert node.requests == []
 
 
+# ── the key the connector keeps for the reconnect (node 2026-10-25, secaudit2026oct22) ──────────
+#
+# `aimeat connect add` keeps the agent's private key of each approval beside its token, as
+# tokens/<agent>@<owner>.key (a bare base64 Ed25519 key), and signs its next device-authorization
+# request with it, so the owner sees the agent coming back rather than a new device taking it over.
+# This package does no device authorization: a crew reconnects with that same command, which the
+# expired-token message names. The key is the connector's, so this package never reads it as a
+# credential and never sends it.
+
+RETURN_KEY = base64.b64encode(b"k" * 32).decode()
+
+
+def _store_return_key(home: Path) -> Path:
+    (home / "tokens").mkdir(exist_ok=True)
+    path = home / "tokens" / "concierge@alice.key"
+    path.write_text(RETURN_KEY, encoding="utf-8")
+    return path
+
+
+def test_the_connectors_return_key_is_not_a_credential_and_never_leaves(home: Path, node: _Recorder) -> None:
+    from aimeat_crewai import AimeatLiaisonError
+    from aimeat_crewai.daemon import resolve_agent_identity
+
+    _store_return_key(home)
+    assert resolve_agent_token("concierge") is None, "the key alone is no token"
+    with pytest.raises(AimeatLiaisonError):
+        resolve_agent_identity("concierge", owner="alice")
+
+    _store(home, VALID)
+    assert resolve_agent_token("concierge") == VALID
+    assert resolve_agent_identity("concierge", owner="alice").gaii == "concierge#alice@node-1"
+    node_llm(agent_name="concierge").call("hi")
+    assert node.requests and all(RETURN_KEY not in r["raw"] for r in node.requests), "the key is on the wire"
+
+
+def test_an_expired_token_names_the_reconnect_that_proves_the_return(home: Path, node: _Recorder) -> None:
+    _store(home, EXPIRED)
+    _store_return_key(home)
+    with pytest.raises(AiError) as err:
+        node_llm(agent_name="concierge")
+    assert "aimeat connect add --agent concierge" in str(err.value), str(err.value)
+    assert RETURN_KEY not in str(err.value)
+    assert node.requests == []
+
+
 def test_publish_offers_with_an_expired_token_names_the_expiry(home: Path, node: _Recorder) -> None:
     path = _store(home, EXPIRED)
     doc = {"version": 1, "offers": [{"id": "o", "title": "t", "ask": "a"}]}

@@ -17,6 +17,9 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-reapproval
  * @version-history
+ *   v1.2.0 — 2026-10-26 — Phase 6: a crew's reconnect through the real `aimeat connect add` is shown
+ *     to the owner as a return, with no takeover warning and no takeover event (secaudit2026oct22,
+ *     unbound-reapproval-of-existing-agent; aimeat-crewai enrols through the connector).
  *   v1.1.0 — 2026-10-25 — Phase 5: a return proved by the agent's key, and a new device taking the
  *     agent over (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.0.0 — 2026-08-08 — Initial, with the fix.
@@ -25,6 +28,10 @@
 import { registerOwner } from './helpers/owner-login.js';
 import { sign, generateKeyPair } from '../src/auth/keypair.js';
 import { returnProofMessage } from '../src/services/device-return-proof.js';
+import { runCli } from './helpers/connect-cli.js';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const owner = `rap${Date.now() % 100000}`;
@@ -381,6 +388,70 @@ await test('a proof signed by another key does not verify, and the request is a 
     assert((await pendingRow(code))?.return_proven === false, 'unproven');
     await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: code, action: 'deny', owner_token: ownerToken }) });
 });
+
+// ── A crew's reconnect through the real connector ──
+//
+// aimeat-crewai does no device authorization of its own: a crew enrols and reconnects with
+// `aimeat connect add` run in its project directory (python/aimeat-crewai README, Setup step 2; the
+// package's expired-token message names the same command). So the proof a crew's return carries is
+// the one the connector signs with the key it kept from the last approval (cli/connect/auth.ts). This
+// phase runs the real CLI twice into one connector home, the second time after the stored token has
+// stopped working, and reads what the owner is shown.
+console.log('\nPhase 6: a crew reconnects with aimeat connect add, and the owner sees a return');
+
+const CREW = 'crew-return';
+const crewHome = join(mkdtempSync(join(tmpdir(), 'aimeat-crew-')), '.aimeat');
+const crewKeyFile = join(crewHome, 'tokens', `${CREW}@${owner}.key`);
+const crewTokenFile = join(crewHome, 'tokens', `${CREW}@${owner}.token`);
+
+/** The pending request the CLI raised for CREW, other than `skip`, once it appears. */
+async function crewRequest(skip = ''): Promise<any> {
+    const deadline = Date.now() + 40_000;
+    while (Date.now() < deadline) {
+        const rows = ((await json('/v1/agents/device-authorize/pending', auth(ownerToken))).body.data?.requests ?? []) as any[];
+        const row = rows.find(r => r.agent_name === CREW && r.status === 'pending' && r.user_code !== skip);
+        if (row) return row;
+        await new Promise(res => setTimeout(res, 300));
+    }
+    throw new Error(`no pending request for ${CREW} within 40 s`);
+}
+
+let firstCrewCode = '';
+await test('a crew connects for the first time: the connector keeps the key of the approval beside the token', async () => {
+    const running = runCli(['connect', 'add', '--url', BASE, '--owner', owner, '--agent', CREW], { home: crewHome, timeoutMs: 90_000 });
+    const row = await crewRequest();
+    firstCrewCode = row.user_code;
+    assert(row.existing_agent === false, `a new agent: ${JSON.stringify(row)}`);
+    assert((await approve(row.user_code)).status === 200, 'approve');
+    const r = await running;
+    assert(r.code === 0, `connect add exited ${r.code}: ${r.out.slice(-400)}`);
+    assert(existsSync(crewKeyFile) && readFileSync(crewKeyFile, 'utf-8').trim().length > 0, `no key at ${crewKeyFile}`);
+    if (process.platform !== 'win32') assert((statSync(crewKeyFile).mode & 0o777) === 0o600, 'the key file is 0600');
+});
+
+await test('designed use: the crew reconnects after its token stopped working, and the owner sees its return, not a takeover', async () => {
+    const keyBefore = readFileSync(crewKeyFile, 'utf-8').trim();
+    // The stored token as it looks once it has expired: its exp is in the past, so the node refuses it.
+    const [head, payload, sig] = readFileSync(crewTokenFile, 'utf-8').trim().split('.');
+    const claims = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    const expired = Buffer.from(JSON.stringify({ ...claims, exp: Math.floor(Date.now() / 1000) - 60 })).toString('base64url');
+    writeFileSync(crewTokenFile, `${head}.${expired}.${sig}`, 'utf-8');
+    const before = (await json('/v1/account/events?limit=50', auth(ownerToken))).body.data.events.filter((e: any) => e.kind === 'agent_device_takeover').length;
+    const running = runCli(['connect', 'add', '--url', BASE, '--owner', owner, '--agent', CREW], { home: crewHome, timeoutMs: 90_000 });
+    const row = await crewRequest(firstCrewCode).catch(async (e: Error) => { const c = await running; throw new Error(`${e.message}; the CLI (exit ${c.code}, timed out ${c.timedOut}) said: ${JSON.stringify(c.out)}`); });
+    assert(row.existing_agent === true && row.return_proven === true, `the card is told it is a return: ${JSON.stringify(row)}`);
+    assert((await json(`/v1/agents/verify/info/${row.user_code}`)).body.data.return_proven === true, 'the consent page is told too');
+    const a = await approve(row.user_code);
+    assert(a.status === 200 && a.body.data.takeover === false && a.body.data.other_sessions_ended === false, `approve: ${JSON.stringify(a.body.data)}`);
+    const r = await running;
+    assert(r.code === 0, `connect add exited ${r.code}: ${r.out.slice(-400)}`);
+    const after = (await json('/v1/account/events?limit=50', auth(ownerToken))).body.data.events.filter((e: any) => e.kind === 'agent_device_takeover').length;
+    assert(after === before, 'no takeover event for the crew\'s return');
+    assert(readFileSync(crewKeyFile, 'utf-8').trim() !== keyBefore, 'the key of the new approval replaced the old one');
+    assert((await works(readFileSync(crewTokenFile, 'utf-8').trim())) === 200, 'the crew works with its new token');
+});
+
+try { rmSync(dirname(crewHome), { recursive: true, force: true }); } catch { /* a handle may still be closing */ }
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);
