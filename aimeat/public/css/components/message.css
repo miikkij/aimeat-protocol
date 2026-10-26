@@ -67,6 +67,9 @@
 .message-react-pick .poster-chip { font-size: 13px; letter-spacing: normal; white-space: nowrap; }
 .poster-turn--user .message-reactions .poster-chip:not(.poster-chip--ink),
 .poster-turn--user .message-react-pick .poster-chip { color: inherit; border-color: currentColor; }
+/* The person's own mark keeps the ink Tag's light letters on the sun too: turn.css gives every Tag in
+   your own words `color: inherit`, which made the ink Tag ink on ink. */
+.poster-turn--user .poster-turn-body .message-reactions .poster-chip--ink { color: var(--card-bg); }
 .message-react-pick .og-input { max-width: 16rem; }
 
 /* A quote jumps to the message it answers, which shows itself for a moment. */
