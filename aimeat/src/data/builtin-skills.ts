@@ -11,6 +11,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-26 -- aimeat-node-guide, use-app-bound-skills and install-skills-locally: the registry
+ *     is the Agent Skills format, a skill loads in steps (body_only, then path), and a file whose
+ *     index entry says encoding base64 is written as its decoded bytes. set-up-content-pipeline moved
+     unchanged to builtin-skills.content-pipeline.ts (max-file-lines).
  *   2026-10-25 -- aimeat-node-guide: an existing agent coming back proves it with `proof` on
  *     device-authorize; without it the owner sees a takeover (secaudit2026oct22, lead 2150).
  *   2026-10-25 -- diagnose-a-workflow, step 7: a 402 on the node's key may be a call that costs more
@@ -228,6 +232,7 @@ import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
 import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
 import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
+import { CONTENT_PIPELINE_SKILL_ENTRY } from './builtin-skills.content-pipeline.js';
 import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
@@ -363,11 +368,13 @@ content, which its operator sets (private for a record unless the operator chose
 
 ## Skills — load expertise on demand
 
-This node runs a skills registry (SKILL.md packs, Anthropic-compatible):
+This node runs a skills registry in the Agent Skills format (agentskills.io: a folder with a
+SKILL.md and any files beside it), the format Claude Code, Cursor and other clients read:
 
 - Browse: \`GET /v1/skills\` (your library: node + personal + workspace scopes) or
   \`aimeat_skill_list\`.
-- Load one: \`GET /v1/skills/{name}\` or \`aimeat_skill_get\` — apply what it teaches.
+- Load one: \`GET /v1/skills/{name}\` or \`aimeat_skill_get\` — apply what it teaches. Load in
+  steps: \`body_only\` gives SKILL.md alone, then \`path\` gives one file it points at.
 - Attach to an agent: \`aimeat_skill_link\` — links are references, always fetched fresh.
 - Install elsewhere: \`GET /v1/skills/{name}/zip\` is upload-ready for Claude-style skill dirs.
 
@@ -443,58 +450,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
 `,
   },
   CREW_AGENT_SKILL_ENTRY,
-  {
-    name: 'set-up-content-pipeline',
-    skillMd: `---
-name: set-up-content-pipeline
-description: Operator runbook for setting up a recurring content pipeline on an AIMEAT node — chaining agents with a workflow definition, scheduling it, and delivering results into a workspace. Use when the owner wants recurring produced content (reports, digests, articles) from their agents.
-license: MIT
-metadata:
-  audience: operator
----
-
-# Set up a content pipeline
-
-A pipeline = a WORKFLOW definition (chained steps dispatched to agents) + a TRIGGER
-(schedule) + a DESTINATION (workspace records/documents).
-
-1. **Check the workers:** \`aimeat_agents_list\` — which agents exist, their capabilities and
-   linked skills (\`aimeat_skill_list\` view "linked"). Attach domain skills first
-   (e.g. an editorial-style skill) so output quality is set by reference, not by prompt copies.
-2. **Author the workflow:** \`aimeat_workflow_get\` an existing one as a template, then
-   \`aimeat_workflow_save\`. Steps signal each other through memory keys; set \`resume: true\` in
-   the definition to have the engine re-evaluate steps against reality on retry, which is off
-   by default (the default is restart-and-skip).
-3. **Dry-run:** \`aimeat_workflow_run\` with \`mode: "signals-only"\` before scheduling.
-4. **Schedule the trigger:** the trigger is part of the definition, not a separate schedule —
-   put \`trigger: { kind: "schedule", cron: "0 7 * * *", timezone: "Europe/Helsinki" }\` in the
-   \`aimeat_workflow_save\` descriptor and the save creates the backing cron; verify with
-   \`aimeat_workflow_get\`.
-5. **Deliver to a workspace:** the final step writes via \`aimeat_workspace_write\` (drafts) —
-   publish stays a human decision unless the owner says otherwise.
-
-## Principles
-- Show the owner the workflow definition BEFORE saving; \`aimeat_workflow_save\` is a write.
-- Start with a manual run, then schedule.
-- When steps call the owner's own model (\`action.kind: "ai"\`), set \`maxCostUsd\` on the
-  definition: an ai step then starts only when what one attempt is expected to cost fits in what
-  is left, so a run that goes wrong stops at a known cost, and says so on the run. A step expected
-  to cost more than the whole limit still runs once, alone. An ai step can also make a picture
-  (\`op: "image"\`) or transcribe a stored recording (\`op: "transcribe"\`, \`audio_key\`); check the
-  capability with \`aimeat_ai_capabilities\` before saving, because one that is off stops the step.
-- The schedule runs on the saver's permissions. The agent that saves the workflow must keep every
-  permission its steps need; if the owner later takes one away, the scheduled run is refused and
-  the owner is asked, once. A run already going is asked too: the node checks the agent or app the
-  run answers to before every step, and a run whose agent was removed or lost a step's permission
-  ends \`refused\` before that step (\`refusal.stoppedBefore\` names it). Chaining agents is giving them work, so a step that dispatches to an
-  agent costs \`work:request\`: ask the owner for it before saving, or the save answers SCOPE_DENIED.
-- An extension step reads the run's vars, and nothing else, unless it names what it takes:
-  \`input_from: { proposal: "x.{ref}.proposal", decision: "x.{ref}.decision" }\` hands it an
-  earlier step's \`result_to_key\` or a person's \`answer_to_key\` as input fields. A key with no record
-  arrives as null, so the extension must throw on a field it cannot act without. Naming keys there is
-  a read of the owner's records, so the saver needs \`memory:read\`.
-`,
-  },
+  CONTENT_PIPELINE_SKILL_ENTRY,
   CONFIGURE_ROUTING_SKILL_ENTRY,
   AI_MODEL_POLICY_SKILL_ENTRY,
   AI_CAPABILITIES_SKILL_ENTRY,
@@ -523,7 +479,8 @@ Before driving any app, check for them.
 ## Before operating an app
 1. \`aimeat_skill_list\` with \`binding: "app:{owner}/{filename}"\` (or
    \`GET /v1/apps/{owner}/{filename}/skills\`) — the skills that teach this app.
-2. If any exist, load each with \`aimeat_skill_get\` and APPLY it — a description saying
+2. If any exist, load each with \`aimeat_skill_get\` (\`body_only: true\` for SKILL.md, then
+   \`path\` for a file it tells you to read) and APPLY it — a description saying
    "use whenever operating X" is required reading, not optional.
 3. Nothing bound? Proceed with the app's own docs. When the app is your owner's own, consider
    authoring a skill once you have learned it (below) so the next agent starts smarter.
@@ -572,16 +529,19 @@ metadata:
 
 # Install AIMEAT skills locally
 
-AIMEAT's SKILL.md contract IS the Anthropic agent-skill format, so installing = writing the
-skill's files where that Claude reads skills from. (With the AIMEAT connector attached you
-often need NO install: \`aimeat_skill_get\` loads expertise on demand. Install when the skill
-should work without the connector, or auto-trigger via Claude's native skill discovery.)
+AIMEAT's SKILL.md contract IS the Agent Skills format (agentskills.io), which Claude reads, so
+installing = writing the skill's files where that Claude reads skills from. (With the AIMEAT
+connector attached you often need NO install: \`aimeat_skill_get\` loads expertise on demand.
+Install when the skill should work without the connector, or auto-trigger via Claude's native
+skill discovery.)
 
 ## Claude Code / Claude Desktop Cowork (filesystem available)
 1. \`aimeat_skill_get\` with the ref (pin it: \`user:{owner}/{name}@{version}\` for stability).
-2. Write each file of \`fileContents\` under:
+2. Write each file of \`fileContents\` under the path it is keyed by, inside:
    - personal (all projects): \`~/.claude/skills/{name}/\`
    - project-scoped: \`{repo}/.claude/skills/{name}/\`
+   A file whose entry in \`files\` says \`encoding: "base64"\` (an image, a font) is base64:
+   decode it and write the bytes. Every other file is UTF-8 text.
 3. Stamp provenance INTO the SKILL.md frontmatter metadata so updates are checkable:
    \`aimeat_ref: {ref}@{version}\` and \`aimeat_node: {node url}\`.
 4. CLI alternative (no MCP needed): \`aimeat skill install {ref} [--dir <path>] [--project]\`.

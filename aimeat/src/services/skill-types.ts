@@ -9,6 +9,9 @@
  *   SkillAccessor · SkillAccessError
  * @usage import { type SkillSummary, SkillAccessError } from './skills.js';   // through the re-export
  * @version-history
+ *   v1.2.0 — 2026-10-26 — A file index entry may say `encoding: "base64"` (skill-files.ts);
+ *     SkillSummary.standardIssues on a publish that breaks a rule of the Agent Skills standard; the
+ *     FILE_NOT_FOUND access code for a `path` the skill does not hold.
  *   v1.1.0 — 2026-10-20 — SkillAccessor.caller: the session (CallerContext) the workspace WRITE rule
  *     for a workspace skill decides on (secaudit 2026-10, defect 2).
  *   v1.0.0 — 2026-10-17 — Extracted from skills.ts (pure extraction), with the organisation level's
@@ -21,6 +24,8 @@ import type { SkillScope } from './skill-refs.js';
 import type { SkillVisibility } from './skill-audience.js';
 import type { AudienceAuth } from './audience.js';
 import type { CallerContext } from './caller-context.js';
+import type { SkillFileEntry } from './skill-files.js';
+import type { SkillStandardIssue } from './skill-md.js';
 
 export interface SkillVersionSnapshot {
   manifest: SkillManifestValue;
@@ -58,8 +63,9 @@ export interface SkillManifestValue {
   fromPackage?: SkillPackageTag;
   /** `organism:<id>` when a user skill is read by one organism's members; its records then sit at 'owner' (skill-audience.ts). */
   audience?: string;
-  /** File index (paths + sizes) — bodies live in the per-file records, never here. */
-  files: Array<{ path: string; size: number }>;
+  /** File index (paths, sizes, and `encoding: "base64"` for a file that is not text) — bodies live
+   *  in the per-file records, never here. */
+  files: SkillFileEntry[];
   /** GAII/GHII that performed the (last) publish. */
   publishedBy: string;
   createdAt: string;
@@ -92,14 +98,19 @@ export interface SkillSummary {
    *  hold (a pinned ref keeps its `@version`). */
   linkedBy?: Array<{ agent: string; ref: string }>;
   visibility: MemoryRecord['visibility'] | SkillVisibility;
-  files: Array<{ path: string; size: number }>;
+  files: SkillFileEntry[];
   updatedAt: string;
   /** The provenance record of SKILL.md, from the manifest row; absent is UNSTATED (skill-provenance.ts). */
   aiProvenanceId?: string;
+  /** Publish answers only: the Agent Skills standard's rules this SKILL.md breaks (skill-md.ts).
+   *  A skill new to the registry is refused for a blocking one, so here they are warnings. */
+  standardIssues?: Array<Omit<SkillStandardIssue, 'blocking'>>;
 }
 
 export interface ResolvedSkill extends SkillSummary {
-  /** path -> content (utf-8). Present when resolve loads bodies. */
+  /** path -> the stored string: the text, or base64 for a file whose `files` entry says so
+   *  (skill-files.ts). Holds the files resolve was asked for: all of them, SKILL.md alone
+   *  (`bodyOnly`), one `path`, or none (`manifestOnly`). */
   fileContents: Record<string, string>;
   /** The retained version snapshots, oldest first; a `@version` pin resolves any of these. */
   versions: Array<{ version: string; publishedAt: string }>;
@@ -128,7 +139,7 @@ export interface SkillAccessor {
 }
 
 export class SkillAccessError extends Error {
-  constructor(public readonly code: 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_REF' | 'BAD_VISIBILITY' | 'NOT_ORGANISM_MEMBER', message: string) {
+  constructor(public readonly code: 'NOT_FOUND' | 'FILE_NOT_FOUND' | 'FORBIDDEN' | 'BAD_REF' | 'BAD_VISIBILITY' | 'NOT_ORGANISM_MEMBER', message: string) {
     super(message);
     this.name = 'SkillAccessError';
   }

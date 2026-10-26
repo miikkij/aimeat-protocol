@@ -265,7 +265,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:32defed2132c524f54316b1f"
+      "digest": "sha256:f61d9d1ef649ca9175496eb9"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -420,18 +420,18 @@
       "digest": "sha256:b8b91484608af79b78c64d6b"
     },
     "node:use-app-bound-skills": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-26",
       "watches": [
         "aimeat/src/routes/skills.ts"
       ],
-      "digest": "sha256:2c4e5625b1491a3141d0611d"
+      "digest": "sha256:87dff7445b39fbe020329618"
     },
     "node:install-skills-locally": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-26",
       "watches": [
         "aimeat/src/cli/skill-install.ts"
       ],
-      "digest": "sha256:86b918b2382facc544199a46"
+      "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
       "reviewedOn": "2026-10-25",
@@ -629,7 +629,7 @@
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "0798cfa0dd0d2c52",
+      "aimeat/src/mcp/core.ts": "877f825eb4828018",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "0052881fc7878d95"
     },
     "node:manage-my-profile-data": {
@@ -652,10 +652,10 @@
       "aimeat/src/services/ai/routing.ts": "1d653dd83370f0e8"
     },
     "node:use-app-bound-skills": {
-      "aimeat/src/routes/skills.ts": "7a6e7bcde1adbf5b"
+      "aimeat/src/routes/skills.ts": "feaff1af3ffa487c"
     },
     "node:install-skills-locally": {
-      "aimeat/src/cli/skill-install.ts": "7be705d404708006"
+      "aimeat/src/cli/skill-install.ts": "43fad9e1b6aedc0d"
     },
     "node:diagnose-a-workflow": {
       "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",

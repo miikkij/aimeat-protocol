@@ -14,6 +14,9 @@
  *     and skill_get without ref or name say what is missing (secaudit 2026-10 follow-up, Part B).
  *   v1.2.0 -- 2026-10-08 -- skill_publish forwards ai_provenance and ai_provenance_id, which
  *     POST /v1/skills records (aiprov E12).
+ *   v1.3.0 -- 2026-10-26 -- Agent Skills standard: skill_publish forwards keep_files (files may
+ *     carry { content, encoding: "base64" } and pass through as they are); skill_get forwards
+ *     body_only and path, and a ref may carry an @{semver} pin, as the node's MCP takes it.
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
 import { query, requiredString, optionalString, optionalBoolean } from './tool-call-helpers.js';
@@ -37,6 +40,7 @@ export const skillTools: ConnectCliToolDefinition[] = [
             return client.post('/v1/skills', {
                 skill_md: requiredString(input, 'skill_md'),
                 files: input.files,
+                ...(optionalBoolean(input, 'keep_files') !== undefined ? { keep_files: optionalBoolean(input, 'keep_files') } : {}),
                 scope: optionalString(input, 'scope'),
                 visibility: optionalString(input, 'visibility'),
                 organism: optionalString(input, 'organism_id'),
@@ -80,19 +84,25 @@ export const skillTools: ConnectCliToolDefinition[] = [
             // came first. That worked only because the fragment happened to contain exactly one
             // `&`, which is a fact about today's flag rather than a rule (CodeQL
             // js/incomplete-sanitization 1603). query() decides the `?` and the separators.
-            const manifestOnly = optionalBoolean(input, 'manifest_only') ? true : undefined;
+            // Which files: none, SKILL.md alone, one path, or all of them (GET /v1/skills/:name decides).
+            const files = {
+                manifest_only: optionalBoolean(input, 'manifest_only') ? true : undefined,
+                body_only: optionalBoolean(input, 'body_only') ? true : undefined,
+                path: optionalString(input, 'path'),
+            };
             if (ref) {
-                const node = ref.match(/^node:([a-z0-9-]+)$/);
-                if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}${query({ scope: 'node', manifest_only: manifestOnly })}`);
-                const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+)$/);
-                if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}${query({ scope: 'user', owner: user[1], manifest_only: manifestOnly })}`);
-                const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+)$/);
-                if (ws) return client.get(`/v1/skills/${encodeURIComponent(ws[3])}${query({ scope: 'workspace', organism: ws[1], ws: ws[2], manifest_only: manifestOnly })}`);
+                // The skill name segment keeps an @{semver} pin; the route resolves it as a pinned ref.
+                const node = ref.match(/^node:([a-z0-9-]+(?:@\d+\.\d+\.\d+)?)$/);
+                if (node) return client.get(`/v1/skills/${encodeURIComponent(node[1])}${query({ scope: 'node', ...files })}`);
+                const user = ref.match(/^user:([a-z0-9_-]+)\/([a-z0-9-]+(?:@\d+\.\d+\.\d+)?)$/);
+                if (user) return client.get(`/v1/skills/${encodeURIComponent(user[2])}${query({ scope: 'user', owner: user[1], ...files })}`);
+                const ws = ref.match(/^ws:([A-Za-z0-9-]+)\/([A-Za-z0-9-]+)\/([a-z0-9-]+(?:@\d+\.\d+\.\d+)?)$/);
+                if (ws) return client.get(`/v1/skills/${encodeURIComponent(ws[3])}${query({ scope: 'workspace', organism: ws[1], ws: ws[2], ...files })}`);
                 throw new Error(`Not a valid skill ref: ${ref}`);
             }
             const name = optionalString(input, 'name');
             if (!name) throw new Error('Provide ref or name');
-            return client.get(`/v1/skills/${encodeURIComponent(name)}${query({ manifest_only: manifestOnly })}`);
+            return client.get(`/v1/skills/${encodeURIComponent(name)}${query(files)}`);
         },
     },
     {

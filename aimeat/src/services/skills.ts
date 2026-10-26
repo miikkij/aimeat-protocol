@@ -32,6 +32,13 @@
  * @usage
  *   import { publishSkill, resolveSkillRef, listSkillLibrary } from '../services/skills.js';
  * @version-history
+ *   v1.14.0 -- 2026-10-26 -- Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss):
+ *     publishSkill stores a file that is not UTF-8 text as base64 with `encoding` on its index entry
+ *     (skill-files.ts), refuses a NEW skill whose SKILL.md breaks a blocking rule of the standard
+ *     (NOT_STANDARD) and names the issues on the answer otherwise, and keeps the files the publish does
+ *     not name when asked (`keepFiles`). resolveSkillRef reads SKILL.md alone (`bodyOnly`) or one file
+ *     (`path`, FILE_NOT_FOUND when the skill holds none of that name), the standard's progressive
+ *     disclosure levels 2 and 3.
  *   v1.13.1 -- 2026-10-26 -- The agent attachment section moved to skill-agent-links.ts (pure
  *     extraction, max-file-lines); its importers import it from there.
  *   v1.13.0 -- 2026-10-22 -- deleteSkill settles a user skill's waiting publish requests `outdated`
@@ -104,6 +111,7 @@ import { skillProvenanceId, type SkillPublishProvenance } from './skill-provenan
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 import { mayReadSkill, publisherMayName, skillVisibilityOf, storedSkillVisibility, type SkillVisibility } from './skill-audience.js';
 import { getAgentSkillLinks } from './skill-agent-link-records.js';
+import { storedSkillFile, skillFileBytes, type SkillFileEntry } from './skill-files.js';
 
 // The addresses (ref grammar, scope owner, key conventions) live in skill-refs.ts since 2026-09-03.
 import {
@@ -194,6 +202,16 @@ export interface PublishSkillOpts {
   fromPackage?: SkillPackageTag;
   /** Who writes SKILL.md and what they declared (skill-provenance.ts). Absent records nothing. */
   provenance?: SkillPublishProvenance;
+  /** Keep every file the skill already holds that `files` does not name, instead of removing it:
+   *  an editor that changes SKILL.md alone republishes without dropping references/ or assets/. */
+  keepFiles?: boolean;
+  /**
+   * What a rule of the Agent Skills standard that SKILL.md breaks does (skill-md.ts issues). Default
+   * 'enforce-new': a skill new to its registry is refused with NOT_STANDARD for a blocking issue, and a
+   * skill already there publishes with the issues named in `standardIssues`. 'warn' never refuses: a
+   * package install carries a skill its author published under the older rules.
+   */
+  standard?: 'enforce-new' | 'warn';
 }
 
 export async function publishSkill(
@@ -243,12 +261,34 @@ export async function publishSkill(
   const mKey = isWs ? wsManifestKey(org, ws, name) : manifestKey(name);
   const fKey = (path: string) => isWs ? wsFileKey(org, ws, name, path) : fileKey(name, path);
 
+  // The skill as the registry holds it now: the caller's own copy, or a workspace's freshest copy
+  // among those its writers made, as a reader of the workspace sees it.
+  const prior = isWs
+    ? freshestByKey(await writtenByWsWriters({ storage, config }, org, ws, await listAcrossOwners(storage, mKey))).get(mKey)
+    : await storage.getMemory(ownerGaii, mKey);
+  // The Agent Skills standard's stricter rules refuse a NEW skill, before anything is written; a
+  // skill already in the registry was published under the older rules and keeps working.
+  const blocking = parsed.issues.filter(i => i.blocking);
+  if (blocking.length > 0 && !prior && opts.standard !== 'warn') {
+    throw new SkillValidationError('NOT_STANDARD',
+      `The skill does not follow the Agent Skills standard (agentskills.io/specification): ${blocking.map(i => i.message).join(' ')}`);
+  }
+  // keepFiles: the files the skill holds that this publish does not name stay as they are.
+  const files = new Map(opts.files);
+  if (opts.keepFiles && prior) {
+    for (const f of (prior.value as SkillManifestValue).files ?? []) {
+      if (files.has(f.path)) continue;
+      const kept = await storage.getMemory(prior.ownerGaii, fKey(f.path));
+      if (kept) files.set(f.path, skillFileBytes(String(kept.value), f.encoding));
+    }
+  }
+
   const workspaceRef = isWs ? `${org}/${ws}` : undefined;
   // How SKILL.md was made, decided before the first write so a refused declaration stores nothing.
   // Once per visibility, so a write made again below does not record it twice.
   const provenanceIds = new Map<string, Promise<string | undefined>>();
   const provenanceFor = (visibility: MemoryRecord['visibility']) => {
-    if (!provenanceIds.has(visibility)) provenanceIds.set(visibility, skillProvenanceId(storage, config, opts.provenance, String(opts.files.get('SKILL.md') ?? ''), visibility));
+    if (!provenanceIds.has(visibility)) provenanceIds.set(visibility, skillProvenanceId(storage, config, opts.provenance, String(files.get('SKILL.md') ?? ''), visibility));
     return provenanceIds.get(visibility)!;
   };
 
@@ -272,12 +312,13 @@ export async function publishSkill(
     const aiProvenanceId = await provenanceFor(visibility);
 
     // Write file records (mirroring the manifest's visibility), then remove stale ones (own copies).
-    const fileIndex: Array<{ path: string; size: number }> = [];
+    // A file that is not UTF-8 text is stored as base64 and its index entry says so (skill-files.ts).
+    const fileIndex: SkillFileEntry[] = [];
     const fileTexts: Record<string, string> = {};
-    for (const [path, content] of opts.files) {
-      const text = content.toString();
+    for (const [path, content] of files) {
+      const { value: text, size, encoding } = storedSkillFile(content);
       fileTexts[path] = text;
-      fileIndex.push({ path, size: Buffer.byteLength(text) });
+      fileIndex.push({ path, size, ...(encoding ? { encoding } : {}) });
       const prior = await storage.getMemory(ownerGaii, fKey(path));
       await storage.setMemory({
         key: fKey(path),
@@ -293,7 +334,7 @@ export async function publishSkill(
         ...(path === 'SKILL.md' && aiProvenanceId ? { aiProvenanceId } : {}),
       });
     }
-    const stale = (existingValue?.files ?? []).filter(f => !opts.files.has(f.path));
+    const stale = (existingValue?.files ?? []).filter(f => !files.has(f.path));
     for (const f of stale) {
       await storage.deleteMemory(ownerGaii, fKey(f.path));
     }
@@ -370,7 +411,9 @@ export async function publishSkill(
     }
   }
 
-  return toSummary(record, opts.scope, opts.scope === 'user' ? opts.owner! : null, isWs ? org : undefined, isWs ? ws : undefined);
+  const summary = toSummary(record, opts.scope, opts.scope === 'user' ? opts.owner! : null, isWs ? org : undefined, isWs ? ws : undefined);
+  if (parsed.issues.length > 0) summary.standardIssues = parsed.issues.map(({ code, field, message }) => ({ code, field, message }));
+  return summary;
 }
 
 function bumpPatch(version: string): string {
@@ -546,12 +589,31 @@ async function listSkillLibraryPlain(
 }
 
 /**
- * THE choke point: resolve a SkillRef to its manifest (+ file bodies unless `manifestOnly`),
- * enforcing scope access rules. Throws SkillAccessError (BAD_REF / NOT_FOUND / FORBIDDEN).
+ * Which files a resolve reads, the Agent Skills standard's three levels: none (`manifestOnly`, the
+ * name, description and file index), SKILL.md alone (`bodyOnly`, the instructions), or one file
+ * (`path`, a resource loaded when the instructions call for it). Without any of them, every file.
+ * A `path` the skill does not hold is FILE_NOT_FOUND, so a caller trying refs in turn stops there.
+ */
+export interface ResolveSkillOpts { manifestOnly?: boolean; bodyOnly?: boolean; path?: string }
+
+function filesToRead(files: SkillFileEntry[], opts: ResolveSkillOpts, refStr: string): SkillFileEntry[] {
+  if (opts.manifestOnly) return [];
+  if (opts.path !== undefined) {
+    const one = files.find(f => f.path === opts.path);
+    if (!one) throw new SkillAccessError('FILE_NOT_FOUND', `The skill ${refStr} has no file "${opts.path}"; the files of its manifest are the paths it holds.`);
+    return [one];
+  }
+  return opts.bodyOnly ? files.filter(f => f.path === 'SKILL.md') : files;
+}
+
+/**
+ * THE choke point: resolve a SkillRef to its manifest plus the file bodies `opts` asks for
+ * (filesToRead), enforcing scope access rules. Throws SkillAccessError (BAD_REF / NOT_FOUND /
+ * FILE_NOT_FOUND / FORBIDDEN).
  */
 export async function resolveSkillRef(
   storage: Storage, config: AimeatConfig, refStr: string, accessor: SkillAccessor,
-  opts: { manifestOnly?: boolean } = {},
+  opts: ResolveSkillOpts = {},
 ): Promise<ResolvedSkill> {
   const ref = parseSkillRef(refStr);
   if (!ref) throw new SkillAccessError('BAD_REF', `Not a valid skill ref: ${refStr} (expected node:{name}, user:{owner}/{name}, or ws:{org}/{ws}/{name})`);
@@ -572,8 +634,8 @@ export async function resolveSkillRef(
     }
     const summary = toSummary(record, 'workspace', null, org, ws);
     // Read the file records published alongside THIS manifest copy (same owner).
-    const fileContents = opts.manifestOnly ? {} : await readFileBodies(storage, config, accessor,
-      record.ownerGaii, summary.files.map(f => [f.path, wsFileKey(org!, ws!, name, f.path)]));
+    const fileContents = await readFileBodies(storage, config, accessor,
+      record.ownerGaii, filesToRead(summary.files, opts, refStr).map(f => [f.path, wsFileKey(org!, ws!, name, f.path)]));
     const versions = retainedVersions(await writtenByWsWriters({ storage, config }, org!, ws!,
       await listAcrossOwners(storage, wsVersionPrefix(org!, ws!, name))), wsVersionPrefix(org!, ws!, name));
     return { ...summary, fileContents, versions };
@@ -595,8 +657,8 @@ export async function resolveSkillRef(
 
   const summary = toSummary(record, ref.scope, skillOwner);
   if (ref.version) summary.ref = formatSkillRef(ref);
-  const fileContents = opts.manifestOnly ? {} : await readFileBodies(storage, config, accessor,
-    ownerGaii, summary.files.map(f => [f.path, fileKey(ref.name, f.path)]));
+  const fileContents = await readFileBodies(storage, config, accessor,
+    ownerGaii, filesToRead(summary.files, opts, refStr).map(f => [f.path, fileKey(ref.name, f.path)]));
   const versions = retainedVersions(await storage.listMemory(ownerGaii, { prefix: versionPrefix(ref.name) }), versionPrefix(ref.name));
   return { ...summary, fileContents, versions };
 }
@@ -625,7 +687,7 @@ function retainedVersions(records: MemoryRecord[], prefix: string): Array<{ vers
  *  passed the scope's access gate; the snapshot lives under the same owner. */
 async function resolvePinned(
   storage: Storage, config: AimeatConfig, accessor: SkillAccessor, liveManifest: MemoryRecord, snapshotKey: string, ref: SkillRef,
-  opts: { manifestOnly?: boolean },
+  opts: ResolveSkillOpts,
 ): Promise<ResolvedSkill> {
   const stored = await storage.getMemory(liveManifest.ownerGaii, snapshotKey);
   const [snap] = stored ? await showSkillRecords({ storage, config }, accessor, [stored]) : [];
@@ -642,7 +704,9 @@ async function resolvePinned(
   summary.ref = formatSkillRef(ref);
   const prefix = snapshotKey.slice(0, snapshotKey.length - ref.version!.length);
   const versions = retainedVersions(await storage.listMemory(liveManifest.ownerGaii, { prefix }), prefix);
-  return { ...summary, fileContents: opts.manifestOnly ? {} : files, versions };
+  const fileContents: Record<string, string> = {};
+  for (const f of filesToRead(summary.files, opts, summary.ref)) if (typeof files[f.path] === 'string') fileContents[f.path] = files[f.path];
+  return { ...summary, fileContents, versions };
 }
 
 /**

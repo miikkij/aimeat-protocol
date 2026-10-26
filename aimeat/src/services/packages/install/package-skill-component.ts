@@ -25,14 +25,19 @@
  *
  *   Content: JSON `{ files: { "SKILL.md": "...", "references/x.md": "..." } }` with the paths in a
  *   stable order, so the package's content hash does not change between two composes of one skill.
+ *   A skill holding a file stored as base64 (an image; skill-files.ts) adds `encodings: { path:
+ *   "base64" }`, and only then, so a skill of text files hashes as it always did.
  *   The component depends on its app and says which one in `meta.skill.bindsTo`.
- * @structure skillComponentId · skillComponentContent · skillFilesOf · skillComponentName ·
+ * @structure skillComponentId · skillComponentContent · skillFilesOf · skillEncodingsOf · skillComponentName ·
  *   rebindSkillMd · boundSkillComponents · registerSkillComponent · deleteSkillComponent ·
  *   fetchSkillComponentContent · skillFileTargets
  * @usage
  *   const comps = await boundSkillComponents(storage, ownerGhii, `app:${owner}/${filename}`, filename);
  *   const out = await registerSkillComponent(storage, { config, owner, ownerGaii, ... });
  * @version-history
+ *   v1.2.0 — 2026-10-26 — A file stored as base64 travels with its encoding (`encodings`) and installs
+ *     as its bytes; the install publishes with `standard: 'warn'`, so a skill written under the rules
+ *     before the Agent Skills standard was enforced still installs (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss).
  *   v1.1.0 — 2026-10-02 — A skill named like one of the node's own is left out with a warning, and the
  *     `fromPackage` tag names the package's author and origin node (package sale design, T5).
  *   v1.0.0 — 2026-09-30 — Initial (wish-a-package-carries-the-skills-bound-to-its-apps).
@@ -43,26 +48,38 @@ import type { Storage, ContentLabelTarget } from '../../../storage/interface.js'
 import { validateSkillFiles, SkillValidationError, parseSkillMd } from '../../skill-md.js';
 import { manifestKey, fileKey, MANIFEST_KEY_RE, scopeOwnerGhii } from '../../skill-refs.js';
 import { publishSkill, deleteSkill, SkillAccessError, type SkillManifestValue, type SkillPackageTag } from '../../skills.js';
+import { skillFileBytes, skillFileEncodings, type SkillFileEncoding } from '../../skill-files.js';
 import { localAccountName } from '../../../utils/gaii.js';
 import { memoryTarget } from '../../classification/labels.js';
 
 /** A skill component's id in its package. The name is unique in the composer's registry. */
 export const skillComponentId = (name: string): string => `skill-${name}`;
 
-/** The component content, paths in code-point order so the same files always hash the same. */
-export function skillComponentContent(files: Record<string, string>): string {
+const byCodePoint = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
+
+/**
+ * The component content, paths in code-point order so the same files always hash the same.
+ * `encodings` names the files stored as base64 (skill-files.ts); it is written only when one is,
+ * so a skill of text files hashes exactly as it did before binary files were kept.
+ */
+export function skillComponentContent(files: Record<string, string>, encodings: Record<string, SkillFileEncoding> = {}): string {
     const sorted: Record<string, string> = {};
-    for (const path of Object.keys(files).sort((a, b) => (a < b ? -1 : a > b ? 1 : 0))) sorted[path] = files[path];
-    return JSON.stringify({ files: sorted });
+    for (const path of Object.keys(files).sort(byCodePoint)) sorted[path] = files[path];
+    const binary: Record<string, SkillFileEncoding> = {};
+    for (const path of Object.keys(encodings).filter(p => p in files).sort(byCodePoint)) binary[path] = encodings[path];
+    return JSON.stringify(Object.keys(binary).length > 0 ? { files: sorted, encodings: binary } : { files: sorted });
+}
+
+/** The component content as JSON, or null when it does not parse. */
+function parseComponent(content: string): { files?: unknown; encodings?: unknown } | null {
+    try { return JSON.parse(content) as { files?: unknown; encodings?: unknown } | null; }
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
+    catch { return null; }
 }
 
 /** The files a skill component carries, or null when the content is not that shape. */
 export function skillFilesOf(content: string): Record<string, string> | null {
-    let parsed: unknown;
-    try { parsed = JSON.parse(content); }
-    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
-    catch { return null; }
-    const files = (parsed as { files?: unknown } | null)?.files;
+    const files = parseComponent(content)?.files;
     if (!files || typeof files !== 'object' || Array.isArray(files)) return null;
     const out: Record<string, string> = {};
     for (const [path, text] of Object.entries(files as Record<string, unknown>)) {
@@ -70,6 +87,16 @@ export function skillFilesOf(content: string): Record<string, string> | null {
         out[path] = text;
     }
     return typeof out['SKILL.md'] === 'string' ? out : null;
+}
+
+/** The files of a skill component stored as base64, path -> encoding; empty for a component of text files. */
+export function skillEncodingsOf(content: string): Record<string, SkillFileEncoding> {
+    const encodings = parseComponent(content)?.encodings;
+    const out: Record<string, SkillFileEncoding> = {};
+    if (encodings && typeof encodings === 'object' && !Array.isArray(encodings)) {
+        for (const [path, encoding] of Object.entries(encodings as Record<string, unknown>)) if (encoding === 'base64') out[path] = 'base64';
+    }
+    return out;
 }
 
 /** The skill's own name from its SKILL.md frontmatter, which is also its registered name. */
@@ -130,7 +157,7 @@ export async function boundSkillComponents(
             id: skillComponentId(manifest.name),
             type: 'skill',
             label: manifest.name,
-            content: skillComponentContent(files),
+            content: skillComponentContent(files, skillFileEncodings(manifest.files ?? [])),
             dependencies: [appComponentId],
             meta: { skill: { bindsTo: appComponentId } },
         });
@@ -170,7 +197,10 @@ export async function registerSkillComponent(
     }
 
     const binding = `app:${input.owner}/${appFilename}`;
-    const fileMap = new Map(Object.entries({ ...files, 'SKILL.md': rebindSkillMd(files['SKILL.md'], binding) }));
+    // A file the composer's registry stored as base64 goes back in as its bytes (skill-files.ts).
+    const encodings = skillEncodingsOf(input.content);
+    const fileMap = new Map<string, string | Buffer>(Object.entries(files).map(([path, value]) => [path, encodings[path] ? skillFileBytes(value, encodings[path]) : value]));
+    fileMap.set('SKILL.md', rebindSkillMd(files['SKILL.md'], binding));
     let name: string;
     try { name = validateSkillFiles(fileMap).parsed.frontmatter.name; }
     catch (err) { return { ok: false, error: `${(err as SkillValidationError).code ?? 'INVALID_SKILL'}: ${(err as Error).message}` }; }
@@ -197,6 +227,9 @@ export async function registerSkillComponent(
     try {
         await publishSkill(storage, input.config, {
             scope: 'user', owner: input.owner, publisher: input.publisher, files: fileMap,
+            // A package carries a skill its author may have published under the older rules; the
+            // installer gets it with the standard's issues named, never a refused install.
+            standard: 'warn',
             // A new skill is the owner's alone; an update keeps whatever visibility the owner gave it.
             ...(existing ? {} : { visibility: 'owner' as const }),
             fromPackage: {
@@ -230,7 +263,7 @@ export async function fetchSkillComponentContent(storage: Storage, name: string,
         const rec = await storage.getMemory(ownerGaii, fileKey(name, f.path));
         if (rec) files[f.path] = String(rec.value);
     }
-    return skillComponentContent(files);
+    return skillComponentContent(files, skillFileEncodings((manifest.value as SkillManifestValue).files ?? []));
 }
 
 /** The label addresses of the records an installed skill is made of: its manifest and its files. */

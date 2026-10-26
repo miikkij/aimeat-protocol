@@ -19,6 +19,11 @@
  *   import { skillsRouter } from '../routes/skills.js';
  *   app.use(skillsRouter(config, storage));
  * @version-history
+ *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss): POST
+ *     /v1/skills takes a file as { content, encoding: "base64" } and `keep_files`, and its answer names
+ *     the standard's rules SKILL.md breaks (`skill.standardIssues`); GET /v1/skills/:name takes
+ *     `body_only` and `path` (404 FILE_NOT_FOUND for a file the skill does not hold); the ZIP writes a
+ *     base64-stored file as its bytes.
  *   2026-10-22 — The skill ZIP answers 404 for a stored name that is not a skill name and leaves out a file
  *     path that would leave the {name}/ wrapper (secaudit2026oct22, skill-zip/entry-name-not-contained).
  *   2026-10-21 — The reader and isAnonymous ask isAnonymousPrincipal: the minted anonymous token read the
@@ -69,6 +74,7 @@ import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
 import { SkillValidationError, isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
+import { readSkillFileInput, skillFileBytes, skillFileEncodings } from '../services/skill-files.js';
 import { parseSkillVisibility, SKILL_VISIBILITY_HINT } from '../services/skill-audience.js';
 import { ProvenanceScopeError } from '../services/ai-provenance.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
@@ -127,7 +133,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     if (err instanceof SkillAccessError) {
-      const status = err.code === 'NOT_FOUND' ? 404 : err.code === 'FORBIDDEN' ? 403 : 400;
+      const status = err.code === 'NOT_FOUND' || err.code === 'FILE_NOT_FOUND' ? 404 : err.code === 'FORBIDDEN' ? 403 : 400;
       res.status(status).json(error(config.nodeId, err.code, err.message));
       return;
     }
@@ -176,7 +182,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  /* ── POST /v1/skills — publish or update. Body: { skill_md, files?, scope?, visibility? } ── */
+  /* ── POST /v1/skills — publish or update. Body: { skill_md, files?, keep_files?, scope?, visibility? }.
+   *    A file is its text, or { content, encoding: "base64" } for one that is not text. ── */
   router.post('/v1/skills', requireAuth(), requireScope('memory:write'), async (req, res) => {
     try {
       const accessor = await accessorOf(req);
@@ -184,7 +191,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(401).json(error(config.nodeId, 'UNAUTHORIZED', 'Authentication required'));
         return;
       }
-      const { skill_md, files: extraFiles, scope: scopeRaw, visibility, organism, ws } = req.body ?? {};
+      const { skill_md, files: extraFiles, keep_files: keepFiles, scope: scopeRaw, visibility, organism, ws } = req.body ?? {};
       const scope: SkillScope = scopeRaw === 'node' ? 'node' : scopeRaw === 'workspace' ? 'workspace' : 'user';
       if (scope === 'node' && !accessor.isOperator) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Skills shared with the whole node are looked after by whoever runs it. Ask them, or publish this one under your own name instead.'));
@@ -221,14 +228,19 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const provenanceIdIn = (req.body ?? {}).ai_provenance_id;
-      const files = new Map<string, string>([['SKILL.md', skill_md]]);
+      if (keepFiles !== undefined && typeof keepFiles !== 'boolean') {
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'keep_files must be true or false'));
+        return;
+      }
+      const files = new Map<string, string | Buffer>([['SKILL.md', skill_md]]);
       if (extraFiles && typeof extraFiles === 'object' && !Array.isArray(extraFiles)) {
         for (const [path, content] of Object.entries(extraFiles as Record<string, unknown>)) {
-          if (typeof content !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `files["${path}"] must be a string`));
+          // The file's text, or { content, encoding: "base64" } for its bytes (skill-files.ts).
+          try { files.set(path, readSkillFileInput(path, content)); }
+          catch (err) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', (err as Error).message));
             return;
           }
-          files.set(path, content);
         }
       }
       const summary = await publishSkill(storage, config, {
@@ -236,6 +248,7 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         owner: accessor.ownerName,
         publisher: req.auth!.sub as string,
         files,
+        keepFiles: keepFiles === true,
         visibility: ask ? undefined : closed.visibility,
         // The accessor is the membership gate of a workspace and of an organisation level.
         accessor,
@@ -265,7 +278,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
     }
   });
 
-  /* ── GET /v1/skills/:name — resolve one skill. Query: scope (user|node), owner, manifest_only.
+  /* ── GET /v1/skills/:name — resolve one skill. Query: scope (user|node), owner, and which files:
+   *    manifest_only (none), body_only (SKILL.md), path (one file), or every file without them.
    *    Open without sign-in: accessorOf gives such a caller no owner, so the scope read gate lets
    *    only a public skill through. An app's guide page (/v1/use-with-ai/…) shows a public bound
    *    skill's text to anyone, as its owner chose by making it public. ── */
@@ -274,6 +288,8 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       const name = req.params.name as string;
       const accessor = await accessorOf(req);
       const manifestOnly = req.query.manifest_only === 'true';
+      const bodyOnly = req.query.body_only === 'true';
+      const path = typeof req.query.path === 'string' ? req.query.path : undefined;
       const scopeQ = req.query.scope as string | undefined;
       const ownerQ = (req.query.owner as string | undefined) ?? accessor.ownerName ?? undefined;
 
@@ -297,11 +313,13 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
       let lastErr: unknown = new SkillAccessError('NOT_FOUND', `Skill not found: ${name}`);
       for (const ref of refs) {
         try {
-          const skill = await resolveSkillRef(storage, config, ref, accessor, { manifestOnly });
+          const skill = await resolveSkillRef(storage, config, ref, accessor, { manifestOnly, bodyOnly, path });
           res.json(success(config.nodeId, { skill }));
           return;
         } catch (err) {
           lastErr = err;
+          // The skill was found and holds no such file: another registry's skill of the name is not the answer.
+          if (err instanceof SkillAccessError && err.code === 'FILE_NOT_FOUND') break;
         }
       }
       sendSkillError(res, lastErr);
@@ -367,10 +385,11 @@ export function skillsRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(500).json(error(config.nodeId, 'ZIP_ERROR', `Failed to build skill ZIP: ${err.message}`));
       });
       // A path stored before isAllowedSkillPath checked every segment is left out, so every entry
-      // stays inside the {name}/ wrapper (secaudit2026oct22).
+      // stays inside the {name}/ wrapper (secaudit2026oct22). A file stored as base64 goes in as its bytes.
+      const encodings = skillFileEncodings(skill.files);
       for (const [path, content] of Object.entries(skill.fileContents)) {
         if (!isAllowedSkillPath(path)) continue;
-        archive.append(content, { name: `${bareName}/${path}` });
+        archive.append(skillFileBytes(content, encodings[path]), { name: `${bareName}/${path}` });
       }
       await archive.finalize();
     } catch (err) {

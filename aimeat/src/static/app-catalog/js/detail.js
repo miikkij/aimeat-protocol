@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-10-26 — skillSetBinding reads SKILL.md alone (body_only) and republishes with keep_files, so
+ *     an attach or detach keeps every other file of the skill, an image as its bytes.
  *   2026-10-13 — Legacy route first, provider path on 410: detailCheckAiAvailability reads the owner's
  *     own key from GET /v1/openrouter/settings again, as before 2026-10-12, and asks GET
  *     /v1/ai/available only when that route answers 410 GONE (node 4.0.0).
@@ -1241,16 +1243,18 @@ function skillListMine() {
     .then(function(r) { return r.json(); })
     .then(function(j) { return (j.data && j.data.skills) ? j.data.skills : []; });
 }
+// SKILL.md alone: the binding lives in its frontmatter, and the other files stay where they are.
 function skillGetMine(name) {
   var base = skillApiBase();
-  return fetch(base + '/v1/skills/' + encodeURIComponent(name) + '?scope=user', { headers: skillAuthHeaders(false) })
+  return fetch(base + '/v1/skills/' + encodeURIComponent(name) + '?scope=user&body_only=true', { headers: skillAuthHeaders(false) })
     .then(function(r) { return r.json(); })
     .then(function(j) { return (j.data && j.data.skill) || null; });
 }
-function skillPublish(skillMd, files) {
+// keep_files: the republish changes SKILL.md and keeps every other file of the skill as stored,
+// an image as its bytes, rather than sending them back through the page.
+function skillPublish(skillMd) {
   var base = skillApiBase();
-  var body = { skill_md: skillMd };
-  if (files && Object.keys(files).length) body.files = files;
+  var body = { skill_md: skillMd, keep_files: true };
   return fetch(base + '/v1/skills', { method: 'POST', headers: skillAuthHeaders(true), body: JSON.stringify(body) })
     .then(function(r) { return r.json().then(function(j) {
       if (!j.ok) throw new Error((j.error && (j.error.message || j.error.code)) || ('HTTP ' + r.status));
@@ -1280,9 +1284,7 @@ function skillSetBinding(name, binding) {
         fm = fm.replace(/^metadata:\s*\r?\n?/m, '');
       }
     }
-    var files = Object.assign({}, skill.fileContents);
-    delete files['SKILL.md'];
-    return skillPublish(m[1] + fm + m[3] + m[4], files);
+    return skillPublish(m[1] + fm + m[3] + m[4]);
   });
 }
 

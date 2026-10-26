@@ -14,6 +14,10 @@
  *   import { registerSkillsTools } from './skills.js';
  *   registerSkillsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss):
+ *     aimeat_skill_publish takes a file as { content, encoding: "base64" } and `keep_files`, as POST
+ *     /v1/skills does; aimeat_skill_get takes `body_only` and `path` and answers FILE_NOT_FOUND for a
+ *     file the skill does not hold, as GET /v1/skills/:name does.
  *   2026-10-24 — aimeat_skill_publish (inline and upload) and aimeat_skill_update refuse the shared
  *     anonymous principal with AUTH_REQUIRED, as POST and PATCH /v1/skills do (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -58,8 +62,10 @@ import { emitChange } from '../services/event-bus.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import {
   publishSkill, listSkills, listSkillLibrary, resolveSkillRef, setSkillVisibility,
-  listSkillsByBinding, type SkillAccessor, type SkillScope,
+  listSkillsByBinding, SkillAccessError, type SkillAccessor, type SkillScope,
 } from '../services/skills.js';
+import { readSkillFileInput } from '../services/skill-files.js';
+import { SkillValidationError } from '../services/skill-md.js';
 import { getAgentSkillLinks, linkSkillToAgent, unlinkSkillFromAgent } from '../services/skill-agent-links.js';
 import type { SkillVisibility } from '../services/skill-audience.js';
 import { readerForAgent } from '../services/classification/reader.js';
@@ -121,7 +127,7 @@ export function registerSkillsTools(
             inputSchema: zodShapeFor('aimeat_skill_publish'),
             annotations: annotationsFor('aimeat_skill_publish'),
         },
-        async ({ skill_md, files, scope, visibility, organism_id, workspace_id, ai_provenance, ai_provenance_id }) => {
+        async ({ skill_md, files, keep_files, scope, visibility, organism_id, workspace_id, ai_provenance, ai_provenance_id }) => {
             if (!ownerName) return err('Could not resolve the calling agent\'s owner');
             if (refusesAnonymous) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             const acc = await accessor();
@@ -156,7 +162,7 @@ export function registerSkillsTools(
                     content_type: 'application/zip',
                     max_bytes: 20 * 1024 * 1024,
                     expires_in_seconds: 3600,
-                    instructions: 'PUT a ZIP of the skill directory (SKILL.md at the root or inside a single wrapping directory; optional scripts/, references/, assets/). The response returns the published skill.',
+                    instructions: 'PUT a ZIP of the skill directory (SKILL.md at the root or inside a single wrapping directory, and any other files of the skill beside it: scripts/, references/, assets/, a LICENSE.txt; images and other binary files are kept as their bytes). The response returns the published skill.',
                 });
             }
 
@@ -168,13 +174,15 @@ export function registerSkillsTools(
             if (ask?.kind === 'refused') return toolError(ask.code, ask.message);
 
             try {
-                const fileMap = new Map<string, string>([['SKILL.md', skill_md]]);
-                for (const [path, content] of Object.entries(files ?? {})) fileMap.set(path, content);
+                const fileMap = new Map<string, string | Buffer>([['SKILL.md', skill_md]]);
+                // A file's text, or { content, encoding: "base64" } for its bytes (skill-files.ts).
+                for (const [path, content] of Object.entries(files ?? {})) fileMap.set(path, readSkillFileInput(path, content));
                 const summary = await publishSkill(storage, config, {
                     scope: targetScope,
                     owner: ownerName,
                     publisher: agentGaii,
                     files: fileMap,
+                    keepFiles: keep_files === true,
                     visibility: ask ? undefined : closed.visibility as SkillVisibility | undefined,
                     // The accessor is the membership gate of a workspace and of an organisation level.
                     accessor: acc,
@@ -198,7 +206,9 @@ export function registerSkillsTools(
                     ...(asked.warnings ? { warnings: asked.warnings } : closedNodeWarnings(closed.warning)),
                 });
             } catch (e) {
-                return withCaughtError(err(`Skill publish failed: ${(e as Error).message}`), e);
+                // A refused SKILL.md names its code (NOT_STANDARD, BAD_FILE_PATH, BAD_ENCODING …), as the REST answer does.
+                const code = e instanceof SkillValidationError ? `${e.code}: ` : '';
+                return withCaughtError(err(`Skill publish failed: ${code}${(e as Error).message}`), e);
             }
         },
     );
@@ -249,7 +259,7 @@ export function registerSkillsTools(
             inputSchema: zodShapeFor('aimeat_skill_get'),
             annotations: annotationsFor('aimeat_skill_get'),
         },
-        async ({ ref, name, manifest_only }) => {
+        async ({ ref, name, manifest_only, body_only, path }) => {
             const acc = await accessor();
             const candidates: string[] = [];
             if (ref) candidates.push(ref);
@@ -262,10 +272,12 @@ export function registerSkillsTools(
             let lastError = 'Skill not found';
             for (const candidate of candidates) {
                 try {
-                    const skill = await resolveSkillRef(storage, config, candidate, acc, { manifestOnly: manifest_only ?? false });
+                    const skill = await resolveSkillRef(storage, config, candidate, acc, { manifestOnly: manifest_only ?? false, bodyOnly: body_only ?? false, path });
                     return ok({ skill });
                 } catch (e) {
                     lastError = (e as Error).message;
+                    // The skill was found and holds no such file, as GET /v1/skills/:name stops there too.
+                    if (e instanceof SkillAccessError && e.code === 'FILE_NOT_FOUND') return toolError('FILE_NOT_FOUND', lastError);
                 }
             }
             return err(lastError);

@@ -17,6 +17,8 @@
  *   aimeat skill install user:alice/style@1.0.2 --project
  *   aimeat skill install ws:ORG/WS/team-style --dir C:\\skills
  * @version-history
+ *   v1.2.0 -- 2026-10-26 -- Any file of the skill folder installs (isAllowedSkillPath allows every path
+ *     that stays inside it), and a file the node stores as base64 is written as its bytes (skill-files.ts).
  *   v1.1.0 -- 2026-10-22 -- skillInstallTarget: the node's skill name must be a skill name and the one asked
  *     for before the directory is cleared, and every file must resolve inside it; the installer had joined
  *     both unchecked and could write or remove outside ~/.claude/skills (secaudit2026oct22).
@@ -26,13 +28,14 @@ import { homedir } from 'node:os';
 import { join, resolve, dirname, relative, isAbsolute } from 'node:path';
 import { mkdirSync, writeFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { isAllowedSkillPath, SKILL_NAME_RE } from '../services/skill-md.js';
+import { skillFileBytes, skillFileEncodings, type SkillFileEntry } from '../services/skill-files.js';
 
 interface ResolvedSkillPayload {
   ref: string;
   name: string;
   description: string;
   version: string;
-  files: Array<{ path: string; size: number }>;
+  files: SkillFileEntry[];
   fileContents: Record<string, string>;
 }
 
@@ -146,6 +149,8 @@ export async function runSkillInstall(ref: string | undefined, flags: Record<str
     if (existsSync(skillDir) && readdirSync(skillDir).length) rmSync(skillDir, { recursive: true, force: true });
 
     const pinnedRef = /@\d+\.\d+\.\d+$/.test(skill.ref) ? skill.ref : `${skill.ref}@${skill.version}`;
+    // A file the node stores as base64 (an image, a font) is written as its bytes.
+    const encodings = skillFileEncodings(skill.files ?? []);
     let written = 0;
     for (const [relPath, content] of Object.entries(skill.fileContents)) {
       const file = skillInstallTarget(baseDir, skill.name, requestedSkillName(ref), relPath);
@@ -155,8 +160,8 @@ export async function runSkillInstall(ref: string | undefined, flags: Record<str
       }
       const target = file.target;
       mkdirSync(dirname(target), { recursive: true });
-      const body = relPath === 'SKILL.md' ? stampProvenance(content, pinnedRef, nodeUrl) : content;
-      writeFileSync(target, body, 'utf-8');
+      const body = relPath === 'SKILL.md' ? Buffer.from(stampProvenance(content, pinnedRef, nodeUrl), 'utf8') : skillFileBytes(content, encodings[relPath]);
+      writeFileSync(target, body);
       written++;
     }
 

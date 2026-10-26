@@ -50980,10 +50980,21 @@ paths:
       operationId: publishSkill
       summary: Publish or update a skill
       description: >-
-        Publish a SKILL.md pack into the registry. Frontmatter (name, description, optional
+        Publish a SKILL.md pack into the registry, in the Agent Skills format
+        (agentskills.io/specification). Frontmatter (name, description, optional
         license/compatibility/metadata) is validated against the shared contract; republishing
-        the same name bumps the version. scope=node is operator-only. Additional files
-        (scripts/, references/, assets/) are passed as relative-path -> content.
+        the same name bumps the version. scope=node is operator-only. The skill's other files are
+        passed as relative-path -> content: any path that stays inside the skill folder
+        (scripts/, references/, assets/, LICENSE.txt …), a text file as its text and a binary file
+        as `{ content, encoding: "base64" }`. A republish holds exactly SKILL.md plus `files`;
+        `keep_files: true` keeps the files the skill already holds that `files` does not name.
+
+        A skill NEW to its registry that breaks a rule the specification's reference validator
+        refuses (two hyphens in a row in the name, `compatibility` over 500 characters) is 422
+        NOT_STANDARD; a skill already in the registry publishes. The answer's
+        `skill.standardIssues` lists every rule of the standard SKILL.md breaks, the warnings
+        included (a top-level field the standard does not define, a metadata value that is not a
+        string).
 
         How SKILL.md was written is recorded: the `ai_provenance` declaration or the
         `ai_provenance_id` in the body, else the node's stamp when an agent publishes (a person
@@ -51007,8 +51018,25 @@ paths:
                   description: The SKILL.md content (YAML frontmatter + markdown body)
                 files:
                   type: object
+                  description: >-
+                    Relative path -> the file's text, or `{ content, encoding: "base64" }` for a file
+                    that is not text. A path that leaves the skill folder is 422 BAD_FILE_PATH; any
+                    other shape is 400.
                   additionalProperties:
-                    type: string
+                    oneOf:
+                      - type: string
+                      - type: object
+                        required: [content, encoding]
+                        properties:
+                          content:
+                            type: string
+                            description: Standard base64 with padding
+                          encoding:
+                            type: string
+                            enum: [base64]
+                keep_files:
+                  type: boolean
+                  description: Keep the files the skill already holds that `files` does not name (default false).
                 scope:
                   type: string
                   enum: [user, node, workspace]
@@ -51042,7 +51070,11 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '422':
-          description: SKILL.md violates the shared contract
+          description: >-
+            SKILL_INVALID with `code`: the SKILL.md violates the shared contract (NO_FRONTMATTER,
+            BAD_YAML, BAD_NAME, BAD_DESCRIPTION, BAD_FIELD, BODY_TOO_LARGE), a file path leaves the
+            skill folder (BAD_FILE_PATH), SKILL.md is not UTF-8 text (BAD_ENCODING), or a new skill
+            breaks a rule of the Agent Skills standard the reference validator refuses (NOT_STANDARD)
 
   /v1/skills/{name}:
     get:
@@ -51051,7 +51083,11 @@ paths:
       description: >-
         Resolve a skill to its manifest plus file bodies. Unscoped lookups search the caller's
         own registry first, then the node library; scope/owner (or scope=workspace with
-        organism + ws) address a specific registry. manifest_only=true skips bodies. A skill a
+        organism + ws) address a specific registry. Which bodies, as the Agent Skills standard
+        loads a skill in steps: manifest_only=true none, body_only=true SKILL.md alone, path one
+        file (404 FILE_NOT_FOUND when the skill holds no such file, and the lookup does not go on to
+        the node library), and every file without them. `fileContents` holds each file's stored
+        string: its text, or base64 for a file whose entry in `files` says `encoding: "base64"`. A skill a
         package install published carries `fromPackage` ({ groupId, instanceId }); the owner's own
         republish keeps it, and only that install replaces or removes the skill. Open without
         sign-in: a caller who is not signed in reads public skills only (pass scope and owner).
@@ -51086,6 +51122,17 @@ paths:
           in: query
           schema:
             type: boolean
+        - name: body_only
+          in: query
+          description: The manifest and SKILL.md alone, without the other files.
+          schema:
+            type: boolean
+        - name: path
+          in: query
+          description: The manifest and this one file, a path from the manifest's `files`.
+          schema:
+            type: string
+            maxLength: 200
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -51269,8 +51316,8 @@ paths:
       operationId: downloadSkillZip
       summary: Download a skill as an upload-ready ZIP
       description: >-
-        The skill's directory ({name}/SKILL.md plus scripts/, references/, assets/) as a ZIP —
-        the layout claude.ai's skill upload expects, and unzip-ready for ~/.claude/skills
+        The skill's directory ({name}/SKILL.md plus every other file of the skill, a binary file as
+        its bytes) as a ZIP — the layout claude.ai's skill upload expects, and unzip-ready for ~/.claude/skills
         (Claude Code / Desktop). Same addressing as the resolve route; the name segment may
         carry an @semver pin. Response headers X-Skill-Ref and X-Skill-Version echo what was
         packed. Open without sign-in for a public skill, as the resolve route is.

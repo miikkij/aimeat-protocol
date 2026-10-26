@@ -56,6 +56,7 @@
     "check:python-shapes": "tsx scripts/check-python-shapes.ts",
     "python:schema": "tsx scripts/check-python-shapes.ts --write",
     "test:python-parity": "tsx scripts/python-parity-test.ts",
+    "check:skills-standard": "tsx scripts/check-skills-standard.ts",
     "check:python-daemon": "tsx scripts/check-python-daemon.ts",
     "audit:browser-libs": "tsx scripts/audit-browser-libs.ts",
     "check:browser-libs": "tsx scripts/audit-browser-libs.ts --check",

@@ -9,6 +9,9 @@
  * @usage
  *   import * as skillsService from '/js/services/skills.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-26 -- publishSkill({ keepFiles }) keeps the skill's other files on a republish;
+ *     getSkill({ bodyOnly }) reads SKILL.md alone; setSkillBinding uses both, so an attach no longer
+ *     sends every file back through the page (and an image no longer goes back as text).
  *   v1.1.0 -- 2026-09-03 -- getLibrary({ links }) asks for each skill's linkedBy; setSkillVisibility()
  *     is the PATCH door (visibility without a republish).
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2b)
@@ -49,30 +52,34 @@ export async function listAppSkills(owner, filename) {
 }
 
 /**
- * Resolve one skill (manifest + file bodies unless manifestOnly).
+ * Resolve one skill: manifest plus every file body, SKILL.md alone (bodyOnly), or no body (manifestOnly).
  * @param {string} name
- * @param {{ scope?: string, owner?: string, organism?: string, ws?: string, manifestOnly?: boolean }} [opts]
+ * @param {{ scope?: string, owner?: string, organism?: string, ws?: string, manifestOnly?: boolean, bodyOnly?: boolean }} [opts]
  */
-export async function getSkill(name, { scope, owner, organism, ws, manifestOnly } = {}) {
+export async function getSkill(name, { scope, owner, organism, ws, manifestOnly, bodyOnly } = {}) {
   const params = new URLSearchParams();
   if (scope) params.set('scope', scope);
   if (owner) params.set('owner', owner);
   if (organism) params.set('organism', organism);
   if (ws) params.set('ws', ws);
   if (manifestOnly) params.set('manifest_only', 'true');
+  if (bodyOnly) params.set('body_only', 'true');
   const qs = params.toString();
   const res = await apiGet(`/v1/skills/${encodeURIComponent(name)}${qs ? `?${qs}` : ''}`);
   return res?.data?.skill ?? null;
 }
 
 /**
- * Publish or update a skill.
- * @param {{ skillMd: string, files?: Record<string, string>, scope?: string, visibility?: string, organism?: string, ws?: string }} opts
+ * Publish or update a skill. `keepFiles` keeps every file the skill already holds besides SKILL.md
+ * (references/, assets/, an image as its bytes); an editor that changes SKILL.md alone passes it,
+ * or the republish would leave the skill with SKILL.md and nothing else.
+ * @param {{ skillMd: string, files?: Record<string, string | { content: string, encoding: 'base64' }>, keepFiles?: boolean, scope?: string, visibility?: string, organism?: string, ws?: string }} opts
  */
-export async function publishSkill({ skillMd, files, scope, visibility, organism, ws }) {
+export async function publishSkill({ skillMd, files, keepFiles, scope, visibility, organism, ws }) {
   const res = await apiPost('/v1/skills', {
     skill_md: skillMd,
     ...(files && Object.keys(files).length ? { files } : {}),
+    ...(keepFiles ? { keep_files: true } : {}),
     ...(scope ? { scope } : {}),
     ...(visibility ? { visibility } : {}),
     ...(organism ? { organism } : {}),
@@ -119,7 +126,7 @@ export async function downloadSkillZip(name, { scope, owner, organism, ws } = {}
  * @param {string|null} binding  "app:{owner}/{filename}" to set, null to clear
  */
 export async function setSkillBinding(name, binding) {
-  const skill = await getSkill(name, { scope: 'user' });
+  const skill = await getSkill(name, { scope: 'user', bodyOnly: true });
   if (!skill) throw new Error('Skill not found: ' + name);
   const md = skill.fileContents?.['SKILL.md'] ?? '';
   const m = md.match(/^(---\r?\n)([\s\S]*?)(\r?\n---\r?\n?)([\s\S]*)$/);
@@ -138,9 +145,8 @@ export async function setSkillBinding(name, binding) {
       fm = fm.replace(/^metadata:\s*\r?\n?/m, '');
     }
   }
-  const files = { ...skill.fileContents };
-  delete files['SKILL.md'];
-  return publishSkill({ skillMd: `${m[1]}${fm}${m[3]}${m[4]}`, files });
+  // The other files stay as the registry holds them; only SKILL.md travels.
+  return publishSkill({ skillMd: `${m[1]}${fm}${m[3]}${m[4]}`, keepFiles: true });
 }
 
 export async function deleteSkill(name, scope) {

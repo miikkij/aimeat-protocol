@@ -5,6 +5,14 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss): test 6
+ *     asserted that a file outside scripts/, references/ and assets/ is refused, which was the contract
+ *     until Jouni ruled the registry follows the standard (any file in the folder), so it now asserts
+ *     acceptance and 6c holds what is still refused. 7b-7l: a binary file stored as base64 and read back
+ *     as the same bytes (also in the ZIP), the two load levels body_only and path with FILE_NOT_FOUND and
+ *     a cross-owner refusal, keep_files and its cross-owner limit, NOT_STANDARD on a new skill, warnings
+ *     on what skills-ref or Claude Code accept, and a republish of an existing skill. 25b-25d: a ZIP with
+ *     root files, a binary asset and Finder entries, and the MCP tools' body_only, path and keep_files.
  *   2026-10-20 — 41b-41e: a workspace skill is workspace content, so publishing and deleting one
  *     asks the workspace WRITE rule. A member with no grant and a viewer are refused POST
  *     /v1/skills (scope workspace) and DELETE /v1/skills/:name, in person and through an agent, the
@@ -119,7 +127,29 @@ function listZipEntries(buffer: Buffer): Promise<string[]> {
     });
 }
 
-function makeZip(entries: Array<{ name: string; data: string; symlink?: boolean }>): Promise<Buffer> {
+/** Every file entry of a ZIP with its bytes. */
+function readZipEntries(buffer: Buffer): Promise<Map<string, Buffer>> {
+    return new Promise((resolvePromise, reject) => {
+        yauzl.fromBuffer(buffer, { lazyEntries: true }, (err, zipfile) => {
+            if (err) return reject(err);
+            const out = new Map<string, Buffer>();
+            zipfile!.readEntry();
+            zipfile!.on('entry', (entry: yauzl.Entry) => {
+                if (/\/$/.test(entry.fileName)) { zipfile!.readEntry(); return; }
+                zipfile!.openReadStream(entry, (e, stream) => {
+                    if (e || !stream) return reject(e);
+                    const chunks: Buffer[] = [];
+                    stream.on('data', (c: Buffer) => chunks.push(c));
+                    stream.on('end', () => { out.set(entry.fileName, Buffer.concat(chunks)); zipfile!.readEntry(); });
+                });
+            });
+            zipfile!.on('end', () => resolvePromise(out));
+            zipfile!.on('error', reject);
+        });
+    });
+}
+
+function makeZip(entries: Array<{ name: string; data: string | Buffer; symlink?: boolean }>): Promise<Buffer> {
     return new Promise((resolve, reject) => {
         const a = new ZipArchive({ zlib: { level: 9 } });
         const chunks: Buffer[] = [];
@@ -127,7 +157,7 @@ function makeZip(entries: Array<{ name: string; data: string; symlink?: boolean 
         a.on('end', () => resolve(Buffer.concat(chunks)));
         a.on('error', reject);
         for (const e of entries) {
-            if (e.symlink) a.symlink(e.name, e.data);
+            if (e.symlink) a.symlink(e.name, String(e.data));
             else a.append(e.data, { name: e.name });
         }
         void a.finalize();
@@ -295,13 +325,34 @@ await test('5. Missing description rejected (422)', async () => {
     assert(status === 422, `status ${status}`);
 });
 
-await test('6. File outside the contract layout rejected (422)', async () => {
-    const { status } = await json('/v1/skills', {
+// Until 2026-10-26 this test asserted that a file outside scripts/, references/ and assets/ was refused.
+// The Agent Skills standard allows any file in the folder (a LICENSE.txt, a forms.md at the root), and
+// Jouni ruled the registry follows it (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss), so
+// the old assertion described the contract that changed, not a hole; 6c holds what is still refused.
+await test('6. Any file inside the skill folder is accepted, as the Agent Skills standard allows', async () => {
+    const md = SKILL_MD.replace('research-briefs', 'any-file');
+    const { status, body } = await json('/v1/skills', {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ skill_md: SKILL_MD, files: { 'evil/notes.txt': 'nope' } }),
+        body: JSON.stringify({ skill_md: md, files: { 'LICENSE.txt': 'MIT', 'forms.md': '# Forms', 'templates/letter.md': 'Dear' } }),
     });
-    assert(status === 422, `status ${status}`);
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const paths = body.data.skill.files.map((f: any) => f.path).sort();
+    assert(JSON.stringify(paths) === JSON.stringify(['LICENSE.txt', 'SKILL.md', 'forms.md', 'templates/letter.md']), `files: ${paths}`);
+});
+
+await test('6c. A path that is not one file on every platform is refused (422 BAD_FILE_PATH), and nothing is stored', async () => {
+    const md = SKILL_MD.replace('research-briefs', 'unsafe-path');
+    for (const path of ['C:/x.md', 'assets/a:stream', 'NUL.txt', '.git/hooks/pre-commit', './SKILL.md', 'skill.md', 'x'.repeat(201)]) {
+        const { status, body } = await json('/v1/skills', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ skill_md: md, files: { [path]: 'payload' } }),
+        });
+        assert(status === 422 && JSON.stringify(body).includes('BAD_FILE_PATH'), `${path.slice(0, 40)}: status ${status} ${JSON.stringify(body).slice(0, 160)}`);
+    }
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!JSON.stringify(lib.body).includes('unsafe-path'), 'a refused skill was stored');
 });
 
 // secaudit2026oct22: the layout check read only the first folder, so a path that climbs out of it was
@@ -333,6 +384,131 @@ await test('7. Multi-file skill publishes with a file index', async () => {
     assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
     const paths = body.data.skill.files.map((f: any) => f.path).sort();
     assert(JSON.stringify(paths) === JSON.stringify(['SKILL.md', 'references/style.md', 'scripts/outline.py']), `files: ${paths}`);
+});
+
+// ─── Phase 1b: Agent Skills standard (2026-10-26) ───
+console.log('\nPhase 1b -- Agent Skills standard: binary files, standard rules, keep_files, levels');
+
+// Bytes that are not UTF-8: a PNG signature, a NUL and 0xFF. Before 2026-10-26 the store turned them into text.
+const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0xff, 0xfe, 0x10]);
+const LEVELS_MD = SKILL_MD.replace('research-briefs', 'levels-skill');
+
+await test('7b. A binary file sent as base64 is stored with its encoding and reads back as the same bytes', async () => {
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({
+            skill_md: LEVELS_MD,
+            files: { 'assets/logo.png': { content: PNG.toString('base64'), encoding: 'base64' }, 'references/forms.md': '# Forms\nFill in.' },
+        }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const png = body.data.skill.files.find((f: any) => f.path === 'assets/logo.png');
+    assert(png?.encoding === 'base64' && png.size === PNG.length, `index entry: ${JSON.stringify(png)}`);
+    assert(!body.data.skill.files.find((f: any) => f.path === 'references/forms.md').encoding, 'a text file carries no encoding');
+    const got = await json(`/v1/skills/levels-skill?scope=user&path=assets/logo.png`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(got.status === 200, `path read ${got.status}`);
+    assert(Buffer.from(got.body.data.skill.fileContents['assets/logo.png'], 'base64').equals(PNG), 'bytes differ after the round trip');
+});
+
+await test('7c. A file in any other shape is refused with 400, naming the file', async () => {
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: SKILL_MD.replace('research-briefs', 'bad-shape'), files: { 'assets/x.bin': { content: 'not base64!', encoding: 'base64' } } }),
+    });
+    assert(status === 400 && JSON.stringify(body).includes('assets/x.bin'), `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+});
+
+await test('7d. Level 2: body_only answers SKILL.md alone, with the whole file index', async () => {
+    const { status, body } = await json(`/v1/skills/levels-skill?scope=user&body_only=true`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `status ${status}`);
+    assert(JSON.stringify(Object.keys(body.data.skill.fileContents)) === '["SKILL.md"]', `contents: ${Object.keys(body.data.skill.fileContents)}`);
+    assert(body.data.skill.files.length === 3, `index: ${body.data.skill.files.length}`);
+});
+
+await test('7e. Level 3: path answers that one file; a path the skill does not hold is 404 FILE_NOT_FOUND', async () => {
+    const one = await json(`/v1/skills/levels-skill?scope=user&path=references/forms.md`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(one.status === 200, `status ${one.status}`);
+    assert(JSON.stringify(Object.keys(one.body.data.skill.fileContents)) === '["references/forms.md"]', `contents: ${Object.keys(one.body.data.skill.fileContents)}`);
+    assert(one.body.data.skill.fileContents['references/forms.md'].startsWith('# Forms'), 'file text');
+    const none = await json(`/v1/skills/levels-skill?path=references/missing.md`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(none.status === 404 && JSON.stringify(none.body).includes('FILE_NOT_FOUND'), `status ${none.status}: ${JSON.stringify(none.body).slice(0, 200)}`);
+});
+
+await test('7f. Owner B cannot read a file of A\'s owner-visibility skill by path', async () => {
+    const { status } = await json(`/v1/skills/levels-skill?scope=user&owner=${ownerName}&path=references/forms.md`, { headers: { Authorization: `Bearer ${otherOwnerToken}` } });
+    assert(status === 403 || status === 404, `status ${status}`);
+});
+
+await test('7g. The ZIP download carries a base64-stored file as its bytes', async () => {
+    const res = await rawFetch(`/v1/skills/levels-skill/zip?scope=user`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(res.status === 200, `status ${res.status}`);
+    const entries = await readZipEntries(Buffer.from(await res.arrayBuffer()));
+    assert(entries.get('levels-skill/assets/logo.png')?.equals(PNG) === true, `zip entries: ${[...entries.keys()]}`);
+});
+
+await test('7h. keep_files keeps the files a SKILL.md-only republish does not send; without it they go', async () => {
+    const kept = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: LEVELS_MD.replace('Always lead', 'Lead'), keep_files: true }),
+    });
+    assert(kept.status === 201, `status ${kept.status}: ${JSON.stringify(kept.body)}`);
+    assert(kept.body.data.skill.files.length === 3, `kept: ${JSON.stringify(kept.body.data.skill.files)}`);
+    const png = await json(`/v1/skills/levels-skill?scope=user&path=assets/logo.png`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(Buffer.from(png.body.data.skill.fileContents['assets/logo.png'], 'base64').equals(PNG), 'the kept image changed');
+    const dropped = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: LEVELS_MD }),
+    });
+    assert(dropped.status === 201 && dropped.body.data.skill.files.length === 1, `without keep_files: ${JSON.stringify(dropped.body.data?.skill?.files)}`);
+});
+
+await test('7i. keep_files takes nothing from another owner\'s skill of the same name', async () => {
+    await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ skill_md: LEVELS_MD, files: { 'references/secret.md': 'owner A only' } }),
+    });
+    const { status, body } = await json('/v1/skills', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${otherOwnerToken}` },
+        body: JSON.stringify({ skill_md: LEVELS_MD, keep_files: true }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.skill.ref === `user:${otherOwnerName}/levels-skill` && body.data.skill.files.length === 1, `B's skill: ${JSON.stringify(body.data.skill.files)}`);
+});
+
+await test('7j. A NEW skill breaking a rule skills-ref refuses is 422 NOT_STANDARD, and nothing is stored', async () => {
+    const cases = [
+        SKILL_MD.replace('name: research-briefs', 'name: two--hyphens'),
+        SKILL_MD.replace('name: research-briefs', `name: long-compat\ncompatibility: ${'x'.repeat(501)}`),
+    ];
+    for (const md of cases) {
+        const { status, body } = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: md }) });
+        assert(status === 422 && JSON.stringify(body).includes('NOT_STANDARD'), `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    }
+    const lib = await json('/v1/skills', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(!JSON.stringify(lib.body).includes('two--hyphens') && !JSON.stringify(lib.body).includes('long-compat'), 'a refused skill was stored');
+});
+
+await test('7k. What skills-ref or Claude Code accept publishes, with the warnings named in standardIssues', async () => {
+    const md = SKILL_MD.replace('name: research-briefs', 'name: claude-code-style\nargument-hint: "[file]"').replace('  tags: research, writing', '  tags: research, writing\n  version: 1.0');
+    const { status, body } = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: md }) });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    const issues = (body.data.skill.standardIssues ?? []).map((i: any) => `${i.code}:${i.field}`).sort();
+    assert(JSON.stringify(issues) === JSON.stringify(['METADATA_NOT_STRING:metadata.version', 'UNKNOWN_FIELD:argument-hint']), `issues: ${JSON.stringify(issues)}`);
+});
+
+await test('7l. A skill already in the registry republishes with a blocking issue, which the answer names', async () => {
+    const ok = SKILL_MD.replace('name: research-briefs', `name: grown-compat\ncompatibility: ${'x'.repeat(400)}`);
+    const first = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: ok }) });
+    assert(first.status === 201 && !first.body.data.skill.standardIssues, `first: ${first.status} ${JSON.stringify(first.body.data?.skill?.standardIssues)}`);
+    const grown = await json('/v1/skills', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ skill_md: ok.replace('x'.repeat(400), 'x'.repeat(600)) }) });
+    assert(grown.status === 201, `republish: ${grown.status} ${JSON.stringify(grown.body).slice(0, 200)}`);
+    assert((grown.body.data.skill.standardIssues ?? []).some((i: any) => i.code === 'COMPATIBILITY_LENGTH'), `issues: ${JSON.stringify(grown.body.data.skill.standardIssues)}`);
 });
 
 // ─── Phase 2: List + resolve ───
@@ -750,6 +926,42 @@ await test('25. ZIP with symlink entry rejected (422)', async () => {
     ]);
     const up = await fetch(data.upload_url, { method: 'PUT', body: new Uint8Array(zip) });
     assert(up.status === 422, `status ${up.status}`);
+});
+
+await test('25b. A ZIP with root files and a binary asset publishes; the Finder\'s own entries are dropped', async () => {
+    const { body } = await mcpRpc('tools/call', { name: 'aimeat_skill_publish', arguments: {} }, 1051);
+    const data = toolText(body);
+    const zip = await makeZip([
+        { name: 'std-skill/SKILL.md', data: SKILL_MD.replace('research-briefs', 'std-skill') },
+        { name: 'std-skill/LICENSE.txt', data: 'Apache-2.0' },
+        { name: 'std-skill/forms.md', data: '# Forms' },
+        { name: 'std-skill/assets/logo.png', data: PNG },
+        { name: 'std-skill/.DS_Store', data: 'finder' },
+        { name: '__MACOSX/std-skill/._SKILL.md', data: 'resource fork' },
+    ]);
+    const up = await fetch(data.upload_url, { method: 'PUT', body: new Uint8Array(zip) });
+    const upBody = await up.json() as any;
+    assert(up.status === 200, `upload status ${up.status}: ${JSON.stringify(upBody)}`);
+    const paths = upBody.skill.files.map((f: any) => f.path).sort();
+    assert(JSON.stringify(paths) === JSON.stringify(['LICENSE.txt', 'SKILL.md', 'assets/logo.png', 'forms.md']), `files: ${paths}`);
+    assert(upBody.skill.files.find((f: any) => f.path === 'assets/logo.png').encoding === 'base64', 'the image is stored as bytes');
+});
+
+await test('25c. aimeat_skill_get loads in steps: body_only, then path; a missing path is FILE_NOT_FOUND', async () => {
+    const body2 = toolText((await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { name: 'std-skill', body_only: true } }, 1052)).body);
+    assert(JSON.stringify(Object.keys(body2.skill.fileContents)) === '["SKILL.md"]', `body_only: ${Object.keys(body2.skill?.fileContents ?? {})}`);
+    const one = toolText((await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { name: 'std-skill', path: 'assets/logo.png' } }, 1053)).body);
+    assert(Buffer.from(one.skill.fileContents['assets/logo.png'], 'base64').equals(PNG), 'the image read back over MCP differs');
+    const missing = await mcpRpc('tools/call', { name: 'aimeat_skill_get', arguments: { name: 'std-skill', path: 'nope.md' } }, 1054);
+    assert(missing.body.result?.isError === true && JSON.stringify(missing.body).includes('FILE_NOT_FOUND'), `missing: ${JSON.stringify(missing.body).slice(0, 200)}`);
+});
+
+await test('25d. aimeat_skill_publish takes a base64 file and keep_files', async () => {
+    const md = SKILL_MD.replace('research-briefs', 'mcp-binary');
+    const first = toolText((await mcpRpc('tools/call', { name: 'aimeat_skill_publish', arguments: { skill_md: md, files: { 'assets/icon.png': { content: PNG.toString('base64'), encoding: 'base64' } } } }, 1055)).body);
+    assert(first.skill?.files?.find((f: any) => f.path === 'assets/icon.png')?.encoding === 'base64', `first: ${JSON.stringify(first).slice(0, 200)}`);
+    const second = toolText((await mcpRpc('tools/call', { name: 'aimeat_skill_publish', arguments: { skill_md: md.replace('Always', 'Always,'), keep_files: true } }, 1056)).body);
+    assert(second.skill?.files?.length === 2, `keep_files: ${JSON.stringify(second.skill?.files)}`);
 });
 
 await test('26. aimeat_skill_link + unlink round-trip', async () => {
