@@ -7,6 +7,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v2.20.0 — 2026-10-26 — Each message gets the thread's `reactions` (its marks and "React"); not in
+ *     a thread one of the person's agents had, whose copies are the agent's.
  *   v2.19.0 — 2026-10-21 — A group chat's head shows the group's name, its picture and its members, with
  *     a Members door that opens the members strip under the head (`groupDoor`, `groupStrip`, ./group-chat.js).
  *   v2.18.0 — 2026-10-19 — The thread head shows an agent peer's own avatar in the identicon's place when it has one (`peerAvatar`, AgentAvatar).
@@ -110,7 +112,7 @@ export function ThreadPanel({
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
   threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds, archiveItem, peerAvatar,
-  groupDoor, groupStrip,
+  groupDoor, groupStrip, reactions,
 }) {
   let lastDay = '';
   // A group chat is named by its name and its members, not by whoever opened it (./group-chat.js).
@@ -193,6 +195,7 @@ export function ThreadPanel({
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending} showLinkPreviews=${showLinkPreviews}
               onTranscribe=${onTranscribe} canTranscribe=${canTranscribe}
+              reactions=${activeConv.viaAgent ? null : reactions} nameOf=${peerDisplay}
               onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
         })}
       <//>

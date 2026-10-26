@@ -5,6 +5,7 @@
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
  *   v1.15.0 -- 2026-10-25 -- internetOpeningCliTools: an app opened to the internet on a closed node (six tools).
+ *   v1.15.0 -- 2026-10-26 -- dmReactionCliTools: aimeat_dm_react (a mark on one message).
  *   v1.14.0 -- 2026-10-21 -- dmGroupCliTools: the six aimeat_dm_group_* tools (group chat).
  *   v1.13.0 -- 2026-10-20 -- contentCliTools: aimeat_content_facts, _inspect, _scan, _classes and _settings
  *     (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -72,6 +73,7 @@ import { internetOpeningCliTools } from './tool-call-defs-internet-opening.js';
 import { publishCliTools } from './tool-call-defs-publish.js';
 import { accountRightsCliTools } from './tool-call-defs-account-rights.js';
 import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
+import { dmReactionCliTools } from './tool-call-defs-dm-reactions.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -123,6 +125,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...publishCliTools,
     ...accountRightsCliTools,
     ...dmGroupCliTools,
+    ...dmReactionCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

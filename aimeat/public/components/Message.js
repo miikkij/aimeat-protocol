@@ -33,6 +33,10 @@
  *        html`<${Message} tone="comment" reply who=${author} whoNote=${['reply']} time=${when} body=${text} plain
  *          actions=${html`<${Action} small onClick=${…}>Reply<//>`} />`
  * @version-history
+ *   v1.2.0 — 2026-10-26 — `reactions` ({ items, palette, onToggle }): the marks under a message as Tags
+ *     (the person's own in ink, a press gives the same or takes one's own back), and "React" in the line
+ *     under it opening the palette and a field for any other symbol. Additive; a page that passes no
+ *     `reactions` draws what it drew.
  *   v1.1.0 — 2026-09-26 — Thread `capped`: a thread that stands inside a page (an agent's Messages
  *     tab) scrolls after 400px instead of filling a column, as main's .pf-agd-msg-history did; additive.
  *   v1.0.0 — 2026-09-26 — Initial: Messages' message (MessageBubble in views/profile/inbox-tab), the
@@ -52,6 +56,7 @@ import { Action } from '/components/Action.js';
 import { Mark } from '/components/Mark.js';
 import { MessageFiles } from '/components/MessageFile.js';
 import { MessageQuestions } from '/components/MessageQuestions.js';
+import { TextField } from '/components/TextField.js';
 import { isSpeechSupported, subscribeSpeech, getSpeechState, speak, stop, textToParagraphs } from '/js/services/speech-reader.js';
 
 const html = htm.bind(h);
@@ -112,6 +117,29 @@ function Quote({ quote }) {
   </button>`;
 }
 
+/**
+ * The marks under a message (`reactions.items`: { reaction, count, mine, title }), each a Tag that
+ * gives the same mark or, on the person's own (ink), takes it back. While `picking`, the person's
+ * palette follows as Tags with their meaning in the tooltip, and a field takes any other symbol.
+ */
+function Reactions({ reactions, picking, onPicked }) {
+  const [other, setOther] = useState('');
+  const items = reactions.items || [];
+  const give = (symbol) => { reactions.onToggle?.(symbol, false); onPicked(); };
+  return html`
+    ${items.length ? html`<div class="message-reactions">
+      ${items.map((it) => html`<${Mark} key=${it.reaction} tone=${it.mine ? 'ink' : undefined}
+        title=${it.title} onClick=${() => reactions.onToggle?.(it.reaction, it.mine)}>${it.reaction} ${it.count}<//>`)}
+    </div>` : null}
+    ${picking ? html`<div class="message-react-pick">
+      ${(reactions.palette || []).map((p) => html`<${Mark} key=${p.symbol} title=${p.meaning || p.symbol}
+        onClick=${() => give(p.symbol)}>${p.symbol}<//>`)}
+      <${TextField} size="small" value=${other} maxLength=${32} ariaLabel=${t('inbox.react.other')}
+        placeholder=${t('inbox.react.otherPlaceholder')} onInput=${setOther}
+        onEnter=${() => { if (other.trim()) { give(other.trim()); setOther(''); } }} onEscape=${onPicked} />
+    </div>` : null}`;
+}
+
 /** The words: Markdown by default, as written with `plain`. */
 function Words({ body, plain }) {
   return plain
@@ -134,8 +162,10 @@ function Head({ who, whoNote, time, timeTitle, board }) {
 
 export function Message({
   id, mine, tone, reply, who, whoNote, label, quote, body, plain, time, timeTitle, receipt, marks,
-  questions, files, onOpenText, onTranscribe, canTranscribe, copy, copyLabel, listen, menu, menuLabel, actions, children,
+  questions, files, onOpenText, onTranscribe, canTranscribe, copy, copyLabel, listen, menu, menuLabel, actions,
+  reactions, children,
 }) {
+  const [picking, setPicking] = useState(false);
   if (tone === 'comment') {
     return html`<div id=${id} class=${cx('message', 'message--comment', reply && 'message--reply')}>
       <${Head} who=${who} whoNote=${whoNote} time=${time} timeTitle=${timeTitle} />
@@ -163,7 +193,7 @@ export function Message({
 
   // The message: the chat's turn, with who and when inside it.
   const hasMeta = (marks && marks.length) || time || receipt?.mark;
-  const hasActions = (copy !== undefined && copy !== null) || listen || (menu && menu.length);
+  const hasActions = (copy !== undefined && copy !== null) || listen || reactions || (menu && menu.length);
   return html`
     <div id=${id} class=${cx('poster-turn', mine ? 'poster-turn--user' : 'poster-turn--agent', 'message')}>
       <div class="poster-turn-body message-body">
@@ -178,6 +208,7 @@ export function Message({
           ${time ? html`<${Mark} kind="time" title=${timeTitle}>${time}<//>` : null}
           ${receipt?.mark ? html`<span class=${cx('message-receipt', receipt.tone && `message-receipt--${receipt.tone}`)} title=${receipt.title}>${receipt.mark}</span>` : null}
         </div>` : null}
+        ${reactions ? html`<${Reactions} reactions=${reactions} picking=${picking} onPicked=${() => setPicking(false)} />` : null}
       </div>
       ${hasActions ? html`<div class="poster-turn-meta message-actions">
         ${/* The raw text the sender wrote: that is what pastes usefully into an AI chat or a
@@ -185,6 +216,8 @@ export function Message({
         ${copy !== undefined && copy !== null ? html`<${Action} tone="text" copy=${String(copy)} copiedLabel="✓"
           copiedTitle=${t('common.copied')} title=${copyLabel} ariaLabel=${copyLabel}>⧉<//>` : null}
         ${listen ? html`<${Listen} id=${listen.id} text=${listen.text} />` : null}
+        ${reactions ? html`<${Action} tone="text" pressed=${picking} title=${t('inbox.react.add')} ariaLabel=${t('inbox.react.add')}
+          onClick=${() => setPicking((p) => !p)}>${t('inbox.react.add')}<//>` : null}
         ${menu && menu.length ? html`<${CardMenu} inline=${mine ? 'end' : 'start'} actions=${menu} label=${menuLabel} />` : null}
       </div>` : null}
     </div>`;

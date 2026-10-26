@@ -11,6 +11,7 @@
  * @structure MessageBubble({ msg, mine, who, … })
  * @usage import { MessageBubble } from './message-turn.js'; (components.js re-exports it)
  * @version-history
+ *   2026-10-26 — `reactions` (./reactions.js): the marks on the message and "React", drawn by the Message component.
  *   2026-10-17 — A message an agent sent in its owner's name carries a mark naming the agent, for the
  *     owner ("your agent X, for you") and for the recipient ("their agent X").
  *   2026-09-28 — No emoji in the menu item "Add to notebook for later" (frontend rule: no emoji in the interface).
@@ -30,13 +31,14 @@ import { t } from '/js/i18n.js';
 import { Message } from '/components/Message.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, trackStatusTone, attachKind } from './helpers.js';
+import { reactionItems } from './reactions.js';
 
 /**
  * One message. `mine` is the person's own side (the sun); the other side is a person or their agent
  * (the spine). Delete stays last in the ⋯ menu, in its danger tone, because it is the only action that
  * cannot be undone and it asks before it acts.
  */
-export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, onDelete, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
+export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, onDelete, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe, reactions, nameOf }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -89,6 +91,11 @@ export function MessageBubble({ msg, mine, who, urlMap, starred, onStar, onTrack
     copy=${String(msg.body || '')} copyLabel=${t('inbox.copyMessage')}
     listen=${{ id: `msg:${msg.id}`, text: msg.body }}
     menu=${menu} menuLabel=${t('inbox.cover.more') || 'More'}
+    reactions=${reactions ? {
+      items: reactionItems(msg, reactions.me, nameOf || ((g) => g)),
+      palette: reactions.palette,
+      onToggle: (symbol, remove) => reactions.react(msg, symbol, remove),
+    } : null}
     questions=${msg.interactive?.role === 'questions' ? {
       spec: msg.interactive, answers: answeredWith ? (answeredWith.answers || {}) : undefined,
       submitting, onSubmit: (answers) => onAnswer?.(msg, answers),

@@ -1254,6 +1254,15 @@ export interface Conversation {
   updatedAt: Generated<Timestamp>;
 }
 
+/** Migration 0118: one person's acknowledgement mark on one message (services/message-reactions.ts). */
+export interface DirectMessageReaction {
+  byAgent: string | null;
+  createdAt: Generated<Timestamp>;
+  messageId: string;
+  reaction: string;
+  reactorGhii: string;
+}
+
 export interface DirectMessage {
   /** TARGET-058: the provenance record describing this message's body. NULL = unstated. */
   aiProvenanceId: string | null;
@@ -2426,6 +2435,7 @@ export interface DB {
   Csm: Csm;
   DeviceAuth: DeviceAuth;
   DirectMessage: DirectMessage;
+  DirectMessageReaction: DirectMessageReaction;
   Dispute: Dispute;
   DisputeAudit: DisputeAudit;
   EcoAuth: EcoAuth;

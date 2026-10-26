@@ -91,6 +91,10 @@
       "count": 4,
       "why": "Inbound catalogue and trust traffic verified with the pinned key after gatePeer('shareCatalogue'). The catalogue sync reads the same pinned key again, after its own signature verified, for the delivery proof that names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3). A peer's trust notice: gatePeer (an active peer with a key), its signature against the pinned key, then the same key for the audience proof naming this node; the notice is stored and acts on nothing (QA audit S6-06, 2026-10-16)."
     },
+    "src/routes/federation-sync/message-reactions.ts": {
+      "count": 2,
+      "why": "An inbound mark on a message: gatePeer with allowMessaging first, then the signature against the pinned key, then the audience proof verified against the same key; the reactor and by_agent must be the signing node's own, and the reactor a party of a copy held here (services/message-reactions.ts applyRemoteReaction; 2026-10-26)."
+    },
     "src/routes/federation-sync/messaging.ts": {
       "count": 7,
       "why": "Inbound messages, receipts, broadcasts, replication and storage grants: gatePeer with the capability word first, then the signature against the pinned key; a message's or a broadcast's sender must be on the signing node (2026-10-01; broadcast QA audit S6-03, 2026-10-16), and a replicate lands only under a principal of the signing node or an existing one of this node (QA audit S6-02). The audience check reads the same pinned key again, after the message's own signature verified against it: it verifies the second signature that names this node (secaudit 2026-10 follow-up, A7). Replicate and the receipt read it once more for the delivery proof, which names this node and the send time (deliveryRefusal; secaudit 2026-10 last items, D3)."
@@ -162,6 +166,10 @@
     "src/services/message-broadcast.ts": {
       "count": 1,
       "why": "A federation broadcast goes to active, non-private peers; a packages-only or contact peer is private (peerMode), so it receives none."
+    },
+    "src/services/message-reactions.ts": {
+      "count": 2,
+      "why": "A mark on a message goes only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on), through peerFetch, signed with this node's key and the audience proof naming that peer (2026-10-26)."
     },
     "src/services/message-delivery.ts": {
       "count": 3,

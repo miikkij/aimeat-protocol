@@ -9,6 +9,8 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.9.0 — 2026-10-26 — Reactions on a single message ("DirectMessageReaction", migration 0118) and
+ *     listDirectMessageCopies (every copy by "mid"). Parity with the SQLite repo.
  *   v1.8.0 — 2026-10-21 — Group chat: a conversation's open invitations (`invited`, migration 0111),
  *     updateConversation writes them and the manager (`createdBy`), listConversationsInvitingMailbox
  *     reads them. Parity with the SQLite repo.
@@ -31,7 +33,7 @@
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
-import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { DirectMessageRecord, ContactConsentRecord, ConversationRecord, MessageDeliveryLog, MessageDeliveryStats, MessageReactionRecord } from '../../../interface.js';
 import type { ConversationSummary, ConversationUpdate } from '../../../repositories/direct-message.repository.js';
 import type { DirectMessage, ContactConsent, Conversation as ConversationRow, JsonValue, MessageDeliveryLog as MessageDeliveryLogRow } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -158,6 +160,40 @@ export const directMessageMethods = {
     if (ids.length === 0) return [];
     const rows = await this.db.selectFrom('DirectMessage').selectAll().where('id', 'in', ids.map(id => dmDocId(id, ownerGhii))).execute();
     return rows.map(toDirectMessageRecord);
+  },
+
+  async listDirectMessageCopies(this: PostgresKyselyStorage, id: string): Promise<DirectMessageRecord[]> {
+    const rows = await this.db.selectFrom('DirectMessage').selectAll().where('mid', '=', id).execute();
+    return rows.map(toDirectMessageRecord);
+  },
+
+  // ── Reactions (migration 0118) ──
+
+  async addMessageReaction(this: PostgresKyselyStorage, r: MessageReactionRecord): Promise<boolean> {
+    const out = await this.db.insertInto('DirectMessageReaction')
+      .values({ messageId: r.messageId, reaction: r.reaction, reactorGhii: r.reactorGhii, byAgent: r.byAgent ?? null, createdAt: new Date(r.createdAt) })
+      .onConflict(oc => oc.columns(['messageId', 'reaction', 'reactorGhii']).doNothing())
+      .executeTakeFirst();
+    return Number(out.numInsertedOrUpdatedRows ?? 0) > 0;
+  },
+
+  async removeMessageReaction(this: PostgresKyselyStorage, messageId: string, reaction: string, reactorGhii: string): Promise<boolean> {
+    const out = await this.db.deleteFrom('DirectMessageReaction')
+      .where('messageId', '=', messageId).where('reaction', '=', reaction).where('reactorGhii', '=', reactorGhii)
+      .executeTakeFirst();
+    return Number(out.numDeletedRows ?? 0) > 0;
+  },
+
+  async listMessageReactions(this: PostgresKyselyStorage, messageIds: string[], opts?: { limit?: number }): Promise<MessageReactionRecord[]> {
+    if (messageIds.length === 0) return [];
+    const rows = await this.db.selectFrom('DirectMessageReaction').selectAll()
+      .where('messageId', 'in', messageIds).orderBy('createdAt', 'asc').orderBy('reactorGhii', 'asc')
+      .limit(opts?.limit ?? 5000).execute();
+    return rows.map(r => ({
+      messageId: r.messageId, reaction: r.reaction, reactorGhii: r.reactorGhii,
+      ...(r.byAgent ? { byAgent: r.byAgent } : {}),
+      createdAt: iso(r.createdAt),
+    }));
   },
 
   async listInbox(this: PostgresKyselyStorage, ownerGhii: string, opts?: { unreadOnly?: boolean; page?: number; perPage?: number }): Promise<{ messages: DirectMessageRecord[]; total: number; unread: number }> {

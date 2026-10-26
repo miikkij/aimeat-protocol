@@ -41,6 +41,7 @@
  *     aimeat_subscription_cancel, aimeat_provenance_embed (Comicland v3 A-3, A-5, A-8).
  *   2026-10-25 — registerGoalTools: aimeat_goal_get, _set, _work and _answer (agent goals, session cc-jouni-goals).
  *   2026-10-24 — registerComplianceAgreementTools: aimeat_compliance_agreement (plan doc-mvmr4i2wdk0p).
+ *   2026-10-26 — registerDmReactionTools: aimeat_dm_react (a mark on one message).
  *   2026-10-21 — registerDmGroupTools: the six aimeat_dm_group_* tools (group chat).
  *   2026-10-17 — registerExposureTools: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
  *   2026-10-16 — registerExtensionsTools receives getToken: aimeat_extension_invoke gives an action's
@@ -135,6 +136,7 @@ import { registerVisibilityTools } from './visibility.js';
 import { registerExposureTools } from './exposure.js';
 import { registerInternetOpeningTools } from './internet-opening.js';
 import { registerDmGroupTools } from './dm-groups.js';
+import { registerDmReactionTools } from './dm-reactions.js';
 import { registerPublishRequestTools } from './publish-requests.js';
 import { registerSecretHostAskTools } from './secret-host-ask.js';
 import { registerAccountRightsTools } from './account-rights.js';
@@ -300,6 +302,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAgentV2TaskTools(mcp, storage, config, agentGaii, owner, caller);
     registerDmMessageTools(mcp, storage, config, agentGaii, peers, scopes, caller);
     registerDmGroupTools(mcp, storage, config, peers, caller);
+    registerDmReactionTools(mcp, storage, config, peers, caller);
     registerDmOrganizeTools(mcp, storage, config, agentGaii);
     registerNotifyTools(mcp, storage, config, agentGaii, caller);
     registerContactTools(mcp, storage, config, agentGaii, scopes, caller);
