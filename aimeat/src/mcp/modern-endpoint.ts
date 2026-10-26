@@ -29,11 +29,16 @@
  *   (decision 2026-10-20, item 7): each client then re-lists its own principal-scoped list. Every open
  *   listen stream is registered in mcp/session-registry.ts under its agent, so deleting the agent or
  *   rotating its key closes it, as it closes a 2025 session.
+ *
+ *   TASKS. Each server the factory builds gets the MCP Tasks extension (mcp/tasks-extension.ts): a
+ *   slow tools/call of a client that declares it answers with a task handle, and the client polls
+ *   tasks/get. The 2025-era session code never gets it.
  * @structure isModernRequest(req) · modernAuthInfo(verified, token) · modernEndpoint(deps) → { serve, notify, close }
  * @usage
  *   const modern = modernEndpoint({ config, storage, run, build });
  *   if (await isModernRequest(req)) return modern.serve(req, res, verified, token, role);
  * @version-history
+ *   v1.1.0 — 2026-10-26 — The MCP Tasks extension on every modern server (wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  *   v1.0.0 — 2026-10-20 — Initial (MCP SDK v2 migration steps 5 and 6, plan doc-mvguy322f9se).
  */
 import type { Request, Response } from 'express';
@@ -49,6 +54,8 @@ import { admitMcpAgent, recordMcpContactThrottled } from '../services/mcp-agent-
 import { answerWithoutToken } from './unauthenticated-answer.js';
 import { mcpSessionPlatform } from './session-platform.js';
 import { noteMcpSession, forgetMcpSession } from './session-registry.js';
+import { installTasksExtension } from './tasks-extension.js';
+import { resolveIdentity } from '../utils/gaii.js';
 
 /** Whether a POST speaks MCP 2026-07-28: the SDK's own classifier, so the two can never disagree. */
 export async function isModernRequest(req: Request): Promise<boolean> {
@@ -83,7 +90,10 @@ export function modernEndpoint(deps: ModernEndpointDeps) {
             h = createMcpHandler(async (ctx) => {
                 const verified = (ctx.authInfo?.extra as { verified?: VerifiedToken } | undefined)?.verified;
                 if (!verified) throw new Error('modern MCP request reached the factory without a verified token');
-                return deps.build(verified.sub, role, verified.owner);
+                const server = await deps.build(verified.sub, role, verified.owner);
+                // The Tasks extension exists only on this code path: a 2025-era session strips resultType.
+                installTasksExtension(server, { storage, config, principal: resolveIdentity(verified, config.nodeId) });
+                return server;
             }, {
                 legacy: 'reject',
                 // A keep-alive comment on open listen streams, so a proxy does not close an idle one.
