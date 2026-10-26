@@ -94,7 +94,12 @@ function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
   return exceedsCeiling(ceiling, requested);
 }
 
-/** A short, comparable name for a public key, for the owner to tell two keys apart. */
+/**
+ * A short, comparable name for a public key, for the owner to tell two keys apart. The input is a
+ * PUBLIC key and the output is shown, so this is a display digest, not a stored secret: CodeQL
+ * js/insufficient-password-hash (code scanning 1766) reads the pending record as a password source,
+ * and that alert is dismissed as a false positive with this reason.
+ */
 function keyFingerprint(publicKey: string): string {
   return createHash('sha256').update(publicKey).digest('hex').slice(0, 16).match(/.{4}/g)!.join(':');
 }

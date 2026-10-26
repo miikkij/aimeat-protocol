@@ -6,6 +6,8 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-26 — PATCH of an action script stamps installedByPrincipal with the resolved identity
+ *     (code scanning 1765); an agent's GAII is unchanged, an owner session writes its GHII.
  *   2026-10-25 — emailPolicy 'unrestricted' is asked of the operators instead of dropped: a script
  *     PATCH by a caller that is not an operator caller holds the grant back from the new code and
  *     files the question, and POST and PUT with a manifest asking for it file the question too; each
@@ -550,11 +552,15 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // The script is new code, so the record names who wrote it, as writeExtensionRecord and the ZIP
       // upload do on every code write: the unattended secret first use and file reach read it
       // (secaudit2026oct22). The same value the install routes stamp.
+      // Resolved, so an owner session stamps its GHII rather than the bare name; every reader of the
+      // field tells an account from an agent by the `#` alone (services/extension-system-run.ts), so
+      // the two read alike (Semgrep owner-data-must-resolve-identity, code scanning 1765).
+      const writer = resolveIdentity(req.auth!, config.nodeId);
       const updated = await storage.updateExtension(name, {
-        actions: updatedActions, version, config: keptConfig, installedByPrincipal: req.auth!.sub,
+        actions: updatedActions, version, config: keptConfig, installedByPrincipal: writer,
       });
       if (updated) {
-        await snapshotExtensionVersion(storage, updated, resolveIdentity(req.auth!, config.nodeId))
+        await snapshotExtensionVersion(storage, updated, writer)
           .catch(err => logger.warn('PATCH action script: version not kept', { name, version, error: String(err) }));
       }
 
