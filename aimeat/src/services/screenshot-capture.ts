@@ -483,7 +483,7 @@ export async function captureAppScreenshot(
 
   // A node-wide slot first, so a busy node takes none of the owner's hourly allowance
   // (services/headless-slots.ts; secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
-  const slot = takeHeadlessSlot();
+  const slot = takeHeadlessSlot(config);
   if (!slot) return { ok: false, status: 503, code: 'HEADLESS_BUSY', message: HEADLESS_BUSY_MESSAGE };
 
   const ownerGaii = live.ownerGaii;

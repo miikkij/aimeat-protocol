@@ -200,7 +200,7 @@ export async function runPartBench(
 
   // One node-wide headless slot for the six launches below, shared with the on-demand screenshots
   // (services/headless-slots.ts; secaudit2026oct26). A busy node answers ran:false with words.
-  const slot = takeHeadlessSlot();
+  const slot = takeHeadlessSlot(config);
   if (!slot) return { ran: false, reason: HEADLESS_BUSY_MESSAGE, at };
   try {
     return await measureAtViewports(config, part, html, url, at);
