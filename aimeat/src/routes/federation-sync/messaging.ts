@@ -5,11 +5,14 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — normalizeInboundAttachments moved to ./inbound-attachments.ts unchanged (max-file-lines).
  *   2026-10-27 — Replicate stores a record time more than five minutes ahead of this node's clock as
  *     the time the replica arrived, so the retention sweep ages it on this node's clock; a person
  *     whose account is deactivated is written to by no peer (403 ACCOUNT_DISABLED, after the consent);
  *     a peer under this node's own id speaks for nobody here: replicate, message, broadcast and the
  *     storage grant treat it as no node's own people (secaudit2026oct26).
+ *   2026-10-27 — A peer's message lands in the conversation it names only when the recipient holds no
+ *     thread under that id or the sender is in it; otherwise in the pair's own thread (secaudit2026oct26).
  *   2026-10-22 — The replicate consent check names the local person with localAccountOf()
  *     (check:identity-shortening).
  *   2026-10-22 — Replicate stores under a person of this node only while that person holds the
@@ -86,7 +89,7 @@
 import type { Router, Response } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage, DirectMessageAttachment } from '../../storage/interface.js';
+import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import type { PeerInfo } from '../../services/federation.js';
@@ -110,25 +113,8 @@ import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
 import { NONCE_WINDOW_MS } from '../../services/request-nonce.js';
-
-/**
- * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
- * the peer's claim about somebody else's disk and are re-stamped rather than believed: the bytes
- * can only be the SENDER's, on the node that sent them. mapMessageAttachments() does the identical
- * thing to a client's claim on the way out, for the same reason.
- *
- * Believing them let a peer set originNodeId to THIS node and ownerGhii to a local owner, which
- * sends the duplicator down its same-node branch (services/attachment-duplication.ts:45) to read
- * that owner's private file and write the bytes into the recipient's own storage.
- */
-function normalizeInboundAttachments(
-    attachments: DirectMessageAttachment[] | undefined | null,
-    senderGhii: string,
-    sourceNode: string,
-): DirectMessageAttachment[] | undefined {
-    if (!attachments?.length) return undefined;
-    return attachments.map(a => ({ ...a, ownerGhii: senderGhii, originNodeId: sourceNode }));
-}
+import { boundInboundConversationId } from '../../services/message-thread-binding.js';
+import { normalizeInboundAttachments } from './inbound-attachments.js';
 
 export function registerMessagingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     /**
@@ -520,7 +506,12 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 // two identities (conversationIdFor), which is exactly what the local send path
                 // computes, so deriving it here puts the message in the same thread it would have
                 // landed in had the peer sent one. Measured against a second local node 2026-09-02.
-                conversationId: message.conversationId ?? conversationIdFor(message.senderGhii, recipientGhii),
+                // A named id lands in that thread only when the recipient holds no thread under it or the
+                // sender is already in it; a peer naming the id of a thread between other parties gets
+                // the pair's own thread (services/message-thread-binding.ts, secaudit2026oct26).
+                conversationId: message.conversationId
+                    ? await boundInboundConversationId(storage, { requested: message.conversationId, senderGhii: message.senderGhii, recipientGhii, recipientMailbox: deliveryGhii })
+                    : conversationIdFor(message.senderGhii, recipientGhii),
                 subject: message.subject ?? undefined,
                 senderGhii: message.senderGhii,
                 recipientGhii,

@@ -8,6 +8,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-27 — readManifest takes the newest copy of a current creator or admin (readOrganismMetaValue),
+ *     and findWsEntry the registry copy that counts (workspaceRegistrations), not the first copy in store
+ *     order (secaudit2026oct26, organism-meta-first-store-order-copy).
  *   2026-10-17 — SECURITY: shareGateDenied does not count a visitor from another node as signed in,
  *     so an 'account' share is this node's accounts only (plan doc-mvcn6c7e4e5q, V0.5).
  *   2026-10-16 — The public collectors are imported from services/workspace-public-collectors.ts,
@@ -96,7 +99,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { readPublishSpace, type UndeclaredSpaceRefusal } from '../../services/workspace-write-items.js';
-import { readWorkspaceMetaRecord, workspaceMetaReader } from '../../services/workspace-meta.js';
+import { readWorkspaceMetaRecord, workspaceMetaReader, workspaceRegistrations } from '../../services/workspace-meta.js';
 import { createPublicCollectors } from '../../services/workspace-public-collectors.js';
 import { logger } from '../../utils/logger.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
@@ -105,7 +108,7 @@ import { classifyAfterWrite } from '../../services/classify-on-write.js';
 // for the same reason. Re-exported so every existing import of these from ./shared.js keeps
 // resolving, including src/mcp/workspaces.ts and services/workspace-tool-ops.ts.
 export { canWriteNamespaceRule, roleSatisfies, fresherRec, ownerGhiiOf, collapseKeyTo, readOrganismConfig } from './record-helpers.js';
-import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig } from './record-helpers.js';
+import { fresherRec, ownerGhiiOf, collapseKeyTo, canWriteNamespaceRule, revertRecordToDraft, readOrganismConfig, readOrganismMetaValue } from './record-helpers.js';
 import { isOrganismOwner } from '../../services/organism-ownership.js';
 
 // The share shapes live in share-types.ts (shared-public.ts names them without a cycle).
@@ -134,12 +137,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const memberRole = (req: Express.Request, organism: { agentGaiis: string[] }, id: string): Promise<string | null> =>
     memberRoleOf(storage, organism, id, { sub: req.auth!.sub, owner: req.auth!.owner });
 
-  // Read the organism's manifest value (for gate policy).
-  const readManifest = async (id: string): Promise<unknown> => {
-    const key = `organism.${id}.meta.manifest`;
-    const { items } = await storage.listAllMemory({ prefix: key, limit: 5 });
-    return items.find(r => r.key === key)?.value ?? null;
-  };
+  // Read the organism's manifest value (for gate policy): the newest copy of a current creator or
+  // admin, as readOrganismConfig reads meta.config. The first copy in store order decided, whoever
+  // wrote it and whatever their role now (secaudit2026oct26).
+  const readManifest = (id: string): Promise<unknown> => readOrganismMetaValue(storage, id, 'meta.manifest');
 
   // Append a signed-by-convention decision-log entry (the audit/Prove trail), then bound the log so it
   // can't grow without limit. Every gate action (publish/batch-publish/auto-approve/gate-approval) writes
@@ -513,16 +514,12 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   const wsRegPrefix = (id: string) => `organism.${id}.meta.workspaces`;
   const bareOwner = (gaii: string) => localAccountName(gaii);
 
-  /** Find a workspace's registry entry across every member's registry (one key per owner). */
+  /** Find a workspace's registry entry across every member's registry (one key per owner): the copy
+   *  that counts (services/workspace-meta-read.ts workspaceRegistrations), never the first in store
+   *  order, which let a since-demoted admin's copy name its writer the creator (secaudit2026oct26). */
   const findWsEntry = async (id: string, ws: string): Promise<{ id: string; name?: string; createdBy?: string; createdAt?: string; ownerGaii: string } | null> => {
-    const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
-    for (const rec of items) {
-      if (rec.key !== wsRegPrefix(id)) continue;
-      const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string; createdAt?: string }> } | null)?.workspaces ?? [];
-      const entry = list.find(w => w.id === ws);
-      if (entry) return { ...entry, ownerGaii: rec.ownerGaii };
-    }
-    return null;
+    const reg = (await workspaceRegistrations(storage, id, { archived: 'exclude' })).get(ws);
+    return reg ? { ...(reg.entry as { id: string; name?: string; createdBy?: string; createdAt?: string }), ownerGaii: reg.record.ownerGaii } : null;
   };
 
   /** The read-authz decision for a workspace given its ALREADY-FETCHED manifest record (or null when the

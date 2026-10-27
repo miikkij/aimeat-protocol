@@ -4,6 +4,9 @@
  *   IANA zones use the runtime timezone database. Custom VTIMEZONE identifiers are refused.
  * @version-history v1.0.0 - 2026-09-18 - Initial calendar interchange.
  *   2026-09-18 - Escape lone CR characters in text fields as ICS newlines.
+ *   2026-10-27 - toICS checks a changed occurrence for its own fields and does not normalise the
+ *     master's additions, exclusions and other changed occurrences again for each one, so one stored
+ *     event no longer makes the public ICS feed quadratic (secaudit2026oct26).
  */
 import { Temporal, local, zoned, fromInstant, wallMs, wallString } from './time.js';
 import { normalize, ruleOptions } from './events.js';
@@ -157,7 +160,9 @@ export function toICS(events, options = {}) {
     const duration=wallMs(e.end)-wallMs(e.start);
     for(const [original,p] of Object.entries(e.overrides || {})) {
       const start=p.start || original, end=p.end || wallString(wallMs(start)+duration,e.allDay);
-      write(normalize({...e,...p,start,end}),e,local(original,e.allDay));
+      // The master was normalised once above; the changed occurrence is checked for its own fields only,
+      // so one event costs time in proportion to its size (secaudit2026oct26).
+      write(normalize({...e,...p,rdates:undefined,exdates:undefined,overrides:undefined,start,end}),e,local(original,e.allDay));
     }
   }
   return [...lines,'END:VCALENDAR'].map(fold).join('\r\n')+'\r\n';

@@ -26,6 +26,9 @@
  *   - readAgentDmInbox()  — messages addressed to the agent, group threads folded in
  * @usage const { messages, total } = await readAgentDmThread(storage, agentGaii, conversationId, { page, perPage });
  * @version-history
+ *   v1.3.0 — 2026-10-27 — An agent without messages:read-as-owner is merged only its owner's rows that
+ *     involve the agent or a party it wrote to or heard from in the thread; the rest are counted in
+ *     `ownerMessagesWithheld` (secaudit2026oct26). An agent with the word reads as before.
  *   v1.2.0 — 2026-10-26 — The thread and the inbox carry each message's reactions (services/message-reactions.ts).
  *   v1.1.0 — 2026-10-17 — readOneToOneWithOwner: an agent's 1:1 conversation is read from both mailboxes
  *     as one, for the owner and for the agent, so the owner can answer in it and the agent sees the
@@ -36,6 +39,10 @@ import type { Storage, DirectMessageRecord } from '../storage/interface.js';
 import { isParticipant } from './conversation-group.js';
 import { deliveryTargetFor } from '../utils/messaging.js';
 import { withReactions } from './message-reactions.js';
+import { permissionAskText } from './permission-ask.js';
+
+/** The owner's mailbox permission (services/owner-mailbox-reads.ts), spelled here: that module imports this one. */
+const MESSAGES_READ_AS_OWNER_SCOPE = 'messages:read-as-owner';
 
 export interface DmPageOpts {
   page?: number;
@@ -43,6 +50,22 @@ export interface DmPageOpts {
 }
 
 export type DmPage = { messages: DirectMessageRecord[]; total: number };
+
+/** A thread page, with how many of the owner's messages in it were left out for this agent. */
+export type AgentThreadPage = DmPage & { ownerMessagesWithheld?: number };
+
+/**
+ * The fields a thread answer carries when the owner's messages were left out: how many, and the ask
+ * that tells the agent where its person gives messages:read-as-owner (services/permission-ask.ts).
+ * Empty when nothing was left out.
+ */
+export function withheldOwnerMessagesFields(baseUrl: string, agentGaii: string, tool: string, withheld?: number): Record<string, unknown> {
+  if (!withheld) return {};
+  return {
+    owner_messages_withheld: withheld,
+    note: permissionAskText({ baseUrl, agentGaii, tool, words: [MESSAGES_READ_AS_OWNER_SCOPE] }),
+  };
+}
 
 /**
  * One conversation as the calling agent sees it, newest first.
@@ -55,11 +78,13 @@ export async function readAgentDmThread(
   agentGaii: string,
   conversationId: string,
   opts?: DmPageOpts,
-): Promise<DmPage> {
+  /** The agent holds messages:read-as-owner: every message its owner keeps in the thread is merged. */
+  readsOwnerMailbox = false,
+): Promise<AgentThreadPage> {
   const convo = await storage.getConversation(conversationId);
-  const page = convo && isParticipant(convo, agentGaii)
+  const page: AgentThreadPage = convo && isParticipant(convo, agentGaii)
     ? await storage.listConversation(deliveryTargetFor(agentGaii), conversationId, opts)
-    : await readOneToOneWithOwner(storage, agentGaii, conversationId, opts);
+    : await readOneToOneWithOwner(storage, agentGaii, conversationId, opts, readsOwnerMailbox);
   return { ...page, messages: await withReactions(storage, page.messages) };
 }
 
@@ -77,24 +102,41 @@ const MERGE_CAP = 500;
  * The owner's rows are added only when the agent itself has a message in the conversation, so an agent
  * never reads an owner's thread it was not part of. Merged by message id (an inbound reply to the agent
  * is in both reads), newest first, then cut to the page.
+ *
+ * WHICH OF THE OWNER'S ROWS (secaudit2026oct26, readOneToOneWithOwner:caller-chosen-conversation-id-
+ * merges-owner-mailbox). A conversation id is a value a sender can name, so "the agent has a row under
+ * this id" did not prove the owner's rows under it were the agent's conversation. Without
+ * messages:read-as-owner the agent is merged only the owner's rows that involve the agent itself or a
+ * party the agent wrote to or heard from in this thread: the replies to it, and its owner's and
+ * siblings' messages to the same person. Any other owner row is left out and counted in
+ * `ownerMessagesWithheld`, so the door can hand over the address where the owner gives the permission.
+ * An agent holding the word reads the merge as before.
  */
 export async function readOneToOneWithOwner(
   storage: Storage,
   agentGaii: string,
   conversationId: string,
   opts?: DmPageOpts,
-): Promise<DmPage> {
+  readsOwnerMailbox = false,
+): Promise<AgentThreadPage> {
   const page = Math.max(1, opts?.page ?? 1);
   const perPage = Math.max(1, opts?.perPage ?? 50);
   const own = await storage.listAgentDmThread(agentGaii, conversationId, { page: 1, perPage: MERGE_CAP });
   if (own.messages.length === 0) return storage.listAgentDmThread(agentGaii, conversationId, opts);
-  const owners = await storage.listConversation(deliveryTargetFor(agentGaii), conversationId, { page: 1, perPage: MERGE_CAP });
+  const ownerMailbox = deliveryTargetFor(agentGaii);
+  const owners = await storage.listConversation(ownerMailbox, conversationId, { page: 1, perPage: MERGE_CAP });
+  // The parties the agent itself wrote to or heard from here, other than itself and its owner.
+  const parties = new Set<string>();
+  for (const m of own.messages) for (const p of [m.senderGhii, m.recipientGhii]) if (p !== agentGaii && p !== ownerMailbox) parties.add(p);
+  const merged = readsOwnerMailbox ? owners.messages : owners.messages.filter(m =>
+    m.senderGhii === agentGaii || m.recipientGhii === agentGaii || parties.has(m.senderGhii) || parties.has(m.recipientGhii));
+  const withheld = owners.messages.length - merged.length;
   const byId = new Map<string, DirectMessageRecord>();
   // The owner's copy first: it carries the owner's read state. The agent's sent copies exist only under the agent.
-  for (const m of owners.messages) byId.set(m.id, m);
+  for (const m of merged) byId.set(m.id, m);
   for (const m of own.messages) if (!byId.has(m.id)) byId.set(m.id, m);
   const all = [...byId.values()].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  return { messages: all.slice((page - 1) * perPage, page * perPage), total: all.length };
+  return { messages: all.slice((page - 1) * perPage, page * perPage), total: all.length, ...(withheld > 0 ? { ownerMessagesWithheld: withheld } : {}) };
 }
 
 /**

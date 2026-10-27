@@ -31,6 +31,10 @@
  *   - sweepRevisions / listRowRevisions / restoreRowRevision
  * @usage const res = await appendRows(deps, caller, { organismId, wsId, space, rows });
  * @version-history
+ *   2026-10-27 — The page read, the revisions list and the restore check a row's classification label
+ *     at the caller-visible rowId, where every row label is set and the single read looks; they looked
+ *     at the surrogate id, where no label is ever written (secaudit2026oct26,
+ *     row-service.ts:revision-label-address-surrogate-id).
  *   2026-10-25 — An extension's marker comes from extensionMarker, so a name that carries its installer
  *     (`<owner>/<name>`) is compared as it is (owner namespaces wish, secaudit2026oct22).
  *   2026-10-22 — A replacement across writer families keeps the old content as a revision and the
@@ -556,7 +560,7 @@ export async function readRows(
   });
 
   // A row this reader may not see is not on the page. The cursor still names where the page ended.
-  const shown = await input.reader.show(page.rows, r => rowTarget(input.organismId, input.wsId, space.name, r.id));
+  const shown = await input.reader.show(page.rows, r => rowTarget(input.organismId, input.wsId, space.name, r.rowId));
   return {
     space: space.name,
     namespace: space.namespace,
@@ -638,7 +642,7 @@ export async function listRowRevisions(
   const space = await loadSpace(deps, organismId, wsId, spaceName);
   await gate(deps, caller, organismId, wsId, space, 'write');
   const kept = await deps.storage.listWorkspaceRowRevisions(organismId, wsId, space.namespace, rowId);
-  const shown = await reader.show(kept, v => rowTarget(organismId, wsId, space.name, v.id));
+  const shown = await reader.show(kept, v => rowTarget(organismId, wsId, space.name, v.rowId));
   return { space: space.name, rowId, revisions: shown.map(publicRevision) };
 }
 
@@ -656,7 +660,7 @@ export async function restoreRowRevision(
   await gate(deps, caller, organismId, wsId, space, 'write');
   const stored = await storage.getWorkspaceRowRevision(organismId, wsId, space.namespace, revisionId);
   const [rev] = stored && stored.rowId === rowId
-    ? await reader.show([stored], v => rowTarget(organismId, wsId, space.name, v.id)) : [];
+    ? await reader.show([stored], v => rowTarget(organismId, wsId, space.name, v.rowId)) : [];
   if (!rev) {
     throw new WorkspaceRowError('NOT_FOUND', 404, `No kept revision "${revisionId}" of row "${rowId}" in ${space.name}.`);
   }

@@ -457,7 +457,7 @@
     },
     "src/routes/knowledge/admin.ts": {
       "reads": {
-        "listMemoryForOwners": 3,
+        "listMemoryForOwners": 2,
         "listMemory": 2,
         "getMemory": 1
       },
@@ -600,7 +600,7 @@
     },
     "src/routes/organisms/shared.ts": {
       "reads": {
-        "listAllMemory": 7,
+        "listAllMemory": 5,
         "listMemoryKeysByPrefix": 1,
         "getMemoryByKeysAnyOwner": 3
       },
@@ -640,9 +640,10 @@
     },
     "src/routes/page-host.ts": {
       "reads": {
-        "getStorageFile": 1
+        "getStorageFile": 1,
+        "getMemory": 1
       },
-      "why": "2026-10-16: a file an HTML page maps passes the classification reader before its bytes go out (passesClassification: show with the anonymous reader, the page host having no session, and leave for a shared page), as the share's own content does. The page itself passed the reader when its frame address was minted."
+      "why": "2026-10-16: a file an HTML page maps passes the classification reader before its bytes go out (passesClassification: show with the anonymous reader, the page host having no session, and leave for a shared page), as the share's own content does. The page itself passed the reader when its frame address was minted. 2026-10-27 (secaudit2026oct26): getMemory reads the page's kept versions only to compare their files maps (mappedByFamily); nothing of them goes out."
     },
     "src/routes/permissions.ts": {
       "reads": {
@@ -1366,6 +1367,12 @@
       },
       "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
     },
+    "src/services/credential-search-reindex.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the once-only start step lists the credential records only to store each again, unchanged, so the search text is rebuilt without its value; nothing is shown to anyone."
+    },
     "src/services/crew-def-store.ts": {
       "reads": {
         "getMemory": 7,
@@ -1872,7 +1879,7 @@
     },
     "src/services/invitations.ts": {
       "reads": {
-        "listAllMemory": 3
+        "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index and access-request records, read to update."
     },
@@ -1888,6 +1895,13 @@
         "listMemoryForOwners": 1
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, v78 and v79), the node's own read: the once-only start step reads which namespaces hold a link row's source key, to give the row its owner; only the holders' identities are used, and nothing is shown to anyone."
+    },
+    "src/services/knowledge-review-reach.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 1,
+        "listAllMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the copies of one package manifest key are read only for their holders and creation times, to decide whose package the operator's reviews are; no value is shown to anyone."
     },
     "src/services/knowledge-overview.ts": {
       "reads": {

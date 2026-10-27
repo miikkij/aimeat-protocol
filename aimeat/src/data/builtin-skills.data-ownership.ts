@@ -30,6 +30,8 @@
  *   2026-10-27 — Section 6: erasure also takes back an accountant role and the beneficiary check, and an
  *     agreement with the operator stays without the account (secaudit2026oct26, owner-erasure.ts
  *     step name_bound_grants).
+ *   2026-10-27 — Section 6: an erasure keeps the person's app addresses reserved, serving nothing, so the
+ *     next holder of the name does not get them (secaudit2026oct26, services/owner-erasure.ts app_labels).
  *   2026-10-23 — Sections 1 and 6: the account export and an erasure each leave one line in the node's
  *     list of data subject requests (plan doc-mvlftkh9zmc9 C4.3; routes/owners/export.ts,
  *     services/owner-erasure.ts v1.14.0).
@@ -276,7 +278,8 @@ let knowledge age, and you should offer them, not wait to be asked:
   lines and receipts, and AI provenance records. A data processing agreement the operator made with
   them stays as the operator's record, without their account. One line stays in the node's list of data subject requests too: the
   account name and when the erasure was done, as the proof that it was. Their name becomes free for
-  someone else.
+  someone else. The web addresses of their apps stay reserved and serve nothing until the node
+  releases them, so another person's app never opens at an address their visitors used.
 - **A group they alone own** cannot be left without an owner, and an erasure cannot ask. It goes to
   the first admin, or else to the first member, and that person becomes its creator. When nobody at
   all is left, nobody holds it and the people who run the node seat a new owner. Tell the person
