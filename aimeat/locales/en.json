@@ -1279,7 +1279,8 @@
           "config_setting": "A setting the server did not accept, so it runs the default",
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
-          "erasure_leftover_schedules": "Schedules that erased accounts left"
+          "erasure_leftover_schedules": "Schedules that erased accounts left",
+          "capability_visibility_words": "Capabilities with a visibility this server does not know"
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1308,7 +1309,8 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
-            "erasure_leftover_schedules": "These schedules belong to accounts that were erased before 25 October 2026. The erasure deleted only the schedules the person made, not the ones their agents or apps made. A schedule like this is shown to whoever registers the username next, and it can run as their agent of the same name. Nothing changes until you decide. Delete each one you do not need, and the incident is resolved with your last decision."
+            "erasure_leftover_schedules": "These schedules belong to accounts that were erased before 25 October 2026. The erasure deleted only the schedules the person made, not the ones their agents or apps made. A schedule like this is shown to whoever registers the username next, and it can run as their agent of the same name. Nothing changes until you decide. Delete each one you do not need, and the incident is resolved with your last decision.",
+            "capability_visibility_words": "These capabilities were saved before 26 October 2026 with a visibility this server does not know. Until you decide, each one is private: only its owner, the owner's agents and you can see or use it. Nothing else changes. Make each one private, or keep it as it is. The incident is resolved with your last decision."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1318,13 +1320,20 @@
           "kept": "kept",
           "confirmClear": "Remove this from the shared anonymous agent? {line}",
           "confirmDelete": "Delete this for good? {line}",
+          "confirm": {
+            "capability_visibility": "Make this capability private? Only its owner, the owner's agents and you can then see or use it. {line}"
+          },
+          "action": {
+            "capability_visibility": "Make private"
+          },
           "kind": {
             "agent_webhook": "A webhook to {url}. It receives the messages sent to the shared agent.",
             "agent_tags": "Tags on the shared agent: {tags}",
             "agent_capabilities": "On the shared agent's public card: {technical} technical and {domain} other capabilities, {languages} languages",
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
-            "schedule": "The schedule \"{label}\" that {maker} made for {owner} ({cron})"
+            "schedule": "The schedule \"{label}\" that {maker} made for {owner} ({cron})",
+            "capability_visibility": "The capability \"{name}\" of {owner}, with the visibility \"{word}\""
           }
         },
         "source": {

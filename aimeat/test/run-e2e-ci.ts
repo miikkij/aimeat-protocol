@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
+ *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
  *   2026-10-25 -- e2e-sse-revocation.ts joins the list (not the guard tier): a live event stream ends when its credential is revoked (secaudit2026oct22).
  *   2026-10-25 -- e2e-realtime-signed-in-only.ts joins the list (not the guard tier): the realtime upgrade on a signed-in-only node admits its own accounts only (secaudit2026oct22).
@@ -1431,6 +1433,10 @@ const ALL_SUITES = [
     // The ref of an extension-backed capability names an extension and an action, and invoke resolves
     // both before its loopback request (secaudit2026oct22).
     'test/e2e-capability-extension-ref.ts',
+    // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
+    'test/e2e-capability-reach.ts',
+    // A capability write stores only a visibility word the node knows (secaudit2026oct22).
+    'test/e2e-capability-visibility-word.ts',
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
     // The cortex CORE suite, as opposed to cortex-ui above. Left out on 2026-07-10 over "2

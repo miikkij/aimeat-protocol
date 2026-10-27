@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-26 -- decideEntry asks with the entry kind's own confirmation (entries.confirm.<kind>) when it
+ *     has one, so a capability's 'clear' says it makes the capability private (secaudit2026oct22).
  *   2026-10-25 -- decideEntry: a record an incident names is cleared or deleted after a confirmation
  *     that names it, or kept with one press (secaudit2026oct22).
  *   2026-10-24 — The security classes (TL and NATO packs) after the classification section
@@ -55,7 +57,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { num, fmtUp, Badge, Spinner, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
@@ -201,7 +203,9 @@ export default function SecurityTab(props) {
       catch (err) { showErr((err && err.message) || t('common.error')); }
     };
     if (resolution === 'keep') return run();
-    return confirm(S(resolution === 'clear' ? 'incidents.entries.confirmClear' : 'incidents.entries.confirmDelete', { line: entryLine(e) }), run, { danger: true, title: S('title') });
+    // A kind whose 'clear' is not "remove from the shared anonymous agent" says what its own does.
+    const general = S(resolution === 'clear' ? 'incidents.entries.confirmClear' : 'incidents.entries.confirmDelete', { line: entryLine(e) });
+    return confirm(tOr('admin.security.incidents.entries.confirm.' + e.kind, general, { line: entryLine(e) }), run, { danger: true, title: S('title') });
   };
   const downloadQuarantine = async (id) => {
     try {

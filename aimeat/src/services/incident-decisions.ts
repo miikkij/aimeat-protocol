@@ -12,6 +12,8 @@
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.3.0 -- 2026-10-26 -- And of the incident that names the capabilities with an unknown visibility
+ *     word: 'clear' sets the word to private (services/capability-visibility-words.ts; secaudit2026oct22).
  *   v1.2.0 -- 2026-10-25 -- And of the incident that names the schedules older erasures left
  *     (services/erasure-leftover-schedules.ts; secaudit2026oct22).
  *   v1.1.0 -- 2026-10-25 -- The entries of the anonymous-records incident are decided here too
@@ -27,6 +29,7 @@ import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap } from './classification/d
 import { decideIncidentEntry } from './incident-entries.js';
 import { ANONYMOUS_RECORDS_INCIDENT_TYPE, clearAnonymousRecord } from './anonymous-principal-records.js';
 import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasure-leftover-schedules.js';
+import { CAPABILITY_VISIBILITY_INCIDENT_TYPE, clearUnknownCapabilityVisibility } from './capability-visibility-words.js';
 
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
@@ -41,7 +44,8 @@ export async function decideIncidentCase(
   const type = (rec?.value as { type?: unknown } | undefined)?.type;
   // An incident that names records to act on: the kind supplies what its action does.
   const actor = type === ANONYMOUS_RECORDS_INCIDENT_TYPE ? clearAnonymousRecord
-    : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule : null;
+    : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule
+    : type === CAPABILITY_VISIBILITY_INCIDENT_TYPE ? clearUnknownCapabilityVisibility : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
   if (type === DEFAULT_CAPS_INCIDENT_TYPE) {
     const r = await decideDefaultCap(config, storage, input);
