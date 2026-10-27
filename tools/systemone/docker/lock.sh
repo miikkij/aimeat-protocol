@@ -4,6 +4,8 @@
 #   bash lock.sh            # all three models, CPU and CUDA
 #
 # Per model directory: requirements.in (what the model needs, by hand), and from it
+#   pip.txt               pip itself, installed first: the base image's pip is older than 26.2.2 and
+#                         trusts the compromised emSign intermediates (the PSF notice of 2026-10-20)
 #   hub.txt               huggingface_hub alone, for the weights layer that comes before torch
 #   requirements-cpu.txt  everything, with torch from PyTorch's CPU index
 #   requirements-cu130.txt  the same with torch built for CUDA 13.0 (NVIDIA driver 580 or newer)
@@ -21,8 +23,10 @@ compile() { # in out [torch-index [constraints]]
   uv pip compile "$1" -o "$2" --generate-hashes --emit-index-url --quiet --no-header \
     --python-version 3.12 --python-platform x86_64-manylinux_2_28 "${extra[@]}"
 }
+printf 'pip==26.2.2\n' > /tmp/systemone-pip.in
 printf 'huggingface_hub>=1.0\n' > /tmp/systemone-hub.in
 for m in laya von jeff; do
+  compile /tmp/systemone-pip.in "$m/pip.txt"
   compile /tmp/systemone-hub.in "$m/hub.txt"
   # torch is pinned so that the lock never picks PyPI's default CUDA build by itself. The cu128 index
   # stops at 2.11, which torch's own advisories and its setuptools<82 bound left behind, so the CUDA

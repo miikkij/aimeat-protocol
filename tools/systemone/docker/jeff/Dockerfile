@@ -10,17 +10,22 @@
 # Every package is installed from a hash-pinned lock (../lock.sh writes them from requirements.in),
 # jeff's source is a fixed commit, the weights are a fixed commit of knowledgator/gliformer-large-v1
 # (the one the image was measured with), and the base image is pinned by digest.
-FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9 AS src
+FROM python:3.12-slim@sha256:12316debbfb86890f6b2d825820612741ba527ad5a44e3902759141d572bfe8f AS src
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates \
  && git clone https://github.com/logan-markewich/jeff /src \
  && git -C /src checkout 34b32f99a727c47b679adde33f4702a001e02979 \
  && rm -rf /src/.git
 
 ARG TORCH=cpu
-FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
+FROM python:3.12-slim@sha256:12316debbfb86890f6b2d825820612741ba527ad5a44e3902759141d572bfe8f
 ARG TORCH
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN useradd -m -u 10001 app
+
+# pip before 26.2.2 trusts the compromised emSign intermediates through its own copy of certifi
+# (the PSF notice of 2026-10-20), and the base image still carries an older one.
+COPY pip.txt /tmp/req/pip.txt
+RUN pip install --require-hashes -r /tmp/req/pip.txt
 
 COPY hub.txt /tmp/req/hub.txt
 RUN pip install --require-hashes -r /tmp/req/hub.txt \
