@@ -8642,6 +8642,8 @@ paths:
         Fetch the live content for a stored `ecosystem_ref` (a pointer + schema + cached metadata) by
         reading through to the ecosystem app over the tunnel ON DEMAND — AIMEAT never persists the live
         content. If the GEAI is offline or refuses, returns the cached metadata + `read_through_unavailable`.
+        A reference that one ecosystem app wrote and that names another app is answered the same way, with
+        `reason: ref_names_another_app`, and the other app is not invoked.
         (A capability with `source.type: 'ecosystem'` is invoked via the normal `POST /v1/capabilities/{id}/invoke`,
         routed over the tunnel.)
       tags: [Ecosystem Apps]
