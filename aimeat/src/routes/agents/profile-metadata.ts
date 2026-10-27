@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — PATCH /v1/agents/:name/mode passes the caller to setAgentMode, which tells the owner
+ *     when an agent changed a mode (secaudit2026oct26).
  *   2026-10-24 — PATCH /v1/agents/:name/tags refuses the shared anonymous principal with 401
  *     AUTH_REQUIRED: its tags are on its public card and decide its catalogue listing (secaudit2026oct22).
  *   2026-10-23 — PATCH /v1/agents/:name/task-start-floor (owner in person), and
@@ -456,7 +458,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const identifier = (req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
     // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
-    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode);
+    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode, req.auth!.sub);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;

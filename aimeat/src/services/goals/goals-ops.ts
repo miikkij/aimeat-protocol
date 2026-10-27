@@ -20,6 +20,8 @@
  * @structure listOp · getOp · waitingOp · createOp · patchOp · goalActionOp · attachOp · workOp · answerOp
  * @usage res.json(success(nodeId, await createOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.2.0 — 2026-10-27 — An agent's answer to a person's step is logged with the agent's name, not as
+ *     "the owner, through their AI" (secaudit2026oct26, goals:person-step-answer-via-self-set-workstation-mode).
  *   v1.1.0 — 2026-10-25 — approve and decline for a proposed goal; a proposal refuses the other actions,
  *     a take and an answer.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -424,7 +426,8 @@ export async function answerOp(deps: GoalDeps, caller: CallerContext, goalId: st
     let next: GoalRecord = {
       ...cur,
       works: cur.works.map(x => x.id === workId ? { ...x, status: rejected ? 'declined' as const : 'done' as const, settledAt: now, result: { answer, by: access.who }, ...(rejected && answer.reason ? { reason: String(answer.reason) } : {}) } : x),
-      log: [...cur.log, logEntry(access.who, 'answered', `${access.person ? 'The owner' : 'The owner, through their AI,'} answered "${w.title}"${describeAnswer(w, answer)}.`, { workId })],
+      // The log names the agent that answered for the owner (secaudit2026oct26, decision 2026-10-27).
+      log: [...cur.log, logEntry(access.who, 'answered', `${access.person ? 'The owner' : `The agent ${access.agent}, for the owner,`} answered "${w.title}"${describeAnswer(w, answer)}.`, { workId })],
     };
     if (w.humanKind === 'provide' && answer.ref) {
       next.material = [...next.material, { id: newId('m'), kind: answer.kind === 'file' ? 'file' as const : answer.kind === 'memory' ? 'memory' as const : 'text' as const, ref: String(answer.ref), title: w.title, by: access.who, at: now }].slice(-100);
@@ -444,7 +447,9 @@ export async function answerOp(deps: GoalDeps, caller: CallerContext, goalId: st
       }
     }
     if (w.final && !rejected && w.humanKind === 'approve') {
-      next = { ...next, status: 'done', settledAt: now, log: [...next.log, logEntry(access.who, 'finished', 'The owner approved the result: the goal is done.')] };
+      next = { ...next, status: 'done', settledAt: now, log: [...next.log, logEntry(access.who, 'finished', access.person
+        ? 'The owner approved the result: the goal is done.'
+        : `The agent ${access.agent} approved the result for the owner: the goal is done.`)] };
     }
     return next;
   });
