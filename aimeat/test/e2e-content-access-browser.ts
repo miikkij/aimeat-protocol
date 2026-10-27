@@ -25,7 +25,7 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_CONTENT_BROWSER_PORT ?? '40481';
+const PORT = process.env.E2E_CONTENT_BROWSER_PORT ?? '28481';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-content-access-browser.db');

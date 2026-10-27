@@ -280,7 +280,7 @@ await test('Provenance: an agent\'s write through the extension is marked AI out
     const p = prov.body.data.provenance ?? prov.body.data;
     assert(p.level === 'ai-generated' && p.generator?.pipeline === `ext.${EXT}.claim`, `agent: ${p.level} ${JSON.stringify(p.generator)}`);
 
-    const r = await invoke(EXT, 'claim', B.token, { id: 'c-person', port: '40256', publish: true });
+    const r = await invoke(EXT, 'claim', B.token, { id: 'c-person', port: '28256', publish: true });
     assert(r.status === 200, `person claim ${r.status}: ${JSON.stringify(r.body?.error)}`);
     // HOLE: the person's record carried the node's ai-generated stamp before this change.
     const personPid = await provenanceOf(`${root()}.shared.claim.c-person.latest`);
@@ -288,7 +288,7 @@ await test('Provenance: an agent\'s write through the extension is marked AI out
 });
 
 await test('The owner in person (A, the creator) needs no scope', async () => {
-    const r = await invoke(EXT, 'claim', A.token, { id: 'c-owner', port: '40255' });
+    const r = await invoke(EXT, 'claim', A.token, { id: 'c-owner', port: '28255' });
     assert(r.status === 200, `owner claim ${r.status}: ${JSON.stringify(r.body?.error)}`);
     assert(r.body.data.written?.version === 1, `written: ${JSON.stringify(r.body.data.written)}`);
 });

@@ -91,11 +91,11 @@ import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
 import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
-// 40314/40315 are this suite's own pair. E2E_AI_STUB_PORT is already e2e-ai-provenance's variable,
+// 28314/28315 are this suite's own pair. E2E_AI_STUB_PORT is already e2e-ai-provenance's variable,
 // so these carry their own names rather than quietly moving that suite's stub.
-const PORT = process.env.E2E_AI_PROVIDER_STUB_PORT ?? '40314';
+const PORT = process.env.E2E_AI_PROVIDER_STUB_PORT ?? '28314';
 const BASE = `http://localhost:${PORT}`;
-const STUB_PORT = parseInt(process.env.E2E_AI_PROVIDER_STUB_UPSTREAM_PORT ?? '40315', 10);
+const STUB_PORT = parseInt(process.env.E2E_AI_PROVIDER_STUB_UPSTREAM_PORT ?? '28315', 10);
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const MODEL = 'stub/test-model';
 const DEFAULT_ANSWER = 'The stub provider answered.';

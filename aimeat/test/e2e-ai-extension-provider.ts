@@ -9,7 +9,7 @@
  *   another origin drops the key; another owner's extension is refused 403; a manifest or a provider
  *   that does not fit is refused, naming what to fix.
  *
- *   Its own node on 40443, and a small service on this machine that records what it received; the
+ *   Its own node on 28443, and a small service on this machine that records what it received; the
  *   manifest lists `localhost`, and the script also tries 127.0.0.1, the same machine under another
  *   name, which the provider run must refuse.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-extension-provider.ts
@@ -28,7 +28,7 @@ import { pinnedEnv } from './run-e2e-server.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_EXTENSION_PROVIDER_PORT ?? '40443';
+const PORT = process.env.E2E_AI_EXTENSION_PROVIDER_PORT ?? '28443';
 const BASE = `http://localhost:${PORT}`;
 const SECRET = 'sk-extension-provider-secret-7731';
 

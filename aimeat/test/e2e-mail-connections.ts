@@ -48,7 +48,7 @@ import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = parseInt(process.env.E2E_MAIL_PORT ?? '40286', 10);
+const PORT = parseInt(process.env.E2E_MAIL_PORT ?? '28286', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-mail-e2e-'));
 const TENANT = 'contoso-test-directory';

@@ -5,8 +5,8 @@
  *   the first-contact request gate on the recipient node, accept, reciprocal reply, the read-receipt
  *   round-trip, and the block rejection path.
  *
- *   Node A: port 40270, aimeat-hub-001-msga
- *   Node B: port 40271, aimeat-node-001-msgb
+ *   Node A: port 28270, aimeat-hub-001-msga
+ *   Node B: port 28271, aimeat-node-001-msgb
  *
  * @version-history
  *   2026-10-23 -- setupOwner uses setupOperator and mintOwnerToken the password sign-in; POST
@@ -194,8 +194,8 @@ let convId = '';
 
 console.log('Setup: boot two nodes, owners, bidirectional peering');
 await test('Boot nodes A + B', async () => {
-    A = await bootNode(40270, 'aimeat-hub-001-msga');
-    B = await bootNode(40271, 'aimeat-node-001-msgb');
+    A = await bootNode(28270, 'aimeat-hub-001-msga');
+    B = await bootNode(28271, 'aimeat-node-001-msgb');
 });
 await test('Register owners (operators)', async () => {
     await setupOwner(A!, `alice${ts}`);
@@ -303,7 +303,7 @@ await test('5. Bob replies; Alice receives it freely (initiator not re-gated)', 
 // node C. Against the pre-fix source (bare "a message with this id exists") this test fails: Carol's
 // injection lands straight in Alice's inbox as accepted.
 await test('5b. A stranger on a third node who computes the thread id is still held at the gate', async () => {
-    const C = await bootNode(40405, 'aimeat-node-001-msgc');
+    const C = await bootNode(28405, 'aimeat-node-001-msgc');
     try {
         await setupOwner(C, `carol${ts}`);
         // Peer A<->C so A accepts C's signed federation frame at all (the gate is about first

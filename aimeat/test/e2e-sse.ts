@@ -30,7 +30,7 @@ import { resolve } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = process.env.E2E_SSE_PORT ?? '40268';
+const PORT = process.env.E2E_SSE_PORT ?? '28268';
 const BASE = `http://localhost:${PORT}`;
 const APP_HOST = 'apps.aimeat.test';
 const NODE_ID = 'aimeat-local-001-dev';

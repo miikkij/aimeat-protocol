@@ -51,7 +51,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const RECEIVER_PORT = parseInt(process.env.E2E_LIVING_HOOKS_PORT ?? '40665', 10);
+const RECEIVER_PORT = parseInt(process.env.E2E_LIVING_HOOKS_PORT ?? '28665', 10);
 const RECEIVER_HOST = '127.0.0.1';
 const RECEIVER = `http://${RECEIVER_HOST}:${RECEIVER_PORT}`;
 const SECRET_NAME = 'HOOK_TOKEN';

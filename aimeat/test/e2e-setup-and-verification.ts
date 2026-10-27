@@ -83,8 +83,8 @@ const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';
 
 /** The two nodes this suite boots itself. Neither number is written down by any other suite. */
-const SETUP_PORT = process.env.E2E_SETUP_PORT ?? '40316';
-const SECOND_PORT = process.env.E2E_SETUP_SECOND_PORT ?? '40320';
+const SETUP_PORT = process.env.E2E_SETUP_PORT ?? '28316';
+const SECOND_PORT = process.env.E2E_SETUP_SECOND_PORT ?? '28320';
 
 /** aimeat/.env, which POST /v1/setup/init writes into when nothing is there. */
 const PACKAGE_ENV = join(dirname(fileURLToPath(import.meta.url)), '..', '.env');
@@ -402,14 +402,14 @@ try {
                 const { status, body } = await call(other.base, '/v1/setup/init', {
                     method: 'POST',
                     body: JSON.stringify({
-                        nodeId: 'renamed-by-wizard', port: 40999, genesisUrl: 'https://genesis.example',
+                        nodeId: 'renamed-by-wizard', port: 28999, genesisUrl: 'https://genesis.example',
                         owner: { username: SECOND_USER, password: SETUP_PASSWORD },
                     }),
                 });
                 assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
                 assert(body.data.owner.name === SECOND_USER, `owner: ${body.data.owner.name}`);
                 const byName = Object.fromEntries((body.data.settings as any[]).map(s => [s.setting, s]));
-                for (const [name, requested] of [['node_id', 'renamed-by-wizard'], ['port', 40999], ['genesis_url', 'https://genesis.example']] as const) {
+                for (const [name, requested] of [['node_id', 'renamed-by-wizard'], ['port', 28999], ['genesis_url', 'https://genesis.example']] as const) {
                     const s = byName[name];
                     assert(s?.status === 'not_written' && s.requested === requested, `${name}: ${JSON.stringify(s)}`);
                     assert(/\.env/.test(s.reason ?? ''), `${name} names the .env that stopped it: ${s.reason}`);

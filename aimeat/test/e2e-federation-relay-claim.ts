@@ -16,7 +16,7 @@
  *   code teaches the relaying operator to look at their caller's permissions, which is the one place
  *   the problem is not.
  *
- *   Node R (receiver) 40293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
+ *   Node R (receiver) 28293. Peers: relay-ok (permitted), relay-demoted (allowRouting false).
  * @version-history
  *   v1.5.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
  *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
@@ -64,9 +64,9 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
-// 40293: free, and checked against every other suite before it was picked. A port two suites share
-// makes a red run that reads exactly like a regression — e2e-sealed-config already holds 40291.
-const PORT = 40293;
+// 28293: free, and checked against every other suite before it was picked. A port two suites share
+// makes a red run that reads exactly like a regression — e2e-sealed-config already holds 28291.
+const PORT = 28293;
 /** Its own database on the run's backend (test/helpers/own-node-db.ts), and on SQLite a file rather
  *  than memory: PUT /v1/admin/config refuses without persistence, and the strict setting has to be
  *  reachable at runtime for the test that turns it on. */

@@ -34,6 +34,7 @@
  *   - Phase 5: aimeat_connection_history and aimeat_connection_replies
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-mail-connection-tools
  * @version-history
+ *   2026-10-27 — Its own node is on suitePort block 30200, out of the range the claims board hands out.
  *   2026-10-17 — 2b, 2c, 3b: a tool missing only one-press words is listed (permission ask,
  *     mcp/permission-ask-gate.ts), so the plain agent's calls are asserted as SCOPE_DENIED with the
  *     allow address instead of "not offered". 3h: the looker's aimeat_mail_send is listed and refused with
@@ -49,8 +50,11 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import type { Server } from 'node:http';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
+import { suitePort } from './helpers/free-port.js';
 
-const PORT = Number(process.env.E2E_MCP_MAIL_PORT ?? (Number(process.env.AIMEAT_TEST_PORT ?? '40251') + 170));
+// A suitePort block, not the base port plus 170: that landed in the range the claims board hands out.
+const PORT = Number(process.env.E2E_MCP_MAIL_PORT
+    ?? suitePort(30200, process.env.E2E_BASE ?? `http://localhost:${process.env.AIMEAT_TEST_PORT ?? '40251'}`));
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-mcp-mail-'));
 const USE_SQLITE = (process.env.AIMEAT_STORAGE ?? 'sqlite') !== 'postgres-kysely';

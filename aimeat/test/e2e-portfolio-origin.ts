@@ -35,7 +35,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = process.env.E2E_PORTFOLIO_ORIGIN_PORT ?? '40263';
+const PORT = process.env.E2E_PORTFOLIO_ORIGIN_PORT ?? '28263';
 const BASE = `http://localhost:${PORT}`;
 const PORTFOLIO_HOST = 'portfolio.aimeat.test';
 const NODE_ID = 'aimeat-local-001-dev';

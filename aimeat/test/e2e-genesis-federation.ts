@@ -14,9 +14,9 @@
  *   the whole of genesis-memory-cache.ts, and the four matches* predicates in federation-helpers.ts.
  *   test/helpers/fake-genesis-peer.ts is that second world, on loopback inside this process.
  *
- *   IT BOOTS ITS OWN NODE IN PROCESS on :40321 with its own database on the run's backend
- *   (test/helpers/own-node-db.ts), the pattern of e2e-mail-connections. 40321 rather than 40320 because e2e-setup-and-verification.ts
- *   already defaults its second node to 40320.
+ *   IT BOOTS ITS OWN NODE IN PROCESS on :28321 with its own database on the run's backend
+ *   (test/helpers/own-node-db.ts), the pattern of e2e-mail-connections. 28321 rather than 28320 because e2e-setup-and-verification.ts
+ *   already defaults its second node to 28320.
  *
  *   CROSS-FEDERATION IS OFF AT BOOT AND ON AFTERWARDS. The node's own genesis sync scheduler fires
  *   its first cycle 30 seconds after start, which would reach the fake federation in the middle of
@@ -58,7 +58,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = parseInt(process.env.E2E_GENESIS_PORT ?? '40321', 10);
+const PORT = parseInt(process.env.E2E_GENESIS_PORT ?? '28321', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-genesis-e2e-'));
 

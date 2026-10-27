@@ -7,7 +7,7 @@
  *   the directory shows the tier; open-join OFF still returns a pending request; a direct-added
  *   peer defaults to `member`; and an operator PUT { tier:'member' } promotes (re-derives full flags).
  *
- *   Nodes: A 40273 aimeat-test-001-fedvisa (open join on); C 40274 aimeat-test-001-fedvisc (off).
+ *   Nodes: A 28273 aimeat-test-001-fedvisa (open join on); C 28274 aimeat-test-001-fedvisc (off).
  *   Virtual joiner B: aimeat-peer-001-visitb (keypair only; not a running server).
  * @version-history
  *   v1.2.1 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
@@ -113,8 +113,8 @@ let bKeys: { publicKey: string; privateKey: string };
 
 console.log('Setup');
 await test('Boot A (open-join ON) + C (open-join OFF) + operators', async () => {
-  A = await bootNode(40273, 'aimeat-test-001-fedvisa', true);
-  C = await bootNode(40274, 'aimeat-test-001-fedvisc', false);
+  A = await bootNode(28273, 'aimeat-test-001-fedvisa', true);
+  C = await bootNode(28274, 'aimeat-test-001-fedvisc', false);
   await setupOwner(A, `fva${ts}`);
   await setupOwner(C, `fvc${ts}`);
   bKeys = await generateKeyPair();

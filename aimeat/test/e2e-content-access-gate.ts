@@ -39,7 +39,7 @@ import { hostRequest } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner, ownerToken } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_CONTENT_GATE_PORT ?? '40265';
+const PORT = process.env.E2E_CONTENT_GATE_PORT ?? '28265';
 const BASE = `http://localhost:${PORT}`;
 const APP_HOST = 'apps.gate.test';
 const PORTFOLIO_HOST = 'portfolio.gate.test';

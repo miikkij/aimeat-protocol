@@ -56,7 +56,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const STUB_PORT = parseInt(process.env.E2E_AI_STUB_PORT ?? '40318', 10);
+const STUB_PORT = parseInt(process.env.E2E_AI_STUB_PORT ?? '28318', 10);
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {

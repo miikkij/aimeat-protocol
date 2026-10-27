@@ -49,7 +49,7 @@ import { createStorage } from '../src/storage/storage-factory.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_UNATTENDED_GATE_PORT ?? '40949';
+const PORT = process.env.E2E_UNATTENDED_GATE_PORT ?? '28949';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const STAMP = Date.now().toString(36).slice(-6);

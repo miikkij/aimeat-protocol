@@ -5,7 +5,7 @@
  *   (pull → signature-verify → version-gate → cache). Three in-process nodes:
  *   G (primary, no genesisUrl), P1 (leaf, listed), P2 (leaf, opted-out).
  *
- *   Ports: G 40278, P1 40279, P2 40280. Each node has a database of its own on the run's backend
+ *   Ports: G 28278, P1 28279, P2 28280. Each node has a database of its own on the run's backend
  *   (test/helpers/own-node-db.ts), one per port.
  * @version-history
  *   v1.0.2 — 2026-10-23 — setupOwner uses setupOperator (a password and the password sign-in); POST
@@ -79,9 +79,9 @@ const ts = Date.now();
 let G: NodeState, P1: NodeState, P2: NodeState;
 
 await test('Boot G (primary) + P1 (listed leaf) + P2 (opted-out leaf) + operators', async () => {
-  G = await bootNode(40278, 'aimeat-test-001-bookg', {});
-  P1 = await bootNode(40279, 'aimeat-test-001-bookp1', { genesisUrl: 'http://127.0.0.1:40278' });
-  P2 = await bootNode(40280, 'aimeat-test-001-bookp2', { genesisUrl: 'http://127.0.0.1:40278', bookListed: false });
+  G = await bootNode(28278, 'aimeat-test-001-bookg', {});
+  P1 = await bootNode(28279, 'aimeat-test-001-bookp1', { genesisUrl: 'http://127.0.0.1:28278' });
+  P2 = await bootNode(28280, 'aimeat-test-001-bookp2', { genesisUrl: 'http://127.0.0.1:28278', bookListed: false });
   await setupOwner(G, `gop${ts}`);
   await setupOwner(P1, `p1op${ts}`);
   await setupOwner(P2, `p2op${ts}`);
@@ -157,8 +157,8 @@ await test('7. a book that is unsigned or tampered is refused, and the mirrored 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, node_id: 'stub', data: { book: served, is_primary: true } }));
   });
-  await new Promise<void>(r => stub.listen(40281, '127.0.0.1', r));
-  const STUB = 'http://127.0.0.1:40281';
+  await new Promise<void>(r => stub.listen(28281, '127.0.0.1', r));
+  const STUB = 'http://127.0.0.1:28281';
   const pullFromStub = () => P1.json('/v1/federation/book/pull', {
     method: 'POST', headers: auth(P1.ownerToken), body: JSON.stringify({ source_url: STUB }),
   });

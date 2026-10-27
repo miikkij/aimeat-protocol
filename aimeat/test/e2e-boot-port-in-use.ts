@@ -15,7 +15,7 @@
  *   the E2E range; the workflow now reserves that range, and this test covers what the node does
  *   whatever took the port.
  *
- *   Port 40433: checked against every other suite before it was picked.
+ *   Port 28433: checked against every other suite before it was picked.
  * @version-history
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.0 — 2026-09-17 — Initial.
@@ -31,7 +31,7 @@ import { join } from 'node:path';
 import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = 40433;
+const PORT = 28433;
 
 let passed = 0;
 let failed = 0;
