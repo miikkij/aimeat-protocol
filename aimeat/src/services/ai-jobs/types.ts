@@ -10,10 +10,11 @@
  *   `completeForOwner` already picks the key, enforces the daily budget and the per-app quota,
  *   records per-app usage and stamps provenance. What is new is the queue, the handle and the
  *   callback.
- * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · AiJobViewer · StartAiJobInput ·
- *   AiJobError · AiJobResultRead · AiJobStarter
+ * @structure AiJobState · AiJobRecord · AiJobStartedBy · AiJobLogEntry · AiJobViewer · visibleToViewer ·
+ *   StartAiJobInput · AiJobError · AiJobResultRead · AiJobStarter
  * @usage import type { AiJobRecord } from './types.js';
  * @version-history
+ *   v1.12.1 -- 2026-10-27 -- visibleToViewer moved here from service.ts, unchanged (max-file-lines; secaudit2026oct26).
  *   v1.12.0 -- 2026-10-22 -- `read_as` on the record and `readAs` on the start context: the principal
  *     an extension's ctx.ai.start reads the owner scope as, when narrower than the owner (secaudit
  *     2026-10, v75).
@@ -198,6 +199,15 @@ export interface AiJobViewer {
     /** True when this caller sees every job of the owner and of the owner's agents. */
     all: boolean;
 }
+
+/**
+ * Whether this viewer may see this job. No viewer means the caller's own key IS the lookup key (the
+ * REST routes resolve the principal) or the caller is the node itself, so there is nothing to fence.
+ * A viewer that does not read as the owner sees only what it started: `created_by` is the audit
+ * trail, and it is the only field that says which principal asked for the job.
+ */
+export const visibleToViewer = (job: { created_by: string }, viewer?: AiJobViewer): boolean =>
+    !viewer || viewer.all || job.created_by === viewer.principal;
 
 /** What a caller asks for. `owner` and `created_by` are resolved server-side and are never read
  *  from a request body — see the routes and services/ai-jobs/service.ts. */
