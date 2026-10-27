@@ -8974,6 +8974,8 @@
   "notiftext.payment_not_delivered.body": "No se pudo entregar el pedido y el pago no volvió al comprador, así que lo tienes tú. Devuelve el pago al comprador o entrega el pedido. Referencia del pedido: {session}.",
   "notiftext.payment_possible.title": "Puede que haya llegado un pago de {amount}",
   "notiftext.payment_possible.body": "El servicio de pagos no respondió cuando un comprador te pagó, así que no se sabe si el dinero llegó. Mira si tu dirección de cobro recibió una transferencia desde {payer}. Si llegó, entrega el pedido o devuelve el pago. Referencia: {reference}.",
+  "notiftext.payout_possible.title": "Puede que haya llegado un pago de {amount}",
+  "notiftext.payout_possible.body": "El servicio de pagos no respondió cuando {provider} te pagó, así que no se sabe si el dinero llegó. Mira si tu dirección de cobro recibió una transferencia desde {payer}. Referencia: {reference}.",
   "notiftext.package_sale_request_approved.title": "Se aprobó tu solicitud de {name}",
   "notiftext.package_sale_request_approved.body": "El vendedor la aprobó. Abre tu página de Paquetes para ver qué sigue.",
   "notiftext.package_sale_request_refused.title": "No se aprobó tu solicitud de {name}",

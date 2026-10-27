@@ -24902,15 +24902,21 @@ paths:
         Entries flip to `paid` only AFTER the facilitator confirms, so a failed settlement leaves them
         payable rather than recording a delivery that did not happen, and a confirmation that arrives
         twice cannot pay twice. Requires scope `exchange:beneficiary`. Returns
-        `{ paid, beneficiary, amount, currency, entries, tx_hash, pay_to, note }`.
+        `{ paid, beneficiary, amount, currency, entries, tx_hash, pay_to, note }`. When the
+        facilitator does not answer the settle, the transfer may have gone out: 502
+        X402_SETTLE_UNKNOWN, the node keeps a possible payout under `commerce.possible.payout.<nonce>`,
+        and its entries stay out of the quote (which lists them as `possible_payments`, or answers
+        POSSIBLE_PAYMENT_OPEN) until you send `possible_payment_not_arrived` with that nonce instead of
+        `payment`; that answers `{ closed, beneficiary, nonce, amount, currency, note }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [beneficiary, payment], properties: {
+        content: { application/json: { schema: { type: object, required: [beneficiary], properties: {
           beneficiary: { type: string, description: 'The beneficiary owner GHII.' },
           currency: { type: string, default: EUR },
-          payment: { type: object, description: 'The signed x402 exact-scheme payload (X-PAYMENT shape).' } } } } }
+          payment: { type: object, description: 'The signed x402 exact-scheme payload (X-PAYMENT shape). Needed unless possible_payment_not_arrived is sent.' },
+          possible_payment_not_arrived: { type: string, description: 'The nonce of an earlier payout whose settlement did not answer, when your wallet shows the transfer did not arrive.' } } } } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
@@ -24920,6 +24926,7 @@ paths:
         '404': { $ref: '#/components/responses/AimeatError' }
         '409': { $ref: '#/components/responses/AimeatError' }
         '422': { $ref: '#/components/responses/AimeatError' }
+        '502': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/beneficiary/approvals:
     post:

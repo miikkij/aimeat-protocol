@@ -11,6 +11,7 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-27 — aimeat_commerce_beneficiary_payout: possible_payment_not_arrived (secaudit2026oct26).
  *   2026-10-16 — aimeat_commerce_invoice_set: the chat path for PUT /v1/commerce/payout/invoice
  *     (commerce:sell, on all three interfaces).
  *   2026-10-16 — aimeat_commerce_psp_delete is screen-only like psp_set: it refuses and returns the Wallet
@@ -192,6 +193,7 @@ export const commerceTools = [
             beneficiary: { type: 'string', required: true, description: 'The beneficiary owner GHII you owe.', zod: z.string().min(3).max(200) },
             currency: { type: 'string', required: false, description: 'Defaults to EUR.', zod: z.string().max(10) },
             payment: { type: 'object', required: false, description: 'The signed x402 exact-scheme payload. Omit to quote.' },
+            possible_payment_not_arrived: { type: 'string', required: false, description: 'The nonce of an earlier payout whose settlement did not answer, when your wallet shows the transfer did not arrive. Its entries are quoted again.', zod: z.string().min(1).max(200) },
         },
     },
     {

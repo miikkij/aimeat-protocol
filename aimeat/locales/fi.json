@@ -10257,6 +10257,8 @@
   "notiftext.payment_not_delivered.body": "Tilausta ei voitu toimittaa, eikä maksu palannut ostajalle, joten raha on sinulla. Palauta maksu ostajalle tai toimita tilaus. Tilauksen tunniste: {session}.",
   "notiftext.payment_possible.title": "Maksu {amount} on ehkä tullut",
   "notiftext.payment_possible.body": "Maksupalvelu ei vastannut, kun ostaja maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Jos raha tuli, toimita tilaus tai palauta maksu. Tunniste: {reference}.",
+  "notiftext.payout_possible.title": "Tilitys {amount} on ehkä tullut",
+  "notiftext.payout_possible.body": "Maksupalvelu ei vastannut, kun {provider} maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Tunniste: {reference}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",

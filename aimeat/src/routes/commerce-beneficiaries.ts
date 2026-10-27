@@ -21,6 +21,9 @@
  *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   2026-10-27 — POST /v1/commerce/beneficiary/payout answers 502 X402_SETTLE_UNKNOWN when the settle did
+ *     not answer and takes possible_payment_not_arrived; the quote lists possible_payments
+ *     (secaudit2026oct26, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  *   2026-10-25 — DELETE /v1/commerce/beneficiary-splits reaches a split on the provider's own extension by its short name too (withdrawSplit), since the split is keyed `<owner>/<name>` (secaudit2026oct22).
  *   2026-10-16 — earnings and obligations total every entry and return the newest `limit` of them, with
  *     `total` beside `count`; the totals were sums of a window (QA audit S8-10).
@@ -296,6 +299,7 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
       entries: q.entries.length,
       pay_to: q.payTo ?? null,
       accepts: q.requirements ? [q.requirements] : [],
+      ...(q.possiblePayments ? { possible_payments: q.possiblePayments } : {}),
       note: q.ok
         ? 'Sign these requirements with the wallet that holds the funds and POST the signed payload '
           + 'back here. The node never holds the money: it settles from your address into theirs.'
@@ -315,20 +319,28 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
     const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
     const body = (req.body ?? {}) as Record<string, unknown>;
     const beneficiary = typeof body.beneficiary === 'string' ? body.beneficiary.trim() : '';
-    if (!beneficiary || !body.payment) {
+    const notArrived = typeof body.possible_payment_not_arrived === 'string' ? body.possible_payment_not_arrived.trim() : '';
+    if (!beneficiary || (!body.payment && !notArrived)) {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         'Send `beneficiary` and the signed `payment` payload from GET /v1/commerce/beneficiary/payout'));
     }
     const r = await settleBeneficiaryPayout(storage, config, {
       providerGhii, beneficiaryGhii: beneficiary,
       currency: typeof body.currency === 'string' ? body.currency : undefined,
-      payload: body.payment as X402PaymentPayload,
+      ...(notArrived ? { notArrivedNonce: notArrived } : { payload: body.payment as X402PaymentPayload }),
     });
     if (!r.ok) {
-      const status = r.reason === 'NOTHING_OWED' ? 404
-        : r.reason === 'BENEFICIARY_NO_ADDRESS' ? 409
+      const status = r.reason === 'NOTHING_OWED' || r.reason === 'NOT_FOUND' ? 404
+        : r.reason === 'BENEFICIARY_NO_ADDRESS' || r.reason === 'POSSIBLE_PAYMENT_OPEN' ? 409
+        : r.reason === 'X402_SETTLE_UNKNOWN' ? 502
         : r.reason === 'PAYMENT_REQUIRED' ? 402 : 422;
       return res.status(status).json(error(config.nodeId, r.reason, r.message));
+    }
+    if ('closed' in r) {
+      return res.json(success(config.nodeId, {
+        closed: true, beneficiary, nonce: r.nonce, amount: r.amount, currency: r.currency,
+        note: 'The possible payout is closed as not arrived. Its entries are in the next quote again.',
+      }));
     }
     return res.json(success(config.nodeId, {
       paid: true, beneficiary, amount: r.amount, currency: r.currency,
