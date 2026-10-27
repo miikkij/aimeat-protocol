@@ -12,6 +12,8 @@
  * @structure provs · onEach / same · cases
  * @usage cd aimeat && DATABASE_URL=postgresql://… pnpm exec vitest run test/unit/storage-conformance-lifecycle.test.ts
  * @version-history
+ *   2026-10-27 — An account erasure holds the account's app addresses, and the next account under the
+ *     name gets another (secaudit2026oct26, ensureAppSubdomain:origin-handed-to-next-name-holder).
  *   2026-10-25 — The held address of a removed app: a package removal keeps the row, another owner
  *     gets another label, the owner gets it back, and the daily sweep releases by age and by the
  *     per-owner cap (secaudit2026oct22, app-label-recycled-after-delete).
@@ -27,6 +29,7 @@ import { runMcpClientCleanup } from '../../src/services/mcp-client-cleanup.js';
 import { deleteComponent } from '../../src/services/component-registrar.js';
 import { ensureAppSubdomain } from '../../src/routes/subdomains.js';
 import { sweepHeldAppLabels } from '../../src/services/held-app-labels.js';
+import { eraseOwner } from '../../src/services/owner-erasure.js';
 
 const SQLITE_PATH = `./test/.conformance-lifecycle-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
@@ -124,6 +127,31 @@ describe('the address of a removed app is held (secaudit2026oct22, app-label-rec
       return { kept: !!held, heldSet: !!held?.heldSince, other: other !== label, back: back === label, cleared: after?.heldSince ?? null };
     });
     expect(same(r)).toEqual({ kept: true, heldSet: true, other: true, back: true, cleared: null });
+  });
+
+  it('an account erasure holds the account\'s addresses; the next holder of the name gets another, and a living owner\'s republish gets its own back (secaudit2026oct26)', async () => {
+    const r = await onEach(async (s, p) => {
+      const owner = `era${p}`;
+      const label = `diary${p}`;
+      const now = new Date().toISOString();
+      await s.createOwner({ name: owner, displayName: owner, publicKey: 'pk', roles: ['owner'], createdAt: now } as never);
+      await site(s, label, `${owner}/${label}.html`);
+      await eraseOwner(s, 'node', owner);
+      const held = await s.getSubdomainSite(label);
+      // The name is released for reuse: a new account under it publishes the same file name.
+      await s.createOwner({ name: owner, displayName: owner, publicKey: 'pk2', roles: ['owner'], createdAt: new Date().toISOString() } as never);
+      const next = await ensureAppSubdomain(s, labelsCfg(), owner, `${label}.html`);
+      // A living owner's delete and republish still gets its address back.
+      const living = `liv${p}`;
+      await site(s, `keep${p}`, `${living}/keep${p}.html`);
+      await deleteComponent(s, 'app', `keep${p}.html`, `${living}@node`);
+      const back = await ensureAppSubdomain(s, labelsCfg(), living, `keep${p}.html`);
+      return {
+        held: !!held?.heldSince, renamed: !!held && held.target.startsWith('erased:') && !held.target.includes(owner),
+        nextIsAnother: next !== label, livingBack: back === `keep${p}`,
+      };
+    });
+    expect(same(r)).toEqual({ held: true, renamed: true, nextIsAnother: true, livingBack: true });
   });
 
   it('the daily sweep releases a held address past the days, starts the clock on an old unmarked one, and keeps an owner to the most held addresses', async () => {
