@@ -21,6 +21,8 @@
  *   name, and two such accounts make the bare name answer 409 AMBIGUOUS_NAME naming both.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-component-namespaces
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A cortex name an account erasure freed goes to the next installer's own
+ *     namespace, and the bare address serves nobody's bytes (secaudit2026oct26).
  *   v1.1.0 — 2026-10-26 — The owner is added, nothing else changes (Jouni, 2026-10-26: "piti lisätä
  *     omistaja johonkin tohon ja pitää toi formaatti mahdollisimman samana").
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
@@ -168,6 +170,24 @@ await test('a cortex keeps its bare lib address, gains its owner\'s, and a freed
     }
     const bobs = await raw(`/v1/cortex/${bob.name}/${CX}/libs/v.js`);
     assert(bobs.status === 200 && bobs.text.includes("'bob'"), `bob's at his own address: ${bobs.status}`);
+});
+
+await test('a cortex name freed by an account erasure serves nobody else\'s bytes under the bare address (secaudit2026oct26)', async () => {
+    const CX2 = `nscxe${stamp}`;
+    const dave = await registerOwner(BASE, `nsdave${stamp}`);
+    const d = await json('/v1/cortex', as(dave.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', CX2), libs: cxLib('dave') }) }));
+    assert(d.status === 201, `dave's cortex: ${d.status} ${short(d.body)}`);
+    const gone = await json(`/v1/owners/${dave.name}`, as(dave.token, { method: 'DELETE' }));
+    assert(gone.status === 200, `dave's account erasure: ${gone.status} ${short(gone.body)}`);
+    const b = await json('/v1/cortex', as(bob.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', CX2), libs: cxLib('bob') }) }));
+    assert(b.status === 201, `bob installs the name: ${b.status} ${short(b.body)}`);
+    const on = await json(`/v1/cortex/${CX2}/activate`, as(bob.token, { method: 'POST' }));
+    assert(on.status === 200, `bob activates his own by the bare name: ${on.status} ${short(on.body)}`);
+    const bare = await raw(`/v1/cortex/${CX2}/libs/v.js`);
+    assert(bare.status === 404, `the bare address serves after dave's erasure: ${bare.status} ${bare.text.slice(0, 80)}`);
+    const bobs = await raw(`/v1/cortex/${bob.name}/${CX2}/libs/v.js`);
+    assert(bobs.status === 200 && bobs.text.includes("'bob'"), `bob's at his own address: ${bobs.status}`);
+    await json(`/v1/cortex/${CX2}`, as(bob.token, { method: 'DELETE' }));
 });
 
 await test('what the node ships keeps its bare name, and `system/<name>` reaches it too', async () => {

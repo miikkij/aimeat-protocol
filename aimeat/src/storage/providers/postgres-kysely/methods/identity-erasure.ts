@@ -17,6 +17,9 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.5.1 — 2026-10-27 — deleteInstalledCortexesDb writes a released-name row for each bare cortex name
+ *     it deletes, held by an erasure pseudonym, as removeCortex does for an uninstall (secaudit2026oct26,
+ *     releaseBareName:erasure-and-package-uninstall-skip-release).
  *   v1.5.0 — 2026-10-22 — KnowledgeLink joins the per-identity cascade: the links of the identity's
  *     packages and the ones it contributed (secaudit 2026-10, v79).
  *   v1.4.0 — 2026-10-09 — Connection, ConnectionDelegation and ProviderClient join the per-identity
@@ -33,7 +36,7 @@
  */
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
-import { partyIdentities } from '../../../erased-party.js';
+import { partyIdentities, erasedPartyPseudonym } from '../../../erased-party.js';
 import { erasedCortexParts } from '../../../erased-cortex.js';
 import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 
@@ -249,6 +252,19 @@ export async function deleteInstalledCortexesDb(
   await db.deleteFrom('ComponentVersion').where('kind', '=', 'cortex').where('name', 'in', names).execute();
   await db.deleteFrom('DependencyEdge').where('fromKind', '=', 'cortex').where('fromRef', 'in', names).execute();
   await db.deleteFrom('CortexExtension').where('installedBy', '=', name).where('name', 'in', names).execute();
+  // A bare name is written down as released, held by a pseudonym no account matches, so the next
+  // account's install of it goes to `<installer>/<name>` and the apps that load the old library never
+  // run the new installer's code (services/component-address.ts; secaudit2026oct26). The account name
+  // is released for reuse, so the holder is never the name itself.
+  const bare = names.filter(n => !n.includes('/'));
+  if (bare.length) {
+    const holder = erasedPartyPseudonym();
+    const releasedAt = new Date();
+    for (const n of bare) {
+      await db.insertInto('ReleasedComponentName').values({ kind: 'cortex', name: n, holder, releasedAt })
+        .onConflict(oc => oc.columns(['kind', 'name']).doUpdateSet({ holder, releasedAt })).execute();
+    }
+  }
   // Every memory write reads the schema locks from a process cache, which a delete refreshes. Its
   // short lifetime covers a write that reloads it before this transaction commits.
   if (locks > 0) invalidateSchemaLockCache();
