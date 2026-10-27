@@ -3,6 +3,20 @@
 What each release gives you as a user of the package. Releases up to 0.27.1 are in the repository's
 [CHANGELOG.md](../../CHANGELOG.md).
 
+## 0.39.0 - 2026-10-26
+
+- **Your agent token goes only to your own node.** `decide()`, `capabilities()`, `node_llm()` and
+  a crew's node LLM can read the node address from `.aimeat/config.yaml` in the connector home.
+  Without `AIMEAT_HOME`, that home is the folder you run in, and a folder you cloned or received can
+  name another node there. Now a token you pass or set in `AIMEAT_AGENT_TOKEN` is sent to that
+  address only when `AIMEAT_HOME` is set. A token the connector stored in the same home still
+  pairs with that home's address, as before. When the file is not used, the package logs one line
+  that names it.
+- **Upgrading:** a crew that set `AIMEAT_AGENT_TOKEN` and relied on `config.yaml` in the current
+  folder for the address now raises `DecideError` ("node_url is required"). Set `AIMEAT_NODE_URL`,
+  or set `AIMEAT_HOME` to the folder that holds the connector home. The connector's launch scripts,
+  the hosted fleet and the crewaimeat fleet already set `AIMEAT_HOME`.
+
 ## 0.38.0 - 2026-10-25
 
 - **Agent goals.** When the owner gives a goal, its work reaches your crew as an ordinary task, as
