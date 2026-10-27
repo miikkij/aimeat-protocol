@@ -50,7 +50,7 @@ import { startFakeAiProvider, chatJson, sseChat, type FakeAiProvider, type Recor
 import { ownerSignIn } from './helpers/owner-login.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
-const PORT = process.env.E2E_AI_NODE_KEY_METERING_PORT ?? '40467';
+const PORT = process.env.E2E_AI_NODE_KEY_METERING_PORT ?? '40465';
 const BASE = `http://localhost:${PORT}`;
 const NODE_KEY = 'sk-node-e2e-metering-never-billed';
 const NODE_MODEL = 'openai/gpt-4o';
@@ -373,6 +373,13 @@ const frame = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
       assert(notices.length === 1, `one notice for the pair, got ${notices.length}`);
       assert(String(notices[0].title).includes(`${bobName}/notes`) && String(notices[0].body).includes('"notes"'),
         `it names the app and the entry: ${JSON.stringify(notices[0])}`);
+
+      // An app of Bob's that no entry names is still refused, before the provider is asked.
+      const otherGrant = await appGrant(alice, bobName, bob, 'other.html');
+      const before = stub.requestsFor('chat').filter(marked('B2OTHER')).length;
+      const other = await complete(otherGrant, { prompt: 'B2OTHER hello', app_id: 'other' });
+      assert(other.status === 403 && other.body?.error?.code === 'APP_NOT_ALLOWED', `an app the list does not name: ${other.status} ${JSON.stringify(other.body?.error)}`);
+      assert(stub.requestsFor('chat').filter(marked('B2OTHER')).length === before, 'the refused call never reached the provider');
     });
   } finally {
     await stopServer(server);
