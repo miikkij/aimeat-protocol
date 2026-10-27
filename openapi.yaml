@@ -1730,7 +1730,7 @@ components:
             - TOTP_REPLAY: TOTP code already used
             - TOTP_ALREADY_ENABLED: TOTP already set up
             - CSM_NOT_FOUND: CSM service not found
-            - VALIDATION_ERROR: Request body validation failed
+            - VALIDATION_ERROR: A field of the request is not valid. `details` lists each field (FieldError): its path, a code, the limit and a sentence in the caller's language. A NUL character or a broken (lone surrogate) character anywhere in the body, the query or the path gets this answer on every route.
             - ALREADY_FLAGGED: User has already flagged this target
             - EMAIL_UNAVAILABLE: Email service not configured
             - FEATURE_DISABLED: Feature disabled on this node
@@ -1741,10 +1741,39 @@ components:
           type: string
           example: You need 110 morsels but have 50
         details:
-          type: object
+          description: More about the error. On VALIDATION_ERROR, one FieldError per field that is not valid.
+          oneOf:
+            - type: object
+            - type: array
+              items:
+                $ref: '#/components/schemas/FieldError'
         retry_after:
           type: integer
           description: Seconds to wait before retry (present on RATE_LIMITED)
+
+    FieldError:
+      type: object
+      description: One field a request was refused for (VALIDATION_ERROR). `path` is the name a form gives the field, so a page shows `message` under it.
+      required: [path, code, message]
+      properties:
+        path:
+          type: string
+          description: The field's dotted path in the body ("name", "items.2.title"); "query.<name>" for the query string; "" for the request itself.
+          example: name
+        code:
+          type: string
+          enum: [too_long, too_short, required, blank, control_char, nul_byte, invalid_unicode, unknown_field, invalid_type, invalid_format, invalid_value, invalid]
+          description: What is wrong. It does not change with the language.
+        message:
+          type: string
+          description: What is wrong, in the caller's language (?lang=, the aimeat-lang cookie, Accept-Language).
+          example: "Too long: at most 200 characters."
+        max:
+          type: integer
+          description: The limit, on too_long.
+        min:
+          type: integer
+          description: The minimum, on too_short and required.
 
     Hints:
       type: object
@@ -42873,15 +42902,17 @@ paths:
               properties:
                 name:
                   type: string
-                  maxLength: 100
-                  description: Organism display name
+                  minLength: 2
+                  maxLength: 200
+                  description: Organism display name. No control character, and not only white space (400 VALIDATION_ERROR naming the field).
                   example: Helsinki Photography Club
                 description:
                   type: string
-                  maxLength: 2000
+                  maxLength: 10000
+                  description: No control character other than tab and line breaks.
                 type:
                   type: string
-                  maxLength: 40
+                  maxLength: 256
                   description: Free text; the presets are community, team, club, cooperative, project.
                 location:
                   type: object
@@ -42896,6 +42927,7 @@ paths:
                   type: array
                   items:
                     type: string
+                    maxLength: 200
                   example: [photography, urban-exploration]
                 joinPolicy:
                   type: string
@@ -43142,10 +43174,11 @@ paths:
               properties:
                 name:
                   type: string
-                  maxLength: 100
+                  maxLength: 200
+                  description: No control character, and not only white space.
                 description:
                   type: string
-                  maxLength: 2000
+                  maxLength: 10000
                 readme:
                   type: string
                   description: |
@@ -44791,7 +44824,7 @@ paths:
               type: object
               required: [name]
               properties:
-                name: { type: string }
+                name: { type: string, maxLength: 200, description: "No control character, and not only white space." }
                 manifest: { type: object }
                 schemas: { type: object }
                 readme: { type: string }
@@ -53322,10 +53355,10 @@ paths:
               type: object
               required: [ws, space, instance_id, body]
               properties:
-                ws: { type: string }
-                space: { type: string, description: The objectType (space) name }
-                instance_id: { type: string, description: The record/document id }
-                body: { type: string }
+                ws: { type: string, maxLength: 256 }
+                space: { type: string, maxLength: 256, description: The objectType (space) name }
+                instance_id: { type: string, maxLength: 1024, description: The record/document id }
+                body: { type: string, maxLength: 100000, description: "Not empty or only white space, no control character other than tab and line breaks; the first 10 000 characters are kept." }
                 anchor:
                   type: object
                   description: Optional anchor to part of a document
@@ -62197,17 +62230,17 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, maxLength: 140 }
+                name: { type: string, maxLength: 140, description: "No control character (400 VALIDATION_ERROR naming the field)." }
                 note: { type: string, nullable: true, maxLength: 1000 }
-                tags: { type: array, items: { type: string } }
+                tags: { type: array, items: { type: string, maxLength: 200 } }
                 links:
                   type: array
                   items:
                     type: object
                     required: [url]
                     properties:
-                      label: { type: string }
-                      url: { type: string }
+                      label: { type: string, maxLength: 200 }
+                      url: { type: string, maxLength: 2048 }
                 relation: { type: string, nullable: true, maxLength: 40 }
       responses:
         '200':
@@ -73636,9 +73669,9 @@ paths:
             schema:
               type: object
               properties:
-                display_name: { type: string }
-                bio: { type: string }
-                avatar: { type: string }
+                display_name: { type: string, maxLength: 200, description: "No control character (400 VALIDATION_ERROR naming the field)." }
+                bio: { type: string, maxLength: 10000 }
+                avatar: { type: string, maxLength: 2048 }
                 locale:
                   type: string
                   description: The LANGUAGE. Also the language this person's email is sent in.

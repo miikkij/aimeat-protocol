@@ -27946,5 +27946,23 @@
   "home.agentPage.takes": "Open work it takes",
   "home.agentPage.takesNone": "None: it has no skills set",
   "home.agentPage.takesSub": "A goal's open work that asks for one of these skills.",
-  "home.agentPage.takesChange": "Change"
+  "home.agentPage.takesChange": "Change",
+  "form.checkFields": "Not saved. Check the marked fields.",
+  "validation": {
+    "failed": "{{n}} fields need a fix. Each one says what to change.",
+    "oneField": "{{field}}: {{problem}}",
+    "tooLong": "Too long: at most {{n}} characters.",
+    "tooShort": "Too short: at least {{n}} characters.",
+    "tooMany": "Too many: at most {{n}}.",
+    "tooFew": "Too few: at least {{n}}.",
+    "required": "Fill this in.",
+    "blank": "Write something other than spaces.",
+    "controlChar": "Contains a hidden control character. Remove it and try again.",
+    "nulByte": "Contains a null character, which cannot be saved. Remove it and try again.",
+    "invalidUnicode": "Contains a broken character. Type or paste the text again.",
+    "unknownField": "This field is not accepted here.",
+    "invalidType": "Wrong kind of value: expected {{expected}}.",
+    "invalidFormat": "Not in the expected format.",
+    "invalidValue": "Not one of the allowed values."
+  }
 }

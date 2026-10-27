@@ -15,6 +15,10 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   String limits — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
+ *   Field errors — 2026-10-27 — validateBody answers through models/validation-issues.ts: each detail
+ *     carries a code and the limit, and the messages follow the caller's language; it was a fixed
+ *     English "Request body validation failed" with Zod's own wording per field.
  *   Board starting level — 2026-10-18 — BoardCreateSchema.visibility is optional; the service gives an
  *     absent one the node's starting level (services/content-defaults.ts; plan doc-mvcn6c7e4e5q, V5.3).
  *   Organisation boards — 2026-10-17 — BoardCreateSchema.visibility also takes `organism:<id>`; the
@@ -51,6 +55,7 @@ import { annotationErrors } from '../utils/onto-context.js';
 import { CONSENT_REACH_INPUTS } from '../utils/consent-reach.js';
 import { AiProvenanceBodyFields } from '../tool-catalog/ai-provenance-schema.js';
 import { memoryWriteVisibilitySchema, storedVisibilitySchema } from '../utils/visibility-words.js';
+import { INPUT_LIMITS } from './input-limits.js';
 
 // ── Semantic Ontology (Phase 0.7b) ─────────────────────────
 
@@ -65,8 +70,8 @@ import { memoryWriteVisibilitySchema, storedVisibilitySchema } from '../utils/vi
  * this node cannot know. → src/utils/onto-context.ts
  */
 export const SemanticAnnotationSchema = z.object({
-    '@context': z.record(z.string(), z.string()).optional(),
-    '@type': z.string().optional(),
+    '@context': z.record(z.string(), z.string().max(INPUT_LIMITS.url)).optional(),
+    '@type': z.string().max(INPUT_LIMITS.url).optional(),
 }).passthrough().superRefine((value, ctx) => {
     for (const message of annotationErrors(value)) {
         ctx.addIssue({ code: z.ZodIssueCode.custom, message });
@@ -78,8 +83,8 @@ export const SemanticAnnotationSchema = z.object({
 export const AnchorRequestSchema = z.object({
     node_id: z.string().min(3).max(80).regex(/^personal-[a-z0-9][a-z0-9-]*[a-z0-9]$/),
     owner_name: z.string().min(3).max(64),
-    public_key: z.string().min(10),
-    agent_gaiis: z.array(z.string()).optional(),
+    public_key: z.string().min(10).max(INPUT_LIMITS.text),
+    agent_gaiis: z.array(z.string().max(INPUT_LIMITS.id)).optional(),
     visibility: z.enum(['private', 'public']).optional(),
 });
 
@@ -91,7 +96,7 @@ export const VisibilityUpdateSchema = z.object({
 
 export const OwnerRegistrationSchema = z.object({
     name: z.string().min(3).max(64).regex(/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/),
-    public_key: z.string().min(1),
+    public_key: z.string().min(1).max(INPUT_LIMITS.text),
     display_name: z.string().max(128).optional(),
 });
 
@@ -100,7 +105,7 @@ export const AgentRegistrationSchema = z.object({
     owner: z.string().min(3).max(64),
     display_name: z.string().max(128).optional(),
     description: z.string().max(10_000).optional(),
-    capabilities: z.array(z.string()).optional(),
+    capabilities: z.array(z.string().max(INPUT_LIMITS.id)).optional(),
     scopes: z.array(z.string().max(64)).max(50).optional(),
     mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation']).optional(),
 });
@@ -108,26 +113,26 @@ export const AgentRegistrationSchema = z.object({
 // ── Auth ────────────────────────────────────────────────────
 
 export const TokenRequestSchema = z.object({
-    gaii: z.string().min(1),
-    timestamp: z.string().min(1),
-    signature: z.string().min(1),
+    gaii: z.string().min(1).max(INPUT_LIMITS.id),
+    timestamp: z.string().min(1).max(INPUT_LIMITS.id),
+    signature: z.string().min(1).max(INPUT_LIMITS.text),
 });
 
 export const OwnerTokenRequestSchema = z.object({
-    owner: z.string().min(1),
-    timestamp: z.string().min(1),
-    signature: z.string().min(1),
+    owner: z.string().min(1).max(INPUT_LIMITS.id),
+    timestamp: z.string().min(1).max(INPUT_LIMITS.id),
+    signature: z.string().min(1).max(INPUT_LIMITS.text),
 });
 
 export const AuthTokenRequestSchema = z.object({
-    gaii: z.string().min(1).optional(),
-    owner: z.string().min(1).optional(),
-    timestamp: z.string().min(1),
-    signature: z.string().min(1),
+    gaii: z.string().min(1).max(INPUT_LIMITS.id).optional(),
+    owner: z.string().min(1).max(INPUT_LIMITS.id).optional(),
+    timestamp: z.string().min(1).max(INPUT_LIMITS.id),
+    signature: z.string().min(1).max(INPUT_LIMITS.text),
 });
 
 export const OtkGenerateSchema = z.object({
-    action: z.string().min(1),
+    action: z.string().min(1).max(INPUT_LIMITS.id),
     params: z.record(z.string(), z.unknown()),
     ttl_minutes: z.number().int().positive().max(1440).optional(),
 });
@@ -139,7 +144,7 @@ export const MemoryWriteSchema = z.object({
     value: z.unknown(),
     // 'organism:<organism id>' too: the active members of one organism (utils/visibility-words.ts).
     visibility: memoryWriteVisibilitySchema.optional(),
-    group_id: z.string().optional(),
+    group_id: z.string().max(INPUT_LIMITS.id).optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).optional(), // max 1 year
     // Optimistic lock: the version the caller read; a write over a changed record is refused with
@@ -147,7 +152,7 @@ export const MemoryWriteSchema = z.object({
     expected_version: z.number().int().nonnegative().optional(),
     // Owner-session only: target GAII to store this entry under one of the
     // owner's own agents (instead of the owner's GHII). Ignored for agents.
-    agent: z.string().optional(),
+    agent: z.string().max(INPUT_LIMITS.id).optional(),
     /**
      * Attach an ALREADY-MINTED AI provenance record to this write (TARGET-058) — typically the one
      * `/v1/ai/complete` returned in `meta.provenance`. This is the publish path: the record is
@@ -160,7 +165,7 @@ export const MemoryWriteSchema = z.object({
 export const MemoryUpdateSchema = z.object({
     value: z.unknown().optional(),
     visibility: memoryWriteVisibilitySchema.optional(),
-    group_id: z.string().optional(),
+    group_id: z.string().max(INPUT_LIMITS.id).optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).nullable().optional(),
     version: z.number().int().nonnegative(),
@@ -181,7 +186,7 @@ export const ActionPricingSchema = z.object({
     toll_morsels: z.number().int().nonnegative().max(100).optional(),
     base_morsels: z.number().int().nonnegative().optional(),
     per_unit: z.object({
-        unit: z.string(),
+        unit: z.string().max(INPUT_LIMITS.name),
         morsels_per_1000: z.number(),
     }).optional(),
 });
@@ -217,10 +222,10 @@ export const ActionUpdateSchema = z.object({
 // ── Work Queue ──────────────────────────────────────────────
 
 export const WorkRequestSchema = z.object({
-    action_id: z.string().min(1),
-    provider_gaii: z.string().min(1),
+    action_id: z.string().min(1).max(INPUT_LIMITS.id),
+    provider_gaii: z.string().min(1).max(INPUT_LIMITS.id),
     input: z.unknown(),
-    callback_url: z.string().url().optional(),
+    callback_url: z.string().url().max(INPUT_LIMITS.url).optional(),
     ttl_hours: z.number().positive().max(720).optional(), // max 30 days
     priority: z.enum(['low', 'normal', 'high']).optional(),
 });
@@ -289,10 +294,10 @@ export const BoardCreateSchema = z.object({
     // starting level for a board, visibility.board_default (plan doc-mvcn6c7e4e5q, V5.3).
     visibility: z.union([
         z.enum(['private', 'shared', 'public', 'system']),
-        z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
+        z.string().max(INPUT_LIMITS.id).regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/),
     ]).optional(),
     description: z.string().max(10_000).optional(),
-    allowed_gaiis: z.array(z.string()).optional(),
+    allowed_gaiis: z.array(z.string().max(INPUT_LIMITS.id)).optional(),
     federate: z.boolean().optional(),
     rules: BoardRulesSchema.optional(),
 });
@@ -324,9 +329,9 @@ export const BoardReplySchema = z.object({
 // ── Federation ──────────────────────────────────────────────
 
 export const PeeringRequestSchema = z.object({
-    target_url: z.string().url(),
-    target_node_id: z.string().optional(),
-    public_key: z.string().optional(),
+    target_url: z.string().url().max(INPUT_LIMITS.url),
+    target_node_id: z.string().max(INPUT_LIMITS.id).optional(),
+    public_key: z.string().max(INPUT_LIMITS.text).optional(),
     message: z.string().max(10_000).optional(),
 });
 
@@ -336,9 +341,9 @@ export const PeeringDecisionSchema = z.object({
 });
 
 export const HeartbeatSchema = z.object({
-    node_id: z.string().min(1),
-    timestamp: z.string().min(1),
-    signature: z.string().min(1),
+    node_id: z.string().min(1).max(INPUT_LIMITS.id),
+    timestamp: z.string().min(1).max(INPUT_LIMITS.id),
+    signature: z.string().min(1).max(INPUT_LIMITS.text),
 });
 
 // ── Admin ───────────────────────────────────────────────────
@@ -353,7 +358,7 @@ export const ConfigUpdateSchema = z.object({
 });
 
 export const RoleGrantSchema = z.object({
-    owner: z.string().min(1),
+    owner: z.string().min(1).max(INPUT_LIMITS.id),
     role: z.enum(['operator']),
 });
 
@@ -368,7 +373,7 @@ export const MorselRequestSchema = z.object({
 
 export const ChunkedUploadInitSchema = z.object({
     key: z.string().min(1).max(256),
-    mime_type: z.string().min(1),
+    mime_type: z.string().min(1).max(INPUT_LIMITS.id),
     chunk_size: z.number().int().positive(),
     // Every visibility POST /v1/storage takes, 'members' and 'organism:<organism id>' included.
     visibility: storedVisibilitySchema.optional(),
@@ -389,7 +394,7 @@ export const SchemaSetSchema = z.object({
 });
 
 export const SchemaListQuerySchema = z.object({
-    prefix: z.string().optional(),
+    prefix: z.string().max(INPUT_LIMITS.key).optional(),
 });
 
 // ── Consent Layer (Phase 0.3) ────────────────────────────────
@@ -406,8 +411,8 @@ export const ConsentCreateSchema = z.object({
 
 export const ConsentAuditQuerySchema = z.object({
     days: z.coerce.number().int().positive().max(365).optional().default(30),
-    accessor_gaii: z.string().optional(),
-    consent_id: z.string().optional(),
+    accessor_gaii: z.string().max(INPUT_LIMITS.id).optional(),
+    consent_id: z.string().max(INPUT_LIMITS.id).optional(),
 });
 
 // ── TOTP / 2FA (Phase 0.5) ──────────────────────────────────
@@ -426,7 +431,7 @@ export const TotpDisableSchema = z.object({
 // ── Validate ────────────────────────────────────────────────
 
 export const ValidateRequestSchema = z.object({
-    endpoint: z.string().min(1),
+    endpoint: z.string().min(1).max(INPUT_LIMITS.url),
     method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
     body: z.record(z.string(), z.unknown()).optional(),
 });
@@ -434,34 +439,18 @@ export const ValidateRequestSchema = z.object({
 // ── Helper: validation middleware ────────────────────────────
 
 import type { Request, Response, NextFunction } from 'express';
+import { requestLocale, validationDetails, validationFailure } from './validation-issues.js';
 
+/**
+ * The body checked against `schema`; on failure a 400 VALIDATION_ERROR whose details name each field,
+ * its code and its limit, in the caller's language (models/validation-issues.ts).
+ */
 export function validateBody<T>(schema: z.ZodType<T>, nodeId: string) {
     return (req: Request, res: Response, next: NextFunction) => {
         const result = schema.safeParse(req.body);
         if (!result.success) {
-            const { error: zodError } = result;
-            res.status(400).json({
-                ok: false,
-                protocol: 'aimeat',
-                version: 'v1',
-                node: nodeId,
-                timestamp: new Date().toISOString(),
-                request_id: `req-${Date.now().toString(36)}`,
-                error: {
-                    code: 'VALIDATION_ERROR',
-                    message: 'Request body validation failed',
-                    details: zodError.issues.map(i => ({
-                        path: i.path.join('.'),
-                        message: i.message,
-                    })),
-                },
-                hints: {
-                    next_actions: [
-                        { description: 'View API documentation', method: 'GET', url: '/v1/docs' },
-                    ],
-                    help_url: '/v1/docs',
-                },
-            });
+            const locale = requestLocale(req);
+            res.status(400).json(validationFailure(nodeId, validationDetails(result.error.issues, req.body, locale), locale));
             return;
         }
         (req as Request & { validated: T }).validated = result.data;

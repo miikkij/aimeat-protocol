@@ -6,6 +6,8 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — PUT /v1/ghii checks its body with validateBody (models/write-body-schemas.ts): a
+ *     too-long or junk display name, bio or avatar is a 400 naming the field.
  *   2026-10-26 — GET /v1/ghii/list on a node with members see each other on lists every active person of
  *     the node without the opt-in, for a caller of this node (services/colleagues.ts).
  *   2026-10-21 — GET /v1/ghii/list refuses the shared anonymous principal by identity
@@ -46,6 +48,8 @@ import type { Router } from 'express';
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
+import { validateBody } from '../../models/schemas.js';
+import { ProfileUpdateBody } from '../../models/write-body-schemas.js';
 import { isOwnerPrincipal, isThirdPartyPrincipal, requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/middleware.js';
 import { isForeignPrincipal } from '../../utils/gaii.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -318,7 +322,7 @@ export function registerProfileRoutes(
     });
 
     // PUT /v1/ghii — Update own profile (requires JWT auth as owner)
-    router.put('/v1/ghii', requireAuth(), requireScope('memory:write-reserved'), async (req, res) => {
+    router.put('/v1/ghii', requireAuth(), requireScope('memory:write-reserved'), validateBody(ProfileUpdateBody, config.nodeId), async (req, res) => {
         const ownerName = req.auth!.owner;
         const ghiiRecord = await storage.getGHIIByOwner(ownerName);
         if (!ghiiRecord) {

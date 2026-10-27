@@ -13,6 +13,7 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.5 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.4 -- 2026-10-19 -- A card's screenshot loads through js/session-src.js (signed-in-only node).
  *   v1.1.3 -- 2026-10-06 -- "Get your own" is a StoreDoor: "Opens soon" while the store does not take
  *     orders (site.store_status "soon").
@@ -32,6 +33,7 @@ import { StoreDoor } from '/components/StoreDoor.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import { SessionImg } from '/js/session-src.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -118,7 +120,7 @@ export function Gallery() {
     <div class="ld-section">
       <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI. Yours goes here too.')}</h2>
       <div class="ld-wall-bar">
-        <input class="ld-wall-search poster-frame" type="search" value=${q}
+        <input class="ld-wall-search poster-frame" type="search" maxLength=${INPUT_LIMITS.line} value=${q}
           onInput=${(e) => setQ(e.target.value)}
           placeholder=${tr('landing.wallSearch', 'Search apps…')}
           aria-label=${tr('landing.wallSearch', 'Search apps')} />

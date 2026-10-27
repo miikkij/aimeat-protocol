@@ -30,9 +30,11 @@
  *     node address, because the first real wallet signature vanished without a trace.
  *   v1.3.1 — 2026-10-10 — DOCUMENT_NEEDED says why in plain words, not "made from a hash"
  *     (pnpm check:plain-language).
+ *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { Router, raw, urlencoded, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { documentText } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -50,7 +52,7 @@ import { rawBodyBytes } from '../utils/raw-body.js';
 import { logger } from '../utils/logger.js';
 
 const StartJsonSchema = z.object({
-  content_base64: z.string().optional(),
+  content_base64: documentText().optional(),
   storage_key: z.string().max(1024).optional(),
   name: z.string().max(255).optional(),
 }).refine((v) => !(v.content_base64 && v.storage_key), { message: 'Send the PDF once: the body itself, content_base64, or storage_key.' });

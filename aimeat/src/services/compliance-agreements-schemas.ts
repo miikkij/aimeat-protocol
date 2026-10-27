@@ -19,9 +19,11 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
 /** The state of one version, in order. `review` means a signed copy arrived and waits for a person. */
@@ -183,7 +185,7 @@ export const VersionSchema = z.object({
 export const HistorySchema = z.object({ at: iso, by: z.string().max(300), event: z.string().max(60), detail: text(600).optional() });
 
 export const AgreementSchema = z.object({
-  id: z.string().regex(/^dpa-[a-z0-9]{6,20}$/),
+  id: z.string().regex(/^dpa-[a-z0-9]{6,20}$/).max(INPUT_LIMITS.id),
   type: z.literal('dpa-art28'),
   template: z.literal('eu-scc-2021-915'),
   language: z.enum(['fi', 'en']),

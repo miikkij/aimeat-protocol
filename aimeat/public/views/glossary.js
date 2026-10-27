@@ -10,6 +10,7 @@
  *   locale's `glossary.area.<id>`, with the registry's English title as the fallback.
  * @usage routed at /v1/glossary by spa.html
  * @version-history
+ *   v1.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-03 — The plain sentence first, in the reader's language, and the technical
  *     definition under it; area titles from the locales; reloads when the language changes.
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 06)
@@ -19,6 +20,7 @@ import { useState, useEffect, useMemo } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { tOr, getLocale, onLocaleChange } from '/js/i18n.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 const tr = (key, fallback) => tOr(key, fallback);
 
@@ -59,7 +61,7 @@ export default function Glossary() {
       <h1 class="gl-title">${tr('glossary.title', 'Glossary')}</h1>
       <p class="gl-lede">${tr('glossary.lede', 'The words AIMEAT uses, each one first in plain words and then defined exactly.')}</p>
 
-      <input class="gl-filter" type="search" value=${q}
+      <input class="gl-filter" type="search" maxLength=${INPUT_LIMITS.line} value=${q}
         placeholder=${tr('glossary.filter', 'Filter terms')}
         aria-label=${tr('glossary.filter', 'Filter terms')}
         onInput=${(e) => setQ(e.target.value)} />

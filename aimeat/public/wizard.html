@@ -529,7 +529,7 @@ body {
       <div class="field">
         <label data-i18n="wizard.node.nameLabel">Node Name</label>
         <div class="hint" data-i18n="wizard.node.nameHint">A unique identifier for your node on the network (e.g. my-node-001)</div>
-        <input type="text" id="nodeId" value="" placeholder="aimeat-local-001-dev">
+        <input type="text" id="nodeId" value="" placeholder="aimeat-local-001-dev" maxlength="256"><!-- js/input-limits.js id -->
       </div>
 
       <div class="field">
@@ -598,20 +598,20 @@ body {
       <div class="field">
         <label data-i18n="wizard.identity.usernameLabel">Username</label>
         <div class="hint" data-i18n="wizard.identity.usernameHint">3-30 characters, lowercase letters, numbers, hyphens and underscores</div>
-        <input type="text" id="username" placeholder="erkki" autocomplete="username" spellcheck="false">
+        <input type="text" id="username" placeholder="erkki" autocomplete="username" spellcheck="false" maxlength="256"><!-- js/input-limits.js id -->
         <div class="field-error" id="usernameError"></div>
       </div>
 
       <div class="field">
         <label data-i18n="wizard.identity.displayLabel">Display Name</label>
         <div class="hint" data-i18n="wizard.identity.displayHint">Optional, defaults to your username</div>
-        <input type="text" id="displayName" placeholder="Erkki">
+        <input type="text" id="displayName" placeholder="Erkki" maxlength="200"><!-- js/input-limits.js name -->
       </div>
 
       <div class="field">
         <label data-i18n="wizard.identity.emailLabel">Email</label>
         <div class="hint" data-i18n="wizard.identity.emailHint">Optional, for verification and magic links</div>
-        <input type="email" id="email" placeholder="erkki@example.com" autocomplete="email">
+        <input type="email" id="email" placeholder="erkki@example.com" autocomplete="email" maxlength="254"><!-- js/input-limits.js email -->
         <div class="field-error" id="emailError"></div>
       </div>
 
@@ -644,14 +644,14 @@ body {
       <div class="field">
         <label data-i18n="wizard.identity.usernameLabel">Username</label>
         <div class="hint" data-i18n="wizard.identity.usernameHint">3-30 characters, lowercase letters, numbers, hyphens and underscores</div>
-        <input type="text" id="importUsername" placeholder="erkki" autocomplete="username" spellcheck="false">
+        <input type="text" id="importUsername" placeholder="erkki" autocomplete="username" spellcheck="false" maxlength="256"><!-- js/input-limits.js id -->
         <div class="field-error" id="importUsernameError"></div>
       </div>
 
       <div class="field">
         <label data-i18n="wizard.identity.displayLabel">Display Name</label>
         <div class="hint" data-i18n="wizard.identity.displayHint">Optional, defaults to your username</div>
-        <input type="text" id="importDisplayName" placeholder="Erkki">
+        <input type="text" id="importDisplayName" placeholder="Erkki" maxlength="200"><!-- js/input-limits.js name -->
       </div>
 
       <div class="field">
@@ -705,7 +705,7 @@ body {
       <div class="field hidden" id="genesisField">
         <label data-i18n="wizard.network.genesisLabel">Genesis URL</label>
         <div class="hint" data-i18n="wizard.network.genesisHint">URL of the network's genesis node (e.g. https://aimeat.io)</div>
-        <input type="url" id="genesisUrl" placeholder="https://aimeat.io">
+        <input type="url" id="genesisUrl" placeholder="https://aimeat.io" maxlength="2048"><!-- js/input-limits.js url -->
         <div class="field-error" id="genesisError"></div>
       </div>
     </div>

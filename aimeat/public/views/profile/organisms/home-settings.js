@@ -17,6 +17,7 @@
  *   import { OrganismSettings } from '/views/profile/organisms/home-settings.js';
  *   <OrganismSettings org ghii isCreator isMember canEdit showToast confirm onBack onChanged onLeave onDeleted />
  * @version-history
+ *   v1.13.0 -- 2026-10-27 -- A refused save shows each field's message under the name, description or type field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.12.0 -- 2026-10-24 -- "Records of processing" (compliance-records.js, plan doc-mvlftkh9zmc9
  *     C7.4): the organism's registers and what they leave open; the creator and admins get the
  *     paste for their AI, a member reads. Archive and delete is section 05.
@@ -66,6 +67,8 @@ import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
+import { fieldErrorsOf, refusalLine } from '/js/field-errors.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 import { OrganismRecords } from '/views/profile/organisms/compliance-records.js';
 
 const TYPE_PRESETS = ['community', 'team', 'club', 'cooperative', 'project'];
@@ -84,6 +87,8 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
   }), [org]);
   const [form, setForm] = useState(baseline);
   const [saving, setSaving] = useState(false);
+  // A refused save's message per field, shown under each field (js/field-errors.js).
+  const [errors, setErrors] = useState({});
   // The type is a preset or a word of the owner's own; "other" opens the field with the custom word.
   const [customType, setCustomType] = useState(!TYPE_PRESETS.includes(baseline.type));
 
@@ -112,6 +117,7 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
     if (!form.name.trim()) { showToast(t('organisms.nameRequired') || 'Name is required'); return; }
     if (!form.type.trim()) { showToast(t('organisms.typeCustomPlaceholder') || 'Give the type a word'); return; }
     setSaving(true);
+    setErrors({});
     try {
       const result = await orgService.updateOrganism(org.id, {
         name: form.name.trim(), description: form.description.trim(),
@@ -122,7 +128,13 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
       });
       if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
-    } catch (err) { swallowed('home-settings', err); showToast(t('organisms.updateError') || 'Failed to update'); }
+    } catch (err) {
+      // A refusal that names fields shows each message under its field (js/field-errors.js).
+      const refused = fieldErrorsOf(err);
+      setErrors(refused);
+      if (!Object.keys(refused).length) swallowed('home-settings', err);
+      showToast(refusalLine(refused, ['name', 'description', 'type'], t) || t('organisms.updateError') || 'Failed to update');
+    }
     finally { setSaving(false); }
   };
   // Leaving a dirty form asks before dropping the changes.
@@ -239,13 +251,13 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
       ]}>
       ${canEdit ? html`
         <${Section} first id="og-set-name" num="01" title=${label('setNameDesc', 'Name and description')}>
-          <${Fields}>
-            <${TextField} label=${label('fieldName', 'Name')} value=${form.name} onInput=${(v) => setForm(f => ({ ...f, name: v }))} />
-            <${TextArea} label=${label('fieldDescription', 'Description')} rows=${3} value=${form.description} onInput=${(v) => setForm(f => ({ ...f, description: v }))} />
+          <${Fields} errors=${errors}>
+            <${TextField} name="name" maxLength=${INPUT_LIMITS.name} label=${label('fieldName', 'Name')} value=${form.name} onInput=${(v) => setForm(f => ({ ...f, name: v }))} />
+            <${TextArea} name="description" maxLength=${INPUT_LIMITS.description} label=${label('fieldDescription', 'Description')} rows=${3} value=${form.description} onInput=${(v) => setForm(f => ({ ...f, description: v }))} />
             <${TagInput} label=${label('fieldInterests', 'Interests')} tags=${form.interests} onChange=${(tags) => setForm(f => ({ ...f, interests: tags }))} placeholder=${t('organisms.addTag') || 'Add…'} />
             <${Field} label=${label('fieldType', 'Type')} group>
               <${Choice} ariaLabel=${label('fieldType', 'Type')} options=${typeOptions} value=${customType ? '__custom' : form.type} onChange=${pickType} />
-              ${customType ? html`<${TextField} maxLength=${40} value=${form.type} placeholder=${t('organisms.typeCustomPlaceholder') || 'Your own word'}
+              ${customType ? html`<${TextField} name="type" maxLength=${40} value=${form.type} placeholder=${t('organisms.typeCustomPlaceholder') || 'Your own word'}
                 ariaLabel=${label('fieldType', 'Type')} onInput=${(v) => setForm(f => ({ ...f, type: v }))} />` : null}
             <//>
           <//>

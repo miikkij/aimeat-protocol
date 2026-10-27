@@ -16,8 +16,10 @@
  *
  * @version-history
  *   v1.0.0 -- 2026-05-23 -- Initial creation, 7 event types (v1 locked)
+ *   v1.0.1 -- 2026-10-27 -- Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 export const WEBHOOK_VERSION = 1;
 
@@ -37,19 +39,19 @@ const WebhookEnvelopeBase = z.object({
   version: z.literal(WEBHOOK_VERSION),
   event: z.enum(WEBHOOK_EVENTS),
   timestamp: z.string().datetime(),
-  node_id: z.string(),
-  agent_gaii: z.string(),
+  node_id: z.string().max(INPUT_LIMITS.id),
+  agent_gaii: z.string().max(INPUT_LIMITS.id),
 });
 
 export const TaskQueuedPayload = WebhookEnvelopeBase.extend({
   event: z.literal('task.queued'),
   data: z.object({
-    task_id: z.string(),
-    title: z.string(),
-    description: z.string().optional().default(''),
+    task_id: z.string().max(INPUT_LIMITS.id),
+    title: z.string().max(INPUT_LIMITS.title),
+    description: z.string().max(INPUT_LIMITS.description).optional().default(''),
     has_todos: z.boolean(),
     todo_count: z.number().int(),
-    scope_summary: z.array(z.string()).optional().default([]),
+    scope_summary: z.array(z.string().max(INPUT_LIMITS.text)).optional().default([]),
     created_at: z.string().datetime(),
   }),
 });
@@ -57,8 +59,8 @@ export const TaskQueuedPayload = WebhookEnvelopeBase.extend({
 export const TaskApprovedPayload = WebhookEnvelopeBase.extend({
   event: z.literal('task.approved'),
   data: z.object({
-    task_id: z.string(),
-    title: z.string(),
+    task_id: z.string().max(INPUT_LIMITS.id),
+    title: z.string().max(INPUT_LIMITS.title),
     status: z.literal('active'),
     todo_count: z.number().int(),
     pending_todo_count: z.number().int(),
@@ -69,9 +71,9 @@ export const TaskApprovedPayload = WebhookEnvelopeBase.extend({
 export const TaskUpdatedPayload = WebhookEnvelopeBase.extend({
   event: z.literal('task.updated'),
   data: z.object({
-    task_id: z.string(),
-    title: z.string(),
-    status: z.string(),
+    task_id: z.string().max(INPUT_LIMITS.id),
+    title: z.string().max(INPUT_LIMITS.title),
+    status: z.string().max(INPUT_LIMITS.id),
     changed_fields: z.array(z.enum([
       'title', 'description', 'scope', 'rules', 'todos',
       'verification', 'resources', 'status',
@@ -85,8 +87,8 @@ export const TaskUpdatedPayload = WebhookEnvelopeBase.extend({
 export const TaskPausedPayload = WebhookEnvelopeBase.extend({
   event: z.literal('task.paused'),
   data: z.object({
-    task_id: z.string(),
-    title: z.string(),
+    task_id: z.string().max(INPUT_LIMITS.id),
+    title: z.string().max(INPUT_LIMITS.title),
     status: z.literal('paused'),
     paused_at: z.string().datetime(),
   }),
@@ -95,9 +97,9 @@ export const TaskPausedPayload = WebhookEnvelopeBase.extend({
 export const MessageInboundPayload = WebhookEnvelopeBase.extend({
   event: z.literal('message.inbound'),
   data: z.object({
-    message_id: z.string(),
-    thread_id: z.string(),
-    linked_task_id: z.string().nullable(),
+    message_id: z.string().max(INPUT_LIMITS.id),
+    thread_id: z.string().max(INPUT_LIMITS.id),
+    linked_task_id: z.string().max(INPUT_LIMITS.id).nullable(),
     preview: z.string().max(200),
     has_proposed_task: z.boolean(),
     created_at: z.string().datetime(),
@@ -120,11 +122,11 @@ export const DirectiveUpdatedPayload = WebhookEnvelopeBase.extend({
 export const OnboardingStepPayload = WebhookEnvelopeBase.extend({
   event: z.literal('onboarding.step'),
   data: z.object({
-    step_id: z.string(),
+    step_id: z.string().max(INPUT_LIMITS.id),
     step_order: z.number().int(),
-    step_title: z.string(),
+    step_title: z.string().max(INPUT_LIMITS.title),
     action: z.enum(['needed', 'passed', 'failed']),
-    message: z.string().optional(),
+    message: z.string().max(INPUT_LIMITS.text).optional(),
     onboarding_progress: z.number().int(),
     onboarding_total: z.number().int(),
   }),

@@ -13,9 +13,11 @@
  *   EcosystemInboundEnvelopeSchema · buildEcosystemEnvelope
  * @usage import { buildEcosystemEnvelope, EcosystemInboundEnvelopeSchema } from '../models/ecosystem-event-schemas.js';
  * @version-history
+ *   v1.0.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-06-14 — Created for ecosystem events & triggers (chunk 2).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /** Envelope/event MAJOR version. Bump only on a breaking change to the envelope or a shared field. */
 export const ECOSYSTEM_EVENT_VERSION = 1;
@@ -51,8 +53,8 @@ export const EcosystemEnvelopeBase = z.object({
   version: z.number().int().min(1),       // event-type MAJOR version
   event: z.string().min(1).max(120),      // event name (open set)
   timestamp: z.string().datetime(),
-  node_id: z.string(),
-  geai: z.string(),                       // the principal this event concerns
+  node_id: z.string().max(INPUT_LIMITS.id),
+  geai: z.string().max(INPUT_LIMITS.id),                     // the principal this event concerns
 });
 
 /**

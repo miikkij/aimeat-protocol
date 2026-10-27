@@ -13,9 +13,11 @@
  * @structure parseWorkSpec() · makeWork() · claimWork() · settleFromTask() · releaseWork() · taskBody()
  * @usage await claimWork(deps, access, goalId, workId);   await settleFromTask(deps, task, 'done', summary);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AgentTaskRecord } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { materialiseAgentTask } from '../scheduler-agent-task.js';
@@ -41,7 +43,7 @@ export const WorkSpecSchema = z.object({
   links: z.array(z.object({ url: z.string().url().max(2000), title: z.string().max(TITLE_MAX).optional() })).max(30).optional(),
   texts: z.array(z.string().max(TEXT_MAX)).max(30).optional(),
   prompt: z.string().max(20_000).optional(),
-  agent: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i).optional(),
+  agent: z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i).max(INPUT_LIMITS.name).optional(),
   wants: z.array(z.string().trim().min(1).max(64)).max(10).optional(),
   runner: z.enum(['model']).optional(),
   model: z.string().trim().min(1).max(200).optional(),

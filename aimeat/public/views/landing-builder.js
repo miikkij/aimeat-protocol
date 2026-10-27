@@ -22,6 +22,7 @@
  *   OtherAi · BuildAppPrompt · BuildInvite
  * @usage import { BuildInvite } from './landing-builder.js';
  * @version-history
+ *   v2.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.1.0 — 2026-10-25 — No "Connect your AI" step, in the steps or the loop line, for a signed-in
  *     person whose AI has connected (Jouni); on the prompt road the long prompt's fold starts open.
  *   v2.0.0 — 2026-10-25 — The connected AI is the road (Jouni): connect, describe, give the short
@@ -45,6 +46,7 @@ import { Collapsible } from '/components/Collapsible.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { swallowed } from '/js/swallowed.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 import { connectedPrompt } from '/views/appcat/dialogs/generate-prompt.js';
 import { useAiConnected } from '/views/home/journey-steps.js';
 
@@ -200,7 +202,7 @@ function BuildAppPrompt() {
 
       <div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">${first + 1}</span><span>${tr('landing.genStep1', 'Describe your app')}</span></div>
-        <textarea class="ld-gen-idea" rows="3" value=${idea} onInput=${(e) => setIdea(e.target.value)}
+        <textarea class="ld-gen-idea" rows="3" maxLength=${INPUT_LIMITS.text} value=${idea} onInput=${(e) => setIdea(e.target.value)}
           aria-label=${tr('landing.genStep1', 'Describe your app')}
           placeholder=${tr('landing.genIdeaPh', 'Describe what the app should do…')}></textarea>
       </div>

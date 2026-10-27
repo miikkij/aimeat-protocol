@@ -9,6 +9,7 @@
  * @structure themeTools
  * @usage import { themeTools } from './themes.js';
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v2.3.0 — 2026-10-03 — aimeat_theme_font_save (the font manager); aimeat_theme_list describes `fonts`.
@@ -21,6 +22,7 @@
 import { tokenMap } from '../input-schemas.js';
 import { FONT_KINDS } from '../../models/tool-input-vocabulary.js';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 
 export const themeTools = [
@@ -83,7 +85,7 @@ export const themeTools = [
             basedOn: { type: 'string', description: 'For a new style: the style of this theme it copies.', zod: z.string().max(40) },
             light: { type: 'object', description: 'Token → colour for light mode, only the ones you change.', zod: tokenMap },
             dark: { type: 'object', description: 'Token → colour for dark mode, only the ones you change.', zod: tokenMap },
-            faces: { type: 'object', description: '{ headline, body, mono }, each a face this server serves.', zod: z.object({ headline: z.string().optional(), body: z.string().optional(), mono: z.string().optional() }) },
+            faces: { type: 'object', description: '{ headline, body, mono }, each a face this server serves.', zod: z.object({ headline: z.string().max(INPUT_LIMITS.name).optional(), body: z.string().max(INPUT_LIMITS.name).optional(), mono: z.string().max(INPUT_LIMITS.name).optional() }) },
             onlyMode: { type: 'string', description: "'light' or 'dark' for a style with one mode; empty for both." },
             retired: { type: 'boolean', description: 'true takes the style out of the pill; false brings it back.' },
             dryRun: { type: 'boolean', description: 'Check everything and save nothing.' },

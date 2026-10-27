@@ -23,6 +23,7 @@
  *   - the wallet signing endpoints                    routes/docsign-wallet.ts, mounted here
  * @usage router.use(docsignRouter(config, storage));
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-21 — POST /v1/docsign/validate asks isAnonymousPrincipal: a stored file is read as a signed-in
  *     caller, which the minted anonymous token is not (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-15 — POST /requests/:id/sign hands the credential origin (req.auth.via) to signRequest, so a personal access token cannot sign with method "session" (feature-list audit #37).
@@ -34,6 +35,7 @@
  */
 import { Router, raw, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { INPUT_LIMITS, documentText } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -56,7 +58,7 @@ const CreateSchema = z.object({
   title: z.string().max(200).optional().default(''),
   message: z.string().max(2000).nullish(),
   document: z.object({
-    sha256: z.string().regex(/^[0-9a-fA-F]{64}$/),
+    sha256: z.string().regex(/^[0-9a-fA-F]{64}$/).max(INPUT_LIMITS.id),
     name: z.string().min(1).max(255),
     size: z.number().int().min(0),
     media_type: z.string().max(120).nullish(),
@@ -74,9 +76,9 @@ const SignSchema = z.object({
 });
 
 const ValidateJsonSchema = z.object({
-  content_base64: z.string().optional(),
-  signature_base64: z.string().optional(),
-  document_base64: z.string().optional(),
+  content_base64: documentText().optional(),
+  signature_base64: documentText().optional(),
+  document_base64: documentText().optional(),
   storage_key: z.string().max(1024).optional(),
   document_storage_key: z.string().max(1024).optional(),
   online: z.boolean().optional(),

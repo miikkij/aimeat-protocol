@@ -33,12 +33,16 @@
  *   - FormActions: `end` (the row at the right), `apart` (the first thing at the left, the rest at
  *     the right: a hint beside the send action).
  * @structure Field({ label, help, hint, message, error, wide, invalid, group, named, id, labelId, hintId, children }) ·
- *   Fields({ cols, children }) · FormActions({ end, apart, children }) · useFieldIds(id) · messageOf(m, error) ·
- *   hasFieldWords(props) · inField(props, ids, control, named)
+ *   Fields({ cols, errors, children }) · FormActions({ end, apart, children }) · useFieldIds(id) · messageOf(m, error) ·
+ *   WithFieldErrors({ errors, children }) · useFieldMessage(props) · describedBy(props, ids) · hasFieldWords(props) · inField(props, ids, control, named)
  * @usage html`<${Fields} cols=${2}><${TextField} label=${t('x.name')} value=${v} onInput=${setV} /><//>`
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.10.0 — 2026-10-27 — Fields `errors`: a refused write's per-field messages (js/field-errors.js),
+ *     each shown under the field whose `name` is its path, through useFieldMessage(); the message has an
+ *     id the control names in aria-describedby (msgId). Additive (wish
+ *     wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.9.0 — 2026-10-02 — Field `help`: a question mark beside the row label that explains the setting
  *     (components/HelpTip.js), passed on by inField so every control of the family takes it; additive.
  *   v1.8.0 — 2026-09-27 — Fields `spaced` (with `plain chapter`: the old detail's About editor, its
@@ -66,8 +70,8 @@
  *     pf-dr-field, pf-or-field, sch-form-row, inbox-form-row, form-row, op-field, pf-edit-label…),
  *     with the look most of them have (component plan C5).
  */
-import { h } from 'preact';
-import { useId } from 'preact/hooks';
+import { h, createContext } from 'preact';
+import { useId, useContext } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
 import { HelpLabel } from '/components/HelpTip.js';
@@ -80,6 +84,28 @@ export function useFieldIds(id) {
   const auto = useId();
   const base = id || `f${auto.replace(/[^a-zA-Z0-9_-]/g, '')}`;
   return { id: base, hintId: `${base}-hint`, labelId: `${base}-label`, msgId: `${base}-msg` };
+}
+
+/** The per-field messages of a refused write, `{ name: message }`, given to Fields as `errors`. */
+const FieldErrors = createContext(/** @type {Record<string, string> | null} */ (null));
+
+/**
+ * A control's props with the refused write's message for its `name` filled in as an error, when the
+ * page gave the control no message of its own. The controls of the family call it.
+ */
+export function useFieldMessage(props) {
+  const errors = useContext(FieldErrors);
+  const own = messageOf(props.message, props.error);
+  if (own || !errors || !props.name) return props;
+  // A list field's refusal names an item ("interests.2"); the field that holds the list shows it.
+  const text = errors[props.name] ?? Object.entries(errors).find(([path]) => path.startsWith(`${props.name}.`))?.[1];
+  return text ? { ...props, message: { text, error: true } } : props;
+}
+
+/** The ids the control's aria-describedby names: its hint and its message, when it has them. */
+export function describedBy(props, ids) {
+  const parts = [props.hint ? ids.hintId : null, messageOf(props.message, props.error) ? ids.msgId : null].filter(Boolean);
+  return parts.length ? parts.join(' ') : undefined;
 }
 
 /** A message given as words, or as { text, error } (the shape the Settings pages keep their messages in). */
@@ -95,7 +121,7 @@ export function messageOf(message, error) {
  * The field's frame. With `group`, the label names the group of controls inside (role group, labelled
  * by the label); otherwise the label points at the control whose id is `id`.
  */
-export function Field({ label, labelNote, help, hint, message, error, wide, invalid, group, named, id, labelId: givenLabelId, hintId, children }) {
+export function Field({ label, labelNote, help, hint, message, error, wide, invalid, group, named, id, labelId: givenLabelId, hintId, msgId, children }) {
   const msg = messageOf(message, error);
   const cls = cx('og-field', 'field', wide && 'field--wide', invalid && 'field--invalid');
   const own = useId();
@@ -116,12 +142,24 @@ export function Field({ label, labelNote, help, hint, message, error, wide, inva
       ${lab}
       ${children}
       ${hint ? html`<span class="poster-hint" id=${hintId}>${hint}</span>` : null}
-      ${msg ? html`<${Note} kind="message" error=${msg.error}>${msg.text}<//>` : null}
+      ${msg ? html`<${Note} kind="message" id=${msgId} error=${msg.error}>${msg.text}<//>` : null}
     </div>`;
 }
 
 /** Fields in a column, or in two columns (`cols` 2) that fold to one on a narrow screen. */
-export function Fields({ cols, plain, beside, chapter, ruled, column, narrow, spaced, children }) {
+export function Fields({ cols, plain, beside, chapter, ruled, column, narrow, spaced, errors, children }) {
+  // errors (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli): a refused
+  // write's per-field messages; each control of the family named in it shows its own under itself.
+  const fields = FieldsBox({ cols, plain, beside, chapter, ruled, column, narrow, spaced, children });
+  return errors ? html`<${FieldErrors.Provider} value=${errors}>${fields}<//>` : fields;
+}
+
+/** The same per-field messages for a form laid out without Fields (a dialog's Stack): no markup of its own. */
+export function WithFieldErrors({ errors, children }) {
+  return html`<${FieldErrors.Provider} value=${errors || null}>${children}<//>`;
+}
+
+function FieldsBox({ cols, plain, beside, chapter, ruled, column, narrow, spaced, children }) {
   // spaced (added by appcat sections-a, parity): with `plain chapter`, a form whose one-line fields
   // carry their own air, 4px under the label and 10px over what follows (the last 8px); a row of
   // doors right under it keeps 4px, its status line 8px, a grey line 10px (the old detail's About
@@ -164,7 +202,7 @@ export function inField(props, ids, control, named) {
   const { label, help, hint, message, error, wide, invalid } = props;
   if (!hasFieldWords(props)) return control;
   return html`<${Field} label=${label} help=${help} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
-    named=${named} id=${ids.id} labelId=${ids.labelId} hintId=${ids.hintId}>${control}<//>`;
+    named=${named} id=${ids.id} labelId=${ids.labelId} hintId=${ids.hintId} msgId=${ids.msgId}>${control}<//>`;
 }
 
 export default Field;

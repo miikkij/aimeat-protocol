@@ -11,6 +11,7 @@
  * @structure addBody · roads · roadName · personForm · roadChat
  * @usage import { addBody, personForm } from './add.js';
  * @version-history
+ *   v1.11.0 — 2026-10-27 — The person form shows a refused save's message under each field (Fields `errors`, ctx.formErrors) and stops each field at the server's limit (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.10.0 — 2026-09-26 — Every part is a kit component (Roads with the chosen road; the person form as Fields of TextField, Choice, TagInput and TextArea, their labels over the fields; FormActions; Beside for the picker and its Add; Label; Note; Action): the page passes data and writes no class (page group G8).
  *   v1.9.0 — 2026-09-26 — A tag that takes itself off is the removable tag (.tag-removable) and its ✗ the Tag's remove mark (.poster-chip-x): grey, coral while the pointer is on the tag (a unification: Jouni's decision "Remove mark").
  *   v1.8.0 — 2026-09-26 — A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -38,6 +39,7 @@ import { Roads, Road } from '/components/Roads.js';
 import { Fields, Field, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 import { TagInput } from '/components/TagInput.js';
 import { Label } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
@@ -96,24 +98,25 @@ export function personForm(ctx, { withInvite = false, editing = false } = {}) {
     set({ relation: v });
   };
   return html`
-    <${Fields}>
-      <${TextField} label=${c('fName')} value=${f.name} placeholder=${t('contacts.personName')} onInput=${(v) => set({ name: v })} />
-      <${TextField} type="email" label=${c('fEmail')} value=${f.email} disabled=${editing && !!editRow?.email} placeholder=${t('contacts.personEmail')}
+    <${Fields} errors=${ctx.formErrors}>
+      ${/* A card keeps a name of 140, a relation of 40 and a note of 1 000 characters (CONTACT_LIMITS, src/models/write-body-schemas.ts). */''}
+      <${TextField} name="name" maxLength=${140} label=${c('fName')} value=${f.name} placeholder=${t('contacts.personName')} onInput=${(v) => set({ name: v })} />
+      <${TextField} name="email" maxLength=${INPUT_LIMITS.email} type="email" label=${c('fEmail')} value=${f.email} disabled=${editing && !!editRow?.email} placeholder=${t('contacts.personEmail')}
         onInput=${(v) => set({ email: v })} onBlur=${() => (editing ? null : ctx.resolveForm())} hint=${emailHint} />
       <${Choice} label=${c('fRelation')} clearable value=${otherOn ? 'other' : f.relation}
         options=${[...RELATIONS.map((k) => [relWord(k), relWord(k)]), ['other', c('rel.other')]]} onChange=${pickRelation} />
-      ${otherOn ? html`<${TextField} size="medium" ariaLabel=${c('fRelation')} value=${f.relation} placeholder=${t('contacts.relationPlaceholder')} onInput=${(v) => set({ relation: v })} />` : null}
+      ${otherOn ? html`<${TextField} name="relation" maxLength=${40} size="medium" ariaLabel=${c('fRelation')} value=${f.relation} placeholder=${t('contacts.relationPlaceholder')} onInput=${(v) => set({ relation: v })} />` : null}
       <${TagInput} label=${c('fTags')} whole tags=${f.tags || []} onChange=${(tags) => set({ tags })} removeLabel=${c('remove')} placeholder=${c('tagPlaceholder')} />
       <${Field} label=${c('fLinks')} hint=${c('linksHint')} group>
         ${links.map((l, i) => html`
           <${Fields} cols=${2} key=${i}>
-            <${TextField} size="medium" ariaLabel=${c('linkLabel')} value=${l.label || ''} placeholder=${c('linkLabel')} onInput=${(v) => setLink(i, { label: v })} />
-            <${TextField} ariaLabel=${c('fLinks')} value=${l.url || ''} placeholder="https://" onInput=${(v) => setLink(i, { url: v })}
+            <${TextField} name=${`links.${i}.label`} maxLength=${INPUT_LIMITS.name} size="medium" ariaLabel=${c('linkLabel')} value=${l.label || ''} placeholder=${c('linkLabel')} onInput=${(v) => setLink(i, { label: v })} />
+            <${TextField} name=${`links.${i}.url`} maxLength=${INPUT_LIMITS.url} ariaLabel=${c('fLinks')} value=${l.url || ''} placeholder="https://" onInput=${(v) => setLink(i, { url: v })}
               actions=${html`<${Action} small soft onClick=${() => set({ links: links.filter((_, j) => j !== i) })}>${c('remove')}<//>`} />
           <//>`)}
         ${links.length < 12 ? html`<${Actions}><${Action} small soft onClick=${() => set({ links: [...links, { label: '', url: '' }] })}>${c('addLink')}<//><//>` : null}
       <//>
-      <${TextArea} label=${c('fNote')} rows=${2} value=${f.note} placeholder=${t('contacts.notePlaceholder')} onInput=${(v) => set({ note: v })} />
+      <${TextArea} name="note" maxLength=${1000} label=${c('fNote')} rows=${2} value=${f.note} placeholder=${t('contacts.notePlaceholder')} onInput=${(v) => set({ note: v })} />
       ${withInvite ? html`
         <${Choice} label=${c('fInvite')} hint=${found?.found ? c('inviteHintFound') : c('inviteHint')} value=${f.invite ? 'here' : 'no'}
           options=${[{ value: 'no', label: c('inviteNo') }, { value: 'here', label: c('inviteHere'), disabled: !!found?.found }]}

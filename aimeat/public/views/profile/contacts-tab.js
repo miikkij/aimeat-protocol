@@ -10,6 +10,9 @@
  * @structure ContactsTab (default) — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
+ *   v2.5.0 — 2026-10-27 — A refused save keeps each field's message (formErrors) for the person form
+ *     to show under its field; the toast says what no field shows (wish
+ *     wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.4.0 — 2026-10-26 — Reloads on the 'ghii' live domain too: on a company server a person who joins or
  *     renames changes everyone's address book.
  *   v2.3.0 — 2026-10-16 — The menu find opens one contact here (useOpenItem, js/open-item.js).
@@ -33,6 +36,10 @@ import * as contactsService from '/js/services/contacts.js';
 import * as messagesService from '/js/services/messages.js';
 import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { fieldErrorsOf, refusalLine } from '/js/field-errors.js';
+
+/** The fields the person form draws, by the name the server's refusal gives them (contacts/add.js). */
+const PERSON_FIELDS = ['name', 'email', 'relation', 'tags', 'links', 'note'];
 import { useOpenItem } from '/js/open-item.js';
 import { useLoadState } from '/js/load-state.js';
 import { c, nameOf, parts } from './contacts/frame.js';
@@ -55,6 +62,7 @@ export default function ContactsTab({ showToast }) {
   const [road, setRoad] = useState('name');
   const [who, setWho] = useState('');
   const [busy, setBusy] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
   const [q, setQ] = useState('');
   const [searchOpen, setSearchOpen] = useState(false);
   const [peopleFilter, setPeopleFilter] = useState('all');
@@ -122,7 +130,7 @@ export default function ContactsTab({ showToast }) {
   useOpenItem('contacts', openPerson, !loading);
   const setFold = (k, open) => setFolds(f => ({ ...f, [k]: open }));
   const openAdd = (which) => { setRoad(which); setFold('add', true); setTimeout(() => document.getElementById('ct-add')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 30); };
-  const resetForm = () => { setForm({ ...EMPTY_FORM }); setFormResolve(null); };
+  const resetForm = () => { setForm({ ...EMPTY_FORM }); setFormResolve(null); setFormErrors({}); };
 
   /* ── doors to other pages ── */
   const openTab = (tabId) => openTabEvent(tabId);
@@ -158,8 +166,16 @@ export default function ContactsTab({ showToast }) {
     tags: (f.tags || []).map(x => x.trim()).filter(Boolean),
     links: (f.links || []).map(l => ({ label: (l.label || '').trim(), url: (l.url || '').trim() })).filter(l => l.url),
   });
+  // A refused save shows each field's message under that field (js/field-errors.js); the toast says the rest.
+  const refuse = (e) => {
+    const refused = fieldErrorsOf(e);
+    setFormErrors(refused);
+    const line = refusalLine(refused, PERSON_FIELDS, t);
+    if (line) showToast?.(line, true); else fail(e);
+  };
   async function savePerson() {
     setBusy(true);
+    setFormErrors({});
     try {
       const r = await contactsService.savePerson(cardOf(form));
       if (r?.ok === false) throw r;
@@ -172,7 +188,7 @@ export default function ContactsTab({ showToast }) {
       showToast?.(note);
       resetForm();
       await load({ showSpinner: false });
-    } catch (e) { fail(e); }
+    } catch (e) { refuse(e); }
     finally { setBusy(false); }
   }
   const startEdit = (row) => {
@@ -184,6 +200,7 @@ export default function ContactsTab({ showToast }) {
     const row = rowOf(view.id);
     if (!row) return;
     setBusy(true);
+    setFormErrors({});
     try {
       const card = cardOf(form);
       // A person with an account keeps their own name and address; the owner edits the rest.
@@ -199,7 +216,7 @@ export default function ContactsTab({ showToast }) {
       showToast?.(t('contacts.updated'));
       setEditing(false);
       await load({ showSpinner: false });
-    } catch (e) { fail(e); }
+    } catch (e) { refuse(e); }
     finally { setBusy(false); }
   }
 
@@ -269,7 +286,7 @@ export default function ContactsTab({ showToast }) {
 
   const ctx = {
     contacts, contactsFailed: contactsLoad.failed, reload: () => load(), people, noAccount, agents, truncated, blockedCount, loading, view, folds, road, who, busy, q, searchOpen, peopleFilter, showAll, agentsFilter,
-    form, formResolve, editing, personData, orgChooser, myOrganisms, me: myGhii, ConfirmUI,
+    form, formResolve, formErrors, editing, personData, orgChooser, myOrganisms, me: myGhii, ConfirmUI,
     rowOf, personOf, pickView, openPerson, setFold, openAdd, setRoad, setWho, setQ, setSearchOpen, setPeopleFilter, setShowAll, setAgentsFilter,
     setForm, resetForm, setEditing, openTab, message, openConversation,
     add, emailUnresolved, resolveForm, savePerson, startEdit, saveEdit, invite, toggleOrgChooser, inviteToOrganism, remove, copyPrompt,

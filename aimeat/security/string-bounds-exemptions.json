@@ -1,0 +1,6 @@
+{
+  "note": "Zod strings under src/ that carry no length limit on purpose, keyed `file :: line text`, each with the reason it needs none. scripts/check-string-bounds.ts refuses any other. Empty since 2026-10-27, when every one was given a limit from src/models/input-limits.ts.",
+  "exempt": {
+    "src/models/input-limits.ts :: return storable(z.string());": "documentText(): a whole document, bounded by the request body limit an operator sets (config.jsonBodyLimitMb, jsonBodyLimitLargeMb). The one place that says so."
+  }
+}

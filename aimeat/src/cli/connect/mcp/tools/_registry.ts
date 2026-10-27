@@ -8,6 +8,7 @@
  *   agent name. Single-agent installs are unaffected -- the parameter is
  *   optional and defaults to the only loaded agent.
  * @version-history
+ *   v1.2.0 -- 2026-10-27 -- Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 -- 2026-09-07 -- `envelopeResult` / `payloadResult`: one place that decides whether a
  *     tool result is an error. Every tool here built its result by hand, and 144 of the 163 return
  *     sites left `isError` off entirely -- so a node refusal came back as a SUCCESSFUL tool call
@@ -17,11 +18,13 @@
  *   v1.0.0 -- 2026-05-29 -- Initial multi-agent tool helpers
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../../../models/input-limits.js';
 import type { AgentRegistry, RegisteredAgent } from '../../agent-registry.js';
 import type { ApiResponse } from '../../api-client.js';
 
 export const agentNameSchema = z
   .string()
+  .max(INPUT_LIMITS.name)
   .optional()
   .describe(
     "Which agent to act as. Optional when only one is connected; with several, defaults to the one marked 'primary: true' in its per-agent config (or the first if none is). A bare name works when only one connected agent has it; when two owners on this connector share a name, that is refused and both full identities are named, and you pass one of those instead.",

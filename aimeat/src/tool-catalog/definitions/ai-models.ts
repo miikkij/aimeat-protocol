@@ -7,6 +7,7 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_ai_routing_set names rules.freeModelLastResort (secaudit2026oct22 follow-up).
  *   2026-10-06 —aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
  *     they make when given nothing asks (secaudit 2026-10 follow-up, A4).
@@ -26,6 +27,7 @@
  *   v1.0.0 — 2026-09-28 — aimeat_ai_policy_set (System 2 plan, V2).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
 
 /** The `role` parameter of every tool that makes an AI call, in one wording (services/ai/roles.ts). */
@@ -189,7 +191,7 @@ export const aiModelTools = [
       + 'the answered `model` beside the vectors: vectors of different models cannot be compared, so a fallback only '
       + 'ever uses the same model. At most 256 texts and 500 000 characters per call.',
     input: {
-      input: { type: 'array', description: 'The texts, one vector each.', required: true, zod: z.array(z.string()).min(1) },
+      input: { type: 'array', description: 'The texts, one vector each.', required: true, zod: z.array(z.string().max(INPUT_LIMITS.text)).min(1) },
       model: { type: 'string', description: 'A model reference; omit to let the owner\'s providers choose.' },
       provider: { type: 'string', description: 'A provider id or type to use, with no fallback.' },
       app_id: { type: 'string', description: 'The app this is for, so its spend is attributed.' },

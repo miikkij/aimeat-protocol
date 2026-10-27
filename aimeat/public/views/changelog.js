@@ -14,6 +14,7 @@
  * @structure monthKey · monthLabel · entryId · default export Changelog({ navigate })
  * @usage routed at /v1/changelog by spa.html; listed in routes/portal.ts spaRoutes
  * @version-history
+ *   v1.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-18 — Each entry shows whom it is for, its one-line summary, a highlight tag and a
  *     fix's impact on use; a second row of chips filters by audience and to the highlights. The
  *     anchor function moved to js/services/news.js (entryAddress), unchanged.
@@ -28,6 +29,7 @@ import { t, getLocale, onLocaleChange } from '/js/i18n.js';
 import { pick, fmtDate, KIND_LABEL } from '/views/landing-changelog.js';
 import { swallowed } from '/js/swallowed.js';
 import { entryAddress, audienceOf, AUDIENCES } from '/js/services/news.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 import { Mark } from '/components/Mark.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -145,7 +147,7 @@ export default function Changelog({ navigate }) {
             ${tr('changelog.onlyHighlights', 'Only the important ones')} · ${whoCounts.highlights || 0}
           </button>
         </div>
-        <input class="chg-search" type="search" value=${q} onInput=${(e) => setQ(e.target.value)}
+        <input class="chg-search" type="search" maxLength=${INPUT_LIMITS.line} value=${q} onInput=${(e) => setQ(e.target.value)}
           placeholder=${tr('changelog.searchPh', 'Search the log…')} aria-label=${tr('changelog.searchPh', 'Search the log')} />
       </div>
 

@@ -19,6 +19,8 @@
  * @usage html`<${Select} label=${t('x.vis')} value=${vis} onChange=${setVis}
  *          options=${[['private', t('x.private')], ['public', t('x.public')]]} />`
  * @version-history
+ *   v1.3.0 — 2026-10-27 — A refused write's message for the field's `name` shows under it (Fields
+ *     `errors`), and aria-describedby names the message too; additive.
  *   v1.2.0 — 2026-09-27 — `line`: the old app catalogue's detail choice (select.modal-input: the ink
  *     line under it, 10px 32px 10px 14px, .88rem bold, the grey arrow); additive, appcat parity
  *     (sections-b), select-field.css .select-field--line.
@@ -29,7 +31,7 @@
  */
 import { h } from 'preact';
 import htm from 'htm';
-import { useFieldIds, inField, messageOf } from '/components/Field.js';
+import { useFieldIds, inField, messageOf, useFieldMessage, describedBy } from '/components/Field.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -46,7 +48,9 @@ function optionOf(o) {
   return html`<option key=${v} value=${v} disabled=${n.disabled} title=${n.title}>${n.label}</option>`;
 }
 
-export function Select(props) {
+export function Select(given) {
+  // A refused write's message for this field's `name`, when the page's Fields carries `errors`.
+  const props = useFieldMessage(given);
   const { id, value, options = [], placeholder, placeholderDisabled, fit, invalid, error, disabled, required, name,
     ariaLabel, title, onChange, onFocus, onBlur, attention, line } = props;
   const ids = useFieldIds(id);
@@ -60,7 +64,7 @@ export function Select(props) {
     class=${cx('select-field', fit && 'select-field--fit', bad && 'select-field--invalid', attention && current !== '' && 'select-field--attention', line && 'select-field--line')}
     value=${current} disabled=${disabled} required=${required} title=${title}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
-    aria-describedby=${props.hint ? ids.hintId : undefined}
+    aria-describedby=${describedBy(props, ids)}
     onChange=${onChange ? (e) => onChange(e.currentTarget.value, e) : undefined} onFocus=${onFocus} onBlur=${onBlur}>
     ${placeholder !== undefined && placeholder !== null ? html`<option value="" disabled=${placeholderDisabled && current !== ''}>${placeholder}</option>` : null}
     ${options.map((o) => (o && typeof o === 'object' && !Array.isArray(o) && Array.isArray(o.options)

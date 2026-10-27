@@ -23,6 +23,7 @@
  * @structure decideTools -- AimeatToolDefinition[]
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.2.2 — 2026-09-25 — aimeat_decision_review says a decision the agent asked for itself is refused
@@ -37,6 +38,7 @@
  */
 import { questionsSchema } from '../input-schemas.js';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { type AimeatToolDefinition, agentEverywhere } from './types.js';
 
 const QUESTIONS_HELP = 'A map of YOUR ids to questions. Three types: {type:"noul", instructions, criteria?:{true?,false?}} returns the probability (0-1) that the statement is true; {type:"choice", instructions, criteria:{"<option>":"<what it means>"|null}} picks one of 2-240 options and returns a probability per option and a confidence; {type:"score", instructions, criteria:["<lowest level>", ..., "<highest level>"]} rates on 2-10 ordered levels. Write instructions and criteria in ENGLISH whatever language the state is in: the model is trained on English first. Ask everything you might need in ONE call (cost is in the state, answers are free), keep one judgment per question, add a "none of these" option to a choice, and keep arithmetic, counting and date comparison in code.';
@@ -64,7 +66,7 @@ export const decideTools = [
             subject: { type: 'string', description: 'What the decision is about: a memory key or a record id. The owner asks by this later.' },
             gates: { type: 'string', description: 'What the answer decides, in plain words ("send the reply automatically").' },
             thresholds: { type: 'object', description: 'The thresholds you will apply, e.g. {"urgent": 0.8}. Recorded with the decision.' },
-            names: { type: 'array', description: 'Extra person names to remove before sending, beyond the owner\'s contacts.', zod: z.array(z.string()) },
+            names: { type: 'array', description: 'Extra person names to remove before sending, beyond the owner\'s contacts.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             public_content: { type: 'boolean', description: 'The content is already public and needs no scrubbing. Honoured only when the owner\'s policy allows it.' },
             cache: { type: 'boolean', description: 'Reuse an identical earlier decision (default true).' },
             app_id: { type: 'string', description: 'App attribution for the per-app quota.' },
@@ -119,13 +121,13 @@ export const decideTools = [
             rule: { type: 'string', description: 'For start: one of the owner\'s decision rules, in place of questions, thresholds and gates. Each result then carries the rule\'s outcome.' },
             provider: { type: 'string', description: 'For start: the decision provider every item is asked on. Leave out to let the node pick.' },
             questions: { type: 'object', description: 'For start: the questions, as for aimeat_decide. Leave out when `rule` is given.', zod: questionsSchema },
-            items: { type: 'array', description: 'For start: [{ subject, state }].', zod: z.array(z.object({ subject: z.string(), state: z.unknown().optional() })) },
-            keys: { type: 'array', description: 'For start: owner memory keys; each record\'s value is one state. A key the node reads to decide what it does (its AI and decision keys, a payout record) is refused.', zod: z.array(z.string()) },
+            items: { type: 'array', description: 'For start: [{ subject, state }].', zod: z.array(z.object({ subject: z.string().max(INPUT_LIMITS.line), state: z.unknown().optional() })) },
+            keys: { type: 'array', description: 'For start: owner memory keys; each record\'s value is one state. A key the node reads to decide what it does (its AI and decision keys, a payout record) is refused.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
             prefix: { type: 'string', description: 'For start: every owner record under this key prefix, less the records the node reads to decide what it does.' },
-            fields: { type: 'array', description: 'For start: keep only these top-level fields of each state.', zod: z.array(z.string()) },
+            fields: { type: 'array', description: 'For start: keep only these top-level fields of each state.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             gates: { type: 'string', description: 'What the answers decide.' },
             thresholds: { type: 'object', description: 'The thresholds you will apply.' },
-            names: { type: 'array', description: 'Extra person names to remove before sending.', zod: z.array(z.string()) },
+            names: { type: 'array', description: 'Extra person names to remove before sending.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             app_id: { type: 'string', description: 'App attribution for the per-app quota.' },
         },
     },
