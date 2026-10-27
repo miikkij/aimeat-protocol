@@ -20,6 +20,80 @@ use tauri::{AppHandle, Manager};
 
 static NODE_PROCESS: Mutex<Option<Child>> = Mutex::new(None);
 static NODE_START_TIME: Mutex<Option<Instant>> = Mutex::new(None);
+/// The port the node in NODE_PROCESS was started on, while it runs. The owner's password and token
+/// go only to that port, and only while that node runs (ensure_own_node).
+static NODE_PORT: Mutex<Option<u16>> = Mutex::new(None);
+
+/// What the owner sees when a sign-in or an AI setting would reach a port where this app's node is
+/// not running: whatever answers there is not their node.
+const NODE_NOT_RUNNING: &str =
+    "The AIMEAT node on this computer is not running. Start it, then try again.";
+
+/// Ok when the node this app started is running and listens on `port`; a plain refusal otherwise,
+/// before any connection is opened. Another account on the same computer can listen on the port
+/// while this node is stopped or failed to start, so the port alone does not say whose node it is.
+pub fn ensure_own_node(port: u16) -> Result<(), String> {
+    if stands_in_for_own_node(port) {
+        return Ok(());
+    }
+    let mut process = NODE_PROCESS.lock().map_err(|e| e.to_string())?;
+    let running = matches!(process.as_mut().map(|child| child.try_wait()), Some(Ok(None)));
+    if !running {
+        return Err(NODE_NOT_RUNNING.to_string());
+    }
+    match NODE_PORT.lock().ok().and_then(|guard| *guard) {
+        Some(started) if started == port => Ok(()),
+        Some(started) => Err(format!(
+            "The AIMEAT node on this computer was started on port {}. Stop it and start it again to use port {}.",
+            started, port
+        )),
+        None => Err(NODE_NOT_RUNNING.to_string()),
+    }
+}
+
+/// In a normal build, nothing stands in for the node this app started.
+#[cfg(not(test))]
+fn stands_in_for_own_node(_port: u16) -> bool {
+    false
+}
+
+#[cfg(test)]
+fn stands_in_for_own_node(port: u16) -> bool {
+    test_support::is_stand_in(port)
+}
+
+/// Tests run a stub node on a port of their own; registering that port makes the stub stand in for
+/// the node this app started, for that port only. Every other port still meets the real check.
+#[cfg(test)]
+pub mod test_support {
+    use std::sync::Mutex;
+
+    static STAND_INS: Mutex<Vec<u16>> = Mutex::new(Vec::new());
+
+    pub fn stand_in_for_own_node(port: u16) {
+        if let Ok(mut ports) = STAND_INS.lock() {
+            ports.push(port);
+        }
+    }
+
+    pub(super) fn is_stand_in(port: u16) -> bool {
+        STAND_INS.lock().map(|ports| ports.contains(&port)).unwrap_or(false)
+    }
+}
+
+/// On macOS and Linux, give a file or folder this mode, so only the person's own account can read
+/// it (0600 for a file, 0700 for a folder). Windows keeps the per-user profile's access list.
+#[cfg(unix)]
+fn make_private(path: &Path, mode: u32) -> Result<(), String> {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
+        .map_err(|e| format!("Failed to restrict {}: {}", path.display(), e))
+}
+
+#[cfg(not(unix))]
+fn make_private(_path: &Path, _mode: u32) -> Result<(), String> {
+    Ok(())
+}
 
 /// Default port the AIMEAT server listens on. Deliberately NOT 40050 — that is the dev
 /// server's default, and a desktop node sharing it collides with anyone running `pnpm dev`
@@ -59,7 +133,15 @@ pub struct NodeConfig {
     /// Output-only: populated by read_config, ignored (and optional) on write_config.
     #[serde(default)]
     pub encryption_configured: bool,
+    /// Where the node answers (AIMEAT_BIND_HOST): "127.0.0.1" for this computer only, "0.0.0.0" for
+    /// the local network too. None when the .env has no such line (an install from before this
+    /// setting, which answers on every address); on write, None or "" leaves the line as it is.
+    #[serde(default)]
+    pub bind_host: Option<String>,
 }
+
+/// The two listen addresses the settings offer.
+const BIND_HOSTS: [&str; 2] = ["127.0.0.1", "0.0.0.0"];
 
 /// Resolved runtime paths, differing between a bundled install and `tauri dev`.
 struct Runtime {
@@ -186,6 +268,10 @@ fn default_env(node_id: &str) -> String {
          AIMEAT_NODE_ID=\"{node_id}\"\n\
          AIMEAT_FEDERATION_ROLE=\"standalone\"\n\
          \n\
+         # The node answers on this computer only. To reach it from other devices on your local\n\
+         # network, choose that in the app's settings (it writes 0.0.0.0 here).\n\
+         AIMEAT_BIND_HOST=\"127.0.0.1\"\n\
+         \n\
          # App origin isolation (security finding H-2): user-published apps run on a\n\
          # SEPARATE origin from the authenticated UI so they can never reach your session.\n\
          # `*.localhost` resolves to loopback in the WebView automatically, so this needs\n\
@@ -241,12 +327,16 @@ fn migrate_legacy_port(env_file: &Path) -> Result<(), String> {
 fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
     std::fs::create_dir_all(&rt.data_dir)
         .map_err(|e| format!("Failed to create data dir: {}", e))?;
+    // The folder holds the .env keys, the database and the log: this account only.
+    make_private(&rt.data_dir, 0o700)?;
 
     if !rt.env_file.exists() {
         std::fs::write(&rt.env_file, default_env(DEFAULT_NODE_ID))
             .map_err(|e| format!("Failed to write default .env: {}", e))?;
-        return Ok(());
+        return make_private(&rt.env_file, 0o600);
     }
+    // An existing install keeps its file and its keys; only who may read it changes.
+    make_private(&rt.env_file, 0o600)?;
 
     // Migrate the legacy desktop port (40050 — the dev-server default) to the dedicated desktop
     // port so a running `pnpm dev` no longer collides. Only the old default is touched; a custom
@@ -295,6 +385,7 @@ fn ensure_env_file(rt: &Runtime) -> Result<(), String> {
         std::fs::write(&rt.env_file, updated)
             .map_err(|e| format!("Failed to update .env with app origin: {}", e))?;
     }
+    // std::fs::write keeps the mode of a file that exists, so the rewrites above stay 0600.
     Ok(())
 }
 
@@ -319,6 +410,7 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
     ensure_env_file(&rt)?;
     std::fs::create_dir_all(rt.data_dir.join("data"))
         .map_err(|e| format!("Failed to create data subdir: {}", e))?;
+    make_private(&rt.data_dir.join("data"), 0o700)?;
 
     if !rt.server_entry.exists() {
         return Err(format!(
@@ -343,6 +435,7 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
         .append(true)
         .open(&rt.log_file)
         .map_err(|e| format!("Failed to open log file: {}", e))?;
+    make_private(&rt.log_file, 0o600)?;
     let log_stderr = log_stdout
         .try_clone()
         .map_err(|e| format!("Failed to clone log file handle: {}", e))?;
@@ -368,6 +461,14 @@ pub fn start_node(app: AppHandle) -> Result<u32, String> {
 
     let pid = child.id();
     *process = Some(child);
+    // The port this node was started on, from the .env it was started with.
+    let started_port = std::fs::read_to_string(&rt.env_file)
+        .ok()
+        .and_then(|content| parse_env(&content).get("AIMEAT_PORT").and_then(|v| v.parse().ok()))
+        .unwrap_or(DEFAULT_PORT);
+    if let Ok(mut port) = NODE_PORT.lock() {
+        *port = Some(started_port);
+    }
 
     if let Ok(mut start_time) = NODE_START_TIME.lock() {
         *start_time = Some(Instant::now());
@@ -391,6 +492,9 @@ pub fn kill_node() {
     if let Ok(mut start_time) = NODE_START_TIME.lock() {
         *start_time = None;
     }
+    if let Ok(mut port) = NODE_PORT.lock() {
+        *port = None;
+    }
 }
 
 #[tauri::command]
@@ -405,6 +509,9 @@ pub fn stop_node(app: AppHandle, pid: u32) -> Result<(), String> {
 
             if let Ok(mut start_time) = NODE_START_TIME.lock() {
                 *start_time = None;
+            }
+            if let Ok(mut port) = NODE_PORT.lock() {
+                *port = None;
             }
 
             if let Ok(rt) = resolve_runtime(&app) {
@@ -433,6 +540,9 @@ pub fn get_node_status(app: AppHandle) -> Result<NodeStatus, String> {
         *process = None;
         if let Ok(mut start_time) = NODE_START_TIME.lock() {
             *start_time = None;
+        }
+        if let Ok(mut port) = NODE_PORT.lock() {
+            *port = None;
         }
         // The node died on its own — reflect "stopped" in the tray.
         crate::tray::refresh_tray(&app, false);
@@ -480,6 +590,23 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
     ensure_env_file(&rt)?;
 
     let existing = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
+    let env_content = compose_env(&existing, &config)?;
+    std::fs::write(&rt.env_file, env_content)
+        .map_err(|e| format!("Failed to write config: {}", e))?;
+    make_private(&rt.env_file, 0o600)
+}
+
+/// The .env `write_config` writes: the keys this app manages from `config`, then every other line of
+/// `existing` as it was.
+fn compose_env(existing: &str, config: &NodeConfig) -> Result<String, String> {
+    // The listen address is written only when the person chose one; otherwise the line (or its
+    // absence, on an install from before this setting) stays as it is.
+    let bind_host = config.bind_host.as_deref().map(str::trim).filter(|h| !h.is_empty());
+    if let Some(h) = bind_host {
+        if !BIND_HOSTS.contains(&h) {
+            return Err(format!("\"{}\" is not a listen address this app offers.", h));
+        }
+    }
 
     // Keys this app manages — everything else in the file is preserved as-is.
     let managed_keys = [
@@ -497,6 +624,9 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
             let trimmed = line.trim();
             if trimmed.is_empty() || trimmed.starts_with('#') {
                 return true; // keep comments and blanks
+            }
+            if bind_host.is_some() && trimmed.starts_with("AIMEAT_BIND_HOST=") {
+                return false; // replaced below with the address the person chose
             }
             !managed_keys
                 .iter()
@@ -525,6 +655,9 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
             env_content.push_str(&format!("AIMEAT_AI_ENDPOINT=\"{}\"\n", ep));
         }
     }
+    if let Some(h) = bind_host {
+        env_content.push_str(&format!("AIMEAT_BIND_HOST=\"{}\"\n", h));
+    }
 
     if !preserved.is_empty() {
         env_content.push('\n');
@@ -533,9 +666,7 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
             env_content.push('\n');
         }
     }
-
-    std::fs::write(&rt.env_file, env_content)
-        .map_err(|e| format!("Failed to write config: {}", e))
+    Ok(env_content)
 }
 
 /// Read the AIMEAT `.env` configuration and return parsed values.
@@ -569,6 +700,7 @@ pub fn read_config(app: AppHandle) -> Result<NodeConfig, String> {
             .unwrap_or_else(|| "sqlite".to_string()),
         data_dir: rt.data_dir.to_string_lossy().to_string(),
         encryption_configured: encryption_configured(&vars),
+        bind_host: vars.get("AIMEAT_BIND_HOST").cloned(),
     })
 }
 
@@ -649,4 +781,117 @@ pub fn get_node_pid() -> Option<u32> {
         .lock()
         .ok()
         .and_then(|guard| guard.as_ref().map(|child| child.id()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A Runtime whose writable folder is a fresh temp folder of its own.
+    fn temp_runtime(name: &str) -> Runtime {
+        let data_dir = std::env::temp_dir().join(format!("aimeat-desktop-test-{}-{}", std::process::id(), name));
+        let _ = std::fs::remove_dir_all(&data_dir);
+        Runtime {
+            node_bin: PathBuf::from("node"),
+            server_entry: PathBuf::from("index.js"),
+            env_file: data_dir.join(".env"),
+            log_file: data_dir.join("aimeat-node.log"),
+            data_dir,
+        }
+    }
+
+    fn config(bind_host: Option<&str>) -> NodeConfig {
+        NodeConfig {
+            node_id: "aimeat-local-001-dev".into(),
+            port: DEFAULT_PORT,
+            federation_role: "standalone".into(),
+            genesis_url: None,
+            ai_endpoint: None,
+            storage: String::new(),
+            data_dir: String::new(),
+            encryption_configured: false,
+            bind_host: bind_host.map(String::from),
+        }
+    }
+
+    // secaudit2026oct26, local-profile-from-default-baseurl-on-network-reachable-listener.
+
+    #[test]
+    fn a_new_install_answers_on_this_computer_only() {
+        let vars = parse_env(&default_env(DEFAULT_NODE_ID));
+        assert_eq!(vars.get("AIMEAT_BIND_HOST").map(String::as_str), Some("127.0.0.1"));
+    }
+
+    #[test]
+    fn saving_the_settings_without_a_choice_keeps_an_existing_install_as_it_is() {
+        let before = "AIMEAT_PORT=41050\nAIMEAT_ENCRYPTION_KEY=\"k\"\n";
+        let after = compose_env(before, &config(None)).unwrap();
+        assert!(!after.contains("AIMEAT_BIND_HOST"), "{}", after);
+        let after = compose_env(before, &config(Some(""))).unwrap();
+        assert!(!after.contains("AIMEAT_BIND_HOST"), "{}", after);
+        let with_line = "AIMEAT_BIND_HOST=\"127.0.0.1\"\nAIMEAT_ENCRYPTION_KEY=\"k\"\n";
+        let after = compose_env(with_line, &config(None)).unwrap();
+        assert_eq!(parse_env(&after).get("AIMEAT_BIND_HOST").map(String::as_str), Some("127.0.0.1"));
+        assert_eq!(parse_env(&after).get("AIMEAT_ENCRYPTION_KEY").map(String::as_str), Some("k"));
+    }
+
+    #[test]
+    fn the_person_can_open_it_to_the_local_network_and_close_it_again() {
+        let new_install = default_env(DEFAULT_NODE_ID);
+        let open = compose_env(&new_install, &config(Some("0.0.0.0"))).unwrap();
+        assert_eq!(open.matches("AIMEAT_BIND_HOST=").count(), 1, "{}", open);
+        assert_eq!(parse_env(&open).get("AIMEAT_BIND_HOST").map(String::as_str), Some("0.0.0.0"));
+        let closed = compose_env(&open, &config(Some("127.0.0.1"))).unwrap();
+        assert_eq!(closed.matches("AIMEAT_BIND_HOST=").count(), 1, "{}", closed);
+        assert_eq!(parse_env(&closed).get("AIMEAT_BIND_HOST").map(String::as_str), Some("127.0.0.1"));
+        // The keys made at install are still there.
+        assert_eq!(
+            parse_env(&closed).get("AIMEAT_ENCRYPTION_KEY"),
+            parse_env(&new_install).get("AIMEAT_ENCRYPTION_KEY")
+        );
+    }
+
+    #[test]
+    fn a_listen_address_the_settings_do_not_offer_is_refused() {
+        assert!(compose_env("", &config(Some("10.0.0.5"))).is_err());
+        assert!(compose_env("", &config(Some("0.0.0.0\"\nAIMEAT_SECURITY_PROFILE=\"local"))).is_err());
+    }
+
+    // secaudit2026oct26, data-dir-default-file-mode.
+
+    #[test]
+    fn an_existing_install_starts_with_the_same_keys_and_values() {
+        let rt = temp_runtime("existing");
+        std::fs::create_dir_all(&rt.data_dir).unwrap();
+        let before = "AIMEAT_PORT=41050\nAIMEAT_ENCRYPTION_KEY=\"aaaa\"\nAIMEAT_TOTP_ENCRYPTION_KEY=\"bbbb\"\nAIMEAT_APP_HOST=\"apps.localhost\"\n";
+        std::fs::write(&rt.env_file, before).unwrap();
+        ensure_env_file(&rt).unwrap();
+        assert_eq!(std::fs::read_to_string(&rt.env_file).unwrap(), before);
+        let _ = std::fs::remove_dir_all(&rt.data_dir);
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn only_this_account_can_read_the_keys_and_the_data() {
+        use std::os::unix::fs::PermissionsExt;
+        let mode = |p: &Path| std::fs::metadata(p).unwrap().permissions().mode() & 0o777;
+
+        let rt = temp_runtime("fresh");
+        ensure_env_file(&rt).unwrap();
+        assert_eq!(mode(&rt.data_dir), 0o700);
+        assert_eq!(mode(&rt.env_file), 0o600);
+
+        // An install from before: a world-readable .env is tightened, its content unchanged.
+        let rt = temp_runtime("upgraded");
+        std::fs::create_dir_all(&rt.data_dir).unwrap();
+        std::fs::set_permissions(&rt.data_dir, std::fs::Permissions::from_mode(0o755)).unwrap();
+        let before = "AIMEAT_ENCRYPTION_KEY=\"aaaa\"\nAIMEAT_TOTP_ENCRYPTION_KEY=\"bbbb\"\nAIMEAT_APP_HOST=\"apps.localhost\"\n";
+        std::fs::write(&rt.env_file, before).unwrap();
+        std::fs::set_permissions(&rt.env_file, std::fs::Permissions::from_mode(0o644)).unwrap();
+        ensure_env_file(&rt).unwrap();
+        assert_eq!(mode(&rt.data_dir), 0o700);
+        assert_eq!(mode(&rt.env_file), 0o600);
+        assert_eq!(std::fs::read_to_string(&rt.env_file).unwrap(), before);
+        let _ = std::fs::remove_dir_all(&rt.data_dir);
+    }
 }

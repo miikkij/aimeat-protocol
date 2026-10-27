@@ -164,6 +164,15 @@
           <p class="hint" id="t-setPortHint"></p>
         </div>
         <div class="field">
+          <label class="poster-label" for="setBind" id="t-setBind"></label>
+          <select id="setBind">
+            <option value="127.0.0.1" id="t-bindLocal"></option>
+            <option value="0.0.0.0" id="t-bindNetwork"></option>
+            <option value="" id="t-bindAsBefore"></option>
+          </select>
+          <p class="hint" id="t-setBindHint"></p>
+        </div>
+        <div class="field">
           <label class="poster-label" for="setRole" id="t-setRole"></label>
           <select id="setRole">
             <option value="standalone" id="t-roleStandalone"></option>
@@ -269,6 +278,11 @@
         setIdHint: 'Given when it was set up. It does not change.',
         setPort: 'Port',
         setPortHint: 'The port it answers on. 41050 unless something else already uses it. A change takes effect the next time you start it.',
+        setBind: 'Who can reach it',
+        bindLocal: 'This computer only',
+        bindNetwork: 'Also other devices on the local network',
+        bindAsBefore: 'Every network, as set before this choice existed',
+        setBindHint: 'This computer only is the safe choice. On the local network, anyone who reaches this computer can open its sign-in page, and it then uses the safety rules of a public server: it no longer reaches an AI server running on this computer. A change takes effect the next time you start it.',
         setRole: 'Its place among others',
         roleStandalone: 'On its own',
         rolePersonal: 'Anchored to another AIMEAT',
@@ -352,6 +366,11 @@
         setIdHint: 'Annettu käyttöönotossa. Se ei muutu.',
         setPort: 'Portti',
         setPortHint: 'Portti, jossa se vastaa. 41050, ellei jokin muu jo käytä sitä. Muutos tulee voimaan, kun käynnistät sen seuraavan kerran.',
+        setBind: 'Kuka siihen pääsee',
+        bindLocal: 'Vain tämä kone',
+        bindNetwork: 'Myös muut laitteet lähiverkossa',
+        bindAsBefore: 'Kaikki verkot, kuten ennen tätä valintaa',
+        setBindHint: 'Vain tämä kone on turvallinen valinta. Lähiverkossa kuka tahansa, joka yltää tähän koneeseen, voi avata sen kirjautumissivun. Silloin se noudattaa julkisen palvelimen turvasääntöjä eikä enää yllä tällä koneella toimivaan tekoälypalvelimeen. Muutos tulee voimaan, kun käynnistät sen seuraavan kerran.',
         setRole: 'Suhde muihin AIMEATeihin',
         roleStandalone: 'Yksin',
         rolePersonal: 'Ankkuroitu toiseen AIMEATiin',
@@ -524,6 +543,11 @@
       $('setPort').value = c.port || 41050;
       $('setRole').value = c.federation_role || 'standalone';
       $('setGenesis').value = c.genesis_url || '';
+      // An install from before this choice has no listen address and answers on every network. It
+      // keeps that until the person picks one: the third option, sent back empty, changes nothing.
+      const bind = c.bind_host === '127.0.0.1' || c.bind_host === '0.0.0.0' ? c.bind_host : '';
+      $('t-bindAsBefore').hidden = bind !== '';
+      $('setBind').value = bind;
       $('setEnc').textContent = c.encryption_configured ? t('encOn') : t('encOff');
     }
 
@@ -549,6 +573,7 @@
         federation_role: $('setRole').value,
         genesis_url: $('setGenesis').value.trim() || null,
         ai_endpoint: loadedConfig ? (loadedConfig.ai_endpoint || null) : null,
+        bind_host: $('setBind').value || null,
       };
       try {
         await invoke('write_config', { config });

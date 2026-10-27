@@ -1,6 +1,8 @@
 // AIMEAT Desktop — AI Service Auto-Detection
 // Scans local ports for LM Studio, Ollama, and OpenAI-compatible endpoints, and reads and saves
 // the owner's AI connection on the node through the provider routes (/v1/ai/providers).
+// 2026-10-27: the owner's password and token go only to the node this app started, while it runs
+// (node_manager::ensure_own_node; secaudit2026oct26, loopback-credentials-to-unverified-listener).
 
 use serde::{Deserialize, Serialize};
 
@@ -97,6 +99,8 @@ pub async fn login_at(base_url: &str, username: &str, password: &str) -> Result<
 /// Owner login against the AIMEAT on this machine, by port (the machine room's AI section).
 #[tauri::command]
 pub async fn node_login(port: u16, username: String, password: String) -> Result<String, String> {
+    // The password goes only to the node this app started, while it runs (node_manager.rs).
+    crate::node_manager::ensure_own_node(port)?;
     login_at(&format!("http://localhost:{}", port), &username, &password).await
 }
 
@@ -261,6 +265,7 @@ async fn providers_view(client: &reqwest::Client, base: &str, token: &str) -> Re
 /// Read the owner's current AI connection. GET /v1/ai/providers (Bearer token).
 #[tauri::command]
 pub async fn get_ai_settings(port: u16, token: String) -> Result<AiSettings, String> {
+    crate::node_manager::ensure_own_node(port)?;
     let base = format!("http://localhost:{}", port);
     let view = providers_view(&node_client()?, &base, &token).await?;
     Ok(settings_of(connection_of(&view)))
@@ -280,6 +285,7 @@ pub async fn save_ai_endpoint(
     base_url: String,
     model: String,
 ) -> Result<(), String> {
+    crate::node_manager::ensure_own_node(port)?;
     let base = format!("http://localhost:{}", port);
     let client = node_client()?;
     let view = providers_view(&client, &base, &token).await?;
@@ -388,6 +394,8 @@ mod tests {
     ) -> (u16, Arc<Mutex<Vec<Seen>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let port = listener.local_addr().unwrap().port();
+        // The stub stands in for the node this app started, on this port only.
+        crate::node_manager::test_support::stand_in_for_own_node(port);
         let seen = Arc::new(Mutex::new(Vec::new()));
         let log = seen.clone();
         std::thread::spawn(move || {
@@ -568,5 +576,65 @@ mod tests {
         ))
         .expect_err("refused");
         assert!(err.contains("allowlist"), "{}", err);
+    }
+
+    // secaudit2026oct26, loopback-credentials-to-unverified-listener: the password and the owner's
+    // token go only to the node this app started, while it runs. In these tests no node was
+    // started, and a listener that is not a stub standing in for it plays another account's
+    // program on the same port.
+
+    /// A listener that is not this app's node. Non-blocking, so a test can ask whether anything
+    /// connected to it without waiting.
+    fn foreign_listener() -> (u16, TcpListener) {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        (port, listener)
+    }
+
+    fn nothing_connected(listener: &TcpListener) -> bool {
+        matches!(listener.accept(), Err(ref e) if e.kind() == std::io::ErrorKind::WouldBlock)
+    }
+
+    #[test]
+    fn sign_in_sends_nothing_when_this_apps_node_is_not_running() {
+        let (port, listener) = foreign_listener();
+        let err = tauri::async_runtime::block_on(node_login(port, "owner".into(), "secret".into()))
+            .expect_err("refused");
+        assert!(err.contains("not running"), "{}", err);
+        assert!(nothing_connected(&listener), "the password went to a listener that is not this app's node");
+    }
+
+    #[test]
+    fn reading_and_saving_the_ai_send_no_token_when_this_apps_node_is_not_running() {
+        let (port, listener) = foreign_listener();
+        let err = match tauri::async_runtime::block_on(get_ai_settings(port, "jwt".into())) {
+            Ok(_) => panic!("read the AI settings from a listener that is not this app's node"),
+            Err(e) => e,
+        };
+        assert!(err.contains("not running"), "{}", err);
+        let err = tauri::async_runtime::block_on(save_ai_endpoint(
+            port,
+            "jwt".into(),
+            "http://localhost:1234/v1".into(),
+            "m".into(),
+        ))
+        .expect_err("refused");
+        assert!(err.contains("not running"), "{}", err);
+        assert!(nothing_connected(&listener), "the token went to a listener that is not this app's node");
+    }
+
+    #[test]
+    fn sign_in_reaches_the_node_this_app_started_and_returns_its_token() {
+        let (port, seen) = stub_node(|method, path| match (method, path) {
+            ("POST", "/v1/ghii/login") => (200, serde_json::json!({ "data": { "token": "jwt-from-the-node" } })),
+            _ => not_found(),
+        });
+        let token = tauri::async_runtime::block_on(node_login(port, "owner".into(), "secret".into()))
+            .expect("signed in");
+        assert_eq!(token, "jwt-from-the-node");
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].body["username"], "owner");
     }
 }
