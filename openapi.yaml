@@ -31446,6 +31446,8 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: SELF_NODE_ID — the request names this node's own id, so approving it would make a peer of this node itself; reject it instead
 
   /v1/federation/peer/activate:
     post:
@@ -31606,7 +31608,7 @@ paths:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
-          description: PEER_KEY_REQUIRED — no `public_key`, so nothing could ever be checked against this peer
+          description: PEER_KEY_REQUIRED — no `public_key`, so nothing could ever be checked against this peer; SELF_NODE_ID — the node id is this node's own
         '409':
           description: CONFLICT — a peer with that node id is already registered
 
@@ -31712,7 +31714,10 @@ paths:
         sends a signed trust notice (type suspend, with the reason) to every other active peer, which
         stores it for its operator; the answer lists each peer's outcome in `network_notices`
         (`accepted` only on a 2xx answer) and `network_notified` is true only when every peer
-        accepted. The peer's stored template listings are deleted with it.
+        accepted. The peer's stored template listings are deleted with it. An emergency removal also
+        deletes the replicas of the peer's own people (`removed_replicas`), and turns a replica the
+        peer saved home for a person or agent of this node into an expiring copy that ends after the
+        de-peering grace (`expiring_replicas`), as the grace path does for every replica.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -32129,9 +32134,13 @@ paths:
         written to only while they hold an active, unexpired sign-in consent (scope `auth`,
         recipient `node:{source_node}`, `*` or `domain:*`), the consent their visitor session on
         the source node needed; without it the answer is 403 CONSENT_REQUIRED and nothing is
-        written. An agent of this node follows its owner's consent. When a newer write replaces
+        written. An agent of this node follows its owner's consent. While the person's account is
+        deactivated the answer is 403 ACCOUNT_DISABLED and nothing is written; the consent stays,
+        so writes work again after reactivation. When a newer write replaces
         a replica, the earlier value is kept for seven days under
-        `replica:{source}:{key}._conflict_{ms}`.
+        `replica:{source}:{key}._conflict_{ms}`. A record time more than five minutes ahead of
+        this node's clock is stored as the time the replica arrived, so the replica ages out on
+        this node's clock.
       tags: [Federation]
       requestBody:
         required: true
@@ -32385,7 +32394,9 @@ paths:
         The exchange carries the NODE key only, which the node's card publishes anyway:
         `agent_keys` in the answer is always an empty list, whatever the peer's tier, and agent
         keys a peer sends are not kept. An unchanged key is answered without a signature for
-        that reason (Core 2026-11 section 9.3).
+        that reason (Core 2026-11 section 9.3). A `node_id` equal to this node's own id is
+        refused with 400 SELF_NODE_ID. The approved request is looked up among the approved
+        requests only, never by reading the pending ones.
       tags: [Federation]
       requestBody:
         required: true
@@ -53575,7 +53586,20 @@ paths:
         AN EXISTING PEER. An active peer of that node id answers 409 CONFLICT. A peer that is offline
         or leaving is replaced only by an admission (an invite, or open join under the same key); a
         pending request leaves it in place, and an open join under another key answers 409
-        PEER_KEY_MISMATCH. A node id held under another key is recorded on the Security page.
+        PEER_KEY_MISMATCH. An invite replaces a peer held under another key only when the invite
+        names that node id (`node_id` at mint); an invite that names no node answers 409
+        PEER_KEY_MISMATCH there and stays unused, and an invite that names another node is not used
+        (the pending path). A node id held under another key is recorded on the Security page.
+
+        THIS NODE'S OWN ID. A `node_id` equal to this node's own id is refused with 400 SELF_NODE_ID,
+        before an invite is used or a request is stored.
+
+        BOUNDS. A `message` is stored up to 10 000 characters. A repeated introduction from the same
+        node id and key while its request is pending keeps one request: from the same address it
+        answers with the waiting request's id, from a new address it replaces it. Introductions that end in
+        a pending request are bounded per address and hour by `federation.introductions_per_hour`
+        (0: no limit); past it the answer is 429 TOO_MANY_INTRODUCTIONS with
+        `details.retry_after_seconds`, and nothing is stored.
 
         HTTPS ON A PUBLIC NODE (AIMEAT Core 2026-11 FED-13). From node 4.0.0 a node whose security
         profile is `public` refuses a `node_url` that is not `https://` with 400 PEER_HTTPS_REQUIRED;
@@ -53594,11 +53618,20 @@ paths:
                 invite_token:
                   type: string
                   description: A one-time invitation minted by the receiving node. Optional.
+                message:
+                  type: string
+                  description: A note for the receiving operator. Stored up to 10 000 characters.
       responses:
         '200':
           description: Auto-admitted (open join, or a valid invite) — carries the tier admitted at
         '202':
-          description: Pending operator approval (default; also an unknown/expired/used invite)
+          description: Pending operator approval (default; also an unknown/expired/used invite, or an invite that names another node)
+        '400':
+          description: SELF_NODE_ID — the node id is this node's own; or a missing field, a stale timestamp or an address this node does not take
+        '409':
+          description: CONFLICT — an active peer holds the node id; PEER_KEY_MISMATCH — a peer holds it under another key and nothing that names this node decided otherwise
+        '429':
+          description: TOO_MANY_INTRODUCTIONS — this address left as many pending requests this hour as `federation.introductions_per_hour` allows; `details.retry_after_seconds` says when to try again
 
   /v1/federation/link-invites:
     post:
@@ -53634,15 +53667,22 @@ paths:
                 label:
                   type: string
                   description: Free-text note for the operator, e.g. which customer this was minted for.
+                node_id:
+                  type: string
+                  description: |
+                    The node this invite is for. Optional. An invite that names a node admits only that
+                    node id, and may replace a peer this node holds under that id with another key (a
+                    rebuilt node coming back). An invite without one admits any new node id, never one
+                    held under another key.
       responses:
         '201':
           description: Created — the response carries the token, which is never readable again
         '400':
-          description: INVALID_INPUT — a tier an invite may not name, or a non-positive ttl_hours
+          description: INVALID_INPUT — a tier an invite may not name, a non-positive ttl_hours, or a node_id that is not a short string; SELF_NODE_ID — the node_id is this node's own
     get:
       operationId: listLinkInvites
       summary: List link invitations
-      description: Every invite this node has minted, newest first, with its state (open, consumed, expired). Never includes a token.
+      description: Every invite this node has minted, newest first, with its state (open, consumed, expired) and the node it names (`node_id`, null for none). Never includes a token.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -53773,7 +53813,9 @@ paths:
       description: |
         Find which node hosts a given GAII. Only this node and the peers the public directory lists
         are named: a private peer (a contact link) is neither named nor asked, so its address is not
-        given out.
+        given out. An identity no listed peer knows is remembered as unknown for 30 seconds, and
+        lookups of one identity made at the same time share one round of questions, so the same
+        unknown identity asked again in that time answers 404 without asking the peers again.
       tags: [Federation]
       parameters:
         - name: gaii
@@ -53835,7 +53877,8 @@ paths:
         Process incoming settlement from a peer node. The body is signed with the peer's node key
         over `{from_node, to_node, gaii, amount, tracking_code, reason, timestamp}`; `to_node` must be
         this node, `timestamp` must be within five minutes of this node's clock (400 STALE_TIMESTAMP
-        otherwise), and a tracking code is credited once (409 CONFLICT the second time).
+        otherwise), and a tracking code is credited once (409 CONFLICT the second time, also for
+        copies of one settlement that arrive at the same moment).
       tags: [Federation]
       requestBody:
         required: true
@@ -74952,7 +74995,9 @@ paths:
         active, unexpired sign-in consent (scope `auth`, recipient `node:{requesting_node}`, `*` or
         `domain:*`) on a link that may carry a sign-in, the consent their visitor session on the
         requesting node needed (list-home), else 403 CONSENT_REQUIRED; an agent of this node follows
-        its owner's consent; a third node's principal is 403 NAMESPACE_NOT_ALLOWED.
+        its owner's consent; a third node's principal is 403 NAMESPACE_NOT_ALLOWED. While the
+        person's account is deactivated the answer is 403 ACCOUNT_DISABLED, and the consent stays
+        for when the account is reactivated.
       requestBody:
         required: true
         content:

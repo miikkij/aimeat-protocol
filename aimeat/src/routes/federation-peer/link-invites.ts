@@ -13,6 +13,8 @@
  *   - DELETE /v1/federation/link-invites/:id  — revoke one
  * @usage registerLinkInviteRoutes(router, config, storage) from ../federation-peer.js
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Mint takes an optional `node_id`, the node the invite is for, and the
+ *     listing shows it; this node's own id is refused (400 SELF_NODE_ID) (secaudit2026oct26).
  *   v1.1.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
  *   v1.0.0 — 2026-08-23 — Initial, for the contact tier.
  */
@@ -33,7 +35,7 @@ const INVITABLE: PeerTier[] = ['contact', 'visiting'];
 export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     // POST /v1/federation/link-invites — mint a one-time invitation (operator)
     router.post('/v1/federation/link-invites', requireAuth(), requireOperator(storage), async (req, res) => {
-        const { tier, ttl_hours, label } = req.body ?? {};
+        const { tier, ttl_hours, label, node_id } = req.body ?? {};
         const wanted = coerceTier(tier ?? 'contact');
         if (!INVITABLE.includes(wanted)) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -44,12 +46,24 @@ export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, s
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'ttl_hours must be a positive number of hours'));
             return;
         }
+        // The node this invite is for, optional (secaudit2026oct26). Only an invite that names a node
+        // may replace a peer held under that node id with another key.
+        const forNode = typeof node_id === 'string' ? node_id.trim() : '';
+        if (node_id !== undefined && node_id !== null && (typeof node_id !== 'string' || forNode.length > 200)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id is the id of the node this invite is for, a string of at most 200 characters'));
+            return;
+        }
+        if (forNode && forNode === config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'SELF_NODE_ID', `${forNode} is this node's own id. An invite is for another node.`));
+            return;
+        }
 
         const { token, invite } = await mintLinkInvite(storage, {
             tier: wanted,
             createdBy: req.auth!.owner,
             ttlHours: typeof ttl_hours === 'number' ? ttl_hours : DEFAULT_INVITE_TTL_HOURS,
             label: typeof label === 'string' ? label.slice(0, 200) : undefined,
+            ...(forNode ? { nodeId: forNode } : {}),
         });
 
         res.status(201).json(success(config.nodeId, {
@@ -60,6 +74,7 @@ export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, s
             tier: invite.tier,
             expires_at: invite.expiresAt,
             label: invite.label,
+            node_id: invite.nodeId ?? null,
             note: 'Give this token to the node being provisioned; it presents it once, as invite_token on POST /v1/federation/peer/introduce. It is shown here and never again.',
         }));
         emitChange('federation');
@@ -73,6 +88,7 @@ export function registerLinkInviteRoutes(router: Router, config: AimeatConfig, s
                 id: i.id,
                 tier: i.tier,
                 label: i.label,
+                node_id: i.nodeId ?? null,
                 created_by: i.createdBy,
                 created_at: i.createdAt,
                 expires_at: i.expiresAt,

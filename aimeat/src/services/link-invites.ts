@@ -34,6 +34,10 @@
  *   // ... later, on introduce:
  *   const claimed = await consumeLinkInvite(storage, token, nodeId);
  * @version-history
+ *   2026-10-27 — An invite may name the node it is for (`nodeId`). consumeLinkInvite leaves such an
+ *     invite unused for any other node id ('other-node'), and leaves an invite that names no node
+ *     unused when the node id is held by a peer under another key ('held'): only an invite naming the
+ *     node may replace that peer (secaudit2026oct26).
  *   2026-10-18 — consumeLinkInvite writes the consumed invite on the version it read (setMemoryIfVersion).
  *   v1.0.0 — 2026-08-23 — Initial, for the contact tier.
  */
@@ -61,6 +65,11 @@ export interface LinkInviteRecord {
   consumedByNodeId?: string;
   /** Free-text note from the operator: which customer this was minted for. */
   label?: string;
+  /**
+   * The node this invite is for, when the operator named one. Only that node id may use it, and only
+   * such an invite may replace a peer held under that id with another key (secaudit2026oct26).
+   */
+  nodeId?: string;
 }
 
 const hashToken = (token: string): string => createHash('sha256').update(token).digest('hex');
@@ -71,6 +80,7 @@ export interface MintInviteInput {
   createdBy: string;
   ttlHours?: number;
   label?: string;
+  nodeId?: string;
 }
 
 /**
@@ -91,6 +101,7 @@ export async function mintLinkInvite(
     createdAt: now.toISOString(),
     expiresAt: new Date(now.getTime() + ttl * 3600_000).toISOString(),
     label: input.label,
+    ...(input.nodeId ? { nodeId: input.nodeId } : {}),
   };
 
   await storage.setMemory({
@@ -121,7 +132,9 @@ export async function listLinkInvites(storage: Storage): Promise<LinkInviteRecor
 
 export type ConsumeResult =
   | { ok: true; tier: PeerTier; invite: LinkInviteRecord }
-  | { ok: false; reason: 'unknown' | 'expired' | 'consumed' };
+  // 'other-node': the invite names another node. 'held': the invite names no node, and this node id
+  // is held by a peer under another key. Neither uses the invite.
+  | { ok: false; reason: 'unknown' | 'expired' | 'consumed' | 'other-node' | 'held' };
 
 /**
  * Claim a token for `nodeId`, once.
@@ -131,7 +144,13 @@ export type ConsumeResult =
  * token exists. Never throws — a storage failure is a refusal, because admitting a peer on a read
  * that did not complete is worse than making somebody re-run provisioning.
  */
-export async function consumeLinkInvite(storage: Storage, token: unknown, nodeId: string): Promise<ConsumeResult> {
+export async function consumeLinkInvite(
+  storage: Storage, token: unknown, nodeId: string,
+  opts: {
+    /** A peer holds `nodeId` under another key than the one presented: only an invite naming `nodeId` may replace it. */
+    heldUnderAnotherKey?: boolean;
+  } = {},
+): Promise<ConsumeResult> {
   if (typeof token !== 'string' || !token.trim()) return { ok: false, reason: 'unknown' };
   try {
     const key = keyFor(token.trim());
@@ -142,6 +161,11 @@ export async function consumeLinkInvite(storage: Storage, token: unknown, nodeId
     if (!invite?.id) return { ok: false, reason: 'unknown' };
     if (invite.consumedAt) return { ok: false, reason: 'consumed' };
     if (new Date(invite.expiresAt).getTime() <= Date.now()) return { ok: false, reason: 'expired' };
+    // Bound to a node: the invite is this operator's decision for that node id and no other. An
+    // invite that names none admits a new node id, never one held under another key (secaudit2026oct26,
+    // link-invite-not-bound-to-node-id-replaces-held-peer). Both leave the invite unused.
+    if (invite.nodeId && invite.nodeId !== nodeId) return { ok: false, reason: 'other-node' };
+    if (!invite.nodeId && opts.heldUnderAnotherKey) return { ok: false, reason: 'held' };
 
     const consumed: LinkInviteRecord = {
       ...invite,

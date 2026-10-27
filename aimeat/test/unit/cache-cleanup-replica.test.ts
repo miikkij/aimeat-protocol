@@ -17,8 +17,10 @@
  *   - a fresh replica of the same shape stays
  *   - the TTLs apply per prefix: expiring: takes the de-peering grace, a conflict copy takes 7 days
  *   - the sweep pages past the page size
+ *   - a row dated ahead of this node's clock is brought to the present, then ages out
  * @usage cd aimeat && pnpm exec vitest run test/unit/cache-cleanup-replica.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A row dated ahead of this node's clock is brought to the present (secaudit2026oct26).
  *   v1.0.0 — 2026-10-20 — Initial (secaudit 2026-10, replica retention).
  */
 
@@ -138,5 +140,39 @@ describe('the federation retention sweep', () => {
     expect(left.length).toBe(0);
     expect(result.replicaRemoved).toBe(1200);
     expect(result.ownersScanned).toBe(3);
+  });
+
+  it('brings a row dated ahead of this node\'s clock to the present, so it ages out instead of staying for ever', async () => {
+    // A replica whose record time a peer set a year ahead (stored before 2026-10-27, secaudit2026oct26).
+    const ahead = new Date(Date.now() + 365 * 24 * 3_600_000).toISOString();
+    const { storage, deleted, left } = dummyStorage([
+      row(FOREIGN, `replica:${PEER}:notes.future`, ahead),
+      row(FOREIGN, `replica:${PEER}:notes.skewed`, new Date(Date.now() + 60_000).toISOString()),
+    ]);
+    const written: Array<{ key: string; updatedAt: string }> = [];
+    Object.assign(storage, {
+      getMemory: async (ownerGaii: string, key: string) => left.find(r => r.ownerGaii === ownerGaii && r.key === key) ?? null,
+      setMemoryIfVersion: async (rec: MemoryMetaRow, expectedVersion: number) => {
+        const at = left.findIndex(r => r.ownerGaii === rec.ownerGaii && r.key === rec.key);
+        if (at < 0 || left[at].version !== expectedVersion) return null;
+        written.push({ key: rec.key, updatedAt: rec.updatedAt });
+        left[at] = { ...left[at], updatedAt: rec.updatedAt };
+        return rec;
+      },
+    });
+
+    const result = await runCleanupCycle(config, storage);
+
+    expect(deleted).toEqual([]);
+    // Only the row past the clock skew allowance is rewritten; a minute ahead is a clock, not a claim.
+    expect(written.map(w => w.key)).toEqual([`replica:${PEER}:notes.future`]);
+    expect(new Date(written[0].updatedAt).getTime()).toBeLessThanOrEqual(Date.now());
+    expect(result.futureClamped).toBe(1);
+
+    // Once its time is this node's, the TTL takes it like any other row.
+    await new Promise(r => setTimeout(r, 20));
+    const after = await runCleanupCycle({ ...config, genesisMemoryCacheTtlHours: 0.000_001 } as AimeatConfig, storage);
+    expect(after.replicaRemoved).toBe(1);
+    expect(deleted).toEqual([`${FOREIGN}|replica:${PEER}:notes.future`]);
   });
 });

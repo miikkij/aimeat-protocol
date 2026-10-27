@@ -14,9 +14,12 @@
  *   2026-10-22 those two read no consent of the person they named, so a linked peer listed or wrote
  *   any local person's records without the person's leave (secaudit 2026-10 wave 3, v70 and v71).
  * @structure authConsentEnded · isNodeAuthConsent · linkCarriesSignIn · hasNodeAuthConsent ·
- *   peerMayActFor · signInConsentRefusal
+ *   peerMayActFor · accountDisabledRefusal · signInConsentRefusal
  * @usage if (!await peerMayActFor(storage, peer, ghii)) refuse(signInConsentRefusal(ghii, peer.nodeId, config.nodeId));
  * @version-history
+ *   v1.1.0 — 2026-10-27 — accountDisabledRefusal: the memory list and the replicate refuse a person
+ *     whose account is deactivated (403 ACCOUNT_DISABLED), as the sign-in verify does; the consent
+ *     stays, so reactivation brings both back (secaudit2026oct26).
  *   v1.0.0 — 2026-10-22 — Initial: the predicate moved here from routes/federation-auth.ts (v1.4.2),
  *     unchanged, so the sign-in, the memory list and the replicate read one consent check
  *     (secaudit 2026-10 wave 3, v70 and v71).
@@ -25,6 +28,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { PeerInfo } from './federation.js';
 import { coerceTier, tierCeiling } from './federation-tiers.js';
+import { deactivatedAccountSkip } from './account-deactivated.js';
 
 /**
  * Has this auth consent's end time passed? Only a time that parses and lies at or before `now` ends
@@ -70,6 +74,23 @@ export async function hasNodeAuthConsent(storage: Storage, ghii: string, nodeId:
  */
 export async function peerMayActFor(storage: Storage, peer: Pick<PeerInfo, 'tier' | 'nodeId'>, ghii: string, now: Date = new Date()): Promise<boolean> {
     return linkCarriesSignIn(peer) && hasNodeAuthConsent(storage, ghii, peer.nodeId, now);
+}
+
+/**
+ * The refusal for a person of this node whose account is deactivated, or null when it is active.
+ * Deactivation (BR-04) stops everything acting in the account's name, and POST
+ * /v1/federation/auth/verify refuses such an owner. The memory list and the replicate the same sign-in
+ * consent opens ask this after the consent, because deactivation leaves the consent in place so that
+ * reactivation brings everything back (secaudit2026oct26, peer-acts-for-deactivated-account).
+ */
+export async function accountDisabledRefusal(
+    storage: Pick<Storage, 'getOwner'>, ghii: string, thisNodeId: string,
+): Promise<{ code: 'ACCOUNT_DISABLED'; message: string } | null> {
+    if (!await deactivatedAccountSkip(storage, ghii)) return null;
+    return {
+        code: 'ACCOUNT_DISABLED',
+        message: `This account has been deactivated. ${ghii} is switched off on ${thisNodeId}, so no other server reads or saves their records here until the operator reactivates the account. Nothing was changed.`,
+    };
 }
 
 /** The refusal a peer gets, in words it can pass on to the person, naming the control that answers it. */

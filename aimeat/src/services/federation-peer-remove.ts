@@ -10,8 +10,12 @@
  *   forgetPeer), cancels in-flight work with the peer and returns its escrow, and can tell the other
  *   peers. Without it the peer enters its de-peering grace and is purged when the grace ends
  *   (federation.ts). A node id that is only a waiting package registration is deleted as that.
- * @structure PeerRemoveResult · removePeer()
+ * @structure settleReplicas() · PeerRemoveResult · removePeer()
  * @version-history
+ *   v1.3.0 — 2026-10-27 — An emergency removal settles the peer's replicas: those of the peer's own
+ *     people are deleted (`removed_replicas`), and one the peer saved home for a person or agent of
+ *     this node becomes an expiring copy as on the grace path (`expiring_replicas`). Until then the
+ *     emergency branch left every replica readable until its TTL (secaudit2026oct26).
  *   v1.2.1 — 2026-10-25 — An emergency de-peering cancels a work item on its status
  *     (storage.transitionWorkStatus) before returning its escrow, so the escrow moves once
  *     (secaudit2026oct22, work-status-transition-without-cas).
@@ -37,10 +41,62 @@ import { sendTrustNotice } from './federation-trust-notice.js';
 import { deleteRemoteTemplates } from './federation-remote-templates.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { forgetPeer, readPendingPeer, deletePendingPeer } from './peer-origin.js';
+import { parseGaiiLoose } from '../utils/gaii.js';
 
 /** Replicas read per listing call while de-peering converts them, and the paging loop's stop. */
 const REPLICA_PAGE_SIZE = 200;
 const REPLICA_MAX_PAGES = 10_000;
+
+/**
+ * What becomes of the replicas a removed peer sent (`replica:<peer>:` across every owner principal).
+ *
+ * THE SCAN IS BY KEY PREFIX ACROSS EVERY OWNER. A replica is stored under the SENDING node's
+ * principal (`agent#owner@<peer>`), which no code path writes into the agents table, so the
+ * listAgents() walk used until 2026-10-20 visited none of them: de-peering converted nothing and the
+ * copies stayed public for ever (secaudit 2026-10, replica retention).
+ *
+ * 'grace' renames every replica to `expiring:<peer>:`, which ages out after the de-peering grace.
+ * 'emergency' deletes the replicas of the peer's own people at once, and gives a replica the peer
+ * saved home for a person or agent of this node (push-home) the same expiring copy as the grace path,
+ * so the person keeps their own record through the grace (secaudit2026oct26).
+ */
+async function settleReplicas(storage: Storage, nodeId: string, mode: 'grace' | 'emergency'): Promise<{ expired: number; removed: number }> {
+    const replicaPrefix = `replica:${nodeId}:`;
+    let expired = 0;
+    let removed = 0;
+    for (let page = 0, offset = 0; page < REPLICA_MAX_PAGES; page++) {
+        const rows = (await storage.listAllMemory({ prefix: replicaPrefix, limit: REPLICA_PAGE_SIZE, offset })).items;
+        if (rows.length === 0) break;
+        // Rows left in place: a converted or deleted row is out of the next listing, so the window
+        // only has to step over what stayed.
+        let kept = 0;
+        for (const mem of rows) {
+            try {
+                if (mode === 'emergency' && parseGaiiLoose(mem.ownerGaii).node === nodeId) {
+                    if (await storage.deleteMemory(mem.ownerGaii, mem.key)) removed++;
+                    else kept++;
+                    continue;
+                }
+                await storage.setMemory({
+                    ...mem,
+                    key: `expiring:${nodeId}:${mem.key.slice(replicaPrefix.length)}`,
+                    tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
+                    updatedAt: new Date().toISOString(),
+                });
+                await storage.deleteMemory(mem.ownerGaii, mem.key);
+                expired++;
+            } catch (err) {
+                kept++;
+                logger.warn('De-peering: a replica could not be converted, continuing', {
+                    peer: nodeId, key: mem.key, owner: mem.ownerGaii, error: String(err),
+                });
+            }
+        }
+        if (rows.length < REPLICA_PAGE_SIZE) break;
+        offset += kept;
+    }
+    return { expired, removed };
+}
 
 export type PeerRemoveResult =
     | { ok: false; status: number; code: string; message: string }
@@ -108,6 +164,11 @@ export async function removePeer(
         // The stored template listings of this peer go with it (services/federation-remote-templates.ts).
         await deleteRemoteTemplates(storage, nodeId);
 
+        // Its replicas go with it too. Until 2026-10-27 the emergency branch left every replica in
+        // place until the cache TTL, or for as long as the time the peer had dated it, and the peer
+        // could no longer take one back (secaudit2026oct26).
+        const replicas = await settleReplicas(storage, nodeId, 'emergency');
+
         emitChange('federation');
         return { ok: true, body: {
             deleted: true,
@@ -115,6 +176,8 @@ export async function removePeer(
             emergency: true,
             reason,
             cancelled_work_items: cancelledCount,
+            removed_replicas: replicas.removed,
+            expiring_replicas: replicas.expired,
             // True only when the notice was asked for, there was a peer to tell, and every peer accepted it.
             network_notified: notifyNetwork && notices.length > 0 && accepted === notices.length,
             ...(notifyNetwork ? { network_notices: notices, network_notified_peers: accepted } : {}),
@@ -144,40 +207,7 @@ export async function removePeer(
         }
 
         // C.4: Rename replica entries to expiring for grace period.
-        //
-        // THE SCAN IS BY KEY PREFIX ACROSS EVERY OWNER. A replica is stored under the SENDING node's
-        // principal (`agent#owner@<peer>`), which no code path writes into the agents table, so the
-        // listAgents() walk this used until 2026-10-20 visited none of them: de-peering converted
-        // nothing and the copies stayed public for ever (secaudit 2026-10, replica retention).
-        const replicaPrefix = `replica:${nodeId}:`;
-        let expiredReplicas = 0;
-        for (let page = 0, offset = 0; page < REPLICA_MAX_PAGES; page++) {
-            const rows = (await storage.listAllMemory({ prefix: replicaPrefix, limit: REPLICA_PAGE_SIZE, offset })).items;
-            if (rows.length === 0) break;
-            // Rows left in place: a converted row is out of the next listing, so the window only has
-            // to step over what stayed.
-            let kept = 0;
-            for (const mem of rows) {
-                const expiringKey = `expiring:${nodeId}:${mem.key.slice(replicaPrefix.length)}`;
-                try {
-                    await storage.setMemory({
-                        ...mem,
-                        key: expiringKey,
-                        tags: [...mem.tags.filter(t => !t.startsWith('replica:')), `expiring:${nodeId}`],
-                        updatedAt: new Date().toISOString(),
-                    });
-                    await storage.deleteMemory(mem.ownerGaii, mem.key);
-                    expiredReplicas++;
-                } catch (err) {
-                    kept++;
-                    logger.warn('De-peering: a replica could not be converted, continuing', {
-                        peer: nodeId, key: mem.key, owner: mem.ownerGaii, error: String(err),
-                    });
-                }
-            }
-            if (rows.length < REPLICA_PAGE_SIZE) break;
-            offset += kept;
-        }
+        const { expired: expiredReplicas } = await settleReplicas(storage, nodeId, 'grace');
 
         // Remove peer keys from cache
         peerKeyCache.delete(nodeId);

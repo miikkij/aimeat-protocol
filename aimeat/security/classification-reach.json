@@ -1094,9 +1094,10 @@
     },
     "src/services/cache-cleanup.ts": {
       "reads": {
+        "getMemory": 1,
         "listAllMemoryMeta": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones. From 2026-10-20 the listing is listAllMemoryMeta, by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk visited none of them (secaudit 2026-10, replica retention). It is the value-free META projection, read to compare an updatedAt against the TTL and delete; nothing is served to anyone."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Lists federation cache entries only to delete expired ones. From 2026-10-20 the listing is listAllMemoryMeta, by key prefix across every owner principal instead of a walk of the local agents table, because a replica sits under the SENDING node's principal and the walk visited none of them (secaudit 2026-10, replica retention). It is the value-free META projection, read to compare an updatedAt against the TTL and delete; nothing is served to anyone. The getMemory (2026-10-27, secaudit2026oct26) reads a row dated ahead of this node's clock only to write it back unchanged but for updatedAt, on the version read; nothing is served to anyone."
     },
     "src/services/call-timing.ts": {
       "reads": {

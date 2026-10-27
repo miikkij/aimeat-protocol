@@ -5,6 +5,8 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.1 — 2026-10-27 — Approving a peering request and adding a peer directly refuse this node's
+ *     own id (400 SELF_NODE_ID); rejecting such a request works as before (secaudit2026oct26).
  *   v1.11.0 — 2026-10-12 — Adding a peer and changing its address ask peerUrlRefusal: a public node
  *     takes an https:// address only from 4.0.0 (Core 2026-11 FED-13).
  *   v1.10.0 — 2026-10-10 — A peer that has once sent a verified audience or delivery proof is refused a
@@ -56,7 +58,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { performKeyExchange } from '../../services/federation-helpers.js';
 import { presence, presenceSignString, type PresenceUpdate } from '../../services/presence.js';
 import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/federation-tiers.js';
-import { gatePeer } from '../../services/federation-peer-gate.js';
+import { gatePeer, selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
 import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../../services/relay-claim-policy.js';
 import { promotionMetrics } from './promotion.js';
@@ -107,6 +109,11 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         if (decision === 'approve' && requestKey === '') {
             res.status(409).json(error(config.nodeId, 'PEER_KEY_REQUIRED',
                 'This request carries no verification key for that node, so approving it would create a peer nothing can be checked against. Wait for that node to introduce itself, which is what brings its key.'));
+            return;
+        }
+        // No peer under this node's own id (secaudit2026oct26). Rejecting such a request stays open.
+        if (decision === 'approve' && (request.fromNodeId ?? request.id) === config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'SELF_NODE_ID', `${selfNodeIdMessage(config.nodeId)} Reject this request instead.`));
             return;
         }
 
@@ -396,6 +403,10 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
 
         if (!node_id || !url) {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'node_id and url are required'));
+            return;
+        }
+        if (node_id === config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'SELF_NODE_ID', selfNodeIdMessage(config.nodeId)));
             return;
         }
         // A public node takes an https:// peer address only (Core 2026-11 FED-13, peer-url-policy.ts).

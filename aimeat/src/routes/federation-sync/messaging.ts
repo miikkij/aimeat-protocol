@@ -5,6 +5,11 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — Replicate stores a record time more than five minutes ahead of this node's clock as
+ *     the time the replica arrived, so the retention sweep ages it on this node's clock; a person
+ *     whose account is deactivated is written to by no peer (403 ACCOUNT_DISABLED, after the consent);
+ *     a peer under this node's own id speaks for nobody here: replicate, message, broadcast and the
+ *     storage grant treat it as no node's own people (secaudit2026oct26).
  *   2026-10-22 — The replicate consent check names the local person with localAccountOf()
  *     (check:identity-shortening).
  *   2026-10-22 — Replicate stores under a person of this node only while that person holds the
@@ -103,7 +108,8 @@ import { duplicateMessageAttachments, sameAccount, isSentVersion, FILE_CHANGED_R
 import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
-import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
+import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
+import { NONCE_WINDOW_MS } from '../../services/request-nonce.js';
 
 /**
  * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
@@ -177,7 +183,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const refuse = (message: string) => ({ code: 'NAMESPACE_NOT_ALLOWED', message });
         const notAnIdentity = refuse(`A replicate is stored under a person or agent of the node that signed it or of this node, and "${gaii}" is neither. Send the record under its owner's identity.`);
         if (!parsed.owner || !parsed.node) return notAnIdentity;
-        if (parsed.node === sourceNode) return null;
+        // A peer speaks for its own node's people. A peer under this node's own id has no people of
+        // its own here, so it takes the this-node branch below like any other peer (secaudit2026oct26).
+        if (parsed.node === sourceNode && sourceNode !== config.nodeId) return null;
         if (parsed.node !== config.nodeId) {
             return refuse(`A node replicates its own people's records only, and ${gaii} is on ${parsed.node}, not on ${sourceNode}, the node that signed this replicate.`);
         }
@@ -191,7 +199,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         const account = localAccountOf(gaii);
         if (!account) return notAnIdentity;
         const person = `${account.toLowerCase()}@${config.nodeId}`;
-        if (await peerMayActFor(storage, peer, person)) return null;
+        // A deactivated account is acted for by nobody, as the sign-in verify refuses it; asked after
+        // the consent, so a peer without one learns nothing about the account (secaudit2026oct26).
+        if (await peerMayActFor(storage, peer, person)) return await accountDisabledRefusal(storage, person, config.nodeId);
         return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, sourceNode, config.nodeId) };
     };
 
@@ -237,7 +247,14 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
 
         // Store replicated memory with cross-node prefix
         const replicaKey = `replica:${source_node}:${key}`;
-        const incomingUpdatedAt = timestamp ?? new Date().toISOString();
+        // The record time is the peer's word, and the retention sweep (cache-cleanup.ts) ages a
+        // replica by it. A time further ahead of this node's clock than the signed-message window is
+        // stored as the time the replica arrived, so a replica dated in the future still ages out
+        // (secaudit2026oct26). A sender signs the record's real update time, which is never ahead.
+        const receivedAt = Date.now();
+        const aheadOfClock = typeof timestamp === 'string' && new Date(timestamp).getTime() > receivedAt + NONCE_WINDOW_MS;
+        const recordTime: string | undefined = aheadOfClock ? new Date(receivedAt).toISOString() : timestamp;
+        const incomingUpdatedAt = recordTime ?? new Date().toISOString();
 
         // C.2: LWW (Last-Writer-Wins) conflict resolution. The comparison is made against the record
         // as stored and the replica is written on the version that was compared (createMemoryIfAbsent
@@ -269,7 +286,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 tags: [`replica:${source_node}`],
                 ttlHours: null,
                 version,
-                createdAt: timestamp ?? new Date().toISOString(),
+                createdAt: recordTime ?? new Date().toISOString(),
                 updatedAt: incomingUpdatedAt,
             };
             if (!existing) {
@@ -353,7 +370,8 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // Until 2026-10-01 a peer could deliver a message that read as from bob@<any node>, and the
         // recipient's contact check took it as bob (incident federated-dm-a-linked-peer-can-name-any-
         // sender-also-a-user-o-muptii84).
-        if (parseGaiiLoose(String(message.senderGhii)).node !== source_node) {
+        // A peer under this node's own id has no people of its own (secaudit2026oct26).
+        if (source_node === config.nodeId || parseGaiiLoose(String(message.senderGhii)).node !== source_node) {
             res.status(403).json(error(config.nodeId, 'SENDER_NOT_OF_PEER',
                 `The sender ${String(message.senderGhii)} is not on ${String(source_node)}, the node that signed this message.`));
             return;
@@ -600,7 +618,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
         // signature proves which node sent the broadcast, and the sender name is that node's word, so
         // a name on another node (this node's operator, a person on a third node) is refused before
         // any contact row or inbox copy is written (QA audit S6-03).
-        if (parseGaiiLoose(senderGhii).node !== source_node) {
+        if (source_node === config.nodeId || parseGaiiLoose(senderGhii).node !== source_node) {
             res.status(403).json(error(config.nodeId, 'SENDER_NOT_OF_PEER',
                 `The sender ${senderGhii} is not on ${String(source_node)}, the node that signed this broadcast.`, 403, { sender: senderGhii, source_node }));
             return;
@@ -730,7 +748,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             if (copy && copy.direction === 'outbound' && copy.origin === 'local'
                 && copy.originNodeId === config.nodeId && sameAccount(copy.senderGhii, sender)) { msg = copy; break; }
         }
-        if (!msg || msg.recipientGhii !== recipient_ghii || parseGaiiLoose(String(recipient_ghii)).node !== source_node) {
+        if (!msg || msg.recipientGhii !== recipient_ghii || source_node === config.nodeId || parseGaiiLoose(String(recipient_ghii)).node !== source_node) {
             res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'No matching message for this grant'));
             return;
         }

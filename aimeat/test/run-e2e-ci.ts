@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -844,6 +845,11 @@ const ALL_SUITES = [
     // and list-home, push-home and list-remote keep working, on two real nodes (secaudit 2026-10
     // wave 3, v70 and v71).
     'test/e2e-federation-peer-consent.ts',
+    // What a linked or introducing node can do here, bounded: one settlement credit per tracking code,
+    // one peer lookup per unknown identity, no acting for a deactivated account, invites bound to a
+    // node, bounded introductions, no peer under the own node id, replicas on this node's clock
+    // (secaudit2026oct26).
+    'test/e2e-federation-peer-bounds.ts',
     // The remote MCP proxy: attach against a real upstream MCP server this suite starts
     // itself, the tool cache, calling, the cross-owner 404 and the scope split. Here and
     // not only in the unit suites because those run on SQLite alone, and this is what

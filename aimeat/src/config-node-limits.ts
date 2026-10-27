@@ -13,6 +13,7 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   v1.4.0 — 2026-10-27 — federationIntroductionsPerHour (secaudit2026oct26, unbounded pending peering requests).
  *   v1.3.0 — 2026-10-25 — appHeldLabelDays and appHeldLabelsPerOwner (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — companySmtpPrivateHosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — deviceAuthEmailLimit and deviceAuthEmailMax (secaudit2026oct22,
@@ -56,6 +57,12 @@ export interface NodeLimitsConfig {
    * AIMEAT_APP_HELD_LABELS_PER_OWNER, default 20; 0 is no limit.
    */
   appHeldLabelsPerOwner: number;
+  /**
+   * Introductions that end in a pending peering request, per network address and hour
+   * (POST /v1/federation/peer/introduce takes no sign-in). AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR,
+   * default 30; 0 is no limit (secaudit2026oct26).
+   */
+  federationIntroductionsPerHour: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -72,5 +79,6 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     companySmtpPrivateHosts: (env.AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS ?? '').split(',').map(s => s.trim()).filter(Boolean),
     appHeldLabelDays: wholeOr(env.AIMEAT_APP_HELD_LABEL_DAYS, 90),
     appHeldLabelsPerOwner: wholeOr(env.AIMEAT_APP_HELD_LABELS_PER_OWNER, 20),
+    federationIntroductionsPerHour: wholeOr(env.AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR, 30),
   };
 }

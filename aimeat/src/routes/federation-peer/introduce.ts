@@ -5,6 +5,12 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — The introduction refuses this node's own id (400 SELF_NODE_ID). An invite replaces a
+ *     peer held under another key only when it names that node (409 PEER_KEY_MISMATCH otherwise, the
+ *     invite unused, the held id recorded). A note is stored up to 10 000 characters; introductions
+ *     that end in a pending request are bounded per address and hour (federation.introductions_per_hour,
+ *     429 TOO_MANY_INTRODUCTIONS), and a repeat from the same node, key and address answers with its
+ *     waiting request instead of adding one (secaudit2026oct26).
  *   2026-10-16 — Through node 4.0.4 GET /v1/federation/service-summary also answers an unsigned request from a
  *     peer whose own signed heartbeat named 4.0.2 or older (unsignedServiceSummaryAccepted), logged once per
  *     peer per start; a peer of unknown or newer version is refused as before (decision 2026-10-16).
@@ -59,12 +65,52 @@ import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-polic
 import { logger } from '../../utils/logger.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
+import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config-federation.js';
 
 /** Peers whose unsigned service summary request was answered since this process started, logged once each. */
 const unsignedSummaryPeersLogged = new Set<string>();
 
+/** The longest introduction note stored, the bound the outbound peering request has (PeeringRequestSchema). */
+const INTRODUCTION_NOTE_MAX = 10_000;
+/** The window the per-address bound on introductions counts in. */
+const INTRODUCTION_WINDOW_MS = 3_600_000;
+/** Addresses remembered at once by that bound; the oldest goes first past it. */
+const INTRODUCTION_ADDRESSES_MAX = 10_000;
+
+/** An introduction's note as stored: a string is cut to the bound, anything else is kept as it was. */
+function boundedNote(message: unknown): string {
+    if (typeof message === 'string') return message.slice(0, INTRODUCTION_NOTE_MAX);
+    return (message ?? '') as string;
+}
+
 export function registerIntroduceRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    // Per node: when each address left a pending peering request in the last hour.
+    const introductionsByAddress = new Map<string, number[]>();
+
+    /**
+     * Seconds until `address` may leave another pending request, or null when it may now (and the
+     * request is counted). `limit` 0 is no limit (secaudit2026oct26, unbounded pending peering requests).
+     */
+    const introductionWait = (address: string, limit: number): number | null => {
+        if (!limit || limit <= 0) return null;
+        const now = Date.now();
+        const recent = (introductionsByAddress.get(address) ?? []).filter(t => t > now - INTRODUCTION_WINDOW_MS);
+        if (recent.length >= limit) {
+            introductionsByAddress.set(address, recent);
+            return Math.max(1, Math.ceil((recent[0] + INTRODUCTION_WINDOW_MS - now) / 1000));
+        }
+        recent.push(now);
+        introductionsByAddress.delete(address);
+        introductionsByAddress.set(address, recent);
+        while (introductionsByAddress.size > INTRODUCTION_ADDRESSES_MAX) {
+            const oldest = introductionsByAddress.keys().next().value;
+            if (oldest === undefined) break;
+            introductionsByAddress.delete(oldest);
+        }
+        return null;
+    };
+
     // GET /v1/federation/directory — public peer directory (Tier 0)
     router.get('/v1/federation/directory', async (_req, res) => {
         const peerList = [...peers.values()]
@@ -194,6 +240,13 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
+        // A peer speaks for the people of its node id, so a peer under this node's own id would speak
+        // for every person here. Refused before anything is read, used or stored (secaudit2026oct26).
+        if (node_id === config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'SELF_NODE_ID', selfNodeIdMessage(config.nodeId)));
+            return;
+        }
+
         // A public node takes an https:// peer address only (Core 2026-11 FED-13, peer-url-policy.ts).
         const schemeRefusal = peerUrlRefusal(config, node_url);
         if (schemeRefusal) { res.status(400).json(error(config.nodeId, schemeRefusal.code, schemeRefusal.message)); return; }
@@ -296,7 +349,15 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // believes a caller's claim about its own trust level is not a door (the F1 finding in
         // lifecycle.ts). An unknown, expired or already-used token is not an error: it falls through
         // to the ordinary pending path below, so a leaked token is worth one link, at one tier, once.
-        const invited = await consumeLinkInvite(storage, invite_token, node_id);
+        const invited = await consumeLinkInvite(storage, invite_token, node_id, { heldUnderAnotherKey });
+        // An invite replaces a peer held under another key only when it names that node: the record
+        // of the operator's decision for this node id (secaudit2026oct26). The invite stays unused.
+        if (!invited.ok && invited.reason === 'held') {
+            reportHeld('invite');
+            res.status(409).json(error(config.nodeId, 'PEER_KEY_MISMATCH',
+                `Node "${node_id}" is a peer of this node under another key. An invite replaces it only when the invite names that node; nothing was admitted and the invite was not used.`));
+            return;
+        }
 
         const policy = await getActivePolicy(storage);
         const policyAdmit = evaluateAutoAdmit({ node_url }, policy);
@@ -341,7 +402,7 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 toNodeId: config.nodeId,
                 targetUrl: node_url,
                 publicKey: public_key,
-                message: message ?? '',
+                message: boundedNote(message),
                 status: 'auto_approved',
                 // The tier this admission was for. The key-exchange auto-add reads it, so a de-peered
                 // link cannot come back one rung higher than it was let in at.
@@ -368,6 +429,33 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             return;
         }
 
+        // An unsigned-in caller stores a row here, so the rows one address leaves are bounded per hour
+        // (federation.introductions_per_hour, 0 for no limit), and a repeat from the same node id and
+        // key replaces its waiting request instead of adding one (secaudit2026oct26).
+        const wait = introductionWait(req.ip ?? '', config.federationIntroductionsPerHour);
+        if (wait !== null) {
+            res.setHeader('Retry-After', String(wait));
+            res.status(429).json(error(config.nodeId, 'TOO_MANY_INTRODUCTIONS',
+                `This address has left as many peering requests this hour as this node takes. Try again in ${wait} seconds; the requests already sent wait for the operator.`,
+                429, { retry_after_seconds: wait }));
+            return;
+        }
+        const earlier = (await storage.listPeeringRequests('pending'))
+            .filter(r => r.fromNodeId === node_id && r.publicKey === public_key);
+        // The same node, key and address again: its waiting request stands, under the id the node
+        // already polls. A new address replaces it, so the operator approves the address in use.
+        const same = earlier.find(r => r.fromNodeUrl === node_url);
+        if (same) {
+            res.status(202).json(success(config.nodeId, {
+                request_id: same.id,
+                status: 'pending',
+                message: 'Peer introduction received. Awaiting operator approval.',
+            }, [
+                { description: 'Check introduction status', method: 'GET', url: `/v1/federation/peer/introduce/${same.id}/status` },
+            ]));
+            return;
+        }
+
         // SECURITY: Never auto-approve — always create pending request for operator review
         await storage.createPeeringRequest({
             id,
@@ -376,11 +464,12 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
             toNodeId: config.nodeId,
             targetUrl: node_url,
             publicKey: public_key,
-            message: message ?? '',
+            message: boundedNote(message),
             status: 'pending',
             createdAt: now,
             updatedAt: now,
         });
+        for (const r of earlier) await storage.deletePeeringRequest(r.id);
 
         res.status(202).json(success(config.nodeId, {
             request_id: id,
