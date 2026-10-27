@@ -6,6 +6,10 @@
  *   extension over a localhost fetch, a manual webhook, an ecosystem app over the connect-tunnel,
  *   or a tool on an MCP server this node has attached.
  * @version-history
+ *   v1.9.3 - 2026-10-27 - An `mcp` source matches the remote server's grants against
+ *     `authority.principal` when the door names one: an app under a grant is narrowed by the grant its
+ *     owner wrote for `app:{owner}/{file}`, as on the direct call route (secaudit2026oct26,
+ *     capability-invoke.ts:mcp-source:app-grant-caller-misses-app-narrowing).
  *   v1.9.2 - 2026-10-25 - The `extension` case reads its ref for the registrant (the bare record, else
  *     the registrant's own of that name; services/component-address.ts) and loops back with the stored
  *     name, so the route runs that record and never the caller's own of the same name (owner
@@ -83,7 +87,16 @@ export interface InvokeResult {
 }
 
 /** What a call may do on the strength of the session making it: see `authority` below. */
-export interface CallAuthority { scopes: string[]; ownerInPerson?: boolean }
+export interface CallAuthority {
+  scopes: string[];
+  ownerInPerson?: boolean;
+  /**
+   * The acting principal a grant on a remote MCP server is matched against (callerPrincipal): an app
+   * under a grant by its eco: identity, so the narrowing its owner wrote for `app:{owner}/{file}`
+   * applies here as on POST /v1/mcp-servers/:id/call. Left out, the caller identity is used.
+   */
+  principal?: string;
+}
 
 /**
  * The authority of the session that holds `token`, for a path that has the buyer's token but no
@@ -344,7 +357,9 @@ export async function invokeCapability(
       const called = await callRemoteTool({
         storage, config, server, tool: toolName,
         args: (input && typeof input === 'object' ? input : {}) as Record<string, unknown>,
-        caller: callerGhii,
+        // The grant is matched against the acting principal: for an app under a grant that is its
+        // eco: identity, not the owner's GHII that `callerGhii` holds (secaudit2026oct26).
+        caller: authority.principal ?? callerGhii,
         scopes: authority.scopes,
         // `callerGhii` is the resolved identity, which for an app under a grant is its owner's
         // GHII. Whether the caller is that owner IN PERSON is the door's to say, never this name's.

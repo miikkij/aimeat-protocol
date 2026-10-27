@@ -33,6 +33,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-27 — Phase 5: an app holding work:request and mcp:use invokes a capability over a remote
+ *     tool, and a grant for app:{owner}/{file} narrows it on the invoke route as on the direct call
+ *     (secaudit2026oct26, capability-invoke.ts:mcp-source:app-grant-caller-misses-app-narrowing).
  *   2026-10-20 — The teardown drops the fake far sides' open connections before closing them; the run
  *     hung there on Postgres while the node's SDK v2 client still held a stream open.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -1277,6 +1280,43 @@ await test('and invoking it reaches the remote tool', async () => {
   assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
   assert(JSON.stringify(body.data).includes('through the capability'),
     `the far side did not answer: ${JSON.stringify(body.data)}`);
+});
+
+await test('an app holding work:request and mcp:use invokes the capability; a grant for app:{owner}/{file} narrows it there too', async () => {
+  // secaudit2026oct26 (capability-invoke.ts:mcp-source:app-grant-caller-misses-app-narrowing): the
+  // invoke route matched the app against the grants as its owner, so the owner's narrowing for the app
+  // did not apply on this route while it did on POST /v1/mcp-servers/:id/call.
+  const app = await appGrant(ownerToken, ownerName, ['work:request', 'mcp:use']);
+  const appAuth = { Authorization: `Bearer ${app.token}` };
+  const before = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+    method: 'POST', headers: appAuth, body: JSON.stringify({ input: { text: 'from the app' } }),
+  });
+  assert(before.status === 200 && JSON.stringify(before.body.data).includes('from the app'),
+    `the app with no grant of its own: ${before.status} ${JSON.stringify(before.body.error)}`);
+
+  const grantee = `app:${ownerName}/${app.filename}`;
+  const put = await json('/v1/mcp-servers/upstream/grants', {
+    method: 'PUT', headers: ownerAuth(), body: JSON.stringify({ grantee, tools: ['refuses'] }),
+  });
+  assert(put.status === 200, `put: ${put.status} ${JSON.stringify(put.body.error)}`);
+  try {
+    const refused = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+      method: 'POST', headers: appAuth, body: JSON.stringify({ input: { text: 'narrowed' } }),
+    });
+    assert(refused.status === 403 && refused.body.error?.code === 'NOT_GRANTED',
+      `the app reached a tool its grant leaves out through the capability: ${refused.status} ${JSON.stringify(refused.body.error)}`);
+    const direct = await json('/v1/mcp-servers/upstream/call', {
+      method: 'POST', headers: appAuth, body: JSON.stringify({ tool: 'echo', arguments: { text: 'narrowed' } }),
+    });
+    assert(direct.status === 403, `the direct call: ${direct.status}`);
+    // The owner in person is not narrowed by a grant written for one of their apps.
+    const owner = await json(`/v1/capabilities/${capabilityId}/invoke`, {
+      method: 'POST', headers: ownerAuth(), body: JSON.stringify({ input: { text: 'the owner' } }),
+    });
+    assert(owner.status === 200, `the owner: ${owner.status} ${JSON.stringify(owner.body.error)}`);
+  } finally {
+    await json(`/v1/mcp-servers/upstream/grants/${encodeURIComponent(grantee)}`, { method: 'DELETE', headers: ownerAuth() });
+  }
 });
 
 await test('an agent holding work:request and NOT mcp:use is refused it, on REST and on MCP', async () => {
