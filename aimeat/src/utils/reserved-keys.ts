@@ -20,6 +20,10 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-10-27 -- `commerce.platform-fee.` is service-owned and owner-removable: the operator's fee on
+ *     a money sale, which the admin dashboard totals (commerce/platform-fee.ts is its one writer, straight
+ *     to storage). An account and its agents wrote one through the memory API and moved the operator's
+ *     money figure (secaudit2026oct26, routes/admin.ts:dashboard:any-namespace-platform-fee-records).
  *   v1.31.0 -- 2026-10-26 -- `mcp.tasks.` is service-owned: an MCP task and the tool result it hands
  *     back on tasks/get (services/mcp-tasks.ts; wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  *   v1.30.0 -- 2026-10-25 -- `agent-device-return.` is service-owned: an existing agent's proven
@@ -396,8 +400,13 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * through a memory route made the hold book call another seller's rail and put a self-released share
  * into a provider's payout. The two books are their writers, straight to storage; people read them
  * through /v1/commerce/holds and /v1/commerce/beneficiary.
+ *
+ * `commerce.platform-fee.` (2026-10-27, secaudit2026oct26) is the operator's fee on a money sale, a
+ * receivable the admin dashboard totals per currency. commerce/platform-fee.ts is its one writer,
+ * straight to storage; a record any account or agent wrote through a memory route raised, lowered or
+ * broke the operator's figure. The account holder in person still removes one of their own.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -414,6 +423,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['scope-use.', 'a record of permission use, and only the node writes it.'],
   ['agent-device-return.', 'the mark that an agent proved it is coming back, and only the device authorization writes it.'],
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
+  ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
 ];
 
 /**
@@ -422,7 +432,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
  * finished hold or share, and every one counts toward the key limit. Removing one's own record harms
  * nobody else; writing and restoring one stays refused to everyone, which is what closed the hole.
  */
-export const OWNER_REMOVABLE_SERVICE_PREFIXES: readonly string[] = ['commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.'];
+export const OWNER_REMOVABLE_SERVICE_PREFIXES: readonly string[] = ['commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'commerce.platform-fee.'];
 
 /** True iff the account holder in person may delete `key` although no memory route writes or restores it. */
 export function isOwnerRemovableServiceKey(key: unknown): boolean {
