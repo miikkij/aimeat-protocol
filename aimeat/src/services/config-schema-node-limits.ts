@@ -9,6 +9,7 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   2026-10-27 — realtime.echat_max_rooms and realtime.max_docs_per_room (secaudit2026oct26).
  *   v1.3.0 — 2026-10-25 — apps.held_label_days and apps.held_labels_per_owner (secaudit2026oct22,
  *     app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — email.company_smtp_private_hosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
@@ -39,5 +40,11 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
     range: '0-3650' },
   { key: 'appHeldLabelsPerOwner', dotPath: 'apps.held_labels_per_owner', envVar: 'AIMEAT_APP_HELD_LABELS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most held addresses of removed apps one owner keeps; past it the one held longest is released first. 0 = no limit',
+    range: '0-10000' },
+  { key: 'realtimeEchatMaxRooms', dotPath: 'realtime.echat_max_rooms', envVar: 'AIMEAT_REALTIME_ECHAT_MAX_ROOMS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most rooms anonymous echat visitors hold open together, inside realtime.max_rooms, so visitors without an account cannot take every room your apps use. 0 = no separate limit',
+    range: '0-10000' },
+  { key: 'realtimeMaxDocsPerRoom', dotPath: 'realtime.max_docs_per_room', envVar: 'AIMEAT_REALTIME_MAX_DOCS_PER_ROOM', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most shared documents one realtime room keeps the latest state of, for players who join later. A document past it is still sent to the room. 0 = no limit',
     range: '0-10000' },
 ];

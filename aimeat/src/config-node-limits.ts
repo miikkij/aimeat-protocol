@@ -13,6 +13,8 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-10-27 — realtimeEchatMaxRooms and realtimeMaxDocsPerRoom (secaudit2026oct26,
+ *     anonymous-room-cap-exhaustion and yjsSnapshots:unbounded).
  *   v1.3.0 — 2026-10-25 — appHeldLabelDays and appHeldLabelsPerOwner (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — companySmtpPrivateHosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — deviceAuthEmailLimit and deviceAuthEmailMax (secaudit2026oct22,
@@ -56,6 +58,17 @@ export interface NodeLimitsConfig {
    * AIMEAT_APP_HELD_LABELS_PER_OWNER, default 20; 0 is no limit.
    */
   appHeldLabelsPerOwner: number;
+  /**
+   * The most rooms anonymous echat visitors may hold open together, inside realtime.max_rooms, so
+   * visitors without an account cannot take every room the node's apps use.
+   * AIMEAT_REALTIME_ECHAT_MAX_ROOMS, default 50; 0 is no separate limit.
+   */
+  realtimeEchatMaxRooms: number;
+  /**
+   * The most shared documents one realtime room keeps the latest state of for late joiners
+   * (services/realtime-yjs.ts). AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, default 64; 0 is no limit.
+   */
+  realtimeMaxDocsPerRoom: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -72,5 +85,7 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     companySmtpPrivateHosts: (env.AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS ?? '').split(',').map(s => s.trim()).filter(Boolean),
     appHeldLabelDays: wholeOr(env.AIMEAT_APP_HELD_LABEL_DAYS, 90),
     appHeldLabelsPerOwner: wholeOr(env.AIMEAT_APP_HELD_LABELS_PER_OWNER, 20),
+    realtimeEchatMaxRooms: wholeOr(env.AIMEAT_REALTIME_ECHAT_MAX_ROOMS, 50),
+    realtimeMaxDocsPerRoom: wholeOr(env.AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, 64),
   };
 }
