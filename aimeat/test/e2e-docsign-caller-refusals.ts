@@ -27,8 +27,12 @@
  *   - Phase 3: an app grant and method session
  *   - Phase 4: a visitor from another node
  *   - Phase 5: the MCP tools
+ *   - Phase 6: a later holder of an erased account name
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=docsign-caller-refusals
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Phase 6: carol and her agent read and sign the requests that name them; after
+ *     her account is erased, the next holder of the name (and an agent of the same name under it) does
+ *     not list, read or sign them, and alice still reads them (secaudit2026oct26).
  *   v1.1.0 — 2026-10-17 — Phase 5: an agent without memory:read is listed aimeat_docsign_requests
  *     (permission ask, mcp/permission-ask-gate.ts), and its call is refused SCOPE_DENIED with the
  *     allow address and no request in the answer.
@@ -293,6 +297,63 @@ async function run(): Promise<void> {
         assert(back.body.data.request.state === 'cancelled', `read back over REST: ${JSON.stringify(back.body.data?.request?.state)}`);
         const bobs = await call('GET', `/v1/docsign/requests/${bobRequest}`, bob.token);
         assert(bobs.body.data.request.state === 'open', 'bob\'s request is still open');
+    });
+
+    // secaudit2026oct26, docsign/records.ts:party-identity-bound-by-reusable-account-name. An account
+    // name is released at erasure; the next person to take it is not the party the requests named.
+    console.log('\nPhase 6 — A later holder of an erased account name');
+
+    const carolName = `dcrcarol${stamp}`;
+    const carolAgentName = `dcrcarolag${stamp}`.slice(0, 30);
+    let carol = { name: '', token: '' };
+    let openForCarol = '', signedByCarol = '', forCarolsAgent = '';
+    await test('usage: carol and her agent read and sign the requests that name them', async () => {
+        carol = await registerOwner(BASE, carolName);
+        const agent = await makeAgent(BASE, carol, ['memory:read', 'memory:write'], carolAgentName);
+        const mk = async (title: string, parties: string[]) => {
+            const r = await call('POST', '/v1/docsign/requests', alice.token, { title, document: doc(`${title}.txt`), parties });
+            assert(r.status === 201, `${title}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+            return r.body.data.request.id as string;
+        };
+        openForCarol = await mk('carol-open', [ghii(names.alice), ghii(carolName)]);
+        signedByCarol = await mk('carol-signed', [ghii(names.alice), ghii(carolName)]);
+        forCarolsAgent = await mk('carol-agent', [ghii(names.alice), agent.gaii]);
+        const listed = await call('GET', '/v1/docsign/requests?state=waiting-for-me', carol.token);
+        const ids = (listed.body.data?.requests ?? []).map((x: { id: string }) => x.id);
+        assert(ids.includes(openForCarol) && ids.includes(signedByCarol), `carol's waiting list: ${JSON.stringify(ids)}`);
+        assert((await call('GET', `/v1/docsign/requests/${openForCarol}`, carol.token)).status === 200, 'carol reads her request');
+        const signed = await call('POST', `/v1/docsign/requests/${signedByCarol}/sign`, carol.token, { method: 'session' });
+        assert(signed.status === 200, `carol signs: ${signed.status} ${JSON.stringify(signed.body?.error)}`);
+        const byAgent = await call('POST', `/v1/docsign/requests/${forCarolsAgent}/sign`, agent.token, { method: 'session' });
+        assert(byAgent.status === 200, `carol's agent signs as itself: ${byAgent.status} ${JSON.stringify(byAgent.body?.error)}`);
+    });
+
+    await test('after carol\'s account is erased, the next holder of her name neither lists, reads nor signs her requests', async () => {
+        const erased = await call('DELETE', `/v1/owners/${carolName}`, carol.token);
+        assert(erased.status === 200, `erase carol: ${erased.status} ${JSON.stringify(erased.body?.error)}`);
+        const next = await registerOwner(BASE, carolName);
+        const listed = await call('GET', '/v1/docsign/requests', next.token);
+        const ids = (listed.body.data?.requests ?? []).map((x: { id: string }) => x.id);
+        assert(![openForCarol, signedByCarol, forCarolsAgent].some(id => ids.includes(id)), `the next holder lists the earlier carol's requests: ${JSON.stringify(ids)}`);
+        for (const id of [openForCarol, signedByCarol]) {
+            const read = await call('GET', `/v1/docsign/requests/${id}`, next.token);
+            assert(read.status === 404, `the next holder reads ${id}: ${read.status}`);
+        }
+        const sign = await call('POST', `/v1/docsign/requests/${openForCarol}/sign`, next.token, { method: 'session' });
+        assert(sign.status === 404 || sign.status === 403, `the next holder signs the earlier carol's request: ${sign.status}`);
+        const agent = await makeAgent(BASE, next, ['memory:read', 'memory:write'], carolAgentName);
+        const agentRead = await call('GET', `/v1/docsign/requests/${forCarolsAgent}`, agent.token);
+        assert(agentRead.status === 404, `an agent of the same name under the next holder reads the earlier agent's request: ${agentRead.status}`);
+        await call('DELETE', `/v1/owners/${carolName}`, next.token);
+    });
+
+    await test('usage: alice still reads every request she shares with the earlier carol, with carol\'s signature on it', async () => {
+        for (const id of [openForCarol, signedByCarol, forCarolsAgent]) {
+            const r = await call('GET', `/v1/docsign/requests/${id}`, alice.token);
+            assert(r.status === 200, `alice reads ${id}: ${r.status}`);
+        }
+        const signed = await call('GET', `/v1/docsign/requests/${signedByCarol}`, alice.token);
+        assert(!!signed.body.data.request.signatures?.[ghii(carolName)], `carol's signature is kept: ${JSON.stringify(Object.keys(signed.body.data.request.signatures ?? {}))}`);
     });
 }
 
