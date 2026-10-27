@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.11.0 — 2026-10-27 — A sibling agent's instruction to another agent's ai schedule, allowed by the
+ *     owner (apply-schedule-instruction.ts; secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — A subscription renewal at a raised price, allowed by the buyer
  *     (apply-subscription-price.ts; secaudit2026oct22).
  *   v1.9.0 — 2026-10-25 — The secret host question switched off at an agent's or app's request
@@ -51,6 +53,7 @@ import { applyExtensionEmailPolicy } from './apply-extension-email-policy.js';
 import { applyCrewModel } from './apply-crew-model.js';
 import { applyAccountSetting } from './apply-account-setting.js';
 import { applySubscriptionPrice } from './apply-subscription-price.js';
+import { applyScheduleInstruction } from './apply-schedule-instruction.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -73,4 +76,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'crew-model': applyCrewModel,
   'account-setting': applyAccountSetting,
   'subscription-price': applySubscriptionPrice,
+  'schedule-instruction': applyScheduleInstruction,
 };

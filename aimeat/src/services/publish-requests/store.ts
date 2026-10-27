@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
+ *     ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-25 — The kind `subscription-price`: a renewal at a raised plan price waits for the buyer
  *     (commerce/subscription-price-ask.ts; secaudit2026oct22).
  *   2026-10-25 — A settled request's notices show the answer and lose their buttons (closeQuestion,
@@ -97,7 +99,9 @@ export type PublishKind =
   // address set by an app, and switching off the owner's secret host question.
   | 'extension-email-policy' | 'crew-model' | 'account-setting'
   // A subscription renewal whose plan price went up since the buyer agreed (commerce/subscription-price-ask.ts).
-  | 'subscription-price';
+  | 'subscription-price'
+  // A sibling agent's new instruction to another agent's ai schedule (services/schedule-instruction-hold.ts).
+  | 'schedule-instruction';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

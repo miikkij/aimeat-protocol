@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-27 — A sibling agent's new prompt or input to an ai schedule that reads with more reach than
+ *     the sibling has is stored and answered with a pending approval_request; the next fire waits for the
+ *     owner (services/schedule-instruction-hold.ts; secaudit2026oct26, sibling-edit-fires-under-maker-reach).
  *   2026-10-25 — An extension schedule names the caller's own extension through
  *     services/component-address.ts (own first) and keeps its stored name (owner namespaces wish,
  *     secaudit2026oct22).
@@ -95,6 +98,7 @@ import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type Schedule
 import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
 import { findExtension } from './component-address.js';
 import { aiScheduleInputRefusal } from './schedule-ai-read.js';
+import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './schedule-instruction-hold.js';
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
@@ -174,7 +178,9 @@ export interface ScheduleWriteRefusal {
 export type ScheduleWriteResult = { ok: true; schedule: ScheduledJobRecord } | ScheduleWriteRefusal;
 
 /** updateScheduledJob answers null when the row vanished between the read and the write. */
-export type ScheduleUpdateResult = { ok: true; schedule: ScheduledJobRecord | null } | ScheduleWriteRefusal;
+export type ScheduleUpdateResult = { ok: true; schedule: ScheduledJobRecord | null } & Partial<HoldAnswer> | ScheduleWriteRefusal;
+/** What an edit held for the owner adds to its answer: the pending request, or why none was filed. */
+type HoldAnswer = { approval_request: unknown; warnings: Array<{ code: string; message: string }> };
 
 /**
  * A manual run answers with what the clock actually did, not only that it was asked. `outcome.code`
@@ -657,10 +663,24 @@ export async function updateScheduleRecord(
         updates.input = next.input;
     }
 
+    // A new instruction to an ai schedule that reads with more reach than its editor has waits for the
+    // owner's one press before it fires (services/schedule-instruction-hold.ts; secaudit2026oct26).
+    const instructed = job.type === 'ai' && updates.input !== undefined;
+    const hold = instructed ? await instructionHoldNeeded(storage, caller, job, updates.input!) : null;
+
     const updated = await storage.updateScheduledJob(id, updates);
+    let asked: Awaited<ReturnType<typeof holdInstruction>> | null = null;
+    if (hold) {
+        asked = await holdInstruction(deps, {
+            owner: caller.owner, requester: { principal: caller.identity, kind: 'agent', sub: caller.identity },
+            job, maker: hold.maker, previousInput: (job.input ?? {}) as Record<string, unknown>, input: updates.input!,
+        });
+    } else if (instructed) {
+        await clearInstructionHold(storage, config.nodeId, id);
+    }
     await (deps.scheduler ?? getActiveScheduler())?.reschedule(id);
     emitChange('scheduler');
-    return { ok: true, schedule: updated };
+    return { ok: true, schedule: updated, ...(asked ?? {}) };
 }
 
 /** Cancel one schedule: off the clock first, then out of storage. */
