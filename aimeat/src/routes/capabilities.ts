@@ -10,6 +10,9 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   2026-10-26 — GET /:id and invoke serve a private capability, one with an unknown visibility word, and
+ *     a draft, pending_review or rejected one to the owner, the owner's agents and apps, and the operator
+ *     only; everyone else gets 404 NOT_FOUND (services/capability-reach.ts; secaudit2026oct22).
  *   2026-10-21 — The list's anonymous branch asks isAnonymousPrincipal, so the minted anonymous token sees
  *     public active capabilities only (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.6.1 — 2026-10-16 — The list's policy no longer carries `publishers`: the setting behind it was enforced nowhere (QA audit D8-05).
@@ -65,6 +68,7 @@ import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
+import { capabilityHiddenFrom } from '../services/capability-reach.js';
 
 /**
  * What a capability's owner may NOT put in a PUT body. Each of these is written by the node about
@@ -244,7 +248,11 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     const cap = await storage.getCapability(req.params.id as string);
     if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
 
-    if (cap.visibility === 'private' && (!req.auth || resolve(req) !== cap.ownerGhii)) {
+    // A private capability, an unknown visibility word, and a capability never published (draft,
+    // pending_review, rejected) are served to the owner's side and the operator only, and answer
+    // everyone else as a missing id does (services/capability-reach.ts; secaudit2026oct22).
+    if (capabilityHiddenFrom(cap, req.auth ? resolve(req) : null) && !(req.auth && await operatorOverride(storage, config, req.auth,
+      { ownerOf: cap.ownerGhii, area: 'capability', action: 'read', subject: cap.name }))) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
     }
 
@@ -314,9 +322,10 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
     if (!cap) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
 
     const callerGhii = resolve(req);
-    // Ownership (SECURITY): a PRIVATE capability may only be invoked by its owner (or an operator) — the
-    // read route hides private caps from non-owners, so invoke must too (404, don't confirm existence).
-    if (cap.visibility === 'private' && callerGhii !== cap.ownerGhii && !(await operatorOverride(storage, config, req.auth,
+    // Ownership (SECURITY): what the read route hides, invoke hides too, with the same 404: a private
+    // capability, an unknown visibility word, and a capability never published reach the owner's side
+    // and the operator only (services/capability-reach.ts; secaudit2026oct22).
+    if (capabilityHiddenFrom(cap, callerGhii) && !(await operatorOverride(storage, config, req.auth,
       { ownerOf: cap.ownerGhii, area: 'capability', action: 'invoke', subject: cap.name }))) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Capability not found'));
     }

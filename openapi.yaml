@@ -57757,7 +57757,14 @@ paths:
                     ref: { type: string }
                     version: { type: string }
                 callable: { type: boolean }
-                visibility: { type: string, enum: [private, owner, group, public] }
+                visibility:
+                  type: string
+                  enum: [private, owner, public]
+                  description: >-
+                    Default private. Any other word is 400 INVALID_INPUT with a sentence that lists
+                    these three; PUT checks a changed word the same way. A capability stored with
+                    another word before 2026-10-26 is treated as private and named to the operator on
+                    the Security page.
                 webhookUrl: { type: string }
                 tags: { type: array, items: { type: string } }
                 cost:
@@ -57780,7 +57787,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
-          description: INVALID_INPUT, for example a source type a person may not name or an extension ref outside ext:<name>[@<version>][:<action>].
+          description: INVALID_INPUT, for example a source type a person may not name, an extension ref outside ext:<name>[@<version>][:<action>], or a visibility other than private, owner or public.
         '403':
           description: Not the owner or their agent, the agent lacks capability:write, or the publishing policy refuses.
 
@@ -57789,6 +57796,13 @@ paths:
       operationId: capabilityGet
       tags: [Capabilities]
       summary: Get capability detail with schemas, examples, exports, dependencies
+      description: >-
+        Anyone reaches a capability whose visibility is `owner` or `public` and whose status is
+        `active`, `deprecated` or `disabled`. Any other capability (a private one, one with a
+        visibility word the node does not know, and a draft, pending_review or rejected one) is
+        served only to its owner, the owner's agents and apps, and the operator. Everyone else gets
+        404 NOT_FOUND, the same answer as for an id that does not exist. The MCP tool
+        aimeat_capabilities_get answers the same way.
       parameters:
         - name: id
           in: path
@@ -57801,6 +57815,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: NOT_FOUND, no such capability, or one this caller may not reach (see the description).
     put:
       operationId: capabilityUpdate
       tags: [Capabilities]
@@ -57848,7 +57864,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
-          description: INVALID_INPUT, a changed source that POST would refuse.
+          description: INVALID_INPUT, a changed source that POST would refuse, or a changed visibility other than private, owner or public (the stored word sent back unchanged passes).
         '403':
           description: Not the owner or their agent, the agent lacks capability:write, or not the capability's owner. PUBLIC_DISABLED, a change to public visibility on a self_only node by a non-operator.
     delete:
@@ -57882,6 +57898,11 @@ paths:
         Proxies to extension or webhook. Cortex returns BROWSER_ONLY. Non-callable returns
         NOT_CALLABLE with usage. An extension capability runs only when its ref names an installed
         extension and one of its actions; otherwise 404 EXTENSION_NOT_FOUND, before any request is made.
+
+
+        Who may invoke follows GET /v1/capabilities/{id}: a private capability, one with an unknown
+        visibility word, and a draft, pending_review or rejected one are invoked only by the owner,
+        the owner's agents and apps, and the operator. Everyone else gets 404 NOT_FOUND.
       security:
         - BearerAuth: []
       parameters:
@@ -57907,7 +57928,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '404':
-          description: NOT_FOUND (no such capability, or another owner's private one), or EXTENSION_NOT_FOUND (the extension or the action its ref names is not installed).
+          description: NOT_FOUND (no such capability, or one this caller may not reach, such as another owner's private one or draft), or EXTENSION_NOT_FOUND (the extension or the action its ref names is not installed).
 
   /v1/capabilities/{id}/telemetry:
     post:
@@ -69747,9 +69768,13 @@ paths:
         token was refused there. The start step of type `erasure_leftover_schedules` names the
         schedules that account erasures before 2026-10-25 left: a schedule whose `ownerScope` names an
         account no one holds now, or an account registered after the schedule was made; the entry id
-        is the schedule id. With `{ name: <entry id>, resolution }` this endpoint decides one
+        is the schedule id. The start step of type `capability_visibility_words` names the
+        capabilities saved before 2026-10-26 with a visibility word the node does not know (one entry
+        per capability, its owner and its word; the entry id is the capability id); until decided,
+        such a capability is private to everyone but its owner's side and the operator. With
+        `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
-        none) or `delete` (the skill or the data package is deleted with its files, the schedule is
+        none; a capability's visibility is set to private) or `delete` (the skill or the data package is deleted with its files, the schedule is
         removed from the scheduler and from storage), or `keep`
         (nothing changes). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.

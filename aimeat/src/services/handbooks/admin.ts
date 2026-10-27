@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.23.0 -- 2026-10-26 -- The incident that names capabilities with an unknown visibility word
+ *     (secaudit2026oct22).
  *   v1.22.0 -- 2026-10-25 -- A deactivated account's background work waits; incidents that name records
  *     to clear, delete or keep, among them the schedules older erasures left (secaudit2026oct22).
  *   v1.21.0 -- 2026-10-25 -- aimeat_admin_config lists every node setting (section, q); aimeat_admin_config_set changes them.
@@ -277,7 +279,10 @@ with a log line that names the deactivation; nothing is deleted, and they run ag
 before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
 capabilities, and the skills and data packages it published) and the schedules that account
 erasures before 2026-10-25 left (type \`erasure_leftover_schedules\`, the entry id is the schedule id:
-its account is gone, or was registered again by someone else after the schedule was made). Read them with
+its account is gone, or was registered again by someone else after the schedule was made) and the
+capabilities saved before 2026-10-26 with a visibility word the node does not know (type
+\`capability_visibility_words\`, the entry id is the capability id; "clear" makes it private, and until
+then it is private to everyone but its owner's side and the operator). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.
