@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-input-validation joins ALL_SUITES (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-27 -- Every suite's fixed ports moved from 40000-41999 to 28000-29999 (down 12000), out of the
  *     range the claims board hands out: a board claim is not a runner, so the port locks never saw it,
  *     and a session holding 40672 refused e2e-secrets with EADDRINUSE. fixedPorts and listeningPorts
@@ -1118,6 +1119,8 @@ const ALL_SUITES = [
     'test/e2e-contact-picker.ts',
     'test/e2e-contacts.ts',
     'test/e2e-colleagues.ts',               // a company server: everyone on it sees each other (members see each other)
+    // Too long, a control character, NUL and a broken character are refused with the field named, on REST and MCP.
+    'test/e2e-input-validation.ts',
     // The answers of selected operations against openapi.yaml: status, schema, no undeclared field.
     'test/e2e-contract.ts',
     'test/e2e-agent-offers.ts',

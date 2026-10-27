@@ -18,6 +18,8 @@
  * @structure zodShapeFor(name) · fieldSchema(field)
  * @usage mcp.tool('aimeat_board_post', descriptionFor('aimeat_board_post'), zodShapeFor('aimeat_board_post'), annotationsFor('aimeat_board_post'), handler)
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A coarse string field is bounded by its name's class (field-limits.ts), so
+ *     both MCP surfaces refuse a longer value and publish maxLength; it was an unbounded z.string().
  *   v1.1.0 — 2026-10-20 — A tool's shape is built once and frozen, because a 2026-07-28 request
  *     builds a server per request (MCP SDK v2 migration, plan item 5).
  *   v1.0.1 — 2026-10-05 — A field that is not required gets `.optional()` unless its schema is
@@ -29,6 +31,7 @@ import { z } from 'zod';
 import { getAimeatToolDefinition, type CatalogTool } from './definitions.js';
 import type { ToolInputField } from './definitions/types.js';
 import { responseFormatSchema, type ResponseFormat } from './shape.js';
+import { coarseStringSchema } from './field-limits.js';
 
 // ── Types: a handler's arguments, read from the catalog entry ──
 // A group file declared `as const satisfies readonly AimeatToolDefinition[]` keeps each entry's
@@ -60,10 +63,11 @@ export type ToolShape<N extends string> = [DefinitionOf<N>] extends [never]
     : { -readonly [K in keyof DefinitionOf<N>['input']]: FieldSchema<DefinitionOf<N>['input'][K]> }
         & (DefinitionOf<N> extends { supportsResponseFormat: true } ? { response_format: z.ZodType<ResponseFormat | undefined> } : unknown);
 
-function coarseSchema(field: ToolInputField): z.ZodType {
+function coarseSchema(field: ToolInputField, key: string): z.ZodType {
     if (field.enum?.length) return z.enum(field.enum as [string, ...string[]]);
     switch (field.type) {
-        case 'string': return z.string();
+        // Bounded by what the field's name says it holds (tool-catalog/field-limits.ts).
+        case 'string': return coarseStringSchema(key);
         case 'number': return z.number();
         case 'boolean': return z.boolean();
         case 'array': return z.array(z.unknown());
@@ -73,8 +77,8 @@ function coarseSchema(field: ToolInputField): z.ZodType {
 }
 
 /** One field's schema: its exact or coarse type, optional unless required, with its description. */
-export function fieldSchema(field: ToolInputField): z.ZodType {
-    let schema = field.zod ?? coarseSchema(field);
+export function fieldSchema(field: ToolInputField, key: string): z.ZodType {
+    let schema = field.zod ?? coarseSchema(field, key);
     // Optional unless required, or unless the schema is optional already on input (a default):
     // `z.unknown()` takes undefined too, but a JSON Schema reader lists it as required without this.
     if (!field.required && (schema as { _zod?: { optin?: string } })._zod?.optin !== 'optional') schema = schema.optional();
@@ -93,7 +97,7 @@ export function zodShapeFor<N extends string>(name: N): ToolShape<N> {
     const def = getAimeatToolDefinition(name);
     if (!def) throw new Error(`Missing tool definition for "${name}" in src/tool-catalog/definitions/: the catalog is the input schema of both MCP surfaces.`);
     const shape: Record<string, z.ZodType> = {};
-    for (const [key, field] of Object.entries(def.input)) shape[key] = fieldSchema(field);
+    for (const [key, field] of Object.entries(def.input)) shape[key] = fieldSchema(field, key);
     if (def.supportsResponseFormat) shape.response_format = responseFormatSchema;
     shapes.set(name, Object.freeze(shape));
     return shape as ToolShape<N>;

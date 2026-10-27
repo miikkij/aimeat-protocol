@@ -8,6 +8,8 @@
  * @structure WorkspaceComments
  * @usage import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
  * @version-history
+ *   v1.12.0 — 2026-10-27 — The comment field stops at 10 000 characters, the part of a comment the
+ *     node keeps (js/input-limits.js description).
  *   v1.11.0 — 2026-09-30 — `canModerate` (the viewer is the organism's creator or an admin) shows
  *     Delete on every comment, not only on the viewer's own: the route always let an admin delete any
  *     comment, and the page gave them no way to.
@@ -49,6 +51,7 @@ import { Group } from '/components/List.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
 import { TextField, TextArea } from '/components/TextField.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 /**
  * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
@@ -123,7 +126,8 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
       <${ThreadForm}>
         ${replyTo ? html`<${Note} kind="meta">${t('organisms.replyingTo') || 'Replying to'}: “${(String(replyTo.body || '').slice(0, 60))}” <${Action} small onClick=${() => setReplyTo(null)}>${t('organisms.cancel') || 'Cancel'}<//><//>` : null}
         <${TextField} placeholder=${t('organisms.anchorQuotePlaceholder') || 'Optional: quote a passage to anchor the comment'} value=${anchorQuote} onInput=${setAnchorQuote} />
-        <${TextArea} rows=${2} placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${setBody} />
+        ${/* The node keeps the first 10 000 characters of a comment, so the field stops there. */''}
+        <${TextArea} rows=${2} maxLength=${INPUT_LIMITS.description} placeholder=${t('organisms.commentPlaceholder') || 'Add a comment…'} value=${body} onInput=${setBody} />
         <${Loud} control disabled=${busy || !body.trim()} onClick=${submit}>${t('organisms.postComment') || 'Comment'}<//>
       <//>
     <//>

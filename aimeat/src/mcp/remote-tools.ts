@@ -25,6 +25,7 @@
  * @structure remoteToolName · splitRemoteToolName · registerRemoteTools
  * @usage await registerRemoteTools(mcp, { storage, config, agentGaii, scopes });
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — A name the far side lists twice is registered once, and a registration that throws
  *     is logged and skipped, so one bad tools/list entry no longer fails the owner's whole MCP
  *     session (secaudit2026oct22, duplicate-upstream-tool-name-aborts-session).
@@ -34,6 +35,7 @@
  *   v1.0.0 — 2026-09-16 — Phase 3 of the MCP proxy.
  */
 import { z } from 'zod';
+import { documentText } from '../models/input-limits.js';
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -245,7 +247,7 @@ function toZodShape(schema: Record<string, unknown>): Record<string, z.ZodTypeAn
  */
 function baseType(type: string | undefined): z.ZodTypeAny {
   switch (type) {
-    case 'string': return z.string();
+    case 'string': return documentText();
     case 'number': case 'integer': return z.number();
     case 'boolean': return z.boolean();
     case 'array': return z.array(z.unknown());

@@ -10,6 +10,7 @@
  *   vat-report · exports)
  * @usage app.use(financeLedgerRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-15 — POST /v1/finance/fiscal-years checks overlap within the same company (organism_id) only (feature-list audit #148).
  *   v1.1.0 — 2026-10-11 — The voucher list's source filter no longer names 'morsel': a morsel is
  *     pacing, never a booking (ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
@@ -18,6 +19,7 @@
 import { Router, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
@@ -48,7 +50,7 @@ const VatEntrySchema = z.object({
 
 const VoucherSchema = z.object({
   organism_id: z.string().max(80).nullish(),
-  date: z.string().regex(DATE_RE),
+  date: z.string().regex(DATE_RE).max(INPUT_LIMITS.id),
   description: z.string().min(1).max(500),
   direction: z.enum(['income', 'expense']),
   source: z.enum(['receipt', 'manual']),
@@ -62,8 +64,8 @@ const VoucherSchema = z.object({
 
 const FiscalYearSchema = z.object({
   label: z.string().min(1).max(40),
-  start_date: z.string().regex(DATE_RE),
-  end_date: z.string().regex(DATE_RE),
+  start_date: z.string().regex(DATE_RE).max(INPUT_LIMITS.id),
+  end_date: z.string().regex(DATE_RE).max(INPUT_LIMITS.id),
   organism_id: z.string().max(80).nullish(),
 }).strict();
 

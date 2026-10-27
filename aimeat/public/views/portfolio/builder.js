@@ -6,6 +6,7 @@
  *   prompt, and upload/publish the resulting HTML. Extracted from portfolio.js
  *   to satisfy max-file-lines.
  * @version-history
+ *   v1.4.2 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.1 -- 2026-09-28 -- No escHtml() on the error text: preact escapes text itself, so an
  *     error message with a quote or an ampersand showed as &quot; / &amp;. The srcdoc preview is unchanged.
  *   v1.4.0 -- 2026-09-13 -- Compose the page headline and five B1 section slabs.
@@ -30,6 +31,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { NODE_URL, tr, stampCspNonce } from './shared.js';
 import { buildPortfolioPrompt } from './prompt.js';
 import { num } from '/js/format.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 /* ── Portfolio Types ── */
 const PORTFOLIO_TYPES = [
@@ -501,7 +503,7 @@ export function PortfolioBuilder({ session, navigate }) {
             `)}
           </div>
           ${portfolioType === 'custom' && html`
-            <textarea class="portfolio-custom-desc" rows="3"
+            <textarea class="portfolio-custom-desc" rows="3" maxLength=${INPUT_LIMITS.description}
               placeholder=${tr('portfolio.builder.customTypePlaceholder', 'Describe what kind of portfolio you want…')}
               value=${customTypeDesc} onInput=${(e) => setCustomTypeDesc(e.target.value)}></textarea>
           `}
@@ -532,7 +534,7 @@ export function PortfolioBuilder({ session, navigate }) {
             `)}
           </div>
           ${authGates.has('custom') && html`
-            <textarea class="portfolio-custom-desc" rows="2"
+            <textarea class="portfolio-custom-desc" rows="2" maxLength=${INPUT_LIMITS.description}
               placeholder=${tr('portfolio.builder.customGatePlaceholder', 'Describe the custom auth-gated sections…')}
               value=${customGateDesc} onInput=${(e) => setCustomGateDesc(e.target.value)}></textarea>
           `}

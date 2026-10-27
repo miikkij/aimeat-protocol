@@ -78,8 +78,10 @@
  *   v1.20.0 — 2026-10-20 — WorkflowRun.principal, the principal the run answers to, asked again before
  *     every dispatch, and refusal.stoppedBefore for a run refused in flight
  *     (services/workflow/dispatch-authority.ts; secaudit 2026-10, v64).
+ *   v1.20.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 import { SignalSchema, type Signal } from './workflow-signals.js';
 import { WorkflowAiStepActionSchema, type WorkflowAiStepAction } from './workflow-ai-step.js';
 
@@ -698,7 +700,7 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     }).strict()).min(1).max(20).optional(),
     /** A declared Table Schema. Shape-checked by the publish service, which owns that contract;
      *  validating it twice, in two places, is how the two definitions drift apart. */
-    schema: z.object({ fields: z.array(z.object({ name: z.string().min(1), type: z.string().min(1) }).loose()).min(1) }).loose().optional(),
+    schema: z.object({ fields: z.array(z.object({ name: z.string().min(1).max(INPUT_LIMITS.id), type: z.string().min(1).max(INPUT_LIMITS.id) }).loose()).min(1) }).loose().optional(),
     /** Required, and required here rather than only at publish: a workflow that discovers the
      *  contract at 06:00 has already lost the run it was written for. */
     changes: z.string().min(1).max(2000),

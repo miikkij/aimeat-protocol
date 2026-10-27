@@ -12,6 +12,7 @@
  * @structure extensionsCortexTools[] — concatenated into organismsWorkspacesAppsTools
  * @usage import { extensionsCortexTools } from './extensions-cortex.js';
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_extension_config_set says emailPolicy "unrestricted" is asked of the operators (secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_invoke says a full run pool answers EXTENSION_RUNS_BUSY with the seconds to wait (secaudit2026oct22, lead 817).
  *   v1.8.0 — 2026-10-20 — aimeat_extension_unattended_reader: what an extension may read when it runs with nobody present, and that only the person can change it (Jouni, 2026-10-20).
@@ -42,6 +43,7 @@
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { INPUT_LIMITS, documentText } from '../../models/input-limits.js';
 
 export const extensionsCortexTools = [
     {
@@ -82,7 +84,7 @@ export const extensionsCortexTools = [
         surfaces: ['appdev'],
         input: {
             manifest: { type: 'string', description: 'Extension manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
-            scripts: { type: 'object', description: 'Map of script filename to JavaScript source code. Omit for upload mode.', zod: z.record(z.string(), z.string()) },
+            scripts: { type: 'object', description: 'Map of script filename to JavaScript source code. Omit for upload mode.', zod: z.record(z.string(), documentText()) },
             update: { type: 'boolean', description: 'Upsert an already-installed extension in place (lifecycle + ext: memory preserved). Without this, an existing name is an error.' },
             activate: { type: 'boolean', description: 'Activate immediately after install/update.' },
         },
@@ -130,7 +132,7 @@ export const extensionsCortexTools = [
         surfaces: ['appdev'],
         input: {
             name: { type: 'string', required: true, description: 'Extension name.' },
-            config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }, e.g. { "WAZUH_HOST": "wazuh.example.com:9200" }. A value is a string, a number or a boolean; an empty string clears a host field.', zod: z.record(z.string(), z.union([z.string(), z.number(), z.boolean()])) },
+            config: { type: 'object', required: true, description: 'The fields to change: { "<field>": value }, e.g. { "WAZUH_HOST": "wazuh.example.com:9200" }. A value is a string, a number or a boolean; an empty string clears a host field.', zod: z.record(z.string(), z.union([z.string().max(INPUT_LIMITS.text), z.number(), z.boolean()])) },
         },
     },
     {
@@ -169,10 +171,10 @@ export const extensionsCortexTools = [
         input: {
             app_id: { type: 'string', description: 'owner/file.html of the app the gate protects; with it the result includes the installable `extension`. A name without a slash only labels the schema and generates no extension.' },
             levels: { type: 'array', required: true, description: 'Level schema: array of { level (int, 0 = most power), key, label, capabilities: string[] }.', zod: z.array(z.object({
-                level: z.number(), key: z.string(), label: z.string(), capabilities: z.array(z.string()),
+                level: z.number(), key: z.string().max(INPUT_LIMITS.id), label: z.string().max(INPUT_LIMITS.name), capabilities: z.array(z.string().max(INPUT_LIMITS.id)),
             })) },
             commands: { type: 'array', required: true, description: 'Command manifest: array of { id, description, capability, tier: read|write|irreversible }.', zod: z.array(z.object({
-                id: z.string(), description: z.string(), capability: z.string(),
+                id: z.string().max(INPUT_LIMITS.id), description: z.string().max(INPUT_LIMITS.description), capability: z.string().max(INPUT_LIMITS.id),
                 tier: z.enum(['read', 'write', 'irreversible']),
             })) },
             default_role: { type: 'string', description: 'Level key that a signed-in caller who is not on the member list holds in the generated gate. Omit for a members-only app. A level holding "*" is refused.' },
@@ -207,7 +209,7 @@ export const extensionsCortexTools = [
         surfaces: ['appdev'],
         input: {
             manifest: { type: 'string', description: 'Cortex manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
-            libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.', zod: z.record(z.string(), z.string()) },
+            libs: { type: 'object', description: 'Map of filename to JavaScript source code for lib files. Omit for upload mode.', zod: z.record(z.string(), documentText()) },
             update: { type: 'boolean', description: 'Replace your installed cortex of the manifest\'s metadata.name in place (inline mode). Without it an inline install of an existing name is refused; a ZIP upload replaces a cortex you installed either way.' },
         },
     },

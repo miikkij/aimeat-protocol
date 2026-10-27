@@ -92,6 +92,7 @@
 import { h, render } from 'preact';
 import { useState, useRef, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 const html = htm.bind(h);
 
@@ -421,7 +422,7 @@ function App() {
           </div>
 
           <div class="chat-input">
-            <input type="text" placeholder="Type a message..." value=${input}
+            <input type="text" placeholder="Type a message..." maxLength=${INPUT_LIMITS.line} value=${input}
               onInput=${e => setInput(e.target.value)}
               onKeyDown=${e => e.key === 'Enter' && sendMessage()} />
             <button onClick=${sendMessage}>Send</button>

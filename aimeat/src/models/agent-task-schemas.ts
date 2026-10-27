@@ -14,8 +14,10 @@
  *   v1.4.0 -- 2026-10-02 -- `start` on create ('automatic' | 'confirm'): how this one task starts,
  *     overriding the agent's own setting; `effects` on a todo: what the step will do that the owner
  *     must see first (spend, send_as_owner, delete). services/agent-task-rules.ts decides with both.
+ *   v1.5.0 -- 2026-10-27 -- Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /**
  * A file handed to the agent WITH the task. `ref` is "<ownerGaii>/<key>" (a bare key means the
@@ -37,30 +39,30 @@ export const AgentTaskCreateSchema = z.object({
   title: z.string().min(1).max(256),
   description: z.string().max(10000).optional().default(''),
   scope: z.array(z.object({
-    name: z.string(),
-    value: z.string(),
+    name: z.string().max(INPUT_LIMITS.name),
+    value: z.string().max(INPUT_LIMITS.text),
     type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']),
-    description: z.string().optional(),
+    description: z.string().max(INPUT_LIMITS.description).optional(),
   })).optional().default([]),
-  rules: z.array(z.string()).optional().default([]),
+  rules: z.array(z.string().max(INPUT_LIMITS.description)).optional().default([]),
   verification: z.object({
-    user_expects: z.string(),
-    technical_checks: z.array(z.string()),
+    user_expects: z.string().max(INPUT_LIMITS.description),
+    technical_checks: z.array(z.string().max(INPUT_LIMITS.description)),
   }).optional().default({ user_expects: '', technical_checks: [] }),
   resources: z.object({
-    knowledge_packages: z.array(z.string()).optional(),
-    memory_keys: z.array(z.string()).optional(),
-    memory_prefixes: z.array(z.string()).optional(),
+    knowledge_packages: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
+    memory_keys: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
+    memory_prefixes: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
     files: z.array(TaskFileRefSchema).max(20).optional(),
   }).optional(),
   todos: z.array(z.object({
-    id: z.string(),
+    id: z.string().max(INPUT_LIMITS.id),
     order: z.number(),
-    title: z.string(),
-    description: z.string().optional().default(''),
+    title: z.string().max(INPUT_LIMITS.title),
+    description: z.string().max(INPUT_LIMITS.description).optional().default(''),
     environment: z.enum(['aimeat', 'agent']),
-    environment_reason: z.string().optional(),
-    verification: z.string().optional().default(''),
+    environment_reason: z.string().max(INPUT_LIMITS.line).optional(),
+    verification: z.string().max(INPUT_LIMITS.description).optional().default(''),
     estimate_minutes: z.number().optional(),
     status: TodoStatusSchema.optional().default('pending'),
     effects: TodoEffectsSchema.optional(),
@@ -82,7 +84,7 @@ export const AgentTaskCreateSchema = z.object({
   // caller may loosen the agent's leash (services/agent-task-write.ts), and the permission floor
   // holds a task for the owner whatever this says.
   start: z.enum(['automatic', 'confirm']).optional(),
-  parent_task_id: z.string().optional(),
+  parent_task_id: z.string().max(INPUT_LIMITS.id).optional(),
   // One-live-commission guard. A caller that knows which job this is (a form submit id, a row id)
   // sends its own key; everyone else gets a server-derived fingerprint over agent + title +
   // description. `allow_duplicate` is the deliberate "yes, run this a second time in parallel".
@@ -96,33 +98,33 @@ export const AgentTaskUpdateSchema = z.object({
   title: z.string().min(1).max(256).optional(),
   description: z.string().max(10000).optional(),
   scope: z.array(z.object({
-    name: z.string(),
-    value: z.string(),
+    name: z.string().max(INPUT_LIMITS.name),
+    value: z.string().max(INPUT_LIMITS.text),
     type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']),
-    description: z.string().optional(),
+    description: z.string().max(INPUT_LIMITS.description).optional(),
   })).optional(),
-  rules: z.array(z.string()).optional(),
+  rules: z.array(z.string().max(INPUT_LIMITS.description)).optional(),
   verification: z.object({
-    user_expects: z.string(),
-    technical_checks: z.array(z.string()),
+    user_expects: z.string().max(INPUT_LIMITS.description),
+    technical_checks: z.array(z.string().max(INPUT_LIMITS.description)),
   }).optional(),
   resources: z.object({
-    knowledge_packages: z.array(z.string()).optional(),
-    memory_keys: z.array(z.string()).optional(),
-    memory_prefixes: z.array(z.string()).optional(),
+    knowledge_packages: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
+    memory_keys: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
+    memory_prefixes: z.array(z.string().max(INPUT_LIMITS.key)).optional(),
     files: z.array(TaskFileRefSchema).max(20).optional(),
   }).optional(),
   todos: z.array(z.object({
-    id: z.string(),
+    id: z.string().max(INPUT_LIMITS.id),
     order: z.number(),
-    title: z.string(),
-    description: z.string().optional().default(''),
+    title: z.string().max(INPUT_LIMITS.title),
+    description: z.string().max(INPUT_LIMITS.description).optional().default(''),
     environment: z.enum(['aimeat', 'agent']),
-    environment_reason: z.string().optional(),
-    verification: z.string().optional().default(''),
+    environment_reason: z.string().max(INPUT_LIMITS.line).optional(),
+    verification: z.string().max(INPUT_LIMITS.description).optional().default(''),
     estimate_minutes: z.number().optional(),
     status: TodoStatusSchema.optional().default('pending'),
-    completed_at: z.string().optional(),
+    completed_at: z.string().max(INPUT_LIMITS.id).optional(),
     effects: TodoEffectsSchema.optional(),
   })).optional(),
 });
@@ -168,7 +170,7 @@ export const AgentTaskTriageSchema = z.object({
 
 export const AgentTaskTodoUpdateSchema = z.object({
   status: TodoStatusSchema,
-  completed_at: z.string().optional(),
+  completed_at: z.string().max(INPUT_LIMITS.id).optional(),
 });
 
 // POST /v1/agents/:name/tasks/:id/request-changes -- owner sends a free-text

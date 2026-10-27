@@ -25742,5 +25742,23 @@
   "home.agentPage.takes": "Trabajo abierto que toma",
   "home.agentPage.takesNone": "Ninguno: no tiene habilidades definidas",
   "home.agentPage.takesSub": "El trabajo abierto de un objetivo que pide una de estas habilidades.",
-  "home.agentPage.takesChange": "Cambiar"
+  "home.agentPage.takesChange": "Cambiar",
+  "form.checkFields": "No se guardó. Revisa los campos marcados.",
+  "validation": {
+    "failed": "Hay que corregir {{n}} campos. Cada uno dice qué cambiar.",
+    "oneField": "{{field}}: {{problem}}",
+    "tooLong": "Demasiado largo: como máximo {{n}} caracteres.",
+    "tooShort": "Demasiado corto: al menos {{n}} caracteres.",
+    "tooMany": "Demasiados: como máximo {{n}}.",
+    "tooFew": "Muy pocos: al menos {{n}}.",
+    "required": "Rellena este campo.",
+    "blank": "Escribe algo más que espacios.",
+    "controlChar": "Contiene un carácter de control oculto. Quítalo e inténtalo de nuevo.",
+    "nulByte": "Contiene un carácter nulo, que no se puede guardar. Quítalo e inténtalo de nuevo.",
+    "invalidUnicode": "Contiene un carácter dañado. Escribe o pega el texto de nuevo.",
+    "unknownField": "Este campo no se acepta aquí.",
+    "invalidType": "Tipo de valor incorrecto: se esperaba {{expected}}.",
+    "invalidFormat": "No tiene el formato esperado.",
+    "invalidValue": "No es uno de los valores permitidos."
+  }
 }

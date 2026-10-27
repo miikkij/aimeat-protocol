@@ -10,9 +10,11 @@
  * @structure GoalInputSchema · GoalPatchSchema · buildGoal() · applyPatch() · previewPatch()
  * @usage const goal = buildGoal(access, GoalInputSchema.parse(body), now);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { Cron } from 'croner';
 import { GoalError, logEntry, newId, type GoalAccess } from './goals-store.js';
 import { WorkSpecSchema, makeWork, parseWorkSpec, appendWorks } from './goals-work.js';
@@ -21,7 +23,7 @@ import {
   type GoalReaction, type GoalRecord, type WorkSpec,
 } from './goals-types.js';
 
-const AgentName = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i);
+const AgentName = z.string().regex(/^[a-z0-9][a-z0-9_-]{0,63}$/i).max(INPUT_LIMITS.name);
 
 const LimitsSchema = z.object({
   usd: z.number().min(0).max(100_000).nullable().optional(),

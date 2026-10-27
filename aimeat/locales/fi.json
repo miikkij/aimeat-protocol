@@ -28099,5 +28099,23 @@
   "home.agentPage.takes": "Avoin työ, jota se ottaa",
   "home.agentPage.takesNone": "Ei mitään: sille ei ole asetettu taitoja",
   "home.agentPage.takesSub": "Tavoitteen avoin työ, joka pyytää jotain näistä taidoista.",
-  "home.agentPage.takesChange": "Muuta"
+  "home.agentPage.takesChange": "Muuta",
+  "form.checkFields": "Ei tallennettu. Tarkista merkityt kentät.",
+  "validation": {
+    "failed": "Korjaa {{n}} kenttää. Jokainen kertoo, mitä muuttaa.",
+    "oneField": "{{field}}: {{problem}}",
+    "tooLong": "Liian pitkä: enintään {{n}} merkkiä.",
+    "tooShort": "Liian lyhyt: vähintään {{n}} merkkiä.",
+    "tooMany": "Liian monta: enintään {{n}}.",
+    "tooFew": "Liian vähän: vähintään {{n}}.",
+    "required": "Täytä tämä.",
+    "blank": "Kirjoita muutakin kuin välilyöntejä.",
+    "controlChar": "Tekstissä on näkymätön ohjausmerkki. Poista se ja yritä uudelleen.",
+    "nulByte": "Tekstissä on nollamerkki, jota ei voi tallentaa. Poista se ja yritä uudelleen.",
+    "invalidUnicode": "Tekstissä on rikkinäinen merkki. Kirjoita tai liitä teksti uudelleen.",
+    "unknownField": "Tätä kenttää ei oteta vastaan tässä.",
+    "invalidType": "Väärä arvon laji: odotettiin {{expected}}.",
+    "invalidFormat": "Muoto ei ole oikea.",
+    "invalidValue": "Arvo ei ole mikään sallituista."
+  }
 }

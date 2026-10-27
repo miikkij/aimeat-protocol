@@ -34,11 +34,13 @@
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-08-23 — A stored report can also be a moment somebody kept, not only a month the
  *     schedule wrote. The index says which kind each one is.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { Storage } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 
@@ -147,12 +149,12 @@ const QuestionSchema = z.object({
   help: z.string().max(2000).optional(),
   type: z.enum(['boolean', 'choice']),
   options: z.array(OptionSchema).max(50).optional(),
-  implies: z.record(z.string(), z.string()),
+  implies: z.record(z.string(), z.string().max(INPUT_LIMITS.id)),
 });
 
 export const QuestionnaireSchema = z.object({
   version: z.string().min(1).max(60),
-  updatedAt: z.string().optional(),
+  updatedAt: z.string().max(INPUT_LIMITS.id).optional(),
   note: z.string().max(4000).default(''),
   classes: z.array(z.object({
     id: z.string().min(1).max(60),
@@ -200,7 +202,7 @@ export const UseCaseSchema = z.object({
   dataSubjects: z.string().max(2000).optional(),
   answers: z.record(z.string(), z.unknown()).optional(),
   answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence'])).optional(),
-  updatedAt: z.string().optional(),
+  updatedAt: z.string().max(INPUT_LIMITS.id).optional(),
   updatedBy: z.string().max(300).optional(),
 });
 

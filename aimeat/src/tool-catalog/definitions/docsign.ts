@@ -12,13 +12,15 @@
  *     an EU Digital Identity Wallet (wish-allekirjoitus-eudi-lompakolla).
  *   v1.2.0 — 2026-10-10 — aimeat_docsign_wallet_start's storage_key is optional.
  *   v1.3.0 — 2026-10-10 — aimeat_docsign_delete.
+ *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
-const SHA256 = z.string().regex(/^[0-9a-fA-F]{64}$/);
+const SHA256 = z.string().regex(/^[0-9a-fA-F]{64}$/).max(INPUT_LIMITS.id);
 
 export const docsignTools = [
     {

@@ -12,9 +12,11 @@
  *   visibility: memoryWriteVisibilitySchema.optional()
  *   if (!storedVisibilitySchema.safeParse(v).success) → 400
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V3.2 + V3.3).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 
 const ORGANISM_ID = '[A-Za-z0-9][A-Za-z0-9_-]{0,127}';
 
@@ -36,7 +38,7 @@ export const MEMORY_WRITE_VISIBILITIES = ['private', 'owner', 'group', 'members'
 export const STORED_VISIBILITY_WORDS = ['private', 'owner', 'group', 'workspace', 'members', 'public'] as const;
 
 // Typed as the template literal it guarantees, so a parsed value is a StoredVisibility, not a string.
-const organismWord = z.string().regex(ORGANISM_VISIBILITY_RE, 'organism:<organism id>') as unknown as z.ZodType<`organism:${string}`>;
+const organismWord = z.string().regex(ORGANISM_VISIBILITY_RE, 'organism:<organism id>').max(INPUT_LIMITS.id) as unknown as z.ZodType<`organism:${string}`>;
 
 /** A memory write's visibility: one of MEMORY_WRITE_VISIBILITIES or `organism:<id>`. */
 export const memoryWriteVisibilitySchema = z.union([z.enum(MEMORY_WRITE_VISIBILITIES), organismWord]);

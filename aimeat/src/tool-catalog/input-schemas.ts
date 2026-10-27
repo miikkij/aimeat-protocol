@@ -10,6 +10,7 @@
  *   questionsSchema · boardRulesInput · organismAudienceInput · wsGrantShape · tokenMap
  * @usage import { flexibleBoolean } from '../input-schemas.js';  owner_scope: { …, zod: flexibleBoolean }
  * @version-history
+ *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.3.0 — 2026-10-18 — itemShape takes kind `subscription` (Comicland v3 A-5).
  *   v1.2.0 — 2026-10-17 — organismAudienceInput: the `organism:<id>` level a board or a skill may take
  *     (plan doc-mvcn6c7e4e5q, V3.5 and V3.9).
@@ -18,6 +19,7 @@
  *     commerce,agent-crew,decide,boards,organisms-name-invites,themes}.ts (secaudit 2026-10, M3).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 
 /**
  * A boolean flag that also accepts the strings "true" and "false".
@@ -63,7 +65,7 @@ export const questionsSchema = z.record(z.string(), z.object({
 /** The rule set an agent may send for a board. Strict, so a misspelled rule is refused instead of dropped. */
 export const boardRulesInput = z.strictObject({
     posting: z.enum(['owner', 'members', 'anyone']).optional(),
-    categories: z.array(z.string()).optional(),
+    categories: z.array(z.string().max(INPUT_LIMITS.name)).optional(),
     default_ttl_hours: z.number().optional(),
     post_cost: z.number().optional(),
 });
@@ -72,13 +74,13 @@ export const boardRulesInput = z.strictObject({
  * `organism:<id>`: the active members of one organism, in the form services/audience.ts parseAudience
  * reads. Membership is decided by the service, not here.
  */
-export const organismAudienceInput = z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/);
+export const organismAudienceInput = z.string().regex(/^organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/).max(INPUT_LIMITS.id);
 
 /** Per-workspace grants applied when an invitee joins an organism. */
 export const wsGrantShape = z.array(z.object({
-    ws: z.string().describe('Workspace id'),
+    ws: z.string().max(INPUT_LIMITS.id).describe('Workspace id'),
     role: z.enum(['viewer', 'contributor']).describe('viewer = read only; contributor = read + write'),
 }));
 
 /** A theme's token → colour map for one mode. */
-export const tokenMap = z.record(z.string(), z.string());
+export const tokenMap = z.record(z.string(), z.string().max(INPUT_LIMITS.line));

@@ -14,6 +14,7 @@
  *   import { registerManagedPrompts } from './prompts-managed.js';
  *   await registerManagedPrompts(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.1.1 — 2026-09-26 — The caller's account name comes from localAccountName (utils/gaii.ts),
  *     which keeps a visitor from another node whole (secaudit 2026-09, F-1).
@@ -26,6 +27,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/server';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, SystemPromptRecord } from '../storage/interface.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
@@ -96,10 +98,10 @@ export async function registerManagedPrompts(
         // Every argument is an optional string, so the handler's inferred args stay
         // Record<string, string | undefined> and substituteVariables can take them as they come.
         const argsSchema: Record<string, z.ZodOptional<z.ZodString>> = {
-            language: z.string().optional().describe('Language tag for the prompt body, e.g. "fi". Defaults to English.'),
+            language: z.string().max(INPUT_LIMITS.id).optional().describe('Language tag for the prompt body, e.g. "fi". Defaults to English.'),
         };
         for (const name of asked) {
-            argsSchema[name] = z.string().optional().describe(`Value for {{${name}}} in this prompt.`);
+            argsSchema[name] = z.string().max(INPUT_LIMITS.text).optional().describe(`Value for {{${name}}} in this prompt.`);
         }
 
         mcp.registerPrompt(

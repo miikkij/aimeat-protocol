@@ -42,6 +42,11 @@
  *          actions=${html`<${Action} small onClick=${save}>${x('save')}<//>`} />`
  *        html`<${TextArea} label=${t('x.body')} rows=${4} value=${body} onInput=${setBody} />`
  * @version-history
+ *   v1.8.0 — 2026-10-27 — A refused write's message for the field's `name` shows under it (Fields
+ *     `errors`, components/Field.js), and aria-describedby names the message too. Without a page's own
+ *     maxLength, a TextField stops at INPUT_LIMITS.line and a TextArea at INPUT_LIMITS.text
+ *     (js/input-limits.js, the server's numbers); a hidden key, a number, code, a page, a source and a
+ *     script take none (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.7.0 — 2026-09-27 — TextArea `source`: a whole file's source in the heavy ink frame (the old app
  *     catalogue's source editor, #source-code), and `script`: an extension's file (the old .cx-code),
  *     appcat parity (dialogs); additive, text-field.css .text-area--source, .text-area--script.
@@ -73,7 +78,8 @@ import { h } from 'preact';
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useFieldIds, inField, messageOf } from '/components/Field.js';
+import { useFieldIds, inField, messageOf, useFieldMessage, describedBy } from '/components/Field.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 const html = htm.bind(h);
 const cx = (...parts) => parts.filter(Boolean).join(' ');
@@ -123,7 +129,9 @@ function keyHandler({ onKeyDown, onEnter, onEscape, onSend, search, onInput, mul
   };
 }
 
-export function TextField(props) {
+export function TextField(given) {
+  // A refused write's message for this field's `name`, when the page's Fields carries `errors`.
+  const props = useFieldMessage(given);
   const {
     id, value, placeholder, type, code, secret, search, size, note, actions, box, invalid, error,
     min, max, step, maxLength, inputMode, autoComplete, spellCheck, name, required, disabled, readOnly,
@@ -143,15 +151,18 @@ export function TextField(props) {
 
   const bad = !!invalid || !!messageOf(props.message, error)?.error;
   const kind = secret ? (shown ? 'text' : 'password') : unmanaged ? 'password' : search ? 'search' : (type || 'text');
+  // A line of text stops at the server's one-line limit unless the page names its own; a key or a
+  // token is pasted whole, so a hidden field takes no default.
+  const limit = maxLength ?? (secret || unmanaged || kind === 'number' ? undefined : INPUT_LIMITS.line);
   const input = html`<input id=${ids.id} ref=${setRef} name=${name}
     class=${cx('og-input', code && 'og-input--code', SIZES.has(size) && `text-field--${size}`, bad && 'og-input--invalid')}
     type=${kind} value=${value ?? ''} placeholder=${placeholder} title=${title}
-    min=${min} max=${max} step=${step} maxLength=${maxLength} inputMode=${inputMode} list=${list}
+    min=${min} max=${max} step=${step} maxLength=${limit} inputMode=${inputMode} list=${list}
     autoComplete=${autoComplete ?? (secret || unmanaged || noManager ? 'off' : undefined)} spellCheck=${secret || unmanaged || code ? false : spellCheck}
     data-1p-ignore=${keepOut ? '' : undefined} data-lpignore=${keepOut ? 'true' : undefined}
     required=${required} disabled=${disabled} readOnly=${readOnly}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
-    aria-describedby=${props.hint ? ids.hintId : undefined}
+    aria-describedby=${describedBy(props, ids)}
     onInput=${onInput ? (e) => onInput(e.currentTarget.value, e) : undefined}
     onChange=${onChange ? (e) => onChange(e.currentTarget.value, e) : undefined}
     onBlur=${onBlur ? (e) => onBlur(e.currentTarget.value, e) : undefined}
@@ -170,7 +181,8 @@ export function TextField(props) {
   return inField(props, ids, control, false);
 }
 
-export function TextArea(props) {
+export function TextArea(given) {
+  const props = useFieldMessage(given);
   const {
     id, value, placeholder, rows, code, grow, invalid, error, maxLength, spellCheck, name, required,
     disabled, readOnly, autoFocus, ariaLabel, title, inputRef, indent, prompt, actions, page, source, script,
@@ -216,12 +228,15 @@ export function TextArea(props) {
   useLayoutEffect(() => { fit(own.current); }, [value, fit, own]);
 
   const bad = !!invalid || !!messageOf(props.message, error)?.error;
+  // Free text stops at the server's free-text limit unless the page names its own. A document (code,
+  // a page, a whole file's source, a script) is bounded by the request size, so it takes no default.
+  const limit = maxLength ?? (code || page || source || script || indent ? undefined : INPUT_LIMITS.text);
   const area = html`<textarea id=${ids.id} ref=${setRef} name=${name}
     class=${cx('og-textarea', code && 'og-textarea--code', grow && 'text-area--grow', prompt && 'text-area--prompt', page && 'og-textarea--page', source && 'text-area--source', script && 'text-area--script', script === 'long' && 'text-area--script-long', bad && 'og-textarea--invalid')}
-    rows=${rows} value=${value ?? ''} placeholder=${placeholder} title=${title} maxLength=${maxLength}
+    rows=${rows} value=${value ?? ''} placeholder=${placeholder} title=${title} maxLength=${limit}
     spellCheck=${code ? false : spellCheck} required=${required} disabled=${disabled} readOnly=${readOnly}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
-    aria-describedby=${props.hint ? ids.hintId : undefined}
+    aria-describedby=${describedBy(props, ids)}
     onInput=${(e) => { fit(e.currentTarget); onInput?.(e.currentTarget.value, e); }}
     onChange=${onChange ? (e) => onChange(e.currentTarget.value, e) : undefined}
     onBlur=${onBlur ? (e) => onBlur(e.currentTarget.value, e) : undefined}

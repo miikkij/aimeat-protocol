@@ -7,6 +7,7 @@
     scope model and the shared consent vocabulary, so its presets and sentences can never diverge
     from the SPA's AgentConsent panel again.
   @version-history
+    2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
     2026-10-25 — A request for an existing agent that did not prove it is coming back
         (`return_proven: false` on /verify/info) says plainly that a new device is taking the agent
         over, and offers to sign its other sessions out (checked; end_other_sessions) (secaudit2026oct22).
@@ -299,7 +300,7 @@
         <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">
           <label>${escHtml(t('usernameLabel'))}</label>
-          <input type="text" id="username" required autocomplete="username" />
+          <input type="text" id="username" required autocomplete="username" maxlength="256" /><!-- js/input-limits.js id -->
           <label>${escHtml(t('passwordLabel'))}</label>
           <input type="password" id="password" required autocomplete="current-password" />
           <label>${escHtml(t('totpLabel'))}</label>

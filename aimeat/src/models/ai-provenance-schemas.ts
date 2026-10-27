@@ -34,6 +34,7 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.4.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.0 — 2026-10-08 — The record says what KIND of thing it describes: optional `mediaKind`
  *     (AI_MEDIA_KINDS), `mediaType` (IANA) and the declarer's `resemblesReal`, and method
  *     `transcribed`. All additive within v1. Every record had been worded as text, so a speech clip
@@ -58,6 +59,7 @@
  *     spelling the strings a second and third time.
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /** The spec identifier readers branch on. Frozen; a new shape means a new string. */
 export const AI_PROVENANCE_SPEC_V1 = 'aimeat.provenance/v1';
@@ -201,7 +203,7 @@ export type LocalizedText = z.infer<typeof LocalizedTextSchema>;
 
 /** SHA-256 identity of the exact bytes the statement is about. `sha256:` prefixed, lower-case hex. */
 export const CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/;
-const contentHash = z.string().trim().regex(CONTENT_HASH_PATTERN, 'contentHash must be `sha256:<64 lower-case hex>`');
+const contentHash = z.string().max(INPUT_LIMITS.id).trim().regex(CONTENT_HASH_PATTERN, 'contentHash must be `sha256:<64 lower-case hex>`');
 
 // ── Nested blocks ───────────────────────────────────────────────────────────────────────────────
 
@@ -303,7 +305,7 @@ export const AiProvenanceSchema = z.object({
   /** What kind of thing this is. Optional: an old record says nothing about its medium. */
   mediaKind: z.enum(AI_MEDIA_KINDS).optional(),
   /** The IANA media type of the bytes, when the node or the declarer knows it (`audio/mpeg`). */
-  mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
+  mediaType: z.string().max(INPUT_LIMITS.id).trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
   /** Does it resemble a real person, place or event? Declared; the node never infers it. */
   resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
 

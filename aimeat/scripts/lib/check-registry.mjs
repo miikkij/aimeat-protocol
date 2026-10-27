@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-10-27: check:string-bounds (every Zod string bounded, zero allowed) and check:write-validation (writing routes read their body through a schema; seeded ratchet).
  *  - 2026-10-23: check:unbounded-lists also refuses a Postgres take-first read without LIMIT 1 (aimeat.io stalled on one that day).
  *  - 2026-10-20: check:unbounded-lists (QA audit P7-10) and check:storage-conformance (P4-09), two ratchets seeded from today's code.
  *  - 2026-10-20: check:unit-ports, a unit test uses port 0 and never a fixed one (three red CI runs in the week from 2026-10-12).
@@ -84,6 +85,10 @@ export const FAST_CHECKS = [
     { script: 'check:mcp-test-calls', label: 'Every MCP tool is called by an E2E suite, or listed with a reason; the list only shrinks' },
     { script: 'check:suite-ports', label: 'No two E2E suites write down the same port' },
     { script: 'check:unit-ports', label: 'No unit test listens on, connects to or names as dead a fixed port' },
+    // Wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli (2026-10-27): about 370
+    // Zod strings had no length limit, and 46 of about 790 writing routes checked their body by schema.
+    { script: 'check:string-bounds', label: 'Every Zod string under src/ has a length limit from models/input-limits.ts' },
+    { script: 'check:write-validation', label: 'Every writing route that reads a body checks it with a schema, or is listed; the list only shrinks' },
     { script: 'check:unbounded-lists', label: 'No new storage list without a bound, no new whole-table read, and no Postgres take-first read without LIMIT 1; the list only shrinks' },
     { script: 'check:storage-conformance', label: 'No new storage repository without a two-provider case, and the methods those cases call only rise' },
     { script: 'check:outbound-fetch', label: 'Outbound fetch goes through safeFetch' },
