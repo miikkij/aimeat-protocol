@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-anonymous-mode-switch.ts joins the list (not the guard tier): anonymous mode switched off through the config endpoint ends minting, injection and the minted tokens at once (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -1165,6 +1166,8 @@ const ALL_SUITES = [
     // A node closed to strangers stores a public write at the signed-in level; the feed announces an app only while it is public (plan doc-mvcn6c7e4e5q, V1.6).
     'test/e2e-closed-node-levels.ts',
     'test/e2e-anonymous-identity-leaks.ts',
+    // Anonymous mode switched off and on through the config endpoint takes effect at once (secaudit2026oct26).
+    'test/e2e-anonymous-mode-switch.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',
