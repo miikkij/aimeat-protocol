@@ -95,6 +95,27 @@ await test('4b. A bensplit. record another account wrote into its own memory is 
   assert(l.status === 200 && l.body.data.count === 0, `the provider lists no forged split: ${JSON.stringify(l.body.data)}`);
 });
 
+console.log('\n8. The operator\'s money platform fees');
+
+const operatorFees = async (): Promise<Record<string, unknown>> => {
+  const r = await json('/v1/admin/dashboard', { headers: auth(operator.token) });
+  assert(r.status === 200, `dashboard: ${r.status} ${JSON.stringify(r.body?.error)}`);
+  const m = JSON.stringify(r.body.data).match(/"operator_money_fees":(\{[^}]*\})/);
+  return m ? JSON.parse(m[1]) : {};
+};
+
+await test('8a. An account and its agent do not write commerce.platform-fee. through a memory route, and the figure does not move', async () => {
+  const before = await operatorFees();
+  const own = await write(mallory.token, `commerce.platform-fee.snl${stamp}`, { fee: 1_000_000, currency: 'EUR' });
+  assert(own.status === 403 && own.body.error?.code === 'RESERVED_KEY', `the account holder: ${own.status} ${JSON.stringify(own.body)}`);
+  const neg = await write(mallory.token, `commerce.platform-fee.snlneg${stamp}`, { fee: -500, currency: 'EUR' });
+  assert(neg.status === 403, `a negative fee: ${neg.status}`);
+  const agent = await write(malloryAgent, `commerce.platform-fee.snlag${stamp}`, { fee: 1_000_000, currency: 'EUR' });
+  assert(agent.status === 403 && agent.body.error?.code === 'RESERVED_KEY', `the agent: ${agent.status} ${JSON.stringify(agent.body)}`);
+  const after = await operatorFees();
+  assert(JSON.stringify(after) === JSON.stringify(before), `the figure moved: ${JSON.stringify(before)} -> ${JSON.stringify(after)}`);
+});
+
 console.log('\n9. Metered contracts and grants');
 
 const forgedEntitlement = (kind: 'grant' | 'contract', extra: Record<string, unknown> = {}) => ({
