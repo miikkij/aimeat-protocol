@@ -9,6 +9,7 @@
  *   once, leaving them as they were.
  * @usage pnpm exec vitest run test/unit/subdomain-site-origin.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-28 — A redirect and an operator's own app are kept as they are without a question, and an incident with nothing left to decide resolves (Jouni, 2026-10-28). The assertions above are unchanged.
  *   v1.2.0 — 2026-10-27 — Each undecided address is an entry of the incident, decided with "app_only" or "keep", and an incident recorded before entries gets them once (Jouni, 2026-10-27).
  *   v1.1.0 — 2026-10-27 — The incident also carries `params` for the page's plain sentence; the detail assertions are unchanged.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
@@ -18,7 +19,7 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { OwnerRecord, SubdomainSiteRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { apexServesSite, autoLabelCandidates, classifySiteOrigin } from '../../src/services/subdomain-site-origin.js';
-import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce } from '../../src/services/subdomain-site-origin-keep.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../../src/services/subdomain-site-origin-keep.js';
 import { listSecurityIncidents, recordSecurityIncident } from '../../src/services/security-incident.js';
 import { decideIncidentCase } from '../../src/services/incident-decisions.js';
 
@@ -179,5 +180,59 @@ describe('the subdomain incident, one entry per address', () => {
         const [i] = await incident();
         expect(i!.entries?.map(e => e.id)).toEqual(['opnotes']);
         expect(await addSubdomainIncidentEntriesOnce(storage, config)).toBeNull();
+    });
+});
+
+// The question was asked of the operator's own apps, where neither answer protects anyone (Jouni, 2026-10-28).
+describe('the operator\'s own addresses need no decision', () => {
+    let storage: SqliteStorage;
+    const incident = async () => (await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'subdomain_site_origin');
+    beforeEach(async () => {
+        storage = new SqliteStorage(':memory:');
+        await storage.createOwner({ name: 'op', publicKey: 'a2V5', roles: ['owner', 'operator'], createdAt: AT } as OwnerRecord);
+        await storage.createOwner({ name: 'alice', publicKey: 'a2V5', roles: ['owner'], createdAt: AT } as OwnerRecord);
+        await storage.createSubdomainSite(row('opnotes', 'op/opnotes.html', `op@${NODE}`));
+        await storage.createSubdomainSite(row('go', 'https://example.com/', 'erased:0a1b2c', 'redirect'));
+    });
+
+    it('keeps them as they are, takes them off the list, and leaves another account\'s app to decide', async () => {
+        await storage.createSubdomainSite(row('brand', 'alice/notes.html', `alice@${NODE}`));
+        await classifySubdomainSiteOriginsOnce(storage, config);
+        expect((await incident())[0]!.entries?.map(e => e.id)).toEqual(['brand', 'go', 'opnotes']);
+
+        expect(await keepOperatorOwnAddressesOnce(storage, config)).toEqual(['go', 'opnotes']);
+        expect((await storage.getSubdomainSite('opnotes'))?.origin).toBe('operator');
+        expect((await storage.getSubdomainSite('opnotes'))?.updatedAt).toBe(AT);
+        expect((await storage.getSubdomainSite('go'))?.origin).toBe('operator');
+        expect((await storage.getSubdomainSite('brand'))?.origin).toBeNull();
+        expect(apexServesSite({ kind: 'app', origin: (await storage.getSubdomainSite('opnotes'))?.origin }, 'opnotes', HOSTS)).toBe(true);
+
+        const [i] = await incident();
+        expect(i!.status).toBe('open');
+        expect(i!.entries?.map(e => [e.id, e.status])).toEqual([['brand', 'open']]);
+        expect(await keepOperatorOwnAddressesOnce(storage, config)).toBeNull();
+    });
+
+    it('removes an incident that asked only about such addresses, entries or none', async () => {
+        await classifySubdomainSiteOriginsOnce(storage, config);
+        await recordSecurityIncident(storage, config, {
+            type: 'subdomain_site_origin', code: 'SUBDOMAIN_ORIGIN_UNKNOWN', actorGhii: `system@${NODE}`, actorName: 'node', source: 'boot',
+            detail: '1 subdomain address(es) could not be told apart: opnotes.',
+        });
+        expect(await incident()).toHaveLength(2);
+        expect(await keepOperatorOwnAddressesOnce(storage, config)).toEqual(['go', 'opnotes']);
+        expect(await incident()).toHaveLength(0);
+    });
+
+    it('resolves an incident whose other addresses the operator decided already', async () => {
+        await storage.createSubdomainSite(row('brand', 'alice/notes.html', `alice@${NODE}`));
+        await classifySubdomainSiteOriginsOnce(storage, config);
+        const [before] = await incident();
+        await decideIncidentCase(config, storage, { incidentId: before!.id, name: 'brand', resolution: 'app_only', by: { principal: `op@${NODE}`, kind: 'human' } });
+        expect((await incident())[0]!.status).toBe('open');
+        await keepOperatorOwnAddressesOnce(storage, config);
+        const [after] = await incident();
+        expect(after!.status).toBe('resolved');
+        expect(after!.entries?.map(e => [e.id, e.status])).toEqual([['brand', 'done']]);
     });
 });
