@@ -174,6 +174,40 @@ describe('names live in the owner\'s namespace, on every provider', () => {
         }
     });
 
+    // secaudit2026oct26 (component-address:extensionCallTarget:bare-extension-head-shadows-owner-namespace).
+    // A bare extension named like an account, given an instance named like that account's extension
+    // AFTER the account's extension was installed, took over /v1/ext/<owner>/<name>/<action>. The
+    // owner's `<owner>/<name>` now takes the call; an instance that was there first keeps its address.
+    it('a later bare extension named like an account does not take over that account\'s <owner>/<name> calls', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const alice = `alice${s}`, mallory = `mal${s}`, carol = `carol${s}`;
+            const nsRec = extRecord(`${alice}/weather`, alice);
+            nsRec.installedAt = new Date(Date.now() - 60_000).toISOString();
+            await storage.createExtension(nsRec);
+            await storage.createExtension(extRecord(alice, mallory));
+            const now = new Date().toISOString();
+            await storage.createExtensionInstance({ id: 'weather', extensionName: alice, config: {}, status: 'active', createdBy: mallory, createdAt: now, updatedAt: now });
+            expect(await extensionCallTarget(storage, alice, 'weather', carol), `${name}: another account calls alice/weather`).toEqual({ extRef: `${alice}/weather` });
+            expect(await extensionCallTarget(storage, alice, 'weather', null), `${name}: a visitor calls alice/weather`).toEqual({ extRef: `${alice}/weather` });
+            // The bare extension's other instances keep the instance form.
+            await storage.createExtensionInstance({ id: 'other', extensionName: alice, config: {}, status: 'active', createdBy: mallory, createdAt: now, updatedAt: now });
+            expect(await extensionCallTarget(storage, alice, 'other', carol), `${name}: an instance with no namespaced twin`).toEqual({ extRef: alice, instanceId: 'other' });
+        }
+    });
+
+    it('an instance address that was there before the account\'s extension keeps its meaning', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const bare = `old${s}`, holder = `hold${s}`, carol = `carol${s}`;
+            const old = new Date(Date.now() - 120_000).toISOString();
+            await storage.createExtension(extRecord(bare, holder));
+            await storage.createExtensionInstance({ id: 'notes', extensionName: bare, config: {}, status: 'active', createdBy: holder, createdAt: old, updatedAt: old });
+            await storage.createExtension(extRecord(`${bare}/notes`, bare));
+            expect(await extensionCallTarget(storage, bare, 'notes', carol), `${name}: the older instance address`).toEqual({ extRef: bare, instanceId: 'notes' });
+        }
+    });
+
     it('the owner\'s short file key and memory owner name the stored ones, and nobody else\'s', async () => {
         for (const { name, storage } of provs) {
             const s = stamp();
