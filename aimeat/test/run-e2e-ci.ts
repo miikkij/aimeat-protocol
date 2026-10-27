@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-refinery-definition-ask.ts joins the list (not the guard tier): a mail refinery definition's mailbox, workspace and keepText changed by an app or an agent that may not run it wait for the owner's one-press answer (secaudit2026oct26).
  *   2026-10-27 -- e2e-portfolio-memory-gate.ts joins the list (not the guard tier): the welcome page's switch written through POST, PATCH or the bulk memory door asks the publish gate as PUT /v1/portfolio/config does (secaudit2026oct26).
  *   2026-10-27 -- e2e-service-namespace-lists.ts joins the list (not the guard tier): beneficiary splits, metered contracts, grants and their history, and the operator's money platform fees take only the service's own records (secaudit2026oct26).
  *   2026-10-27 -- e2e-memory-door-parity.ts joins the list (not the guard tier): bulk-delete and the bin routes ask the bin's per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller reads as absent (secaudit2026oct26).
@@ -816,6 +817,9 @@ const ALL_SUITES = [
     // The welcome page's switch written through a memory door asks the publish gate as
     // PUT /v1/portfolio/config does (secaudit2026oct26).
     'test/e2e-portfolio-memory-gate.ts',
+    // Where a mail refinery reads and files mail waits for the owner when an app or an agent that may
+    // not run it changes it (secaudit2026oct26).
+    'test/e2e-refinery-definition-ask.ts',
     // Who sees the hands on a key, and who reads a task's title in the event record (secaudit 2026-10, v88, v89).
     'test/e2e-memory-hands-readers.ts',
     'test/e2e-account-events-readers.ts',

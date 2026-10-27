@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   2026-10-27 — Where a mail refinery reads and files mail, asked by an app or an agent that may not
+ *     run it and allowed by the owner (apply-refinery-definition.ts; secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — A subscription renewal at a raised price, allowed by the buyer
  *     (apply-subscription-price.ts; secaudit2026oct22).
  *   v1.9.0 — 2026-10-25 — The secret host question switched off at an agent's or app's request
@@ -51,6 +53,7 @@ import { applyExtensionEmailPolicy } from './apply-extension-email-policy.js';
 import { applyCrewModel } from './apply-crew-model.js';
 import { applyAccountSetting } from './apply-account-setting.js';
 import { applySubscriptionPrice } from './apply-subscription-price.js';
+import { applyRefineryDefinition } from './apply-refinery-definition.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -73,4 +76,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'crew-model': applyCrewModel,
   'account-setting': applyAccountSetting,
   'subscription-price': applySubscriptionPrice,
+  'refinery-definition': applyRefineryDefinition,
 };

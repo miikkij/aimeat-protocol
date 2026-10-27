@@ -7504,7 +7504,11 @@ components:
         The welcome page's switch, the memory record `portfolio.config`, written through a memory
         route (POST, PUT, PATCH /v1/memory, POST /v1/memory/bulk or /import) asks the same as
         PUT /v1/portfolio/config: a write that would switch the served page on, or open it to anyone,
-        stores the rest of the record and files a request of kind `portfolio`.
+        stores the rest of the record and files a request of kind `portfolio`. A mail refinery's
+        definition (`<prefix>.config` in the owner's own namespace), written there by an app grant or an
+        agent that does not hold the four run permissions, keeps the mailbox, the workspace, the spaces
+        and `keepText` it had when the write changes them, and files a request of kind
+        `refinery-definition` that the owner answers with one press; the rest of the write is stored.
       content:
         application/json:
           schema:

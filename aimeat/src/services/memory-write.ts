@@ -29,6 +29,8 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-27 — A `gatePublic` write asks services/memory-write-asks.ts, which adds a mail refinery
+ *     definition's destination changed by a writer that may not run it (secaudit2026oct26).
  *   2026-10-27 — A `gatePublic` write of the welcome page's switch (portfolio.config) asks the publish
  *     gate as PUT /v1/portfolio/config does (services/portfolio-memory-gate.ts); shadowWarning moved to
  *     services/memory-write-shadow.ts and is re-exported (secaudit2026oct26).
@@ -157,8 +159,7 @@ import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRe
 import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 import { shadowWarning } from './memory-write-shadow.js';
-import { portfolioMemoryWriteGate } from './portfolio-memory-gate.js';
-import { filePortfolioAsk } from './portfolio-publish-gate.js';
+import { memoryWriteAsks, fileMemoryWriteAsks } from './memory-write-asks.js';
 export { shadowWarning };
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
@@ -500,11 +501,11 @@ export async function writeMemoryRecord(
             input = { ...input, ...keptMemoryLevel(existing) };
         }
     }
-    // 3b. The welcome page's switch, as PUT /v1/portfolio/config asks it (services/portfolio-memory-gate.ts;
-    //     secaudit2026oct26): all but the change that makes the served page public, and a request for it.
-    const portfolio = input.gatePublic ? await portfolioMemoryWriteGate({ storage, config }, caller, input.key, input.value) : null;
-    if (portfolio?.kind === 'refused') return { ok: false, status: portfolio.status, code: 'PUBLISH_NOT_ALLOWED', message: portfolio.message };
-    if (portfolio?.kind === 'ask') input = { ...input, value: portfolio.value };
+    // 3b. The owner's other questions (services/memory-write-asks.ts; secaudit2026oct26): the welcome
+    //     page's switch and a mail refinery's destination store all but the change asked about.
+    const asks = input.gatePublic ? await memoryWriteAsks({ storage, config }, caller, input.key, input.value) : null;
+    if (asks && 'refused' in asks) return { ok: false, status: asks.refused.status, code: 'PUBLISH_NOT_ALLOWED', message: asks.refused.message };
+    if (asks?.asks.length) input = { ...input, value: asks.value };
     if (input.key.startsWith('organism.')) {
         const guard = await isKeyArchived(storage, input.key);
         if (guard.archived) {
@@ -685,9 +686,9 @@ export async function writeMemoryRecord(
         if (filed.ok) publishRequest = filed.publishRequest;
         else warnings.push(filed.warning);
     }
-    if (portfolio?.kind === 'ask') {
-        const asked = await filePortfolioAsk({ storage, config }, portfolio.ownerName, portfolio);
-        if ('publishRequest' in asked) publishRequest = asked.publishRequest; else warnings.push(asked.warning);
+    if (asks && !('refused' in asks) && asks.asks.length) {
+        const filed = await fileMemoryWriteAsks({ storage, config }, asks.asks);
+        publishRequest ??= filed.publishRequest; warnings.push(...filed.warnings);
     }
 
     return {
