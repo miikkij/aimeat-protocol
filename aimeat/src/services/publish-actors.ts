@@ -32,6 +32,8 @@
  *   const actors = [invokingActor(storage, config.nodeId, caller)];
  *   const ask = askActors({ storage, config }, actors);   // allowed | refused | ask (requester)
  * @version-history
+ *   v1.0.1 — 2026-10-27 — installerActor passes the extension's installedAt to the keep check
+ *     (secaudit2026oct26, keep-matched-by-reusable-identifier).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v68 and v69).
  */
 import type { AimeatConfig } from '../config.js';
@@ -100,7 +102,7 @@ export async function principalActor(storage: Storage, nodeId: string, ownerName
  * publishes for the owner as it did (services/extension-publish-keep.ts).
  */
 export async function installerActor(
-    storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, ext: Pick<ExtensionRecord, 'name' | 'actions' | 'installedByPrincipal'>, ownerName: string,
+    storage: Storage, config: Pick<AimeatConfig, 'nodeId'>, ext: Pick<ExtensionRecord, 'name' | 'actions' | 'installedByPrincipal'> & { installedAt?: string }, ownerName: string,
 ): Promise<PublishActor> {
     const principal = (ext.installedByPrincipal ?? '').trim();
     if (!principal.includes('#') || await keepsPrePublishGate(storage, config.nodeId, ext)) {
