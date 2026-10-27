@@ -6,6 +6,9 @@
  *   owner-scope memory lookup (GHII + all agents). Extracted from src/routes/knowledge.ts so the
  *   split route-group modules can share them. Extracted to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — findReadableManifest reads every public copy exactly at the key, accounts and agents
+ *     together, and answers the first one written (firstPackageCopy): a later record of another
+ *     account at a package's key no longer answers for the package (secaudit2026oct26).
  *   2026-10-22 — findReadableManifest takes `preferOwn`: the caller's own account is asked before the
  *     public scan, so the links read lists the caller's own package's rows even when another account
  *     holds a public record at the same key (secaudit 2026-10, v78).
@@ -30,6 +33,18 @@ import { isNodeAccount } from '../../services/audience.js';
 import { packageAudienceOf, knowledgeAudienceAllows } from '../../services/knowledge-audience.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { presentMemory } from '../../services/classification/present-memory.js';
+
+/**
+ * The copy of a package's manifest that names the package: of the records exactly at `manifestKey`,
+ * the one written first. A package id is a server-made uuid, so the import writes its manifest before
+ * anybody can know the key, and any other account's record at that key is later. The store returns
+ * rows in no set order, and a copy picked by scan order let a decoy answer for another account's
+ * package and absorb its moderation (secaudit2026oct26).
+ */
+export function firstPackageCopy(rows: MemoryRecord[], manifestKey: string): MemoryRecord | undefined {
+  return rows.filter(r => r.key === manifestKey)
+    .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.ownerGaii.localeCompare(b.ownerGaii))[0];
+}
 
 export type KnowledgeHelpers = {
   resolve: (req: Express.Request) => string;
@@ -90,12 +105,12 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
       if (found) { record = found.record; own = true; }
     }
     if (!record) {
+      // Every public copy at exactly this key, accounts and agents alike, and the one the package's
+      // importer wrote (firstPackageCopy).
       const allOwners = await storage.listOwners();
-      record = (await storage.listMemoryForOwners(allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' }))[0];
-    }
-    if (!record) {
       const allAgents = await storage.listAgents();
-      record = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' }))[0];
+      record = firstPackageCopy(await storage.listMemoryForOwners(
+        [...allOwners.map(o => `${o.name}@${config.nodeId}`), ...allAgents.map(a => a.gaii)], { prefix: manifestKey, visibility: 'public' }), manifestKey);
     }
     if (!record && signedIn && !opts?.preferOwn) {
       const found = await findOwnerScopeMemory(req, manifestKey);

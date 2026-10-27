@@ -35,6 +35,10 @@
  *   v1.2.1 — 2026-10-27 — /v1/ext/<a>/<b>/<action>: the account's `<a>/<b>` takes the call over a bare
  *     extension `<a>` whose instance `<b>` was made after it (secaudit2026oct26,
  *     extensionCallTarget:bare-extension-head-shadows-owner-namespace).
+ *   v1.3.0 — 2026-10-27 — A new bare install of a short name that only accounts keep under their own
+ *     (no bare record, no released row) lands in the installer's namespace, so it does not take the
+ *     bare address from the holder; the bare address of a shipped cortex name falls back to no
+ *     account's namespaced copy (secaudit2026oct26).
  *   v1.2.0 — 2026-10-26 — The owner is additive: an install keeps its bare name (`<owner>/<name>` only
  *     when asked for in full or when another account released the name), answers keep `name` and add
  *     `owner` and `full_name`, and a bare name the caller has nothing under reaches the one account
@@ -46,6 +50,7 @@
  */
 import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../storage/interface.js';
 import type { ComponentKind } from '../storage/types/component-versions.js';
+import { bundledCortexNames } from './cortex-seeder.js';
 
 /** The namespace of what the node ships: bundled cortexes (system@<node>) and built-in extensions (system). */
 export const SYSTEM_NAMESPACE = 'system';
@@ -123,8 +128,11 @@ async function findComponent<T extends { installedBy: string; name: string }>(
     : (await get(address)) ?? (own ? await own() : null);
   if (found || address.includes('/') || address.includes('@')) return found;
   // No bare record and none of the caller's own: the one account that holds the name in its own
-  // namespace, as a bare name reached before. A name its holder released stays retired.
+  // namespace, as a bare name reached before. A name its holder released stays retired, and so does
+  // a shipped cortex name: apps load the pack from its bare address, which is the node's own even
+  // while the bundled record is missing (secaudit2026oct26).
   if (await releasedName(storage, kind, address)) return null;
+  if (kind === 'cortex' && bundledCortexNames().has(address)) return null;
   const holders = (await list()).filter(r => splitComponentAddress(r.name)?.name === address);
   if (holders.length > 1) throw new AmbiguousComponentName(address, holders.map(r => r.name).sort());
   // The listing is lean (no scripts, no lib bodies): the whole record is read by its key.
@@ -204,7 +212,28 @@ export async function installNameFor(
   if (released && !holds(released.holder, ownerName)) {
     return { name: namespacedName(ownerName, shortName), shortName, reclaimed: false, foreignPrefix };
   }
+  // A bare address with no bare record reaches the one account that keeps the name under its own
+  // (findComponent). A new bare record would take that address from it, so the install goes to the
+  // installer's own namespace, as a second namespaced holder does (secaudit2026oct26).
+  // A shipped cortex name's bare address never falls back to an account, so nothing is taken there.
+  if (!released && !(kind === 'cortex' && bundledCortexNames().has(shortName)) && !(await bareRecordExists(storage, kind, shortName))
+    && (await namespacedHolders(storage, kind, shortName)).some(n => splitComponentAddress(n)?.owner !== ownerName)) {
+    return { name: namespacedName(ownerName, shortName), shortName, reclaimed: false, foreignPrefix };
+  }
   return { name: shortName, shortName, reclaimed: !!released, foreignPrefix };
+}
+
+/** Is there a bare record of this kind under `name`? */
+async function bareRecordExists(storage: Storage, kind: ComponentKind, name: string): Promise<boolean> {
+  return kind === 'extension' ? !!(await storage.getExtension(name)) : !!(await storage.getCortexExtension(name));
+}
+
+/** The stored names of every record of this kind that an account keeps under `<owner>/<short>`. */
+async function namespacedHolders(storage: Storage, kind: ComponentKind, short: string): Promise<string[]> {
+  const all: Array<{ name: string }> = kind === 'extension'
+    ? await leanExtensions(storage)
+    : (typeof storage.listCortexExtensions === 'function' ? await storage.listCortexExtensions({ lean: true }) : []);
+  return all.filter(r => splitComponentAddress(r.name)?.name === short).map(r => r.name);
 }
 
 /**

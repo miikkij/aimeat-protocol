@@ -272,6 +272,23 @@ await test('E3. Owner erasure removes the person\'s link rows, and a new account
     assert(inherited.status === 200 && inherited.body.data.count === 0, `the new account inherited: ${show(inherited)}`);
 });
 
+// secaudit2026oct26: a package id names the package its importer wrote. A public record another
+// account writes later at the same key does not answer for it, to anybody.
+await test('D1. A later public record of another account at a public package\'s key does not answer for the package', async () => {
+    const before = await json(`/v1/knowledge/${pp}`);
+    assert(before.status === 200 && before.body.data?.manifest?.name === 'Public package', `the package as imported: ${show(before)}`);
+    const decoy = await json('/v1/memory', {
+        method: 'POST', headers: auth(C.token),
+        body: JSON.stringify({ key: `packages/${pp}/manifest`, visibility: 'public', tags: ['knowledge-package'],
+            value: { ...before.body.data.manifest, name: 'Decoy package', author_ghii: `${C.name}@${node}` } }),
+    });
+    assert(decoy.status === 201 || decoy.status === 200, `C's public record: ${show(decoy)}`);
+    for (const token of [undefined, B.token, C.token]) {
+        const r = await json(`/v1/knowledge/${pp}`, { headers: token ? auth(token) : {} });
+        assert(r.status === 200 && r.body.data?.manifest?.name === 'Public package', `the package answers as imported: ${show(r)}`);
+    }
+});
+
 await test('Cleanup: the owners go', async () => {
     for (const o of [B, C, A]) if (o.name) await json(`/v1/owners/${o.name}`, { method: 'DELETE', headers: auth(o.token) });
 });

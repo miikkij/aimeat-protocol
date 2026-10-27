@@ -8,6 +8,8 @@
  *     the periods one call walks are counted (secaudit2026oct22).
  *   2026-10-27 - A changed occurrence is normalised without the master's additions, exclusions and other
  *     changed occurrences, so expanding one event costs time in proportion to its size (secaudit2026oct26).
+ *   2026-10-27 - A rule whose BYHOUR x BYMINUTE x BYSECOND lists multiply past 86400 entries is refused
+ *     before the engine builds that list; no rule of distinct in-range values reaches it (secaudit2026oct26).
  */
 import * as rruleModule from 'rrule';
 // The package is an ES module to the bundler and CommonJS to Node, which finds no named export in
@@ -47,11 +49,13 @@ export function ruleOptions(text) {
 // 2. A day filter that never matches (February 30) yields nothing, and the engine walks every period
 //    to the year 9999: the walk is stopped once it is past the requested range (lastPeriod).
 // 3. Everything the engine walks in one call is counted against maxIterations * ENGINE_FACTOR.
+// 4. The BY-time product the engine builds up front is at most MAX_TIMESET entries (occurrences).
 const TIME_LIMITS = { [RRule.HOURLY]: ['byhour'], [RRule.MINUTELY]: ['byhour','byminute'], [RRule.SECONDLY]: ['byhour','byminute','bysecond'] };
 const TIME_SIZE = { byhour: 24, byminute: 60, bysecond: 60 };
 const UTC_PART = { byhour: d => d.getUTCHours(), byminute: d => d.getUTCMinutes(), bysecond: d => d.getUTCSeconds() };
 const DAY_FILTERS = ['bymonth','byweekno','byweekday','byeaster','bymonthday','byyearday'];
 const ENGINE_FACTOR = 5;
+const MAX_TIMESET = 24 * 60 * 60;
 const PAST_END = Symbol('past the range end');
 const asList = v => v == null ? [] : [].concat(v);
 const gcd = (a, b) => b ? gcd(b, a % b) : a;
@@ -164,6 +168,11 @@ export function occurrences(events, options) {
       const { never, lift: limits } = timeLimits(opts, startWall);
       if (!never) {
       for (const [k] of limits) delete opts[k];
+      // 4. The engine builds the BYHOUR x BYMINUTE x BYSECOND product as one list before its first
+      // period, outside the count above. Distinct in-range values give at most one day of seconds, so a
+      // longer product is repeated or out-of-range values and is refused before it is built.
+      const timeset = ['byhour','byminute','bysecond'].reduce((n, k) => n * Math.max(1, asList(opts[k]).length), 1);
+      if (timeset > MAX_TIMESET) throw new RangeError('Recurrence iteration limit exceeded; shorten the series');
       const rule = new RRule({...opts,dtstart:new Date(startWall),until:new Date(endWall)});
       meterPeriods(rule, lastPeriod(opts.freq, rule.options.interval, startWall, endWall), engine);
       try { rule.all(date => {

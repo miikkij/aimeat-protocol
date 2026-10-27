@@ -20,6 +20,8 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.13.1 — 2026-10-27 — Extension code an agent or app installs names that principal as its writer
+ *     (codeWriterOf, the registrar's codeWriter); the owner's own install is unchanged (secaudit2026oct26).
  *   v1.13.0 — 2026-10-17 — Who may install a package is package-read.ts packageVisibleTo: a 'members'
  *     package installs for this node's accounts and an 'organism:<id>' one for that organism's
  *     members (plan doc-mvcn6c7e4e5q, V3.7).
@@ -95,6 +97,7 @@ import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app
 import type { AppRecord } from '../../../storage/types/apps.js';
 import type { Scheduler } from '../../scheduler.js';
 import { logger } from '../../../utils/logger.js';
+import { isOwnerInPerson } from '../../../utils/gaii.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -115,6 +118,16 @@ export interface PackageInstallCaller {
     roles: string[];
     scopes: string[];
     federated?: boolean;
+}
+
+/**
+ * Who wrote the extension code an install or a migration by `caller` brings in (the registrar's
+ * codeWriter): nobody but the account when the owner's authority did it (the owner in person, the
+ * owner's approval of a request, the owner's own update job), else the acting principal, an agent or
+ * an app (secaudit2026oct26).
+ */
+export function codeWriterOf(caller: Pick<PackageInstallCaller, 'roles' | 'sub' | 'federated'>): string | undefined {
+    return isOwnerInPerson(caller) ? undefined : caller.sub;
 }
 
 export interface PackageInstallInput {
@@ -357,6 +370,7 @@ export async function installPackage(
         // category it was published under rather than the package's.
         meta: comp.meta,
         callerGaii: caller.sub,
+        codeWriter: codeWriterOf(caller),
         packageContext,
     });
 

@@ -303,6 +303,45 @@ describe('the host binding — made only once the call is accepted', () => {
         expect(out).toMatchObject({ ok: true });
     });
 
+    // secaudit2026oct26: the owner's approval names the installer by account name. An account
+    // registered under that name after the approval (an erased account's name taken again) is not the
+    // account the owner allowed; the account that installed it keeps the approval.
+    describe('an approval names the installer account that existed when it was given', () => {
+        const approve = async (storage: SqliteStorage, name: string, approvedAt: string) => {
+            const rec = (await storage.getSecret(owner, name))!;
+            const approvals = [{ extension: 'bob/sender', installer: 'bob', host: 'collector.example', requestedAt: approvedAt, requestedBy: owner, approvedAt, approvedBy: owner }];
+            expect(await storage.swapSecretApprovals(owner, name, rec.approvals ?? [], approvals)).toBe(true);
+        };
+        const bob = (storage: SqliteStorage, createdAt: string) => storage.createGHII({
+            username: 'bob', nodeId: cfg.nodeId, ghii: `bob@${cfg.nodeId}`, displayName: 'Bob',
+            verificationLevel: 0, ownerName: 'bob', createdAt, updatedAt: createdAt,
+        } as never);
+        const call = (storage: SqliteStorage, name: string) => resolveSecretForHeaders({
+            storage: storage as never, config: cfg, ownerGhii: owner, extConfig: {}, extName: 'bob/sender',
+            headers: { 'X-Key': `{{secret:${name}}}` }, url: 'https://collector.example/x',
+            approvedFor: { extension: 'bob/sender', installer: 'bob' },
+            firstUse: async () => ({ allowed: false, by: 'bob' }),
+        });
+
+        it('an account registered under the installer\'s name after the approval does not inherit it', async () => {
+            const storage = new SqliteStorage(':memory:');
+            expect((await putOwnerSecret(storage as never, cfg, owner, 'APPROVED', 'approved-value', { host: 'api.example.com' })).ok).toBe(true);
+            await approve(storage, 'APPROVED', '2026-10-01T00:00:00.000Z');
+            await bob(storage, '2026-10-20T00:00:00.000Z');
+            expect(await call(storage, 'APPROVED')).toMatchObject({ ok: false, reason: 'host', secretName: 'APPROVED' });
+        });
+
+        it('the account that installed it when the owner allowed it keeps the approval', async () => {
+            const storage = new SqliteStorage(':memory:');
+            expect((await putOwnerSecret(storage as never, cfg, owner, 'APPROVED', 'approved-value', { host: 'api.example.com' })).ok).toBe(true);
+            await bob(storage, '2026-09-01T00:00:00.000Z');
+            await approve(storage, 'APPROVED', '2026-10-01T00:00:00.000Z');
+            const out = await call(storage, 'APPROVED');
+            expect(out).toMatchObject({ ok: true });
+            if (out.ok) expect(out.headers['X-Key']).toBe('approved-value');
+        });
+    });
+
     // secaudit 2026-10, v58 as amended 2026-10-21: a refused first use through another account's
     // extension carries that extension and its installer to the message, and binds nothing.
     it('a first use refused for another account\'s extension names it and binds nothing', async () => {

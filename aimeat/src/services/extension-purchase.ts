@@ -24,6 +24,10 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.6.0 — 2026-10-27 — An extension-backed capability's ref is resolved in the seller's namespace
+ *     before the settle, and the run takes that stored name; a ref that lands on the buyer's own
+ *     extension is refused EXTENSION_CAPABILITY_NOT_YOURS with nothing charged, the rule the
+ *     capability invoke route asks (secaudit2026oct26).
  *   v1.5.1 — 2026-10-25 — A tool's binding is read for the seller: their own extension by a bare name
  *     is still theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.5.0 — 2026-10-24 — The seller's extension action runs in-process for the buyer, the
@@ -56,6 +60,8 @@ import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { logger } from '../utils/logger.js';
 import { membersOnlyRefusalForCapability, MEMBERS_ONLY_MESSAGE } from './members-only.js';
 import { findBackingCapability } from './component-address.js';
+import { resolveExtensionForCall } from './component-versions.js';
+import { splitExtensionRef } from './capability-extension-ref.js';
 
 /**
  * The bare owner name behind any principal the capability registry stores. Extension-backed
@@ -95,10 +101,16 @@ async function runSellerExtensionForBuyer(args: {
   buyerOwner: string;
   internalPass: string;
   runSellerAction: SellerActionRunner;
+  /** The extension the ref names in the seller's namespace (sellerExtensionTarget), when it resolved. */
+  target?: { extRef: string; actionId: string } | null;
 }): Promise<{ result: unknown }> {
   const { assertCapabilityRunnable } = await import('./capability-invoke.js');
   assertCapabilityRunnable(args.cap);
-  const [, sellerExt, actionId] = args.cap.source.ref.split(':');
+  const [, rawExt, rawAction] = args.cap.source.ref.split(':');
+  // The stored name the seller's namespace resolved, so the run reads that record and never the
+  // buyer's own of the same short name. A ref that resolved to nothing runs as written, as before.
+  const sellerExt = args.target?.extRef ?? rawExt;
+  const actionId = args.target?.actionId ?? rawAction;
   // The paywall writes a refusal into a responder; this keeps it to report in the thrown error.
   let refusal: { status: number; body: unknown } | null = null;
   const res = { status(code: number) { return { json(body: unknown) { refusal = { status: code, body }; return body; } }; } };
@@ -117,6 +129,25 @@ async function runSellerExtensionForBuyer(args: {
     : ((recorded?.body as { error?: { message?: string } } | undefined)?.error?.message ?? 'Extension invoke failed');
   const statusCode = out.kind === 'refused' ? (out.status ?? 500) : (recorded?.status ?? 502);
   throw Object.assign(new Error(message), { statusCode, code: 'EXTENSION_ERROR' });
+}
+
+/**
+ * The extension an extension-backed capability's ref names, read in the seller's (the registrant's)
+ * namespace as the capability invoke route reads it: its stored name (with the pin), the action, and
+ * who installed it. Null when the ref names no installed action.
+ */
+async function sellerExtensionTarget(
+  storage: Storage, ref: string, sellerOwner: string,
+): Promise<{ extRef: string; actionId: string; installedBy: string } | null> {
+  const segments = splitExtensionRef(ref);
+  if (!segments) return null;
+  const resolved = await resolveExtensionForCall(storage, segments.pinned, sellerOwner);
+  if (!resolved.ok || !resolved.ext.actions.some(a => a.id === segments.action)) return null;
+  return {
+    extRef: resolved.pinned ? `${resolved.name}@${resolved.pinned}` : resolved.name,
+    actionId: segments.action,
+    installedBy: resolved.ext.installedBy ?? '',
+  };
 }
 
 /** What an extension's purchase produced — or why it could not be made. */
@@ -206,6 +237,18 @@ export async function buyForExtension(args: {
       correlation };
   }
 
+  // An extension-backed capability runs the extension its ref names, read in the SELLER's namespace,
+  // as the capability invoke route reads it. One that lands on the buyer's own extension would let
+  // the seller choose which of the buyer's actions runs, with the seller's locked input; the invoke
+  // route refuses it (EXTENSION_CAPABILITY_NOT_YOURS), and so does this, before anything is charged
+  // (secaudit2026oct26).
+  const sellerTarget = cap.source.type === 'extension' ? await sellerExtensionTarget(storage, cap.source.ref, sellerOwner) : null;
+  if (sellerTarget && ownerNameOf(sellerTarget.installedBy) === extOwner) {
+    return { ok: false, code: 'EXTENSION_CAPABILITY_NOT_YOURS',
+      message: `Tool "${tool}" on app "${appRef}" would run your own extension "${sellerTarget.extRef}", and another account published it. Call your extension directly. Nothing was charged.`,
+      correlation };
+  }
+
   // Who the app serves, before anything is charged (services/members-only.ts). The buying
   // extension acts for its owner, so the owner's membership is what is asked.
   if (await membersOnlyRefusalForCapability(storage, cap.id, buyer)) {
@@ -243,7 +286,7 @@ export async function buyForExtension(args: {
     const invoked = cap.source.type === 'extension'
       ? await runSellerExtensionForBuyer({
         cap, input: lockedInput, buyer, buyerOwner: extOwner, internalPass: pass,
-        runSellerAction: args.runSellerAction,
+        runSellerAction: args.runSellerAction, target: sellerTarget,
       })
       : await invokeCapability(
         config, storage, cap, lockedInput, buyer, '', 'normal', pass,

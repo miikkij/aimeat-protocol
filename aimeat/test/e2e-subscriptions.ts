@@ -11,6 +11,8 @@
  *   the Stripe handlers do; without it the suite says it skipped.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=subscriptions
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A plan period shortened after the quote is refused PRICE_CHANGED at completion
+ *     (secaudit2026oct26).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-5, A-4).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -50,7 +52,7 @@ const artist = await registerOwner(BASE, `subartist${stamp}`);
 const SCRIPTS = {
   plans: `export default async function(ctx, input){
     await ctx.memory.set('subscription.plans', { plans: [
-      { id: 'studio-harbour', title: 'Harbour Studio, monthly', amount: 3990000, currency: 'EUR', period_days: 30,
+      { id: 'studio-harbour', title: 'Harbour Studio, monthly', amount: 3990000, currency: 'EUR', period_days: input.period_days || 30,
         beneficiaries: [{ ghii: input.artist, weight: 1, note: 'the studio artist' }] },
     ] });
     return { ok: true };
@@ -149,6 +151,26 @@ if (!moneyRail) {
     assert(!list.isError && list.data.subscriptions.some((x: any) => x.ext === EXT && x.active), `list: ${list.text.slice(0, 300)}`);
     const none = await callTool(s, 'aimeat_subscription_cancel', { ext: EXT, plan: 'nothing' });
     assert(none.isError && /NOT_FOUND/.test(none.text), `cancel nothing: ${none.text.slice(0, 200)}`);
+  });
+
+  // secaudit2026oct26: the period is part of the price, so a period shortened after the quote is a
+  // changed price and the checkout stays open for a new quote.
+  await test('FAILURE: a plan period shortened after the quote is refused PRICE_CHANGED at completion, and nothing is charged', async () => {
+    const open = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(reader.token),
+      body: JSON.stringify({ currency: 'EUR', items: [{ kind: 'subscription', app: EXT, tool: 'studio-harbour', input: { auto_renew: true } }] }) });
+    assert(open.status === 201, `open ${open.status}: ${JSON.stringify(open.body?.error)}`);
+    const before = (await json('/v1/commerce/subscriptions', { headers: auth(reader.token) })).body.data.subscriptions.find((s: any) => s.ext === EXT);
+    const shorten = await json(`/v1/ext/${EXT}/plans`, { method: 'POST', headers: auth(studio.token), body: JSON.stringify({ artist: artist.ghii, period_days: 1 }) });
+    assert(shorten.status === 200, `plans ${shorten.status}`);
+    try {
+      const done = await json(`/v1/commerce/checkout-sessions/${open.body.data.session.id}/complete`, {
+        method: 'POST', headers: auth(reader.token), body: JSON.stringify({ payment: { handler: 'test.money', instrument: 'testpm' } }) });
+      assert(done.status === 409 && done.body.error?.code === 'PRICE_CHANGED', `expected 409 PRICE_CHANGED, got ${done.status}: ${JSON.stringify(done.body?.error)}`);
+      const after = (await json('/v1/commerce/subscriptions', { headers: auth(reader.token) })).body.data.subscriptions.find((s: any) => s.ext === EXT);
+      assert(after?.active_until === before?.active_until, `the subscription is unchanged: ${before?.active_until} -> ${after?.active_until}`);
+    } finally {
+      await json(`/v1/ext/${EXT}/plans`, { method: 'POST', headers: auth(studio.token), body: JSON.stringify({ artist: artist.ghii }) });
+    }
   });
 
   await test('Cancelling stops the renewal and keeps the paid period', async () => {

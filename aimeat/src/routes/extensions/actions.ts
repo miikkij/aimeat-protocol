@@ -7,6 +7,8 @@
  *   node MCP tool aimeat_extension_invoke runs too, and render its answer as HTTP. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — A visitor's run share is keyed by visitorRunShareKey: IPv6 by its /64 network, as the
+ *     visitor rate limiter keys it (secaudit2026oct26, extension-run-slots:visitor-share-keyed-on-raw-ip).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:extName` may be
  *     an encoded `<owner>/<name>`; the three-segment path is the instance form or the literal
  *     `<owner>/<name>/<action>`, read so a
@@ -83,6 +85,7 @@ import { invokeExtensionAction } from '../../services/extension-invoke.js';
 import { resolveExtensionForCall } from '../../services/component-versions.js';
 import { extensionCallTarget, addressSegment } from '../../services/component-address.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
+import { visitorRunShareKey } from '../../services/extension-run-slots.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
   // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
@@ -185,7 +188,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       paywall: { res },
       correlationId: req.header('x-aimeat-correlation') ?? null,
       // A visitor has no account: its share of the run slots is counted per client address.
-      admission: { account: `visitor:${req.ip ?? 'unknown'}` },
+      admission: { account: visitorRunShareKey(req.ip) },
     });
     if (out.kind === 'paywall') return;
     if (out.kind === 'refused') {

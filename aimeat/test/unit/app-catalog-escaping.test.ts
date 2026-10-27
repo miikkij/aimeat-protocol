@@ -12,9 +12,13 @@
  *   - jsArg: unchanged, because the on* handler path depends on JS-level escaping
  * @usage pnpm exec vitest run test/unit/app-catalog-escaping.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — The version list's View button takes the address through jsArg; no on*
+ *     handler argument is escaped with escapeHtml (secaudit2026oct26).
  *   v1.0.0 — 2026-08-11 — Created with the H-25 fix (stored XSS through the app catalogue).
  */
 import { describe, it, expect } from 'vitest';
+import { readdirSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { escapeHtml, filterAttr, jsArg } from '../../src/static/app-catalog/js/util.js';
 
 /**
@@ -85,6 +89,28 @@ describe('filterAttr (audit H-25)', () => {
     // the escaping must not disturb what the search sees for the normal case.
     const out = filterAttr('Budget Planner', ['Tools', 'Money']);
     expect(out).toBe(' data-filter="budget planner tools money" data-tags="tools,money"');
+  });
+});
+
+describe('the version list View button (secaudit2026oct26)', () => {
+  // The app's own address goes into viewPublished('<url>', ...) inside an onclick. encodeURIComponent
+  // leaves the apostrophe as is, so a filename holding one ended the JS string when the address was
+  // escaped with escapeHtml.
+  it('no on* handler argument in the catalogue is escaped with escapeHtml', () => {
+    const dir = fileURLToPath(new URL('../../src/static/app-catalog/js/', import.meta.url));
+    const hits = readdirSync(dir).filter(f => f.endsWith('.js'))
+      .flatMap(f => readFileSync(dir + f, 'utf8').split('\n').map((line, i) => ({ f, i: i + 1, line })))
+      .filter(({ line }) => /\\'' \+ escapeHtml\(/.test(line));
+    expect(hits.map(h => `${h.f}:${h.i}`)).toEqual([]);
+  });
+
+  it('an address with an apostrophe round-trips through jsArg, the HTML decode and the JS parse', () => {
+    const viewU = 'https://node.example/v1/apps/alice/' + encodeURIComponent("pkg-alice-x-a'b.html") + '?version=2&mode=inline';
+    const attr = "window.__seen.push('" + jsArg(viewU) + "')";
+    const decoded = attr.replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+    const seen: string[] = [];
+    new Function('window', decoded)({ __seen: seen });
+    expect(seen).toEqual([viewU]);
   });
 });
 

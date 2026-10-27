@@ -493,6 +493,46 @@ async function run() {
       `the refused migration deleted the existing component (read back ${survived.status})`);
   });
 
+  // secaudit2026oct26: code an agent supplies to a migration is not the package's code, so without
+  // packages:install-code it waits for the owner's one press, and the owner's Allow applies it.
+  await test('an agent without packages:install-code asks the owner before a migration writes its own extension code', async () => {
+    const pkgs = await json('/v1/packages');
+    const withExt = (pkgs.body.data.packages ?? []).find((p: Record<string, unknown>) =>
+      ((p.components ?? []) as Array<{ type?: string }>).some(c => c.type === 'extension'));
+    assert(!!withExt, 'this test needs a published package carrying an extension component');
+    const inst = await json(`/v1/packages/${encodeURIComponent(withExt.packageGroupId)}/install`, {
+      method: 'POST', headers: auth(ownerA.token), body: JSON.stringify({ label: `hardening agent ${Date.now()}` }),
+    });
+    assert(inst.status === 201, `install package ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const instanceId = inst.body.data.id as string;
+    const extComp = (withExt.components as Array<{ id: string; type: string }>).find(c => c.type === 'extension')!;
+    const registeredAs = ((inst.body.data.installedComponents ?? []) as Array<{ componentId: string; registeredAs: string }>)
+      .find(c => c.componentId === extComp.id)!.registeredAs;
+    // The agent's manifest declares one action, `run`, which the package's own extension does not.
+    const scriptOf = async () => ((await json(`/v1/extensions/${registeredAs}`, { headers: auth(ownerA.token) })).body.data.extension.actions ?? [])
+      .map((a: { id: string }) => a.id === 'run' ? 'agent-written' : a.id).join('\n');
+    const before = await scriptOf();
+
+    const agent = await makeAgent(BASE, ownerA, ['packages:write', 'ext:read']);
+    const content = JSON.stringify({
+      manifest: ['metadata:', '  name: agent-written', '  version: 1.0.0', '  description: written by an agent', '  author: e2e',
+        'actions:', '  - id: run', '    method: POST', '    path: /run', '    script: run'].join('\n'),
+      scripts: { run: 'export default async function(){ return { by: "agent-written" }; }' },
+    });
+    const asked = await json(`/v1/instances/${instanceId}/apply-migration`, {
+      method: 'POST', headers: auth(agent.token),
+      body: JSON.stringify({ targetVersion: withExt.version, components: [{ componentId: extComp.id, action: 'custom', content }] }),
+    });
+    assert(asked.status === 202 && asked.body.data?.status === 'awaiting_owner',
+      `the agent's own code waits for the owner: ${asked.status} ${JSON.stringify(asked.body?.error ?? asked.body?.data)}`);
+    assert(await scriptOf() === before, 'nothing was written before the owner answered');
+    const yes = await json(`/v1/package-install-requests/${encodeURIComponent(asked.body.data.request_id)}/decision`, {
+      method: 'POST', headers: auth(ownerA.token), body: JSON.stringify({ decision: 'approve' }),
+    });
+    assert(yes.status === 200, `the owner approves: ${yes.status} ${JSON.stringify(yes.body?.error ?? yes.body?.data)}`);
+    assert((await scriptOf()).includes('agent-written'), 'the owner\'s Allow applied the agent\'s code');
+  });
+
   // ── 3d. Gating somebody else's app ─────────────────────────────────────────────────────────
   await test('an extension cannot declare that it gates another owner\'s app', async () => {
     // `config: { app: owner/file.html }` names the app whose membership this extension enforces, and
@@ -861,6 +901,35 @@ async function run() {
     const late = await json(`/v1/publish-requests/${id}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
     assert(late.status === 409 && late.body?.error?.code === 'OUTDATED', `expected 409 OUTDATED, got ${late.status} ${JSON.stringify(late.body?.error)}`);
     assert((await storedConfig(mailExt, seed.token)).emailPolicy === undefined, 'a grant was written for code the operator did not see');
+  });
+
+  // secaudit2026oct26: a second ask about newer code moves the waiting question to that code; the
+  // operators are asked again about it, so a press answers the code they were last shown.
+  await test('a second ask after new code asks the operators again, and the Allow lands on the newest code', async () => {
+    const codeNotices = async () => ((await json('/v1/notifications', { headers: auth(seed.token) })).body?.data?.notifications ?? [])
+      .filter((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === mailExt).length;
+    const edit = (n: number) => json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// agent edit ${n}` }),
+    });
+    // The extension holds the grant again before the agent writes code.
+    await json(`/v1/extensions/${mailExt}/config`, { method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }) });
+    const first = await edit(3);
+    const id = first.body?.data?.approval_request?.request_id;
+    assert(first.status === 200 && typeof id === 'string', `first ${first.status}: ${JSON.stringify(first.body?.data)}`);
+    const before = await codeNotices();
+    const second = await edit(4);
+    assert(second.status === 200, `second ${second.status}: ${JSON.stringify(second.body?.error)}`);
+    // The second edit holds no grant to take back, so the agent asks for it again through the config route.
+    const reask = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
+    });
+    const waiting = reask.body?.data?.approval_request?.request_id;
+    assert(reask.status === 202 && waiting === id, `the standing question moves to the newer code: ${reask.status} ${JSON.stringify(reask.body?.data)}`);
+    const after = await codeNotices();
+    assert(after > before, `the operators were not asked again about the newer code (notices ${before} -> ${after})`);
+    const yes = await json(`/v1/publish-requests/${waiting}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    assert((await storedConfig(mailExt, seed.token)).emailPolicy === 'unrestricted', 'the grant was not written for the newest code');
   });
 
   console.log(`\nExtension Hardening E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

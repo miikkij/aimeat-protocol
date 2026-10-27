@@ -20,6 +20,12 @@
  *   default role · no relationship to app-grant scopes · server-side enforcement.
  *   See docs/internal/aimeat-iam-design.md.
  * @version-history
+ *   v1.6.0 — 2026-10-27 — resolveRole's owner fallback folds a row owner@node into the local account
+ *     only when node is this node (read from the local caller's gaii). A row the owner wrote for
+ *     another node's GHII named the local account that shares its local part; that person now matches
+ *     only as a visitor carrying the full GHII. Rows by bare name and by owner@this-node resolve as
+ *     before. Extension manifest 1.5.0. A copy installed before this keeps its old script until its
+ *     instance is updated (secaudit2026oct26, resolveRole:owner-fallback-ignores-node).
  *   v1.5.0 — 2026-10-01 — Before a claim exists, only the account that installed the extension
  *     (ctx.extension.owner, from the node's record, compared with ctx.caller.owner) may claim or
  *     administer it. canAdmin used to open with `!config.ownerGhii`, so on an unclaimed instance every
@@ -106,12 +112,21 @@ const RESOLVE_FN = `
     }
     if (owner) {
       if (Object.prototype.hasOwnProperty.call(assignments, owner)) return { role: assignments[owner], via: 'owner' };
+      // A local caller's owner is a bare name and its gaii ends in @<this node>; a row owner@node is
+      // that account only when node is this node. A row for another node's GHII names that person,
+      // who arrives as a visitor with the full GHII and matches the exact row above. When the node
+      // cannot be read from the caller, the old fold is kept.
+      var at = (owner.indexOf('@') === -1 && caller) ? String(caller).lastIndexOf('@') : -1;
+      var here = at !== -1 ? String(caller).slice(at + 1).toLowerCase() : null;
       var keys = Object.keys(assignments);
       for (var i = 0; i < keys.length; i++) {
         var k = keys[i];
-        if (k.indexOf('#') === -1 && String(k).toLowerCase().split('@')[0] === owner) {
-          return { role: assignments[k], via: 'owner' };
-        }
+        if (k.indexOf('#') !== -1) continue;
+        var kl = String(k).toLowerCase();
+        var cut = kl.indexOf('@');
+        if ((cut === -1 ? kl : kl.slice(0, cut)) !== owner) continue;
+        if (cut !== -1 && here && kl.slice(cut + 1) !== here) continue;
+        return { role: assignments[k], via: 'owner' };
       }
     }
     return { role: null, via: 'none' };
@@ -309,7 +324,7 @@ const EXTENSION_IAM = JSON.stringify({
   manifest: [
     'metadata:',
     '  name: iam',
-    '  version: 1.4.0',
+    '  version: 1.5.0',
     '  description: In-app role & permission management with server-side enforcement. A role is keyed to the caller OWNER by default, so a member who works through an agent is covered by one entry and one revoke removes it from all of their agents; subject gaii or both change that. BBS levels + command manifest.',
     '  author: operator',
     'required_apis:',

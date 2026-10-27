@@ -23,6 +23,8 @@
  *   import { importParsedPackage } from './package-import.js';
  *   const out = await importParsedPackage({ storage, config }, caller, { parsed, via: 'zip' });
  * @version-history
+ *   v1.1.1 — 2026-10-27 — upstreamFromZip also checks the signed component metadata where the source
+ *     signs it (verifyComponentMetadata); a mismatch is INVALID, as a component digest is (secaudit2026oct26).
  *   v1.1.0 — 2026-09-28 — The imported record keeps the ZIP's `expects` instead of an empty manifest.
  *   v1.0.1 — 2026-09-12 — The author GHII is resolved from the node instead of falling back to the
  *     caller's `sub`. wish-identity-gate-sees-resolveghii.
@@ -36,7 +38,7 @@ import type { AimeatConfig } from '../../../config.js';
 import type { Storage, PackageRecord, UpstreamRef } from '../../../storage/interface.js';
 import type { ParsedPackage } from './package-zip.js';
 import type { PeerInfo } from '../../federation.js';
-import { verifyAttestation, verifyComponentDigests, type AttestationDoc } from '../peer/package-attestation.js';
+import { verifyAttestation, verifyComponentDigests, verifyComponentMetadata, type AttestationDoc } from '../peer/package-attestation.js';
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
 import {
     normalizeComponents, nextPackageVersion, checkAuthorQuota,
@@ -87,6 +89,8 @@ export async function upstreamFromZip(
     if (!(await verifyAttestation(peer.publicKey, doc))) return 'INVALID';
     const digests = verifyComponentDigests(d, parsed.components);
     if (!digests.ok) return 'INVALID';
+    // The signed component metadata too, where the source signs it (secaudit2026oct26).
+    if (!(await verifyComponentMetadata(peer.publicKey, doc, parsed.components)).ok) return 'INVALID';
 
     return { ...base, publicKey: peer.publicKey, verifiedAt: new Date().toISOString() };
 }

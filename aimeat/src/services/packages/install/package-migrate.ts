@@ -29,6 +29,11 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.7.3 — 2026-10-27 — A replaced, custom or new extension names its writer (codeWriterOf): the
+ *     agent or app that migrated without the owner's authority. Code a caller supplies in `content`
+ *     for an extension, app, cortex or skill, other than the package's own, needs packages:install-code
+ *     or the owner's one-press approval of the filed request, as a widening update does
+ *     (secaudit2026oct26).
  *   v1.7.2 — 2026-10-21 — A replaced extension of byte-identical code keeps the old-code first-use
  *     mark (services/extension-first-use-keep.ts).
  *   v1.7.1 — 2026-10-05 —The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -60,12 +65,15 @@ import type {
 import {
     registerComponent, validateComponentContent, deleteComponent, computeHash,
 } from '../../component-registrar.js';
-import { registeredNameFor } from './package-install.js';
+import { registeredNameFor, codeWriterOf } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { forkedUpdateRefusal } from './package-managed.js';
 import { packageCapabilities, widenedItems } from './package-capabilities.js';
-import { approvedItems, codeInstallRefusal, recordApproval } from './package-approvals.js';
+import { approvedItems, codeInstallRefusal, recordApproval, INSTALL_CODE_SCOPE } from './package-approvals.js';
+
+/** Component types whose content is code: what a caller-supplied migration content can bring in. */
+const CODE_COMPONENT_TYPES = new Set(['extension', 'app', 'cortex', 'skill']);
 import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
@@ -306,6 +314,7 @@ export async function applyInstanceMigration(
     // carry out, and the owner is never asked to approve content it would then turn down.
     const missingWords = new Set<string>();
     let lackingComponent = '';
+    let suppliedCode = '';
 
     // Refuse content this node will not accept BEFORE anything is deleted. `replace` and `custom`
     // both delete the existing component and then register the new one.
@@ -348,6 +357,14 @@ export async function applyInstanceMigration(
         const existingComp = existingMap.get(compId);
         const compType = targetComp?.type ?? existingComp?.type ?? 'csm';
         const proposed = action.content ?? targetComp?.content ?? '';
+        // Code the caller supplies instead of the package's own is not what any approval of this
+        // package covered. Without the owner's authority or packages:install-code it waits for the
+        // owner's one press, as an install that widens does (secaudit2026oct26).
+        if (typeof action.content === 'string' && action.content !== (targetComp?.content ?? '') && CODE_COMPONENT_TYPES.has(compType)
+            && codeInstallRefusal({ carriesCode: true }, caller)) {
+            missingWords.add(INSTALL_CODE_SCOPE);
+            suppliedCode ||= compId;
+        }
         const check = validateComponentContent(compType, proposed, nameFor(compId, compType), config, owner);
         if (!check.ok) {
             return {
@@ -407,7 +424,10 @@ export async function applyInstanceMigration(
             message: lackingComponent
                 ? `Component "${lackingComponent}" writes into the owner's memory, which needs ${missing.map(s => `"${s}"`).join(' and ')}, `
                     + `and this session does not carry ${missing.length === 1 ? 'it' : 'them'}. Nothing was changed.`
-                : `${codeRefusal!.message} Nothing was changed.`,
+                : suppliedCode && !codeRefusal
+                    ? `Component "${suppliedCode}" would take code this session supplied instead of the package's own. Doing that without the owner `
+                        + `takes "${INSTALL_CODE_SCOPE}", which this session does not hold, so it waits for the owner to approve it. Nothing was changed.`
+                    : `${codeRefusal!.message} Nothing was changed.`,
             missing, target: targetPkg, instance,
         };
     }
@@ -458,6 +478,7 @@ export async function applyInstanceMigration(
                     packageDescription: targetPkg.description,
                     meta: targetComp?.meta,
                     callerGaii: caller.sub,
+                    codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,
                 });
@@ -514,6 +535,7 @@ export async function applyInstanceMigration(
                     packageDescription: targetPkg.description,
                     meta: targetComp.meta,
                     callerGaii: caller.sub,
+                    codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,
                 });
