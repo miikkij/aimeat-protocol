@@ -71,7 +71,7 @@
  *     pf-dr-field, pf-or-field, sch-form-row, inbox-form-row, form-row, op-field, pf-edit-label…),
  *     with the look most of them have (component plan C5).
  */
-import { h, createContext } from 'preact';
+import { h, createContext, Fragment } from 'preact';
 import { useId, useContext, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
@@ -101,12 +101,16 @@ export function useFieldMessage(props) {
   const at = useRef(null);
   const own = messageOf(props.message, props.error);
   if (own || !errors || !props.name) return props;
+  // A control with no field words of its own (no label, no hint) is drawn the same way whether a
+  // message stands under it or not (inField's `bare` branch): wrapping it in a Field only when a
+  // message came would mount a new element and take the person's focus with the old one.
+  const scoped = hasFieldWords(props) ? props : { ...props, bare: true };
   // A list field's refusal names an item ("interests.2"); the field that holds the list shows it.
   const text = errors[props.name] ?? Object.entries(errors).find(([path]) => path.startsWith(`${props.name}.`))?.[1];
-  if (!text) return props;
+  if (!text) return scoped;
   if (!at.current || at.current.errors !== errors) at.current = { errors, value: props.value };
-  if (at.current.value !== props.value) return props;
-  return { ...props, message: { text, error: true } };
+  if (at.current.value !== props.value) return scoped;
+  return { ...scoped, message: { text, error: true } };
 }
 
 /** The ids the control's aria-describedby names: its hint and its message, when it has them. */
@@ -207,6 +211,13 @@ export function hasFieldWords(props) {
  */
 export function inField(props, ids, control, named) {
   const { label, help, hint, message, error, wide, invalid } = props;
+  // `bare` (set by useFieldMessage): a control with no words of its own in a form that shows
+  // refusals. The control and its message are siblings in one Fragment, in both states, so the
+  // control is never mounted again when a message comes or goes.
+  if (props.bare) {
+    const msg = messageOf(message, error);
+    return html`<${Fragment}>${control}${msg ? html`<${Note} kind="message" id=${ids.msgId} error=${msg.error}>${msg.text}<//>` : null}<//>`;
+  }
   if (!hasFieldWords(props)) return control;
   return html`<${Field} label=${label} help=${help} hint=${hint} message=${messageOf(message, error)} wide=${wide} invalid=${invalid}
     named=${named} id=${ids.id} labelId=${ids.labelId} hintId=${ids.hintId} msgId=${ids.msgId}>${control}<//>`;
