@@ -11,6 +11,11 @@
  * @structure sendDirectMessage(ctx, input) → { ok, message } | { ok:false, code }
  * @usage import { sendDirectMessage } from '../services/message-send.js';
  * @version-history
+ *   v1.12.0 — 2026-10-27 — A named conversation id is bound to the sender (message-thread-binding.ts):
+ *     a message naming another pair's thread lands in the pair's own thread, so no sender places a
+ *     message inside a thread between other accounts, and no agent under its owner's thread with
+ *     somebody else (secaudit2026oct26). `senderReadsOwnerMailbox` keeps an agent with
+ *     messages:read-as-owner answering in its owner's threads.
  *   v1.11.0 — 2026-10-26 — On a node with members see each other on, a first message from another person
  *     of the node is accepted, not a request (areColleagues, services/colleagues.ts). A block still wins:
  *     the gate only decides when there is no row or the row is pending.
@@ -70,6 +75,7 @@ import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-d
 import { duplicateMessageAttachments } from './attachment-duplication.js';
 import { localIdentityExists, missingIdentityReason } from './local-identity.js';
 import { checkSendLimit, type SendLimitMark } from './message-send-limit.js';
+import { boundConversationId } from './message-thread-binding.js';
 
 export interface SendMessageInput {
   senderGhii: string;
@@ -114,6 +120,11 @@ export interface SendMessageInput {
    * held it. Naming the acting agent here lets the send find the bytes and record their real holder.
    */
   actingGaii?: string;
+  /**
+   * True for an agent sender that may read its owner's mailbox (messages:read-as-owner): a thread its
+   * owner holds counts as one it holds when it names that thread's id (message-thread-binding.ts).
+   */
+  senderReadsOwnerMailbox?: boolean;
   /**
    * The agent that sends this in the sender's name, and its name as the owner sees it
    * (DirectMessageRecord.sentByAgent). Set by services/message-send-as-owner.ts only; written on both
@@ -270,8 +281,14 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
   const now = new Date().toISOString();
   // Default: the deterministic per-pair thread. An explicit conversationId continues a specific thread;
   // a `subject` with no id opens a NEW thread (fresh minted id). Both nodes share the id via the payload.
+  // A named id lands in that thread only when the sender holds it or nobody else's thread is under it;
+  // otherwise the message goes to the pair's own thread (services/message-thread-binding.ts, secaudit2026oct26).
   const conversationId = input.conversationId
-    || (subject ? randomUUID() : conversationIdFor(senderGhii, recipientGhii));
+    ? await boundConversationId(storage, {
+      requested: input.conversationId, senderGhii, recipientGhii,
+      recipientMailbox: isLocal ? deliveryGhii : null, senderReadsOwnerMailbox: input.senderReadsOwnerMailbox,
+    })
+    : (subject ? randomUUID() : conversationIdFor(senderGhii, recipientGhii));
 
   // For a local recipient, refuse before writing: the recipient has to exist, and it has to be the
   // one that was ADDRESSED. This checked the owner only, and an agent's or an app's mail is delivered

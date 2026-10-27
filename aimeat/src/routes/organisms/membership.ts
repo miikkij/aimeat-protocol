@@ -7,6 +7,10 @@
  *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — GET /v1/organisms/:id/members answers a private organism's roster only to an active
+ *     member (or an agent of one), an agent attached to it and the operator, and 404 to everyone else,
+ *     as GET /v1/organisms/:id and aimeat_organism_members do (secaudit2026oct26,
+ *     GET-members:private-organism-without-visibility-gate).
  *   2026-10-19 — Each member's agents on GET /v1/organisms/:id/members carry `avatar` (services/agent-avatar.ts), one batched read for every listed agent.
  *   2026-10-15 — POST /:id/invitations/accept accepts only for the person in person (isOwnerPrincipal),
  *     as the emailed link does (feature-list audit #57). POST /:id/agents on an organism that admits only
@@ -71,6 +75,22 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       return;
     }
 
+    // The shared anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
+    const rosterCaller = await rosterCallerFromAuth(storage, req.auth);
+
+    // A private organism is not there for a caller who is not in it, here as on GET /v1/organisms/:id
+    // and aimeat_organism_members: an active member (an agent of one by its owner's name), an agent
+    // attached to the organism, or the operator. The roster tier below decides only how much of the
+    // roster a caller who may see the organism reads.
+    if (organism.visibility === 'private' && !rosterCaller.isOperator) {
+      const membership = rosterCaller.ownerName ? await storage.getMembership(id, rosterCaller.ownerName) : null;
+      const attached = !!req.auth && organism.agentGaiis.includes(req.auth.sub);
+      if (membership?.status !== 'active' && !attached) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+        return;
+      }
+    }
+
     const members = await storage.listMembers(id, {
       role: role as string,
       status: (status as string) || 'active',
@@ -78,8 +98,6 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
 
     // Roster privacy (memberVisibility): below the tier the listing shrinks to the accountability
     // rows — creator/admins + the caller's own row — while the TRUE total stays (count ≠ identity).
-    // The shared anonymous identity is treated as unauthenticated (rosterCallerFromAuth).
-    const rosterCaller = await rosterCallerFromAuth(storage, req.auth);
     const canSeeRoster = await canSeeMembers(storage, organism, rosterCaller);
     if (!canSeeRoster) {
       const visible = members.filter(m => m.role === 'creator' || m.role === 'admin'

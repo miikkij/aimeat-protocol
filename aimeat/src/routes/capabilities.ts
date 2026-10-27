@@ -10,6 +10,7 @@
  *   - invoke, telemetry, vouch, test
  * @usage Mounted by mountRoutes(); the shared write lives in services/capability-record.ts.
  * @version-history
+ *   v1.6.3 — 2026-10-27 — Invoke passes the acting principal (callerPrincipal) beside the caller's authority, so a remote MCP server's grant for an app narrows that app here too (secaudit2026oct26).
  *   2026-10-26 — GET /:id and invoke serve a private capability, one with an unknown visibility word, and
  *     a draft, pending_review or rejected one to the owner, the owner's agents and apps, and the operator
  *     only; everyone else gets 404 NOT_FOUND (services/capability-reach.ts; secaudit2026oct22).
@@ -66,7 +67,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { requireAuth, requireRole, requireScope } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
 import { isOperatorCaller, operatorOverride } from '../services/operator-override.js';
 import { capabilityHiddenFrom } from '../services/capability-reach.js';
 
@@ -338,8 +339,10 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       // This door proves work:request only. What else the session holds, and whether it is the
       // owner in person, goes with the call, so a capability over a remote MCP tool asks for
       // mcp:use there, as every MCP door does.
+      // The grant on a remote MCP server is matched against the acting principal: an app under a
+      // grant by its eco: identity, as POST /v1/mcp-servers/:id/call does (secaudit2026oct26).
       const result = await invokeCapability(config, storage, cap, input, callerGhii, jwt, mode,
-        undefined, callAuthority(req.auth!));
+        undefined, { ...callAuthority(req.auth!), principal: callerPrincipal(req.auth!, config.nodeId) });
 
       await recordCapabilityInvocation({ storage }, cap, callerGhii, input, { ok: true, durationMs: result.duration_ms });
 

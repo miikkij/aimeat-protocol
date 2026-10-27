@@ -52,6 +52,9 @@
  *   const actor = labelActorOf(req.auth!, config.nodeId);
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
+ *   v1.11.1 — 2026-10-27 — setLabel and reviewLabel follow memory:read-as-owner as readContentLabel
+ *     does: a record the caller may not read with owner_scope is refused with ReadAsOwnerRequired,
+ *     which names no label, source or lock (secaudit2026oct26).
  *   v1.11.0 — 2026-10-22 — readContentLabel follows memory:read-as-owner (owner-scope-labels.ts): a
  *     record of the owner or a sibling that the caller may not read with owner_scope answers as one
  *     with no stored label, and the view carries READ_AS_OWNER_NOTE (secaudit 2026-10, v77).
@@ -120,7 +123,7 @@ import {
   assertMayLabelContainer, containerTargetOf, isContainerKind, resolveContainer, CONTAINER_KINDS,
 } from './containers.js';
 import { effectiveLabels, type EffectiveLabel } from './effective.js';
-import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE, ReadAsOwnerRequired } from './owner-scope-labels.js';
 
 export { ClassificationError, isAppActor, isOwnerPerson, appNameOf, type ClassificationDeps, type LabelActor } from './label-core.js';
 export { documentKeyOf, memoryTarget, labelAddressOf, documentContentKeys, labelsFor, targetId } from './label-rows.js';
@@ -333,6 +336,18 @@ async function putLabel(storage: Storage, row: ContentLabelRow, stale: readonly 
 }
 
 /**
+ * The label write doors answer what the label read answers (secaudit2026oct26,
+ * classification-labels:label-write-ignores-read-as-owner): a record of the owner or a sibling agent
+ * that this caller may not read with owner_scope (owner-scope-labels.ts hidden) is neither labelled nor
+ * described. The refusal carries memory:read-as-owner, so the caller is handed the address where the
+ * owner gives it. A caller holding the word, the owner in person and an app grant see no change, and
+ * every agent still labels its own records and the owner's records marked owner, members or public.
+ */
+async function assertReadsRecord(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget): Promise<void> {
+  if (await ownerScopeLabelView(deps.storage, actor).hidden(target)) throw new ReadAsOwnerRequired();
+}
+
+/**
  * Set a label, or leave a suggestion when the rules say an AI or a rule may not set it. `opts.via`
  * says the call is reviewLabel accepting a suggestion, which an app's exception names as a review.
  */
@@ -349,6 +364,7 @@ export async function setLabel(
   if (actor.kind === 'rule' && humanSaid) throw new ClassificationError('INVALID_INPUT', 400, 'A detection rule has no person to quote.');
 
   await assertMayLabel(deps, actor, target, 'write');
+  await assertReadsRecord(deps, actor, target);
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const next = activeLabel(policy, input.label);
   const { row: prev, stale } = await currentRow(deps.storage, policy, target);
@@ -472,6 +488,7 @@ export async function reviewLabel(
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
   }
   await assertMayLabel(deps, actor, target, 'write');
+  await assertReadsRecord(deps, actor, target);
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row: prev, stale } = await currentRow(deps.storage, policy, target);
   if (prev) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));

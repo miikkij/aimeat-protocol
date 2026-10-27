@@ -14,6 +14,9 @@
  *   form-action, the holder's frame-src against a navigation) was proven in a real browser on the
  *   sandbox and is not repeated here; this suite asserts the headers that make the browser do it.
  * @version-history
+ *   v1.4.0 — 2026-10-27 — A contributor who publishes a new version of another member's page is served
+ *     the pictures the owner mapped and kept, and none of the owner's other private files the
+ *     contributor's map names (secaudit2026oct26).
  *   v1.3.0 — 2026-10-17 — Sharing one HTML page answers `window_url` (viewer_url + &view=page); a
  *     Markdown page answers none.
  *   v1.2.0 — 2026-10-17 — A page file carries CORP cross-origin and ACAO *, the page CORP same-origin:
@@ -295,6 +298,34 @@ await test('aimeat_workspace_share stops sharing, and the page host stops servin
   assert(!md.isError && md.data?.viewer_url?.includes(`id=${mdId}`) && !('window_url' in (md.data ?? {})), `a Markdown page has no page-alone address: ${md.text.slice(0, 300)}`);
   const missing = await callTool(s, 'aimeat_workspace_share', { organism_id: orgId, ws, id: pageId, shared: true });
   assert(missing.isError && /^INVALID_INPUT: /.test(missing.text), `id without space: ${missing.text}`);
+});
+
+console.log('\nA contributor\'s version of another member\'s page (secaudit2026oct26)');
+
+await test('a contributor\'s new version serves the owner\'s mapped picture it kept, never another private file of the owner it added', async () => {
+  const add = await call(`/v1/organisms/${orgId}/members`, { token: A.token, body: { ghii: B.name } });
+  assert(add.status === 201 || add.status === 200, `add B: ${add.status} ${JSON.stringify(add.body.error)}`);
+  const g = await call(`/v1/organisms/${orgId}/workspace-access/grant`, { token: A.token, body: { ws, grantee: B.name, role: 'contributor' } });
+  assert(g.status === 200, `contributor grant: ${g.status} ${JSON.stringify(g.body.error)}`);
+  const secret = await call('/v1/storage', { token: A.token, body: { key: `private-${stamp}/secret.png`, data: PNG, mime_type: 'image/png', visibility: 'private' } });
+  assert(secret.status === 201, `A's private file: ${secret.status} ${JSON.stringify(secret.body.error)}`);
+  const w = await call(`/v1/organisms/${orgId}/workspace/drafts`, { token: B.token, body: { ws, space: 'pages', id: pageId, value: {
+    title: 'Esitys', html: PAGE_HTML.replace('Q4', 'Q4 by B').replace('</body>', '<img src="leak.png"></body>'),
+    files: { 'kuva.png': imageUrl, 'leak.png': secret.body.data.embed_url },
+  } } });
+  assert(w.status === 200, `B's draft: ${w.status} ${JSON.stringify(w.body.error)}`);
+  const p = await call(`/v1/organisms/${orgId}/publish`, { token: B.token, body: { ws, namespace: 'shared.pages', id: pageId } });
+  assert(p.status === 200, `B publishes: ${p.status} ${JSON.stringify(p.body.error)}`);
+  const f = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/frame?ws=${ws}`, { token: B.token, body: {} });
+  assert(f.status === 200 && typeof f.body.data.frame_url === 'string', `B's frame: ${f.status} ${JSON.stringify(f.body.error)}`);
+  const base = new URL(f.body.data.frame_url).pathname;
+  const leak = await page(`${base}leak.png`, 'image');
+  assert(leak.status === 404, `the contributor's map served A's private file: ${leak.status}`);
+  const kept = await page(`${base}kuva.png`, 'image');
+  assert(kept.status === 200, `the picture A mapped, kept in B's version: ${kept.status}`);
+  const own = await call(`/v1/organisms/${orgId}/workspace/documents/pages/${pageId}/frame?ws=${ws}`, { token: A.token, body: {} });
+  const ownKept = await page(`${new URL(own.body.data.frame_url).pathname}kuva.png`, 'image');
+  assert(ownKept.status === 200, `A's own frame of the page: ${ownKept.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);

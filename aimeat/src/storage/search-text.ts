@@ -21,6 +21,10 @@
  * @usage
  *   import { buildSearchBlob, searchValueText } from '../../search-text.js';
  * @version-history
+ *   2026-10-27 — searchableValue(): a credential record (the keys services/secret-records.ts masks on
+ *     every read door) gives no value text at all, so it is found by its key and segments only; its
+ *     value had been indexed whole and a word-prefix hit or miss on its key recovered it
+ *     (secaudit2026oct26, search-text.ts:searchableValue:secret-record-values-indexed).
  *   2026-10-25 — searchableValue(): the passwordHash and icsKeyHash of a workspace share record are left
  *     out of the search text on both backends, as every read door masks them (secaudit2026oct22).
  *   2026-10-15 — Initial: buildSearchBlob moved here from providers/postgres-kysely/helpers.ts so the
@@ -38,6 +42,19 @@ const WORKSPACE_SHARE_KEY_RE = /^organism\.[^.]+\.w\.[^.]+\.meta\.share$/;
 const SHARE_SECRET_FIELDS = ['passwordHash', 'icsKeyHash'] as const;
 
 /**
+ * The credential records every generic read door shows only as configured: the same keys as
+ * services/secret-records.ts isSecretRecordKey, spelled here because storage does not import a
+ * service (check:deps). test/unit/search-text-credentials.test.ts holds the two lists equal.
+ */
+const CREDENTIAL_KEYS: ReadonlySet<string> = new Set(['openrouter.apikey', 'decide.apikey', 'commerce.psp']);
+const CREDENTIAL_KEY_PREFIXES: readonly string[] = ['openrouter.apikey.agent.', 'decide.apikey.agent.', 'decide.apikey.provider.', 'ai.apikey.'];
+
+/** True for a key whose value holds a credential, which the search text leaves out entirely. */
+export function isIndexedCredentialKey(key: unknown): boolean {
+  return typeof key === 'string' && (CREDENTIAL_KEYS.has(key) || CREDENTIAL_KEY_PREFIXES.some(p => key.startsWith(p)));
+}
+
+/**
  * The value as the search text may read it. A field that every read door masks is left out: search
  * matches a word at its start, so a hit or a miss on a chosen prefix of an indexed hash recovers the
  * hash a character at a time, and a masked field is then readable through the index (secaudit2026oct22,
@@ -45,6 +62,7 @@ const SHARE_SECRET_FIELDS = ['passwordHash', 'icsKeyHash'] as const;
  * values. Every other key's value is returned unchanged.
  */
 export function searchableValue(key: string | undefined, value: unknown): unknown {
+  if (isIndexedCredentialKey(key)) return null;
   if (!key || !WORKSPACE_SHARE_KEY_RE.test(key) || !value || typeof value !== 'object' || Array.isArray(value)) return value;
   const rest: Record<string, unknown> = { ...(value as Record<string, unknown>) };
   for (const field of SHARE_SECRET_FIELDS) delete rest[field];

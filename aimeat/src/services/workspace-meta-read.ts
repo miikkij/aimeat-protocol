@@ -21,6 +21,10 @@
  * @usage
  *   const rec = await readWorkspaceMetaRecord(storage, orgId, wsId, 'meta.manifest', config.nodeId);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — workspaceRegistrations ranks registry copies that disagree by their writer's
+ *     role now (manager, then a member's own registration, then the rest), so a copy written by an admin
+ *     since demoted or removed no longer names the creator; `opts.archived` for a reader that never
+ *     read archived copies (secaudit2026oct26, organism-meta-first-store-order-copy).
  *   v1.0.0 — 2026-10-13 — Extracted from services/workspace-meta.ts, a pure move, so that
  *     updateWorkspaceMeta can ask services/fenced-space.ts without an import cycle.
  */
@@ -83,16 +87,23 @@ function freshestFirst(a: MemoryRecord, b: MemoryRecord): number {
  *
  * The registry is one record per creator, so every copy is read, as updateWorkspaceMeta always has,
  * archived copies included, because an archived organism's workspaces still have the creators who
- * made them. When more than one copy lists a workspace, the answer must not depend on the order the
- * store returns them in: a copy whose entry names its own owner as the creator wins over one that
- * names somebody else, and owner-id order breaks a remaining tie. Only an organism manager or a
- * workspace's provisioning writes a registry copy, so two that disagree are an administrator's doing.
+ * made them (`opts.archived` narrows that for a reader that never read archived copies). When more
+ * than one copy lists a workspace, the answer must not depend on the order the store returns them in.
+ * Only an organism manager or a workspace's provisioning writes a registry copy, so two that disagree
+ * are an administrator's doing, and the copy that counts is, in this order (secaudit2026oct26,
+ * organism-meta-first-store-order-copy):
+ *   1. a copy whose writer is a creator or admin of the organism now, on this node;
+ *   2. a copy whose entry names its own writer, who is an active member now (a member provisioned it);
+ *   3. any other copy of this node, then any copy of another node;
+ * and within one rank a self-named copy first, then owner-id order. A copy an admin wrote before
+ * being demoted or removed therefore no longer outranks the copies of the people who run the
+ * organism now; a workspace listed by one copy only keeps that copy's creator whatever its rank.
  */
 export async function workspaceRegistrations(
-  storage: Storage, orgId: string,
+  storage: Storage, orgId: string, opts: { archived?: ArchiveFilter; nodeId?: string } = {},
 ): Promise<Map<string, WorkspaceRegistration>> {
   const regKey = `organism.${orgId}.meta.workspaces`;
-  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000, archived: 'include' });
+  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000, archived: opts.archived ?? 'include' });
   const found = new Map<string, WorkspaceRegistration[]>();
   for (const record of items) {
     if (record.key !== regKey) continue;
@@ -105,18 +116,39 @@ export async function workspaceRegistrations(
     }
   }
   const selfNamed = (r: WorkspaceRegistration) => (r.creator === bareOwnerOf(r.record.ownerGaii) ? 0 : 1);
+  // The writers' roles are read only where copies disagree, once per writer.
+  const roles = new Map<string, string | null>();
+  const roleOf = async (gaii: string): Promise<string | null> => {
+    const name = bareOwnerOf(gaii);
+    if (!roles.has(name)) {
+      const m = await storage.getMembership(orgId, name);
+      roles.set(name, m && m.status === 'active' ? m.role : null);
+    }
+    return roles.get(name) ?? null;
+  };
+  const localNode = opts.nodeId ?? null;
+  const rank = async (r: WorkspaceRegistration): Promise<number> => {
+    if (localNode && nodeOf(r.record.ownerGaii) !== localNode) return 3;
+    const role = await roleOf(r.record.ownerGaii);
+    if (role === 'creator' || role === 'admin') return 0;
+    if (role && selfNamed(r) === 0) return 1;
+    return 2;
+  };
   const out = new Map<string, WorkspaceRegistration>();
   for (const [wsId, all] of found) {
-    out.set(wsId, all.sort((a, b) => selfNamed(a) - selfNamed(b) || byOwnerId(a.record, b.record))[0]);
+    if (all.length === 1) { out.set(wsId, all[0]!); continue; }
+    const ranked = await Promise.all(all.map(async r => ({ r, k: await rank(r) })));
+    ranked.sort((a, b) => a.k - b.k || selfNamed(a.r) - selfNamed(b.r) || byOwnerId(a.r.record, b.r.record));
+    out.set(wsId, ranked[0]!.r);
   }
   return out;
 }
 
 /** Find one workspace in the organism's registry, and the creator it names (workspaceRegistrations). */
 export async function findWorkspaceRegistration(
-  storage: Storage, orgId: string, wsId: string,
+  storage: Storage, orgId: string, wsId: string, opts: { archived?: ArchiveFilter; nodeId?: string } = {},
 ): Promise<WorkspaceRegistration | null> {
-  return (await workspaceRegistrations(storage, orgId)).get(wsId) ?? null;
+  return (await workspaceRegistrations(storage, orgId, opts)).get(wsId) ?? null;
 }
 
 /**

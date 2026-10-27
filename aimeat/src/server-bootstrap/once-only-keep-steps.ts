@@ -30,6 +30,8 @@
  *   2026-10-25 -- reportAnonymousPrincipalRecordsOnce, last: what the shared anonymous agent wrote outside
  *     its namespace is named on the Security page, nothing changed (secaudit2026oct22; developer ruling
  *     2026-10-25; services/anonymous-principal-records.ts).
+ *   2026-10-27 -- reindexCredentialSearchTextOnce, after the share reindex: the stored credential records
+ *     get a search text without their value (secaudit2026oct26; services/credential-search-reindex.ts).
  *   2026-10-25 -- reindexShareSearchTextOnce, last: the stored workspace share records get a search text
  *     without the password hash (secaudit2026oct22; services/share-search-reindex.ts).
  *   v1.2.6 -- 2026-10-25 -- classifySubdomainSiteOriginsOnce, last: the subdomain rows from before
@@ -77,6 +79,7 @@ import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 import { classifySubdomainSiteOriginsOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
+import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
 import { reportUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
@@ -157,6 +160,9 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // meets the old index first.
   await reindexShareSearchTextOnce(storage, config)
     .catch(err => logger.error('Failed to rebuild the search text of the workspace share records; the next boot tries again', { error: String(err) }));
+  // The same for the credential records, whose whole value was in the search text (services/credential-search-reindex.ts).
+  await reindexCredentialSearchTextOnce(storage, config)
+    .catch(err => logger.error('Failed to rebuild the search text of the credential records; the next boot tries again', { error: String(err) }));
   // What the shared anonymous agent wrote outside its namespace before its token was refused there is
   // named on the Security page, one entry per record, nothing changed (services/anonymous-principal-records.ts).
   await reportAnonymousPrincipalRecordsOnce(storage, config)

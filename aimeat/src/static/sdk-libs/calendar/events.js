@@ -6,6 +6,8 @@
  *   2026-10-25 - The engine's own work is bounded: a sub-daily BY-time limit no step can reach yields no
  *     occurrence instead of an endless loop, an impossible day filter stops at the end of the range, and
  *     the periods one call walks are counted (secaudit2026oct22).
+ *   2026-10-27 - A changed occurrence is normalised without the master's additions, exclusions and other
+ *     changed occurrences, so expanding one event costs time in proportion to its size (secaudit2026oct26).
  */
 import * as rruleModule from 'rrule';
 // The package is an ES module to the bundler and CommonJS to Node, which finds no named export in
@@ -135,7 +137,8 @@ export function occurrences(events, options) {
       seen.add(start);
       if (!patch && (excluded.has(start) || overrides.has(start))) return;
       if (patch?.cancelled) return;
-      const data = patch ? normalize({...e,...patch,rrule:undefined,start:patch.start || start,end:patch.end || wallString(wallMs(patch.start || start)+duration,e.allDay)}) : e;
+      // A changed occurrence is checked for its own fields; the master was normalised once above.
+      const data = patch ? normalize({...e,...patch,rrule:undefined,rdates:undefined,exdates:undefined,overrides:undefined,start:patch.start || start,end:patch.end || wallString(wallMs(patch.start || start)+duration,e.allDay)}) : e;
       const localStart = patch ? data.start : start;
       const localEnd = patch ? data.end : wallString(wallMs(start)+duration,e.allDay);
       const startMs = zoned(localStart,data.timeZone).epochMilliseconds;

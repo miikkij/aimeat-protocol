@@ -28,6 +28,8 @@
  *   2026-10-27 — Step name_bound_grants: the operator's beneficiary approval of the person, the accountant
  *     grants other owners gave them, and the agreements naming their account as the counterparty's
  *     (services/name-bound-grants-erasure.ts, secaudit2026oct26).
+ *   2026-10-27 — The app_labels step holds the account's app labels under a pseudonym: they were found by
+ *     the account name, and the next holder of the name got them back (secaudit2026oct26).
  *   2026-10-25 — The scheduled_jobs step deletes every job whose ownerScope is the account, not only
  *     those the person made in person: a job an agent or ecosystem app made carries the maker's
  *     identity as createdBy and survived (secaudit2026oct22).
@@ -90,6 +92,7 @@ import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
 import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
+import { holdErasedOwnerAppLabels } from './held-app-labels.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -351,6 +354,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const { apps } = await storage.listApps({ ownerGaii: ghii });
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       return apps.length ? `apps:${apps.length}` : null;
+    }, deletionLog, storage);
+
+    // The app labels (origins) were found by the account name, which is released for reuse: they are
+    // held under a pseudonym, so the next holder of the name gets new ones and never the origins
+    // whose browser storage the previous person's visitors keep (services/held-app-labels.ts).
+    await step('app_labels', async () => {
+      const held = await holdErasedOwnerAppLabels(storage, name, erasedPartyPseudonym());
+      return held.length ? `app_labels:${held.length}` : null;
     }, deletionLog, storage);
 
     // The compliance documents of this person's apps (registers, requests, breaches, impact

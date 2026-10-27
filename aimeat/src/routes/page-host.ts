@@ -32,6 +32,10 @@
  * @structure pageHostRouter(config, storage) — GET /p/_/holder.js · GET/HEAD /p/:token/{*path} (the holder, index.html, the page's files)
  * @usage app.use(pageHostRouter(config, storage)); // only answers on the page host
  * @version-history
+ *   v1.1.2 — 2026-10-27 — A file only the page owner's family may open is served for the published page
+ *     only when that family put the name in the map (mappedByFamily, from the kept versions): a
+ *     contributor who published a new version mapped the owner's other private files and was served
+ *     them under the owner's name (secaudit2026oct26, page-host.ts:pageFile:files-resolved-against-latest-owner).
  *   v1.1.1 — 2026-10-17 — A page's own files carry CORP cross-origin and ACAO *: the sandboxed page has
  *     an opaque origin, and with CORP same-origin the browser refused every file of every page.
  *   v1.1.0 — 2026-10-16 — The page and each of its files carry their provenance (the AI-Disclosure and
@@ -44,6 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { verifyPageFrameToken, PageFrameTokenError, type PageFrameClaims } from '../services/page-frame-token.js';
 import { findWorkspaceRecord } from '../services/workspace-write.js';
+import { listVersionRefs } from '../services/workspace-versions.js';
 import { readShareMetaOf, isDocPublicAt, publicViewerPath, shareIsOpen } from '../services/workspace-share.js';
 import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 import { applyServeMarks } from '../services/app-serve-marks.js';
@@ -90,7 +95,7 @@ function parseFileRef(ref: string): { owner?: string; key: string } | null {
  * owner had.
  */
 async function pageFile(
-    deps: { storage: Storage; config: AimeatConfig }, pageOwner: string, ref: string, c: PageFrameClaims,
+    deps: { storage: Storage; config: AimeatConfig }, pageOwner: string, ref: string, c: PageFrameClaims, name: string,
 ): Promise<StorageFileRecord | null> {
     const { storage } = deps;
     const parsed = parseFileRef(ref);
@@ -103,11 +108,35 @@ async function pageFile(
         const file = await storage.getStorageFile(owner, parsed.key).catch(err => { logger.warn('page host: a page file could not be read', { error: String(err) }); return null; });
         if (!file) continue;
         const refs = (file.workspaceRef ?? '').split(/\s+/).filter(Boolean);
-        const mayOpen = family.includes(owner) || file.visibility === 'public'
-            || (file.visibility === 'workspace' && refs.includes(`${c.org}/${c.ws}`));
+        const openToReaders = file.visibility === 'public' || (file.visibility === 'workspace' && refs.includes(`${c.org}/${c.ws}`));
+        // A file only the page's owner family may open is opened for the page when that family put the
+        // name in the map: a contributor's new version of the page is served under the owner's name.
+        const mayOpen = openToReaders
+            || (family.includes(owner) && (c.r !== 'latest' || await mappedByFamily(storage, c, name, ref, family)));
         return mayOpen ? passesClassification(deps, file, owner, parsed.key, c) : null;
     }
     return null;
+}
+
+/**
+ * Whether the page's owner family put `name` → `ref` in the published page's file map (secaudit2026oct26,
+ * page-host.ts:pageFile:files-resolved-against-latest-owner). Publishing keeps the first publisher as
+ * the owner of `.latest` and writes each version under its publisher, so the kept versions say who
+ * wrote the map: walking back from the newest, the mapping counts when a version that holds it was
+ * published by the family before any version without it. A newest version without the mapping means
+ * `.latest` was written another way, which is served as before; a page with no versions likewise.
+ */
+async function mappedByFamily(storage: Storage, c: PageFrameClaims, name: string, ref: string, family: readonly string[]): Promise<boolean> {
+    const base = `organism.${c.org}.w.${c.ws}.${c.ns}.${c.id}`;
+    const versions = (await listVersionRefs(storage, base)).sort((a, b) => b.n - a.n);
+    for (let i = 0; i < versions.length; i++) {
+        const v = versions[i]!;
+        const rec = await storage.getMemory(v.ownerGaii, v.key);
+        const files = (rec?.value as { files?: Record<string, unknown> } | undefined)?.files;
+        if (!files || files[name] !== ref) return i === 0;
+        if (family.includes(v.ownerGaii)) return true;
+    }
+    return versions.length === 0;
 }
 
 /**
@@ -215,7 +244,7 @@ export function pageHostRouter(config: AimeatConfig, storage: Storage): Router {
         }
         const files = rec.value.files && typeof rec.value.files === 'object' ? rec.value.files : {};
         const ref = pageFileNameOk(path) ? files[path] : undefined;
-        const file = typeof ref === 'string' ? await pageFile({ storage, config }, rec.ownerGaii, ref, claims) : null;
+        const file = typeof ref === 'string' ? await pageFile({ storage, config }, rec.ownerGaii, ref, claims, path) : null;
         if (!file || !isServablePageFileType(file.mimeType)) { sendText(res, 404, 'Not found'); return; }
         // The page asks for its own files from an opaque origin (the sandbox), so no file can be
         // same-origin to it: with CORP same-origin the browser refused every picture, stylesheet and

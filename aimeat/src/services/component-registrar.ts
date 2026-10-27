@@ -15,6 +15,8 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.16.2 — 2026-10-27 — deleteComponent of an extension writes the released-name row for a bare name,
+ *     as uninstallExtension does, so the next account's install of it is namespaced (secaudit2026oct26).
  *   v1.16.1 — 2026-10-25 — rewriteComponentRefs moved to component-ref-rewrite.ts, which also rewrites a name written with its owner (secaudit2026oct22).
  *   2026-10-25 — Removing an app component keeps its subdomain row as a held name (held-app-labels.ts) instead of deleting it, so no other owner's app gets the old origin (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.16.0 — 2026-10-20 — A memory component writes no `skills.` or `organism.` key: the raw setMemory below wrote the author's key verbatim under the installer's identity, so a package planted a workspace skill in an organism its installer is not a member of, and shadowed a node built-in skill (secaudit 2026-10; package-memory-component.ts v1.4.0 says why each prefix).
@@ -98,6 +100,7 @@ import { mergeExtensionConfig } from './packages/compose/package-config.js';
 import { registerSkillComponent, deleteSkillComponent } from './packages/install/package-skill-component.js';
 import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
 import { rewriteComponentRefs } from './component-ref-rewrite.js';
+import { releaseBareName } from './component-address.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -688,8 +691,15 @@ export async function deleteComponent(
     switch (type) {
       case 'csm':
         return await storage.deleteCsm(registeredAs);
-      case 'extension':
-        return await storage.deleteExtension(registeredAs);
+      case 'extension': {
+        // A bare name is written down with its holder, as uninstallExtension and removeCortex do, so
+        // the next account's install of the name goes to `<installer>/<name>` and never reaches what
+        // the apps and the ext:<name> memory of this one named (secaudit2026oct26).
+        const holder = (await storage.getExtension(registeredAs))?.installedBy;
+        const deleted = await storage.deleteExtension(registeredAs);
+        if (deleted && holder) await releaseBareName(storage, 'extension', registeredAs, holder);
+        return deleted;
+      }
       case 'cortex': {
         // The one uninstall of a cortex (services/cortex-lifecycle.ts removeCortex): an active one is
         // taken down first, so the actions, boards, schema locks and prompts its activation made go
