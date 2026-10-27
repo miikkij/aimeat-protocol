@@ -43,6 +43,9 @@
  *   if (!hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
  *   const refusal = setupCodeRefusal(config, body.setupCode, isLoopbackAddress(req.socket.remoteAddress));
  * @version-history
+ *   2026-10-27 -- requestFromThisMachine: the routes' `fromLoopback` also asks a loopback Host header and
+ *     no forwarding header, so a request a same-host tunnel or reverse proxy hands on is asked for the
+ *     code (secaudit2026oct26, loopback-socket-behind-local-proxy).
  *   v1.3.0 -- 2026-10-23 -- setupCodeRequired and setupCodeRefusal take `fromLoopback`, the request's
  *     socket address: a loopback base URL waives the code only for a request from loopback
  *     (secaudit2026oct22; Jouni, 2026-10-23).
@@ -56,6 +59,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../config-types.js';
 import { isLoopbackBaseUrl } from '../utils/test-money-guard.js';
+import { fromNodeMachine } from '../auth/loopback-pass.js';
 
 /** Crockford base32: no I, L, O or U, so a code read aloud or copied by hand is not misread. */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -72,6 +76,16 @@ const CODE_LENGTH = 12;
  */
 export function setupCodeRequired(config: Pick<AimeatConfig, 'baseUrl'>, fromLoopback: boolean): boolean {
   return !(fromLoopback && isLoopbackBaseUrl(config.baseUrl));
+}
+
+/**
+ * The `fromLoopback` every setup-code route passes. One rule for all of them, kept in
+ * auth/loopback-pass.ts fromNodeMachine: a loopback socket, no request the node made to itself for
+ * someone else, no forwarding header, and a Host header that names this machine (secaudit2026oct26,
+ * loopback-socket-behind-local-proxy and setup-code/loopback-waiver-honours-connect-tunnel-self-fetch).
+ */
+export function requestFromThisMachine(req: { socket?: { remoteAddress?: string | undefined }; headers: Record<string, string | string[] | undefined> }): boolean {
+  return fromNodeMachine(req);
 }
 
 /**

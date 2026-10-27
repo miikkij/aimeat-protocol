@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-27 — The minted anonymous token is not a member of this node, so aimeat_datamap_get gives it no map of an app listed to members, as the REST read does not (secaudit2026oct26, minted-anonymous-token-counted-as-member).
  *   2026-10-24 — aimeat_datamap_get carries records_of_processing and privacy_notice, as the REST read.
  *   2026-10-22 — aimeat_memory_hands passes the session caller to handsOnKey, which answers by the owner-scope read rule, and carries its `note` (secaudit 2026-10, v88).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -46,6 +47,7 @@ import { toolError } from './tool-error.js';
 import type { DataMap } from '../services/data-map/data-map-types.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 const text = (v: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(v, null, 2) }] });
 const fail = (msg: string) => ({ isError: true, content: [{ type: 'text' as const, text: msg }] });
@@ -68,7 +70,10 @@ export function registerDataMapTools(
       ownerName: session.owner,
       roles: [...session.roles],
       scopes: [...session.scopes],
-      member: session.kind !== 'anonymous' && !session.visitor,
+      // The minted anonymous token is an agent session here (kind 'agent'), and it is nobody's
+      // membership: the REST twin passes no caller for it (routes/data-map.ts).
+      member: session.kind !== 'anonymous' && !session.visitor
+        && !isAnonymousPrincipal({ sub: session.principal, owner: session.owner }),
       auth: session.auth,
     };
   };

@@ -37,6 +37,8 @@
  * @version-history
  *   2026-10-27 — A node on 40537: a sign-in or registration forwarded through the connector tunnel is
  *     not the node's own machine for the setup code (secaudit2026oct26).
+ *   2026-10-27 — On the loopback node a request that carries a forwarding header (a same-host tunnel or
+ *     proxy) is asked for the code (secaudit2026oct26, loopback-socket-behind-local-proxy).
  *   2026-10-23 — The loopback node prints a code, and a request from this machine's network address is
  *     asked for it (secaudit2026oct22; Jouni, 2026-10-23).
  *   2026-10-16 — The password carries a fixed digit: a letters-only STAMP failed the password rule.
@@ -325,6 +327,20 @@ try {
         assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_REQUIRED', `the first account from ${lan} without the code: ${r.status} ${short(r.body)}`);
         const i = await init(fromLan, `laninit${STAMP}`);
         assert(i.status === 403 && i.body.error?.code === 'SETUP_CODE_REQUIRED', `the setup from ${lan} without the code: ${i.status} ${short(i.body)}`);
+    });
+
+    // secaudit2026oct26: a tunnel client or a reverse proxy on the same machine hands every outside
+    // request to the node on a loopback socket; it says so in a forwarding header.
+    await test('a request a same-host proxy forwards is asked for the code, and its first account is refused without it', async () => {
+        for (const fwd of [{ 'X-Forwarded-For': '203.0.113.9' }, { Forwarded: 'for=203.0.113.9' }, { 'X-Real-IP': '203.0.113.9' }]) {
+            const s = await json(local, '/v1/setup/status', { headers: fwd });
+            assert(s.body.data.setupCodeRequired === true, `status through ${Object.keys(fwd)[0]}: ${short(s.body.data)}`);
+        }
+        const fwd = { 'X-Forwarded-For': '203.0.113.9' };
+        const r = await json(local, '/v1/ghii', { method: 'POST', headers: fwd, body: JSON.stringify({ username: `fwdowner${STAMP}`, display_name: 'Forwarded', password: PASSWORD }) });
+        assert(r.status === 403 && r.body.error?.code === 'SETUP_CODE_REQUIRED', `the first account through a proxy without the code: ${r.status} ${short(r.body)}`);
+        const i = await json(local, '/v1/setup/init', { method: 'POST', headers: fwd, body: JSON.stringify({ locale: 'en', owner: { username: `fwdinit${STAMP}`, password: PASSWORD } }) });
+        assert(i.status === 403 && i.body.error?.code === 'SETUP_CODE_REQUIRED', `the setup through a proxy without the code: ${i.status} ${short(i.body)}`);
     });
 
     await test('a loopback node registers its first account without a code, as the operator', async () => {

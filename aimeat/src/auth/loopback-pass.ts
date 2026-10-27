@@ -41,6 +41,9 @@
  *   // auth/mcp-token-on-rest.ts:
  *   if (loopbackPassCovers(req.header(LOOPBACK_PASS_HEADER), token, req.socket.remoteAddress)) accept();
  * @version-history
+ *   2026-10-27 — fromNodeMachine also asks no forwarding header and a Host that names this machine, the
+ *     rule services/setup-code.ts requestFromThisMachine held, so every setup-code route asks one
+ *     function (secaudit2026oct26, loopback-socket-behind-local-proxy).
  *   2026-10-27 — SELF_REQUEST_HEADER and fromNodeMachine(req): a request the node makes to itself for a
  *     principal is not the node's own machine for the setup code's loopback waiver (secaudit2026oct26).
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp).
@@ -98,16 +101,35 @@ export function isLoopbackAddress(address: string | undefined | null): boolean {
  */
 export const SELF_REQUEST_HEADER = 'x-aimeat-self-request';
 
+/** The headers a forwarder (a reverse proxy or a tunnel client) adds to the request it hands on. */
+const FORWARDING_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-host'] as const;
+
+/** Whether a Host header names this machine itself: localhost (and *.localhost), 127.x or ::1. */
+function loopbackHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const lower = host.trim().toLowerCase();
+  const v6 = /^\[([^\]]+)\](?::\d+)?$/.exec(lower);
+  const name = v6 ? v6[1] : lower.replace(/:\d+$/, '');
+  return name === 'localhost' || name.endsWith('.localhost') || name === '::1' || /^127(?:\.\d{1,3}){3}$/.test(name);
+}
+
 /**
  * True when the request comes from a person on the node's own machine: it came in on a loopback
- * socket, and it is not a request the node made to itself for someone else. The setup code's
- * loopback waiver asks this (services/setup-code.ts): a request the connector tunnel replays onto
- * loopback for a remote agent arrives on a loopback socket too (secaudit2026oct26,
- * setup-code/loopback-waiver-honours-connect-tunnel-self-fetch).
+ * socket, it is not a request the node made to itself for someone else, no forwarder handed it on,
+ * and its Host header names this machine. The setup code's loopback waiver asks this
+ * (services/setup-code.ts). A request the connector tunnel replays onto loopback for a remote agent
+ * arrives on a loopback socket too (secaudit2026oct26,
+ * setup-code/loopback-waiver-honours-connect-tunnel-self-fetch), and so does every outside request a
+ * tunnel client or reverse proxy on the same machine hands on (secaudit2026oct26,
+ * loopback-socket-behind-local-proxy). Local development, the E2E runner and `pnpm sandbox`
+ * (http://localhost or 127.0.0.1, no forwarder) still pass.
  */
 export function fromNodeMachine(req: { socket?: { remoteAddress?: string | null } | null; headers: Record<string, unknown> }): boolean {
   if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
-  return req.headers[SELF_REQUEST_HEADER] === undefined && req.headers[LOOPBACK_PASS_HEADER] === undefined;
+  if (req.headers[SELF_REQUEST_HEADER] !== undefined || req.headers[LOOPBACK_PASS_HEADER] !== undefined) return false;
+  if (FORWARDING_HEADERS.some(h => req.headers[h] !== undefined)) return false;
+  const host = req.headers.host;
+  return loopbackHost(typeof host === 'string' ? host : Array.isArray(host) && typeof host[0] === 'string' ? host[0] : undefined);
 }
 
 /**

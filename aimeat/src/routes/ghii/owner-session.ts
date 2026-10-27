@@ -18,6 +18,7 @@
  * @usage await completeOwnerLogin(config, storage, req, res, { ghiiRecord, loginName, wantsOwnerKey });
  * @version-history
  *   2026-10-27 — The self-heal claim reads fromNodeMachine(req): a sign-in the node replays onto loopback for a remote agent (the connector tunnel) is not this machine's own (secaudit2026oct26).
+ *   2026-10-27 — The self-heal claim reads requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — The self-heal claim reads the request's socket address: a loopback base URL waives the
  *     setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-16 — On a node whose base URL is not loopback, the no-operator self-heal promotes the account

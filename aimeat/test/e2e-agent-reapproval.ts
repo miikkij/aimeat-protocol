@@ -389,6 +389,48 @@ await test('a proof signed by another key does not verify, and the request is a 
     await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: code, action: 'deny', owner_token: ownerToken }) });
 });
 
+// ── A proof is used once, and a v2 proof names the node it is for (secaudit2026oct26) ──
+//
+// The v1 text names no node and the node kept no record of a proof it took, so a proof made for one
+// node (or read from a process list) showed another party's request as the agent's return, again and
+// again for five minutes. The v2 text names the node; every proof is taken once.
+const NODE_ID_OF = async () => (await json('/.well-known/aimeat')).body.data.node_id as string;
+async function authorizeWithProofObject(proofObj: Record<string, unknown>): Promise<{ code: string; proof: string }> {
+    const r = await json('/v1/agents/device-authorize', {
+        method: 'POST', body: JSON.stringify({ agent_name: AGENT, owner, proof: proofObj }),
+    });
+    assert(r.status === 200, `authorize ${r.status}: ${JSON.stringify(r.body.error)}`);
+    return { code: r.body.data.user_code as string, proof: r.body.data.return_proof as string };
+}
+const denyCode = (code: string) => json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: code, action: 'deny', owner_token: ownerToken }) });
+
+await test('one proof sent twice: the second request is not shown as the agent\'s return', async () => {
+    const signedAt = new Date().toISOString();
+    const proofObj = { signed_at: signedAt, signature: await sign(current.privateKey, returnProofMessage(owner, AGENT, signedAt)) };
+    const first = await authorizeWithProofObject(proofObj);
+    const second = await authorizeWithProofObject(proofObj);
+    assert(first.proof === 'verified', `first: ${first.proof}`);
+    assert(second.proof === 'not_verified' && (await pendingRow(second.code))?.return_proven === false, `second: ${second.proof}`);
+    await denyCode(first.code);
+    await denyCode(second.code);
+});
+
+await test('a v2 proof that names another node is not shown as the agent\'s return', async () => {
+    const signedAt = new Date().toISOString();
+    const signature = await sign(current.privateKey, `aimeat-device-return:v2\nanother-node-001\n${owner}\n${AGENT}\n${signedAt}`);
+    const r = await authorizeWithProofObject({ signed_at: signedAt, signature });
+    assert(r.proof === 'not_verified', `return_proof: ${r.proof}`);
+    await denyCode(r.code);
+});
+
+await test('designed use: a v2 proof that names this node is the agent\'s return', async () => {
+    const signedAt = new Date().toISOString();
+    const signature = await sign(current.privateKey, `aimeat-device-return:v2\n${await NODE_ID_OF()}\n${owner}\n${AGENT}\n${signedAt}`);
+    const r = await authorizeWithProofObject({ signed_at: signedAt, signature });
+    assert(r.proof === 'verified' && (await pendingRow(r.code))?.return_proven === true, `return_proof: ${r.proof}`);
+    await denyCode(r.code);
+});
+
 // ── A crew's reconnect through the real connector ──
 //
 // aimeat-crewai does no device authorization of its own: a crew enrols and reconnects with

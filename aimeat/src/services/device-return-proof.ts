@@ -25,15 +25,22 @@
  *   owner already connected may carry the same proof, signed with the app's pinned key over
  *   `aimeat-eco-hello:v1\n<owner>\n<app>\n<signed_at>`. The mark is the same record, holding the GEAI,
  *   and GET /v1/ecosystem-apps/pending reports it as `key_proven`.
- * @structure RETURN_PROOF_PREFIX · RETURN_PROOF_MAX_AGE_MS · returnProofMessage · ecoHelloProofMessage ·
- *   proofVerifies · ecoHelloProofVerifies · markReturnProven · returnProven
+ * @structure RETURN_PROOF_PREFIX · RETURN_PROOF_MAX_AGE_MS · returnProofMessage · returnProofMessageV2 ·
+ *   ecoHelloProofMessage · proofVerifies · ecoHelloProofVerifies · spendReturnProof · markReturnProven ·
+ *   returnProven
  * @usage
- *   if (existing && await proofVerifies(existing.publicKey, owner, name, body.proof)) await markReturnProven(storage, ownerGhii, userCode, gaii);
+ *   if (existing && await proofVerifies(existing.publicKey, owner, name, body.proof, Date.now(), nodeId)
+ *     && await spendReturnProof(storage, ownerGhii, body.proof)) await markReturnProven(storage, ownerGhii, userCode, gaii);
  * @version-history
  *   v1.1.0 — 2026-10-27 — ecoHelloProofMessage and ecoHelloProofVerifies: an ecosystem app proves a
  *     same-key reconnect with its pinned key (secaudit2026oct26, token-pickup-without-pinned-key-proof).
+ *   2026-10-27 — The v2 text names the node (`aimeat-device-return:v2\n<node id>\n<owner>\n<agent>\n<signed_at>`),
+ *     so a proof made for another node does not verify here; v1 is still accepted. Every proof is taken
+ *     once (spendReturnProof): sent again, the request is shown as a new device, not as the return
+ *     (secaudit2026oct26, device-return-proof:return-proof-unbound-to-node-and-request).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
+import { createHash } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { verify } from '../auth/keypair.js';
 
@@ -42,9 +49,21 @@ export const RETURN_PROOF_PREFIX = 'agent-device-return.';
 /** How old a signed_at may be. */
 export const RETURN_PROOF_MAX_AGE_MS = 5 * 60_000;
 
-/** The exact text an agent signs to prove it is coming back. */
+/**
+ * The v1 text an agent signs to prove it is coming back. It names no node, so a proof made for one
+ * node verifies on another where the same owner and agent names exist. Still accepted, for the
+ * clients that sign it; they move to v2.
+ */
 export function returnProofMessage(owner: string, agentName: string, signedAt: string): string {
   return `aimeat-device-return:v1\n${owner}\n${agentName}\n${signedAt}`;
+}
+
+/**
+ * The v2 text: the same, naming the node the request goes to (its node_id, as GET
+ * /.well-known/aimeat answers it), so the proof verifies on that node only (secaudit2026oct26).
+ */
+export function returnProofMessageV2(nodeId: string, owner: string, agentName: string, signedAt: string): string {
+  return `aimeat-device-return:v2\n${nodeId}\n${owner}\n${agentName}\n${signedAt}`;
 }
 
 /**
@@ -55,24 +74,62 @@ export function ecoHelloProofMessage(owner: string, app: string, signedAt: strin
   return `aimeat-eco-hello:v1\n${owner}\n${app}\n${signedAt}`;
 }
 
-/** Shared check: `proof` is `{ signed_at, signature }`, fresh, and signs `messageOf(signed_at)` with `publicKey`. */
-async function signedProofVerifies(publicKey: string | undefined, proof: unknown, messageOf: (signedAt: string) => string, now: number): Promise<boolean> {
+/**
+ * Shared check: `proof` is `{ signed_at, signature }`, fresh, and signs one of `messagesOf(signed_at)`
+ * with `publicKey`, tried in order.
+ */
+async function signedProofVerifies(publicKey: string | undefined, proof: unknown, messagesOf: (signedAt: string) => string[], now: number): Promise<boolean> {
   if (!publicKey || !proof || typeof proof !== 'object') return false;
   const { signed_at: signedAt, signature } = proof as { signed_at?: unknown; signature?: unknown };
   if (typeof signedAt !== 'string' || typeof signature !== 'string' || signature.length > 200) return false;
   const at = Date.parse(signedAt);
   if (!Number.isFinite(at) || Math.abs(now - at) > RETURN_PROOF_MAX_AGE_MS) return false;
-  return verify(publicKey, messageOf(signedAt), signature);
+  for (const message of messagesOf(signedAt)) {
+    if (await verify(publicKey, message, signature)) return true;
+  }
+  return false;
 }
 
-/** Does `proof` verify against the agent's current public key, and is it fresh? Never throws. */
-export async function proofVerifies(publicKey: string | undefined, owner: string, agentName: string, proof: unknown, now = Date.now()): Promise<boolean> {
-  return signedProofVerifies(publicKey, proof, (at) => returnProofMessage(owner, agentName, at), now);
+/**
+ * Does `proof` verify against the agent's current public key, and is it fresh? The v2 text naming
+ * `nodeId` is tried first, then the v1 text. Never throws.
+ */
+export async function proofVerifies(publicKey: string | undefined, owner: string, agentName: string, proof: unknown, now = Date.now(), nodeId?: string): Promise<boolean> {
+  return signedProofVerifies(publicKey, proof, (at) => [
+    ...(nodeId ? [returnProofMessageV2(nodeId, owner, agentName, at)] : []),
+    returnProofMessage(owner, agentName, at),
+  ], now);
 }
 
 /** Does an ecosystem app's hello `proof` verify against `publicKey`, and is it fresh? Never throws. */
 export async function ecoHelloProofVerifies(publicKey: string | undefined, owner: string, app: string, proof: unknown, now = Date.now()): Promise<boolean> {
-  return signedProofVerifies(publicKey, proof, (at) => ecoHelloProofMessage(owner, app, at), now);
+  return signedProofVerifies(publicKey, proof, (at) => [ecoHelloProofMessage(owner, app, at)], now);
+}
+
+/** The proofs this process took, by signature, until they could no longer verify. */
+const spentHere = new Map<string, number>();
+
+/**
+ * Take a verified proof, once: true the first time this signature is presented, false after. A proof
+ * sent again (relayed, or read from a process list) is then shown as what it is, a request from
+ * somewhere else, not as the agent's return. Held in this process and as a service-owned record in
+ * the owner's namespace for as long as the proof is fresh, so another process of the node sees it too.
+ */
+export async function spendReturnProof(storage: Storage, ownerGhii: string, proof: unknown, now = Date.now()): Promise<boolean> {
+  const signature = String((proof as { signature?: unknown } | null)?.signature ?? '');
+  const id = createHash('sha256').update(signature).digest('hex').slice(0, 32);
+  for (const [k, until] of spentHere) if (until < now) spentHere.delete(k);
+  if (spentHere.has(id)) return false;
+  spentHere.set(id, now + 2 * RETURN_PROOF_MAX_AGE_MS);
+  const at = new Date(now).toISOString();
+  const record = {
+    key: `${RETURN_PROOF_PREFIX}spent-${id}`, ownerGaii: ownerGhii, value: { spent_at: at }, visibility: 'private' as const,
+    tags: ['agent', 'device-return'], ttlHours: 1, version: 1, createdAt: at, updatedAt: at,
+  };
+  // One conditional insert: of two processes taking the same proof, one wins. Both providers have it;
+  // a store without it is held by this process's own record above.
+  if (!storage.createMemoryIfAbsent) return true;
+  return (await storage.createMemoryIfAbsent(record)) !== null;
 }
 
 const markKey = (userCode: string) => `${RETURN_PROOF_PREFIX}${userCode}`;

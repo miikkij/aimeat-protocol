@@ -12,6 +12,7 @@
  *
  * @version-history
  *   2026-10-27 — The operator claim reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
+ *   2026-10-27 — The operator claim reads requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — The operator claim reads the request's socket address: a loopback base URL waives the
  *     setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-21 — GET /v1/owners/:name asks isAnonymousPrincipal: the minted anonymous token read the

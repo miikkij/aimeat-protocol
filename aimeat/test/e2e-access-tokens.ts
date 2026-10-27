@@ -417,6 +417,41 @@ async function main() {
     }
   });
 
+  // secaudit2026oct26: signing out everywhere (and a password reset or change) leaves the person's own
+  // access tokens working, since programs run on them; the person is told which ones act as them.
+  console.log('\nPhase 9 — Sign out everywhere names the access tokens that still act as you');
+  const userC = `patc${stamp}`;
+  let ownerPatC = '', scopedPatC = '';
+  await test('setup: owner C makes a Full access token and a scoped one', async () => {
+    const jwtC = await registerAndLogin(userC, pw);
+    const full = await api('/v1/access/tokens', { bearer: jwtC, body: { label: `my-script-${stamp}`, grant_owner: true } });
+    const scoped = await api('/v1/access/tokens', { bearer: jwtC, body: { label: `reader-${stamp}`, scopes: ['memory:read'] } });
+    assert(full.status === 201 && scoped.status === 201, `mint: ${full.status} ${scoped.status}`);
+    ownerPatC = full.data.data.token;
+    scopedPatC = scoped.data.data.token;
+    const out = await api('/v1/auth/sessions', { method: 'DELETE', bearer: jwtC });
+    assert(out.status === 200, `sign out everywhere: ${out.status} ${JSON.stringify(out.data?.error)}`);
+  });
+
+  await test('after sign out everywhere the person is told which access tokens still act as them', async () => {
+    let notice: any;
+    for (let i = 0; i < 20 && !notice; i++) {
+      const n = await api('/v1/notifications', { method: 'GET', bearer: ownerPatC });
+      notice = (n.data?.data?.notifications ?? []).find((x: any) => x.type === 'owner_tokens_kept');
+      if (!notice) await sleep(150);
+    }
+    assert(!!notice, 'no owner_tokens_kept notice');
+    assert(notice.body.includes(`my-script-${stamp}`) && !notice.body.includes(`reader-${stamp}`), `body: ${notice.body}`);
+    assert(notice.link === '/v1/profile#access', `link: ${notice.link}`);
+  });
+
+  await test('usage: both access tokens keep working after sign out everywhere', async () => {
+    for (const t of [ownerPatC, scopedPatC]) {
+      const r = await api('/v1/auth/token/exchange', { bearer: t });
+      assert(r.status === 200 && r.data?.ok, `exchange: ${r.status} ${r.data?.error?.message}`);
+    }
+  });
+
   console.log('\n─────────────────────────────────────');
   console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed === 0) console.log('✅ All tests passed!');

@@ -12,6 +12,7 @@
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
  *   2026-10-27 — aimeat_app_publish and aimeat_app_draft_publish under a role-'app' token name that app on the version (`publishingApp`; secaudit2026oct26).
+ *   2026-10-27 — aimeat_app_get and aimeat_app_list count the minted anonymous token as no member of this node, so it neither reads nor lists an app listed to members, as on REST (secaudit2026oct26, minted-anonymous-token-counted-as-member).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version` (the display version
@@ -121,6 +122,7 @@
 
 import { McpServer } from '@modelcontextprotocol/server';
 import { withCaughtError } from './tool-fault.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appListingOf } from '../storage/interface.js';
@@ -179,6 +181,16 @@ export function registerAppsTools(
     function refusalText(refusal: { message: string; details?: Record<string, unknown> }): string {
         if (!refusal.details) return refusal.message;
         return `${refusal.message}\n\n${JSON.stringify(refusal.details, null, 2)}`;
+    }
+
+    /**
+     * Whether the session is a member of this node, for an app listed to members. The minted anonymous
+     * token is an agent session here (kind 'agent') and is nobody's membership, as on the REST reads
+     * (services/app-visibility.ts; secaudit2026oct26).
+     */
+    function sessionIsMember(session: CallerContext): boolean {
+        return session.kind !== 'anonymous' && !session.visitor
+            && !isAnonymousPrincipal({ sub: session.principal, owner: session.owner });
     }
 
     // ── Tool 1: aimeat_app_publish ──
@@ -568,9 +580,10 @@ export function registerAppsTools(
                 offset: skip,
                 // Browsing the full catalogue still surfaces the caller's OWN parked apps
                 // (hidden from everyone else), so an owner's agent can act on them. The agent acts
-                // for a member of this node, so it sees the community apps the member sees too.
+                // for a member of this node, so it sees the community apps the member sees too. The
+                // minted anonymous token is no member and does not (secaudit2026oct26).
                 viewerGhii: ownerGhii,
-                includeCommunity: true,
+                includeCommunity: sessionIsMember(caller()),
                 ...(own ? { ownerGaii: ownerGhii } : {}),
             };
 
@@ -652,7 +665,7 @@ export function registerAppsTools(
             // node's members for a caller who is not one) is answered as absent, as the app read routes
             // answer it (services/app-visibility.ts; QA audit W15).
             const session = caller();
-            const viewer = { ownerName: session.owner, member: session.kind !== 'anonymous' && !session.visitor, auth: session.auth };
+            const viewer = { ownerName: session.owner, member: sessionIsMember(session), auth: session.auth };
             if (!app || !(await mayViewApp(storage, config, viewer, app, 'detail'))) {
                 return { content: [{ type: 'text' as const, text: `App "${filename}" not found for owner "${owner}"` }], isError: true };
             }

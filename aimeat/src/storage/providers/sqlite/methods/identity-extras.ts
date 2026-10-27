@@ -8,6 +8,7 @@
  * @structure identityExtraMethods
  * @usage Object.assign(SqliteStorage.prototype, identityExtraMethods) in ../index.ts
  * @version-history
+ *   2026-10-27 — reserveEmailVerificationAttempt (secaudit2026oct26, password-reset-attempt-cap-read-then-write).
  *   v1.0.0 — 2026-10-05 — 12 methods (createChatInstance, getChatInstance, listChatInstances, …) moved here
  *     from identity-nodes.ts so the file mirrors postgres-kysely/methods/identity-extras.ts (secaudit
  *     2026-10, M8).
@@ -139,6 +140,12 @@ export const identityExtraMethods = {
   async spendEmailVerification(this: SqliteStorage, id: string, verifiedAt: string): Promise<boolean> {
     return this.db.prepare(`UPDATE email_verifications SET status = 'verified', verifiedAt = ? WHERE id = ? AND status = 'pending'`)
       .run(verifiedAt, id).changes === 1;
+  },
+
+  /** One conditional UPDATE, so overlapping guesses of one code are each counted against its cap. */
+  async reserveEmailVerificationAttempt(this: SqliteStorage, id: string, max: number): Promise<boolean> {
+    return this.db.prepare(`UPDATE email_verifications SET attempts = attempts + 1 WHERE id = ? AND status = 'pending' AND attempts < ?`)
+      .run(id, max).changes === 1;
   },
 
   deserializeEmailVerification(this: SqliteStorage, row: Record<string, unknown>): EmailVerificationRecord {

@@ -20,6 +20,7 @@
  *   2026-10-27 -- e2e-service-namespace-lists.ts joins the list (not the guard tier): beneficiary splits, metered contracts, grants and their history, and the operator's money platform fees take only the service's own records (secaudit2026oct26).
  *   2026-10-27 -- e2e-memory-door-parity.ts joins the list (not the guard tier): bulk-delete and the bin routes ask the bin's per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller reads as absent (secaudit2026oct26).
  *   2026-10-27 -- e2e-own-reach-oct26.ts joins the list (not the guard tier): round 8 of secaudit2026oct26, group memory-b.
+ *   2026-10-27 -- e2e-anonymous-member-reads.ts joins the list (not the guard tier): the shared anonymous credential reads no app listed to members over MCP, as over REST (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -499,6 +500,8 @@ const ALL_SUITES = [
     'test/e2e-agent-activity.ts',
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
+    // The shared anonymous credential and an app listed to members: MCP answers as REST (secaudit2026oct26).
+    'test/e2e-anonymous-member-reads.ts',
     'test/e2e-auth-lib.ts',
     'test/e2e-account-security-gate.ts',
     'test/e2e-totp-lifecycle.ts',
