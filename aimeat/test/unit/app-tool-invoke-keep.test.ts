@@ -115,6 +115,19 @@ describe('the app-tool keep step', () => {
         expect(await appToolInvokeKept(storage, NODE_ID, gaii('caller'), ['memory:read'])).toBe(false);
         expect(await appToolInvokeKept(storage, NODE_ID, gaii('silent'), ['memory:read'])).toBe(false);
     });
+
+    // secaudit2026oct26, keep-matched-by-reusable-identifier: an agent name is released with the agent,
+    // and a new agent under it is a new principal the step never saw.
+    it('does not keep a new agent registered under a kept agent\'s name after the step', async () => {
+        await makeAgent('reborn', ['memory:read']); await called(gaii('reborn'));
+        const rec = await storage.getMemory(`system@${NODE_ID}`, APP_TOOL_INVOKE_KEEP_KEY);
+        const value = rec!.value as { at: string; principals: Array<Record<string, unknown>> };
+        await storage.setMemory({ ...rec!, value: { ...value, principals: [...value.principals, { id: gaii('reborn'), owner: OWNER, kind: 'agent', scopes: ['memory:read'] }] } });
+        expect(await appToolInvokeKept(storage, NODE_ID, gaii('reborn'), ['memory:read'])).toBe(true);
+        await storage.deleteAgent(gaii('reborn'));
+        await makeAgent('reborn', ['memory:read'], OWNER, new Date(Date.parse(value.at) + 60_000).toISOString());
+        expect(await appToolInvokeKept(storage, NODE_ID, gaii('reborn'), ['memory:read'])).toBe(false);
+    });
 });
 
 describe('the app-tool gate', () => {
