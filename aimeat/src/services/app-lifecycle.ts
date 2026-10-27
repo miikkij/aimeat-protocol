@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.3 — 2026-10-27 — publishAppDraft passes `publishingApp`, the app whose grant publishes
+ *     (secaudit2026oct26, app-grant-publisher-reads-as-owner).
  *   v1.10.2 — 2026-10-25 — deleteOwnedApp marks the app's own address held (held-app-labels.ts;
  *     secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.10.1 — 2026-10-25 — A fork into another account's catalogue leaves out the source owner's
@@ -320,6 +322,8 @@ export interface PublishAppDraftInput {
   draft: AppDraftRecord;
   /** The publish gate's answer for this caller (services/app-publish-gate.ts); see PublishAppInput. */
   publishGate: PublishAsk | null;
+  /** The app whose grant publishes, when the caller is a role-'app' token; see PublishAppInput. */
+  publishingApp?: string;
   declaredProvenanceId?: string;
   declaredProvenance?: DeclaredProvenance;
   specToken?: string;
@@ -361,6 +365,7 @@ export async function publishAppDraft(
     accessCode: { mode: 'carry' },
     source: 'draft',
     publishGate: input.publishGate,
+    publishingApp: input.publishingApp,
     // The draft's own notice says what it changed, so it is the roadmap line when none is given.
     roadmap: input.roadmap?.trim() ? input.roadmap : draft.manifest.draftNotice?.text,
     declaredProvenanceId: input.declaredProvenanceId,

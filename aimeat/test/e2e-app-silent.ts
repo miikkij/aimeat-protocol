@@ -8,6 +8,10 @@
  *   subdomain-served app HTML and the bridge page is framable only by app origins.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
+ *   2026-10-27 — An access token minted from a consent to an erased author's app stops working once the
+ *     name is registered again; the same author's republish keeps it. A version another author's app
+ *     published through the owner's grant asks once for its new words and the owner is told; the
+ *     owner's own app publishing through its own grant signs in as before (secaudit2026oct26).
  *   2026-10-25 — A consent to an erased author's app does not pass to the next holder of the name (the
  *     silent bridge, the refresh and the grant list); the same author's republish keeps it
  *     (secaudit2026oct22, app-grants:grants-to-erased-authors-apps-rebind-on-name-reuse).
@@ -772,6 +776,71 @@ async function main() {
             await consentAndExchange(r1.requestId!, r1.verifier, `${ORIGIN_D}/callback`, B.token);
             const again = await silent(ORIGIN_D, 'memory:read', B.rt);
             assert(again.ok === true, `a consent to the new holder's app does not sign in: ${JSON.stringify({ ok: again.ok, error: again.error })}`);
+        });
+
+        // secaudit2026oct26 (credential-revoked:app-grant-token-ignores-earlier-author). The ACCESS token
+        // minted from a consent to an erased author's app kept working until it expired, after the name
+        // was registered again and the same file published at the same origin. It now ends with the
+        // grant; the same author's republish keeps it working.
+        await test('an access token minted for an erased author\'s app stops working once the name is registered again', async () => {
+            const en = `silente${(Date.now() + 3) % 100000}`;
+            const E1 = await register(en);
+            await publish(E1.token, 'app-e.html', 'memory:read');
+            await assignSub(A.token, 'eee', `${en}/app-e.html`);
+            const ORIGIN_E = `https://eee.${APP_HOST}`;
+            const r0 = await authorize(`${en}/app-e.html`, 'memory:read', `${ORIGIN_E}/callback`);
+            const granted = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_E}/callback`, B.token);
+            const read = () => json('/v1/memory?limit=1', { headers: { Authorization: `Bearer ${granted.access_token}` } });
+            const before = await read();
+            assert(before.status === 200, `the app's token reads before anything changed: ${before.status} ${JSON.stringify(before.body?.error)}`);
+            await publish(E1.token, 'app-e.html', 'memory:read');
+            const kept = await read();
+            assert(kept.status === 200, `the same author's republish ended the token: ${kept.status}`);
+
+            const del = await json(`/v1/owners/${en}`, { method: 'DELETE', headers: { Authorization: `Bearer ${E1.token}` } });
+            assert(del.status === 200, `erase the author: ${del.status} ${JSON.stringify(del.body?.error)}`);
+            const E2 = await register(en);
+            await publish(E2.token, 'app-e.html', 'memory:read');
+            const after = await read();
+            assert(after.status === 401, `the earlier access token works for the new holder's app: ${after.status}`);
+        });
+
+        // secaudit2026oct26 (own-app-consent:app-grant-publisher-reads-as-owner), the developer's decision
+        // of 2026-10-27. A version another author's app published through the owner's grant read as the
+        // owner's own, so the owner's own-app silent sign-in gave its new words without asking. The
+        // version now names that app, the owner hears of it, and the new words are asked once.
+        await test('a version another author\'s app published through the owner\'s grant asks once for its new words, and the owner is told', async () => {
+            const tn = `silentt${(Date.now() + 4) % 100000}`;
+            const T = await register(tn);
+            await publish(T.token, 'tool.html', 'app:write');
+            await assignSub(A.token, 'pbtool', `${tn}/tool.html`);
+            const ORIGIN_T = `https://pbtool.${APP_HOST}`;
+            const r0 = await authorize(`${tn}/tool.html`, 'app:write', `${ORIGIN_T}/callback`);
+            const tool = await consentAndExchange(r0.requestId!, r0.verifier, `${ORIGIN_T}/callback`, B.token);
+            await publish(tool.access_token, 'made.html', 'memory:read contacts:read');
+            await assignSub(A.token, 'pbmade', `${bn}/made.html`);
+            const ORIGIN_M = `https://pbmade.${APP_HOST}`;
+            const s = await silent(ORIGIN_M, 'memory:read contacts:read', B.rt) as Record<string, any>;
+            assert(s.ok === false && s.error === 'consent_required' && s.why === 'publisher_version',
+                `the version the other author's app published signed in silently: ${JSON.stringify({ ...s, access_token: !!s.access_token })}`);
+            assert(s.published_by_app === `${tn}/tool.html`, `the publishing app is not named: ${JSON.stringify(s.published_by_app)}`);
+            const n = await json('/v1/notifications?limit=50', { headers: { Authorization: `Bearer ${B.token}` } });
+            assert(JSON.stringify(n.body).includes('app_published_by_app') && JSON.stringify(n.body).includes(`${tn}/tool.html`), 'the owner was not told');
+            // The owner's own publish of the same app signs in silently, its new words included.
+            await publish(B.token, 'made.html', 'memory:read contacts:read');
+            const own = await silent(ORIGIN_M, 'memory:read contacts:read', B.rt);
+            assert(own.ok === true, `the owner's own version asks: ${JSON.stringify({ ...own, access_token: !!own.access_token })}`);
+        });
+
+        await test('the owner\'s own app publishing through its own grant signs in silently as before', async () => {
+            await publish(B.token, 'bself.html', 'app:write');
+            await assignSub(A.token, 'pbself', `${bn}/bself.html`);
+            const self = await silent(`https://pbself.${APP_HOST}`, 'app:write', B.rt);
+            assert(self.ok === true && !!self.access_token, `the owner's own app: ${JSON.stringify({ ...self, access_token: !!self.access_token })}`);
+            await publish(self.access_token!, 'bmade.html', 'memory:read storage:read');
+            await assignSub(A.token, 'pbownmade', `${bn}/bmade.html`);
+            const s = await silent(`https://pbownmade.${APP_HOST}`, 'memory:read storage:read', B.rt);
+            assert(s.ok === true, `the version the owner's own app published asks: ${JSON.stringify({ ...s, access_token: !!s.access_token })}`);
         });
 
         await test('a subdomain ending in --draft cannot be registered', async () => {
