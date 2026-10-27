@@ -30223,6 +30223,10 @@ paths:
         (signed in). Each signature gets a verdict (valid, invalid, indeterminate), reason codes, the
         signer, the signing time and its proof, the chain and its EU trusted list entry, revocation,
         and the eIDAS level. `aimeat` lists this node's AIMEAT signatures for the same document.
+        A PDF with more signatures than docsign.max_signatures (50 by default, 0 no limit) is 400
+        TOO_MANY_SIGNATURES. One check sends at most docsign.max_fetches requests (200 by default, 0
+        no limit) to the addresses in the file's certificates; past that, a signature's revocation
+        notes say so and its revocation stays open.
       tags: [Document signing]
       security: []
       parameters:

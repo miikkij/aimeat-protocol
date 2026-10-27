@@ -37,6 +37,9 @@
  *     time only when its authority is on a trusted list or chains to an operator anchor.
  *   v1.2.2 — 2026-10-25 — secaudit2026oct22: the proven signing time goes to checkRevocation, which
  *     uses an embedded good OCSP answer only when it was made at or after that time.
+ *   2026-10-27 — secaudit2026oct26: one validatePdf or validateCmsFile call runs inside an outbound
+ *     budget of docsign.max_fetches requests (online-budget.ts), and a PDF with more than
+ *     docsign.max_signatures signature fields is refused as TOO_MANY_SIGNATURES before any is read.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -46,6 +49,7 @@ import { buildChain, isEudiTestRoot, type BuiltChain } from './chain.js';
 import { findIssuingService, qualifiersFor, type TrustMatch } from './trust-list.js';
 import { checkRevocation, type RevocationResult } from './revocation.js';
 import { readCert, holderLabel, type CertInfo } from './x509-info.js';
+import { withOnlineBudget } from './online-budget.js';
 
 export type Verdict = 'valid' | 'invalid' | 'indeterminate';
 
@@ -432,11 +436,20 @@ export class ValidationInputError extends Error {
   constructor(public readonly code: string, message: string) { super(message); }
 }
 
-export async function validatePdf(config: AimeatConfig, pdf: Buffer, opts: { online?: boolean } = {}): Promise<ValidationReport> {
+/**
+ * Every signature in a PDF. One call makes at most docsign.max_fetches outbound requests to the
+ * addresses its certificates name, and refuses a file with more than docsign.max_signatures fields
+ * (TOO_MANY_SIGNATURES); 0 is no limit for either (secaudit2026oct26).
+ */
+export function validatePdf(config: AimeatConfig, pdf: Buffer, opts: { online?: boolean } = {}): Promise<ValidationReport> {
+  return withOnlineBudget(config.docsignMaxFetches ?? 0, () => validatePdfWithinBudget(config, pdf, opts));
+}
+
+async function validatePdfWithinBudget(config: AimeatConfig, pdf: Buffer, opts: { online?: boolean }): Promise<ValidationReport> {
   const online = config.docsignOnlineChecks && opts.online !== false;
   let fields: PdfSignatureField[];
   try {
-    fields = extractPdfSignatures(pdf);
+    fields = extractPdfSignatures(pdf, { maxFields: config.docsignMaxSignatures ?? 0 });
   } catch (err) {
     if (err instanceof PdfExtractError) throw new ValidationInputError(err.code, err.message);
     throw err;
@@ -485,8 +498,14 @@ export async function validatePdf(config: AimeatConfig, pdf: Buffer, opts: { onl
  * A CMS signature file: detached (.p7s) with the document it signs, or attached (.p7m) carrying
  * the document inside it. The report's document is the signed content in both cases.
  */
-export async function validateCmsFile(
+export function validateCmsFile(
   config: AimeatConfig, signature: Buffer, content: Buffer | null, opts: { online?: boolean } = {},
+): Promise<ValidationReport> {
+  return withOnlineBudget(config.docsignMaxFetches ?? 0, () => validateCmsFileWithinBudget(config, signature, content, opts));
+}
+
+async function validateCmsFileWithinBudget(
+  config: AimeatConfig, signature: Buffer, content: Buffer | null, opts: { online?: boolean },
 ): Promise<ValidationReport> {
   const online = config.docsignOnlineChecks && opts.online !== false;
   const cms = verifyCms(signature, content);

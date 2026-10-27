@@ -14,6 +14,8 @@
  * @structure BuiltChain · buildChain · operatorAnchors · _setCaIssuerFetcher (test seam)
  * @usage const chain = await buildChain(config, signerDer, poolDers);
  * @version-history
+ *   2026-10-27 — A caIssuers fetch takes one from the check's outbound budget (online-budget.ts); when it
+ *     is spent the chain stops and its gap says so (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — The EU reference wallet's test CAs are anchors too while
  *     docsign.eudi_test_roots is on; isEudiTestRoot() tells the report so (wish-allekirjoitus-eudi-lompakolla).
@@ -27,6 +29,7 @@ import { readBodyCapped } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { readCert, safeVerify, type CertInfo } from './x509-info.js';
 import { EUDI_TEST_ROOTS_B64 } from '../../data/eudi-test-roots.js';
+import { BUDGET_SPENT_NOTE, takeOnlineFetch } from './online-budget.js';
 
 const MAX_DEPTH = 8;
 const MAX_FETCHES = 3;
@@ -140,6 +143,7 @@ export async function buildChain(config: AimeatConfig, signer: Buffer, pool: Buf
   const first = readCert(signer);
   const out: BuiltChain = { certs: [first], reachesRoot: false, operatorAnchor: null, fetched: [], gap: null };
   let fetches = 0;
+  let budgetSpent = false;
   for (let depth = 0; depth < MAX_DEPTH; depth++) {
     const cur = out.certs[out.certs.length - 1]!;
     const anchor = anchors.find((a) => a.sha256 === cur.sha256);
@@ -152,6 +156,8 @@ export async function buildChain(config: AimeatConfig, signer: Buffer, pool: Buf
       const urls = [...new Set([...cur.caIssuerUrls, ...out.certs.flatMap((c) => c.caIssuerUrls)])];
       for (const url of urls) {
         if (fetches >= MAX_FETCHES || !/^https?:\/\//i.test(url)) continue;
+        // The check's own outbound budget (online-budget.ts; secaudit2026oct26).
+        if (!takeOnlineFetch()) { budgetSpent = true; break; }
         fetches++;
         try {
           for (const der of certsFromCaIssuers(await caFetcher(url))) add(der);
@@ -163,7 +169,10 @@ export async function buildChain(config: AimeatConfig, signer: Buffer, pool: Buf
         if (issuer) break;
       }
     }
-    if (!issuer) { out.gap = `no issuer found for ${cur.subject.commonName ?? cur.subject.text}`; break; }
+    if (!issuer) {
+      out.gap = `no issuer found for ${cur.subject.commonName ?? cur.subject.text}${budgetSpent ? `: ${BUDGET_SPENT_NOTE}` : ''}`;
+      break;
+    }
     out.certs.push(issuer);
   }
   if (!out.operatorAnchor) {
