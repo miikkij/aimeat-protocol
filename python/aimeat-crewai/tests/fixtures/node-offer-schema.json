@@ -498,6 +498,7 @@
                 },
                 "snapshotHash": {
                   "type": "string",
+                  "maxLength": 256,
                   "pattern": "^(sha256:)?[a-fA-F0-9]{64}$"
                 },
                 "lineage": {
@@ -537,6 +538,7 @@
               "properties": {
                 "language": {
                   "type": "string",
+                  "maxLength": 256,
                   "pattern": "^[a-z]{2}$"
                 },
                 "productType": {
