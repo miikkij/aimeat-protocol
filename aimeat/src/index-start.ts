@@ -4,6 +4,11 @@
  * SPDX-License-Identifier: MIT
  * @description `aimeat start` / `serve` runtime: asset self-heal, server listen + banner, WebSocket upgrade routing (personal tunnel / connector tunnel / realtime P2P + echat), and graceful shutdown. Extracted from index.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — secaudit2026oct26 (services/realtime-upgrade-guards.ts): the realtime socket takes no
+ *     frame larger than its size check can pass (1009), the personal tunnel has the connect tunnel's
+ *     ceiling, an anonymous echat upgrade is counted by the client address Express's trust-proxy rule
+ *     gives, and its room comes from EchatDoor (the visitors' room limit; a room nobody joined is
+ *     closed when its handshake ends).
  *   2026-10-25 — secaudit2026oct22: on a signed-in-only node the realtime upgrade refuses a verified
  *     credential that is not a node account (isNodeAccount) with 401 SIGN_IN_REQUIRED, as the REST
  *     content-access gate does; node accounts join by header and by ticket as before.
@@ -289,13 +294,19 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
     const { isAnonymousMode, isOwnerPrincipal } = await import('./auth/middleware.js');
     const { isNodeAccount } = await import('./services/audience.js');
     const { CONNECT_TUNNEL_PATH } = await import('./services/connect-tunnel.js');
-    const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true }) : null;
-    const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true }) : null;
+    const { realtimeMaxPayload, upgradeClientKey, EchatDoor } = await import('./services/realtime-upgrade-guards.js');
     // Cap forward-tunnel frame size (ws defaults to 100 MiB). An authenticated
     // agent could otherwise buffer huge frames in memory (cheap DoS). Sized a
     // little above the largest JSON body the routes accept; bulk uploads use
-    // presigned URLs, not the tunnel.
+    // presigned URLs, not the tunnel. The personal tunnel carries heartbeats and mailbox
+    // acknowledgements, and has the same ceiling (secaudit2026oct26).
     const connectMaxPayload = (config.jsonBodyLimitLargeMb + 1) * 1024 * 1024;
+    const tunnelWss = tunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
+    // The realtime socket receives no frame larger than the room's size check can pass; the limit is
+    // set again before each upgrade, so a saved realtime.max_message_size_bytes applies to the next
+    // socket (services/realtime-upgrade-guards.ts; secaudit2026oct26).
+    const realtimeWss = realtimeManager ? new WebSocketServer({ noServer: true, maxPayload: realtimeMaxPayload(config.realtimeMaxMessageSizeBytes) }) : null;
+    const echatDoor = realtimeManager ? new EchatDoor(realtimeManager, config) : null;
     const connectWss = connectTunnelManager ? new WebSocketServer({ noServer: true, maxPayload: connectMaxPayload }) : null;
     // An upgrade let in on the deprecated ?token= says so in its 101 answer (Core 2026-11 HTTP-07).
     for (const wss of [tunnelWss, realtimeWss, connectWss]) {
@@ -403,7 +414,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       }
 
       // ── Realtime P2P upgrade ──
-      if (url.pathname === '/v1/realtime/ws' && realtimeManager && realtimeWss) {
+      if (url.pathname === '/v1/realtime/ws' && realtimeManager && realtimeWss && echatDoor) {
+        realtimeWss.options.maxPayload = realtimeMaxPayload(config.realtimeMaxMessageSizeBytes);
         // ── Echat anonymous connection ──
         const isEchat = url.searchParams.get('echat') === '1';
         if (isEchat) {
@@ -419,21 +431,25 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
             socket.destroy();
             return;
           }
-          // Rate limit anonymous echat connections per IP
-          const clientIp = request.socket.remoteAddress ?? 'unknown';
-          if (!echatRateCheck(clientIp)) {
+          // Rate limit anonymous echat connections per visitor: the address Express would give req.ip
+          // (its trust-proxy rule), IPv6 by its /64. The socket address alone is the proxy's for every
+          // visitor behind the documented same-host proxy (secaudit2026oct26).
+          const clientKey = upgradeClientKey(request, app.get('trust proxy fn') as Parameters<typeof upgradeClientKey>[1]);
+          if (!echatRateCheck(clientKey)) {
             socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
             socket.destroy();
             return;
           }
           try {
-            const room = await realtimeManager.getOrCreateRoomByName(
-              roomName,
-              'echat-anonymous',
-            );
+            // The visitors' room limit, and a room nobody joined is closed once its handshake ends,
+            // failed or not (services/realtime-upgrade-guards.ts EchatDoor; secaudit2026oct26).
+            const { room, settle } = await echatDoor.open(roomName);
+            socket.once('close', settle);
+            if (socket.destroyed) settle();   // closed while the room was looked up
             const anonNick = 'anon-' + Math.random().toString(16).slice(2, 6);
             realtimeWss.handleUpgrade(request, socket, head, (ws) => {
               realtimeManager.handleUpgrade(ws, room.id, anonNick);
+              settle();
             });
           } catch (err: unknown) {
             if (err instanceof Error && err.message === 'ROOM_LIMIT_REACHED') {
