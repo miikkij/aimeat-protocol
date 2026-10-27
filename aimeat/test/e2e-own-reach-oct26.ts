@@ -21,6 +21,10 @@
  *     - LABELS: an agent without memory:read-as-owner neither changes nor learns the label of a record
  *       of its owner it may not read, and is handed the address to ask for the permission; with the
  *       permission, and on records it may read, it labels as before.
+ *     - THREADS: a message naming another pair's conversation lands in the sender's own pair thread, so
+ *       no account writes into a thread between others and no agent reads its owner's thread through
+ *       one row of its own; the agent's own thread keeps its owner's word in it, replies stay in their
+ *       thread, and an agent with messages:read-as-owner reads the owner's thread.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
@@ -29,6 +33,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
+import { conversationIdFor } from '../src/utils/messaging.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now() % 1_000_000;
@@ -413,6 +418,63 @@ await test('USE: the agent with memory:read-as-owner labels the private record; 
     assert(o.status === 200, `own record: ${o.status} ${JSON.stringify(o.body?.error)}`);
     const s = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.shared'), label: 'luottamuksellinen' });
     assert(s.status === 200, `record marked owner: ${s.status} ${JSON.stringify(s.body?.error)}`);
+});
+
+// ─── THREADS (agent-dm-reads.ts:readOneToOneWithOwner:caller-chosen-conversation-id-merges-owner-mailbox) ───
+console.log('\nTHREADS: a named conversation id is the sender\'s own thread, and an agent reads its owner\'s rows only with the tick');
+
+const NODE = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
+let dmBot!: McpAgent;
+let ownerThread = '';
+const send = (token: string, to: string, body: string, conversation_id?: string) =>
+    call('POST', '/v1/messages', token, { to, body, ...(conversation_id ? { conversation_id } : {}) });
+const threadBodies = async (token: string, path: string): Promise<string[]> => {
+    const r = await call('GET', path, token);
+    assert(r.status === 200, `${path}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return (r.body.data.messages as Body[]).map(m => String(m.body));
+};
+
+await test('Setup: alice writes to dan; alice\'s agent holds messages:send and messages:read only', async () => {
+    const s = await send(alice.token, `${dan.name}@${NODE}`, `alice to dan ${stamp}`);
+    assert(s.status === 201, `alice to dan: ${s.status} ${JSON.stringify(s.body?.error)}`);
+    ownerThread = s.body.data.message.conversationId;
+    assert(ownerThread === conversationIdFor(`${alice.name}@${NODE}`, `${dan.name}@${NODE}`), 'not the pair thread');
+    dmBot = await makeAgent(BASE, alice, ['messages:send', 'messages:read']);
+});
+
+await test('ATTACK: the agent names its owner\'s thread with dan on a send and then reads no row of it', async () => {
+    const s = await send(dmBot.token, `ghost@nowhere-node-${stamp}`, 'probe', ownerThread);
+    assert(s.status === 201 || s.status === 202, `the send: ${s.status} ${JSON.stringify(s.body?.error)}`);
+    const bodies = await threadBodies(dmBot.token, `/v1/messages/agent-thread/${ownerThread}`);
+    assert(!bodies.includes(`alice to dan ${stamp}`), `the agent read its owner's message to dan: ${JSON.stringify(bodies)}`);
+});
+
+await test('ATTACK: carol names the thread between alice and dan, and her message lands in her own thread with dan', async () => {
+    const s = await send(carol.token, `${dan.name}@${NODE}`, `carol inside ${stamp}`, ownerThread);
+    assert(s.status === 201, `carol's send: ${s.status} ${JSON.stringify(s.body?.error)}`);
+    assert(s.body.data.message.conversationId !== ownerThread, `carol's message is in the thread of alice and dan: ${s.body.data.message.conversationId}`);
+    const danView = await threadBodies(dan.token, `/v1/messages/conversations/${ownerThread}`);
+    assert(danView.includes(`alice to dan ${stamp}`) && !danView.includes(`carol inside ${stamp}`), `dan's thread with alice: ${JSON.stringify(danView)}`);
+});
+
+await test('USE: the agent\'s own thread with dan holds dan\'s reply and alice\'s word in it, and dan answers alice in hers', async () => {
+    const first = await send(dmBot.token, `${dan.name}@${NODE}`, `bot asks ${stamp}`);
+    assert(first.status === 201, `bot to dan: ${first.status} ${JSON.stringify(first.body?.error)}`);
+    const botThread = first.body.data.message.conversationId;
+    const reply = await send(dan.token, dmBot.gaii, `dan answers bot ${stamp}`, botThread);
+    assert(reply.status === 201 && reply.body.data.message.conversationId === botThread, `dan's reply: ${reply.status} ${reply.body?.data?.message?.conversationId}`);
+    const word = await send(alice.token, `${dan.name}@${NODE}`, `alice adds ${stamp}`, botThread);
+    assert(word.status === 201 && word.body.data.message.conversationId === botThread, `alice's word: ${word.status} ${word.body?.data?.message?.conversationId}`);
+    const bodies = await threadBodies(dmBot.token, `/v1/messages/agent-thread/${botThread}`);
+    for (const b of [`bot asks ${stamp}`, `dan answers bot ${stamp}`, `alice adds ${stamp}`]) assert(bodies.includes(b), `the agent's thread lacks "${b}": ${JSON.stringify(bodies)}`);
+    const back = await send(dan.token, `${alice.name}@${NODE}`, `dan to alice ${stamp}`, ownerThread);
+    assert(back.status === 201 && back.body.data.message.conversationId === ownerThread, `dan's answer: ${back.body?.data?.message?.conversationId}`);
+});
+
+await test('USE: an agent with messages:read-as-owner reads its owner\'s thread with dan', async () => {
+    const reader = await makeAgent(BASE, alice, ['messages:send', 'messages:read', 'messages:read-as-owner']);
+    const bodies = await threadBodies(reader.token, `/v1/messages/conversations/${ownerThread}`);
+    assert(bodies.includes(`alice to dan ${stamp}`), `the agent with the word: ${JSON.stringify(bodies)}`);
 });
 
 await test('Cleanup: the operator turns classification off', async () => {

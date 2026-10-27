@@ -5,6 +5,8 @@
  * @description Federation messaging + memory-replication routes — signed peer replicate, human↔human
  *   direct message, operator broadcast, delivery/read receipt, and attachment download grant. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — A peer's message lands in the conversation it names only when the recipient holds no
+ *     thread under that id or the sender is in it; otherwise in the pair's own thread (secaudit2026oct26).
  *   2026-10-22 — The replicate consent check names the local person with localAccountOf()
  *     (check:identity-shortening).
  *   2026-10-22 — Replicate stores under a person of this node only while that person holds the
@@ -104,6 +106,7 @@ import { systemReader } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { CAS_ATTEMPTS } from '../../services/record-cas.js';
 import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
+import { boundInboundConversationId } from '../../services/message-thread-binding.js';
 
 /**
  * An inbound attachment descriptor says which storage the bytes come from, so those two fields are
@@ -502,7 +505,12 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 // two identities (conversationIdFor), which is exactly what the local send path
                 // computes, so deriving it here puts the message in the same thread it would have
                 // landed in had the peer sent one. Measured against a second local node 2026-09-02.
-                conversationId: message.conversationId ?? conversationIdFor(message.senderGhii, recipientGhii),
+                // A named id lands in that thread only when the recipient holds no thread under it or the
+                // sender is already in it; a peer naming the id of a thread between other parties gets
+                // the pair's own thread (services/message-thread-binding.ts, secaudit2026oct26).
+                conversationId: message.conversationId
+                    ? await boundInboundConversationId(storage, { requested: message.conversationId, senderGhii: message.senderGhii, recipientGhii, recipientMailbox: deliveryGhii })
+                    : conversationIdFor(message.senderGhii, recipientGhii),
                 subject: message.subject ?? undefined,
                 senderGhii: message.senderGhii,
                 recipientGhii,

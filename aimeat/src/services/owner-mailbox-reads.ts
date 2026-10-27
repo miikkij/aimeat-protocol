@@ -38,6 +38,8 @@
  *   if (!reader) → 403
  *   const { conversations } = await readOwnerConversations(storage, reader);
  * @version-history
+ *   v1.4.1 — 2026-10-27 — readOwnerThread of an agent's thread asks readAgentDmThread for the owner's
+ *     whole merge, which an agent of its own now gets only with messages:read-as-owner (secaudit2026oct26).
  *   v1.4.0 — 2026-10-26 — readOwnerThread: each message carries its reactions (services/message-reactions.ts).
  *   v1.3.0 — 2026-10-25 — readOwnerOverview takes `compact`: each row's last message is cut to a
  *     preview and each agent is its id and names. The Messages page renders nothing more, and on
@@ -199,7 +201,8 @@ export async function readOwnerThread(
   // list had just advertised. readAgentDmThread resolves that the way the agent's own door does.
   // Each message's reactions come with it (readAgentDmThread attaches its own).
   const result = opts.agentGaii
-    ? await readAgentDmThread(storage, opts.agentGaii, conversationId, { page: opts.page, perPage: opts.perPage })
+    // The owner in person reads their own mailbox's rows of the thread too, as before (secaudit2026oct26).
+    ? await readAgentDmThread(storage, opts.agentGaii, conversationId, { page: opts.page, perPage: opts.perPage }, true)
     : await storage.listConversation(readAs, conversationId, { page: opts.page, perPage: opts.perPage })
       .then(async page => ({ ...page, messages: await withReactions(storage, page.messages) }));
   // A group thread carries its membership, which is part of reading it for a PARTICIPANT and for

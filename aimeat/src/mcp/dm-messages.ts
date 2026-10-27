@@ -12,6 +12,9 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers, scopes, caller)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   2026-10-27 — aimeat_dm_send and aimeat_dm_ask bind a named conversation_id to the sender
+ *     (services/message-thread-binding.ts); aimeat_dm_thread merges the owner's rows that do not involve
+ *     the agent only with messages:read-as-owner, and names the ask otherwise (secaudit2026oct26).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-17 — aimeat_dm_send_as_owner calls services/message-send-as-owner.ts, the implementation
@@ -84,9 +87,10 @@ import { takeSendTurn } from '../services/message-send-limit.js';
 import { sendAsOwner } from '../services/message-send-as-owner.js';
 import { toolError } from './tool-error.js';
 import { resolveGroupTarget, soleParticipantNote } from '../services/message-alias.js';
-import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
+import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent-dm-reads.js';
 import { deleteOwnerMessage } from '../services/direct-message-delete.js';
-import { delegateReaderFor, readOwnerOverview, readOwnerThread } from '../services/owner-mailbox-reads.js';
+import { delegateReaderFor, readOwnerOverview, readOwnerThread, MESSAGES_READ_AS_OWNER_SCOPE } from '../services/owner-mailbox-reads.js';
+import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { sendGroupMessage } from '../services/conversation-group.js';
 import { broadcastFromPrincipal, broadcastProvenanceStamp } from '../services/message-broadcast.js';
 import type { DeliveryCtx } from '../services/message-delivery.js';
@@ -244,6 +248,7 @@ export function registerDmMessageTools(
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
                 conversationId: conversation_id, subject, aiProvenanceId, sendLimit: turn,
+                senderReadsOwnerMailbox: scopeIsCovered(caller().scopes, MESSAGES_READ_AS_OWNER_SCOPE),
             });
 
             if (!result.ok) {
@@ -560,6 +565,7 @@ export function registerDmMessageTools(
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', conversationId: conversation_id, subject,
                 interactive, aiProvenanceId, sendLimit: turn,
+                senderReadsOwnerMailbox: scopeIsCovered(caller().scopes, MESSAGES_READ_AS_OWNER_SCOPE),
             });
             if (!result.ok) {
                 if (result.code === 'RATE_LIMITED') return sendLimitRefused({ message: result.reason });
@@ -639,7 +645,9 @@ export function registerDmMessageTools(
         async ({ conversation_id, page, per_page }) => {
             const agentGaii = getAgentGaii();
             const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
-            const { messages, total } = await readAgentDmThread(storage, agentGaii, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
+            // The owner's rows that do not involve this agent need messages:read-as-owner (secaudit2026oct26).
+            const { messages, total, ownerMessagesWithheld } = await readAgentDmThread(storage, agentGaii, conversation_id,
+                { page: page ?? 1, perPage: per_page ?? 50 }, scopeIsCovered(caller().scopes, MESSAGES_READ_AS_OWNER_SCOPE));
             // Oldest-first so the agent reads the conversation in order.
             const ordered = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
             // TARGET-058: how each message in the thread was made, in one query. This is the case the
@@ -665,6 +673,7 @@ export function registerDmMessageTools(
                             ...provFor(m.aiProvenanceId),
                         })),
                         total,
+                        ...withheldOwnerMessagesFields(config.baseUrl, agentGaii, 'aimeat_dm_thread', ownerMessagesWithheld),
                     }, null, 2),
                 }],
             };
