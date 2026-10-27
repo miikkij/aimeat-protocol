@@ -13,6 +13,9 @@
  *   renderToString/renderRich; rich CDN loaders; live memory embeds; attach('md', …).
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
+ *   v1.2.2 — 2026-10-27 — The rich pipeline loads markdown-it, its two plugins, DOMPurify and
+ *     highlight.js by exact version, not by a major range (secaudit2026oct26,
+ *     ensureRich:floating-cdn-without-integrity).
  *   v1.2.1 — 2026-10-25 — secaudit2026oct22: sanitizeHref and sanitizeImgSrc decide the scheme on the
  *     text the URL parser reads (tabs and newlines removed, C0 controls trimmed).
  *   v1.2.0 — 2026-10-25 — renderRich() loads Mermaid 12 from /lib/mermaid@12/ (ELK layout); the initialize options are unchanged and valid in 12.
@@ -300,12 +303,15 @@ var _richP = null;
 function ensureRich() {
   if (window.markdownit && window.DOMPurify) return Promise.resolve();
   if (_richP) return _richP;
-  _richP = loadScript('https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js').then(function () {
+  // Exact versions, never a range: a range loads whatever the newest release in it is on the day a
+  // visitor opens the app, into the app's origin (secaudit2026oct26). DOMPurify is the version the
+  // node's vendored Mermaid 12 bundles.
+  _richP = loadScript('https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js').then(function () {
     return Promise.all([
-      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2/dist/markdown-it-task-lists.min.js').catch(function () {}),
-      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-footnote@4/dist/markdown-it-footnote.min.js').catch(function () {}),
-      loadScript('https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js'),
-      loadScript('https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js').catch(function () {}),
+      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js').catch(function () {}),
+      loadScript('https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js').catch(function () {}),
+      loadScript('https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js'),
+      loadScript('https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js').catch(function () {}),
     ]);
   }).catch(function (e) { _richP = null; throw e; });
   return _richP;
