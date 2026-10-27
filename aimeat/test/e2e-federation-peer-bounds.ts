@@ -14,10 +14,11 @@
  *     - Deactivated account: a member peer that holds a person's sign-in consent lists and writes
  *       their records while the account is active, is refused (403 ACCOUNT_DISABLED) while it is
  *       deactivated, and works again after reactivation with the consent untouched.
- *     - Invites: an invite that names no node may not replace a peer held under another key (409
- *       PEER_KEY_MISMATCH, the invite stays open); an invite that names that node may; an invite
- *       presented by another node is not used. A fresh node and an offline peer under its own key
- *       are admitted as before.
+ *     - Invites: an invite that names no node does not silently replace a peer held under another key:
+ *       it waits as a pending request, the operator is asked with Allow and Don't allow, the invite is
+ *       used only on Allow, and the presenting node reads pending, then approved or rejected. An invite
+ *       that names that node replaces it at once; an invite presented by another node is not used. A
+ *       fresh node and an offline peer under its own key are admitted as before.
  *     - Introductions: a long message is stored bounded, a repeated introduction keeps one pending
  *       request, and the per-address hourly bound answers 429 with when to try again (0 is no limit).
  *     - Own node id: no introduction, key exchange, approval or direct add makes a peer of this
@@ -33,6 +34,8 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A plain invite for a held id waits for the operator's one-press answer
+ *     (V2, V2b, V2c) instead of a 409 (the coordinator's ruling).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, federation group).
  */
 import http, { type Server } from 'node:http';
@@ -289,26 +292,83 @@ try {
         assert(await inviteState(inv.id) === 'consumed', 'the invite is used');
     });
 
-    await test('V2. REFUSED — a plain invite does not replace an offline peer held under another key: 409, the invite stays open', async () => {
+    let plainInvite!: { id: string; token: string };
+    let replaceRequest = '';
+    const replaceNotices = async () => {
+        const n = await H.json('/v1/notifications', { headers: auth(H.ownerToken) });
+        return ((n.body.data?.notifications ?? []) as any[]).filter(x => x.type === 'peer_replace_ask' && String(x.title).includes(X_ID));
+    };
+    const introStatus = async (id: string) => (await H.json(`/v1/federation/peer/introduce/${id}/status`)).body.data?.status;
+    const decide = (id: string, decision: 'approve' | 'reject') => H.json(`/v1/admin/peering/requests/${id}/decision`, {
+        method: 'POST', headers: auth(H.ownerToken), body: JSON.stringify({ decision }),
+    });
+
+    await test('V2. NOT SILENT — a plain invite for an offline peer held under another key waits for the operator: 202 pending, the peer and the invite unchanged, the operator asked', async () => {
         k1 = await generateKeyPair();
         k2 = await generateKeyPair();
         await addPeer(H, X_ID, X_URL, k1.publicKey);
         const off = await H.json(`/v1/federation/peers/${X_ID}`, { method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ status: 'offline' }) });
         assert(off.status === 200, `set offline: ${off.status} ${JSON.stringify(off.body)}`);
-        const inv = await mintInvite();
-        const r = await introduce(X_ID, X_URL, k2, { invite_token: inv.token });
-        assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH, got ${r.status} ${JSON.stringify(r.body)}`);
+        plainInvite = await mintInvite({ label: 'rebuild' });
+        const r = await introduce(X_ID, X_URL, k2, { invite_token: plainInvite.token });
+        assert(r.status === 202 && r.body.data?.status === 'pending', `expected 202 pending, got ${r.status} ${JSON.stringify(r.body)}`);
+        replaceRequest = r.body.data.request_id;
         const row = await peerRow(X_ID);
-        assert(row?.public_key === k1.publicKey, `the held peer keeps its key: ${JSON.stringify(row)}`);
-        assert(await inviteState(inv.id) === 'open', 'the refused introduction does not use the invite');
+        assert(row?.public_key === k1.publicKey, `the held peer keeps its key until the operator decides: ${JSON.stringify(row)}`);
+        assert(await inviteState(plainInvite.id) === 'open', 'the invite is not used before the operator decides');
+        assert(await introStatus(replaceRequest) === 'pending', 'the presenting node sees pending');
+        const asks = await replaceNotices();
+        assert(asks.length === 1, `the operator gets one notice: ${JSON.stringify(asks.map(a => a.title))}`);
+        const ids = (asks[0].actions ?? []).map((a: any) => a.id).sort();
+        assert(JSON.stringify(ids) === JSON.stringify(['allow', 'deny']), `with Allow and Don't allow: ${JSON.stringify(asks[0].actions)}`);
+        assert(String(asks[0].body).includes('different key'), `in plain words: ${asks[0].body}`);
+        const again = await introduce(X_ID, X_URL, k2, { invite_token: plainInvite.token });
+        assert(again.status === 202 && again.body.data?.request_id === replaceRequest, `the same invite again answers with its waiting request: ${JSON.stringify(again.body.data)}`);
     });
 
-    await test('V3. KEPT — an invite that names the node replaces the held peer, which is the operator\'s decision for it', async () => {
+    await test('V2a. REFUSED — a person who is not an operator cannot answer it: 403, nothing replaced', async () => {
+        const plain = await registerOwner(H.baseUrl, `plain${stamp}`);
+        const r = await H.json(`/v1/admin/peering/requests/${replaceRequest}/decision`, {
+            method: 'POST', headers: auth(plain.token), body: JSON.stringify({ decision: 'approve' }),
+        });
+        assert(r.status === 403, `a plain owner: ${r.status} ${JSON.stringify(r.body)}`);
+        assert((await peerRow(X_ID))?.public_key === k1.publicKey, 'the held peer keeps its key');
+        assert(await introStatus(replaceRequest) === 'pending', 'still pending');
+    });
+
+    await test('V2b. DON\'T ALLOW — the operator says no: the held peer and the invite stay, the presenting node reads rejected', async () => {
+        const r = await decide(replaceRequest, 'reject');
+        assert(r.status === 200 && r.body.data?.status === 'rejected', `reject: ${r.status} ${JSON.stringify(r.body)}`);
+        assert((await peerRow(X_ID))?.public_key === k1.publicKey, 'the held peer keeps its key');
+        assert(await inviteState(plainInvite.id) === 'open', 'the invite stays unused');
+        assert(await introStatus(replaceRequest) === 'rejected', 'the presenting node reads rejected');
+    });
+
+    await test('V2c. ALLOW — the operator says yes with one press: the node takes the place under its new key and the invite is used', async () => {
+        const r = await introduce(X_ID, X_URL, k2, { invite_token: plainInvite.token });
+        assert(r.status === 202, `presented again: ${r.status} ${JSON.stringify(r.body)}`);
+        const reqId = r.body.data.request_id;
+        assert(reqId !== replaceRequest, 'a new question after the first was answered');
+        const ok = await decide(reqId, 'approve');
+        assert(ok.status === 200 && ok.body.data?.status === 'approved', `approve: ${ok.status} ${JSON.stringify(ok.body)}`);
+        const row = await peerRow(X_ID);
+        assert(row?.public_key === k2.publicKey && row.status === 'active' && row.tier === 'contact', `replaced at the invite's tier: ${JSON.stringify(row)}`);
+        assert(await inviteState(plainInvite.id) === 'consumed', 'the invite is used on Allow');
+        assert(await introStatus(reqId) === 'approved', 'the presenting node reads approved');
+        const asks = await replaceNotices();
+        assert(asks.length >= 2 && asks.every(a => !!a.answered && !(a.actions ?? []).length), `every question's notice shows its answer: ${JSON.stringify(asks.map(a => a.answered ?? null))}`);
+    });
+
+    let k3!: { publicKey: string; privateKey: string };
+    await test('V3. KEPT — an invite that names the node replaces the held peer at once, which is the operator\'s decision for it', async () => {
+        k3 = await generateKeyPair();
+        const off = await H.json(`/v1/federation/peers/${X_ID}`, { method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ status: 'offline' }) });
+        assert(off.status === 200, `set offline: ${off.status}`);
         const inv = await mintInvite({ node_id: X_ID });
-        const r = await introduce(X_ID, X_URL, k2, { invite_token: inv.token });
+        const r = await introduce(X_ID, X_URL, k3, { invite_token: inv.token });
         assert(r.status === 200, `named invite: ${r.status} ${JSON.stringify(r.body)}`);
         const row = await peerRow(X_ID);
-        assert(row?.public_key === k2.publicKey && row.status === 'active', `the node is admitted under its new key: ${JSON.stringify(row)}`);
+        assert(row?.public_key === k3.publicKey && row.status === 'active', `the node is admitted under its new key: ${JSON.stringify(row)}`);
         const list = await H.json('/v1/federation/link-invites', { headers: auth(H.ownerToken) });
         const mine = (list.body.data?.invites ?? []).find((i: any) => i.id === inv.id);
         assert(mine?.node_id === X_ID && mine.consumed_by_node_id === X_ID, `the listing names the node: ${JSON.stringify(mine)}`);
@@ -326,9 +386,9 @@ try {
         const off = await H.json(`/v1/federation/peers/${X_ID}`, { method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ status: 'offline' }) });
         assert(off.status === 200, `set offline: ${off.status}`);
         const inv = await mintInvite();
-        const r = await introduce(X_ID, X_URL, k2, { invite_token: inv.token });
+        const r = await introduce(X_ID, X_URL, k3, { invite_token: inv.token });
         assert(r.status === 200, `own key: ${r.status} ${JSON.stringify(r.body)}`);
-        assert((await peerRow(X_ID))?.public_key === k2.publicKey, 'the same key');
+        assert((await peerRow(X_ID))?.public_key === k3.publicKey, 'the same key');
     });
 
     // ── 5. Introductions ──

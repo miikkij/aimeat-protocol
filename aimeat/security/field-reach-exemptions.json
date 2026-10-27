@@ -348,6 +348,7 @@
     "no-twin:PUT /v1/admin/ghii/:ghii": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (verificationLevel) and no agent tool does the same job.",
     "no-twin:PUT /v1/admin/msm/:name": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (federate) and no agent tool does the same job.",
     "no-twin:PUT /v1/admin/peering/requests/:id": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (reason) and no agent tool does the same job.",
+    "no-twin:POST /v1/admin/peering/requests/:id/decision": "Reviewed 2026-10-27 (secaudit2026oct26): the notice-button twin of PUT /v1/admin/peering/requests/:id, sharing its handler (routes/federation-peer/peers.ts decidePeering). `reason` is only echoed in the answer and never stored, so no field is dropped for an agent; the operator's agent holding operator:admin calls this door with its own token (requireOperator).",
     "no-twin:PUT /v1/admin/push/templates/:id/:locale": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (fields) and no agent tool does the same job.",
     "no-twin:PUT /v1/agents/:name/cors": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (allowed_origins) and no agent tool does the same job.",
     "no-twin:PUT /v1/agents/:name/directives": "NOT YET REVIEWED. Seeded 2026-09-14: the door reads record fields (budget_limits, memory_areas, purpose, resources, rules) and no agent tool does the same job.",

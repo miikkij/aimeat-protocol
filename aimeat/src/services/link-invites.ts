@@ -28,6 +28,7 @@
  *   - mintLinkInvite() — create one, return the token ONCE
  *   - listLinkInvites() — what exists, without the tokens
  *   - consumeLinkInvite() — claim a token, or refuse; single-use
+ *   - consumeLinkInviteAtKey() — claim the invite at a stored key, once the operator approved a replacement
  *   - revokeLinkInvite() — delete one by id
  * @usage
  *   const invite = await mintLinkInvite(storage, { tier: 'contact', createdBy, ttlHours: 72 });
@@ -36,8 +37,8 @@
  * @version-history
  *   2026-10-27 — An invite may name the node it is for (`nodeId`). consumeLinkInvite leaves such an
  *     invite unused for any other node id ('other-node'), and leaves an invite that names no node
- *     unused when the node id is held by a peer under another key ('held'): only an invite naming the
- *     node may replace that peer (secaudit2026oct26).
+ *     unused when the node id is held by a peer under another key ('held', with its key): the operator
+ *     approves that replacement, and consumeLinkInviteAtKey then uses the invite (secaudit2026oct26).
  *   2026-10-18 — consumeLinkInvite writes the consumed invite on the version it read (setMemoryIfVersion).
  *   v1.0.0 — 2026-08-23 — Initial, for the contact tier.
  */
@@ -132,9 +133,11 @@ export async function listLinkInvites(storage: Storage): Promise<LinkInviteRecor
 
 export type ConsumeResult =
   | { ok: true; tier: PeerTier; invite: LinkInviteRecord }
-  // 'other-node': the invite names another node. 'held': the invite names no node, and this node id
-  // is held by a peer under another key. Neither uses the invite.
-  | { ok: false; reason: 'unknown' | 'expired' | 'consumed' | 'other-node' | 'held' };
+  // 'other-node': the invite names another node. Not used.
+  | { ok: false; reason: 'unknown' | 'expired' | 'consumed' | 'other-node' }
+  // 'held': the invite names no node, and this node id is held by a peer under another key. Not used
+  // here: the operator decides the replacement (services/peer-replace-ask.ts), which then uses it by `key`.
+  | { ok: false; reason: 'held'; key: string; invite: LinkInviteRecord };
 
 /**
  * Claim a token for `nodeId`, once.
@@ -152,8 +155,22 @@ export async function consumeLinkInvite(
   } = {},
 ): Promise<ConsumeResult> {
   if (typeof token !== 'string' || !token.trim()) return { ok: false, reason: 'unknown' };
+  return consumeAtKey(storage, keyFor(token.trim()), nodeId, opts);
+}
+
+/**
+ * Use the invite stored at `key` for `nodeId`, after the operator approved the replacement of a peer
+ * held under another key that it was presented for (services/peer-replace-ask.ts). Expired, revoked or
+ * used meanwhile answers as consumeLinkInvite does.
+ */
+export async function consumeLinkInviteAtKey(storage: Storage, key: string, nodeId: string): Promise<ConsumeResult> {
+  return consumeAtKey(storage, key, nodeId, {});
+}
+
+async function consumeAtKey(
+  storage: Storage, key: string, nodeId: string, opts: { heldUnderAnotherKey?: boolean },
+): Promise<ConsumeResult> {
   try {
-    const key = keyFor(token.trim());
     const record = await storage.getMemory(LINK_INVITE_GAII, key);
     if (!record) return { ok: false, reason: 'unknown' };
 
@@ -162,10 +179,11 @@ export async function consumeLinkInvite(
     if (invite.consumedAt) return { ok: false, reason: 'consumed' };
     if (new Date(invite.expiresAt).getTime() <= Date.now()) return { ok: false, reason: 'expired' };
     // Bound to a node: the invite is this operator's decision for that node id and no other. An
-    // invite that names none admits a new node id, never one held under another key (secaudit2026oct26,
-    // link-invite-not-bound-to-node-id-replaces-held-peer). Both leave the invite unused.
+    // invite that names none admits a new node id; for one held under another key the operator is
+    // asked first (secaudit2026oct26, link-invite-not-bound-to-node-id-replaces-held-peer). Both
+    // leave the invite unused here.
     if (invite.nodeId && invite.nodeId !== nodeId) return { ok: false, reason: 'other-node' };
-    if (!invite.nodeId && opts.heldUnderAnotherKey) return { ok: false, reason: 'held' };
+    if (!invite.nodeId && opts.heldUnderAnotherKey) return { ok: false, reason: 'held', key, invite };
 
     const consumed: LinkInviteRecord = {
       ...invite,

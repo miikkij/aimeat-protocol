@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.12.0 — 2026-10-27 — POST /v1/admin/peering/requests/:id/decision, the same decision as the PUT,
+ *     for a notice's Allow and Don't allow. A request that asks to replace a peer held under another
+ *     key is decided by services/peer-replace-ask.ts (secaudit2026oct26).
  *   v1.11.1 — 2026-10-27 — Approving a peering request and adding a peer directly refuse this node's
  *     own id (400 SELF_NODE_ID); rejecting such a request works as before (secaudit2026oct26).
  *   v1.11.0 — 2026-10-12 — Adding a peer and changing its address ask peerUrlRefusal: a public node
@@ -44,8 +47,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from federation-peer.ts (max-file-lines)
  */
 
-import type { Router } from 'express';
+import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
+import { decidePeerReplacement } from '../../services/peer-replace-ask.js';
 import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -85,8 +89,9 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         }));
     });
 
-    // PUT /v1/admin/peering/requests/:id — approve/reject peering request (operator)
-    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireOperator(storage), validateBody(PeeringDecisionSchema, config.nodeId), async (req, res) => {
+    // PUT /v1/admin/peering/requests/:id — approve/reject peering request (operator). The same
+    // decision as POST …/:id/decision, the form a notice's Allow and Don't allow buttons call.
+    const decidePeering: RequestHandler = async (req, res) => {
         const id = req.params.id as string;
         const { decision, reason } = req.body ?? {};
 
@@ -94,6 +99,17 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         if (!request) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peering request not found: ${id}`));
             return;
+        }
+
+        // A node presenting an invite for a node id held under another key: the operator's answer
+        // replaces the held peer or leaves it (services/peer-replace-ask.ts; secaudit2026oct26).
+        if (request.status === 'pending') {
+            const replaced = await decidePeerReplacement({ storage, config, peers }, id, decision, req.auth?.owner ?? null);
+            if (replaced) {
+                if (!replaced.ok) { res.status(replaced.status).json(error(config.nodeId, replaced.code, replaced.message)); return; }
+                res.json(success(config.nodeId, { id, decision, reason, status: replaced.status }));
+                return;
+            }
         }
 
         const newStatus = decision === 'approve' ? 'approved' : 'rejected';
@@ -151,7 +167,9 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             status: newStatus,
         }));
         emitChange('federation');
-    });
+    };
+    router.put('/v1/admin/peering/requests/:id', requireAuth(), requireOperator(storage), validateBody(PeeringDecisionSchema, config.nodeId), decidePeering);
+    router.post('/v1/admin/peering/requests/:id/decision', requireAuth(), requireOperator(storage), validateBody(PeeringDecisionSchema, config.nodeId), decidePeering);
 
     // DELETE /v1/admin/peering/requests/:id — delete a peering request (operator)
     router.delete('/v1/admin/peering/requests/:id', requireAuth(), requireOperator(storage), async (req, res) => {
