@@ -12,6 +12,10 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-27 — Progress (accepted to in_progress) and rate (delivered to rated) move the status with
+ *     storage.transitionWorkStatus, so a call that read before a delivery or a dispute cannot reopen or
+ *     relabel the item; the call that lost answers 409 CONFLICT (secaudit2026oct26,
+ *     work-status-overwrite-after-stale-read).
  *   2026-10-25 — Reject moves the item pending → cancelled on its status (storage.transitionWorkStatus)
  *     in the same transaction as the refund, so concurrent rejects return the escrow once; a call that
  *     lost answers 409 CONFLICT (secaudit2026oct22, work-status-transition-without-cas).
@@ -569,10 +573,14 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       return;
     }
 
-    const updated = await storage.updateWork(tc, {
-      status: 'in_progress',
-      updatedAt: new Date().toISOString(),
-    });
+    // accepted -> in_progress in one conditional UPDATE: a call whose read came before a delivery
+    // must not reopen the delivered item for a second payment (secaudit2026oct26).
+    if (!await storage.transitionWorkStatus(tc, ['accepted'], 'in_progress', new Date().toISOString())) {
+      const now = await storage.getWork(tc);
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `This work is ${now?.status ?? 'gone'}. It has to be accepted before it can start.`));
+      return;
+    }
+    const updated = await storage.getWork(tc);
 
     // Notify requester via webhook if callback_url provided
     if (work.callbackUrl) {
@@ -677,8 +685,14 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
 
     const { rating, comment } = req.body ?? {};
 
+    // delivered -> rated on the stored status, so a rate call that read before a dispute opened does
+    // not relabel the disputed item (secaudit2026oct26).
+    if (!await storage.transitionWorkStatus(tc, ['delivered'], 'rated', new Date().toISOString())) {
+      const now = await storage.getWork(tc);
+      res.status(409).json(error(config.nodeId, 'CONFLICT', `Work is in status "${now?.status ?? 'unknown'}", cannot rate`));
+      return;
+    }
     const updated = await storage.updateWork(tc, {
-      status: 'rated',
       rating: { score: rating === 'positive' ? 5 : 1, comment },
       updatedAt: new Date().toISOString(),
     });
