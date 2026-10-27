@@ -47,7 +47,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
-import { parseGaiiLoose, localAccountName } from '../../utils/gaii.js';
+import { parseGaiiLoose, localAccountName, resolveIdentity } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
@@ -84,7 +84,7 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     // roster a caller who may see the organism reads.
     if (organism.visibility === 'private' && !rosterCaller.isOperator) {
       const membership = rosterCaller.ownerName ? await storage.getMembership(id, rosterCaller.ownerName) : null;
-      const attached = !!req.auth && organism.agentGaiis.includes(req.auth.sub);
+      const attached = !!req.auth && organism.agentGaiis.includes(resolveIdentity(req.auth, config.nodeId));
       if (membership?.status !== 'active' && !attached) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
         return;

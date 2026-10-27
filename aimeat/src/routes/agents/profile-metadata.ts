@@ -460,7 +460,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const identifier = (req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
     // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
-    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode, req.auth!.sub);
+    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode, resolveIdentity(req.auth!, config.nodeId));
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
