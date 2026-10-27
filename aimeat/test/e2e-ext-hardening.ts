@@ -863,6 +863,35 @@ async function run() {
     assert((await storedConfig(mailExt, seed.token)).emailPolicy === undefined, 'a grant was written for code the operator did not see');
   });
 
+  // secaudit2026oct26: a second ask about newer code moves the waiting question to that code; the
+  // operators are asked again about it, so a press answers the code they were last shown.
+  await test('a second ask after new code asks the operators again, and the Allow lands on the newest code', async () => {
+    const codeNotices = async () => ((await json('/v1/notifications', { headers: auth(seed.token) })).body?.data?.notifications ?? [])
+      .filter((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === mailExt).length;
+    const edit = (n: number) => json(`/v1/extensions/${mailExt}/actions/ping`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ scriptContent: `${ECHO}\n// agent edit ${n}` }),
+    });
+    // The extension holds the grant again before the agent writes code.
+    await json(`/v1/extensions/${mailExt}/config`, { method: 'PATCH', headers: auth(seed.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }) });
+    const first = await edit(3);
+    const id = first.body?.data?.approval_request?.request_id;
+    assert(first.status === 200 && typeof id === 'string', `first ${first.status}: ${JSON.stringify(first.body?.data)}`);
+    const before = await codeNotices();
+    const second = await edit(4);
+    assert(second.status === 200, `second ${second.status}: ${JSON.stringify(second.body?.error)}`);
+    // The second edit holds no grant to take back, so the agent asks for it again through the config route.
+    const reask = await json(`/v1/extensions/${mailExt}/config`, {
+      method: 'PATCH', headers: auth(opAgent.token), body: JSON.stringify({ config: { emailPolicy: 'unrestricted' } }),
+    });
+    const waiting = reask.body?.data?.approval_request?.request_id;
+    assert(reask.status === 202 && waiting === id, `the standing question moves to the newer code: ${reask.status} ${JSON.stringify(reask.body?.data)}`);
+    const after = await codeNotices();
+    assert(after > before, `the operators were not asked again about the newer code (notices ${before} -> ${after})`);
+    const yes = await json(`/v1/publish-requests/${waiting}/decision`, { method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    assert((await storedConfig(mailExt, seed.token)).emailPolicy === 'unrestricted', 'the grant was not written for the newest code');
+  });
+
   console.log(`\nExtension Hardening E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
   if (failed > 0) process.exit(1);
 }
