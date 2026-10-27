@@ -18,6 +18,9 @@
  *   still send the same request bodies.
  * @usage cd aimeat && pnpm exec vitest run test/unit/openhands-bundle-secrets.test.ts
  * @version-history
+ *   v1.0.1 -- 2026-10-27 -- The curl stub answers GET /.well-known/aimeat with a node id, which the
+ *     enrolment script now reads to sign the v2 return proof (secaudit2026oct26, merged with the
+ *     return-proof fix).
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -78,6 +81,7 @@ for a in "$@"; do
   if [ "$a" = "@-" ]; then printf '%s\\n' "$(cat)" >> "$STUB_LOG/stdin.log"; fi
 done
 case "$*" in
+  */.well-known/aimeat*) printf '{"node_id":"node-one"}' ;;
   *device-authorize*) printf '{"device_code":"${DEVICE_CODE}","user_code":"ABCD-EFGH","verification_uri_complete":"http://node/v?code=ABCD","status":"approved"}' ;;
   *device-token*) printf '{"access_token":"${AGENT_TOKEN}","gaii":"openhands#alice@node-one","expires_at":"2030-01-01","privateKey":"%s"}' "$STUB_KEY" ;;
   */activate*) printf '{"model":"%s"}' "$LLM_MODEL" ;;

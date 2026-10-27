@@ -199,7 +199,7 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
             + 'are mutually exclusive and one probe run cannot exercise both.',
     },
     aimeat_compliance_agreement: Object.fromEntries(
-        ['id', 'dry_run', 'message', 'storage_key', 'kind', 'party', 'accept', 'reason', 'choice', 'note', 'version'].map(p => [p,
+        ['id', 'dry_run', 'message', 'storage_key', 'kind', 'party', 'accept', 'reason', 'choice', 'note', 'version', 'uploaded_at'].map(p => [p,
             'Conditional, not dropped: each belongs to one or a few actions, and the probe holds `action` at one '
             + 'sentinel. Every action forwards its parameters, measured per action in '
             + 'test/unit/compliance-agreement-dispatch.test.ts.'])),
