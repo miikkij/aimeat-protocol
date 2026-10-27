@@ -8,6 +8,7 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   2026-10-27 — The version rows' View button takes the address through jsArg (secaudit2026oct26).
  *   2026-10-26 — skillSetBinding reads SKILL.md alone (body_only) and republishes with keep_files, so
  *     an attach or detach keeps every other file of the skill, an image as its bytes.
  *   2026-10-13 — Legacy route first, provider path on 410: detailCheckAiAvailability reads the owner's
@@ -1756,7 +1757,7 @@ function detailLoadVersions(owner, filename) {
             '<div class="version-meta"><span class="version-num">v' + v.version_number + (isLatest ? ' <span class="version-current">' + t('versions.current') + '</span>' : '') + '</span> ' +
               '<span class="version-sub" style="color:var(--text-muted);font-size:.8rem">' + (kb ? kb : '') + (when ? ' · ' + when : '') + since + '</span></div>' +
             '<div class="dtl-btn-row">' +
-              dtlBtn(t('card.view'), 'window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')') +
+              dtlBtn(t('card.view'), 'window._launcher.viewPublished(\'' + jsArg(viewU) + '\', \'' + jsArg(filename) + '\')') +
               (isLatest ? '' : dtlBtn(t('card.restore'), 'window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')')) +
               dtlBtn(t('card.fork'), 'window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')') +
             '</div>' +
@@ -2458,7 +2459,7 @@ function showVersionsModal(owner, filename) {
               '<span class="version-sub">' + escapeHtml(v.version || '') + (kb ? ' · ' + kb : '') + (when ? ' · ' + when : '') + since + '</span>' +
             '</div>' +
             '<div class="version-actions">' +
-              '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
+              '<button onclick="window._launcher.viewPublished(\'' + jsArg(viewU) + '\', \'' + jsArg(filename) + '\')">' + t('card.view') + '</button>' +
               (isLatest ? '' : '<button onclick="window._launcher.restoreVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Re-publish this version as the new latest">' + t('card.restore') + '</button>') +
               '<button onclick="window._launcher.forkVersion(' + ownerArg + ', ' + fileArg + ', ' + v.version_number + ')" title="Copy this version into a new app">' + t('card.fork') + '</button>' +
             '</div>' +
