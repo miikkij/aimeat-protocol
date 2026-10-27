@@ -66,7 +66,7 @@ import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = Number(process.env.E2E_OWN_KEY_ROADS_PORT ?? 40350);
+const PORT = Number(process.env.E2E_OWN_KEY_ROADS_PORT ?? 28350);
 const SHARED_PORT = PORT + 1;
 const STUB_PORT = PORT + 2;
 const NODE_ID = 'aimeat-local-001-dev';

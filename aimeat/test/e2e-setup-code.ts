@@ -26,16 +26,16 @@
  *   first account and setup are refused without it; and the first registration from loopback works
  *   without one.
  *
- *   It runs its own four nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
- *   (public, setup), 40535 (public, registration), 40536 (public, no operator) and 40534 (loopback).
+ *   It runs its own four nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 28533
+ *   (public, setup), 28535 (public, registration), 28536 (public, no operator) and 28534 (loopback).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
  *   2026-10-23 — The loopback node prints a code, and a request from this machine's network address is
  *     asked for it (secaudit2026oct22; Jouni, 2026-10-23).
  *   2026-10-16 — The password carries a fixed digit: a letters-only STAMP failed the password rule.
- *   2026-10-16 — A node on 40536 with an owner but no operator: the code is printed, sign-in and
+ *   2026-10-16 — A node on 28536 with an owner but no operator: the code is printed, sign-in and
  *     registration self-heal need it (Jouni, 2026-10-16).
- *   2026-10-16 — A third node on 40535: the registration routes refuse the first account without the code
+ *   2026-10-16 — A third node on 28535: the registration routes refuse the first account without the code
  *     and make it the operator with it; the loopback node's first account is registered (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
  */
@@ -52,10 +52,10 @@ import { tokenRoles } from './helpers/owner-login.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { hashPassword } from '../src/services/password.js';
 
-const PUBLIC_PORT = 40533;
-const LOOPBACK_PORT = 40534;
-const REGISTER_PORT = 40535;
-const NO_OPERATOR_PORT = 40536;
+const PUBLIC_PORT = 28533;
+const LOOPBACK_PORT = 28534;
+const REGISTER_PORT = 28535;
+const NO_OPERATOR_PORT = 28536;
 const STAMP = Date.now().toString(36).slice(-6);
 // A fixed digit: STAMP is base36 and is sometimes letters only, and the password rule asks for a number.
 const PASSWORD = `Setup-Code-${STAMP}-Pw7!`;

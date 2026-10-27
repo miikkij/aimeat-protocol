@@ -42,17 +42,17 @@ import { ownerSignIn } from './helpers/owner-login.js';
 import { removedOn } from './helpers/node-release.js';
 import { AI_LEGACY_SETTINGS_ROUTES_REMOVED_IN } from '../src/config-ai-models.js';
 
-// 40420 is this suite's own port and 40421 is the closed one it points the allowed host at;
-// check:suite-ports holds both. 40322/40323 were the first choice and belong to
+// 28420 is this suite's own port and 28421 is the closed one it points the allowed host at;
+// check:suite-ports holds both. 28322/28323 were the first choice and belong to
 // e2e-federation-settlements-sync, which that gate said out loud before this suite ever ran.
-const PORT = process.env.E2E_AI_PROVIDER_ALLOWLIST_PORT ?? '40420';
+const PORT = process.env.E2E_AI_PROVIDER_ALLOWLIST_PORT ?? '28420';
 const BASE = `http://localhost:${PORT}`;
 const PASSWORD = 'AllowlistTest1234';
 
 /** The one host this node's operator permits. Everything else must be refused at both doors. */
 const ALLOWED_HOST = 'localhost';
 /** Allowed by the list, and nothing listens there, so reaching it proves only that the gate passed. */
-const ALLOWED_URL = 'http://localhost:40421/v1';
+const ALLOWED_URL = 'http://localhost:28421/v1';
 /** A perfectly ordinary provider address that this node's operator has not permitted. */
 const OUTSIDE_URL = 'https://api.openai.com/v1';
 
@@ -198,7 +198,7 @@ async function main() {
         });
 
         await test('an allowed host gets past the gate, and fails on its own merits instead, on the provider test and on the legacy model picker (410 GONE on 4.0.0)', async () => {
-            // Nothing listens on 40421, so the only thing this proves is that the allowlist let the
+            // Nothing listens on 28421, so the only thing this proves is that the allowlist let the
             // call through: a connection failure is a different answer from a refusal, and telling
             // the two apart is the whole assertion.
             const w = await storeSettings(token, ALLOWED_URL);

@@ -24,7 +24,7 @@
  *   It runs its own node, with email on (a real SMTP sink) and app origins on, because the shared
  *   E2E server has neither. That node follows the run's backend (test/helpers/own-node-db.ts).
  *   `E2E_MAGIC_RETURN_PORT` moves
- *   it (default 40454, with the SMTP sink one port above).
+ *   it (default 28454, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-return
  * @version-history
  *   2026-10-24 — POST /v1/ghii/verify-email refuses a sign-in link's token and leaves the link live (secaudit2026oct22, verify-email:no-purpose-binding).
@@ -46,7 +46,7 @@ import { registerOwner, ownerToken as passwordToken, OWNER_PASSWORD } from './he
 import { seedPassword } from './helpers/seed-password.js';
 import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
-const PORT = Number(process.env.E2E_MAGIC_RETURN_PORT ?? 40454);
+const PORT = Number(process.env.E2E_MAGIC_RETURN_PORT ?? 28454);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
 const APP_HOST = 'apps.aimeat.test';

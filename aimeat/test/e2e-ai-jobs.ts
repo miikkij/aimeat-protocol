@@ -101,9 +101,9 @@ import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type
 import { ownerSignIn } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const PORT = process.env.E2E_AI_JOBS_PORT ?? '40297';
+const PORT = process.env.E2E_AI_JOBS_PORT ?? '28297';
 const BASE = `http://localhost:${PORT}`;
-const STUB_PORT = parseInt(process.env.E2E_AI_JOBS_STUB_PORT ?? '40298', 10);
+const STUB_PORT = parseInt(process.env.E2E_AI_JOBS_STUB_PORT ?? '28298', 10);
 const STUB_BASE = `http://127.0.0.1:${STUB_PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 

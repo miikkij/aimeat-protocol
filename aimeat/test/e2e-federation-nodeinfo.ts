@@ -5,7 +5,7 @@
  *   federation_settings) and that a peer's advertised software version (sent on the heartbeat ping)
  *   is stamped onto the peer record and surfaced via GET /v1/federation/peers.
  *
- *   Node: 40277 aimeat-test-001-nodeinfo.
+ *   Node: 28277 aimeat-test-001-nodeinfo.
  * @version-history
  *   v1.1.2 -- 2026-10-23 -- The operator comes from setupOperator (a password and the password
  *     sign-in); POST /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22). Test 6: an
@@ -38,7 +38,7 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(c: boolean, m: string) { if (!c) throw new Error(m); }
 
-const PORT = 40277, NODE_ID = 'aimeat-test-001-nodeinfo', BASE = `http://127.0.0.1:${PORT}`;
+const PORT = 28277, NODE_ID = 'aimeat-test-001-nodeinfo', BASE = `http://127.0.0.1:${PORT}`;
 const adminPw = randomBytes(16).toString('base64url');
 async function json(path: string, opts: RequestInit = {}) {
   const res = await fetch(`${BASE}${path}`, { ...opts, headers: { 'Content-Type': 'application/json', ...opts.headers } });

@@ -9,7 +9,7 @@
  *   /v1/ai/available on the provider records, the provider test of speech and embeddings, an app's
  *   prefer.* in its meta, and the publish hints.
  *
- *   Its own node on 40441, whose fixed provider types point at the fake provider
+ *   Its own node on 28441, whose fixed provider types point at the fake provider
  *   (test/helpers/fake-ai-provider.ts), and whose catalogue sources point at a stub serving the V4
  *   samples, so a retirement can be made to happen.
  *
@@ -41,7 +41,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, chatJson, imageJson, anthropicJson, providerStatus, speechPcm, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_CAPABILITIES_PORT ?? '40441';
+const PORT = process.env.E2E_AI_CAPABILITIES_PORT ?? '28441';
 const BASE = `http://localhost:${PORT}`;
 const REDIRECT = 'http://localhost:9912/callback';
 /** One transparent pixel, which is all an image answer needs to be stored. */

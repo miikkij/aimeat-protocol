@@ -8,7 +8,7 @@
  *   two models cannot be compared), the limits of one call, aimeat_ai_embed over MCP, and a caller
  *   without ai:use refused.
  *
- *   Its own node on 40442, whose fixed provider types point at the fake provider.
+ *   Its own node on 28442, whose fixed provider types point at the fake provider.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-embed.ts
  * @version-history
  *   v1.0.0 — 2026-09-28 — Initial (V5 of the System 2 plan).
@@ -24,7 +24,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, providerStatus, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_EMBED_PORT ?? '40442';
+const PORT = process.env.E2E_AI_EMBED_PORT ?? '28442';
 const BASE = `http://localhost:${PORT}`;
 
 let passed = 0, failed = 0;

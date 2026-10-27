@@ -30,7 +30,7 @@ import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
 // A fixed own port, like the other in-process suites: the runner takes it under its port lock.
-const PORT = parseInt(process.env.E2E_SOCIAL_PORT ?? '40327', 10);
+const PORT = parseInt(process.env.E2E_SOCIAL_PORT ?? '28327', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-social-e2e-'));
 

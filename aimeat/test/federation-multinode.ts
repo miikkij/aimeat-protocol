@@ -5,9 +5,9 @@
  *   real cross-node federation: peering, service discovery, routing, federated
  *   login, memory replication, and directory visibility filtering.
  *
- *   Node A (hub/operator): port 40260, node ID aimeat-hub-001-testa
- *   Node B (contributor):  port 40261, node ID aimeat-node-001-testb
- *   Node C (contributor):  port 40262, node ID aimeat-node-001-testc
+ *   Node A (hub/operator): port 28260, node ID aimeat-hub-001-testa
+ *   Node B (contributor):  port 28261, node ID aimeat-node-001-testb
+ *   Node C (contributor):  port 28262, node ID aimeat-node-001-testc
  *
  * @version-history
  *   2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
@@ -267,18 +267,18 @@ let nodeA: NodeState;
 let nodeB: NodeState;
 let nodeC: NodeState;
 
-await test('Boot Node A (hub, port 40260)', async () => {
-    nodeA = await bootNode(40260, 'aimeat-hub-001-testa');
+await test('Boot Node A (hub, port 28260)', async () => {
+    nodeA = await bootNode(28260, 'aimeat-hub-001-testa');
     console.log(`    Node A running on ${nodeA.baseUrl}`);
 });
 
-await test('Boot Node B (contributor, port 40400)', async () => {
-    nodeB = await bootNode(40400, 'aimeat-node-001-testb');
+await test('Boot Node B (contributor, port 28400)', async () => {
+    nodeB = await bootNode(28400, 'aimeat-node-001-testb');
     console.log(`    Node B running on ${nodeB.baseUrl}`);
 });
 
-await test('Boot Node C (contributor, port 40401)', async () => {
-    nodeC = await bootNode(40401, 'aimeat-node-001-testc');
+await test('Boot Node C (contributor, port 28401)', async () => {
+    nodeC = await bootNode(28401, 'aimeat-node-001-testc');
     console.log(`    Node C running on ${nodeC.baseUrl}`);
 });
 

@@ -25,7 +25,7 @@
  *      no notification of a lowering, and a new public write of an unlabelled record is refused.
  *   3. Restarted. No second incident; the decisions stand.
  *
- *   It runs its own node on the run's backend (test/helpers/own-node-db.ts), on port 40492.
+ *   It runs its own node on the run's backend (test/helpers/own-node-db.ts), on port 28492.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-classification-defaults
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/run-e2e-ci.ts --test=e2e-classification-defaults
  * @version-history
@@ -43,7 +43,7 @@ import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { DEFAULT_LABELS } from '../src/services/classification/defaults.js';
 
-const PORT = 40492;
+const PORT = 28492;
 const BASE = `http://127.0.0.1:${PORT}`;
 const STAMP = Date.now().toString(36).slice(-6);
 const NODE_ID = `aimeat-test-001-caps${STAMP}`;

@@ -23,7 +23,7 @@
  *   itself and NODE_OPTIONS carries the peer, which claims the process when the entry point is
  *   called `acp`. One mechanism, both platforms, nothing to mark executable.
  *
- *   E2E_CHAT_AGENT_PORT moves the set (default 40300, the broken node one port above, the node-route
+ *   E2E_CHAT_AGENT_PORT moves the set (default 28300, the broken node one port above, the node-route
  *   node two above and its stub AI provider three above).
  * @structure
  *   - the node lifecycle: startNode(), stopNode()
@@ -57,7 +57,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 import { startFakeAiProvider, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
 
-const PORT = Number(process.env.E2E_CHAT_AGENT_PORT ?? 40300);
+const PORT = Number(process.env.E2E_CHAT_AGENT_PORT ?? 28300);
 const BROKEN_PORT = PORT + 1;
 const NODE_ID = 'aimeat-local-001-dev';
 const PEER = pathToFileURL(resolvePath(process.cwd(), 'test/helpers/fake-goose-acp.ts')).href;

@@ -39,7 +39,7 @@
  *     that proposal (feature-list audit #90).
  *   v1.4.0 — 2026-10-01 — A node is registered as a peer only after its own card answers with the same
  *     id and key (the peer-registration incident, finding F). The sale to a node nothing answers for
- *     (127.0.0.1:40799) now stands with its registration pending (`peer_pending`), and the seller whose
+ *     (127.0.0.1:28799) now stands with its registration pending (`peer_pending`), and the seller whose
  *     signatures are replayed answers its card from a server this test runs. Setup that no longer
  *     matched production: both had registered addresses where nothing listened.
  *   v1.3.0 — 2026-09-29 — Phase 6b: an owner the crew image already signed in as is still welcomed;
@@ -244,9 +244,9 @@ const installSet = (extra: Record<string, unknown> = {}) => ({
 console.log('Setup');
 
 await test('Boot R (repository) and C (customer), each the other\'s active peer', async () => {
-    // 40733-40734: clear of every other suite's fixed ports (the runner lists them from the files).
-    R = await bootNode(40733, `aimeat-test-001-isrepo${ts}`, true);
-    C = await bootNode(40734, `aimeat-test-001-iscust${ts}`, false);
+    // 28733-28734: clear of every other suite's fixed ports (the runner lists them from the files).
+    R = await bootNode(28733, `aimeat-test-001-isrepo${ts}`, true);
+    C = await bootNode(28734, `aimeat-test-001-iscust${ts}`, false);
     vendorToken = await setupOwner(R, `vendor${ts}`);
     opsToken = await setupOwner(C, `ops${ts}`);
     // acme exists before the apply, with a key this test holds, so its runner agent can be registered
@@ -600,7 +600,7 @@ await test('A new node started with an install set links the repository, waits f
     })));
     // Package federation stays off, as on a node nobody configured beyond its install set: the
     // repository the set names is reached anyway (services/install-set-trust.ts).
-    D = await bootNode(40735, `aimeat-test-001-isnew${ts}`, false, { installSetPath: setFile, packageFederationEnabled: false });
+    D = await bootNode(28735, `aimeat-test-001-isnew${ts}`, false, { installSetPath: setFile, packageFederationEnabled: false });
     // A node booted in this process takes over the token signing the earlier two used, so their
     // tokens are minted again.
     vendorToken = await mintToken(R, `vendor${ts}`);
@@ -696,7 +696,7 @@ await test('Before R\'s author names C a seller, C\'s signed sale is refused, an
     newNodeKey = (await generateKeyPair()).publicKey;
     const r = await C.json('/v1/package-sales/entitlements', {
         method: 'PUT', headers: auth(opsToken),
-        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey } }),
+        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:28799', public_key: newNodeKey } }),
     });
     assert(r.status === 403 && r.body.error?.code === 'NOT_A_SELLER', `expected 403 NOT_A_SELLER: ${r.status} ${JSON.stringify(r.body)}`);
     const helper = await registerAgent(C, opsToken, `ops${ts}`, 'shopbot', 'interactive', ['*']);
@@ -717,7 +717,7 @@ await test('R\'s author names C a seller; C then reads the bundle\'s questions a
     assert(wrongKey.status === 409 && wrongKey.body.error?.code === 'PEER_KEY_MISMATCH', `a wrong repository key is refused: ${wrongKey.status} ${JSON.stringify(wrongKey.body)}`);
     const g = await C.json('/v1/package-sales/entitlements', {
         method: 'PUT', headers: auth(opsToken),
-        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:40799', public_key: newNodeKey }, note: 'order 3' }),
+        body: JSON.stringify({ repository: R.nodeId, group_id: setupOnR, node_id: newNode, node: { url: 'http://127.0.0.1:28799', public_key: newNodeKey }, note: 'order 3' }),
     });
     // Nothing answers at that address, so the sale stands and the node becomes a peer on its first
     // signed request (e2e-peer-registration-proof.ts covers that request).

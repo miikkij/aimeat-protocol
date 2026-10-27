@@ -23,14 +23,14 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
-process.env.AIMEAT_PORT = '40282';
+process.env.AIMEAT_PORT = '28282';
 process.env.AIMEAT_NODE_ID = 'aimeat-local-001-dev';
 process.env.AIMEAT_DEV_MODE = 'true';
 process.env.AIMEAT_TEST_MODE = 'true';
 process.env.AIMEAT_ADMIN_PASSWORD = 'x';
 
 const { config } = loadConfig({});
-Object.assign(config, (await ownNodeDb('40282', { memory: true })).config);
+Object.assign(config, (await ownNodeDb('28282', { memory: true })).config);
 config.nodeId = 'aimeat-local-001-dev';
 config.messageRetryTtlHours = 168;   // 7 days
 

@@ -34,7 +34,7 @@
  *   - parseMail(raw, recipients) -> ParsedMail: headers, subject, text, attachments
  *   - decodeWords / decodePart / unfoldHeaders: the MIME half, exported for a direct assertion
  * @usage
- *   const smtp = await startFakeSmtp({ port: 40295, requireAuth: true });
+ *   const smtp = await startFakeSmtp({ port: 28295, requireAuth: true });
  *   const mail = await smtp.waitForMail('alice@aimeat.test', /\b\d{6}\b/);
  *   await smtp.close();
  * @version-history

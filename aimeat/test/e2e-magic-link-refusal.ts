@@ -21,7 +21,7 @@
  *
  *   It runs its own node on its own port because SMTP is process-wide configuration, and the shared
  *   E2E server has email off. That node follows the run's backend (test/helpers/own-node-db.ts).
- *   `E2E_MAGIC_LINK_PORT` moves it (default 40289, with the SMTP sink one port above).
+ *   `E2E_MAGIC_LINK_PORT` moves it (default 28289, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-refusal
  * @version-history
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -43,7 +43,7 @@ import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
 import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 
-const PORT = Number(process.env.E2E_MAGIC_LINK_PORT ?? 40289);
+const PORT = Number(process.env.E2E_MAGIC_LINK_PORT ?? 28289);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';

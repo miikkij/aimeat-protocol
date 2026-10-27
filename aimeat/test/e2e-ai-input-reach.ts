@@ -39,7 +39,7 @@ import { startFakeAiProvider, chatJson, transcriptionJson, type FakeAiProvider }
 import { ownerSignIn } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent } from './helpers/mcp-session.js';
 
-const PORT = process.env.E2E_AI_INPUT_REACH_PORT ?? '40963';
+const PORT = process.env.E2E_AI_INPUT_REACH_PORT ?? '28963';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const RUNNER_STORAGE = process.env.AIMEAT_STORAGE ?? '';

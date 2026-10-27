@@ -14,7 +14,7 @@
  *   everything for an unrelated reason, and it would then certify a link that cannot carry the one
  *   thing it exists for.
  *
- *   Node V (vendor) 40287. Peer C is a keypair, not a running server: nothing here needs it to
+ *   Node V (vendor) 28287. Peer C is a keypair, not a running server: nothing here needs it to
  *   answer, only to sign.
  * @version-history
  *   2026-10-25 -- I11: an unsigned key exchange leaves a degraded peer's status and the operator's
@@ -166,7 +166,7 @@ async function peerRow(): Promise<any> {
 
 console.log('Setup');
 await test('Boot V, one operator, peer C admitted at tier contact', async () => {
-    V = await bootNode(40287, 'aimeat-test-001-contactv');
+    V = await bootNode(28287, 'aimeat-test-001-contactv');
     await setupOwner(V, `clv${ts}`);
     cKeys = await generateKeyPair();
 

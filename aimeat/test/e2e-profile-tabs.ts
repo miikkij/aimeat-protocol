@@ -1299,8 +1299,8 @@ console.log('\n--- Notifications Tab ---');
 // The endpoints are loopback: validateOutboundUrl (audit H-8's other half) resolves the host, so a
 // name that does not exist would be refused for the wrong reason, and the runner allows private
 // egress. Nothing listens there, which is what a delivery attempt is supposed to survive.
-const pushEndpointA = 'https://127.0.0.1:40961/push/e2e-device-a';
-const pushEndpointB = 'https://127.0.0.1:40961/push/e2e-device-b';
+const pushEndpointA = 'https://127.0.0.1:28961/push/e2e-device-a';
+const pushEndpointB = 'https://127.0.0.1:28961/push/e2e-device-b';
 const pushKeys = { p256dh: 'test-key', auth: 'test-auth' };
 
 await test('GET /v1/push/vapid-key — VAPID public key', async () => {

@@ -12,13 +12,17 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- Every suite's fixed ports moved from 40000-41999 to 28000-29999 (down 12000), out of the
+ *     range the claims board hands out: a board claim is not a runner, so the port locks never saw it,
+ *     and a session holding 40672 refused e2e-secrets with EADDRINUSE. fixedPorts and listeningPorts
+ *     read the new band; scripts/check-suite-ports.ts refuses a fixed suite port outside it.
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
  *   2026-10-25 -- e2e-sse-revocation.ts joins the list (not the guard tier): a live event stream ends when its credential is revoked (secaudit2026oct22).
  *   2026-10-25 -- e2e-realtime-signed-in-only.ts joins the list (not the guard tier): the realtime upgrade on a signed-in-only node admits its own accounts only (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-backup-reader.ts joins the list (not the guard tier): the classification reader and the export trail on GET /v1/admin/backup (secaudit2026oct22).
  *   2026-10-25 -- e2e-admin-operator-trail.ts joins the list (not the guard tier): the operator trail on the identity and scheduler routes (secaudit2026oct22).
- *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 40991 (secaudit2026oct22).
- *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 40458 (secaudit2026oct22).
+ *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 28991 (secaudit2026oct22).
+ *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 28458 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
@@ -27,8 +31,8 @@
  *   2026-10-24 -- e2e-compliance-agreements.ts joins the list (not the guard tier): data processing agreements (plan doc-mvmr4i2wdk0p).
  *   2026-10-23 -- e2e-compliance-records.ts and e2e-classification-packs.ts join the list (not the guard tier): the records of processing and the documents beside them, and the TL and NATO label packs (plan doc-mvlftkh9zmc9).
  *   2026-10-22 -- e2e-federation-peer-consent.ts joins the list (not the guard tier) and PURPOSE_SUITES: a linked peer acts for a person here only with that person's sign-in consent, and list-home, push-home, list-remote and a peer's own replication keep working, on two in-process nodes in port blocks 30700 and 30800 (secaudit 2026-10 wave 3, v70, v71; the developer's ruling of 2026-10-22).
- *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 40987 (secaudit 2026-10, v89).
- *   2026-10-22 -- e2e-workflow-organism-writes.ts and e2e-unattended-publish-gate.ts join the list (not the guard tier): a workflow step's answer to an organism key meets the organism rule, and an extension's or a workflow's public file or package meets the publish gate, the latter on its own node on 40949 (secaudit 2026-10, r66, v68, v69).
+ *   2026-10-22 -- e2e-account-events-task-keep.ts joins the list (not the guard tier): an app grant made before the update keeps a task's title and reason in the event record, on its own node on 28987 (secaudit 2026-10, v89).
+ *   2026-10-22 -- e2e-workflow-organism-writes.ts and e2e-unattended-publish-gate.ts join the list (not the guard tier): a workflow step's answer to an organism key meets the organism rule, and an extension's or a workflow's public file or package meets the publish gate, the latter on its own node on 28949 (secaudit 2026-10, r66, v68, v69).
  *   2026-10-22 -- e2e-workspace-row-revisions.ts joins the list (not the guard tier): a row replaced by another writer family is kept as a revision the delete authority lists and restores (secaudit 2026-10, v80).
  *   2026-10-22 -- e2e-knowledge-link-owner.ts joins the list (not the guard tier): a knowledge link row belongs to the namespace of its source package, and owner erasure takes the person's rows (secaudit 2026-10, v78, v79).
  *   2026-10-22 -- e2e-memory-hands-readers.ts and e2e-account-events-readers.ts join the list (not the guard tier): the readers of the hands on a key and of a task's title in the event record (secaudit 2026-10, v88, v89).
@@ -36,19 +40,19 @@
  *     is for still works, five of them new (test/e2e-purpose-*.ts); pnpm gate runs it with the guard
  *     tier, and a skipped test in it is red as in the guard tier (docs/pitfalls.md §126).
  *   2026-10-21 -- e2e-content-class.ts joins the list (not the guard tier): content classes on their
- *     own node on 40451, against the sandbox's decision and completion stand-ins.
+ *     own node on 28451, against the sandbox's decision and completion stand-ins.
  *   2026-10-20 -- e2e-mcp-modern.ts joins the list (not the guard tier): MCP 2026-07-28 on the
  *     shared node (MCP SDK v2 migration step 5).
  *   2026-10-20 -- e2e-workspace-transfer-gates.ts joins the list (not the guard tier): a workspace
  *     backup is not a way round the write rules on a restore, the ecosystem read data-areas on an
- *     export, or the credential mask, on its own node with the publish gate on, port 40496
+ *     export, or the credential mask, on its own node with the publish gate on, port 28496
  *     (secaudit 2026-10).
  *   2026-10-20 -- e2e-catalogue-classification.ts joins the list (not the guard tier): the public
  *     knowledge catalogue and the single read of the same manifest answer the same, on its own node
- *     with classification on, port 40495 (secaudit 2026-10).
+ *     with classification on, port 28495 (secaudit 2026-10).
  *   2026-10-19 -- e2e-agent-avatar.ts joins the list (not the guard tier): an agent's own picture at agent.avatar.
  *   2026-10-18 -- e2e-exposure-conflicts.ts joins the list (not the guard tier): the conflicts in what others can see (plan doc-mvdipuyqraas, L4.1).
- *   2026-10-18 -- e2e-classification-defaults.ts joins the list (not the guard tier): the default audience caps a new node takes and a running node is offered (plan doc-mvdipuyqraas, L5). Its own node on 40492.
+ *   2026-10-18 -- e2e-classification-defaults.ts joins the list (not the guard tier): the default audience caps a new node takes and a running node is offered (plan doc-mvdipuyqraas, L5). Its own node on 28492.
  *   2026-10-18 -- e2e-classification-clearance.ts joins the list (not the guard tier): an agent's clearance (plan doc-mvdipuyqraas, L2).
  *   2026-10-18 -- e2e-classification-audience-cap.ts joins the list (not the guard tier): a label's audience cap (plan doc-mvdipuyqraas, L3).
  *   2026-10-18 -- e2e-classification-containers.ts joins the list (not the guard tier): the classification of containers and the effective label (plan doc-mvdipuyqraas, L1).
@@ -64,13 +68,13 @@
  *     recipient is `*` meets the publish gate, on a node that has it on (secaudit 2026-10).
  *   2026-10-22 -- e2e-publish-request-content-swap.ts joins the list (not the guard tier): a skill or
  *     cortex publish request publishes only the content it was filed for, on its own node with the
- *     publish gate on, port 40954 (secaudit 2026-10).
+ *     publish gate on, port 28954 (secaudit 2026-10).
  *   2026-10-20 -- e2e-publish-request-bin-takeover.ts joins the list (not the guard tier): a memory
  *     publish request publishes only the content it was filed for, across a bin and a re-create, on
- *     its own node with the publish gate on, port 40482 (secaudit 2026-10).
+ *     its own node with the publish gate on, port 28482 (secaudit 2026-10).
  *   2026-10-20 -- e2e-public-feed-exposure.ts joins the list (not the guard tier): what reaches the
  *     anonymous activity feed, and the publish gate in front of a restore, on its own node with the
- *     publish gate on, port 40497 (secaudit 2026-10).
+ *     publish gate on, port 28497 (secaudit 2026-10).
  *   2026-10-18 -- e2e-page-access.ts joins the list (not the guard tier): who may open a welcome page and a company front page (V3.10).
  *   2026-10-18 -- e2e-content-defaults.ts joins the list (not the guard tier): the node's starting levels for content.
  *   2026-10-18 -- e2e-publish-gate-files.ts joins the list (not the guard tier): the publish gate on stored files and on memory bulk, import and copy.
@@ -89,7 +93,7 @@
  *     job log they were only in is served to signed-in readers only.
  *   2026-10-16 -- e2e-config-setting-fallback.ts joins the list (not the guard tier): a node started with
  *     a setting it does not accept runs the default and shows a Security page incident, on its own node
- *     on 40484 (Jouni, decision 2026-10-16).
+ *     on 28484 (Jouni, decision 2026-10-16).
  *   2026-10-16 -- e2e-html-pages.ts joins the list (not the guard tier): HTML pages in workspaces and their page host.
  *   2026-10-16 -- e2e-contract.ts joins the list (not the guard tier): selected operations answer what
  *     openapi.yaml declares, field by field (QA audit D3-01).
@@ -107,12 +111,12 @@
  *   2026-10-16 -- e2e-federation-peer-limits.ts joins the list and GUARD_SUITES (140 → 141), measured
  *     alone three times on each backend: a member peer's replicate namespaces, broadcast sender, key
  *     exchange roster, signed service summary and resolve, and the package repository doors refusing
- *     unsigned, misaddressed and repeated requests, on its own node on 40393 (QA audit S6-02, S6-03,
+ *     unsigned, misaddressed and repeated requests, on its own node on 28393 (QA audit S6-02, S6-03,
  *     S6-04, S6-09, S10-02).
  *   2026-10-16 -- e2e-setup-code.ts joins the list (not the guard tier): the one-time setup code on a node
- *     with a public base URL and none on a loopback node, its own nodes on 40533 to 40536 (Jouni, 2026-10-16).
+ *     with a public base URL and none on a loopback node, its own nodes on 28533 to 28536 (Jouni, 2026-10-16).
  *   2026-10-16 -- e2e-production-posture.ts joins the list (not the guard tier): a node on the public
- *     profile with production settings, its own node on 40479 (QA audit P7-05).
+ *     profile with production settings, its own node on 28479 (QA audit P7-05).
  *   2026-10-16 -- --production-settings: every suite's node runs with the settings a production node
  *     runs (test/run-e2e-production-lane.ts); `pnpm test:e2e:guards:*` pass it. run-e2e-production-lane.ts
  *     is in NOT_SUITES (QA audit P1-01, P1-08, P7-03, P7-05, F03a-02, S1-08, F7d).
@@ -122,7 +126,7 @@
  *     that names extensions refuses an agent's direct write on every code path and takes it through
  *     a named extension.
  *   2026-10-13 -- e2e-app-scope-allowance.ts joins the list (not the guard tier): a published app that
- *     worked on a 3.x node keeps the scope words its code needs, on its own node on 40478.
+ *     worked on a 3.x node keeps the scope words its code needs, on its own node on 28478.
  *   2026-10-16 -- e2e-production-size.ts joins the list (not the guard tier): the size-dependent reads
  *     past their old windows (QA audit W31). A suite line `⏭ SKIPPED: <what> — <why>` is counted as
  *     skipped: the summary shows a Skipped column, a suite that ran nothing but skips gets "-" and
@@ -131,7 +135,7 @@
  *     e2e-backup-restore's PostgreSQL half without pg_dump).
  *   2026-10-13 -- e2e-rest-scope-keep-working.ts joins the list (not the guard tier): an agent that
  *     worked on a 3.x node keeps the scope words 4.0.0 started to check, across boots of its own node
- *     on 40477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
+ *     on 28477 (ruling decision-4-0-x-olemassa-olevat-agentit-saavat-rest-porttien-uudet-san).
  *   2026-10-13 -- --tests-file=<path> skips a line starting with #, so test/version-aware-suites.txt (the
  *     nightly 4.0.0 run's list) carries its own explanation.
  *   2026-10-12 -- --tests-file=<path> takes the suite names from a file, one a line, for a list too long
@@ -211,8 +215,8 @@
  *            (ANONYMOUS_OFF_SUITES in run-e2e-server.ts: the credential suites run with it off, as
  *            production does). The suite header, the lane line and the summary print the setting.
  *   v1.65.0 -- 2026-09-29 -- e2e-refinery.ts joins the suites (not the guard tier): the mail refinery on
- *            its own node on 40449, against the sandbox's test mailbox and its model stand-ins.
- *   v1.64.0 -- 2026-09-28 -- e2e-ai-roles.ts joins the suites (not the guard tier): AI roles on its own node on 40444.
+ *            its own node on 28449, against the sandbox's test mailbox and its model stand-ins.
+ *   v1.64.0 -- 2026-09-28 -- e2e-ai-roles.ts joins the suites (not the guard tier): AI roles on its own node on 28444.
  *   v1.63.0 -- 2026-09-28 -- e2e-ai-model-policy.ts joins the suites (not the guard tier): the model
  *            policy of the System 2 plan, V2.
  *   v1.62.0 -- 2026-09-26 -- federation-messages.ts joins GUARD_SUITES (138 → 139), measured alone on
@@ -225,24 +229,24 @@
  *            2026-09, F-1 as a class and a0ecb62eafb3).
  *   v1.60.0 -- 2026-09-26 -- Add e2e-held-account-names.ts to ALL_SUITES: the move to the full
  *            identity on data it cannot place, the one incident it opens and the operator's two
- *            decisions over REST and MCP, across three boots of its own node on 40452. Not in the
+ *            decisions over REST and MCP, across three boots of its own node on 28452. Not in the
  *            guard tier.
  *   v1.59.0 -- 2026-09-26 -- Add e2e-app-frame.ts to ALL_SUITES: apps on a node several people share
  *            with no app origin run in an isolated frame (audit A7-1). It boots a node of its own on
- *            40266, with the app origin off, so it starts with one owner and adds the second itself.
+ *            28266, with the app origin off, so it starts with one owner and adds the second itself.
  *   v1.58.0 -- 2026-09-25 -- Add e2e-workspace-member-changes.ts to ALL_SUITES: a plain member adds a
  *            space and changes sections under the workspace's rule, and the decision on a member's
  *            suggestion (REST and MCP). Not in the guard tier.
  *   v1.57.0 -- 2026-09-25 -- Add e2e-operator-admin-migration.ts to ALL_SUITES: the once-per-node
  *            migration that gives the operator's full-access agents operator:admin, across three
- *            boots of its own node on 40447. Not in the guard tier.
+ *            boots of its own node on 28447. Not in the guard tier.
  *   v1.56.0 -- 2026-09-26 -- Add e2e-mail-read-consent.ts to ALL_SUITES: reading mail for the apps
  *            granted before connections:read-through, with the owner's one-tap door. Not in the
  *            guard tier.
  *   v1.55.0 -- 2026-09-25 -- Add e2e-package-install-requests.ts to ALL_SUITES: an agent's install
  *            that needs words it lacks becomes a request the owner answers. Not in the guard tier.
  *   v1.54.1 -- 2026-09-25 -- The port STOP message no longer says nothing is written down above
- *            40650 (suites name 40665, 40672, 40701, 40702 and 40961); it names the grep that
+ *            28650 (suites name 28665, 28672, 28701, 28702 and 28961); it names the grep that
  *            answers the question and the cross-session trap.
  *   v1.54.0 -- 2026-09-24 -- Add e2e-themes.ts to ALL_SUITES: Themes & Styles (a theme, a style,
  *            component CSS, warnings, the operator-only writes). Not in the guard tier.
@@ -252,7 +256,7 @@
  *            archive and rules, and messages:organize-as-owner. Not in the guard tier.
  *   v1.52.0 -- 2026-09-13 -- Add e2e-ai-provider-allowlist.ts to ALL_SUITES: the operator's provider
  *            allowlist on the model picker and on the settings write, each proved against a node
- *            booted with a list. Own node on 40420, so it lands in lane 0. Not in the guard tier.
+ *            booted with a list. Own node on 28420, so it lands in lane 0. Not in the guard tier.
  *   v1.51.0 -- 2026-09-12 -- Add e2e-dm-read-as-owner.ts to ALL_SUITES: the four owner-mailbox reads
  *            for an app on messages:read and an agent on messages:read-as-owner. Not in the guard tier.
  *   v1.50.0 -- 2026-09-12 -- Add e2e-display-prefs.ts to ALL_SUITES: language, format and time zone
@@ -301,12 +305,12 @@
  *            alone on both backends, which it has not had time to accumulate.
  *   v1.35.0 -- 2026-09-07 -- Guard publishing permission across all three HTTP doors.
  *   v1.34.0 -- 2026-09-06 -- Add e2e-secrets.ts: the owner's write-only credential vault, and the
- *            resolution of {{secret:NAME}} inside ctx.fetch. It binds 40672 for a real receiver, so
+ *            resolution of {{secret:NAME}} inside ctx.fetch. It binds 28672 for a real receiver, so
  *            it is a fixed-port suite and lands in lane 0 beside e2e-living-hooks; what arrives at
  *            that receiver is the only proof that the node substituted the right owner's value, and
  *            what a probe extension answers with is the only proof the sandbox never held it.
  *   v1.33.0 -- 2026-09-06 -- Add e2e-living-hooks.ts: the two doors a living document uses to talk
- *            to the world (living-hooks, shipped with the node). It binds 40665 for a real receiver,
+ *            to the world (living-hooks, shipped with the node). It binds 28665 for a real receiver,
  *            so it is a fixed-port suite and lands in lane 0; the body that arrives there is what
  *            proves a send, and the call count is what proves the ten-second cache.
  *   v1.33.0 -- 2026-09-08 -- Seven suites from the coverage work, each for code the sweep had never
@@ -319,7 +323,7 @@
  *            their own and so sit in lane 0.
  *   v1.32.0 -- 2026-09-06 -- The runner REFUSES to start on a port a suite in this run writes down.
  *            It had computed that answer since fixedPorts() existed and never said it, and the
- *            silence cost two sessions in one day: a throwaway node on 40262 turned e2e-app-origin
+ *            silence cost two sessions in one day: a throwaway node on 28262 turned e2e-app-origin
  *            red for everybody with 44 assertions that read like a regression, and the session that
  *            had READ that incident then claimed 40272, which three suites write down. A suite on a
  *            fixed port checks only that SOMETHING answers there, so the collision is invisible from
@@ -341,8 +345,8 @@
  *   v1.28.0 -- 2026-09-03 -- Add e2e-federation-relay-claim.ts, in ALL_SUITES and in the guard tier:
  *            eleven of its seventeen assertions are a refusal, and the capability it proves did not
  *            exist before (a receiving node could not refuse a relay). It spawns its own node on
- *            40293 with its own sqlite file, so it neither needs nor disturbs the shared server
- *            (40291 is e2e-sealed-config's).
+ *            28293 with its own sqlite file, so it neither needs nor disturbs the shared server
+ *            (28291 is e2e-sealed-config's).
  *   v1.27.0 -- 2026-09-02 -- Add e2e-workspace-doc-edit.ts: in-place document edits, the byte-identity
  *            of everything they do not touch, and two concurrent appends both surviving.
  *   v1.26.0 -- 2026-09-02 -- Add e2e-app-playtest.ts: the game playtest bench through the audit door.
@@ -498,15 +502,15 @@ const ALL_SUITES = [
     'test/e2e-oauth-login.ts',
     'test/e2e-session-refresh.ts',
     'test/e2e-access-tokens.ts',
-    // The owner's secrets vault. Starts a real receiver on 127.0.0.1:40672 (E2E_SECRETS_PORT),
+    // The owner's secrets vault. Starts a real receiver on 127.0.0.1:28672 (E2E_SECRETS_PORT),
     // reachable because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS — so the header that arrives is
     // the header the node actually built, which is the only way to prove the resolution at all.
     'test/e2e-secrets.ts',
     // Whose vault an extension may read, and who may make the first use that binds a secret's host
-    // (secaudit 2026-10, v58 and v59). Its receiver is on 127.0.0.1:40674 (E2E_SECRETS_AUTHORITY_PORT).
+    // (secaudit 2026-10, v58 and v59). Its receiver is on 127.0.0.1:28674 (E2E_SECRETS_AUTHORITY_PORT).
     'test/e2e-secrets-authority.ts',
     // The old uses of a vault secret work again (declared uses_secrets), the holes stay closed, and the
-    // owner allows a refused first use with one press. Receiver on 127.0.0.1:40675 (E2E_SECRETS_APPROVALS_PORT).
+    // owner allows a refused first use with one press. Receiver on 127.0.0.1:28675 (E2E_SECRETS_APPROVALS_PORT).
     'test/e2e-secrets-approvals.ts',
     'test/e2e-apps.ts',
     // An app listed to the community: signed-in members and their agents see it, the anonymous
@@ -553,17 +557,17 @@ const ALL_SUITES = [
     'test/e2e-page-access.ts',
     // Self-spawns its own node with the publish gate on: a consent to everyone meets the same gate.
     'test/e2e-consent-publish-gate.ts',
-    // Self-spawns its own node with the publish gate on, port 40496: a workspace backup is not a way
+    // Self-spawns its own node with the publish gate on, port 28496: a workspace backup is not a way
     // round the write rules on a restore, the read rules on an export, or the credential mask.
     'test/e2e-workspace-transfer-gates.ts',
-    // Self-spawns its own node with the publish gate on and anonymous mode, port 40497: what reaches
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 28497: what reaches
     // the public activity feed (a share that opens nothing, a task's private title) and what a
     // restore puts back.
     'test/e2e-public-feed-exposure.ts',
-    // Self-spawns its own node with the publish gate on and anonymous mode, port 40482: a memory
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 28482: a memory
     // publish request publishes only the content it was filed for, across a bin and a re-create.
     'test/e2e-publish-request-bin-takeover.ts',
-    // Self-spawns its own node with the publish gate on and anonymous mode, port 40954: a skill or
+    // Self-spawns its own node with the publish gate on and anonymous mode, port 28954: a skill or
     // cortex publish request publishes only the content it was filed for, across a delete, a
     // same-version redeploy and an install again.
     'test/e2e-publish-request-content-swap.ts',
@@ -588,22 +592,22 @@ const ALL_SUITES = [
     'test/e2e-board-ttl.ts',
     'test/e2e-calibrator.ts',
     'test/e2e-concurrency.ts',
-    // Two requests at once on the money paths, on an own in-process node (40296) whose card handlers
+    // Two requests at once on the money paths, on an own in-process node (28296) whose card handlers
     // are stand-ins: password lock, EXCHANGE delivery, UCP idempotency and completion, renewal.
     'test/e2e-money-path-races.ts',
     // Two writers of one record at once on the commerce books, the UCP checkout, the package sales
-    // catalogue and the AI settings record, on an own in-process node (40473) with a stand-in platform.
+    // catalogue and the AI settings record, on an own in-process node (28473) with a stand-in platform.
     'test/e2e-atomic-money.ts',
-    // Two writes of one permission record at the same moment, on an own in-process node (40419):
+    // Two writes of one permission record at the same moment, on an own in-process node (28419):
     // the first operation is held after its read while the second runs (atomic-write round, G2).
     'test/e2e-atomic-access.ts',
     // Two writers of one record at once on the workspace registry, the chat archive, the signing
-    // indexes, crews, settings and content records, on an own in-process node (40563).
+    // indexes, crews, settings and content records, on an own in-process node (28563).
     'test/e2e-atomic-content-b.ts',
     // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
     // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
     'test/e2e-connections.ts',
-    // Boots its own node on :40286 with its own SQLite file and answers Google, Microsoft, Mastodon,
+    // Boots its own node on :28286 with its own SQLite file and answers Google, Microsoft, Mastodon,
     // LinkedIn, X and Bluesky inside the process: the mail providers address their upstreams with
     // module constants, so replacing globalThis.fetch is the only seam there is.
     'test/e2e-mail-connections.ts',
@@ -611,15 +615,15 @@ const ALL_SUITES = [
     // owner's own door that adds connections:read-through to one grant, and the word surviving a
     // refresh until the owner takes it away. Reaches the runner's database to run the migration.
     'test/e2e-mail-read-consent.ts',
-    // A node of its own on 40312 with real VAPID keys, an SMTP sink on 40313 and an HTTPS push
+    // A node of its own on 28312 with real VAPID keys, an SMTP sink on 28313 and an HTTPS push
     // receiver: services/push.ts, services/mailbox-notification.ts and both notification sweeps are
     // dead code on the shared server, which pins the VAPID pair empty. Lane 0, two fixed ports.
     'test/e2e-mailbox-push.ts',
     // The three publish recipes and five metrics readers against the same fake upstreams, on an
-    // own in-process node (40317): Mastodon's transcode poll, YouTube's resumable chunks, Bluesky.
+    // own in-process node (28317): Mastodon's transcode poll, YouTube's resumable chunks, Bluesky.
     'test/e2e-publish-upstreams.ts',
     // Facebook Page, Instagram, Reddit, X articles and threads, and the replies reader on every
-    // network, against fake upstreams on an own in-process node (40327). Not in the guard tier.
+    // network, against fake upstreams on an own in-process node (28327). Not in the guard tier.
     'test/e2e-connections-social.ts',
     'test/e2e-disputes.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
@@ -769,11 +773,11 @@ const ALL_SUITES = [
     'test/e2e-federation.ts',
     // Cross-federation "genesis": peering CRUD, signed catalogue ingest, the aggregated
     // cross-catalogue and its filters, cross-genesis memory read both ways, subscriptions and the
-    // sync service. Boots its OWN in-process node on 40321 with its own SQLite file, and serves the
+    // sync service. Boots its OWN in-process node on 28321 with its own SQLite file, and serves the
     // other federation on loopback — a genesis peer is a second federation, not a second node.
     'test/e2e-genesis-federation.ts',
     // Settlements, routing, cross-node templates and the four sync services. It boots TWO in-process
-    // nodes on 40322-40323 (plus a fake peer on an ephemeral loopback port), so it needs neither the
+    // nodes on 28322-28323 (plus a fake peer on an ephemeral loopback port), so it needs neither the
     // runner's server nor its port, and it is the only suite that turns packageFederationEnabled on.
     'test/e2e-federation-settlements-sync.ts',
     // The two federated memory routes a HOME user drives, against a peer the suite serves itself on
@@ -898,10 +902,10 @@ const ALL_SUITES = [
     'test/e2e-owner-home.ts',
     // One export, every section of it: the Article 15 and 20 door read against fixtures built first.
     'test/e2e-owner-export.ts',
-    // The setup wizard and the verification doors: spawns nodes of its own on 40320
+    // The setup wizard and the verification doors: spawns nodes of its own on 28320
     // (E2E_SETUP_SECOND_PORT). Lane 0 in the coverage runner.
     'test/e2e-setup-and-verification.ts',
-    // A node whose port is taken exits and says why, instead of announcing a start (own port 40433).
+    // A node whose port is taken exits and says why, instead of announcing a start (own port 28433).
     'test/e2e-boot-port-in-use.ts',
     // The moderation appeal end to end: the four target arms, the queue, the review, every refusal.
     'test/e2e-appeals.ts',
@@ -911,18 +915,18 @@ const ALL_SUITES = [
     // own node with a real SMTP sink, because the secret these paths turn on arrives only by mail.
     'test/e2e-magic-link-refusal.ts',
     // The emailed link returns to the place it was asked from: a path, or one of the node's own app
-    // origins, and a foreign address lands on the front page. Own node on 40454 with a real SMTP
+    // origins, and a foreign address lands on the front page. Own node on 28454 with a real SMTP
     // sink and app origins on.
     'test/e2e-magic-link-return.ts',
     // The email service, which no other suite executes: every .env.test.* leaves AIMEAT_SMTP_HOST
-    // unset. Runs its own node on 40294 with a real SMTP sink and drives all eight send methods.
+    // unset. Runs its own node on 28294 with a real SMTP sink and drives all eight send methods.
     'test/e2e-email-delivery.ts',
     // BR-04: SAML organisation sign-in over live HTTP — doors, discovery, invite/disable refusals.
     'test/e2e-saml-login.ts',
     // BR-04: SCIM provisioning — the directory's lifecycle, and every isolation boundary as a refusal.
     'test/e2e-scim-users.ts',
     'test/e2e-ai-jobs.ts',
-    // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 40963.
+    // What a model may be handed of the owner's data, by whom (secaudit 2026-10, r49, v74, v75). Own node on 28963.
     'test/e2e-ai-input-reach.ts',
     // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps
     // reading as before until it is changed (secaudit 2026-10 wave 3, r49). In-process node on block 31700.
@@ -930,46 +934,46 @@ const ALL_SUITES = [
     // A group message attachment is delivered as the version that was sent or not at all (secaudit
     // 2026-10 wave 3, v82). In-process node on block 31800.
     'test/e2e-group-attachment-version.ts',
-    // The AI paths BEHIND the gate. Spawns its own node on 40314 with a scriptable OpenAI-compatible
-    // provider on 40315, because every other AI suite stops at the door for want of one.
+    // The AI paths BEHIND the gate. Spawns its own node on 28314 with a scriptable OpenAI-compatible
+    // provider on 28315, because every other AI suite stops at the door for want of one.
     'test/e2e-ai-provider-stub.ts',
-    // The decision provider (TARGET-080): its own node on 40436 and a TypeSafe stand-in on an
+    // The decision provider (TARGET-080): its own node on 28436 and a TypeSafe stand-in on an
     // ephemeral port, so what the scrubber let out is read from the bytes that arrived.
     'test/e2e-ai-decide.ts',
-    // The mail refinery: its own node on 40449, the sandbox's test mailbox in process with its
+    // The mail refinery: its own node on 28449, the sandbox's test mailbox in process with its
     // decision and completion stand-ins on an ephemeral port, so each queue a message lands in is
     // the pipeline's doing. Follows the runner's backend.
     'test/e2e-refinery.ts',
-    // Content classes: its own node on 40451, the sandbox's decision and completion stand-ins on an
+    // Content classes: its own node on 28451, the sandbox's decision and completion stand-ins on an
     // ephemeral port answering the content class prompts, so the class an item lands in is the
     // pipeline's doing. Follows the runner's backend.
     'test/e2e-content-class.ts',
-    // The model policy (System 2, V2): its own node on 40438 with a recommended list set the way an
+    // The model policy (System 2, V2): its own node on 28438 with a recommended list set the way an
     // operator sets it, and the OpenAI-compatible stub on an ephemeral port, so the model the node
     // sent is read from what arrived. Follows the runner's backend.
     'test/e2e-ai-model-policy.ts',
-    // AI providers and routing (System 2, V3): its own node on 40439 with the fixed provider types
+    // AI providers and routing (System 2, V3): its own node on 28439 with the fixed provider types
     // pointed at one stub (each at its own path) and a node key, so which provider a request reached,
     // with which key, is read from what arrived. Follows the runner's backend.
     'test/e2e-ai-providers.ts',
-    // The model catalogue (System 2, V4): its own node on 40440 whose catalogue sources point at a
+    // The model catalogue (System 2, V4): its own node on 28440 whose catalogue sources point at a
     // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
     // catalogue price are read from what the node wrote. Follows the runner's backend.
     'test/e2e-ai-catalog.ts',
-    // Capabilities for apps and agents (System 2, V5): its own node on 40441 with the fixed types on
+    // Capabilities for apps and agents (System 2, V5): its own node on 28441 with the fixed types on
     // the stub and the catalogue sources on a second stub, so every reason a capability is off can
-    // be made to happen; and embeddings on its own node on 40442. Both follow the runner's backend.
+    // be made to happen; and embeddings on its own node on 28442. Both follow the runner's backend.
     'test/e2e-ai-capabilities.ts',
     'test/e2e-ai-embed.ts',
-    // An extension as an AI provider (System 2, V6): its own node on 40443 and a recording service on
+    // An extension as an AI provider (System 2, V6): its own node on 28443 and a recording service on
     // this machine, so where the owner's key went, and where it did not, is read from what arrived.
     'test/e2e-ai-extension-provider.ts',
-    // AI roles (wish-tekoalyn-roolit): its own node on 40444 with the fixed types on the stub, so which
+    // AI roles (wish-tekoalyn-roolit): its own node on 28444 with the fixed types on the stub, so which
     // model and fine-tuning a role's call sent, and that an unbound app role sent nothing, is read from
     // what arrived. Follows the runner's backend.
     'test/e2e-ai-roles.ts',
     // The operator's provider allowlist, on the two doors that were outside it. Spawns its own node
-    // on 40420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
+    // on 28420 with AIMEAT_AI_PROVIDER_ALLOWLIST set, because the list is read from the environment
     // at boot: on a node with no list every host is allowed and there is nothing to prove.
     'test/e2e-ai-provider-allowlist.ts',
     'test/e2e-ai-usage-history.ts',
@@ -1017,11 +1021,11 @@ const ALL_SUITES = [
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
-    // Owns its node on 40492 and boots one database three times: a new node takes the default audience
+    // Owns its node on 28492 and boots one database three times: a new node takes the default audience
     // caps, the same database made a pre-cap node is offered them on the Security page and takes each
     // on the operator's decision, with no content level changed (plan doc-mvdipuyqraas, L5).
     'test/e2e-classification-defaults.ts',
-    // Owns its node on 40495 with AIMEAT_CLASSIFICATION=all: the public knowledge catalogue and the
+    // Owns its node on 28495 with AIMEAT_CLASSIFICATION=all: the public knowledge catalogue and the
     // single read of the same manifest answer the same once the listing has the classification reader.
     'test/e2e-catalogue-classification.ts',
     'test/e2e-notifications.ts',
@@ -1031,7 +1035,7 @@ const ALL_SUITES = [
     'test/e2e-knowledge-link-owner.ts',
     'test/e2e-libs.ts',
     'test/e2e-library-packs.ts',
-    // Starts a real receiver on 127.0.0.1:40665 (E2E_LIVING_HOOKS_PORT), reachable because the
+    // Starts a real receiver on 127.0.0.1:28665 (E2E_LIVING_HOOKS_PORT), reachable because the
     // runner pins AIMEAT_ALLOW_PRIVATE_EGRESS, so the body that arrives is the body that was sent.
     'test/e2e-living-hooks.ts',
     'test/e2e-appdev-pitfalls.ts',
@@ -1043,29 +1047,29 @@ const ALL_SUITES = [
     'test/e2e-appdev-flow.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
-    // Owns its server on 40447 and boots it three times on one database: the operator:admin
+    // Owns its server on 28447 and boots it three times on one database: the operator:admin
     // migration runs at boot and records that it ran, so only a restart proves it runs once.
     'test/e2e-operator-admin-migration.ts',
-    // Owns its server on 40452 and boots it three times on one database: the move to the full
+    // Owns its server on 28452 and boots it three times on one database: the move to the full
     // identity runs when the store opens, and what it cannot place becomes one incident.
     'test/e2e-held-account-names.ts',
-    // Owns its server on 40458 and boots it three times on one database: what the shared anonymous
+    // Owns its server on 28458 and boots it three times on one database: what the shared anonymous
     // agent wrote outside its namespace becomes one Security page incident, once (secaudit2026oct22).
     'test/e2e-anonymous-records-incident.ts',
-    // Owns its server on 40477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
+    // Owns its server on 28477 and boots one database as 3.27.0, then twice as 4.0.0: the agents that
     // worked on 3.x keep the scope words 4.0.0 started to check, once, and only those agents.
     'test/e2e-rest-scope-keep-working.ts',
     // A node started as a production deployment starts it: public profile, the three modes off,
-    // the shipped limits and scopes. Its own node on 40479, on the run's backend (QA audit P7-05).
+    // the shipped limits and scopes. Its own node on 28479, on the run's backend (QA audit P7-05).
     'test/e2e-production-posture.ts',
-    // Owns its node on 40484 and boots it three times on one database: a setting the node does not
+    // Owns its node on 28484 and boots it three times on one database: a setting the node does not
     // accept runs its default and opens a Security page incident, which the corrected start closes.
     'test/e2e-config-setting-fallback.ts',
-    // Four nodes of its own on 40533, 40535 and 40536 (public base URL) and 40534 (loopback): every path
+    // Four nodes of its own on 28533, 28535 and 28536 (public base URL) and 28534 (loopback): every path
     // that makes an operator asks for the one-time code the start log prints only on a public base
     // URL (Jouni, 2026-10-16).
     'test/e2e-setup-code.ts',
-    // Owns its server on 40478, the same three boots for a published app: an app that calls a gated
+    // Owns its server on 28478, the same three boots for a published app: an app that calls a gated
     // route its aimeat-scopes does not name keeps the word, and a new app gets a publish warning.
     'test/e2e-app-scope-allowance.ts',
     'test/e2e-mcp-v2.ts',
@@ -1249,7 +1253,7 @@ const ALL_SUITES = [
     'test/e2e-display-prefs.ts',
     'test/e2e-living-pulse.ts',
     // Every core scheduled job fired through the operator's trigger door, on a node of its own
-    // (40310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.
+    // (28310) with an SMTP sink, short windows and the flags the seeding keys on. Lane 0.
     'test/e2e-core-jobs.ts',
     'test/e2e-registration-mode.ts',
     'test/e2e-mcp-session-expiry.ts',
@@ -1368,7 +1372,7 @@ const ALL_SUITES = [
     'test/e2e-company-brain.ts',
     'test/e2e-personal-node.ts',
     // The personal tunnel itself, over a real WebSocket: welcome, mailbox sync and ack, heartbeat,
-    // replacement, graceful disconnect. Its last phase self-spawns a node on 40299 with a ten-second
+    // replacement, graceful disconnect. Its last phase self-spawns a node on 28299 with a ten-second
     // heartbeat to reach the degraded and timeout branches, so it is a fixed-port suite (lane 0).
     'test/e2e-personal-tunnel.ts',
     'test/e2e-connect-tunnel.ts',
@@ -1454,12 +1458,12 @@ const ALL_SUITES = [
     // A record's disclosure decided for the item as it is served, and its words by medium.
     'test/e2e-ai-provenance-served.ts',
     'test/e2e-chat.ts',
-    // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (40300 and
-    // 40301) with a fake ACP peer as goose, because AIMEAT_GOOSE_BIN is process-wide configuration.
+    // The other half of e2e-chat: a node that HAS an agent. Runs two nodes of its own (28300 and
+    // 28301) with a fake ACP peer as goose, because AIMEAT_GOOSE_BIN is process-wide configuration.
     'test/e2e-chat-agent.ts',
     // Which key paid, road by road (the chat, a node AI call, an agent through /v1/llm, an agent's
     // own key, the shared chat key), read from the Authorization header a stand-in provider got.
-    // Runs two nodes of its own (40350 and 40351) and the stand-in on 40352.
+    // Runs two nodes of its own (28350 and 28351) and the stand-in on 28352.
     'test/e2e-own-key-roads.ts',
     'test/e2e-llm-proxy.ts',
     'test/e2e-message-transcript.ts',
@@ -1538,14 +1542,14 @@ const ALL_SUITES = [
     'test/e2e-workflow-extension-step.ts',
     // A workflow step's answer to an organism key meets the organism namespace rule (secaudit 2026-10, r66).
     'test/e2e-workflow-organism-writes.ts',
-    // Self-spawns its own node with the publish gate on, port 40949 (E2E_UNATTENDED_GATE_PORT): an
+    // Self-spawns its own node with the publish gate on, port 28949 (E2E_UNATTENDED_GATE_PORT): an
     // extension's files and data packages, and a workflow's datapackage step, meet the publish gate
     // (secaudit 2026-10, v68, v69).
     'test/e2e-unattended-publish-gate.ts',
-    // Self-spawns its own node twice on one database, port 40987 (E2E_TASK_KEEP_PORT): an app grant
+    // Self-spawns its own node twice on one database, port 28987 (E2E_TASK_KEEP_PORT): an app grant
     // made before the update keeps a task's title and reason in the event record (secaudit 2026-10, v89).
     'test/e2e-account-events-task-keep.ts',
-    // Self-spawns its own node with AIMEAT_MCP_ENFORCE_SCOPES=false, port 40991 (E2E_MCP_WARN_ONLY_PORT):
+    // Self-spawns its own node with AIMEAT_MCP_ENFORCE_SCOPES=false, port 28991 (E2E_MCP_WARN_ONLY_PORT):
     // warn-only keeps the words no wildcard carries on the node MCP surface (secaudit2026oct22).
     'test/e2e-mcp-warn-only-scopes.ts',
     // The realtime rooms and the WebSocket at /v1/realtime/ws: every route, every message type and
@@ -1718,8 +1722,8 @@ const GUARD_SUITES = [
     // them (168 runs, zero flakes). They are the suites that found 22 defects on their first day,
     // most of them an identity compared in the wrong alphabet or a guard that could not fire, and
     // about a third of their assertions are refusals or isolation boundaries. The own-node ones
-    // (mailbox-push 40312-40313, setup-and-verification 40320, genesis-federation 40321,
-    // settlements-sync 40322-40323, publish-upstreams 40317) sit in lane 0 like their siblings.
+    // (mailbox-push 28312-28313, setup-and-verification 28320, genesis-federation 28321,
+    // settlements-sync 28322-28323, publish-upstreams 28317) sit in lane 0 like their siblings.
     'test/e2e-account-doors.ts',            // the GHII register/login validators and the whole agent lifecycle surface
     'test/e2e-admin-doors.ts',              // the operator doors: who may open them and what each refuses
     'test/e2e-admin-doors-2.ts',            // roles grant/revoke with live roles, the last-operator guard, setup/token
@@ -1756,8 +1760,8 @@ const GUARD_SUITES = [
     // nightly sweep ran them. e2e-federated-namesake failed one run in six on its GET sweep, which read
     // /v1/health's own uptime tick as a difference between callers; the sweep leaves those figures out
     // now, and the suite then earned its three runs on each backend. The own-node ones (ai-decide
-    // 40436, app-frame 40266, app-silent 40264, connect-serve-loopback 40412, mail-connections 40286,
-    // operator-admin-migration 40447, personal-tunnel 40299, sealed-config 40291) sit in lane 0.
+    // 28436, app-frame 28266, app-silent 28264, connect-serve-loopback 28412, mail-connections 28286,
+    // operator-admin-migration 28447, personal-tunnel 28299, sealed-config 28291) sit in lane 0.
     'test/e2e-admin-federation-page.ts',    // the operator's federation read, and every non-operator refused at it
     'test/e2e-admin-hooks-page.ts',         // what a gate is bound to; a bare action id is bound as the one it names
     'test/e2e-admin-knowledge-page.ts',     // the operator's knowledge read, and a door held to its own schema
@@ -1802,7 +1806,7 @@ const GUARD_SUITES = [
     // Promoted the way the rule says: alone, on a freshly deleted database, three consecutive 16-of-16
     // runs on BOTH backends. The identity work keeps touching the paths it drives (a message to a person
     // on another node, the first-contact gate there, a block, a message to an agent there), and nothing
-    // ran it on a push, only the nightly sweep. It boots its own nodes on 40270, 40271 and 40405, in
+    // ran it on a push, only the nightly sweep. It boots its own nodes on 28270, 28271 and 28405, in
     // one process, so it sits in lane 0.
     'test/federation-messages.ts',          // a message crosses to the right mailbox on the other node; a stranger is held
     // Earned 2026-09-30 the way the rule says: alone, on a freshly deleted database, three
@@ -2035,7 +2039,7 @@ function parseArgs(): string[] {
 // of the 285 finish in under five seconds each — the restart was most of what a suite cost.
 //
 // Lane 0 keeps the base port and takes every suite that binds a port of its own (a second node, a
-// mesh, the fake connection provider on 40388): two lanes on one fixed port would collide, and the
+// mesh, the fake connection provider on 28388): two lanes on one fixed port would collide, and the
 // runner cannot move a port a suite wrote down. Those are the heavier suites, so lane 0 gets fewer
 // of the rest. A lane's suite output is buffered and printed when the suite ends, whole; with one
 // lane it streams as before.
@@ -2058,7 +2062,7 @@ function parseWorkers(): number {
  *
  * WHY THIS EXISTS. fixedPorts() below excludes TARGET.port on purpose, and for a good reason — the
  * comment there explains it — but the consequence was that the runner computed the collision and
- * said nothing about it. It has now cost two sessions in one day: a throwaway node on 40262 turned
+ * said nothing about it. It has now cost two sessions in one day: a throwaway node on 28262 turned
  * e2e-app-origin red for everybody (incident 2026-09-05-port-40262-app-origin, 44 failed
  * assertions that read exactly like a regression), and a session that had READ that incident then
  * claimed 40272, which three other suites write down.
@@ -2099,7 +2103,9 @@ function fixedPorts(suites: string[]): Map<string, number[]> {
         // caller overrode it — with AIMEAT_PORT=40512 every suite that so much as names 40251
         // counted as pinned, all 65 landed in lane 0, and a four-lane run silently became one
         // (measured 2026-09-05: "Suites: 65", one lane, 611 s instead of about 300).
-        const ports = [...src.matchAll(/\b(40[0-9]{3})\b/g)].map(m => Number(m[1]))
+        // The band suites write their own ports in, 28000-29999 (scripts/check-suite-ports.ts
+        // holds it). It read 40000-40999 until 2026-10-27, when the suites left the board's range.
+        const ports = [...src.matchAll(/\b(2[89][0-9]{3})\b/g)].map(m => Number(m[1]))
             .filter(p => p !== Number(TARGET.port) && p !== 40050 && p !== 40251);
         if (ports.length > 0) out.set(suite, [...new Set(ports)]);
     }
@@ -2129,10 +2135,10 @@ function listeningPorts(): Set<number> {
         const out = execSync(cmd, { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], timeout: 10_000 });
         for (const m of out.matchAll(/[:.](\d{4,5})\b/g)) {
             const n = Number(m[1]);
-            // Up to 42000, not 41000: the two allowlist suites put a node of their own in
-            // 41000-41199, and a lane chosen blind to those is a lane that can be handed one.
-            // 20000-27999 is where a session's own lane ports are computed (scripts/lib/e2e-ports.ts).
-            if ((n >= 40000 && n < 42000) || (n >= 20000 && n < 28000)) found.add(n);
+            // 20000-27999 is where a session's own lane ports are computed (scripts/lib/e2e-ports.ts),
+            // 28000-29999 where suites write their own fixed ports, and 30000-32699 the suitePort
+            // blocks (test/helpers/free-port.ts). Until 2026-10-27 the fixed ports were 40000-41999.
+            if (n >= 20000 && n < 32700) found.add(n);
         }
     } catch {
         // No netstat, no lsof, or it answered nothing. Say so rather than pretending to know.
@@ -2225,7 +2231,7 @@ async function main() {
   database, and every assertion after that is noise that reads like broken code.
 
   Give the runner a port no suite writes down:  AIMEAT_PORT=<port> pnpm ...
-  40600-40649 is pnpm sandbox, and a runner's lanes are computed into 20000-27999. Any other port is
+  28600-28649 is pnpm sandbox, and a runner's lanes are computed into 20000-27999. Any other port is
   clear only when no test file names it: grep -lE "\\b<port>\\b" test/*.ts finds nothing.
   A suite in ANOTHER session's run cannot see your port either.
 `);

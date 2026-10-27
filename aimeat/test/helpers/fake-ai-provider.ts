@@ -37,7 +37,7 @@
  *   - anthropicJson / anthropicSse / anthropicTextStream / anthropicToolCallStream /
  *     anthropicError — the Anthropic Messages reply shapes, for the `messages` route
  * @usage
- *   const provider = await startFakeAiProvider(40315);   // or 0: any free port, read back from `port`
+ *   const provider = await startFakeAiProvider(28315);   // or 0: any free port, read back from `port`
  *   provider.queue('chat', chatJson('hello'));
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();

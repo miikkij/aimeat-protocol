@@ -13,7 +13,7 @@
  *   address), S10-02 (the four writing /v1/federation doors in routes/package-sales.ts had their
  *   refusals tested outside the guard tier only).
  *
- *   Node V boots IN-PROCESS on 40393 with the package repository role on. Peer M is a member (a
+ *   Node V boots IN-PROCESS on 28393 with the package repository role on. Peer M is a member (a
  *   keypair: nothing needs it to answer), peer P a contact link (private), and a node:http fake peer
  *   records the key exchange V sends out.
  * @structure Setup · 1 replicate namespaces · 2 broadcast sender · 3 key exchange roster · 4 service
@@ -93,7 +93,7 @@ console.log('\n=== Federation: what an admitted peer still may not do ===\n');
 
 console.log('Setup');
 await test('Boot V (package repository on), an operator with an agent, member peer M, contact peer P, a fake peer', async () => {
-    V = await bootNode(40393, V_NODE, { packageFederationEnabled: true, packageRepository: true });
+    V = await bootNode(28393, V_NODE, { packageFederationEnabled: true, packageRepository: true });
     await setupOperator(V, `plv${ts}`);
     const agent = await V.json('/v1/agents', {
         method: 'POST', headers: auth(V.ownerToken),

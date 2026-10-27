@@ -31,7 +31,7 @@
  *   whether the subscription is pruned or counted.
  *
  *   IT RUNS ITS OWN NODE. VAPID keys, SMTP and the two sweep timers are boot-time configuration, so
- *   this spawns a node of its own on 40312 with the SMTP sink on 40313 (both written out here so
+ *   this spawns a node of its own on 28312 with the SMTP sink on 28313 (both written out here so
  *   the runner's fixedPorts() sees them and keeps this suite in lane 0) and its own database. That node
  *   follows the run's backend (test/helpers/own-node-db.ts).
  * @structure
@@ -71,7 +71,7 @@ import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 const require = createRequire(import.meta.url);
 const webPush = require('web-push') as typeof import('web-push');
 
-const PORT = Number(process.env.E2E_MAILBOX_PUSH_PORT ?? 40312);
+const PORT = Number(process.env.E2E_MAILBOX_PUSH_PORT ?? 28312);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';

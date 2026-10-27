@@ -30,7 +30,7 @@
  *   asserts.
  *
  *   THE RECEIVER runs on 127.0.0.1, which the runner admits with AIMEAT_ALLOW_PRIVATE_EGRESS=true,
- *   on E2E_SECRETS_AUTHORITY_PORT (40674 by default).
+ *   on E2E_SECRETS_AUTHORITY_PORT (28674 by default).
  * @version-history
  *   2026-10-25 — 22 to 26: the owner's "Ask me before my secret is sent to a new address for the first
  *     time": on by default, an agent switching it off asks the owner, off lets the agent's code and the
@@ -51,7 +51,7 @@ import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_AUTHORITY_PORT ?? '40674', 10);
+const RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_AUTHORITY_PORT ?? '28674', 10);
 const RECEIVER_HOST = '127.0.0.1';
 const RECEIVER = `http://${RECEIVER_HOST}:${RECEIVER_PORT}`;
 const RECEIVER_BOUND = `${RECEIVER_HOST}:${RECEIVER_PORT}`;

@@ -57,7 +57,7 @@ import { MORSEL_PRICE_FIELDS_REMOVED_IN } from '../src/config-pacing.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = parseInt(process.env.E2E_MONEY_PORT ?? '40411', 10);
+const PORT = parseInt(process.env.E2E_MONEY_PORT ?? '28411', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 process.env.AIMEAT_PORT = String(PORT);
 process.env.AIMEAT_DEV_MODE = 'true';

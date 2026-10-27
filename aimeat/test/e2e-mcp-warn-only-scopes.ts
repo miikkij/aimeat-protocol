@@ -29,7 +29,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const PORT = process.env.E2E_MCP_WARN_ONLY_PORT ?? '40991';
+const PORT = process.env.E2E_MCP_WARN_ONLY_PORT ?? '28991';
 const BASE = `http://localhost:${PORT}`;
 const TAG = Date.now().toString(36).slice(-6);
 

@@ -36,7 +36,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const PORT = process.env.E2E_PAGE_ACCESS_PORT ?? '40491';
+const PORT = process.env.E2E_PAGE_ACCESS_PORT ?? '28491';
 const BASE = `http://localhost:${PORT}`;
 const APP_HOST = 'apps.pageaccess.test';
 const PORTFOLIO_HOST = 'portfolio.pageaccess.test';

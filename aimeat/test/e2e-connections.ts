@@ -65,7 +65,7 @@ import { startFakeProvider, type FakeProvider } from './helpers/fake-oauth-provi
 import { BROWSER_START, roundCookie, roundCookieLine, readRoundRow } from './helpers/oauth-round.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const FAKE_PORT = Number(new URL(process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388').port);
+const FAKE_PORT = Number(new URL(process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:28388').port);
 
 let passed = 0;
 let failed = 0;

@@ -37,7 +37,7 @@ import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_TASK_KEEP_PORT ?? '40987';
+const PORT = process.env.E2E_TASK_KEEP_PORT ?? '28987';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const TAG = Date.now().toString(36).slice(-6);

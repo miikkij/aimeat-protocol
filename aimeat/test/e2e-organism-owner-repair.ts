@@ -15,7 +15,7 @@
  *   much as the repair, because a break-glass every agent of the operator holds by default is the
  *   same incident one level up with a node-wide blast radius. That is why the scope is tested as an
  *   exact string here: an agent with '*' must be refused.
- * @usage cd aimeat && rm -f test/.ownerrepair.db* && AIMEAT_PORT=40432 AIMEAT_DB_PATH=test/.ownerrepair.db \
+ * @usage cd aimeat && rm -f test/.ownerrepair.db* && AIMEAT_PORT=28432 AIMEAT_DB_PATH=test/.ownerrepair.db \
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-organism-owner-repair
  * @version-history
  *   v1.0.0 — 2026-08-15 — Initial, with the operator break-glass it was written to hold in place.

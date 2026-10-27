@@ -39,7 +39,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_BIN_TAKEOVER_PORT ?? '40482';
+const PORT = process.env.E2E_BIN_TAKEOVER_PORT ?? '28482';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-publish-request-bin-takeover.db');

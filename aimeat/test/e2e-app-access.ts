@@ -31,7 +31,7 @@ import { hostRequest } from './helpers/host-request.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_APP_ACCESS_PORT ?? '40267';
+const PORT = process.env.E2E_APP_ACCESS_PORT ?? '28267';
 const BASE = `http://localhost:${PORT}`;
 const APP_HOST = 'apps.access.test';
 const NODE_ID = 'aimeat-local-001-dev';

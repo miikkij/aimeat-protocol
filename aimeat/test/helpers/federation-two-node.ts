@@ -25,7 +25,7 @@
  * @structure NodeState · bootNode() · setupOperator() · addPeer() · startFakePeer() with `modes`
  *   and `seen` · makeJson()/auth() request helpers
  * @usage
- *   const A = await bootNode(40322, 'aimeat-test-001-seta', { packageFederationEnabled: true });
+ *   const A = await bootNode(28322, 'aimeat-test-001-seta', { packageFederationEnabled: true });
  *   const fake = await startFakePeer();
  *   await addPeer(A, 'aimeat-fake-001', fake.url, peerPublicKey);
  * @version-history
