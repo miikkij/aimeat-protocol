@@ -33,6 +33,8 @@
  *   await keepExtensionFirstUseOnce(storage, config);              // server-bootstrap/once-only-keep-steps.ts
  *   if (keepsPreAuditFirstUse(extConfig)) ...                     // extension-secret-authority.ts
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: only an extension installed before the rule's first try on this
+ *     node gets the mark, also when the step runs at a later start (keptBefore, madeBefore).
  *   v1.1.0 — 2026-10-21 — carryFirstUseKeep: byte-identical code keeps the mark through a redeploy,
  *     a ZIP upload or a package reinstall; only a changed script drops it.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, v58 and v59; the developer's ruling on old extensions).
@@ -40,7 +42,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
 
 /** The mark on an extension record's config. __-prefixed, so no manifest or config write can set it. */
 export const FIRST_USE_KEEP_KEY = '__keepsPreAuditFirstUse';
@@ -102,9 +104,13 @@ export async function keepExtensionFirstUseOnce(
     if (!claim) return { ran: false, names: [] };
     try {
         const at = new Date().toISOString();
+        // Only what was installed before the rule first took effect here, also on a later start after a
+        // failed one: an extension written under the rule never gets the mark (secaudit2026oct26).
+        const cutoff = keptBefore(claim);
         const names: string[] = [];
         for (const ext of await storage.listExtensions({ lean: true })) {
             if (ext.installedBy === NODE_INSTALLER || keepsPreAuditFirstUse(ext.config)) continue;
+            if (!madeBefore(ext.installedAt, cutoff)) continue;
             const updated = await storage.updateExtension(ext.name, { config: { ...(ext.config ?? {}), [FIRST_USE_KEEP_KEY]: at } });
             if (!updated) throw new Error(`extension first-use keep: the mark on ${ext.name} did not land`);
             names.push(ext.name);
