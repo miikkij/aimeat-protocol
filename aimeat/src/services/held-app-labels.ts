@@ -20,11 +20,14 @@
  *     releasing the one held longest first, so deleting apps does not hoard addresses.
  *   The operator releases a held label at any time with the ordinary delete on the Subdomains page
  *   (DELETE /v1/admin/subdomains/:subdomain, MCP aimeat_app_manage subdomain_delete).
- * @structure holdAppLabels(storage, ownerBare, filename, config?) · sweepHeldAppLabels(storage, config, now?)
+ * @structure holdAppLabels(storage, ownerBare, filename, config?) · holdErasedOwnerAppLabels(storage, ownerBare, pseudonym) ·
+ *   sweepHeldAppLabels(storage, config, now?)
  * @usage
  *   await holdAppLabels(storage, ownerName, filename, config);       // when an app goes away
  *   scheduler.registerCoreHandler('held-label-release', () => sweepHeldAppLabels(storage, config));
  * @version-history
+ *   v1.1.0 — 2026-10-27 — holdErasedOwnerAppLabels: an account erasure holds the account's app labels
+ *     under the erasure's pseudonym, so the next holder of the name does not get them (secaudit2026oct26).
  *   v1.0.1 — 2026-10-25 — The mappings are read a page at a time (listSubdomainSitesPage), and whether
  *     an app is there is asked of storage here: a service does not import a route (check:deps).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, app-label-recycled-after-delete).
@@ -101,6 +104,30 @@ export async function holdAppLabels(storage: Storage, ownerBare: string, filenam
   if (!config) return [];
   const held = sites.filter(s => s.kind === 'app' && s.heldSince && ownerOfTarget(s.target) === ownerBare);
   return releaseOverLimit(storage, config, held);
+}
+
+/**
+ * At an account erasure: every app label whose target names the erased account (`<name>/<file>`, or
+ * the account's full identity) is held, and its target is given the erasure's pseudonym in place of the
+ * name. The account name is released for reuse (decision 2026-08-10), and the labels were found by
+ * that name: the next account registered under it got the previous person's origins back on its first
+ * publish of the same file name, with what that person's visitors kept in the origin's storage
+ * (secaudit2026oct26, ensureAppSubdomain:origin-handed-to-next-name-holder). A pseudonym matches no
+ * account, so the label serves nothing and is released by the daily sweep after apps.held_label_days,
+ * or by the operator on the Subdomains page. Returns the labels held.
+ */
+export async function holdErasedOwnerAppLabels(storage: Storage, ownerBare: string, pseudonym: string): Promise<string[]> {
+  const now = new Date().toISOString();
+  const held: string[] = [];
+  for (const s of await allSites(storage)) {
+    if (s.kind !== 'app') continue;
+    const owner = ownerOfTarget(s.target);
+    if (!owner || localAccountName(owner) !== ownerBare) continue;
+    const file = s.target.slice(owner.length + 1);
+    await storage.updateSubdomainSite(s.subdomain, { target: `${pseudonym}/${file}`, heldSince: s.heldSince ?? now });
+    held.push(s.subdomain);
+  }
+  return held;
 }
 
 /** The daily sweep: the marks follow the apps, then age and the per-owner limit release labels. */
