@@ -7,10 +7,13 @@
  *   (public → /v1/pub, otherwise → /v1/storage). Extracted from organisms.js.
  * @usage import { uploadImage, uploadFile, extractStorageImages, applyImageVisibilityUrls } from './organisms.images.js';
  * @version-history
+ *   v1.1.0 — 2026-10-27 — fetchStorageTabUrl: the object URL a document's file link opens in a tab is
+ *     made from an inert blob (secaudit2026oct26, workspace-document-file-link-blob-apex-origin).
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
  */
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { authHeaders } from '/js/services/auth.js';
+import { inertBlob } from '/views/profile/memory-tab/inert-blob.js';
 
 /** ── Document images (stored in /v1/storage, fetched with the session for display) ── */
 function blobToBase64(blob) {
@@ -61,6 +64,19 @@ export async function fetchStorageObjectUrl(url) {
   const resp = await fetch(url, { headers: authHeaders() });
   if (!resp.ok) throw new Error('image fetch failed: ' + resp.status);
   return URL.createObjectURL(await resp.blob());
+}
+
+/**
+ * Fetch a /v1/storage, /v1/memory/files or /v1/pub file with the session token for a NEW TAB. The
+ * object URL belongs to the node's own origin, where the session lives, and the stored type is the
+ * writer's choice (another workspace member, an agent, an app), so a type a browser runs script from
+ * opens as plain text or is saved instead, as the Files view opens it (inert-blob.js;
+ * secaudit2026oct26). A PDF, an image, audio, video and plain text open as themselves.
+ */
+export async function fetchStorageTabUrl(url) {
+  const resp = await fetch(url, { headers: authHeaders() });
+  if (!resp.ok) throw new Error('file fetch failed: ' + resp.status);
+  return URL.createObjectURL(inertBlob(await resp.blob()));
 }
 
 /** List the caller's storage files → map of key → visibility (for showing per-image visibility). */
