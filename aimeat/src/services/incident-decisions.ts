@@ -5,13 +5,15 @@
  * @description The operator's decision on one case of a Security page incident, whatever kind of case
  *   it is: a held account name (held-account-names.ts resolveHeldName, "holder" or "previous") or an
  *   offered default audience cap (classification/default-caps.ts decideDefaultCap, "apply" or
- *   "keep"), or a record an incident names to act on (incident-entries.ts: "clear" or "delete" as the
- *   entry offers, or "keep"; the shared anonymous agent's records, and the schedules older account
- *   erasures left). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
+ *   "keep"), or a record an incident names to act on (incident-entries.ts: "clear", "delete" or "app_only" as
+ *   the entry offers, or "keep"; the shared anonymous agent's records, the schedules older account
+ *   erasures left, and the subdomain addresses the start step could not classify). The route POST /v1/admin/security/incidents/:id/resolve, the MCP tool
  *   aimeat_admin_incident_resolve and its CLI twin all call decideIncidentCase(), so they decide alike.
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.5.0 -- 2026-10-27 -- And of the subdomain incident: 'app_only' serves the address only at its app
+ *     address (services/subdomain-site-origin-keep.ts; Jouni, 2026-10-27).
  *   v1.4.0 -- 2026-10-27 -- The capability incident is gone: the step sets an unknown word to private and
  *     tells the owner (services/capability-visibility-words.ts; developer decision 2026-10-27).
  *   v1.3.0 -- 2026-10-26 -- And of the incident that names the capabilities with an unknown visibility
@@ -31,6 +33,7 @@ import { DEFAULT_CAPS_INCIDENT_TYPE, decideDefaultCap } from './classification/d
 import { decideIncidentEntry } from './incident-entries.js';
 import { ANONYMOUS_RECORDS_INCIDENT_TYPE, clearAnonymousRecord } from './anonymous-principal-records.js';
 import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasure-leftover-schedules.js';
+import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './subdomain-site-origin-keep.js';
 
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
@@ -45,7 +48,8 @@ export async function decideIncidentCase(
   const type = (rec?.value as { type?: unknown } | undefined)?.type;
   // An incident that names records to act on: the kind supplies what its action does.
   const actor = type === ANONYMOUS_RECORDS_INCIDENT_TYPE ? clearAnonymousRecord
-    : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule : null;
+    : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule
+    : type === SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE ? serveAtAppAddressOnly : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
   if (type === DEFAULT_CAPS_INCIDENT_TYPE) {
     const r = await decideDefaultCap(config, storage, input);

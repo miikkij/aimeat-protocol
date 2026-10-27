@@ -23,6 +23,8 @@
  *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.8.0 -- 2026-10-27 -- An entry's action can be 'app_only': a subdomain address is served only at its
+ *     app address (services/subdomain-site-origin-keep.ts; Jouni, 2026-10-27).
  *   v1.7.0 -- 2026-10-27 -- `params`: the values the Security page's own sentence for the incident's type
  *     names, so the page can say it plainly in the reader's language; `detail` stays as it was (Jouni,
  *     2026-10-27, on the subdomain incident).
@@ -115,7 +117,8 @@ export interface SecurityIncidentInput {
 
 /**
  * One record an incident names that the operator may act on (services/incident-entries.ts): the
- * offered `action` ('clear' sets the named field back, 'delete' removes the record) or 'keep'. Unlike
+ * offered `action` ('clear' sets the named field back, 'delete' removes the record, 'app_only' serves a
+ * subdomain address only at its app address) or 'keep'. Unlike
  * a held name or an offered cap, an open entry does not stop the incident from being resolved or
  * deleted: resolving it keeps every entry still open as it is. The incident resolves itself when the
  * last entry is decided.
@@ -131,8 +134,8 @@ export interface IncidentEntry {
   what: string;
   /** The values the Security page puts into its own sentence for `kind`, in the reader's language. */
   params?: Record<string, string | number>;
-  /** The action offered besides 'keep'. */
-  action: 'clear' | 'delete';
+  /** The action offered besides 'keep'. 'app_only' serves a subdomain address only at its app address. */
+  action: 'clear' | 'delete' | 'app_only';
   status: 'open' | 'done' | 'kept';
   decidedAt?: string;
   decidedBy?: string;

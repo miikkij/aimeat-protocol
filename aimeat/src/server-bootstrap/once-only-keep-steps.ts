@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-27 -- addSubdomainIncidentEntriesOnce, after the subdomain step: an open subdomain incident
+ *     recorded before entries gets one per undecided address (Jouni, 2026-10-27).
  *   2026-10-27 -- settleUnknownCapabilityVisibilityOnce in its place: an unknown word is set to private and
  *     the owner is told, in place of the Security page question (developer decision 2026-10-27).
  *   2026-10-26 -- reportUnknownCapabilityVisibilityOnce, last: the capabilities stored with a visibility word
@@ -79,7 +81,7 @@ import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
-import { classifySubdomainSiteOriginsOnce } from '../services/subdomain-site-origin-keep.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
@@ -157,6 +159,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // apex answers by the classified origin from the first request.
   await classifySubdomainSiteOriginsOnce(storage, config)
     .catch(err => logger.error('Failed to classify the older subdomain addresses; the next boot tries again', { error: String(err) }));
+  // An open subdomain incident recorded before incidents carried entries gets one per address still
+  // undecided, so the operator decides each with one press. After the step above, whose new incident
+  // has its entries already.
+  await addSubdomainIncidentEntriesOnce(storage, config)
+    .catch(err => logger.error('Failed to list the undecided subdomain addresses on their incident; the next boot tries again', { error: String(err) }));
   // The workspace share records stored before the search text left out the password hash are stored
   // again, so the index holds no word of it (services/share-search-reindex.ts). Awaited, so no search
   // meets the old index first.

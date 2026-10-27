@@ -9,6 +9,7 @@
  *   once, leaving them as they were.
  * @usage pnpm exec vitest run test/unit/subdomain-site-origin.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Each undecided address is an entry of the incident, decided with "app_only" or "keep", and an incident recorded before entries gets them once (Jouni, 2026-10-27).
  *   v1.1.0 — 2026-10-27 — The incident also carries `params` for the page's plain sentence; the detail assertions are unchanged.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
@@ -17,8 +18,9 @@ import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { OwnerRecord, SubdomainSiteRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
 import { apexServesSite, autoLabelCandidates, classifySiteOrigin } from '../../src/services/subdomain-site-origin.js';
-import { classifySubdomainSiteOriginsOnce } from '../../src/services/subdomain-site-origin-keep.js';
-import { listSecurityIncidents } from '../../src/services/security-incident.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce } from '../../src/services/subdomain-site-origin-keep.js';
+import { listSecurityIncidents, recordSecurityIncident } from '../../src/services/security-incident.js';
+import { decideIncidentCase } from '../../src/services/incident-decisions.js';
 
 const NODE = 'test-node';
 const config = { nodeId: NODE } as AimeatConfig;
@@ -134,5 +136,48 @@ describe('classifySubdomainSiteOriginsOnce', () => {
         await storage.createSubdomainSite(row('notes', 'alice/notes.html', `alice@${NODE}`));
         expect(await classifySubdomainSiteOriginsOnce(storage, config)).toEqual({ operator: 0, publisher: 1, unclassified: [] });
         expect((await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'subdomain_site_origin')).toHaveLength(0);
+    });
+});
+
+// The operator decides each address on the Security page with one press (Jouni, 2026-10-27).
+describe('the subdomain incident, one entry per address', () => {
+    let storage: SqliteStorage;
+    const by = { principal: `op@${NODE}`, kind: 'human' as const };
+    const incident = async () => (await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'subdomain_site_origin');
+    beforeEach(async () => {
+        storage = new SqliteStorage(':memory:');
+        await storage.createOwner({ name: 'op', publicKey: 'a2V5', roles: ['owner', 'operator'], createdAt: AT } as OwnerRecord);
+        await storage.createSubdomainSite(row('opnotes', 'op/opnotes.html', `op@${NODE}`));
+        await storage.createSubdomainSite(row('brand', 'op/brand.html', `op@${NODE}`));
+    });
+
+    it('names each address as an entry, and "app_only" serves it only at its app address', async () => {
+        await classifySubdomainSiteOriginsOnce(storage, config);
+        const [i] = await incident();
+        expect(i!.entries?.map(e => [e.id, e.kind, e.action, e.status])).toEqual([
+            ['brand', 'subdomain', 'app_only', 'open'], ['opnotes', 'subdomain', 'app_only', 'open'],
+        ]);
+        expect(i!.entries?.[1]?.params).toEqual({ label: 'opnotes', target: 'op/opnotes.html' });
+
+        const r = await decideIncidentCase(config, storage, { incidentId: i!.id, name: 'opnotes', resolution: 'app_only', by });
+        expect(r.ok).toBe(true);
+        expect((await storage.getSubdomainSite('opnotes'))?.origin).toBe('publisher');
+
+        // Keep leaves the address served as before, at both addresses.
+        const k = await decideIncidentCase(config, storage, { incidentId: i!.id, name: 'brand', resolution: 'keep', by });
+        expect(k.ok && k.data.incident_status).toBe('resolved');
+        expect((await storage.getSubdomainSite('brand'))?.origin).toBeNull();
+    });
+
+    it('gives an incident recorded before entries existed one entry per address still undecided, once', async () => {
+        await recordSecurityIncident(storage, config, {
+            type: 'subdomain_site_origin', code: 'SUBDOMAIN_ORIGIN_UNKNOWN', actorGhii: `system@${NODE}`, actorName: 'node', source: 'boot',
+            detail: '2 subdomain address(es) could not be told apart: brand, opnotes.',
+        });
+        await storage.updateSubdomainSite('brand', { origin: 'operator' });
+        expect(await addSubdomainIncidentEntriesOnce(storage, config)).toEqual(['opnotes']);
+        const [i] = await incident();
+        expect(i!.entries?.map(e => e.id)).toEqual(['opnotes']);
+        expect(await addSubdomainIncidentEntriesOnce(storage, config)).toBeNull();
     });
 });
