@@ -34,6 +34,8 @@
  * @structure ForeignA2AHandler
  * @usage new ForeignA2AHandler(storage, config, agent, peer, card, payment)
  * @version-history
+ *   v1.3.0 -- 2026-10-27 -- The provider's paid-work notice says where the caller's key is published
+ *     when that is not the node its name gives (secaudit2026oct26, jwks-origin-unbound-to-claimed-node).
  *   v1.2.0 -- 2026-10-25 -- A settlement whose outcome is unknown is kept as a possible payment for the
  *     provider and the operator, and the answer asks the caller not to pay again yet
  *     (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
@@ -365,7 +367,10 @@ export class ForeignA2AHandler implements A2ARequestHandler {
       await notify(this.storage, work.providerGhii, {
         type: 'a2a_foreign_work_paid',
         title: 'A paid task arrived from outside',
-        body: `${this.peer.displayName} paid for "${work.taskType}" from your agent ${this.agent.name}. It is waiting in your work inbox.`,
+        // The name is the caller's own claim; when its key is published elsewhere than the node it
+        // names, the provider sees where (secaudit2026oct26, jwks-origin-unbound-to-claimed-node).
+        body: `${this.peer.displayName} paid for "${work.taskType}" from your agent ${this.agent.name}. It is waiting in your work inbox.`
+          + (this.peer.keyHost && !this.peer.hostIsNode ? ` Its key is published at ${this.peer.keyHost}, not at the node its name gives.` : ''),
         link: '/v1/profile#exchange',
       }).catch(err => logger.warn('a2a: could not notify the provider', { error: String(err) }));
 

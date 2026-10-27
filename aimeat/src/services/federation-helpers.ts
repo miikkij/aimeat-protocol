@@ -12,6 +12,8 @@
  *   - performKeyExchange(peerUrl, config, storage, expectNodeId): exchange and cache peer public keys
  *
  * @version-history
+ *   2026-10-27 — The key-exchange answer is read under a ceiling, and an error copies at most 500
+ *     characters of it (secaudit2026oct26, keyIsPublished:uncapped-body siblings).
  *   2026-10-16 — performKeyExchange sends no agent roster (agent_keys is an empty list) and keeps none
  *     it receives; PeerKeyEntry holds the node key only (QA audit S6-04).
  *   v1.2.0 — 2026-10-12 — performKeyExchange asks peerUrlRefusal first: a public node exchanges keys
@@ -28,6 +30,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readJson, readText, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { peerUrlRefusal } from './peer-url-policy.js';
 
 // ── E.4: Keyword matching helpers for cross-catalogue filtering ──
@@ -124,11 +127,11 @@ export async function performKeyExchange(
 
         if (!resp.ok) {
             // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
-            const body = await resp.text().catch(() => '');
-            return { success: false, error: `Peer returned ${resp.status}: ${body}` };
+            const body = await readText(resp, 64 * 1024).catch(() => '');
+            return { success: false, error: `Peer returned ${resp.status}: ${body.slice(0, 500)}` };
         }
 
-        const data = await resp.json() as {
+        const data = await readJson(resp, OUTBOUND_READ_MAX_BYTES) as {
             data?: {
                 node_id?: string;
                 node_public_key?: string;

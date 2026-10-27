@@ -18,11 +18,13 @@
  * @structure normalizeInstance · registerAtInstance
  * @usage import { normalizeInstance, registerAtInstance } from './instance.js';
  * @version-history
+ *   v1.0.1 — 2026-10-27 — The registration answer is read under OUTBOUND_READ_MAX_BYTES (secaudit2026oct26, keyIsPublished:uncapped-body siblings).
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1c.
  */
 
 import { randomUUID } from 'node:crypto';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readJson, OUTBOUND_READ_MAX_BYTES } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { sealCredential, openCredential } from './credential.js';
 import type { Storage } from '../../storage/interface.js';
@@ -130,7 +132,7 @@ export async function registerAtInstance(
 
   if (!res.ok) return { error: `instance refused the registration (HTTP ${res.status})` };
 
-  const json = await res.json().catch((err: unknown) => {
+  const json = await readJson(res, OUTBOUND_READ_MAX_BYTES).catch((err: unknown) => {
     // Logged rather than swallowed: an instance answering 200 with something that is not JSON is a
     // different problem from one answering with JSON that lacks the fields, and the message below
     // is the same for both. Without this line the two are indistinguishable in production.
