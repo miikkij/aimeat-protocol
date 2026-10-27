@@ -15,8 +15,12 @@
  * @version-history
  *   v1.0.0 -- 2026-05-28 -- Initial creation.
  *   v1.0.1 -- 2026-05-28 -- Add security warning, recursive scheduling guard, and per-strategy fixes.
+ *   v1.0.2 -- 2026-10-27 -- On Windows with AIMEAT_HOME set, a wake command whose first word the
+ *     working directory and PATH both hold runs the PATH program (command-path.ts; secaudit2026oct26,
+ *     commandHash:home-bound-not-resolution-directory).
  */
 import { exec } from 'node:child_process';
+import { wakeEnvPreferringPath } from '../command-path.js';
 import type { AimeatConnectConfig } from '../config.js';
 
 export async function wakeAgent(config: AimeatConnectConfig, event: string, detail: string): Promise<void> {
@@ -63,8 +67,10 @@ export async function wakeAgent(config: AimeatConnectConfig, event: string, deta
 }
 
 function execCommand(cmd: string): Promise<void> {
+  // The approved program, not a same-named file in the directory the daemon runs in (command-path.ts).
+  const env = wakeEnvPreferringPath(cmd);
   return new Promise((resolve, reject) => {
-    exec(cmd, { timeout: 10_000 }, (err) => {
+    exec(cmd, { timeout: 10_000, ...(env ? { env } : {}) }, (err) => {
       if (err) reject(err);
       else resolve();
     });
