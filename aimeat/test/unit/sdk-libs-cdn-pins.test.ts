@@ -46,6 +46,21 @@ describe('the served libraries load third-party scripts by exact version', () =>
     expect(cdnRefs().length).toBeGreaterThan(0);
   });
 
+  it('every jsDelivr script is loaded with an integrity hash and an anonymous CORS request', () => {
+    const jsdelivr = cdnRefs().filter(r => r.url.startsWith('https://cdn.jsdelivr.net/'));
+    expect(jsdelivr.length).toBeGreaterThan(0);
+    const withHash = new Set<string>();
+    let corsSet = false;
+    for (const file of sources(ROOT)) {
+      const text = readFileSync(file, 'utf8');
+      for (const m of text.matchAll(/loadScript\(\s*'(https:\/\/cdn\.jsdelivr\.net\/[^']+)'\s*,\s*'(sha384-[A-Za-z0-9+/]{64})'/g)) withHash.add(m[1]!);
+      if (/\.integrity\s*=\s*integrity/.test(text) && /\.crossOrigin\s*=\s*'anonymous'/.test(text)) corsSet = true;
+    }
+    const missing = jsdelivr.filter(r => ![...withHash].some(u => u.startsWith(r.url)));
+    expect(missing.map(r => `${r.file}: ${r.url}`)).toEqual([]);
+    expect(corsSet).toBe(true);
+  });
+
   it('every CDN address names one exact version, never a range', () => {
     const floating = cdnRefs().filter(r => !r.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(r.version));
     expect(floating.map(r => `${r.file}: ${r.url}`)).toEqual([]);
