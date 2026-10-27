@@ -20,6 +20,8 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-27 — A sign-in that opens an adopted account with two-step sign-in through the adoption key
+ *     tells the person in the bell (services/sso-adoption-notice.ts; secaudit2026oct26, adoption-skips-second-factor).
  *   2026-10-25 — An SP-initiated round finishes only in the browser that started it: authorize sets the
  *     round's cookie (SameSite=None; Secure, since the ACS is a cross-site form post) and stores its
  *     hash and the AuthnRequest id, and the ACS answers ?auth_error=SAML_OTHER_BROWSER to a Response
@@ -55,6 +57,8 @@ import {
   signPendingToken, setPendingCookie,
 } from '../services/external-login.js';
 import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
+import { twoStepArmed } from '../services/passkeys.js';
+import { tellSignedInPastCode } from '../services/sso-adoption-notice.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
@@ -255,6 +259,9 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
 
         await establishForGhii(storage, config, req, res, result.ghii);
         await ensureSsoMembership(storage, conn, result.ghii.ownerName);
+        // The organisation's sign-in opened an adopted account past its two-step code: the person
+        // is told (services/sso-adoption-notice.ts; secaudit2026oct26).
+        if (result.adoptedNow && twoStepArmed(result.ghii)) void tellSignedInPastCode(storage, result.ghii, conn);
 
         // Playbook evidence: the connection has seen a real login (throttled write).
         const now = Date.now();

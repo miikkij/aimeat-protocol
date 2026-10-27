@@ -24,6 +24,8 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-27 — mapExternalIdentity answers `adoptedNow` when step 2 linked the provider through the
+ *     adoption key, so the SAML ACS can tell the person (secaudit2026oct26, adoption-skips-second-factor).
  *   2026-10-27 — finalizeExternalSignup reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-27 — Over https the pending sign-up cookie is `__Host-aimeat_pending_signup` (Secure,
  *     Path=/), and readPendingSignup reads the old name only for a token signed before this change:
@@ -339,7 +341,8 @@ export async function establishForGhii(
 export interface PendingExternalLink { providerId: string; sub: string }
 
 export type ExternalMapResult =
-  | { outcome: 'login'; ghii: GHIIRecord }
+  /** `adoptedNow`: this sign-in linked the provider through the adoption key (step 2). */
+  | { outcome: 'login'; ghii: GHIIRecord; adoptedNow?: boolean }
   | { outcome: 'pending'; pending: PendingSignup }
   /** Step 3 matched an account with two-step sign-in armed: nothing is linked yet. The caller starts
    *  the code step (routes/ghii/login-link-second-factor.ts startLinkSecondFactor) with `link`, and
@@ -372,12 +375,16 @@ export async function mapExternalIdentity(
   let ghiiRecord = await storage.getGHIIByExternalId(providerId, sub);
 
   // 2) Adoption: the same subject under a sibling key (a SCIM externalId equal to the SAML
-  //    NameID). Link the provider key so step 1 answers directly next time.
+  //    NameID). Link the provider key so step 1 answers directly next time. The organisation's
+  //    directory vouches for the account here, so no second factor is asked; the caller tells the
+  //    person when the account has one (secaudit2026oct26).
+  let adoptedNow = false;
   if (!ghiiRecord && opts.adoptProviderKeys?.length) {
     for (const key of opts.adoptProviderKeys) {
       const adopted = await storage.getGHIIByExternalId(key, sub);
       if (adopted) {
         ghiiRecord = await storage.updateGHII(adopted.ghii, externalIdUpdate(adopted, providerId, sub));
+        adoptedNow = !!ghiiRecord;
         break;
       }
     }
@@ -433,7 +440,7 @@ export async function mapExternalIdentity(
     };
   }
 
-  return { outcome: 'login', ghii: ghiiRecord };
+  return { outcome: 'login', ghii: ghiiRecord, ...(adoptedNow ? { adoptedNow } : {}) };
 }
 
 export type FinalizeResult =
