@@ -43,6 +43,9 @@
  *   if (!hasOperator) logger.warn(`Setup code: ${setupCodeGateFor(config).issue()} ...`);
  *   const refusal = setupCodeRefusal(config, body.setupCode, isLoopbackAddress(req.socket.remoteAddress));
  * @version-history
+ *   2026-10-27 -- requestFromThisMachine: the routes' `fromLoopback` also asks a loopback Host header and
+ *     no forwarding header, so a request a same-host tunnel or reverse proxy hands on is asked for the
+ *     code (secaudit2026oct26, loopback-socket-behind-local-proxy).
  *   v1.3.0 -- 2026-10-23 -- setupCodeRequired and setupCodeRefusal take `fromLoopback`, the request's
  *     socket address: a loopback base URL waives the code only for a request from loopback
  *     (secaudit2026oct22; Jouni, 2026-10-23).
@@ -56,6 +59,7 @@
 import { createHash, randomInt, timingSafeEqual } from 'node:crypto';
 import type { AimeatConfig } from '../config-types.js';
 import { isLoopbackBaseUrl } from '../utils/test-money-guard.js';
+import { isLoopbackAddress } from '../auth/loopback-pass.js';
 
 /** Crockford base32: no I, L, O or U, so a code read aloud or copied by hand is not misread. */
 const ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
@@ -72,6 +76,34 @@ const CODE_LENGTH = 12;
  */
 export function setupCodeRequired(config: Pick<AimeatConfig, 'baseUrl'>, fromLoopback: boolean): boolean {
   return !(fromLoopback && isLoopbackBaseUrl(config.baseUrl));
+}
+
+/** The headers a forwarder (a reverse proxy or a tunnel client) adds to the request it hands on. */
+const FORWARDING_HEADERS = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'x-forwarded-host'] as const;
+
+/** Whether a Host header names this machine itself: localhost (and *.localhost), 127.x or ::1. */
+function loopbackHost(host: string | undefined): boolean {
+  if (!host) return false;
+  const lower = host.trim().toLowerCase();
+  const v6 = /^\[([^\]]+)\](?::\d+)?$/.exec(lower);
+  const name = v6 ? v6[1] : lower.replace(/:\d+$/, '');
+  return name === 'localhost' || name.endsWith('.localhost') || name === '::1' || /^127(?:\.\d{1,3}){3}$/.test(name);
+}
+
+/**
+ * The `fromLoopback` every setup-code route passes: the request came in on a loopback socket, names
+ * this machine in its Host header, and carries no forwarding header. A tunnel client or a reverse
+ * proxy on the same machine hands every outside request on over a loopback socket, so the socket
+ * alone let the first visitor through such a forwarder become the operator of a node that kept the
+ * default loopback base URL (secaudit2026oct26, loopback-socket-behind-local-proxy). Local
+ * development, the E2E runner and `pnpm sandbox` (http://localhost or 127.0.0.1, no forwarder) still
+ * need no code; anyone else has it from the start log.
+ */
+export function requestFromThisMachine(req: { socket?: { remoteAddress?: string | undefined }; headers: Record<string, string | string[] | undefined> }): boolean {
+  if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
+  if (FORWARDING_HEADERS.some(h => req.headers[h] !== undefined)) return false;
+  const host = req.headers.host;
+  return loopbackHost(Array.isArray(host) ? host[0] : host);
 }
 
 /**
