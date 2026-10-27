@@ -30,6 +30,8 @@
  *   import { audienceOf } from '../middleware/message-audience.js';
  *   if (audienceOf(code) === 'person') { ...it must read like a sentence... }
  * @version-history
+ *   v1.2.2 — 2026-10-27 — VALIDATION_ERROR has its own next step (change the fields the details name):
+ *     the _ERROR pattern told a person their own input was the node's fault.
  *   v1.2.1 — 2026-10-09 — PROVENANCE_HASH_MISMATCH (machine) has its next step: attach the record made
  *     for these bytes (aiprov plan, B12).
  *   v1.2.0 — 2026-10-08 — PROVIDER_REJECTED (machine), CONTENT_REFUSED and PROVIDER_NO_CREDIT have
@@ -140,6 +142,9 @@ export const NEXT_STEP_BY_CODE: Readonly<Record<string, string>> = Object.freeze
     // Permission the owner has not granted this assistant
     SCOPE_DENIED: 'You can turn this on for your assistant in Profile → Agents.',
     INVALID_SCOPES: 'You can choose what your assistant may do in Profile → Agents.',
+    // It ends in _ERROR, and the pattern below would read it as the node's fault. It is the caller's
+    // input, and `details` names each field to change (models/validation-issues.ts).
+    VALIDATION_ERROR: 'Change what the details name for each field, then send it again.',
     INSUFFICIENT_ROLE: 'You can turn this on for your assistant in Profile → Agents.',
     DATA_AREA_DENIED: 'You can widen what this app may reach in Profile → Apps.',
     POLICY_DENIED: 'You can change this in your settings, or ask whoever runs this node.',

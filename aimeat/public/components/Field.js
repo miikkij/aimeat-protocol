@@ -40,8 +40,9 @@
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
  *   v1.10.0 — 2026-10-27 — Fields `errors`: a refused write's per-field messages (js/field-errors.js),
- *     each shown under the field whose `name` is its path, through useFieldMessage(); the message has an
- *     id the control names in aria-describedby (msgId). Additive (wish
+ *     each shown under the field whose `name` is its path, through useFieldMessage(), until the person
+ *     changes that field's value; the message has an id the control names in aria-describedby (msgId).
+ *     WithFieldErrors gives the same to a form laid out without Fields. Additive (wish
  *     wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.9.0 — 2026-10-02 — Field `help`: a question mark beside the row label that explains the setting
  *     (components/HelpTip.js), passed on by inField so every control of the family takes it; additive.
@@ -71,7 +72,7 @@
  *     with the look most of them have (component plan C5).
  */
 import { h, createContext } from 'preact';
-import { useId, useContext } from 'preact/hooks';
+import { useId, useContext, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { Note } from '/components/Note.js';
 import { HelpLabel } from '/components/HelpTip.js';
@@ -95,11 +96,17 @@ const FieldErrors = createContext(/** @type {Record<string, string> | null} */ (
  */
 export function useFieldMessage(props) {
   const errors = useContext(FieldErrors);
+  // The value the field held when this refusal arrived: once the person changes it, the message
+  // and the invalid mark step aside until the next send answers again.
+  const at = useRef(null);
   const own = messageOf(props.message, props.error);
   if (own || !errors || !props.name) return props;
   // A list field's refusal names an item ("interests.2"); the field that holds the list shows it.
   const text = errors[props.name] ?? Object.entries(errors).find(([path]) => path.startsWith(`${props.name}.`))?.[1];
-  return text ? { ...props, message: { text, error: true } } : props;
+  if (!text) return props;
+  if (!at.current || at.current.errors !== errors) at.current = { errors, value: props.value };
+  if (at.current.value !== props.value) return props;
+  return { ...props, message: { text, error: true } };
 }
 
 /** The ids the control's aria-describedby names: its hint and its message, when it has them. */

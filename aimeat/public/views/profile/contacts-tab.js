@@ -36,7 +36,7 @@ import * as contactsService from '/js/services/contacts.js';
 import * as messagesService from '/js/services/messages.js';
 import { listOrganisms, inviteMember } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
-import { fieldErrorsOf, refusalLine } from '/js/field-errors.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 
 /** The fields the person form draws, by the name the server's refusal gives them (contacts/add.js). */
 const PERSON_FIELDS = ['name', 'email', 'relation', 'tags', 'links', 'note'];
@@ -171,7 +171,7 @@ export default function ContactsTab({ showToast }) {
     const refused = fieldErrorsOf(e);
     setFormErrors(refused);
     const line = refusalLine(refused, PERSON_FIELDS, t);
-    if (line) showToast?.(line, true); else fail(e);
+    if (line) { showToast?.(line, true); focusFirstInvalid(); } else fail(e);
   };
   async function savePerson() {
     setBusy(true);

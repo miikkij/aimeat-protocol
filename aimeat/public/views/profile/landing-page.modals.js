@@ -45,7 +45,7 @@ import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { Choice } from '/components/Choice.js';
 import { Field, WithFieldErrors } from '/components/Field.js';
-import { fieldErrorsOf, otherErrors } from '/js/field-errors.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { List, Row, Tick, Cell } from '/components/List.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
@@ -99,8 +99,8 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
       const refused = fieldErrorsOf(resp);
       if (Object.keys(refused).length) {
         setErrors(refused);
-        const rest = otherErrors(refused, ['display_name', 'bio', 'avatar', 'locale']);
-        showToast(rest || resp.error?.message || t('profile.landing.editError'), true);
+        showToast(refusalLine(refused, ['display_name', 'bio', 'avatar', 'locale'], t), true);
+        focusFirstInvalid();
       } else if (resp && resp.data) {
         // Every date already on the screen repaints in the new format and clock, without a reload.
         setDisplayPrefs({ region: resp.data.region, timezone: resp.data.timezone });
