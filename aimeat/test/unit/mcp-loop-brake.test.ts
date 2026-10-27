@@ -114,6 +114,16 @@ describe('the address check at attach time', () => {
     expect(selfAddressRefusal({ nodeId: NODE_ID, baseUrl: '' }, { kind: 'http', url: 'https://x.example/mcp' }))
       .toBeNull();
   });
+
+  // secaudit2026oct26, mcp-client/hops:selfAddressRefusal-trailing-slash-regex-quadratic. The trailing
+  // slashes come off in one pass: a path of a long slash run and one letter answers at once.
+  it('answers a path of a long slash run in linear time', () => {
+    const url = `https://aimeat.example/${'/'.repeat(60_000)}x`;
+    const started = performance.now();
+    expect(selfAddressRefusal(own, { kind: 'http', url })).toBeNull();
+    expect(performance.now() - started).toBeLessThan(500);
+    expect(selfAddressRefusal(own, { kind: 'http', url: `https://aimeat.example/v1/mcp${'/'.repeat(60_000)}` })?.code).toBe('SELF_ADDRESS');
+  });
 });
 
 // ── Against real sockets ────────────────────────────────────────────────────────────────────────

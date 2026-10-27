@@ -31,9 +31,12 @@
  *   await runWithVia(via, () => handle(req, res));
  *   headers[MCP_VIA_HEADER] = outgoingVia(config.nodeId);
  * @version-history
+ *   v1.0.1 — 2026-10-27 — selfAddressRefusal strips trailing slashes with the linear
+ *     stripTrailingSlashes (secaudit2026oct26, selfAddressRefusal-trailing-slash-regex-quadratic).
  *   v1.0.0 — 2026-09-17 — Initial.
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
+import { stripTrailingSlashes } from '../../utils/url-validator.js';
 
 /** Lower case, because Node lowercases incoming header names and a lookup must match. */
 export const MCP_VIA_HEADER = 'x-aimeat-mcp-via';
@@ -132,7 +135,9 @@ export function selfAddressRefusal(
   const sameOrigin = target.protocol === own.protocol
     && target.hostname.toLowerCase() === own.hostname.toLowerCase()
     && target.port === own.port;
-  const path = target.pathname.replace(/\/+$/, '');
+  // One pass: replace(/\/+$/, '') retried from every slash of a run, quadratic on a caller's path
+  // (secaudit2026oct26, selfAddressRefusal-trailing-slash-regex-quadratic).
+  const path = stripTrailingSlashes(target.pathname);
   const ownMcpPath = path === '/v1/mcp' || path === '/mcp' || path.startsWith('/v2/mcp/');
   return sameOrigin && ownMcpPath ? refusal : null;
 }

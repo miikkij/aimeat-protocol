@@ -32,6 +32,8 @@
  * @usage const wire = await resolveWireAddress(storage, server);
  *   if (wire.ok) await client.connect(buildTransport(wire.server, credential));
  * @version-history
+ *   2026-10-27 — A peer's address loses its trailing slashes through stripTrailingSlashes, not a
+ *     backtracking regex (secaudit2026oct26, selfAddressRefusal-trailing-slash-regex-quadratic).
  *   2026-10-20 — The MCP client is the SDK v2 client package (@modelcontextprotocol/client), with the 2025 handshake it keeps by default (SDK v2 migration step 4a).
  *   v1.5.0 — 2026-09-26 — Every answer a remote server sends is read with a ceiling that holds while
  *     it arrives, MCP_RESPONSE_MAX_BYTES, per answer or per event on a stream (secaudit 2026-09, A2-2).
@@ -49,7 +51,7 @@
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { StreamableHTTPClientTransport, SSEClientTransport } from '@modelcontextprotocol/client';
 import type { Transport, FetchLike } from '@modelcontextprotocol/client';
-import { safeFetch } from '../../utils/url-validator.js';
+import { safeFetch, stripTrailingSlashes } from '../../utils/url-validator.js';
 import { capResponseBody } from '../../utils/read-capped.js';
 import { checkStdioPolicy } from './stdio-policy.js';
 import { MCP_VIA_HEADER, outgoingVia } from './hops.js';
@@ -168,7 +170,7 @@ export async function resolveWireAddress(
     server: {
       ...server,
       // Streamable HTTP, because that is what this node serves at that path and a peer is a node.
-      transport: { kind: 'http', url: `${peer.url.replace(/\/+$/, '')}/v1/mcp` },
+      transport: { kind: 'http', url: `${stripTrailingSlashes(peer.url)}/v1/mcp` },
     },
   };
 }
