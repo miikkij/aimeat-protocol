@@ -12,6 +12,10 @@
  *   refreshOwnerSession() for rotation.
  * @usage import { establishOwnerSession, refreshOwnerSession, clearRefreshCookie } from '../services/owner-session.js'
  * @version-history
+ *   2026-10-27 — A refresh token issued for the `__Host-` cookie starts with HOST_REFRESH_TOKEN_PREFIX,
+ *     and readRefreshCookie does not read such a token under the old name on https: this node never set
+ *     it there, so a same-site app origin wrote it (secaudit2026oct26,
+ *     owner-session:legacy-refresh-cookie-accepted-from-app-origin).
  *   2026-10-25 — On an https node the refresh cookie is `__Host-aimeat_rt`, Secure, Path=/, so a
  *     same-site app origin cannot write a cookie the apex reads. The old name `aimeat_rt` is read
  *     until auth.refresh_cookie_legacy_until (set once to 30 days after the first start,
@@ -131,7 +135,26 @@ export function readRefreshCookie(req: Request, config: Pick<AimeatConfig, 'refr
   // (auth/middleware.ts maybeSetPatBrowserSession). The prefix is PAT_PREFIX
   // (services/access-token.ts, which imports this module).
   if (secure && value?.startsWith('aimeat_pat_')) return null;
+  // On https a token this node issued for the `__Host-` cookie is not read under the old name: this
+  // node never set it there (HOST_REFRESH_TOKEN_PREFIX; secaudit2026oct26).
+  if (secure && value?.startsWith(HOST_REFRESH_TOKEN_PREFIX)) return null;
   return value;
+}
+
+/**
+ * The start of every refresh token this node issues for the `__Host-` cookie. A token so marked went
+ * out under the new name only, so the same value under the old name was written by someone else: a
+ * same-site app origin can write `aimeat_rt` for the apex, and its author's own session would then
+ * sign a signed-out visitor in to the author's account. Such a value is not read (readRefreshCookie).
+ * A token from before the rename, or from a plain-http answer, has no mark and still moves over
+ * (secaudit2026oct26, owner-session:legacy-refresh-cookie-accepted-from-app-origin).
+ */
+export const HOST_REFRESH_TOKEN_PREFIX = 'h1.';
+
+/** A new raw refresh token for the cookie this request gets: marked when it is the `__Host-` one. */
+function newRefreshToken(req: Request): string {
+  const raw = randomBytes(32).toString('hex');
+  return cookieSecure(req) ? `${HOST_REFRESH_TOKEN_PREFIX}${raw}` : raw;
 }
 
 /** Set the httpOnly refresh cookie. maxAge defaults to the absolute cap. On https the old name is
@@ -222,7 +245,7 @@ export async function establishOwnerSession(
   if (ownerRecord?.disabledAt) throw new AccountDisabledError(identity.owner);
 
   const sessionId = randomUUID();
-  const rawToken = randomBytes(32).toString('hex');
+  const rawToken = newRefreshToken(req);
   const now = Date.now();
   const issuedAt = new Date(now).toISOString();
   const idleExpiresAt = new Date(now + config.refreshIdleDays * DAY_MS).toISOString();
@@ -368,7 +391,7 @@ export async function refreshOwnerSession(
   // Normal path: presented token == current. Rotate one-time-use and slide the idle window.
   const roles = await freshOwnerRoles(storage, session.owner);
   const displayName = await freshOwnerDisplayName(storage, session.owner);
-  const newRawToken = randomBytes(32).toString('hex');
+  const newRawToken = newRefreshToken(req);
   const newIdle = new Date(absolute ? Math.min(now + config.refreshIdleDays * DAY_MS, absolute) : now + config.refreshIdleDays * DAY_MS).toISOString();
   await storage.rotateSessionRefresh(session.sessionId, {
     refreshTokenHash: hashToken(newRawToken),
