@@ -33,6 +33,10 @@
  *   const why = unsafeRegexReason(rule.pattern, rule.flags); if (why) problems.push(why);
  *   const hit = testWithin(re, text, 25);   // true, false, or null when the limit was reached
  * @version-history
+ *   v1.0.2 — 2026-10-27 — The parser throws when a closing character it moves to is missing (\k<, \p{,
+ *     \u{, (?< and (? without a closer) and when a pass of alts() or klass() reads nothing, so the check
+ *     refuses such a pattern instead of reading it again from the start without end
+ *     (secaudit2026oct26, regex-safety.ts:Parser:unterminated-escape-cursor-reset).
  *   v1.0.1 — 2026-09-30 — unsafeRegexReason(): an invalid pattern's reason carries the engine's own
  *     message, and a valid pattern the parser cannot read is logged as a parser gap before it is
  *     refused (aimeat/no-silent-catch, substitutes).
@@ -117,12 +121,30 @@ class Parser {
   }
   private lit(c: number): Ranges { return this.ci ? foldCase([[c, c]]) : [[c, c]]; }
 
+  /**
+   * The position after the next `closer` from the cursor. Without the u flag `\p{`, `\u{` and `\k<a`
+   * are valid patterns with no closer; indexOf then answers -1, and a cursor set to 0 read the pattern
+   * again from the start without end. A missing closer throws, and the check refuses the pattern.
+   */
+  private past(closer: string): number {
+    const at = this.src.indexOf(closer, this.i);
+    if (at < 0) throw new Error(`no closing ${closer}`);
+    return at + 1;
+  }
+
+  /** Throws when a pass of a loop read nothing: the loop would otherwise run without end. */
+  private advanced(from: number): void {
+    if (this.i <= from) throw new Error('the reader did not move');
+  }
+
   alts(): Atom[][] {
     const out: Atom[][] = [[]];
     while (this.i < this.src.length && this.peek() !== ')') {
+      const from = this.i;
       if (this.peek() === '|') { this.i++; out.push([]); continue; }
       const a = this.atom();
       if (a) out[out.length - 1]!.push(a);
+      this.advanced(from);
     }
     return out;
   }
@@ -166,8 +188,8 @@ class Parser {
       const rest = this.src.slice(this.i + 1);
       if (rest.startsWith('=') || rest.startsWith('!')) { look = true; this.i += 2; }
       else if (rest.startsWith('<=') || rest.startsWith('<!')) { look = true; this.i += 3; }
-      else if (rest.startsWith('<')) this.i = this.src.indexOf('>', this.i) + 1;
-      else this.i = this.src.indexOf(':', this.i) + 1;   // (?: and the (?i:) modifiers
+      else if (rest.startsWith('<')) this.i = this.past('>');
+      else this.i = this.past(':');   // (?: and the (?i:) modifiers
     }
     const alts = this.alts();
     this.i++;   // )
@@ -180,7 +202,7 @@ class Parser {
     const c = this.peek();
     if (c === 'b' || c === 'B') { this.i++; return { t: 'zero' }; }
     if (/[1-9]/.test(c)) { while (/\d/.test(this.peek())) this.i++; return { t: 'ref', q: ONCE }; }
-    if (c === 'k' && this.peek(1) === '<') { this.i = this.src.indexOf('>', this.i) + 1; return { t: 'ref', q: ONCE }; }
+    if (c === 'k' && this.peek(1) === '<') { this.i = this.past('>'); return { t: 'ref', q: ONCE }; }
     return { t: 'set', set: this.escapeSet(false), q: ONCE };
   }
 
@@ -202,15 +224,15 @@ class Parser {
       case '0': return [[0, 0]];
       case 'b': return inClass ? [[8, 8]] : ALL;
       case 'p': case 'P':
-        if (this.peek() === '{') this.i = this.src.indexOf('}', this.i) + 1;
+        if (this.peek() === '{') this.i = this.past('}');
         return ALL;   // a Unicode property: taken as overlapping everything (conservative)
       case 'c': { const x = this.src.charCodeAt(this.i++); return [[x % 32, x % 32]]; }
       case 'x': { const h = parseInt(this.src.slice(this.i, this.i + 2), 16); this.i += 2; return this.lit(h); }
       case 'u': {
         if (this.peek() === '{') {
-          const end = this.src.indexOf('}', this.i);
-          const h = parseInt(this.src.slice(this.i + 1, end), 16);
-          this.i = end + 1;
+          const next = this.past('}');
+          const h = parseInt(this.src.slice(this.i + 1, next - 1), 16);
+          this.i = next;
           return this.lit(h);
         }
         const h = parseInt(this.src.slice(this.i, this.i + 4), 16);
@@ -231,7 +253,9 @@ class Parser {
     let set: Ranges = [];
     // In JavaScript a `]` right after `[` closes the class (an empty class), so no special case.
     while (this.i < this.src.length && this.peek() !== ']') {
+      const from = this.i;
       const lo = this.classAtom();
+      this.advanced(from);
       if (this.peek() === '-' && this.peek(1) !== ']' && this.peek(1) !== '' && lo.length === 1 && lo[0]![0] === lo[0]![1]) {
         this.i++;
         const hi = this.classAtom();
