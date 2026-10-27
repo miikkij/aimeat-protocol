@@ -5,6 +5,8 @@
  * @description E2E tests for app-catalog backup export + selective import.
  *   Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-apps-backup
  * @version-history
+ *   2026-10-27 — A restored app keeps the intake forms its owner manages and leaves out the others,
+ *     naming them in errors (secaudit2026oct26).
  *   2026-10-16 — Hand-made backups: a new app keeps no operator's search approval, an appended version
  *     keeps the live app's access code, and a cortex extension is rebuilt from its manifest in a
  *     namespace the caller owns (QA audit F10b-01). Header added.
@@ -467,6 +469,33 @@ await test('A version appended onto an access-coded app keeps the code', async (
     assert(outsider.status === 403, `the appended version opened without the code: ${outsider.status}`);
     const withCode = await fetch(`${BASE}/v1/apps/${owner2}/bk-coded.html?code=bk-code-5678`);
     assert(withCode.status === 200, `the code opens it: ${withCode.status}`);
+});
+
+// secaudit2026oct26 (apps-backup-import.ts:restoredManifest:archive-intake-declaration-kept). The
+// archive's intake-form list went in as it was, without the check a publish makes, so a restored app
+// could name, and an opening could open, a form of an organism the restorer does not manage. A form the
+// restorer manages is kept; any other is left out and named in errors, and the app is restored.
+await test('A restored app keeps the intake forms its owner manages and leaves out the others, naming them', async () => {
+    const o = await json('/v1/organisms', authed({ method: 'POST', body: JSON.stringify({ name: `Bk org ${Date.now() % 100000}`, type: 'project', visibility: 'private' }) }, token2));
+    assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body.error)}`);
+    const orgId = o.body.data.organism.id as string;
+    const w = await json(`/v1/organisms/${orgId}/workspaces`, authed({ method: 'POST', body: JSON.stringify({
+        name: 'Intake',
+        manifest: { manifestVersion: '1', name: 'Intake', kind: 'project', objectTypes: [{ name: 'contact', namespace: 'crm.contacts', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:contact@1' }] },
+        schemas: { 'crm.contacts': { type: 'object', additionalProperties: false, required: ['id'], properties: { id: { type: 'string' }, nimi: { type: 'string' } } } },
+    }) }, token2));
+    assert(w.status === 201, `workspace: ${w.status} ${JSON.stringify(w.body.error)}`);
+    const wsId = w.body.data.ws as string;
+    const intake = [{ org: orgId, ws: wsId, formId: 'contact' }, { org: 'org-not-mine', ws: 'ws-not-mine', formId: 'theirs' }];
+    const zip = await forgedZip({ apps: [{ filename: 'bk-intake.html', manifest: { ...baseManifest, name: 'Intake', intake } }] });
+    const { status, body } = await restoreAs(token2, zip, { selections: [{ filename: 'bk-intake.html' }] });
+    assert(status === 200 && body.data.apps_created.includes('bk-intake.html'), `the app is restored: ${status} ${JSON.stringify(body.data ?? body.error)}`);
+    assert(body.data.errors.some((e: any) => e.item === 'bk-intake.html' && String(e.message).includes('org-not-mine/ws-not-mine/theirs')),
+        `the form left out is not named: ${JSON.stringify(body.data.errors)}`);
+    const r = await json(`/v1/apps/${owner2}/bk-intake.html/internet-opening`, authed({}, token2));
+    assert(r.status === 200, `read: ${r.status} ${JSON.stringify(r.body.error)}`);
+    const forms = (r.body.data.declared_forms as any[]).map(f => `${f.org}/${f.ws}/${f.form_id}`);
+    assert(forms.length === 1 && forms[0] === `${orgId}/${wsId}/contact`, `declared forms after restore: ${JSON.stringify(forms)}`);
 });
 
 const cortexYaml = (name: string, namespace: string) => [

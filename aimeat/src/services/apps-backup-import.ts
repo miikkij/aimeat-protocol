@@ -13,6 +13,8 @@
  * @structure parseAppsBackup; inspectAppsBackup; restoreAppsBackup; types
  * @usage import { parseAppsBackup, restoreAppsBackup } from '../services/apps-backup-import.js';
  * @version-history
+ *   2026-10-27 — A restored version keeps only the intake forms the caller manages; each form left out
+ *     is named in errors (secaudit2026oct26, restoredManifest:archive-intake-declaration-kept).
  *   2026-10-17 — A restored version keeps the app's access setting (who may open it), as it keeps the listing.
  *   v1.0.0 — 2026-06-12 — Initial: selective app-catalog restore with conflict modes
  *   v1.1.0 — 2026-09-28 — `append` onto an app a managed package install owns is refused per app
@@ -32,6 +34,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { parseCortexManifest, validateNamespaceOwnership } from './cortex-manifest.js';
 import { cortexInstallRefusal } from './install-quotas.js';
 import { libsWithoutContent, missingLibsMessage } from './cortex-lifecycle.js';
+import { managedIntakeForms } from './app-intake-forms.js';
 
 const APP_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
 
@@ -398,15 +401,28 @@ export async function restoreAppsBackup(
       // carry as a publish carries it; a new app (free name, copy) starts with none of it.
       const writeVersions = async (filename: string, renumberFrom?: number, live?: AppRecord | null) => {
         let next = renumberFrom ?? 0;
+        const named = new Set<string>();
         for (const v of versions) {
           const versionNumber = renumberFrom !== undefined ? ++next : v.version;
+          // Ownership transfers to the caller; the operator-owned parts of the manifest do not.
+          const manifest = restoredManifest(v.manifest, owner, live ?? null);
+          // The archive's intake-form list keeps only the forms the caller manages, the rule a publish
+          // applies; each one left out is named once, and the app is restored (secaudit2026oct26).
+          if (manifest.intake !== undefined) {
+            const { kept, dropped } = await managedIntakeForms(storage, owner, manifest.intake);
+            if (kept.length) manifest.intake = kept; else delete manifest.intake;
+            for (const d of dropped) {
+              if (named.has(d.form)) continue;
+              named.add(d.form);
+              summary.errors.push({ item: sel.filename, message: `The intake form ${d.form} was left out of the restored app: ${d.why}` });
+            }
+          }
           await storage.createApp({
             ownerGaii: ownerGhii,
             ownerName: owner,
             filename,
             versionNumber,
-            // Ownership transfers to the caller; the operator-owned parts of the manifest do not.
-            manifest: restoredManifest(v.manifest, owner, live ?? null),
+            manifest,
             mimeType: v.mimeType,
             size: v.data.length,
             data: v.data,
