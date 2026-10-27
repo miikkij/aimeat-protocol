@@ -31,6 +31,8 @@
  *   const road = await readAppRoadmap(storage, ownerGhii, appId);
  *   await addRoadmapEntry(storage, { ownerGhii, appId, state: 'done', what: 'The login pill fits a phone.', by, version });
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A roadmap older than the account that now holds the author name is an earlier
+ *     holder's and reads as none; eraseAppRoadmapsOf for the account erasure (secaudit2026oct26).
  *   v1.1.0 — 2026-09-24 — APP_ROADMAP_WISHES_PER_ACCOUNT: one account holds at most ten open wishes
  *     on one app, refused with WISH_LIMIT_REACHED, and the owner is not counted (A6-16). The list's
  *     own cap names its code too, CAPACITY_EXCEEDED, so the door renders what the service decided.
@@ -38,7 +40,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import { randomUUID } from 'node:crypto';
-import { appKeySegment, readAppRecord, equalAppId } from './app-record-keys.js';
+import { appKeySegment, readAuthorAppRecord, appRecordsOfAuthor, equalAppId } from './app-record-keys.js';
 
 export const APP_ROADMAP_SPEC = 'aimeat.approadmap/1' as const;
 
@@ -105,7 +107,7 @@ export const appRoadmapKey = (appId: string) =>
 
 /** This app's roadmap, or null when nobody has written one. Null is a real answer. */
 export async function readAppRoadmap(storage: Storage, appId: string): Promise<AppRoadmap | null> {
-  const rec = await readAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
+  const rec = await readAuthorAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
   const v = rec?.value as AppRoadmap | undefined;
   if (!v || v.spec !== APP_ROADMAP_SPEC || !equalAppId(v.appId, appId)) return null;
   return v;
@@ -115,7 +117,7 @@ export async function readAppRoadmap(storage: Storage, appId: string): Promise<A
 async function changeRoadmap(storage: Storage, appId: string, change: (road: AppRoadmap) => void): Promise<AppRoadmap> {
   if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('Roadmap writes require atomic storage.');
   for (let attempt = 0; attempt < 40; attempt++) {
-    const existing = await readAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
+    const existing = await readAuthorAppRecord(storage, NS_ROADMAP, appRoadmapKey(appId), appId);
     const road = existing ? structuredClone(existing.value as AppRoadmap) : emptyRoadmap(appId);
     change(road);
     road.updatedAt = new Date().toISOString();
@@ -141,6 +143,17 @@ function emptyRoadmap(appId: string): AppRoadmap {
 }
 
 const nextId = () => randomUUID();
+
+/**
+ * Erase the roadmaps of every app `account` authored, for the account erasure: the record is keyed by
+ * the app id `<name>/<filename>`, which the next holder of the name reuses (secaudit2026oct26).
+ * Returns how many went.
+ */
+export async function eraseAppRoadmapsOf(storage: Storage, account: string): Promise<number> {
+  const rows = await appRecordsOfAuthor(storage, NS_ROADMAP, 'approadmap.', account);
+  for (const r of rows) await storage.deleteMemory(NS_ROADMAP, r.key);
+  return rows.length;
+}
 
 /**
  * Add a line. Returns the whole roadmap, because that is what a caller renders next.

@@ -11,6 +11,8 @@
  *   that a stale spec is told on every app and never refused.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-design-spec
  * @version-history
+ *   v1.1.0 — 2026-10-27 — An erased account's spec and roadmap do not pass to the next holder of the
+ *     name; the owner's own delete and republish keeps both (secaudit2026oct26).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
  */
 import * as ed from '@noble/ed25519';
@@ -320,6 +322,54 @@ await test('but once it has a spec, a publish past it is told like any other', a
     assert(w.status === 201, `write ${w.status}`);
     const pub = await publish(owner.token, ALONE, 'v3');
     assert(String(pub.body.data.design_spec_hint ?? '').includes('version 3'), 'the hint names the version published');
+});
+
+// ── An erased account's builder records ───────────────────────────────────────────────────────────
+// secaudit2026oct26 (owner-erasure:app-builder-records-keyed-by-reusable-name-survive). The spec and
+// the roadmap are keyed by `<name>/<filename>`, and erasure left them, so the next holder of the name
+// who published the same filename read the erased person's documents. The owner's own delete and
+// republish of an app keeps both, as it always did.
+
+async function registerNamed(name: string) {
+    const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'DS', password: 'DsTest1234' }) });
+    assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+    const tok = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: name, password: 'DsTest1234' }) });
+    assert(tok.status === 200, `login ${tok.status}`);
+    return { name, token: tok.body.data.token as string };
+}
+const ERASED_APP = 'paja.html';
+let erasedName = '';
+
+await test('the owner deletes and republishes an app, and its spec and roadmap are still there', async () => {
+    erasedName = `dser${Date.now().toString(36)}`;
+    const first = await registerNamed(erasedName);
+    assert((await publish(first.token, ERASED_APP, 'v1')).status === 201, 'publish');
+    const w = await json(`/v1/apps/${erasedName}/${ERASED_APP}/design-spec`, { method: 'PUT', headers: auth(first.token), body: JSON.stringify({ markdown: SPEC_V1 }) });
+    assert(w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+    const rm = await json(`/v1/apps/${erasedName}/${ERASED_APP}/roadmap`, { method: 'POST', headers: auth(first.token), body: JSON.stringify({ state: 'done', what: 'The first private plan line.' }) });
+    assert(rm.status === 201, `roadmap ${rm.status}: ${JSON.stringify(rm.body?.error)}`);
+    const del = await json(`/v1/apps/${ERASED_APP}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(del.status === 200, `delete the app: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    assert((await publish(first.token, ERASED_APP, 'v2')).status === 201, 'republish');
+    const s = await json(`/v1/apps/${erasedName}/${ERASED_APP}/design-spec`, { headers: auth(first.token) });
+    assert(s.status === 200 && s.body.data.design_spec?.markdown === SPEC_V1, `the spec is gone after the owner's own republish: ${JSON.stringify(s.body.data?.design_spec)}`);
+    const r = await json(`/v1/apps/${erasedName}/${ERASED_APP}/roadmap`, { headers: auth(first.token) });
+    assert(r.status === 200 && JSON.stringify(r.body.data.roadmap).includes('first private plan line'), `the roadmap is gone: ${JSON.stringify(r.body.data)}`);
+    const erase = await json(`/v1/owners/${erasedName}`, { method: 'DELETE', headers: auth(first.token) });
+    assert(erase.status === 200, `erase: ${erase.status} ${JSON.stringify(erase.body?.error)}`);
+});
+
+await test('FAILURE: the next holder of an erased name reads neither the spec nor the roadmap of the same filename', async () => {
+    const next = await registerNamed(erasedName);
+    assert((await publish(next.token, ERASED_APP, 'new holder')).status === 201, 'publish');
+    const s = await json(`/v1/apps/${erasedName}/${ERASED_APP}/design-spec`, { headers: auth(next.token) });
+    assert(s.status === 200 && s.body.data.design_spec === null, `the erased person's spec came back: ${JSON.stringify(s.body.data?.design_spec)}`);
+    const r = await json(`/v1/apps/${erasedName}/${ERASED_APP}/roadmap`, { headers: auth(next.token) });
+    assert(r.status === 200 && !JSON.stringify(r.body.data.roadmap ?? null).includes('first private plan line'), `the erased person's roadmap came back: ${JSON.stringify(r.body.data?.roadmap)}`);
+    // The new holder starts their own spec.
+    const w = await json(`/v1/apps/${erasedName}/${ERASED_APP}/design-spec`, { method: 'PUT', headers: auth(next.token), body: JSON.stringify({ markdown: SPEC_V2 }) });
+    assert(w.status === 201 && w.body.data.design_spec?.revision === 1, `the new holder's first spec: ${w.status} ${JSON.stringify(w.body?.data?.design_spec ?? w.body?.error)}`);
+    await json(`/v1/owners/${erasedName}`, { method: 'DELETE', headers: auth(next.token) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

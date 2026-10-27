@@ -38,10 +38,12 @@
  *   const spec = await readAppDesignSpec(storage, 'alice/paja.html');
  *   const out = await writeAppDesignSpec(storage, { appId, markdown, by, principal, appVersion });
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A spec older than the account that now holds the author name is an earlier
+ *     holder's and reads as none; eraseAppDesignSpecsOf for the account erasure (secaudit2026oct26).
  *   v1.0.0 — 2026-10-02 — Initial (wish-sovelluksen-design-speksi-sovelluksen-l-helle-settings-contr).
  */
 import type { Storage } from '../storage/interface.js';
-import { appKeySegment, readAppRecord, equalAppId } from './app-record-keys.js';
+import { appKeySegment, readAuthorAppRecord, appRecordsOfAuthor, equalAppId } from './app-record-keys.js';
 
 export const APP_DESIGN_SPEC_SPEC = 'aimeat.appdesignspec/1' as const;
 
@@ -110,7 +112,7 @@ export const appDesignSpecKey = (appId: string) => `appdesignspec.${appKeySegmen
 
 /** This app's design spec, or null when nobody has written one. Null is a real answer. */
 export async function readAppDesignSpec(storage: Storage, appId: string): Promise<AppDesignSpec | null> {
-  const rec = await readAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
+  const rec = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
   const v = rec?.value as AppDesignSpec | undefined;
   if (!v || v.spec !== APP_DESIGN_SPEC_SPEC || !equalAppId(v.appId, appId)) return null;
   return v;
@@ -145,7 +147,7 @@ export async function writeAppDesignSpec(
 ): Promise<{ spec: AppDesignSpec; replacedRevision: number | null; unchanged: boolean } | { conflict: AppDesignSpec }> {
   if (!storage.createMemoryIfAbsent || !storage.setMemoryIfVersion) throw new Error('Design spec writes require atomic storage.');
   for (let attempt = 0; attempt < 40; attempt++) {
-    const existing = await readAppRecord(storage, NS_SPEC, appDesignSpecKey(input.appId), input.appId);
+    const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(input.appId), input.appId);
     const current = existing?.value as AppDesignSpec | undefined;
     const live = current && current.spec === APP_DESIGN_SPEC_SPEC ? current : null;
     if (typeof input.expectedRevision === 'number' && (live?.revision ?? 0) !== input.expectedRevision) {
@@ -179,10 +181,21 @@ export async function writeAppDesignSpec(
 
 /** Take the document away. Returns whether there was one. */
 export async function deleteAppDesignSpec(storage: Storage, appId: string): Promise<boolean> {
-  const existing = await readAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
+  const existing = await readAuthorAppRecord(storage, NS_SPEC, appDesignSpecKey(appId), appId);
   if (!existing) return false;
   await storage.deleteMemory(NS_SPEC, appDesignSpecKey(appId));
   return true;
+}
+
+/**
+ * Erase the design specs of every app `account` authored, for the account erasure: the record is keyed
+ * by the app id `<name>/<filename>`, which the next holder of the name reuses (secaudit2026oct26).
+ * Returns how many went.
+ */
+export async function eraseAppDesignSpecsOf(storage: Storage, account: string): Promise<number> {
+  const rows = await appRecordsOfAuthor(storage, NS_SPEC, 'appdesignspec.', account);
+  for (const r of rows) await storage.deleteMemory(NS_SPEC, r.key);
+  return rows.length;
 }
 
 function emptySpec(appId: string): AppDesignSpec {
