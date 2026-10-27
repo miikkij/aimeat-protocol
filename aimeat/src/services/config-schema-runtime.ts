@@ -14,6 +14,8 @@
  *   Config tab shows it. The secrets show only whether they are set.
  * @structure RUNTIME_CONFIG_FIELDS
  * @version-history
+ *   v1.1.0 -- 2026-10-27 -- bindHost row (AIMEAT_BIND_HOST), immutable like the port (secaudit2026oct26,
+ *     local-profile-from-default-baseurl-on-network-reachable-listener).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 // Typed by the keys alone, not AimeatConfig: config-types.ts reaches config-schema.ts, so importing
@@ -32,7 +34,7 @@ type RuntimeKey = 'usageHotDays' | 'usageHourRollupDays' | 'usageArchiveBatch' |
   | 'usageBufferMs' | 'tallyBufferMs' | 'logLevel' | 'perfTrace' | 'nodeKeyPath' | 'keyPassphrase' | 'encryptionKey'
   | 'federationPublicKey' | 'federationPrivateKey' | 'securityProfile' | 'allowPrivateEgress' | 'trustProxy' | 'appHost'
   | 'appOriginEnabled' | 'portfolioHost' | 'portfolioOriginEnabled' | 'coHost' | 'coOriginEnabled' | 'connectFakeBaseUrl'
-  | 'x402TestFacilitator';
+  | 'x402TestFacilitator' | 'bindHost';
 
 export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   // ── Usage meter (mutable). The windows and batches are read on each run; the flush intervals at start. ──
@@ -57,6 +59,7 @@ export const RUNTIME_CONFIG_FIELDS: ConfigFieldShape<RuntimeKey>[] = [
   { key: 'federationPrivateKey', dotPath: 'federation.private_key', envVar: 'AIMEAT_PRIVATE_KEY', type: 'string', validate: textOrNull, immutable: true, description: 'Private half of that key pair (secret)', adminDisplay: 'configured' },
 
   // ── Deployment (immutable: each decides who may reach what) ──
+  { key: 'bindHost', dotPath: 'node.bind_host', envVar: 'AIMEAT_BIND_HOST', type: 'string', validate: text, immutable: true, description: 'The address the node listens on: 127.0.0.1 for this computer only, 0.0.0.0 for every network. Empty listens on every address. A node set to listen beyond this computer does not take the local profile on its own. Takes effect at the next start' },
   { key: 'securityProfile', dotPath: 'security.profile', envVar: 'AIMEAT_SECURITY_PROFILE', type: 'string', ...oneOf('local', 'public'), immutable: true, description: 'local or public. Sets the safe defaults for a node on the internet (public) or on one machine (local); every explicit setting still wins. Empty decides from the node address' },
   { key: 'allowPrivateEgress', dotPath: 'security.allow_private_egress', envVar: 'AIMEAT_ALLOW_PRIVATE_EGRESS', type: 'boolean', validate: bool, immutable: true, description: 'Let the node call addresses in private networks (localhost, 10.x, 192.168.x). On by default for a local profile, off for public' },
   { key: 'trustProxy', dotPath: 'security.trust_proxy', envVar: 'AIMEAT_TRUST_PROXY', type: 'string', validate: text, immutable: true, description: 'Which reverse proxies the node trusts to report the visitor\'s address: a hop count (1), a subnet list, or true for any. Empty trusts loopback on a public address' },

@@ -3810,6 +3810,15 @@
      "plain": "Security profile A local or public profile, from configuration or the host, drives a startup self-check that warns about unsafe settings. AIMEAT_SECURITY_PROFILE"
     },
     {
+     "slug": "g-20-listen-address",
+     "cells": [
+      "<strong>Listen address</strong>",
+      "Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network.",
+      "<code>AIMEAT_BIND_HOST</code>, admin Config tab (Node)"
+     ],
+     "plain": "Listen address Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network. AIMEAT_BIND_HOST, admin Config tab (Node)"
+    },
+    {
      "slug": "g-20-readable-refusals",
      "cells": [
       "<strong>Readable refusals</strong>",
@@ -4424,6 +4433,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 448
+  "rows": 449
  }
 }

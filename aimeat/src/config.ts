@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.35.0 -- 2026-10-27 -- The default profile comes from defaultSecurityProfile (config-private-host.ts): never local when AIMEAT_BIND_HOST is beyond this computer (secaudit2026oct26).
  *   v1.34.0 — 2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
  *   v1.33.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
  *   v1.33.0 — 2026-10-25 — extensionLoadDefaults() (config-extension-load.ts): the operator's limits on extension load (secaudit2026oct22).
@@ -143,7 +144,7 @@ import type {
 import type { LoadConfigOptions, LoadConfigResult } from './config-load-types.js';
 
 // isPrivateHost moved to config-private-host.ts when this file reached the line limit (2026-10-06).
-import { isPrivateHost } from './config-private-host.js';
+import { defaultSecurityProfile } from './config-private-host.js';
 
 // Moved to config-posture.ts when this file hit the line limit. Re-exported so the dozen
 // modules that import it from here keep working; the move was not meant to be visible.
@@ -244,7 +245,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const securityProfile: 'local' | 'public' =
     ['local', 'public'].includes(process.env.AIMEAT_SECURITY_PROFILE ?? '')
       ? (process.env.AIMEAT_SECURITY_PROFILE as 'local' | 'public')
-      : ((isPrivateHost(resolvedBaseUrl) || nodeType === 'personal') ? 'local' : 'public');
+      : defaultSecurityProfile(resolvedBaseUrl, nodeType, process.env.AIMEAT_BIND_HOST);
   const allowPrivateEgress = process.env.AIMEAT_ALLOW_PRIVATE_EGRESS !== undefined
     ? process.env.AIMEAT_ALLOW_PRIVATE_EGRESS === 'true'
     : securityProfile === 'local';
