@@ -6,6 +6,12 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-27 — An ecosystem step's invoke frame names the agent or ecosystem app the run
+ *     acts for; the owner's, an app grant's and an older run's frame name the owner as before
+ *     (secaudit2026oct26, workflow/engine-steps:ecosystem-step-caller-is-owner-not-run-principal).
+ *   v1.14.0 — 2026-10-27 — export-out, datapackage and an extension step's input_from read with the
+ *     reader of the principal the run acts for (run-reader.ts); a record hidden from that agent ends an
+ *     extension step red with the reason (secaudit2026oct26, step-reads-use-system-reader-not-run-principal).
  *   v1.12.0 — 2026-10-22 — An extension step's result_to_key that names an `organism.*` key is written
  *     through the shared memory write as the run's principal, so the organism namespace rule applies
  *     (step-write.ts; secaudit 2026-10, r66). A datapackage step, and an extension step's ctx.files and
@@ -94,7 +100,7 @@ import { dispatchAiStep } from './engine-ai-step.js';
 import { dispatchInspector } from './engine-inspector.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import type { WorkflowRun, WorkflowRunStep, WorkflowStep } from '../../models/workflow-schemas.js';
-import { systemReader } from '../classification/reader.js';
+import { runReader, hiddenStepInputError } from './run-reader.js';
 import { memoryTarget } from '../classification/labels.js';
 import { shownMemoryValue } from '../secret-records.js';
 
@@ -226,16 +232,22 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
  * Fire an ecosystem action step (export-out / trigger-geai) over the connect-tunnel and route its
  * reply into onPushTerminal. Fire-and-forget: the run was already marked 'dispatched' + persisted
  * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
- * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
+ *
+ * The caller on the frame is who the run acts for (run.principal): an agent's run names the agent and
+ * an ecosystem app's run names that app, as the capability door and an agent's eco-capability schedule
+ * do (scheduler-remote-jobs.ts). The owner's run, an app grant's run (an app's schedule names the owner
+ * too) and a run started before runs recorded a principal name the owner, as before (secaudit2026oct26,
+ * ecosystem-step-caller-is-owner-not-run-principal).
  */
 export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'export-out' } | { kind: 'trigger-geai' }>, onPushTerminal: OnPushTerminal): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
+  const caller = run.principal && (run.principal.kind === 'agent' || run.principal.kind === 'ecosystem') ? run.principal.id : ownerGhii;
   const fire = async (): Promise<boolean> => {
     const mgr = getActiveConnectTunnelManager();
     if (!mgr) return false;
     if (action.kind === 'trigger-geai') {
-      const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller: ownerGhii });
+      const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller });
       return reply.ok;
     }
     // export-out: read the owner-namespace `from` key and push it to the GEAI's ingest capability.
@@ -244,7 +256,7 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
     // The value goes to an outside app, so it passes leave() first (TARGET-082). A refused value
     // makes the step red, and the log says which key and why.
     if (rec) {
-      const { left } = await systemReader(deps, ownerGhii).leave([rec], r => memoryTarget(r.ownerGaii, r.key),
+      const { left } = await runReader(deps, run, ownerGhii).leave([rec], r => memoryTarget(r.ownerGaii, r.key),
         { kind: 'external', to: action.geai });
       if (left.length) {
         logger.warn(`workflow ${workflowId} run ${runId}: export-out step "${stepId}" sent nothing: "${fromKey}" is ${left[0]!.reason}`,
@@ -255,7 +267,7 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
     const reply = await mgr.invokeOnPrincipal(action.geai, {
       capability: action.capability ?? '__deposit__',
       input: { from: fromKey, data: rec?.value ?? null },
-      caller: ownerGhii,
+      caller,
     });
     return reply.ok;
   };
@@ -318,12 +330,14 @@ export function dispatchExtensionStep(
     const base = templateInput(action.input, run.vars);
     // input_from: an earlier step's deliverable or a person's answer, read from the owner's memory
     // here because the sandbox cannot read it. Over `input`, so a vars default cannot shadow it.
-    // Read as the node's own work in the owner's space, through the classification reader, the
-    // same reader ctx.memory uses for the extension's own namespace (TARGET-082).
+    // Read through the classification reader of the principal the run acts for (run-reader.ts): the
+    // node's own work for the owner's run, the agent for an agent's run (TARGET-082; secaudit2026oct26).
+    // A record hidden from that agent ends the step red with the reason, rather than arriving as null.
     for (const [param, keyTmpl] of Object.entries(action.input_from ?? {})) {
       const key = (run.keyPrefix ?? '') + template(keyTmpl, run.vars);
       const rec = await deps.storage.getMemory(ownerGhii, key);
-      const shown = rec ? await systemReader(deps, ownerGhii).show([rec], r => memoryTarget(r.ownerGaii, r.key)) : [];
+      const shown = rec ? await runReader(deps, run, ownerGhii).show([rec], r => memoryTarget(r.ownerGaii, r.key)) : [];
+      if (rec && !shown.length) throw hiddenStepInputError(key, run, deps.config.baseUrl);
       base[param] = shown.length ? (shownMemoryValue(key, shown[0]!.value) ?? null) : null;
     }
     const out = action.paging
@@ -407,7 +421,7 @@ export function dispatchDataPackageStep(
     }
     // A public data package is an export, so the source record passes leave() first (TARGET-082).
     // A refusal is a red step with the reason, and the package stays on its previous version.
-    const { left } = await systemReader(deps, ownerGhii).leave([record], r => memoryTarget(r.ownerGaii, r.key),
+    const { left } = await runReader(deps, run, ownerGhii).leave([record], r => memoryTarget(r.ownerGaii, r.key),
       { kind: 'export', organismId: null });
     if (left.length) throw new Error(`CLASSIFIED: "${key}" is ${left[0]!.reason}, so nothing was published`);
     // A UNION publishes several lists as one table. `aiuutiset` answers with topics, actors and

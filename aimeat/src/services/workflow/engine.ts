@@ -118,6 +118,7 @@
  *     and the run ends refused (dispatch-authority.ts; secaudit 2026-10, v64). resumeInflight's body
  *     moved unchanged to engine-resume.ts (max-file-lines).
  *   v1.23.0 — 2026-10-22 — An answer whose write was refused turns its step red, and the owner is told as for any failed step (secaudit 2026-10, r66).
+ *   v1.24.0 — 2026-10-27 — A run whose account is deactivated dispatches no step until reactivation (secaudit2026oct26).
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -341,8 +342,9 @@ export class WorkflowEngine {
     let mutated = false;
     let stopped = false;
     // The run's principal is asked again before each dispatch, resolved once for this tick.
-    const gate = dispatchGate(this.storage, run);
+    const gate = dispatchGate(this.storage, run, ownerGhii);
     let refused = false;
+    let paused = false;
     // ai steps waiting for room under the cost cap: no model call answers inside one tick, so they
     // wait for the rest of it, and their signals are not asked again in a later pass.
     const waiting = new Set<string>();
@@ -397,6 +399,8 @@ export class WorkflowEngine {
         // cost fits beside what the run has spent and what its open model calls hold; otherwise it
         // stays pending, and after the pass the run stops if no call is open (run-cost.ts).
         if (spendsAi(step) && admitAiStep(run, step.id) === 'wait') { waiting.add(step.id); continue; }
+        // A deactivated account's run dispatches nothing and stays as it is (dispatch-authority.ts waits).
+        if (await gate.waits()) { paused = true; break; }
         // Gone, or short of a word this step costs, and the step is not dispatched: the run ends refused.
         if (await gate.refuses(step, now)) { refused = true; mutated = true; break; }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
@@ -407,7 +411,7 @@ export class WorkflowEngine {
         await maybeAlertAgentOffline(this.stepDeps(), ownerGhii, run, step);
       }
       // Only dispatched (non-terminal) steps remained this pass ⇒ nothing new can be unblocked now.
-      if (refused || !advancedTerminal) break;
+      if (refused || paused || !advancedTerminal) break;
     }
     // ai steps left waiting with no model call open get no room back: the run stops at its cap.
     if (!refused && stopWhenNoRoomComes(run, [...waiting], now)) { stopped = true; mutated = true; }

@@ -23,6 +23,8 @@
  *   v1.0.0 — 2026-06-13 — Initial: deterministic ops + llm leaf (degrades when disabled) + composites.
  *   v1.1.0 — 2026-07-05 — Add extractProgress(observed) — sums count_nonempty progress for the
  *     watchdog's slow-vs-stuck decision (resume-on-retry).
+ *   v1.2.0 — 2026-10-27 — globToRegExp matches without a backtracking RegExp, in time bounded by the
+ *     glob and string lengths, with the same answers (secaudit2026oct26, globToRegExp:catastrophic-backtracking).
  */
 import type { Signal, DeterministicSignal } from '../../models/workflow-schemas.js';
 
@@ -73,13 +75,46 @@ function templateKey(template: string, vars: Record<string, string>): string {
 }
 
 // ── helpers ────────────────────────────────────────────────────────────────────
+/** What globToRegExp answers: one question, does the whole string match the glob. */
+export interface GlobMatcher { test(s: string): boolean }
+
+/** The characters a RegExp `.` does not match without the `s` flag, so a `*` does not match them either. */
+const LINE_END = new Set(['\n', '\r', ' ', ' ']);
+
 /**
- * Convert a `key_glob` ('*' is the only wildcard) into an anchored RegExp. Exported so the engine's
+ * Match a `key_glob` ('*' is the only wildcard) against a whole string. Exported so the engine's
  * `listGlob` implementation (Phase 4, over listMemory) matches keys exactly the same way.
+ *
+ * It answers what the anchored RegExp `^...$` with `.*` per star answered (a star matches any run of
+ * characters except a line end), but by walking the glob's positions over the string once: time is
+ * at most the glob length times the string length. The RegExp backtracked over every split of the
+ * string among the stars, so a glob of many stars and a missing literal held the node's event loop
+ * for seconds per match (secaudit2026oct26, globToRegExp:catastrophic-backtracking).
  */
-export function globToRegExp(glob: string): RegExp {
-  const escaped = glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*');
-  return new RegExp(`^${escaped}$`);
+export function globToRegExp(glob: string): GlobMatcher {
+  const pat = [...glob.replace(/\*{2,}/g, '*')];
+  return {
+    test(s: string): boolean {
+      // live[i]: the glob's first i characters match the string read so far. A star may match nothing,
+      // so a position before a star also makes the position after it live.
+      let live = new Array<boolean>(pat.length + 1).fill(false);
+      const close = (set: boolean[]) => { for (let i = 0; i < pat.length; i++) if (set[i] && pat[i] === '*') set[i + 1] = true; };
+      live[0] = true;
+      close(live);
+      for (const ch of s) {
+        const next = new Array<boolean>(pat.length + 1).fill(false);
+        let any = false;
+        for (let i = 0; i < pat.length; i++) {
+          if (!live[i]) continue;
+          if (pat[i] === '*') { if (!LINE_END.has(ch)) { next[i] = true; any = true; } } else if (pat[i] === ch) { next[i + 1] = true; any = true; }
+        }
+        if (!any) return false;
+        close(next);
+        live = next;
+      }
+      return live[pat.length];
+    },
+  };
 }
 
 function isNonEmpty(value: unknown): boolean {
