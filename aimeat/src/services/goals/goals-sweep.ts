@@ -12,6 +12,9 @@
  * @structure SWEEP_MS · sweepGoals() · sweepOne() · scheduleGoalSweep()
  * @usage scheduleGoalSweep({ storage, config });   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A deactivated account's goals wait: the sweep starts no round and no model
+ *     work and expires nothing, and a finished job does not move the goal on, until reactivation
+ *     (secaudit2026oct26, goals-sweep.ts:deactivated-account-goals-keep-running).
  *   v1.1.0 — 2026-10-25 — The node's model works: settled when their job finishes (the finished-job
  *     listener registered here) and checked each minute (checkModelWorks); a proposed goal waits.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -26,6 +29,7 @@ import { advanceGoal } from './goals-advance.js';
 import { startRound } from './goals-ops.js';
 import { checkModelWorks, settleModelJob } from './goals-model.js';
 import { onAiJobFinished } from '../ai-jobs/finished-listeners.js';
+import { deactivatedAccountSkip } from '../account-deactivated.js';
 import { GOAL_PREFIX, MAX_ATTEMPTS, MODEL_TAKER, goalSettled, type GoalRecord } from './goals-types.js';
 
 export const SWEEP_MS = 60_000;
@@ -80,6 +84,10 @@ async function returnStuck(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, 
 export async function sweepOne(deps: GoalDeps, ownerGhii: string, goal: GoalRecord, now = Date.now()): Promise<void> {
   // A proposal waits for the owner's yes: nothing in it moves, and it does not expire on its own.
   if (goalSettled(goal.status) || goal.status === 'proposed') return;
+  // The sweep acts in the account's name with no token, as a schedule fire does: while the account is
+  // deactivated the goal waits as it is (no round, no model work, no expiry), and the first sweep after
+  // reactivation moves it on (services/account-deactivated.ts; secaudit2026oct26).
+  if (await deactivatedAccountSkip(deps.storage, ownerGhii)) return;
   const ended = (goal.endsAt && Date.parse(goal.endsAt) <= now) || (goal.renewBy && Date.parse(goal.renewBy) <= now);
   if (ended) {
     await updateGoal(deps, ownerGhii, goal.id, cur => goalSettled(cur.status) ? UNCHANGED : ({
@@ -128,8 +136,9 @@ export async function sweepGoals(deps: GoalDeps): Promise<void> {
 export function scheduleGoalSweep(deps: GoalDeps): void {
   // A goal's model work settles the moment its job finishes; the sweep is only the fallback.
   onAiJobFinished(async job => {
+    // A job that finished is recorded on its work; the goal moves on only for an active account.
     const settled = await settleModelJob(deps, job);
-    if (settled) await advanceGoal(deps, settled.ownerGhii, settled.goalId);
+    if (settled && !(await deactivatedAccountSkip(deps.storage, settled.ownerGhii))) await advanceGoal(deps, settled.ownerGhii, settled.goalId);
   });
   const run = () => { sweepGoals(deps).catch(err => logger.warn('goal sweep failed', { error: String(err) })); };
   setTimeout(run, 30_000);
