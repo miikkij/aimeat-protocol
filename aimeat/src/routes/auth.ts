@@ -10,6 +10,7 @@
  * @usage
  *   app.use(authRouter(config, storage));
  * @version-history
+ *   2026-10-27 — DELETE /v1/auth/sessions tells the person which of their Full and operator access tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26).
  *   2026-10-25 — The refresh, revoke and session routes read the refresh cookie by the node's config, so an
  *     https node reads `__Host-aimeat_rt` and the old name only inside its window (secaudit2026oct22,
  *     refresh-cookie-unprefixed-first-match).
@@ -108,6 +109,7 @@ import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { loginTarpit } from '../middleware/login-tarpit.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
+import { tellOwnerTokensKept } from '../services/owner-tokens-kept-notice.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, isExternalPrincipal, isForeignPrincipal, localAccountName } from '../utils/gaii.js';
 import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
@@ -765,6 +767,9 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     let count = 0;
     for (const s of mine) if (await storage.revokeSession(s.sessionId)) count++;
     clearRefreshCookie(req, res); // the caller's own device is included in "all"
+    // The person's own Full and operator access tokens keep working (programs run on them); the
+    // person is told which ones still act as them (secaudit2026oct26).
+    void tellOwnerTokensKept(storage, config, owner);
 
     res.json(success(config.nodeId, {
       revoked_sessions: count,

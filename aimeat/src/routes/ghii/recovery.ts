@@ -6,6 +6,9 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — A password reset or change tells the person which of their Full and operator access
+ *     tokens still act as them (services/owner-tokens-kept-notice.ts; secaudit2026oct26,
+ *     owner-level-pat-session-survives-reset).
  *   2026-10-27 — POST /v1/ghii/email/confirm answers 409 EMAIL_CHANGED, and marks nothing, when the recovery
  *     address changed after the code was sent; the reset code and the username go only to the address
  *     whose hash is the proven one (services/recovery-address.ts). A reset code's guess is counted
@@ -68,6 +71,7 @@ import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
 import { recoveryAddressIs, provenRecoveryAddress, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
+import { tellOwnerTokensKept } from '../../services/owner-tokens-kept-notice.js';
 
 /**
  * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
@@ -411,6 +415,9 @@ export function registerRecoveryRoutes(
         // ...and every sign-in session the person had ends, or whoever held one keeps the account
         // through the reset. Agents keep theirs (secaudit2026oct22).
         await endPersonSessionsAfterPasswordChange(storage, username);
+        // The person's own Full and operator access tokens keep working (programs run on them); the
+        // person is told which ones still act as them (secaudit2026oct26).
+        void tellOwnerTokensKept(storage, config, username);
 
         // A change to how this account is entered is always news (storage/types/account-events.ts):
         // the person reads it on their account feed, and the operator has a line to search.
@@ -482,6 +489,7 @@ export function registerRecoveryRoutes(
         // The person's other sign-in sessions end; the one the change was made from stays, and
         // agents keep theirs (secaudit2026oct22).
         await endPersonSessionsAfterPasswordChange(storage, ownerName, req.auth!.sessionId);
+        void tellOwnerTokensKept(storage, config, ownerName);
         // `set` is the first password on an account made through Google or Entra sign-in: a new way in,
         // which the person must be able to see even though no current password was asked for.
         const how = ghiiRecord.passwordHash ? 'changed' : 'set';
