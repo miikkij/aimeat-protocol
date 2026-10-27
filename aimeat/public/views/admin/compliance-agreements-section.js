@@ -18,6 +18,7 @@
  * @structure Strip · Waiting · ReviewBox · NewAgreement · Detail · AgreementsSection (default)
  * @usage html`<${AgreementsSection} num="11" onMessage=${(kind, text) => …} />`
  * @version-history
+ *   2026-10-27 — The decision on a returned copy names the copy shown (uploadedAt), secaudit2026oct26.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
  */
 import { h } from 'preact';
@@ -146,7 +147,7 @@ function Detail({ agreement, busy, onAct, confirm }) {
       ]} />
     <//>
     ${v.status === 'review' && v.review ? html`<${ReviewBox} version=${v} busy=${busy}
-      onDecide=${(accept, reason) => onAct(() => decideCopy(id, accept, reason), accept ? A('review.accepted') : A('review.rejected'))} />` : null}
+      onDecide=${(accept, reason) => onAct(() => decideCopy(id, accept, reason, v.review.uploadedAt), accept ? A('review.accepted') : A('review.rejected'))} />` : null}
     ${v.status === 'draft' ? html`
       <${Note} kind="aside">${f ? A('op.draftNext', { n: v.n }) : A('op.draftFirst')}<//>
       <${Actions}>

@@ -23,6 +23,7 @@
  *     the agreement; a draft's new counterparty account is checked as on create (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p).
  */
+import { createHash } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
 
@@ -301,6 +302,43 @@ await test('A draft\'s counterparty account is checked on a change as on a new a
     assert(named.status === 200, `a registered account is taken: ${named.status} ${JSON.stringify(named.body?.error)}`);
     const reads = await call('GET', `${A}/${r.body.data.id}`, other.token);
     assert(reads.status === 200 && reads.body.data.viewer === 'counterparty', `the named account reads it: ${reads.status}`);
+});
+
+await test('A signed copy: the operator\'s yes is bound to the copy it saw, and the evidence keeps the checked bytes (secaudit2026oct26)', async () => {
+    const r = await call('POST', A, op.token, { counterparty: { name: `Kopio ${stamp} Oy`, contactEmail: `kopio${stamp}@example.invalid`, signerName: 'Kalle Kopio', account: other.ghii }, product: 'box', language: 'en' });
+    assert(r.status === 200, `create: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const cid = r.body.data.id as string;
+    assert((await call('POST', `${A}/${cid}/send`, op.token)).status === 200, 'send');
+    const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const put = (key: string, data: string) => call('POST', '/v1/storage', other.token, { key, data, mime_type: 'image/png', visibility: 'private' });
+    const keyA = `dpa/${stamp}/copy-a.png`;
+    assert((await put(keyA, PNG)).status === 201, 'upload A');
+    const a1 = await call('POST', `${A}/${cid}/signed-copy`, other.token, { storage_key: keyA, kind: 'scan' });
+    assert(a1.status === 200, `copy A: ${a1.status} ${JSON.stringify(a1.body?.error)}`);
+    const seenAt = (await call('GET', `${A}/${cid}`, op.token)).body.data.versions[0].review.uploadedAt as string;
+    // The counterparty sends another copy after the operator looked.
+    const keyB = `dpa/${stamp}/copy-b.png`;
+    const bigger = Buffer.concat([Buffer.from(PNG, 'base64'), Buffer.from('second')]).toString('base64');
+    assert((await put(keyB, bigger)).status === 201, 'upload B');
+    const b1 = await call('POST', `${A}/${cid}/signed-copy`, other.token, { storage_key: keyB, kind: 'scan' });
+    assert(b1.status === 200, `copy B: ${b1.status}`);
+    const stale = await call('POST', `${A}/${cid}/confirm`, op.token, { accept: true, uploaded_at: seenAt });
+    assert(stale.status === 409 && stale.body.error.code === 'COPY_CHANGED', `a yes to the copy seen first is not a yes to the second: ${stale.status} ${JSON.stringify(stale.body?.error)}`);
+    const mid = (await call('GET', `${A}/${cid}`, op.token)).body.data.versions[0];
+    assert(mid.signatures.length === 0 && mid.status === 'review', `nothing recorded: ${JSON.stringify(mid.signatures)}`);
+    // Usage: a yes to the copy now waiting records it, and the evidence holds what was checked.
+    const now = mid.review;
+    const ok = await call('POST', `${A}/${cid}/confirm`, op.token, { accept: true, uploaded_at: now.uploadedAt });
+    assert(ok.status === 200 && ok.body.data.accepted === true, `accepted: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+    const sig = (await call('GET', `${A}/${cid}`, op.token)).body.data.versions[0].signatures[0];
+    const sha = createHash('sha256').update(Buffer.from(bigger, 'base64')).digest('hex');
+    assert(sig?.evidence?.sha256 === sha, `the evidence names the checked bytes: ${JSON.stringify(sig?.evidence)}`);
+    assert(typeof sig?.evidence?.copyKey === 'string' && !String(sig.evidence.copyKey).endsWith(keyB), `a copy the node keeps: ${sig?.evidence?.copyKey}`);
+    // The uploader's own file can change later; the evidence does not move with it.
+    const replaced = await put(keyB, PNG);
+    assert(replaced.status === 201 || replaced.status === 200, `the counterparty replaces its own file: ${replaced.status}`);
+    const after = (await call('GET', `${A}/${cid}`, op.token)).body.data.versions[0].signatures[0];
+    assert(after.evidence.sha256 === sha && after.evidence.copyKey === sig.evidence.copyKey, 'the evidence stays');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
