@@ -9,10 +9,15 @@
  *       as it does on the single read; a reader the label admits sees all three.
  *     - MEMBERS: a private organism's roster answers 404 to a caller who is not its member, as its
  *       detail does; members, the operator and a public organism's outsiders read as before.
+ *     - CREDENTIALS: no word-start query on a credential record's stored value finds it; the record is
+ *       still found by its key, and an ordinary record by its value.
+ *     - ANCHORS: personal-node anchors sent together leave an owner within personal_nodes.max_per_owner
+ *       (the race shows on PostgreSQL); anchors one after another, a delete and a re-anchor work as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 
@@ -39,6 +44,32 @@ async function call(method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE', path: s
     let parsed: Body;
     try { parsed = JSON.parse(text) as Body; } catch { parsed = { _raw: text }; }
     return { status: res.status, body: parsed };
+}
+
+/** An app-grant bearer of `owner` holding `scopes`, through the real flow (as e2e-mcp-proxy.ts does). */
+async function appGrant(owner: RegisteredOwner, scopes: string[]): Promise<string> {
+    const filename = `reach-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.html`;
+    const redirect = 'http://localhost:9933/callback';
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const pub = await call('POST', '/v1/apps', owner.token, {
+        filename, name: 'Reach probe', description: 'app-grant probe', category: 'tool',
+        content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>', 'utf8').toString('base64'),
+    });
+    assert(pub.status === 201, `publish probe app: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+    const q = new URLSearchParams({
+        app: `${owner.name}/${filename}`, response_type: 'code', scope: scopes.join(' '),
+        redirect_uri: redirect, state: 'x', code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authorize = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    assert(authorize.status === 302, `authorize: ${authorize.status}`);
+    const requestId = decodeURIComponent(/req=([^&]+)/.exec(authorize.headers.get('location') ?? '')?.[1] ?? '');
+    const consent = await call('POST', '/v1/app-grants/authorize-consent', owner.token, { request_id: requestId });
+    assert(consent.status === 200, `consent: ${consent.status} ${JSON.stringify(consent.body?.error)}`);
+    const code = new URL(consent.body.data.redirect_url as string).searchParams.get('code') ?? '';
+    const tok = await call('POST', '/v1/app-grants/token', undefined, { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect });
+    assert(tok.status === 200, `app token: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.access_token as string;
 }
 
 let op!: RegisteredOwner, alice!: RegisteredOwner, bob!: RegisteredOwner, carol!: RegisteredOwner;
@@ -156,6 +187,76 @@ await test('USE: a public organism shows its creator and admins to an outsider w
     const r = await call('GET', `/v1/organisms/${o.body.data.organism.id}/members`);
     const names = (r.body?.data?.members as Body[] | undefined)?.map(m => m.ghii) ?? [];
     assert(r.status === 200 && names.includes(alice.name), `outsider on a public organism: ${r.status} ${JSON.stringify(names)}`);
+});
+
+// ─── CREDENTIALS (search-text.ts:searchableValue:secret-record-values-indexed) ───
+console.log('\nCREDENTIALS: a credential record is found by its key, never by its value');
+
+/** A one-character word-start query: hex digits that start no word of the record's key or tags. */
+const PROBES = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'b', 'c', 'd', 'e', 'f'];
+let reader = '';
+const discoverKeys = async (token: string, q: string): Promise<string> => {
+    const r = await call('GET', `/v1/discover?q=${encodeURIComponent(q)}&scope=own&per_page=100`, token);
+    assert(r.status === 200, `discover ${q}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return JSON.stringify(r.body.data.entries);
+};
+
+await test('Setup: alice stores an AI provider key in person; an app of hers holds memory:read', async () => {
+    const p = await call('PUT', '/v1/ai/providers/mykeyholder', alice.token, { title: 'Mine', type: 'anthropic', capabilities: { text: { enabled: true, model: 'claude-opus-5-5' } } });
+    assert(p.status === 200 || p.status === 201, `provider: ${p.status} ${JSON.stringify(p.body?.error)}`);
+    const k = await call('PUT', '/v1/ai/providers/mykeyholder/key', alice.token, { api_key: 'sk-ant-own-reach-key' });
+    assert(k.status === 200, `key: ${k.status} ${JSON.stringify(k.body?.error)}`);
+    const n = await call('POST', '/v1/memory', alice.token, { key: 'notes.reach', value: { text: 'zucchini harvest' }, visibility: 'private' });
+    assert(n.status === 201 || n.status === 200, `note: ${n.status} ${JSON.stringify(n.body?.error)}`);
+    reader = await appGrant(alice, ['memory:read']);
+});
+
+await test('ATTACK: no word-start query on the stored value finds the credential record', async () => {
+    const hits: string[] = [];
+    // The provider's own settings record carries the same id in its key; only the key record is the credential.
+    for (const q of PROBES) if ((await discoverKeys(reader, q)).includes('apikey.provider.mykeyholder')) hits.push(q);
+    assert(hits.length === 0, `the credential record answered value probes ${JSON.stringify(hits)}`);
+});
+
+await test('USE: the credential record is found by its key, and an ordinary record by its value', async () => {
+    assert((await discoverKeys(reader, 'mykeyholder')).includes('apikey.provider.mykeyholder'), 'the credential record is not found by its key');
+    assert((await discoverKeys(reader, 'zucchini')).includes('notes.reach'), 'the ordinary record is not found by its value');
+});
+
+// ─── ANCHORS (personal-anchor-per-owner-cap-check-then-create-race) ───
+console.log('\nANCHORS: anchors sent together hold the per-owner limit');
+
+const anchor = (owner: RegisteredOwner, id: string) => call('POST', '/v1/personal/anchor', owner.token, {
+    node_id: id, owner_name: owner.name, public_key: 'test-key-base64', agent_gaiis: [], visibility: 'private',
+});
+const anchoredBy = async (name: string): Promise<string[]> => {
+    const r = await call('GET', '/v1/personal/nodes', op.token);
+    assert(r.status === 200, `node list: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const nodes = (r.body.data.nodes ?? r.body.data.personal_nodes ?? r.body.data) as Body[];
+    return nodes.filter(n => n.owner_name === name).map(n => n.node_id as string);
+};
+
+await test('ATTACK: six anchors sent together leave carol with no more than the limit of three', async () => {
+    const answers = await Promise.all([1, 2, 3, 4, 5, 6].map(i => anchor(carol, `personal-race${stamp}-${i}`)));
+    const mine = await anchoredBy(carol.name);
+    assert(mine.length <= 3, `carol holds ${mine.length} anchors: ${JSON.stringify(answers.map(a => a.status))}`);
+    const refused = answers.filter(a => a.status === 409);
+    assert(refused.every(a => a.body?.error?.code === 'PERSONAL_NODE_LIMIT'), `refusals: ${JSON.stringify(refused.map(a => a.body?.error?.code))}`);
+    for (const id of mine) await call('DELETE', `/v1/personal/anchor/${id}`, carol.token);
+});
+
+await test('USE: anchors one after another up to the limit, then a delete frees a slot for the next', async () => {
+    for (const i of [1, 2, 3]) {
+        const r = await anchor(bob, `personal-seq${stamp}-${i}`);
+        assert(r.status === 201, `anchor ${i}: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    }
+    const fourth = await anchor(bob, `personal-seq${stamp}-4`);
+    assert(fourth.status === 409 && fourth.body?.error?.code === 'PERSONAL_NODE_LIMIT', `the fourth: ${fourth.status}`);
+    const del = await call('DELETE', `/v1/personal/anchor/personal-seq${stamp}-1`, bob.token);
+    assert(del.status === 200, `delete: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    const again = await anchor(bob, `personal-seq${stamp}-4`);
+    assert(again.status === 201, `after the delete: ${again.status} ${JSON.stringify(again.body?.error)}`);
+    assert((await anchoredBy(bob.name)).length === 3, 'bob holds three');
 });
 
 await test('Cleanup: the operator turns classification off', async () => {
