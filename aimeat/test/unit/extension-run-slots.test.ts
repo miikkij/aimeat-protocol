@@ -15,7 +15,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { takeExtensionRunSlot, runSlotsInUse } from '../../src/services/extension-run-slots.js';
+import { takeExtensionRunSlot, runSlotsInUse, visitorRunShareKey } from '../../src/services/extension-run-slots.js';
 
 const cfg = (node: number, perAccount: number) => ({ extensionRunSlots: node, extensionRunSlotsPerAccount: perAccount }) as unknown as AimeatConfig;
 type Held = { ok: true; release: () => void };
@@ -56,6 +56,25 @@ describe('request-driven extension run slots', () => {
         expect(two.ok).toBe(true);
         expect(takeExtensionRunSlot(c, 'a@n').ok).toBe(false);
         (two as Held).release();
+    });
+
+    it('a visitor\'s share is keyed by IPv6 /64, as the visitor rate limiter keys it (secaudit2026oct26)', () => {
+        const c = cfg(10, 1);
+        const first = takeExtensionRunSlot(c, visitorRunShareKey('2001:db8:aa:1::1'));
+        expect(first.ok).toBe(true);
+        // Another host address of the same /64 is the same client.
+        expect(takeExtensionRunSlot(c, visitorRunShareKey('2001:db8:aa:1:ffff::2')).ok).toBe(false);
+        // Another /64, another IPv4 address and an IPv4-mapped address each keep a share of their own.
+        const held = [
+            takeExtensionRunSlot(c, visitorRunShareKey('2001:db8:bb:2::1')),
+            takeExtensionRunSlot(c, visitorRunShareKey('198.51.100.7')),
+            takeExtensionRunSlot(c, visitorRunShareKey('198.51.100.8')),
+            takeExtensionRunSlot(c, visitorRunShareKey('::ffff:203.0.113.9')),
+        ];
+        expect(held.every(h => h.ok)).toBe(true);
+        (first as Held).release();
+        for (const h of held) (h as Held).release();
+        expect(runSlotsInUse()).toBe(0);
     });
 
     it('0 is no limit on both numbers', () => {
