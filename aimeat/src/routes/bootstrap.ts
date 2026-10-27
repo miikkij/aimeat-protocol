@@ -8,6 +8,7 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-27 — A static front page is stamped with the node's head metadata (utils/page-head.ts).
  *   2026-10-21 — The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
  *     "accelerate your AI" page (public/front-start.html, .fi sibling), same rules as demo.
  *   2026-10-17 — A node set to signed-in content access answers GET / without the operator's
@@ -91,7 +92,8 @@ import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
-import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
+import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';
+import { injectStaticPageHead } from '../utils/page-head.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { getActiveEmailService } from '../services/email.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
@@ -288,7 +290,8 @@ export function bootstrapRouter(
         const staticPath = resolvePublicFile(wantsFi ? `${base}.fi.html` : `${base}.html`);
         if (staticPath) {
           res.set('Cache-Control', 'no-cache');
-          res.type('html').send(readFileSync(staticPath, 'utf-8'));
+          const nonce = res.locals.cspNonce as string | undefined;
+          res.type('html').send(injectStaticPageHead(readFileSync(staticPath, 'utf-8'), '/', findPublicPage('/'), config, nonce ? ` nonce="${nonce}"` : ''));
           return;
         }
       }
