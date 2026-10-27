@@ -28,6 +28,7 @@
  * @version-history v2.3.0 -- 2026-10-25 -- The agent's private key of each approval is kept beside its token, and a reconnect signs the device-authorize request with it (`proof`), so the owner sees the agent coming back rather than a new device taking it over (services/device-return-proof.ts; secaudit2026oct22, lead 2150).
  * @version-history v2.3.1 -- 2026-10-26 -- A stored token the node answers 401 is not sent with the device-authorize request: the node refuses a dead bearer, so a reconnect after the token expired (the path aimeat-crewai names for an expired token) failed with "Authorization request failed" before the owner saw anything (secaudit2026oct22, lead 2150 follow-up).
  * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
+ * @version-history v2.3.2 -- 2026-10-27 -- ownerHandleFrom accepts only one plain path segment as the owner handle and runAuth stops before writing anything otherwise: the handle names the token, key and config files and is read back into generated scripts (secaudit2026oct26, node-owner-handle-in-local-paths).
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens, storeAgentKey, getAgentKey } from './keychain.js';
@@ -80,10 +81,21 @@ interface DeviceTokenResponse {
  */
 export function ownerHandleFrom(tokenData: DeviceTokenResponse, cliOwner: string): string {
   const fromGaii = /#([^@]+)@/.exec(tokenData.gaii);
-  if (fromGaii) return fromGaii[1];
-  if (typeof tokenData.owner === 'string' && tokenData.owner && !tokenData.owner.includes('@')) return tokenData.owner;
-  return cliOwner.includes('@') ? cliOwner.split('@')[0] : cliOwner;
+  let handle: string;
+  if (fromGaii) handle = fromGaii[1];
+  else if (typeof tokenData.owner === 'string' && tokenData.owner && !tokenData.owner.includes('@')) handle = tokenData.owner;
+  else handle = cliOwner.includes('@') ? cliOwner.split('@')[0] : cliOwner;
+  // The handle names files under the connector home and is read back into generated scripts, so
+  // it must be one plain path segment. Every node issues owner names inside this set (utils/gaii.ts
+  // OWNER_RE is a subset of it); anything else is refused before a file is written.
+  if (!SAFE_OWNER_SEGMENT.test(handle)) {
+    throw new Error(`The node answered with the owner name "${handle.replace(/[\r\n]/g, ' ')}", which is not a valid account name. Nothing was stored.`);
+  }
+  return handle;
 }
+
+/** One path segment: letters, digits, dot, underscore and hyphen, not starting with a dot. */
+const SAFE_OWNER_SEGMENT = /^[A-Za-z0-9_-][A-Za-z0-9._-]{0,127}$/;
 
 /**
  * The address the owner opens to approve the agent. The consent page at /v1/agents/verify reads the
@@ -391,7 +403,13 @@ export async function runAuth(args: AuthArgs): Promise<void> {
 
   // Key ALL local artifacts by the resolved owner HANDLE, not the raw `--owner` (which may be an email).
   // This keeps `{agent}@{owner}.token` unambiguous so the serve daemon derives the right agent name.
-  const ownerHandle = ownerHandleFrom(token, owner);
+  let ownerHandle: string;
+  try {
+    ownerHandle = ownerHandleFrom(token, owner);
+  } catch (e) {
+    fail((e as Error).message);
+    process.exit(1);
+  }
 
   // Before storing the new token, check whether this is the first agent (so it
   // gets marked as `primary: true` in its per-agent config -- multi-agent serve
