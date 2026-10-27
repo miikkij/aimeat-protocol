@@ -16,6 +16,11 @@
  *   - enqueueMemoryReplication / sendQueuedMemoryEntries / onMemoryReplicationEnqueued: the queue
  *
  * @version-history
+ *   v1.6.1 — 2026-10-27 — The consent pattern is matched as a glob by a walk over the key, never
+ *     compiled as a regular expression: `*` is one segment between dots (it may be empty), `**` any
+ *     rest, and every other character is itself. The owner's pattern was compiled with its regex
+ *     syntax intact, so a pattern built to backtrack held the event loop on every public write
+ *     (secaudit2026oct26, memory-replication:matchesPattern-compiles-owner-pattern-as-raw-regex).
  *   v1.6.0 — 2026-10-20 — RETRACTION. A record that stops being eligible is taken back from the peers
  *     that hold it: retractMemoryFromPeer sends a signed POST /v1/federation/retract, and the
  *     scheduled round reconciles what it has sent to each peer against what is eligible now and
@@ -133,33 +138,52 @@ export function federationConsentCovers(
   return consents.some(c => c.status === 'active' && c.scope === 'federation' && matchesPattern(key, c.dataPattern));
 }
 
+/** One step of a consent pattern: a character, `*` (one segment, may be empty) or `**` (any rest). */
+type GlobStep = { lit: string } | { star: 1 | 2 };
+
+function globSteps(pattern: string): GlobStep[] {
+  const steps: GlobStep[] = [];
+  for (let i = 0; i < pattern.length;) {
+    if (pattern[i] === '*') {
+      const two = pattern[i + 1] === '*';
+      steps.push({ star: two ? 2 : 1 });
+      i += two ? 2 : 1;
+    } else {
+      steps.push({ lit: pattern[i]! });
+      i += 1;
+    }
+  }
+  return steps;
+}
+
 /**
- * Simple glob pattern matching for consent data patterns.
- * Supports: exact match, * (single segment), ** (multi-segment)
+ * Glob matching for consent data patterns: exact match, `*` (any run of characters without a dot)
+ * and `**` (any run at all), every other character itself. The same meaning the regex this replaced
+ * gave a plain pattern (`[^.]*` and `.*`), read by a walk over key and pattern that takes at most
+ * their two lengths multiplied, so no pattern can make it backtrack. The regex compiled every other
+ * character as regex syntax, so an owner's pattern decided how long the event loop was held.
  */
 function matchesPattern(key: string, pattern: string): boolean {
   if (pattern === '*') return true;
   if (pattern === key) return true;
-
-  // Convert glob to regex
-  const regexStr = pattern
-    .replace(/\./g, '\\.')
-    .replace(/\*\*/g, '##DOUBLE##')
-    .replace(/\*/g, '[^.]*')
-    .replace(/##DOUBLE##/g, '.*');
-
-  try {
-    return new RegExp(`^${regexStr}$`).test(key);
-  } catch (e) {
-    // A consent pattern that will not compile decides nothing, so the key is NOT eligible. This
-    // read `return key === pattern`, which cannot be true: the equal case returned true at the top
-    // of this function, so the fallback was `false` written in a way that hid a malformed consent
-    // pattern from the operator who wrote it. Fail closed and say which pattern it was.
-    logger.warn('Federation consent pattern does not compile; no key matches it', {
-      pattern, error: e instanceof Error ? e.message : String(e),
-    });
-    return false;
+  const steps = globSteps(pattern);
+  // at[j]: the first j steps match the key read so far.
+  let at = new Uint8Array(steps.length + 1);
+  at[0] = 1;
+  for (let j = 0; j < steps.length; j++) if ('star' in steps[j]! && at[j]) at[j + 1] = 1;
+  for (const ch of key) {
+    const next = new Uint8Array(steps.length + 1);
+    for (let j = 0; j < steps.length; j++) {
+      const s = steps[j]!;
+      if ('lit' in s) {
+        if (at[j] && s.lit === ch) next[j + 1] = 1;
+      } else if (next[j] || (at[j + 1] && (s.star === 2 || ch !== '.'))) {
+        next[j + 1] = 1;
+      }
+    }
+    at = next;
   }
+  return at[steps.length] === 1;
 }
 
 /**
