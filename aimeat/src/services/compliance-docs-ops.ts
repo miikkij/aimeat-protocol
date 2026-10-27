@@ -20,6 +20,8 @@
  * @usage
  *   const out = await writeDocOp(deps, caller, 'registers', { scope: 'organism', organism_id }, body, { dryRun });
  * @version-history
+ *   2026-10-27 — The register floors take the caller as the keeper whose organisms a register may move
+ *     (secaudit2026oct26, compliance-docs:register-containers-not-bound-to-scope).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1–C7.1).
  *   v1.1.0 — 2026-10-24 — patchItemOp() (C7.7).
  */
@@ -91,6 +93,9 @@ function kindOf(v: unknown): ComplianceDocKind {
 }
 
 /** One document, with what the node knows beside it. */
+/** The account behind the caller: whose organisms a register's containers may move (compliance-domain-floor.ts). */
+const keeperOf = (caller: OperatorCaller): string | undefined => localAccountName(caller.owner ?? caller.sub) ?? undefined;
+
 export async function readDocOp(deps: Deps, caller: OperatorCaller, rawKind: unknown, input: ScopeInput): Promise<Record<string, unknown>> {
   const kind = kindOf(rawKind);
   const scope = scopeFrom(input, caller);
@@ -107,7 +112,7 @@ export async function readDocOp(deps: Deps, caller: OperatorCaller, rawKind: unk
   }
   if (kind === 'registers') {
     const regs = (doc as ComplianceDocs['registers']).items;
-    return { ...head, items: regs, floors: await applyDomainFloors(deps, scope, regs, { dryRun: true }) };
+    return { ...head, items: regs, floors: await applyDomainFloors(deps, scope, regs, { dryRun: true, keeperName: keeperOf(caller) }) };
   }
   return { ...head, ...(doc as object) };
 }
@@ -130,11 +135,11 @@ export async function writeDocOp(
   }
   const doc = parsed.data as ComplianceDocs[typeof kind];
   if (opts.dryRun) {
-    const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (doc as ComplianceDocs['registers']).items, { dryRun: true }) : undefined;
+    const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (doc as ComplianceDocs['registers']).items, { dryRun: true, keeperName: keeperOf(caller) }) : undefined;
     return { kind, scope, would_store: doc, stored: false, ...(floors ? { floors } : {}), note: 'Nothing was written. Show this to the person, and send it again without dry_run to store it.' };
   }
   const saved = await writeDoc(deps.storage, deps.config.nodeId, kind, scope, doc, a.by);
-  const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (saved as ComplianceDocs['registers']).items) : undefined;
+  const floors = kind === 'registers' ? await applyDomainFloors(deps, scope, (saved as ComplianceDocs['registers']).items, { keeperName: keeperOf(caller) }) : undefined;
   return { kind, scope, stored: true, ...(saved as object), ...(floors ? { floors } : {}) };
 }
 
@@ -194,7 +199,7 @@ export async function patchItemOp(
     (item) => { const next = change(item); delete next.derived; return next; }, validate, a.by);
   if (!saved) throw new ComplianceDocError(404, 'NOT_FOUND', `No ${kind} entry ${id} in this scope. A processor the node lists from its configuration is changed by writing it into the document first.`);
   const floors = kind === 'registers'
-    ? await applyDomainFloors(deps, scope, (await readDoc(deps.storage, deps.config.nodeId, 'registers', scope)).items.filter(r => r.id === id))
+    ? await applyDomainFloors(deps, scope, (await readDoc(deps.storage, deps.config.nodeId, 'registers', scope)).items.filter(r => r.id === id), { keeperName: keeperOf(caller) })
     : undefined;
   return { kind, scope, stored: true, item: saved, ...(floors ? { floors } : {}) };
 }

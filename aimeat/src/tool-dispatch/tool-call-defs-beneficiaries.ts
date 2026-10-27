@@ -18,6 +18,7 @@
  * @structure beneficiaryCliTools[] — the handler table, spread by index.ts
  * @usage import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
  * @version-history
+ *   2026-10-27 — aimeat_commerce_beneficiary_payout forwards possible_payment_not_arrived (secaudit2026oct26).
  *   v1.0.0 — 2026-10-12 — Moved from the connector MCP module (wish: every MCP tool on aimeat connect serve).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -90,8 +91,11 @@ export const beneficiaryCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => {
             const beneficiary = requiredString(input, 'beneficiary');
             const currency = optionalString(input, 'currency');
-            if (!input.payment) return client.get(`/v1/commerce/beneficiary/payout${query({ beneficiary, currency })}`);
-            return client.post('/v1/commerce/beneficiary/payout', { beneficiary, currency, payment: input.payment });
+            const notArrived = optionalString(input, 'possible_payment_not_arrived');
+            if (!input.payment && !notArrived) return client.get(`/v1/commerce/beneficiary/payout${query({ beneficiary, currency })}`);
+            return client.post('/v1/commerce/beneficiary/payout', {
+                beneficiary, currency, ...(notArrived ? { possible_payment_not_arrived: notArrived } : { payment: input.payment }),
+            });
         },
     },
 ];

@@ -29,6 +29,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's beneficiary ledger (commerce.benefit.*): read-to-update and ledger listings for its owner. 2026-10-16 (QA audit S8-10): the beneficiary's own entries are read with listMemory on their own identity, and a provider's obligations with listAllMemoryPages over every commerce.benefit.* record, so totals are not sums of a window."
     },
+    "src/commerce/beneficiary-payout-hold.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the provider's possible-payout records (commerce.possible.payout.*), which the payout service itself wrote when a settlement did not answer, read to leave their entries out of the provider's own quote. No content is shown to anyone else."
+    },
     "src/commerce/beneficiary-payout.ts": {
       "reads": {
         "getMemory": 1
@@ -1238,9 +1244,9 @@
     },
     "src/services/compliance-agreements-sign.ts": {
       "reads": {
-        "getStorageFile": 1
+        "getStorageFile": 2
       },
-      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF the node rendered for a version, compared byte for byte with a returned signed copy and attached to the in-force e-mail. A copy a person uploads is read through readOwnFile (docsign/files.ts), which applies the classification reader, and a scan goes to a model only after reader.useForAi()."
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF the node rendered for a version, compared byte for byte with a returned signed copy and attached to the in-force e-mail. The second read (2026-10-27, secaudit2026oct26) is the node's own copy of a returned signed copy, kept beside the version's PDF when it was checked, hashed again before the operator's yes records it; nothing of it is shown. A copy a person uploads is read through readOwnFile (docsign/files.ts), which applies the classification reader, and a scan goes to a model only after reader.useForAi()."
     },
     "src/services/compliance-docs.ts": {
       "reads": {
@@ -1641,7 +1647,7 @@
     "src/services/exchange-work.ts": {
       "reads": {
         "getMemory": 1,
-        "listAllMemory": 2
+        "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The node's own exchange-work ledger namespace, which no one can label: a default label would hide an agent's own work from it. Decided and documented in the file."
     },
@@ -1761,9 +1767,10 @@
     },
     "src/services/finance/accountant-access.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2,
+        "listAllMemoryPages": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Accountant and client access lists."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Accountant and client access lists. 2026-10-27 (secaudit2026oct26): the second getMemory reads the same list with its write time to date an entry granted before grant times were kept, and listAllMemoryPages finds every client list naming an erased account so the account erasure takes it off; both are access lists, no content."
     },
     "src/services/genesis-sync.ts": {
       "reads": {

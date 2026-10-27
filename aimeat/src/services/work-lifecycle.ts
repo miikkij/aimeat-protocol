@@ -37,6 +37,9 @@
  *   const out = await acceptWork({ storage, config }, providerGaii, trackingCode);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-27 — acceptWork() moves pending to accepted with storage.transitionWorkStatus, so an accept
+ *     that read the status before a reject or an expiry cannot reopen the refunded item (secaudit2026oct26,
+ *     work-status-overwrite-after-stale-read).
  *   2026-10-25 — deliverWork() moves the status to delivered with storage.transitionWorkStatus before
  *     settling, so concurrent delivers, or a deliver and the expiry job, pay or return the escrow once
  *     on PostgreSQL too (secaudit2026oct22, work-status-transition-without-cas).
@@ -179,10 +182,14 @@ export async function acceptWork(
     if (!loaded.ok) return loaded;
     const work = loaded.work;
 
-    const updated = await storage.updateWork(trackingCode, {
-        status: 'accepted',
-        updatedAt: new Date().toISOString(),
-    });
+    // pending -> accepted in one conditional UPDATE: an accept whose read came before a reject, the
+    // expiry job or a peer removal returned the escrow must not reopen the item for a paid delivery
+    // (secaudit2026oct26, work-status-overwrite-after-stale-read).
+    if (!await storage.transitionWorkStatus(trackingCode, ['pending'], 'accepted', new Date().toISOString())) {
+        const now = await storage.getWork(trackingCode);
+        return { ok: false, status: 409, code: 'CONFLICT', message: `Work is in status "${now?.status ?? 'unknown'}", cannot accept` };
+    }
+    const updated = await storage.getWork(trackingCode);
 
     // Auto-create task if agent has task system enabled
     await createTaskFromWork(storage, work, work.providerGaii).catch(err =>

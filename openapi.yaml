@@ -23164,7 +23164,9 @@ paths:
         frameworks, { answers: { <framework>: { <question>: answer } }, answerSources }. A register
         with data domains raises each container it names to the domain's floor, only up, and a
         label a person set lower waits for them as a suggestion; the answer lists each one under
-        `floors`. `dry_run=true` validates and answers what would be stored, storing nothing. The
+        `floors`. An organism or workspace counts only when it is the register's own organism or one
+        the writer creates or administers; any other is listed with outcome `not-in-scope` and left
+        alone. `dry_run=true` validates and answers what would be stored, storing nothing. The
         node stamps updatedAt and updatedBy.
       security:
         - BearerAuth: []
@@ -23615,13 +23617,17 @@ paths:
         Accepting records the signature with its method and level (qualified, advanced or scanned);
         when both parties have signed, the version is in force and both receive the PDF. Rejecting
         needs a reason, which the counterparty receives. Operator only, `compliance:write`.
+        `uploaded_at` names the copy the operator looked at (the review's uploadedAt): when another
+        copy replaced it meanwhile, the answer is 409 COPY_CHANGED and nothing is recorded. The
+        signature's evidence names the sha256 of the checked bytes and the copy the node keeps of
+        them (409 COPY_MISSING when that copy is gone).
       security:
         - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [accept], properties: { accept: { type: boolean }, reason: { type: string } } }
+            schema: { type: object, required: [accept], properties: { accept: { type: boolean }, reason: { type: string }, uploaded_at: { type: string, description: 'The uploadedAt of the copy reviewed.' } } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -24354,7 +24360,9 @@ paths:
         cross-owner). PREFERRED: pass `offering_id` (works for both ext-action and app-tool offerings; an
         app-tool contract is pinned to the offering's interface version). LEGACY: pass `ext` + `action` +
         `contract_ref` for a raw ext-action. Body: `{ offering_id?, ext?, action?, contract_ref?,
-        cap_units?, plan_id?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`.
+        cap_units?, plan_id?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`. An
+        ext-action offering whose provider does not own the extension answers 409
+        OFFERING_PROVIDER_MISMATCH.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -24381,6 +24389,8 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
         '404':
+          $ref: '#/components/responses/AimeatError'
+        '409':
           $ref: '#/components/responses/AimeatError'
     get:
       operationId: exchangeListEntitlements
@@ -24659,7 +24669,7 @@ paths:
     post:
       operationId: exchangeAcceptProposal
       summary: Accept a proposed contract change — supersede (EXCHANGE / TARGET-045)
-      description: "The COUNTERPARTY accepts: the old contract is archived to history (with its final spend + period) and a fresh one takes effect at the agreed terms. Returns `{ proposal, entitlement }`."
+      description: "The COUNTERPARTY accepts: the old contract is archived to history (with its final spend + period) and a fresh one takes effect at the agreed terms. Returns `{ proposal, entitlement }`. A contract the consumer paused stays paused when the provider accepts; a revoked contract answers 409 CONTRACT_ENDED, and the consumer starts a new one by accepting the offering again."
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
@@ -24920,15 +24930,21 @@ paths:
         Entries flip to `paid` only AFTER the facilitator confirms, so a failed settlement leaves them
         payable rather than recording a delivery that did not happen, and a confirmation that arrives
         twice cannot pay twice. Requires scope `exchange:beneficiary`. Returns
-        `{ paid, beneficiary, amount, currency, entries, tx_hash, pay_to, note }`.
+        `{ paid, beneficiary, amount, currency, entries, tx_hash, pay_to, note }`. When the
+        facilitator does not answer the settle, the transfer may have gone out: 502
+        X402_SETTLE_UNKNOWN, the node keeps a possible payout under `commerce.possible.payout.<nonce>`,
+        and its entries stay out of the quote (which lists them as `possible_payments`, or answers
+        POSSIBLE_PAYMENT_OPEN) until you send `possible_payment_not_arrived` with that nonce instead of
+        `payment`; that answers `{ closed, beneficiary, nonce, amount, currency, note }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [beneficiary, payment], properties: {
+        content: { application/json: { schema: { type: object, required: [beneficiary], properties: {
           beneficiary: { type: string, description: 'The beneficiary owner GHII.' },
           currency: { type: string, default: EUR },
-          payment: { type: object, description: 'The signed x402 exact-scheme payload (X-PAYMENT shape).' } } } } }
+          payment: { type: object, description: 'The signed x402 exact-scheme payload (X-PAYMENT shape). Needed unless possible_payment_not_arrived is sent.' },
+          possible_payment_not_arrived: { type: string, description: 'The nonce of an earlier payout whose settlement did not answer, when your wallet shows the transfer did not arrive.' } } } } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
@@ -24938,6 +24954,7 @@ paths:
         '404': { $ref: '#/components/responses/AimeatError' }
         '409': { $ref: '#/components/responses/AimeatError' }
         '422': { $ref: '#/components/responses/AimeatError' }
+        '502': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/beneficiary/approvals:
     post:

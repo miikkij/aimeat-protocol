@@ -6,6 +6,7 @@
  *   MCP: a thin REST proxy over /v1/compliance/agreements/*, so the node decides everything (plan
  *   doc-mvmr4i2wdk0p, D1.5). Each action is one route; the action table below is the whole mapping.
  * @version-history
+ *   2026-10-27 — confirm forwards uploaded_at (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.5).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -38,7 +39,10 @@ export const complianceAgreementCliTools: ConnectCliToolDefinition[] = [
           const party = optionalString(input, 'party');
           return client.post(`${at()}/signed-copy`, { storage_key: requiredString(input, 'storage_key'), kind: requiredString(input, 'kind'), ...(party ? { party } : {}) });
         }
-        case 'confirm': return client.post(`${at()}/confirm`, { accept: optionalBoolean(input, 'accept') === true, ...(reason ? { reason } : {}) });
+        case 'confirm': {
+          const seen = optionalString(input, 'uploaded_at');
+          return client.post(`${at()}/confirm`, { accept: optionalBoolean(input, 'accept') === true, ...(reason ? { reason } : {}), ...(seen ? { uploaded_at: seen } : {}) });
+        }
         case 'end': { const choice = optionalString(input, 'choice'); return client.post(`${at()}/end`, { ...(choice ? { choice } : {}), ...(reason ? { reason } : {}) }); }
         case 'deletion_done': { const note = optionalString(input, 'note'); return client.post(`${at()}/deletion-done`, note ? { note } : {}); }
         case 'breach_notice': return client.post(`${BASE}/breach-notice`, body);

@@ -53,6 +53,9 @@ const START = 100;
 function paired(inner: Storage) {
   let held = new Set<string>();
   const waiting = new Map<string, () => void>();
+  // A frozen key answers getWork with the copy given: a call whose read came before a write that
+  // another call committed in the meantime.
+  const frozen = new Map<string, WorkRecord>();
   const proxy = new Proxy(inner, {
     get(target, prop) {
       const v = Reflect.get(target, prop, target) as unknown;
@@ -61,6 +64,7 @@ function paired(inner: Storage) {
       const fn = (v as (...a: unknown[]) => unknown).bind(target);
       if (!READS.has(name)) return fn;
       return async (key: string, ...rest: unknown[]) => {
+        if (name === 'getWork' && frozen.has(key)) return { ...frozen.get(key)! };
         const out = await fn(key, ...rest);
         if (!held.has(key)) return out;
         const other = waiting.get(key);
@@ -77,7 +81,8 @@ function paired(inner: Storage) {
   return {
     storage: proxy,
     hold(...keys: string[]): void { held = new Set(keys); },
-    clear(): void { held = new Set(); waiting.clear(); },
+    freezeAs(key: string, rec: WorkRecord): void { frozen.set(key, rec); },
+    clear(): void { held = new Set(); waiting.clear(); frozen.clear(); },
   };
 }
 
@@ -274,6 +279,57 @@ describe.each(names)('%s: work and dispute calls at the same moment move morsels
       expect(await balance(PG)).toBe(50);
       expect(await balance(RG)).toBe(61);
     }
+  });
+
+  it('a progress call whose read came before a delivery does not reopen the delivered item', async () => {
+    const tc = await work('accepted');
+    await setBalance(PG, 50);
+    const stale = (await inner.getWork(tc))!;
+    expect((await call(P, 'POST', `/v1/work/${tc}/deliver`, { output: { n: 1 } })).status).toBe(200);
+    expect(await balance(PG)).toBe(60);
+    // The progress call read 'accepted' before the delivery committed and writes after it.
+    ctl.freezeAs(tc, stale);
+    const late = await call(P, 'POST', `/v1/work/${tc}/progress`);
+    ctl.clear();
+    expect(late.status).toBe(409);
+    expect((await inner.getWork(tc))?.status).toBe('delivered');
+    expect((await call(P, 'POST', `/v1/work/${tc}/deliver`, { output: { n: 2 } })).status).toBe(409);
+    expect(await balance(PG)).toBe(60);
+  });
+
+  it('an accept whose read came before a reject does not reopen the refunded item', async () => {
+    const tc = await work('pending');
+    await setBalance(PG, 50); await setBalance(RG, 50);
+    const stale = (await inner.getWork(tc))!;
+    expect((await call(P, 'POST', `/v1/work/${tc}/reject`, { reason: 'Busy.' })).status).toBe(200);
+    expect(await balance(RG)).toBe(61);
+    // The accept read 'pending' before the reject committed and writes after it.
+    ctl.freezeAs(tc, stale);
+    const late = await call(P, 'POST', `/v1/work/${tc}/accept`);
+    ctl.clear();
+    expect(late.status).toBe(409);
+    expect((await inner.getWork(tc))?.status).toBe('cancelled');
+    expect((await call(P, 'POST', `/v1/work/${tc}/deliver`, { output: { n: 1 } })).status).toBe(409);
+    expect(await balance(PG)).toBe(50);
+  });
+
+  it('designed use: accept, progress, deliver and rate one at a time work as before', async () => {
+    const tc = await work('pending');
+    await setBalance(PG, 50);
+    const accepted = await call(P, 'POST', `/v1/work/${tc}/accept`);
+    expect(accepted.status).toBe(200);
+    expect(accepted.body.data.status).toBe('accepted');
+    const started = await call(P, 'POST', `/v1/work/${tc}/progress`);
+    expect(started.status).toBe(200);
+    expect(started.body.data.status).toBe('in_progress');
+    const delivered = await call(P, 'POST', `/v1/work/${tc}/deliver`, { output: { ok: true } });
+    expect(delivered.status).toBe(200);
+    expect(await balance(PG)).toBe(60);
+    const rated = await call(R, 'POST', `/v1/work/${tc}/rate`, { rating: 'positive', comment: 'Good.' });
+    expect(rated.status).toBe(200);
+    expect(rated.body.data.status).toBe('rated');
+    expect((await call(P, 'POST', `/v1/work/${tc}/progress`)).status).toBe(409);
+    expect((await call(P, 'POST', `/v1/work/${tc}/accept`)).status).toBe(409);
   });
 
   it('designed use: one call at a time still resolves, rejects, delivers and expires', async () => {

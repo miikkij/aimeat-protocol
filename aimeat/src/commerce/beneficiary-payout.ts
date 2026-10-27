@@ -27,6 +27,10 @@
  *   // provider signs q.accepts[0] → X-PAYMENT
  *   const r = await settleBeneficiaryPayout(storage, config, { ...same, payload });
  * @version-history
+ *   2026-10-27 — A settle that throws is kept as a possible payout (beneficiary-payout-hold.ts): the
+ *     answer is X402_SETTLE_UNKNOWN, the covered entries leave the quote until the provider sends
+ *     notArrivedNonce, and the beneficiary is notified (secaudit2026oct26,
+ *     commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  *   2026-10-16 — The payout quote sums every released entry, not those in the first 1000 records (QA audit S8-10).
  *   v1.0.0 — 2026-07-30 — Initial: the provider-signed x402 leg that pays a beneficiary for real.
  */
@@ -38,6 +42,7 @@ import {
   type X402PaymentPayload, type X402PaymentRequirements,
 } from './x402-facilitator.js';
 import { logger } from '../utils/logger.js';
+import { openPayoutHolds, heldTrackingCodes, keepPayoutHold, closePayoutHoldNotArrived } from './beneficiary-payout-hold.js';
 
 /** What one provider owes one beneficiary right now, and how to pay it. */
 export interface BeneficiaryPayoutQuote {
@@ -52,6 +57,8 @@ export interface BeneficiaryPayoutQuote {
   payTo?: string;
   /** x402 exact-scheme requirements for the provider to sign. */
   requirements?: X402PaymentRequirements;
+  /** Earlier payouts whose settlement did not answer; their entries are left out (beneficiary-payout-hold.ts). */
+  possiblePayments?: Array<{ nonce: string; amount: number; createdAt: string }>;
 }
 
 const facilitatorFor = (config: AimeatConfig) =>
@@ -73,13 +80,23 @@ export async function quoteBeneficiaryPayout(
   const currency = (args.currency ?? 'EUR').toUpperCase();
   // Every entry: the payout amount is a sum, and a window of 1000 made it short (QA audit S8-10).
   const all = await listBeneficiaryEntries(storage, args.beneficiaryGhii);
+  // A payout whose settlement did not answer may have moved the money: the entries it covered stay
+  // out of the quote until the provider says it did not arrive (beneficiary-payout-hold.ts).
+  const holds = await openPayoutHolds(storage, args.providerGhii, args.beneficiaryGhii, currency);
+  const held = heldTrackingCodes(holds);
+  const possiblePayments = holds.length ? holds.map(h => ({ nonce: h.nonce, amount: h.amount, createdAt: h.createdAt })) : undefined;
   // `released` is the payable state: accrued means the provider has not agreed to pay it yet, and
   // paid means it already left. Anything else is not owed today.
   const entries = all
-    .filter(e => e.fromGhii === args.providerGhii && e.currency === currency && e.status === 'released')
+    .filter(e => e.fromGhii === args.providerGhii && e.currency === currency && e.status === 'released' && !held.has(e.trackingCode))
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
   const amount = entries.reduce((sum, e) => sum + e.amount, 0);
 
+  if ((!entries.length || amount <= 0) && possiblePayments) {
+    return { ok: false, reason: 'POSSIBLE_PAYMENT_OPEN', entries: [], amount: 0, currency, possiblePayments,
+      message: 'An earlier payout to this beneficiary may already have gone out: the payment service did not answer. '
+        + 'Check your wallet for that transfer. If it did not arrive, send possible_payment_not_arrived with its nonce, and the amount is quoted again.' };
+  }
   if (!entries.length || amount <= 0) {
     return { ok: false, reason: 'NOTHING_OWED', entries: [], amount: 0, currency,
       message: `You owe this beneficiary nothing released and unpaid in ${currency}` };
@@ -105,7 +122,7 @@ export async function quoteBeneficiaryPayout(
   }
 
   return {
-    ok: true, entries, amount, currency, payTo,
+    ok: true, entries, amount, currency, payTo, ...(possiblePayments ? { possiblePayments } : {}),
     requirements: buildExactRequirements({
       network, asset, payTo, amountMicros: amount,
       resource: `${config.baseUrl}/v1/commerce/beneficiary/payout`,
@@ -117,6 +134,7 @@ export async function quoteBeneficiaryPayout(
 /** What settling produced. */
 export type BeneficiaryPayoutResult =
   | { ok: true; amount: number; currency: string; entries: number; txHash: string | null; payTo: string }
+  | { ok: true; closed: true; nonce: string; amount: number; currency: string }
   | { ok: false; reason: string; message: string };
 
 /**
@@ -130,8 +148,15 @@ export type BeneficiaryPayoutResult =
 export async function settleBeneficiaryPayout(
   storage: Storage,
   config: AimeatConfig,
-  args: { providerGhii: string; beneficiaryGhii: string; currency?: string; payload: X402PaymentPayload },
+  args: { providerGhii: string; beneficiaryGhii: string; currency?: string; payload?: X402PaymentPayload; notArrivedNonce?: string },
 ): Promise<BeneficiaryPayoutResult> {
+  // The provider checked the wallet and the transfer of an earlier unanswered settlement did not
+  // arrive: its entries are quoted again (beneficiary-payout-hold.ts).
+  if (args.notArrivedNonce) {
+    const closed = await closePayoutHoldNotArrived(storage, args.providerGhii, args.beneficiaryGhii, args.notArrivedNonce);
+    if (!closed) return { ok: false, reason: 'NOT_FOUND', message: 'No open possible payout to this beneficiary has that nonce.' };
+    return { ok: true, closed: true, nonce: closed.nonce, amount: closed.amount, currency: closed.currency };
+  }
   const quote = await quoteBeneficiaryPayout(storage, config, args);
   if (!quote.ok || !quote.requirements || !quote.payTo) {
     return { ok: false, reason: quote.reason ?? 'NOT_PAYABLE', message: quote.message ?? 'Not payable' };
@@ -145,7 +170,25 @@ export async function settleBeneficiaryPayout(
   if (!verified.isValid) {
     return { ok: false, reason: 'X402_VERIFY_FAILED', message: `The authorisation did not verify: ${verified.invalidReason ?? 'unknown reason'}` };
   }
-  const settled = await facilitator.settle(args.payload, quote.requirements);
+  // A settle that throws (a timeout, a network failure, a non-2xx answer) has an UNKNOWN outcome: the
+  // transfer may have gone out. The node keeps it and the provider is told not to sign again yet.
+  let settled: Awaited<ReturnType<typeof facilitator.settle>>;
+  try {
+    settled = await facilitator.settle(args.payload, quote.requirements);
+  } catch (err) {
+    const auth = args.payload.payload.authorization;
+    await keepPayoutHold(storage, {
+      provider: args.providerGhii, beneficiary: args.beneficiaryGhii, currency: quote.currency, amount: quote.amount,
+      nonce: auth.nonce, payer: auth.from ?? '', payTo: quote.payTo, network: quote.requirements.network,
+      trackingCodes: quote.entries.map(e => e.trackingCode), reason: err instanceof Error ? err.message : String(err),
+    });
+    return {
+      ok: false, reason: 'X402_SETTLE_UNKNOWN',
+      message: 'The payment service did not answer in time, so it is not known whether your transfer went through. Do not sign again yet. '
+        + `Check your wallet for the transfer with nonce ${auth.nonce}; the beneficiary was told too. These entries stay out of the next quote. `
+        + 'If the transfer did not arrive, send possible_payment_not_arrived with that nonce, and the amount is quoted again.',
+    };
+  }
   if (!settled.success) {
     return { ok: false, reason: 'X402_SETTLE_FAILED', message: `Settlement failed (replay or onchain error): ${settled.errorReason ?? 'unknown reason'}` };
   }

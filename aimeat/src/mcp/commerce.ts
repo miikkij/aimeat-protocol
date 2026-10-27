@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-27 — aimeat_commerce_beneficiary_payout takes possible_payment_not_arrived and shows the open
+ *     possible payouts in the quote (secaudit2026oct26, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  *   2026-10-25 — aimeat_commerce_beneficiary_splits withdraws a split on the owner's own extension by its short name too (withdrawSplit, secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
@@ -671,7 +673,16 @@ export function registerCommerceTools(
             inputSchema: zodShapeFor('aimeat_commerce_beneficiary_payout'),
             annotations: annotationsFor('aimeat_commerce_beneficiary_payout'),
         },
-        async ({ beneficiary, currency, payment }) => {
+        async ({ beneficiary, currency, payment, possible_payment_not_arrived }) => {
+            // The provider checked the wallet: an earlier unanswered settlement did not arrive, so its
+            // entries are quoted again (commerce/beneficiary-payout-hold.ts).
+            if (possible_payment_not_arrived) {
+                const r = await settleBeneficiaryPayout(storage, config, {
+                    providerGhii: ownerGhii, beneficiaryGhii: beneficiary, currency, notArrivedNonce: possible_payment_not_arrived,
+                });
+                if (!r.ok) return fail(`${r.reason}: ${r.message}`);
+                return ok({ ...r, note: 'The possible payout is closed as not arrived. Its entries are in the next quote again.' });
+            }
             // No signature yet -> QUOTE. The agent hands these requirements to whatever holds the
             // wallet; the node never sees a key.
             if (!payment) {
@@ -682,6 +693,7 @@ export function registerCommerceTools(
                 return ok({
                     payable: true, beneficiary, amount: q.amount, currency: q.currency,
                     entries: q.entries.length, pay_to: q.payTo, accepts: [q.requirements],
+                    ...(q.possiblePayments ? { possible_payments: q.possiblePayments } : {}),
                     note: 'Sign these requirements with the wallet that holds the funds, then call this '
                         + 'tool again with the signed payload as `payment`.',
                 });
@@ -691,6 +703,7 @@ export function registerCommerceTools(
                 payload: payment as unknown as X402PaymentPayload,
             });
             if (!r.ok) return fail(`${r.reason}: ${r.message}`);
+            if ('closed' in r) return ok({ ...r });
             return ok({
                 paid: true, beneficiary, amount: r.amount, currency: r.currency,
                 entries: r.entries, tx_hash: r.txHash, pay_to: r.payTo,

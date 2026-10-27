@@ -21,6 +21,8 @@
  *   30 days.
  * @structure CLAIM_DAYS · createClaim() · redeemClaim()
  * @version-history
+ *   2026-10-27 — redeemClaim passes deps.securityProfile to the grant's node link (secaudit2026oct26,
+ *     linkPackagePeer-no-peerUrlRefusal).
  *   v1.2.0 — 2026-10-05 — A redeem consumes the code in one compare-and-swap before the grant's network
  *     step and gives it back when the grant is refused; create and redeem never overwrite each other
  *     (record-cas.ts; secaudit 2026-10, PKG-7).
@@ -101,7 +103,7 @@ export async function createClaim(
  * The grant runs as the package's author on the seller's behalf, so the seller's limits apply.
  */
 export async function redeemClaim(
-    deps: { storage: Storage; peers: Map<string, PeerInfo>; timeoutMs?: number; thisNodeId?: string; peerCap?: number; repository?: boolean },
+    deps: { storage: Storage; peers: Map<string, PeerInfo>; timeoutMs?: number; thisNodeId?: string; peerCap?: number; repository?: boolean; securityProfile?: 'local' | 'public' },
     input: { groupId: string; author: string; code: unknown; nodeId: string; node: { url: string; public_key: string } },
 ): Promise<EntitlementResult> {
     if (typeof input.code !== 'string' || !input.code.startsWith('pkgc_')) return fail(400, 'INVALID_INPUT', 'code is the claim code the seller gave.');
@@ -125,7 +127,7 @@ export async function redeemClaim(
     const out = await grantEntitlement(deps.storage, { owner: input.author, isOperator: false }, {
         groupId: input.groupId, nodeId: input.nodeId, updatesUntil: taken.updatesUntil, channel: taken.channel,
         note: `sold by ${taken.soldBy}${taken.note ? `: ${taken.note}` : ''}`, node: input.node, terms: taken.terms,
-    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: taken.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap, repository: deps.repository });
+    }, deps.peers, { timeoutMs: deps.timeoutMs ?? 10_000, seller: taken.soldBy, thisNodeId: deps.thisNodeId, peerCap: deps.peerCap, repository: deps.repository, securityProfile: deps.securityProfile });
     // A refused grant gives the code back, so the person can redeem it on the right node.
     if (!out.ok) await updateClaims(deps.storage, input.groupId, cur => ({ groupId: input.groupId, pending: { ...cur.pending, [h]: taken } }));
     return out;

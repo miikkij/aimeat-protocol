@@ -18,6 +18,9 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   2026-10-27 — The listings read contracts, grants and history only from their own namespaces, so a
+ *     record under the same key in an account's namespace is not listed (secaudit2026oct26,
+ *     exchange:cross-namespace-prefix-scan-trusts-value).
  *   v1.7.0 — 2026-07-27 — A right is keyed to the OWNER, not to the exact caller, because the wallet
  *     already is: `debitBalance` collapses every GAII to its owner, so keying the right per-principal
  *     made one person hold two contracts for one product (measured on production: an agent's contract
@@ -317,11 +320,14 @@ export async function readEntitlementForCall(
  * skipped grants would show a provider a customer roster with their guests missing from it.
  */
 async function listAllEntitlements(storage: Storage): Promise<MeteredEntitlement[]> {
+  // Each from the namespace its writer (persistEntitlement) uses; a record under the same key in an
+  // account's namespace is not a contract (secaudit2026oct26).
   const [bought, granted] = await Promise.all([
-    storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 }),
-    storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 }),
+    storage.listAllMemory({ prefix: 'entitlement.', ownerPrefix: NS, limit: 5000 }),
+    storage.listAllMemory({ prefix: 'entgrant.', ownerPrefix: NS_GRANT, limit: 5000 }),
   ]);
-  return [...bought.items, ...granted.items].map(r => r.value as MeteredEntitlement).filter(Boolean);
+  return [...bought.items.filter(r => r.ownerGaii === NS), ...granted.items.filter(r => r.ownerGaii === NS_GRANT)]
+    .map(r => r.value as MeteredEntitlement).filter(Boolean);
 }
 
 /** Every entitlement a consumer holds (for the app cost/contract surface, G3). Filtered prefix scan. */
@@ -341,8 +347,8 @@ export async function listEntitlementsByApp(storage: Storage, appId: string): Pr
 
 /** Every grant a provider has issued — "who am I carrying, and what has it cost me?". */
 export async function listGrantsByProvider(storage: Storage, providerGhii: string): Promise<MeteredEntitlement[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 });
-  return items.map(r => r.value as MeteredEntitlement).filter(v => v && !!v.grant && v.providerGhii === providerGhii);
+  const { items } = await storage.listAllMemory({ prefix: 'entgrant.', ownerPrefix: NS_GRANT, limit: 5000 });
+  return items.filter(r => r.ownerGaii === NS_GRANT).map(r => r.value as MeteredEntitlement).filter(v => v && !!v.grant && v.providerGhii === providerGhii);
 }
 
 /** Mint (or overwrite) an entitlement — called by the contract-acceptance flow after both sides agree.
@@ -717,16 +723,16 @@ export async function archiveEntitlement(
 
 /** Past (archived) contracts a consumer held — newest first. */
 export async function listEntitlementHistoryByConsumer(storage: Storage, consumerGaii: string): Promise<EntitlementHistoryEntry[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', limit: 5000 });
-  return items.map(r => r.value as EntitlementHistoryEntry)
+  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', ownerPrefix: NS_HISTORY, limit: 5000 });
+  return items.filter(r => r.ownerGaii === NS_HISTORY).map(r => r.value as EntitlementHistoryEntry)
     .filter(v => v && v.archivedId && v.consumerGaii === consumerGaii)
     .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
 }
 
 /** Past (archived) contracts a provider sold — newest first. */
 export async function listEntitlementHistoryByProvider(storage: Storage, providerGhii: string): Promise<EntitlementHistoryEntry[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', limit: 5000 });
-  return items.map(r => r.value as EntitlementHistoryEntry)
+  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', ownerPrefix: NS_HISTORY, limit: 5000 });
+  return items.filter(r => r.ownerGaii === NS_HISTORY).map(r => r.value as EntitlementHistoryEntry)
     .filter(v => v && v.archivedId && v.providerGhii === providerGhii)
     .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
 }

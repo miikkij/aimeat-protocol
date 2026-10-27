@@ -21,6 +21,7 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-27 — aimeat_exchange_proposal_decide answers CONTRACT_ENDED for a revoked contract (secaudit2026oct26).
  *   2026-10-25 — The members-only question reads a bare tool binding as the app owner's own extension (owner namespaces wish, secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
@@ -95,7 +96,7 @@ import {
 } from '../services/exchange-work.js';
 import { refuseWorkBetween } from '../services/work-parties.js';
 import {
-    getProposal, listProposalsForOwner, supersedeWithProposal, putProposal,
+    getProposal, listProposalsForOwner, supersedeWithProposal, putProposal, CONTRACT_ENDED_TEXT,
 } from '../services/exchange-proposals.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
@@ -478,6 +479,7 @@ export function registerExchangeRunTools(
             }
             const ent = await supersedeWithProposal(storage, p);
             if (!ent) return fail('CONTRACT_GONE: the contract no longer exists');
+            if (ent === 'ended') return fail(`CONTRACT_ENDED: ${CONTRACT_ENDED_TEXT}`);
             p.status = 'accepted'; p.resolvedAt = new Date().toISOString(); await putProposal(storage, p);
             await notify(p.proposerOwner, 'EXCHANGE — contract change accepted',
                 `${owner} accepted your proposed change to ${p.capabilityLabel}. The new contract is in effect; the previous one is in your contract history.`);

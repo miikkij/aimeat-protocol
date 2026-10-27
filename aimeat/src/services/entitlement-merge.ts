@@ -25,6 +25,7 @@
  *   const all = await listAllEntitlementsForMerge(storage);   // { key, value } — the key matters
  *   await mergeOwnerEntitlements(storage, group, { dryRun });
  * @version-history
+ *   2026-10-27 — listAllEntitlementsForMerge reads only the entitlement and grant namespaces (secaudit2026oct26).
  *   v1.0.0 — 2026-07-28 — Extracted from metered-entitlements.ts (max-file-lines) with the deletion
  *     and idempotence fixes.
  */
@@ -40,11 +41,13 @@ import {
  * which has to see records whose key no longer resolves in order to fold them in.
  */
 export async function listAllEntitlementsForMerge(storage: Storage): Promise<Array<{ key: string; value: MeteredEntitlement }>> {
+  // Each from the namespace persistEntitlement writes it to; a record under the same key in an
+  // account's namespace is not a right to fold (secaudit2026oct26).
   const [bought, granted] = await Promise.all([
-    storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 }),
-    storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 }),
+    storage.listAllMemory({ prefix: 'entitlement.', ownerPrefix: NS_ENTITLEMENT, limit: 5000 }),
+    storage.listAllMemory({ prefix: 'entgrant.', ownerPrefix: NS_GRANT_PUBLIC, limit: 5000 }),
   ]);
-  return [...bought.items, ...granted.items]
+  return [...bought.items.filter(r => r.ownerGaii === NS_ENTITLEMENT), ...granted.items.filter(r => r.ownerGaii === NS_GRANT_PUBLIC)]
     .filter(r => r.value)
     .map(r => ({ key: r.key, value: r.value as MeteredEntitlement }));
 }

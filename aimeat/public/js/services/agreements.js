@@ -18,6 +18,7 @@
  *   deletionDone · downloadAgreementPdf
  * @usage import { myAgreements, sendSignedCopy } from '/js/services/agreements.js';
  * @version-history
+ *   2026-10-27 — decideCopy sends uploaded_at, the copy the operator saw (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
  */
 import { api, apiGet, apiPost, apiPatch } from '/js/api.js';
@@ -36,7 +37,10 @@ export const newVersion = (id) => apiPost(`${at(id)}/versions`, {}).then((r) => 
 export const sendAgreement = (id, message) => apiPost(`${at(id)}/send`, message ? { message } : {}).then((r) => r?.data);
 export const announceChange = (id) => apiPost(`${at(id)}/notice`, {}).then((r) => r?.data);
 export const objectToChange = (id, reason) => apiPost(`${at(id)}/object`, { reason }).then((r) => r?.data);
-export const decideCopy = (id, accept, reason) => apiPost(`${at(id)}/confirm`, reason ? { accept, reason } : { accept }).then((r) => r?.data);
+// uploadedAt names the copy the operator saw, so a copy that replaced it meanwhile is not decided on.
+export const decideCopy = (id, accept, reason, uploadedAt) => apiPost(`${at(id)}/confirm`, {
+  accept, ...(reason ? { reason } : {}), ...(uploadedAt ? { uploaded_at: uploadedAt } : {}),
+}).then((r) => r?.data);
 export const endAgreement = (id, choice, reason) => apiPost(`${at(id)}/end`, reason ? { choice, reason } : { choice }).then((r) => r?.data);
 export const deletionDone = (id, note) => apiPost(`${at(id)}/deletion-done`, note ? { note } : {}).then((r) => r?.data);
 

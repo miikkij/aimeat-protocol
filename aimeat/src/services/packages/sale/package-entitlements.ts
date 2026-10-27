@@ -28,6 +28,8 @@
  * @usage
  *   const pkg = await entitledVersion(storage, groupId, nodeId, versionParam);
  * @version-history
+ *   2026-10-27 — grantEntitlement takes peerOpts.securityProfile for the node link, so a public node
+ *     takes only an https node address (secaudit2026oct26, linkPackagePeer-no-peerUrlRefusal).
  *   v1.9.0 — 2026-10-10 — resolveNodeRead adopts a pending node only for a request signed with the key
  *     its grant named (pendingPeerProof); an unsigned request naming it had its card read and the node
  *     registered (secaudit 2026-10-10 I7). pendingPeerProof takes its fields from package-node-auth.ts.
@@ -179,7 +181,7 @@ export async function grantEntitlement(
     caller: { owner: string; isOperator: boolean },
     input: { groupId: string; nodeId: string; updatesUntil?: unknown; note?: unknown; channel?: unknown; node?: unknown; terms?: PackageEntitlement['terms'] },
     peers?: Map<string, PeerInfo>,
-    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string; peerCap?: number; repository?: boolean } = {},
+    peerOpts: { timeoutMs?: number; seller?: string; thisNodeId?: string; peerCap?: number; repository?: boolean; securityProfile?: 'local' | 'public' } = {},
 ): Promise<EntitlementResult> {
     const refused = await mayManage(storage, input.groupId, caller);
     if (refused) return refused;
@@ -220,7 +222,7 @@ export async function grantEntitlement(
     if (input.node !== undefined && input.node !== null) {
         if (!peers) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'node cannot be registered on this path.' };
         const link = await linkPackagePeer(
-            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000, thisNodeId: peerOpts.thisNodeId, cap: peerOpts.peerCap }, input.nodeId, input.node,
+            { storage, peers, timeoutMs: peerOpts.timeoutMs ?? 10_000, thisNodeId: peerOpts.thisNodeId, cap: peerOpts.peerCap, securityProfile: peerOpts.securityProfile }, input.nodeId, input.node,
             peerOpts.seller
                 ? { source: 'package-sale', by: peerOpts.seller, groupId: input.groupId }
                 : { source: 'package-grant', by: caller.owner, groupId: input.groupId },
