@@ -10,13 +10,19 @@
  *   - wellknownRouter(config, storage): mounts the well-known GET endpoints
  *   - GET /.well-known/aimeat: node id/type, protocol edition and profiles (from 4.0.0), payment
  *     bindings, public key, capability set, federation settings, key endpoints
- *   - GET /.well-known/mcp.json: MCP Server Card (SEP-1649) describing the /v1/mcp server + the WebMCP bridge
+ *   - GET /.well-known/mcp.json: the node's extended MCP card (registry server.json shape) describing the
+ *     /v1/mcp server + the WebMCP bridge + the priced tool catalog
+ *   - GET /v1/mcp/server-card and /.well-known/mcp/server-card.json: the SEP-2127 Server Card
+ *     (services/mcp-server-card.ts)
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *   - the ARD manifest (/.well-known/ard.json, /.well-known/ai-catalog.json) is routes/ard-manifest.ts, mounted here
  *
  * @version-history
+ *   v1.14.0 — 2026-10-27 — The SEP-2127 Server Card at /v1/mcp/server-card (the location the SEP
+ *     reserves) and at /.well-known/mcp/server-card.json, which served the extended card until now;
+ *     /.well-known/mcp.json keeps the extended card unchanged.
  *   v1.13.0 — 2026-10-26 — Mounts aiCatalogRouter, and the API catalog links the ARD manifest
  *     (wish-ai-catalog-well-known-ai-catalog-json-ard).
  *   v1.12.0 — 2026-10-20 — The MCP server card states 2026-07-28 and lists every revision the node
@@ -74,6 +80,7 @@ import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
 } from '../services/web-bot-auth.js';
 import { aiCatalogRouter } from './ard-manifest.js';
+import { mcpServerCard, SERVER_CARD_MEDIA_TYPE } from '../services/mcp-server-card.js';
 
 /**
  * RFC 8288 discovery Link headers on every GET/HEAD response, so agents that land on
@@ -163,10 +170,20 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     ]));
   });
 
-  // MCP Server Card (SEP-1649) — lets agents discover the node's MCP server, its
-  // transport, and that OAuth is required, without probing /v1/mcp blind.
-  // Two paths, one card. Readers look for it at either; a card nobody finds is not a card.
-  router.get(['/.well-known/mcp.json', '/.well-known/mcp/server-card.json'], async (_req, res) => {
+  // The SEP-2127 Server Card: identity, the one remote and the revisions it serves, nothing else.
+  // /v1/mcp/server-card is the location the SEP reserves and the one the AI Catalog names; the
+  // .well-known path is where the SEP's drafts put it and where scanners still look. Public, so it
+  // carries the CORS header itself: /v1/mcp/server-card is outside the /.well-known middleware.
+  router.get(['/v1/mcp/server-card', '/.well-known/mcp/server-card.json'], (_req, res) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Cache-Control', 'public, max-age=300');
+    res.type(SERVER_CARD_MEDIA_TYPE).send(JSON.stringify(mcpServerCard(config)));
+  });
+
+  // The node's extended MCP card — lets agents discover the node's MCP server, its
+  // transport, and that OAuth is required, without probing /v1/mcp blind, plus the WebMCP bridge
+  // and the priced tool catalog, which a Server Card has no field for.
+  router.get('/.well-known/mcp.json', async (_req, res) => {
     // commerce_tools (TARGET-034 phase D): the priced app-tool catalog on the card.
     // AIMEAT_MCP_CARD_COMMERCE_TOOLS: 'inline' (default) embeds the entries — richest
     // single-fetch discovery; 'pointer' keeps the card lean and links the catalog endpoint.

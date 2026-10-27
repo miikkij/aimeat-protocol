@@ -10,6 +10,7 @@
  *   owner who is not the operator cannot publish a node-wide skill (403), so cannot fill the
  *   manifest with entries of their own.
  * @version-history
+ *   2026-10-27 — The MCP entry is the SEP-2127 card (/v1/mcp/server-card), served as its media type.
  *   2026-10-26 — Initial (wish-ai-catalog-well-known-ai-catalog-json-ard).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ard-manifest
@@ -87,6 +88,15 @@ const URN = /^urn:air:[a-zA-Z0-9.-]+(:[a-zA-Z0-9._-]+)+$/;
         const types = ard.json.entries.map((e: any) => e.type);
         assert(types.includes('application/mcp-server-card+json'), 'no MCP server card entry');
         assert(types.includes('application/vnd.oai.openapi'), 'no OpenAPI entry');
+    });
+
+    await test('the MCP entry is the SEP-2127 Server Card, served as its media type', async () => {
+        const entry = ard.json.entries.find((e: any) => e.type === 'application/mcp-server-card+json');
+        const r = await fetch(local(entry.url), { headers: { Accept: 'application/mcp-server-card+json' } });
+        assert(/^application\/mcp-server-card\+json/.test(r.headers.get('content-type') ?? ''), `content-type ${r.headers.get('content-type')}`);
+        const card = await r.json() as any;
+        assert(card.$schema === 'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json', `$schema ${card.$schema}`);
+        assert(Array.isArray(card.remotes) && String(card.remotes[0]?.url).endsWith('/v1/mcp'), `remotes ${JSON.stringify(card.remotes)}`);
     });
 
     await test('every entry url answers 200 to an anonymous reader', async () => {
