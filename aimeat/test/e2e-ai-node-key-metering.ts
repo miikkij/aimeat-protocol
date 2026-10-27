@@ -29,11 +29,15 @@
  *     openai/gpt-4o (catalogue-priced) as the node's chat model
  *   - U1-U7: the uses that keep working
  *   - A1, A4, A5, A6: the four leads
+ *   - B2: an allowlist entry under an app's bare file name still lets that app in, and the owner is
+ *     told once when the app it let in is another author's (ai-app-id.ts:entryNamesApp:
+ *     bare-allowlist-entry-matches-any-author, designed use made visible)
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-node-key-metering
  * @version-history
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
+import { createHash, randomBytes } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -116,13 +120,42 @@ async function stopServer(child: ChildProcess): Promise<void> {
 
 let seq = 0;
 /** A fresh account, so each case starts from the whole allowance. */
-async function owner(label: string): Promise<string> {
+async function ownerNamed(label: string): Promise<{ token: string; name: string }> {
   const name = `nkm${label}${Date.now() % 1_000_000}${++seq}`.toLowerCase();
   const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: name, display_name: 'Metering', password: 'Metering12345' }) });
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
   const tok = await ownerSignIn(BASE, name, 'Metering12345');
   assert(tok.status === 200, `auth/token ${tok.status}`);
-  return tok.body.data.token as string;
+  return { token: tok.body.data.token as string, name };
+}
+const owner = async (label: string): Promise<string> => (await ownerNamed(label)).token;
+
+const REDIRECT = 'http://localhost:9912/callback';
+/** The author publishes `filename` with ai:use (once), and `user` grants it ai:use: the app's token. */
+async function appGrant(user: string, authorName: string, author: string, filename: string): Promise<string> {
+  const html = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="ai:use"></head><body>metering</body></html>';
+  const pub = await json('/v1/apps', {
+    method: 'POST', headers: auth(author),
+    body: JSON.stringify({ filename, content: Buffer.from(html).toString('base64'), name: `Metering ${filename}`, description: 'metering e2e probe', category: 'utility', visibility: 'public' }),
+  });
+  assert(pub.status === 201 || pub.status === 200 || pub.status === 409, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  const q = new URLSearchParams({ app: `${authorName}/${filename}`, response_type: 'code', scope: 'ai:use',
+    redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256' });
+  const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  const m = /req=([^&]+)/.exec(res.headers.get('location') ?? '');
+  assert(!!m, `consent redirect expected, got ${res.status} ${res.headers.get('location')}`);
+  const con = await json('/v1/app-grants/authorize-consent', {
+    method: 'POST', headers: auth(user), body: JSON.stringify({ request_id: decodeURIComponent(m![1]) }),
+  });
+  assert(con.status === 200, `consent ${con.status}: ${JSON.stringify(con.body?.error)}`);
+  const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+  const tok = await json('/v1/app-grants/token', {
+    method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+  });
+  assert(tok.body.ok === true, `app token: ${JSON.stringify(tok.body.error)}`);
+  return tok.body.data.access_token as string;
 }
 const allowanceLeft = async (t: string) => Number((await json('/v1/chat/status', { headers: auth(t) })).body.data.allowance_remaining_usd);
 const usage = async (t: string) => (await json('/v1/ai/usage', { headers: auth(t) })).body.data as { total_calls: number; spent_today_usd: number };
@@ -310,6 +343,36 @@ const frame = (o: unknown) => `data: ${JSON.stringify(o)}\n\n`;
         stub.setDefault('chat', chatJson('The stub provider answered.'));
         stub.releaseHeld();
       }
+    });
+
+    // ── which app an allowlist entry lets in (ai-app-id.ts:entryNamesApp:bare-allowlist-entry-matches-any-author) ──
+
+    await test('B2. a bare allowlist entry still lets the app in, and the owner is told once when it is another author\'s app', async () => {
+      const { token: alice, name: aliceName } = await ownerNamed('b2a');
+      const { token: bob, name: bobName } = await ownerNamed('b2b');
+      // Alice's own app and Bob's app share the file name the list names.
+      const ownGrant = await appGrant(alice, aliceName, alice, 'notes.html');
+      const bobGrant = await appGrant(alice, bobName, bob, 'notes.html');
+      const saved = await json('/v1/ai/settings', { method: 'POST', headers: auth(alice), body: JSON.stringify({ app_allowlist: ['notes'] }) });
+      assert(saved.status === 200, `allowlist ${saved.status}`);
+      const told = async () => ((await json('/v1/notifications', { headers: auth(alice) })).body?.data?.notifications as any[] ?? [])
+        .filter((n) => n.type === 'ai_app_name_match');
+
+      stub.queue('chat', chatJson('own app answered', { model: NODE_MODEL }), marked('B2OWN'));
+      const own = await complete(ownGrant, { prompt: 'B2OWN hello', app_id: 'notes' });
+      assert(own.status === 200, `Alice's own app is let in: ${own.status} ${JSON.stringify(own.body?.error)}`);
+      await sleep(500);
+      assert((await told()).length === 0, 'her own app tells her nothing');
+
+      for (const marker of ['B2BOB1', 'B2BOB2']) {
+        stub.queue('chat', chatJson('bob app answered', { model: NODE_MODEL }), marked(marker));
+        const r = await complete(bobGrant, { prompt: `${marker} hello`, app_id: 'notes' });
+        assert(r.status === 200, `Bob's app is let in as before: ${r.status} ${JSON.stringify(r.body?.error)}`);
+      }
+      const notices = await until(told, (n) => n.length > 0);
+      assert(notices.length === 1, `one notice for the pair, got ${notices.length}`);
+      assert(String(notices[0].title).includes(`${bobName}/notes`) && String(notices[0].body).includes('"notes"'),
+        `it names the app and the entry: ${JSON.stringify(notices[0])}`);
     });
   } finally {
     await stopServer(server);
