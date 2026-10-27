@@ -43,6 +43,9 @@
  *     not the one the daemon's client was built with, which for an agent moved onto a key was the
  *     stray stored bearer; and AIMEAT_HOME, so its own `aimeat connect call` reaches this daemon
  *     (production refusal log L-3).
+ *   v1.2.1 -- 2026-10-27 -- On Windows with AIMEAT_HOME set and no runner.cwd, a bare runner command
+ *     that the working directory and PATH both hold runs the PATH program (command-path.ts;
+ *     secaudit2026oct26, commandHash:home-bound-not-resolution-directory).
  */
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
@@ -50,6 +53,7 @@ import { join } from 'node:path';
 import type { RegisteredAgent } from './agent-registry.js';
 import { resolveToken } from './agent-key.js';
 import { getConfigDir } from './config.js';
+import { pathPreferredProgram } from './command-path.js';
 import { logger } from '../../utils/logger.js';
 import { writePrivateFile, ensurePrivateDir } from '../../utils/private-file.js';
 
@@ -214,7 +218,10 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
     [nodeUrlEnv]: agent.client.getBaseUrl(),
   };
 
-  const cmd = runner.command;
+  // The approved program, not a same-named file in the directory the daemon happens to run in.
+  const fromPath = runner.cwd ? null : pathPreferredProgram(runner.command);
+  if (fromPath) console.error(`[runner:${agent.agent}] "${runner.command}" is also a file in ${process.cwd()}; running ${fromPath} from PATH`);
+  const cmd = fromPath ?? runner.command;
   const args = runner.args ?? [];
 
   console.error(`[runner:${agent.agent}] task ${task.id} -- launching: ${cmd} ${args.join(' ')}`);
