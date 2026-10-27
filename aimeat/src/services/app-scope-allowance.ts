@@ -35,6 +35,9 @@
  *   const words = await appAllowanceWords(storage, 'alice/notes.html');
  *   const asked = withAllowance(requested, words);
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: keepWorkingAppsOnce leaves a grant its holder narrowed by hand
+ *     (scopesFixedAt) as the holder left it and counts it in the change log (narrowed_grants_left);
+ *     the holder's next sign-in asks for the words once.
  *   v1.3.0 — 2026-10-21 — keepWorkingAppsOnce takes `rules`: only a word that a call found by one of
  *     those rules needs (services/app-on-done-keep-migration.ts gives ext:invoke for an AI job's
  *     on_done and not for an undeclared extension call).
@@ -140,7 +143,12 @@ export async function keepWorkingAppsOnce(
         at: new Date().toISOString(),
       });
       let grants = 0;
+      let narrowedLeft = 0;
       for (const grant of await liveGrantsOf(storage, appId)) {
+        // A grant its holder narrowed by hand (scopesFixedAt) keeps what the holder left it, as the
+        // vocabulary migration and the own-app consent treat it; the holder's next sign-in asks for the
+        // allowance words once (secaudit2026oct26, keep-step-ignores-grant-scopesFixedAt).
+        if (grant.scopesFixedAt) { narrowedLeft++; continue; }
         // Written on the list that was read, so a refresh or the owner's edit meanwhile is kept.
         const changed = await changeScopeList(storage, { kind: 'app-grant', id: grant.grantId }, grant.scopes, held => {
           const add = missing.filter(w => !held.includes(w));
@@ -150,7 +158,7 @@ export async function keepWorkingAppsOnce(
       }
       await recordAppAudit(storage, {
         ownerGhii: app.ownerGaii, filename: app.filename, by: `system@${config.nodeId}`, action: 'scope_allowance.kept',
-        detail: { words: missing.join(', '), grants, reason },
+        detail: { words: missing.join(', '), grants, reason, ...(narrowedLeft ? { narrowed_grants_left: narrowedLeft } : {}) },
       });
       kept.push({ appId, owner: app.ownerName, name: app.manifest?.name || app.filename, words: missing, grants });
     }
