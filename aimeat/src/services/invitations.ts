@@ -21,6 +21,9 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-10-27 — findWorkspaceEntry and the departure revoke read the registry copy that counts
+ *     (workspace-meta-read.ts workspaceRegistrations), not the first copy in store order, so a copy a
+ *     since-demoted admin wrote names no creator (secaudit2026oct26).
  *   2026-10-15 — NAMED_INVITE_ACCEPT_REFUSAL, the one sentence for an agent or app that tries to accept
  *     a named invitation (feature-list audit #57).
  *   2026-10-05 — createEmailInvitation counts the inviter's account allowance (takeInviteEmail), so
@@ -73,6 +76,7 @@ import { formatForPerson } from './display-prefs.js';
 import { grantWorkspaceRole, revokeWorkspaceRole } from './workspace-roles.js';
 import { findPendingInvitation, membershipOwner } from './invitation-lookup.js';
 import { localAccountName } from '../utils/gaii.js';
+import { findWorkspaceRegistration, workspaceRegistrations } from './workspace-meta-read.js';
 import { isValidEmail } from '../utils/email-validator.js';
 import { LOCALES } from '../i18n.js';
 import { emailTemplateLang } from './email-templates.js';
@@ -384,15 +388,9 @@ export async function createEmailInvitation(
 export async function findWorkspaceEntry(
   storage: Storage, orgId: string, ws: string,
 ): Promise<{ id: string; name?: string; createdBy?: string; ownerGaii: string } | null> {
-  const regKey = `organism.${orgId}.meta.workspaces`;
-  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-  for (const rec of items) {
-    if (rec.key !== regKey) continue;
-    const list = (rec.value as { workspaces?: Array<{ id: string; name?: string; createdBy?: string }> } | null)?.workspaces ?? [];
-    const entry = list.find(w => w.id === ws);
-    if (entry) return { ...entry, ownerGaii: rec.ownerGaii };
-  }
-  return null;
+  // The registry copy that counts (workspace-meta-read.ts), not the first in store order (secaudit2026oct26).
+  const reg = await findWorkspaceRegistration(storage, orgId, ws, { archived: 'exclude' });
+  return reg ? { ...reg.entry, ownerGaii: reg.record.ownerGaii } : null;
 }
 
 /** The bare owner behind a memory record's owner identity (`agent#owner@node` / `owner@node` → `owner`). */
@@ -487,27 +485,20 @@ export async function revokeDepartedMemberAccess(
   // says so — one registry record per creator, each listing the workspaces they made. revokeWorkspaceRole
   // is the same call the deny and revoke routes make, so what counts as a workspace-role grant stays
   // defined in exactly one place (services/workspace-roles.ts).
+  // Each workspace once, under the registry copy that counts (workspace-meta-read.ts), the same copy
+  // the grant was made under (secaudit2026oct26).
   const revokedWorkspaces: string[] = [];
-  const regKey = `organism.${organism.id}.meta.workspaces`;
-  const { items } = await storage.listAllMemory({ prefix: regKey, limit: 1000 });
-  const seen = new Set<string>();
-  for (const rec of items) {
-    if (rec.key !== regKey) continue;
-    const list = (rec.value as { workspaces?: Array<{ id?: string; createdBy?: string }> } | null)?.workspaces ?? [];
-    for (const w of list) {
-      if (!w.id || seen.has(w.id)) continue;
-      seen.add(w.id);
-      const createdBy = w.createdBy ?? bareOwnerOf(rec.ownerGaii);
-      if (createdBy === departing) continue;
-      const revoked = await revokeWorkspaceRole(storage, config, {
-        creatorGhii: `${createdBy}@${config.nodeId}`, orgId: organism.id, ws: w.id, grantee: departing,
-      });
-      if (revoked > 0) revokedWorkspaces.push(w.id);
-      // An OPEN request outlives the membership it was made under, and the reviewer's panel reads a
-      // request with no grant as pending — so an ejected member kept asking from beyond the roster.
-      // Closing the membership closes the question.
-      await withdrawAccessRequest(storage, organism.id, w.id, departing);
-    }
+  for (const [wsId, reg] of await workspaceRegistrations(storage, organism.id, { archived: 'exclude' })) {
+    const createdBy = reg.creator;
+    if (createdBy === departing) continue;
+    const revoked = await revokeWorkspaceRole(storage, config, {
+      creatorGhii: `${createdBy}@${config.nodeId}`, orgId: organism.id, ws: wsId, grantee: departing,
+    });
+    if (revoked > 0) revokedWorkspaces.push(wsId);
+    // An OPEN request outlives the membership it was made under, and the reviewer's panel reads a
+    // request with no grant as pending — so an ejected member kept asking from beyond the roster.
+    // Closing the membership closes the question.
+    await withdrawAccessRequest(storage, organism.id, wsId, departing);
   }
 
   if (detachedAgents.length || revokedWorkspaces.length) emitChange('organisms');

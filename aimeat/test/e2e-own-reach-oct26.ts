@@ -15,6 +15,9 @@
  *       (the race shows on PostgreSQL); anchors one after another, a delete and a re-anchor work as before.
  *     - REVIEWS: an account that writes its own record at another account's package key does not read
  *       the operator's review of that package; the owner, the owner's agent and the operator do.
+ *     - ORGANISM META: a copy of the organism manifest or the workspace registry written by an admin
+ *       who has since been demoted decides neither the gate policy nor who decides an access request;
+ *       the creator's copies decide as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
@@ -299,6 +302,70 @@ await test('USE: alice in person, her agent and the operator read the review', a
     }
     const rep = await call('GET', `/v1/knowledge/${pkgId}/reputation`, alice.token);
     assert(rep.status === 200 && rep.body.data.last_review?.action === 'note', `alice's last review: ${rep.status} ${JSON.stringify(rep.body?.data?.last_review)}`);
+});
+
+// ─── ORGANISM META (organisms/shared.ts:organism-meta-first-store-order-copy) ───
+console.log('\nORGANISM META: a copy written by a demoted admin decides nothing');
+
+let zorg!: RegisteredOwner, aadm!: RegisteredOwner, dan!: RegisteredOwner;
+let zOrg = '', zWs = '';
+let zAgent!: McpAgent;
+const orgManifest = (autonomy: string, alwaysGate?: string[]) => ({
+    manifestVersion: '1', id: zOrg, name: 'Meta copies', kind: 'project', status: 'active',
+    objectTypes: [{ name: 'item', namespace: 'shared.items', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:item@1' }],
+    policy: { agentAutonomy: autonomy, ...(alwaysGate ? { alwaysGate } : {}) },
+});
+const askApproval = () => call('POST', `/v1/organisms/${zOrg}/approvals`, zAgent.token, { action: `publish-notes-${Date.now()}`, risk: 'low' });
+
+await test('Setup: zorg\'s organism, aadm its admin who writes a looser manifest and a registry copy, then is demoted', async () => {
+    // aadm's name sorts before zorg's, so a reader that takes the first copy by owner takes aadm's.
+    zorg = await registerOwner(BASE, `zorg${stamp}`);
+    aadm = await registerOwner(BASE, `aadm${stamp}`);
+    dan = await registerOwner(BASE, `ordan${stamp}`);
+    const o = await call('POST', '/v1/organisms', zorg.token, { name: `Meta ${stamp}`, type: 'project', join_policy: 'invite_only', visibility: 'private' });
+    assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body?.error)}`);
+    zOrg = o.body.data.organism.id;
+    const w = await call('POST', `/v1/organisms/${zOrg}/workspaces`, zorg.token, { name: 'Notes', manifest: orgManifest('L3') });
+    assert(w.status === 201, `workspace: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    zWs = w.body.data.ws;
+    for (const who of [aadm, dan]) {
+        const add = await call('POST', `/v1/organisms/${zOrg}/members`, zorg.token, { ghii: who.name });
+        assert(add.status === 201, `add ${who.name}: ${add.status} ${JSON.stringify(add.body?.error)}`);
+    }
+    const promote = await call('POST', `/v1/organisms/${zOrg}/admins`, zorg.token, { target_ghii: aadm.name });
+    assert(promote.status === 200 || promote.status === 201, `promote: ${promote.status} ${JSON.stringify(promote.body?.error)}`);
+    // While admin, aadm writes a manifest that gates nothing and a registry copy naming himself.
+    const m = await call('POST', '/v1/memory', aadm.token, { key: `organism.${zOrg}.meta.manifest`, value: orgManifest('L5', []), visibility: 'private' });
+    assert(m.status === 201 || m.status === 200, `aadm's manifest: ${m.status} ${JSON.stringify(m.body?.error)}`);
+    const reg = await call('POST', '/v1/memory', aadm.token, { key: `organism.${zOrg}.meta.workspaces`, value: { workspaces: [{ id: zWs, name: 'Notes', createdBy: aadm.name }] }, visibility: 'private' });
+    assert(reg.status === 201 || reg.status === 200, `aadm's registry copy: ${reg.status} ${JSON.stringify(reg.body?.error)}`);
+    const own = await call('POST', '/v1/memory', zorg.token, { key: `organism.${zOrg}.meta.manifest`, value: orgManifest('L1'), visibility: 'private' });
+    assert(own.status === 201 || own.status === 200, `zorg's manifest: ${own.status} ${JSON.stringify(own.body?.error)}`);
+    const demote = await call('DELETE', `/v1/organisms/${zOrg}/admins/${aadm.name}`, zorg.token);
+    assert(demote.status === 200, `demote: ${demote.status} ${JSON.stringify(demote.body?.error)}`);
+    zAgent = await makeAgent(BASE, zorg, ['organism:read', 'organism:write']);
+});
+
+await test('ATTACK: the creator\'s L1 gates an agent\'s action; the demoted admin\'s L5 copy does not decide', async () => {
+    const r = await askApproval();
+    assert(r.status === 201 && r.body.data.gated === true, `the action was not gated: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+});
+
+await test('ATTACK: the demoted admin does not decide an access request to zorg\'s workspace', async () => {
+    const ask = await call('POST', `/v1/organisms/${zOrg}/workspace-access`, dan.token, { ws: zWs, message: 'may I' });
+    assert(ask.status === 201, `dan asks: ${ask.status} ${JSON.stringify(ask.body?.error)}`);
+    assert(ask.body.data.workspace_creator === zorg.name, `the request went to ${ask.body.data.workspace_creator}`);
+    const d = await call('POST', `/v1/organisms/${zOrg}/workspace-access/decision`, aadm.token, { ws: zWs, requester: dan.name, decision: 'approve' });
+    assert(d.status === 403, `aadm decided: ${d.status} ${JSON.stringify(d.body?.data ?? d.body?.error)}`);
+});
+
+await test('USE: the workspace creator decides the request, and a current admin\'s newer manifest decides the gate', async () => {
+    const d = await call('POST', `/v1/organisms/${zOrg}/workspace-access/decision`, zorg.token, { ws: zWs, requester: dan.name, decision: 'approve' });
+    assert(d.status === 200, `zorg decides: ${d.status} ${JSON.stringify(d.body?.error)}`);
+    const looser = await call('POST', '/v1/memory', zorg.token, { key: `organism.${zOrg}.meta.manifest`, value: orgManifest('L5', []), visibility: 'private' });
+    assert(looser.status === 200 || looser.status === 201, `zorg's L5: ${looser.status} ${JSON.stringify(looser.body?.error)}`);
+    const r = await askApproval();
+    assert(r.status === 201 && r.body.data.gated === false, `the creator's own L5 did not decide: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
 });
 
 await test('Cleanup: the operator turns classification off', async () => {

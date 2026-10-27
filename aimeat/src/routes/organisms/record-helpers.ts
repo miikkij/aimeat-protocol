@@ -10,6 +10,8 @@
  * @structure canWriteNamespaceRule · roleSatisfies · fresherRec · ownerGhiiOf · collapseKeyTo · revertRecordToDraft
  * @usage import { fresherRec, ownerGhiiOf } from './record-helpers.js';
  * @version-history
+ *   2026-10-27 — readOrganismMetaValue: readOrganismConfig's rule for any organism-level meta record,
+ *     which the gate policy's manifest read uses (secaudit2026oct26, organism-meta-first-store-order-copy).
  *   2026-10-25 — readOrganismConfig takes the newest copy of a current creator or admin of the
  *     organism on this node, not the first copy in storage order (secaudit2026oct22,
  *     readOrganismConfig:first-copy-any-owner).
@@ -109,7 +111,19 @@ export async function collapseKeyTo(storage: Storage, key: string, keepOwner: st
 export async function readOrganismConfig(
     storage: Storage, organismId: string,
 ): Promise<Record<string, unknown> | null> {
-    const key = `organism.${organismId}.meta.config`;
+    return readOrganismMetaValue(storage, organismId, 'meta.config');
+}
+
+/**
+ * The value of one organism-level meta record (`organism.{id}.{rel}`) by the rule readOrganismConfig
+ * describes: the newest copy whose writer is a creator or admin of the organism now. The gate policy
+ * reads the organism manifest (`meta.manifest`) this way since secaudit2026oct26: a copy written by an
+ * admin who was since demoted or removed decided it while it came first in store order.
+ */
+export async function readOrganismMetaValue(
+    storage: Storage, organismId: string, rel: string,
+): Promise<Record<string, unknown> | null> {
+    const key = `organism.${organismId}.${rel}`;
     const { items } = await storage.listAllMemory({ prefix: key, limit: ORGANISM_CONFIG_COPIES });
     const managers: MemoryRecord[] = [];
     const roles = new Map<string, boolean>();
