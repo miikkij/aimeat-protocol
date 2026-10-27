@@ -160,6 +160,49 @@ describe('runSubscriptionRenewals', () => {
       expect(JSON.stringify((await storage.listMemory(SELLER, { prefix: 'notif.' })).map(n => n.value))).toContain('approval_answer_declined');
     });
 
+    // secaudit2026oct26: a shorter period at the same amount is a higher price per day.
+    const reperiod = (period_days: number, amount = 3_990_000) => write(`ext:${EXT}`, PLANS_KEY, { plans: [{ id: 'monthly', title: 'Monthly', amount, currency: 'EUR', period_days }] });
+    const periodAsks = async () => (await storage.listMemory(BUYER, { prefix: 'notif.' })).filter(n => JSON.stringify(n.value).includes('approval_subscription_period'));
+
+    it('a shorter period at the same amount is not charged: the buyer is asked once, and two daily runs charge nothing', async () => {
+      const until = new Date(Date.now() + DAY).toISOString();
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until }));
+      await reperiod(1);
+      const r = await runSubscriptionRenewals(storage, config);
+      expect(r[0]).toMatchObject({ result: 'skipped' });
+      const sub = await subOf();
+      expect(sub.active_until).toBe(until);
+      expect(sub.period_days).toBe(30);
+      expect(sub.price_question).toMatchObject({ amount: 3_990_000, currency: 'EUR', period: until, period_days: 1 });
+      expect((await periodAsks()).length).toBe(1);
+      expect((await runSubscriptionRenewals(storage, config))[0].detail).toContain('waiting for the buyer');
+      expect((await subOf()).active_until).toBe(until);
+      expect((await periodAsks()).length).toBe(1);
+    });
+
+    it('the buyer allows the shorter period with one press: it is the agreed one and the period renews at once', async () => {
+      const until = new Date(Date.now() + DAY).toISOString();
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec({ active_until: until }));
+      await reperiod(7);
+      await runSubscriptionRenewals(storage, config);
+      const id = (await subOf()).price_question.request_id as string;
+      expect(await decidePublishRequest(ctx(), { caller: buyer() }, id, 'approve')).toMatchObject({ ok: true });
+      const sub = await subOf();
+      expect(sub.period_days).toBe(7);
+      expect(Date.parse(sub.active_until) - Date.parse(until)).toBe(7 * DAY);
+    });
+
+    it('designed use: a longer period, or a lower amount over a shorter period at no higher price per day, renews as before', async () => {
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec());
+      await reperiod(60);
+      expect((await runSubscriptionRenewals(storage, config))[0]).toMatchObject({ result: 'renewed' });
+      expect((await subOf()).period_days).toBe(60);
+      await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec());
+      await reperiod(15, 1_995_000);
+      expect((await runSubscriptionRenewals(storage, config))[0]).toMatchObject({ result: 'renewed' });
+      expect((await periodAsks()).length + (await asks()).length).toBe(0);
+    });
+
     it('designed use: the same or a lower price renews as before, at the plan\'s price', async () => {
       await write(BUYER, `commerce.subscription.${EXT}.monthly`, rec());
       await raise(2_990_000);

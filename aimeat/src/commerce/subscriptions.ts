@@ -31,6 +31,9 @@
  * @structure PLANS_KEY · SUBSCRIPTION_PREFIX · readPlan · subscriptionSellableResolver ·
  *   activeSubscriptions · listSubscriptions · cancelSubscription · runSubscriptionRenewals
  * @version-history
+ *   v1.2.1 — 2026-10-27 — A plan whose period got shorter at an amount that does not fall with it is a
+ *     higher price per day and waits for the buyer the same way; allowRaisedPrice checks and records
+ *     the period the buyer was asked about (secaudit2026oct26).
  *   v1.2.0 — 2026-10-25 — A renewal whose plan price went up since the buyer agreed (or whose currency
  *     changed) is not charged: the buyer is asked with one press (subscription-price-ask.ts), and
  *     allowRaisedPrice() makes the new price the agreed one and renews at once. The same or a lower
@@ -262,15 +265,19 @@ const renewalReference = (sub: SubscriptionRecord) => `subrenew:${sub.buyer_ghii
  * daily run. Refused when the subscription, its period or the plan's price is no longer what was asked.
  */
 export async function allowRaisedPrice(
-  storage: Storage, config: AimeatConfig, buyerGhii: string, asked: { ext: string; plan: string; period: string; amount: number; currency: string },
+  storage: Storage, config: AimeatConfig, buyerGhii: string,
+  asked: { ext: string; plan: string; period: string; amount: number; currency: string; period_days?: number },
 ): Promise<{ ok: true; result: SubscriptionRenewalOutcome['result']; detail?: string } | { ok: false; reason: string }> {
   const sub = await readRecord(storage, buyerGhii, asked.ext, asked.plan);
   if (!sub || !sub.auto_renew) return { ok: false, reason: 'the subscription no longer renews' };
   if (sub.active_until !== asked.period) return { ok: false, reason: 'the subscription is in another period now' };
   const plan = await readPlan(storage, asked.ext, asked.plan);
-  if (!plan || plan.amount !== asked.amount || plan.currency !== asked.currency) return { ok: false, reason: 'the plan\'s price changed again since you were asked' };
+  if (!plan || plan.amount !== asked.amount || plan.currency !== asked.currency
+    || (asked.period_days !== undefined && plan.period_days !== asked.period_days)) return { ok: false, reason: 'the plan\'s price changed again since you were asked' };
+  // A question that named the period makes that period the agreed one too (secaudit2026oct26).
+  const agreedPeriod = asked.period_days !== undefined ? { period_days: plan.period_days } : {};
   const agreed = await updateRecord(storage, buyerGhii, subKey(asked.ext, asked.plan), parseRecord,
-    cur => (cur ? { ...cur, amount: plan.amount, currency: plan.currency, updated_at: new Date().toISOString() } : UNCHANGED), { tag: SUBSCRIPTION_ACTION });
+    cur => (cur ? { ...cur, amount: plan.amount, currency: plan.currency, ...agreedPeriod, updated_at: new Date().toISOString() } : UNCHANGED), { tag: SUBSCRIPTION_ACTION });
   if (!agreed) return { ok: false, reason: 'the subscription no longer renews' };
   if (Date.parse(agreed.active_until) <= Date.now() || agreed.last_order === renewalReference(agreed)) return { ok: true, result: 'skipped' };
   const out = await renewOne(storage, config, agreed, renewalReference(agreed));
