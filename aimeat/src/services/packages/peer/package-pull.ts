@@ -24,6 +24,8 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.7.1 — 2026-10-27 — checkUpstream strips the stored upstream address with stripTrailingSlashes
+ *     too; a ZIP import stores the archive's source_url there unchecked (secaudit2026oct26).
  *   v1.7.0 — 2026-10-25 — A pull is bound to the group it was requested and verified for: the signed
  *     name and author must be the requested group's, the manifest must name the signed package, and
  *     each component must arrive under its signed type, or the pull is refused before any write
@@ -447,7 +449,8 @@ export async function checkUpstream(
     }
 
     const timeoutMs = config.federationTimeoutMs ?? 10000;
-    const base = up.url.replace(/\/+$/, '');
+    // A ZIP import stores the archive's own source_url here as is, so the strip must be linear.
+    const base = stripTrailingSlashes(up.url);
     const url = `${base}/v1/federation/packages/${encodeURIComponent(up.groupId)}/attestation`;
 
     let doc: AttestationDoc;
