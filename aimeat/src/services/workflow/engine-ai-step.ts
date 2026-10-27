@@ -55,6 +55,9 @@
  *   v1.14.0 — 2026-10-22 — A result_to_key that names an `organism.*` key is written through the shared
  *     memory write as the run's principal, so the organism namespace rule applies; the owner's own keys
  *     are written as before (step-write.ts; secaudit 2026-10, r66).
+ *   v1.15.0 — 2026-10-27 — The step reads its inputs with the reader of the principal the run acts for,
+ *     so an agent's clearance and a label's audience apply as on the agent's own read; the owner's run
+ *     reads as before (run-reader.ts; secaudit2026oct26, step-reads-use-system-reader-not-run-principal).
  */
 import type { StepDeps, OnPushTerminal } from './engine-steps.js';
 import type { WorkflowRun, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -66,7 +69,7 @@ import { template } from './engine-util.js';
 import { reportOutcome, type ResultWrite } from './engine-answer.js';
 import { logger } from '../../utils/logger.js';
 import { readAiRecords, readAiFile } from '../ai-inputs.js';
-import { systemReader } from '../classification/reader.js';
+import { runReader } from './run-reader.js';
 import { workflowAiCaller } from './ai-caller.js';
 import type { AiCallerContext } from '../ai/caller-context.js';
 import { writeStepValue } from './step-write.js';
@@ -102,9 +105,11 @@ export function dispatchAiStep(
     if (typeof cost === 'number' && Number.isFinite(cost) && cost > 0) spentUsd += cost;
   };
   const appId = `workflow:${workflowId}`;
-  // A step runs with no caller present: the node's own classification reader, whose useForAi
-  // still refuses content a model may not read (TARGET-082).
-  const reader = systemReader(deps, ownerGhii);
+  // A step runs with no caller present: the classification reader of the principal the run acts for
+  // (run-reader.ts), the node's own for the owner's run and the agent's for an agent's run, whose
+  // useForAi refuses content a model may not read and names the agent's clearance (TARGET-082;
+  // secaudit2026oct26).
+  const reader = runReader(deps, run, ownerGhii);
   // Who the step's model calls run as: the principal the run acts for (ai-caller.ts), so the owner's
   // rules for that agent or app apply. Read once, when the first call needs it.
   let whoP: Promise<AiCallerContext> | null = null;

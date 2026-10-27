@@ -15,6 +15,9 @@
  * @structure runAiJob(storage, config, job)
  * @usage scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
  * @version-history
+ *   v1.3.0 -- 2026-10-27 -- A fire waits while a sibling agent's new instruction waits for the owner, and
+ *     runs the earlier instruction when the owner did not allow it (services/schedule-instruction-hold.ts;
+ *     secaudit2026oct26, sibling-edit-fires-under-maker-reach).
  *   v1.2.0 -- 2026-10-25 -- A schedule an agent made reads its inputs with that agent's reader, so the
  *     agent's clearance applies at the fire and a refusal names it; the owner's, an app's and an
  *     ecosystem app's schedules read as an unattended run as before (secaudit2026oct22, lead 494).
@@ -44,6 +47,7 @@ import { writeMemoryRecord } from './memory-write.js';
 import { scopeIsCovered, READ_AS_OWNER_SCOPE } from '../utils/scope-coverage.js';
 import { AiInputHiddenError } from './ai-read-viewer.js';
 import { aiScheduleFireViewer } from './schedule-ai-read.js';
+import { instructionHoldAtFire } from './schedule-instruction-hold.js';
 import { noteAgentRefusal } from './agent-refusals.js';
 import { agentSessionCaller, callerFromAuth } from './caller-context.js';
 
@@ -52,7 +56,12 @@ import { agentSessionCaller, callerFromAuth } from './caller-context.js';
  * server-side completion on the owner's OpenRouter key, and store the result
  * to the owner's output key. Zero agent involvement; runs even when offline.
  */
-export async function runAiJob(storage: Storage, config: AimeatConfig, job: ScheduledJobRecord): Promise<JobRunResult> {
+export async function runAiJob(storage: Storage, config: AimeatConfig, stored: ScheduledJobRecord): Promise<JobRunResult> {
+  // A sibling agent's new instruction that waits for the owner skips this fire; one the owner did not
+  // allow is replaced by the instruction the schedule had (services/schedule-instruction-hold.ts).
+  const held = await instructionHoldAtFire({ storage, config }, stored);
+  if ('wait' in held) return { reads: [], writes: [], skipped: true, skipCode: 'stopped', skipReason: held.wait };
+  const job = held.job;
   const owner = job.ownerScope;
   if (!owner) throw new Error(`AI job "${job.id}" missing ownerScope`);
   const cfg = (job.input ?? {}) as {

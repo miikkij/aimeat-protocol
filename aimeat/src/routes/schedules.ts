@@ -31,6 +31,8 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   2026-10-27 — PATCH answers `approval_request` when a sibling agent's new instruction waits for the
+ *     owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-20 — The write caller says when it is an ecosystem app and carries its roles, so PATCH,
  *     DELETE and trigger refuse a GEAI every schedule but its own and a file-access check can run as
  *     the maker (secaudit 2026-10).
@@ -380,7 +382,12 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       { storage, config, scheduler }, writeCaller(req), id, (req.body ?? {}) as Record<string, unknown>,
     );
     if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
-    res.json(success(config.nodeId, { schedule: out.schedule }));
+    // An instruction held for the owner (services/schedule-instruction-hold.ts) is answered pending.
+    res.json(success(config.nodeId, {
+      schedule: out.schedule,
+      ...(out.approval_request ? { approval_request: out.approval_request } : {}),
+      ...(out.warnings ? { warnings: out.warnings } : {}),
+    }));
   });
 
   // ── DELETE /v1/schedules/:id — cancel ──

@@ -15,6 +15,8 @@
  * @structure GoalRecord · GoalWork · GoalLogEntry · limits and caps · goalKey() · trackingCode() · parseTrackingCode()
  * @usage import { type GoalRecord, goalKey } from './goals-types.js';
  * @version-history
+ *   v1.2.0 — 2026-10-27 — GoalWork.readAsk, readAllowed and readLeftOut: a model work waits for the
+ *     owner's one press on a private record an agent without memory:read-as-owner named (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — A work the node's model does (`runner: 'model'`, MODEL_TAKER, runKey,
  *     resultsKey), and the status `proposed` for a goal the owner's AI proposed (Jouni, 2026-10-25:
  *     the AI proposes, the person approves; with no agent or computer the node's model does the work).
@@ -114,6 +116,14 @@ export interface GoalWork {
   jobId?: string;
   /** When the owner was told that a model work waits because the goal reached its spending limit. */
   limitAt?: string;
+  /**
+   * A model work that waits for the owner's one press: an agent without memory:read-as-owner named
+   * these private records (services/goals/goals-model-reach.ts). The request id and the agent.
+   */
+  readAsk?: { requestId: string; agent: string; keys: string[] };
+  /** Records the owner allowed the model to read for this work, and records left out on a no. */
+  readAllowed?: string[];
+  readLeftOut?: string[];
   /** Skills an open work asks for; an agent whose tags hold one of them may take it. */
   wants?: string[];
   /** Agents that may not take this work: the one whose own result produced it. */

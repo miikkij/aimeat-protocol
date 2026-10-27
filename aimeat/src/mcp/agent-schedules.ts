@@ -18,6 +18,8 @@
  *   import { registerAgentScheduleTools } from './agent-schedules.js';
  *   registerAgentScheduleTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-27 — aimeat_schedule_update answers `approval_request` when the agent's new instruction to a
+ *     sibling's ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-25 — aimeat_schedule_list without workflow:read lists the schedules the agent may manage
  *     (canManageSchedule: its own and its sibling agents') and those that target it; app-made and
  *     ecosystem-app-made schedules, with their prompts, need workflow:read as on GET /v1/schedules
@@ -198,7 +200,13 @@ export function registerAgentScheduleTools(
         prompt: a.prompt,
       });
       if (!out.ok) return err(`${out.code}: ${out.message}`);
-      return text({ updated: true, schedule_id: a.schedule_id, ...(a.prompt !== undefined && out.schedule ? { prompt: schedulePromptOf(out.schedule).prompt } : {}) });
+      return text({
+        updated: true, schedule_id: a.schedule_id,
+        ...(a.prompt !== undefined && out.schedule ? { prompt: schedulePromptOf(out.schedule).prompt } : {}),
+        // An instruction held for the owner (services/schedule-instruction-hold.ts) is answered pending.
+        ...(out.approval_request ? { approval_request: out.approval_request } : {}),
+        ...(out.warnings ? { warnings: out.warnings } : {}),
+      });
     },
   );
 

@@ -1778,6 +1778,12 @@
       },
       "why": "Reviewed 2026-10-25 (agent goals, the node's model as a worker), the node's own read: the answer a goal's own background AI job wrote to its temporary record (goal-runs.<goal>.<work>), read once to move it into the goal's results record for the same owner and then deleted. The job and the record are the goal's; nobody else's content is read."
     },
+    "src/services/goals/goals-model-reach.ts": {
+      "reads": {
+        "getOwnerScopeMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26, goal model work), the node's own read: a record an agent named in a goal is looked up only for its namespace and visibility, to learn whether that agent may read it before the model work starts; its value is not read on. What the model reads comes through services/ai-inputs.ts when the job runs."
+    },
     "src/services/goals/goals-ops.ts": {
       "reads": {
         "getMemory": 2
@@ -2398,6 +2404,12 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-10-22 (secaudit 2026-10, r49), the node's own read: the once-only step's own record under system@<node>, and a record a scheduled AI job names, read only to learn whether the saver may see it before the schedule is saved; the content the job's model reads comes through services/ai-inputs.ts when it runs."
+    },
+    "src/services/schedule-instruction-hold.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26, sibling schedule edit), the node's own read: the hold record a held schedule instruction keeps under system@<node> (schedules.instruction-hold.<id>), written only by this file. No content anybody classified."
     },
     "src/services/schedule-extension-keep.ts": {
       "reads": {

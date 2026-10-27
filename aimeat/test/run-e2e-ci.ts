@@ -935,6 +935,9 @@ const ALL_SUITES = [
     // A scheduled AI job reads what its maker may read, and a schedule stored before that rule keeps
     // reading as before until it is changed (secaudit 2026-10 wave 3, r49). In-process node on block 31700.
     'test/e2e-schedule-ai-input-reach.ts',
+    // A sibling's new instruction to another agent's ai schedule waits for the owner's one press when the
+    // schedule reads with more reach than the editor has (secaudit2026oct26). In-process node on block 31900.
+    'test/e2e-schedule-sibling-instruction.ts',
     // A group message attachment is delivered as the version that was sent or not at all (secaudit
     // 2026-10 wave 3, v82). In-process node on block 31800.
     'test/e2e-group-attachment-version.ts',

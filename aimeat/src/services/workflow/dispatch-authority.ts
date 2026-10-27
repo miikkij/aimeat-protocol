@@ -23,12 +23,19 @@
  *
  *   The principal is resolved at most once per tick, and only when a step is about to dispatch, so a
  *   tick costs one lookup however many steps it dispatches.
- * @structure runPrincipalAtStart(def, caller, ownerGhii) · runPrincipal(run) · dispatchGate(storage, run)
+ *
+ *   A run whose account is deactivated dispatches nothing (waits()): its steps stay as they are, the
+ *   run is not ended, and a tick after reactivation dispatches them, as a schedule of that account
+ *   waits (services/account-deactivated.ts).
+ * @structure runPrincipalAtStart(def, caller, ownerGhii) · runPrincipal(run) · dispatchGate(storage, run, ownerGhii)
  * @usage
- *   const gate = dispatchGate(storage, run);
+ *   const gate = dispatchGate(storage, run, ownerGhii);
+ *   if (await gate.waits()) { ...stop dispatching for this tick... }
  *   if (await gate.refuses(step, now)) { ...stop the tick, persist the run... }
  *   await gate.tell(deps, ownerGhii);   // after the refused run is saved
  * @version-history
+ *   v1.1.0 — 2026-10-27 — waits(): a run in flight dispatches no step while its account is deactivated,
+ *     and resumes after reactivation (secaudit2026oct26, dispatchGate:in-flight-run-ignores-deactivation).
  *   v1.0.1 — 2026-10-21 — A run with no recorded principal (started before v1.0.0) is not asked again
  *     and dispatches as before. The saver used to stand in for it, which refused, at its next step, a
  *     run the owner had started in person on a workflow an agent saved; no record asked for that.
@@ -36,6 +43,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
+import { deactivatedAccountSkip } from '../account-deactivated.js';
 import { missingStepScopes, saverFromCaller, type WorkflowCaller } from './step-authority.js';
 import { saverOfDef, saverAuthority, openInFlightRefusal, type SaverNow, type TriggerAuthorityDeps } from './trigger-authority.js';
 import type { WorkflowDef, WorkflowRun, WorkflowSaver, WorkflowStep } from '../../models/workflow-schemas.js';
@@ -92,14 +100,34 @@ export interface DispatchGate {
   refuses(step: WorkflowStep, nowIso: string): Promise<boolean>;
   /** After the refused run is saved: the refusal is opened and the owner told, once. A no-op otherwise. */
   tell(deps: TriggerAuthorityDeps, ownerGhii: string): Promise<void>;
+  /**
+   * Is the run's account deactivated? True: no step is dispatched in this tick, the steps stay as
+   * they are, and the run dispatches again at a tick after reactivation (account-deactivated.ts).
+   */
+  waits(): Promise<boolean>;
 }
 
 /** The dispatch check for one tick of one run. The principal is resolved once, on the first dispatch. */
-export function dispatchGate(storage: Storage, run: WorkflowRun): DispatchGate {
+export function dispatchGate(storage: Storage, run: WorkflowRun, ownerGhii?: string): DispatchGate {
   const principal = runPrincipal(run);
   let held: Promise<SaverNow> | null = null;
   let refused: { now: SaverNow; missing: string[]; stepId: string } | null = null;
+  let paused: Promise<boolean> | null = null;
   return {
+    waits() {
+      // Asked once per tick, before the first dispatch. A run in flight acts in the account's name
+      // with no token, as a schedule fire does, so it waits while the account is deactivated
+      // (secaudit2026oct26, dispatchGate:in-flight-run-ignores-deactivation). A failed owner read
+      // dispatches as before, with a log line: the run's principal check below still applies.
+      paused ??= deactivatedAccountSkip(storage, ownerGhii).then(skip => {
+        if (skip) logger.info(`workflow "${run.workflowId}" run ${run.runId}: no step dispatched. ${skip}`);
+        return !!skip;
+      }, err => {
+        logger.warn('workflow dispatch: the account state could not be read', { runId: run.runId, error: String(err) });
+        return false;
+      });
+      return paused;
+    },
     async refuses(step, nowIso) {
       if (!principal || principal.kind === 'owner') return false;
       held ??= saverAuthority(storage, principal);
