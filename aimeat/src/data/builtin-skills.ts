@@ -19,6 +19,8 @@
      unchanged to builtin-skills.content-pipeline.ts (max-file-lines).
  *   2026-10-25 -- aimeat-node-guide: an existing agent coming back proves it with `proof` on
  *     device-authorize; without it the owner sees a takeover (secaudit2026oct22, lead 2150).
+ *   2026-10-27 -- diagnose-a-workflow, step 7: on a model with no catalogue price, a 402 may mean another
+ *     call of the account still holds what is left (secaudit2026oct26).
  *   2026-10-25 -- diagnose-a-workflow, step 7: a 402 on the node's key may be a call that costs more
  *     than is left; aimeat-node-guide: the email form of device-authorize is counted per network
  *     address (secaudit2026oct22).
@@ -654,7 +656,8 @@ metadata:
    first provider failed and the attempts say why. A 402 \`QUOTA_EXHAUSTED\` on the node's key means
    the owner's allowance is spent and the operator's setting refuses, or a daily cap the operator
    set was reached, or the call would cost more than is left (the node prices a call before it
-   runs, with the answer at most the operator's length limit); its message says which. The owner's
+   runs, with the answer at most the operator's length limit), or, on a model the catalogue has no
+   price for, another call of the account still holds what is left; its message says which. The owner's
    own key, more allowance, or a shorter answer or a cheaper model for the last case, is the fix.
    A step that named no model is answered by the free model instead only when the free model as the
    last resort is on for the owner (\`free_model\` on \`GET /v1/ai/routing\`); off, it gets this 402 too.

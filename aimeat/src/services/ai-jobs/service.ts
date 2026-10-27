@@ -22,6 +22,8 @@
  *   const service = new AiJobService(config, storage);
  *   await service.startJob({ prompt, result_key }, { ownerGhii, createdBy });
  * @version-history
+ *   v1.17.2 -- 2026-10-27 -- The per-owner queue brake and the slot pool's lane count the account (ownerGhiiOf), not the
+ *     calling principal; visibleToViewer moved to types.ts unchanged (secaudit2026oct26, per-owner-queue-brake-keyed-on-principal).
  *   v1.17.1 -- 2026-10-25 -- An on_done callback names the account's own extension through services/component-address.ts, own
  *     first, and readResult reads a short name on a job as the owner's `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   v1.17.0 -- 2026-10-25 -- finish() tells the finished-job listeners (finished-listeners.ts).
@@ -100,7 +102,7 @@ import { CAS_ATTEMPTS } from '../record-cas.js';
 import { SlotPool, SlotAbortedError } from '../slot-pool.js';
 import { AiCompletionError } from '../ai/completion.js';
 import { aiJobKeyRefusal } from '../ai-job-keys.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { assembleJobPrompt } from './prompt.js';
 import { jobReader, jobWriter, jobReadViewer, starterMayInvokeExtensions, onDoneScopeRefusal } from './starter.js';
@@ -123,21 +125,12 @@ import {
     AiJobError,
     type AiJobRecord, type AiJobState, type AiJobLogEntry, type AiJobClassificationWarnings,
     type StartAiJobInput, type StartAiJobContext, type StartAiJobResult, type AiJobStarter,
-    type AiJobResultRead, type AiJobViewer,
+    type AiJobResultRead, type AiJobViewer, visibleToViewer,
 } from './types.js';
 
 /** How long a caller is asked to wait after a queue-full refusal. A guess would be worse than a
  *  round number: what it really says is "shortly", and Retry-After has no way to say that. */
 const RETRY_AFTER_SECONDS = 30;
-
-/**
- * Whether this viewer may see this job. No viewer means the caller's own key IS the lookup key (the
- * REST routes resolve the principal) or the caller is the node itself, so there is nothing to fence.
- * A viewer that does not read as the owner sees only what it started: `created_by` is the audit
- * trail, and it is the only field that says which principal asked for the job.
- */
-const visibleToViewer = (job: { created_by: string }, viewer?: AiJobViewer): boolean =>
-    !viewer || viewer.all || job.created_by === viewer.principal;
 
 /** What a live job carries in this process, beside the record in storage. */
 interface LiveEntry {
@@ -413,7 +406,8 @@ export class AiJobService implements AiJobStarter {
     private async run(jobId: string): Promise<void> {
         const entry = this.live.get(jobId);
         if (!entry) return;
-        const owner = entry.job.owner;
+        // The lane is the account, so its agents and access tokens share one turn (secaudit2026oct26).
+        const owner = ownerGhiiOf(entry.job.owner);
 
         try {
             await this.pool.acquire(owner, { signal: entry.controller.signal });
@@ -697,13 +691,14 @@ export class AiJobService implements AiJobStarter {
         if (!ext!.actions.some(a => a.id === actionId)) refuse();
     }
 
-    /** Queued jobs, node-wide or for one owner. Counted from this process's own live map, which is
-     *  the only place that knows what has been accepted but not yet started. */
+    /** Queued jobs, node-wide or for one account (an agent's or access token's job counts under its owner).
+     *  Counted from this process's own live map, the only place that knows what was accepted but not started. */
     private countQueued(ownerGhii?: string): number {
+        const account = ownerGhii ? ownerGhiiOf(ownerGhii) : undefined;
         let n = 0;
         for (const entry of this.live.values()) {
             if (entry.job.state !== 'queued') continue;
-            if (ownerGhii && entry.job.owner !== ownerGhii) continue;
+            if (account && ownerGhiiOf(entry.job.owner) !== account) continue;
             n++;
         }
         return n;

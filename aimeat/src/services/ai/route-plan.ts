@@ -31,6 +31,11 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.9.1 -- 2026-10-27 -- A node-key call is priced by everything it sends (estimate.inputTokens: tools,
+ *     pictures, files), not only its prompt; the owner's own ceiling reads promptTokens as before.
+ *     A node-key text call on a model the catalogue does not price is priced by the
+ *     settlement's fallback rates (catalog/price.ts uncataloguedTextCost) and holds at most what is left,
+ *     so calls side by side no longer run unheld; with nothing left it is a spent allowance (secaudit2026oct26).
  *   v1.9.0 — 2026-10-25 — The free model on the node's key is the last resort only: a degraded candidate
  *     waits behind every other candidate, and the account's rule freeModelLastResort (null: the node's
  *     ai.free_model_last_resort) can switch it off, so the call is refused with 402 and the price
@@ -75,7 +80,7 @@ import { defaultsFor, type LoadedRouting, type RoutingRules } from './routing.js
 import { isFixedType, type AiCapability, type AiOp, type AiTarget } from './types.js';
 import { UNSET_MODEL } from './unset-model.js';
 import { catalogModel } from './catalog/store.js';
-import { textPricePerMtok } from './catalog/price.js';
+import { textPricePerMtok, uncataloguedTextCost } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 import { extensionRunner } from './extension-provider.js';
 import { nodeKeyOutputCap, nodeKeyRoomUsd, tooCostlyMessage, type NodeKeyHold } from './node-key-hold.js';
@@ -153,8 +158,9 @@ export interface RoutePlanInput {
    *  The shape is written out here: importing it would close a cycle through ai/completion.ts. */
   nodeAllowance: () => Promise<NodeKeyAnswer>;
   /** What the call will use, for the owner's price ceiling: the prompt's tokens (a quarter of its
-   *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way. */
-  estimate?: { promptTokens?: number; maxTokens?: number };
+   *  length) and the answer's cap. Absent, a text call is estimated at 1024 tokens each way.
+   *  `inputTokens` is everything the call sends (ai/call-size.ts): a call on the node's key is priced by it. */
+  estimate?: { promptTokens?: number; maxTokens?: number; inputTokens?: number };
   /** The app's order of preference for this capability, from `prefer.<capability>` in its meta:
    *  provider types and model references. It orders the owner's candidates and adds none. */
   appPrefer?: string[];
@@ -420,9 +426,21 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       // here from the prompt's size and the answer's length (at most the operator's limit), less what
       // the account's calls in flight hold (ai/node-key-hold.ts; secaudit2026oct22).
       const maxTokens = nodeKeyOutputCap(config, input.estimate?.maxTokens);
-      const est = allowance.mayPay ? estimateCallUsd(p.type, model, capability, { ...input.estimate, ...(maxTokens ? { maxTokens } : {}) }) : undefined;
+      // Priced by everything the call sends (inputTokens: tools, pictures, files; ai/call-size.ts,
+      // secaudit2026oct26); the owner's own ceiling above keeps reading promptTokens.
+      const promptTokens = input.estimate?.inputTokens ?? input.estimate?.promptTokens;
+      const sized = { ...input.estimate, ...(promptTokens !== undefined ? { promptTokens } : {}), ...(maxTokens ? { maxTokens } : {}) };
+      const priced = allowance.mayPay ? estimateCallUsd(p.type, model, capability, sized) : undefined;
       const room = allowance.mayPay ? nodeKeyRoomUsd(gaii, allowance) : 0;
-      const tooCostly = est !== undefined && est > room;
+      // A text model the catalogue does not price (openrouter/auto, a model it does not list) is priced
+      // by the rates settlement falls back to, and holds at most what is left: one such call runs as
+      // before, and calls side by side see each other; with nothing left it is a spent allowance
+      // (secaudit2026oct26, node-key-unpriced-model-zero-hold).
+      const unpriced = allowance.mayPay && priced === undefined && TOKEN_PRICED.includes(capability)
+        ? uncataloguedTextCost(p.type, model, sized.promptTokens ?? DEFAULT_ESTIMATE_TOKENS, sized.maxTokens ?? DEFAULT_ESTIMATE_TOKENS).costUsd
+        : undefined;
+      const est = unpriced !== undefined ? Math.min(unpriced, Math.max(0, room)) : priced;
+      const tooCostly = unpriced !== undefined ? !(room > 0) : est !== undefined && est > room;
       if (!allowance.mayPay || tooCostly) {
         const free = config.modelFreeFallback;
         const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
@@ -432,7 +450,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
         if (freeAllowed && !input.requested && lastResortOn) {
           model = free; degradedToFree = true;
         } else if (!(freeAllowed && model === free)) {
-          const spent = tooCostly ? tooCostlyMessage(est!, room) : allowance.message;
+          const spent = tooCostly ? tooCostlyMessage(unpriced ?? est!, room) : allowance.message;
           const message = input.op === 'text' && free && !input.requested && !freeAllowed
             ? `${spent ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
             : input.op === 'text' && free && !input.requested && !lastResortOn

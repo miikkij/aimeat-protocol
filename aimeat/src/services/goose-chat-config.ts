@@ -30,6 +30,7 @@
  * @usage
  *   const { root, cwd } = ensureChatGooseConfig(config);   // before `goose acp` starts
  * @version-history
+ *   v1.1.1 -- 2026-10-27 -- config/ and work/ are created 0700 under an operator-set root too (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — The default root under the temp directory is created 0700 and used only when
  *     this account owns it; otherwise a private directory beside it is used (secaudit2026oct22).
  *   v1.0.0 — 2026-10-04 — Initial.
@@ -122,8 +123,10 @@ let warnedOperatorFile = false;
 export function ensureChatGooseConfig(config: RootConfig): { root: string; cwd: string } {
   const root = chatGooseRoot(config);
   const cwd = chatWorkDir(config);
-  mkdirSync(join(root, 'config'), { recursive: true });
-  mkdirSync(cwd, { recursive: true });
+  // Created private, as the default root is: goose keeps its sessions and logs under the root, and an
+  // operator-set root is used as given (secaudit2026oct26). An existing directory keeps its mode.
+  mkdirSync(join(root, 'config'), { recursive: true, mode: 0o700 });
+  mkdirSync(cwd, { recursive: true, mode: 0o700 });
   const file = join(root, 'config', 'config.yaml');
   const wanted = chatGooseConfigYaml();
   const current = existsSync(file) ? readFileSync(file, 'utf8') : null;

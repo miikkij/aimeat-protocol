@@ -10301,6 +10301,8 @@
   "notiftext.approval_answer_allowed.body": "{who} salli pyynnön. Muutos on nyt voimassa.",
   "notiftext.approval_answer_declined.title": "Ei sallittu: {what}",
   "notiftext.approval_answer_declined.body": "{who} ei sallinut pyyntöä. Mikään ei muuttunut.",
+  "notiftext.ai_app_name_match.title": "{app} käytti tekoälyä listasi nimellä ”{entry}”",
+  "notiftext.ai_app_name_match.body": "Listassasi sovelluksista, jotka saavat käyttää tekoälyä, on nimi ”{entry}”. Sovellus {app} on toisen tekijän, mutta sen tiedostonimi on sama, joten sekin saa käyttää tekoälyä. Jos tarkoitit toista sovellusta, kirjoita listaan sen koko nimi (tekijä/sovellus) nimen ”{entry}” tilalle.",
   "notiftext.approval_answer_expired.title": "Ei vastausta: {what}",
   "notiftext.approval_answer_expired.body": "Kukaan ei vastannut pyyntöön ajoissa. Mikään ei muuttunut. Pyydä uudelleen, jos tarvitset sitä yhä.",
   "notiftext.approval_answer_outdated.title": "Ei tehty: {what}",

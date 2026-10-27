@@ -33,6 +33,8 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-10-27 -- aimeat-paying-for-the-ai: a node-key call is priced by everything it sends, a model
+ *     with no catalogue price runs one call at a time on what is left, and empty attempts are counted (secaudit2026oct26).
  *   2026-10-25 — aimeat-paying-for-the-ai: the free model is the last resort, on or off by the
  *     operator's default and the person's own routing rule (secaudit2026oct22 follow-up).
  *   2026-10-18 — aimeat-welcome-pages: `access` says who may open the person's page or the company's
@@ -521,14 +523,18 @@ not you:
    node's key keeps paying past the allowance up to a cap per account and a cap for all accounts,
    and the refusal then says which cap was reached and that it opens again the next day (UTC).
 
-**On the node's key a call is priced before it runs.** The node estimates the call from the length
-of the prompt and of the answer, and an answer there is at most the operator's limit long (32,000
+**On the node's key a call is priced before it runs.** The node estimates the call from everything
+it sends (the prompt, and the tools, pictures and files that go with it) and from the length of the
+answer, and an answer there is at most the operator's limit long (32,000
 tokens by default; a longer one comes back cut short, with \`truncated: true\`). While the call runs,
 its price is held against what is left, so calls side by side cannot spend more than is left
 together. A call that would cost more than is left is treated like a spent allowance: a text call
 that named no model gets the free model, and any other is refused (\`QUOTA_EXHAUSTED\`) with the
 price and what is left. The fix is in the refusal: ask for a shorter answer (\`max_tokens\`), name a
-cheaper model, or wait for a call still running to finish.
+cheaper model, or wait for a call still running to finish. A model with no price in the catalogue
+(\`openrouter/auto\`, for one) runs one call at a time on what is left: a second call beside it gets
+the same answer as a spent allowance until the first is settled. An answer that came back empty and
+was asked again was still a call the provider billed, so it is counted against the allowance too.
 
 **One step can come before all three: a key for a single agent.** The owner may give one agent a key
 of its own on that agent's page (AI keys, cap and gate). That key then pays for that agent's calls

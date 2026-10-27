@@ -21,10 +21,13 @@
  *   OLD NAMES KEEP WORKING. Keys written before this rule (a cap saved under `owner/app.html`, today's
  *   spend under `app.html`) are read through the same function, so they count toward and limit the
  *   canonical app instead of being ignored.
- * @structure canonicalAiAppId · namesSignedApp · appSpentToday · appQuotaFor · appAllowlisted · mergePerApp
+ * @structure canonicalAiAppId · namesSignedApp · appSpentToday · appQuotaFor · appAllowlisted · bareNameOnlyEntry ·
+ *   mergePerApp
  * @usage
  *   const appKey = canonicalAiAppId(call.appId, gaii) || '_unknown';
  * @version-history
+ *   2026-10-27 -- bareNameOnlyEntry: which bare allowlist entry lets another author's app in by its file
+ *     name alone, so the owner can be told (secaudit2026oct26).
  *   2026-10-25 — A cap or allowlist entry under the name an app called itself also holds for the
  *     signed app reference an app grant's call is now attributed to (entryNamesApp; secaudit2026oct22).
  *   2026-10-19 — namesSignedApp: does a body app_id name the app token's own app, under any of its
@@ -109,6 +112,21 @@ export function appQuotaFor(
 /** True when the owner's allowlist names this app under any of its names. */
 export function appAllowlisted(allowlist: unknown[], appId: string, ownerGhii?: string): boolean {
   return allowlist.some(e => entryNamesApp(e, appId, ownerGhii));
+}
+
+/**
+ * The bare entry (`notes`) through which ANOTHER author's signed app (`bob/notes.html`) is in the
+ * owner's list, when no entry names that app with its author: the 2026-10-25 compatibility match
+ * above, which also lets in any other author's app of the same file name. Undefined for the owner's
+ * own app, for an app an entry names exactly, and for an app no entry names. The owner is told of
+ * the match once (services/ai/app-name-notice.ts; secaudit2026oct26).
+ */
+export function bareNameOnlyEntry(entries: unknown[], appId: string, ownerGhii?: string): string | undefined {
+  const app = canonicalAiAppId(appId, ownerGhii);
+  if (!app || !app.includes('/')) return undefined;
+  if (entries.some(e => canonicalAiAppId(e, ownerGhii) === app)) return undefined;
+  const hit = entries.find(e => typeof e === 'string' && !e.includes('/') && namesSignedApp(e, appId));
+  return typeof hit === 'string' ? hit : undefined;
 }
 
 /** A per-app map with every name folded into its canonical one, sums added. For readers of history. */
