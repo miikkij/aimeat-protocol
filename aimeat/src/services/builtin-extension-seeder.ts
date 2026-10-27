@@ -30,6 +30,10 @@
  * @usage
  *   await seedBuiltinExtensions(storage, config, scheduler);   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A record under a shipped name that another account holds (not `system`,
+ *     not an operator) is left as it is and gets no shipped code; the operator is told once with the
+ *     security incident BUILTIN_EXTENSION_NAME_HELD, as the bundled cortex seeder does
+ *     (secaudit2026oct26).
  *   v1.0.0 — 2026-09-06 — Initial (living hooks, the node-side half).
  */
 import type { AimeatConfig } from '../config.js';
@@ -39,6 +43,9 @@ import { buildExtensionRecordFromManifest } from './extension-manifest.js';
 import { writeExtensionRecord, activateExtension } from './extension-lifecycle.js';
 import { BUILTIN_EXTENSIONS, type BuiltinExtension } from '../data/builtin-extensions/index.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
+import { isOperatorCaller } from './operator-override.js';
+import { recordSecurityIncident, SECURITY_INCIDENT_PREFIX, securityOwner } from './security-incident.js';
 
 /** The owner a shipped extension is recorded under. Not a sign-in account. */
 export const BUILTIN_EXTENSION_OWNER = 'system';
@@ -48,6 +55,32 @@ export interface BuiltinSeedResult {
   updated: string[];
   unchanged: string[];
   refused: string[];
+  /** Shipped names another account holds: left as they are, and reported to the operator. */
+  held: string[];
+}
+
+/**
+ * Is a record under a shipped name the node's own? `system` (or a `system@` seeder identity), or an
+ * operator's account: an operator who installed or redeployed a built-in by hand keeps it (rule 2).
+ */
+async function heldByNode(storage: Storage, config: AimeatConfig, installedBy: string): Promise<boolean> {
+  if (installedBy === BUILTIN_EXTENSION_OWNER || installedBy.startsWith(`${BUILTIN_EXTENSION_OWNER}@`)) return true;
+  const owner = localAccountName(installedBy);
+  return isOperatorCaller(storage, { sub: `${owner}@${config.nodeId}`, owner, roles: ['owner'], scopes: [] });
+}
+
+/** One incident per account found holding a shipped extension name; a later start opens none. */
+async function reportHeldName(storage: Storage, config: AimeatConfig, existing: ExtensionRecord): Promise<void> {
+  const source = `extension-name:${existing.name}@${existing.installedBy}`;
+  const { items } = await storage.listAllMemory({ prefix: SECURITY_INCIDENT_PREFIX, limit: 1000 });
+  const owner = securityOwner(config.nodeId);
+  if (items.some(r => r.ownerGaii === owner && ((r.value as { sources?: string[] })?.sources ?? []).includes(source))) return;
+  await recordSecurityIncident(storage, { nodeId: config.nodeId }, {
+    type: 'extension_name', code: 'BUILTIN_EXTENSION_NAME_HELD', actorGhii: existing.installedBy, source: 'builtin_extension_seeder',
+    detail: `The extension "${existing.name}" is one this node ships, and the record under that name was installed by ${existing.installedBy}. `
+      + `Calls to /v1/ext/${existing.name}/ reach that account's code. The record was left as it is. Uninstall it if it is not the node's, and the next start installs the shipped extension.`,
+    sources: [source],
+  });
 }
 
 /**
@@ -121,12 +154,23 @@ export async function seedBuiltinExtensions(
   config: AimeatConfig,
   scheduler?: Scheduler | null,
 ): Promise<BuiltinSeedResult> {
-  const result: BuiltinSeedResult = { installed: [], updated: [], unchanged: [], refused: [] };
+  const result: BuiltinSeedResult = { installed: [], updated: [], unchanged: [], refused: [], held: [] };
   const now = new Date().toISOString();
 
   for (const builtin of BUILTIN_EXTENSIONS) {
     try {
       const existing = await storage.getExtension(builtin.name);
+
+      // Another account's record under a name the node ships (installed before a release added the
+      // name): not the node's, so it is neither adopted nor given the shipped code under that
+      // account's management. It is left as it is, and the operator is told once, as the bundled
+      // cortex seeder does (secaudit2026oct26).
+      if (existing && !(await heldByNode(storage, config, existing.installedBy))) {
+        result.held.push(builtin.name);
+        logger.error(`Built-in extension "${builtin.name}": the name is held by ${existing.installedBy}, not installed or updated`);
+        await reportHeldName(storage, config, existing);
+        continue;
+      }
 
       // Same version or newer than what we ship: somebody else's copy wins, and that is the point
       // of comparing rather than overwriting.
