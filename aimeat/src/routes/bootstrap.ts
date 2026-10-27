@@ -8,7 +8,9 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
- *   2026-10-21 — The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
+ *   2026-10-27 — secaudit2026oct26: GET /v1/health probes storage with one keyed read instead of
+ *     listing every account, lists the personal nodes once, and reads one mailbox item per node.
+ *   2026-10-21 —The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
  *     "accelerate your AI" page (public/front-start.html, .fi sibling), same rules as demo.
  *   2026-10-17 — A node set to signed-in content access answers GET / without the operator's
  *     template, the front page passages and the live page body, and the JSON bootstrap says
@@ -700,15 +702,19 @@ export function bootstrapRouter(
       };
     }
 
+    // The personal nodes, listed once for the tunnel and the mailbox subsystems (secaudit2026oct26).
+    // Both readers await it inside their own try, the mailbox one always.
+    const personalNodes = config.personalNodesEnabled ? storage.listPersonalNodes() : null;
+
     // Tunnel subsystem
-    if (config.personalNodesEnabled && tunnelManager) {
+    if (personalNodes && tunnelManager) {
       const tunnelSub: Record<string, unknown> = {
         healthy: true,
         connections_active: tunnelManager.getOnlineCount(),
       };
       // Find most recent connection timestamp from online nodes
       try {
-        const nodes = await storage.listPersonalNodes();
+        const nodes = await personalNodes;
         let newest: string | null = null;
         for (const n of nodes) {
           if (n.lastSeen && (!newest || n.lastSeen > newest)) newest = n.lastSeen;
@@ -719,9 +725,9 @@ export function bootstrapRouter(
     }
 
     // Mailbox subsystem
-    if (config.personalNodesEnabled) {
+    if (personalNodes) {
       try {
-        const nodes = await storage.listPersonalNodes();
+        const nodes = await personalNodes;
         let totalItems = 0;
         let totalBytes = 0;
         let oldestAge = 0;
@@ -730,7 +736,8 @@ export function bootstrapRouter(
           const mbStats = await storage.getMailboxStats(node.nodeId);
           totalItems += mbStats.count;
           totalBytes += mbStats.totalBytes;
-          const items = await storage.listMailboxItems(node.nodeId);
+          // Ordered oldest first, so the first item is the oldest; one is all this reads.
+          const items = await storage.listMailboxItems(node.nodeId, { limit: 1 });
           if (items.length > 0) {
             const age = Math.floor((Date.now() - new Date(items[0].createdAt).getTime()) / 1000);
             if (age > oldestAge) oldestAge = age;
@@ -752,11 +759,13 @@ export function bootstrapRouter(
 
     // Storage health probe, with its own time limit: a database that stops answering made this
     // request wait without end, so the health check did not answer at all (QA audit E6-07). The
-    // pool's own limits end the query later; the probe answers degraded first.
+    // pool's own limits end the query later; the probe answers degraded first. The probe is one keyed
+    // read of a name no account can hold: listing every account made each unsigned call cost as much as
+    // the node has accounts (secaudit2026oct26).
     let probeTimer: ReturnType<typeof setTimeout> | undefined;
     try {
       await Promise.race([
-        storage.listOwners(),
+        storage.getOwner('__health_probe__'),
         new Promise((_, reject) => { probeTimer = setTimeout(() => reject(new Error(`storage did not answer within ${HEALTH_STORAGE_PROBE_MS} ms`)), HEALTH_STORAGE_PROBE_MS); }),
       ]);
       subsystems.storage = { healthy: true };
