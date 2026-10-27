@@ -6,6 +6,8 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — The clone copies the source copy the package's importer wrote (firstPackageCopy)
+ *     (secaudit2026oct26).
  *   2026-10-24 — The sharing PATCH, the entry visibility PATCH and the clone refuse the shared
  *     anonymous principal with refuseAnonymousPrincipal: a package lives under packages/<id>/, outside
  *     the anonymous.* namespace (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
@@ -51,7 +53,7 @@ import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
 import { success, error } from '../../middleware/envelope.js';
 import { refuseClassified } from '../../middleware/refusals.js';
 import { emitChange } from '../../services/event-bus.js';
-import type { KnowledgeHelpers } from './helpers.js';
+import { firstPackageCopy, type KnowledgeHelpers } from './helpers.js';
 import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { memoryTarget } from '../../services/classification/labels.js';
@@ -225,7 +227,7 @@ export function registerSharingRoutes(
     // Find the source manifest across all agents in ONE IN query (was getMemory per agent).
     const allAgents = await storage.listAgents();
     const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: sourceManifestKey, visibility: 'public' });
-    const found: MemoryRecord | null = rows.find(r => r.key === sourceManifestKey) ?? null;
+    const found: MemoryRecord | null = firstPackageCopy(rows, sourceManifestKey) ?? null;
     // A clone copies another owner's content to the requester: only what the requester may see is
     // copied (the classification reader, TARGET-082). A hidden manifest answers like a missing one.
     const reader = readerFor({ storage, config }, req.auth);

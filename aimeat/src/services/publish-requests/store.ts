@@ -38,6 +38,9 @@
  *     ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
  *   2026-10-27 — The kind `refinery-definition`: where a mail refinery reads and files mail, changed by
  *     an app or an agent that may not run it, waits for the owner (refinery/definition-ask.ts; secaudit2026oct26).
+ *   2026-10-27 — A second ask that moves a waiting question under the approval standard to other
+ *     content (version, digest) asks its approvers again: the old notices and list items close as
+ *     outdated and new ones go out under the same request id (secaudit2026oct26).
  *   2026-10-25 — The kind `subscription-price`: a renewal at a raised plan price waits for the buyer
  *     (commerce/subscription-price-ask.ts; secaudit2026oct22).
  *   2026-10-25 — A settled request's notices show the answer and lose their buttons (closeQuestion,
@@ -207,6 +210,31 @@ export function memoryValueDigest(value: unknown): string {
 /** The target fields that bind the request to one content, not to one target: left out of the fingerprint. */
 const CONTENT_BINDING_FIELDS = new Set(['version', 'digest', 'entry_digests']);
 
+/** Does `next` bind other content than `prev` (a version, digest or entry digest that differs)? */
+function contentBindingMoved(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
+  return [...CONTENT_BINDING_FIELDS].some(k => stableStringify(prev[k] ?? null) !== stableStringify(next[k] ?? null));
+}
+
+/**
+ * Take a waiting question back from its approvers without deciding it: its list items close and its
+ * notices lose their buttons, shown as outdated. The request itself stays waiting.
+ */
+async function withdrawQuestion(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest): Promise<void> {
+  const lists = [...(request.item_id ? [{ ghii: ownerGhii, id: request.item_id }] : []), ...(request.approver_items ?? [])];
+  for (const it of lists) {
+    try {
+      if (await getItem(ctx.storage, it.ghii, it.id)) await closeItem(ctx.storage, it.ghii, it.id, 'person');
+      emitChange('open-items', it.ghii);
+    } catch (err) {
+      logger.warn('Publish request: could not close a list item of a moved question', { owner: it.ghii, id: request.id, error: String(err) });
+    }
+  }
+  await closeQuestion(ctx, {
+    recipients: await approverGhiis(ctx, ownerGhii, waitingFor(request)),
+    ref: questionRef(request.id), outcome: 'outdated', decidedBy: null,
+  });
+}
+
 /** One filing or decision at a time per owner, in this process: two taps cannot both approve. */
 export function inPublishQueue<T>(ownerGhii: string, work: () => Promise<T>): Promise<T> {
   return serialByKey(`publish-requests ${ownerGhii}`, work);
@@ -349,6 +377,18 @@ export async function filePublishRequest(
     if (same) {
       if (stableStringify(same.target) === stableStringify(draft.target)) return { ok: true as const, request: same, alreadyWaiting: true };
       const moved: PublishRequest = { ...same, target: draft.target, change: draft.change };
+      // A question under the approval standard names the code its approver confirms. When the ask
+      // moves it to other content, the approvers are asked again about that content: the notices and
+      // list items they had lose their buttons, and new ones go out under the same request id, so a
+      // press answers what they were last shown (secaudit2026oct26).
+      const words = draft.approval ?? same.approval;
+      if (words && contentBindingMoved(same.target, draft.target)) {
+        await withdrawQuestion(ctx, ownerGhii, same);
+        const asked: PublishRequest = { ...moved, approval: words, item_id: null };
+        delete asked.approver_items;
+        await announceApproval(ctx, ownerGhii, asked, words, requesterName(draft.requested_by));
+        return { ok: true as const, request: asked, alreadyWaiting: true };
+      }
       await putRequest(storage, ownerGhii, moved);
       return { ok: true as const, request: moved, alreadyWaiting: true };
     }

@@ -24,6 +24,10 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.7.2 — 2026-10-27 — A pull also checks the signed component metadata (verifyComponentMetadata)
+ *     where the source signs it, and stops before any write on a mismatch (secaudit2026oct26).
+ *   v1.7.1 — 2026-10-27 — checkUpstream strips the stored upstream address with stripTrailingSlashes
+ *     too; a ZIP import stores the archive's source_url there unchecked (secaudit2026oct26).
  *   v1.7.0 — 2026-10-25 — A pull is bound to the group it was requested and verified for: the signed
  *     name and author must be the requested group's, the manifest must name the signed package, and
  *     each component must arrive under its signed type, or the pull is refused before any write
@@ -62,7 +66,7 @@ import { readBodyCapped } from '../../../utils/read-capped.js';
 import { parseZip, ZipValidationError, type ParsedPackage } from '../compose/package-zip.js';
 import { installSetRepositories } from '../../install-set-trust.js';
 import {
-    verifyAttestation, verifyComponentDigests, type AttestationDoc,
+    verifyAttestation, verifyComponentDigests, verifyComponentMetadata, type AttestationDoc,
 } from './package-attestation.js';
 import { importParsedPackage } from '../compose/package-import.js';
 import { getPackageFor } from '../compose/package-read.js';
@@ -362,6 +366,12 @@ export async function pullPackage(
     if (!digests.ok) {
         return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: digests.reason };
     }
+    // 8b. And what manifest.yaml says about each component, which the install reads (an app's tools,
+    //     data map, name and icon), is what the node signed, where it signed it (secaudit2026oct26).
+    const metadata = await verifyComponentMetadata(source.publicKey, doc, parsed.components);
+    if (!metadata.ok) {
+        return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: metadata.reason };
+    }
 
     const upstream: UpstreamRef = {
         node: source.nodeId,
@@ -447,7 +457,8 @@ export async function checkUpstream(
     }
 
     const timeoutMs = config.federationTimeoutMs ?? 10000;
-    const base = up.url.replace(/\/+$/, '');
+    // A ZIP import stores the archive's own source_url here as is, so the strip must be linear.
+    const base = stripTrailingSlashes(up.url);
     const url = `${base}/v1/federation/packages/${encodeURIComponent(up.groupId)}/attestation`;
 
     let doc: AttestationDoc;

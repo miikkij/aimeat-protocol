@@ -16,6 +16,9 @@
  *   v1.3.0 — 2026-10-01 — Tests 12 and 13 (audit 2026-10-01, defect A): on an UNCLAIMED install a
  *            different owner and that owner's agent are refused claim and every admin op and do not
  *            become owner; the installer, or the installer's own agent, claims as before.
+ *   v1.5.0 — 2026-10-27 — Test 14: a row for another node's GHII does not resolve for the local
+ *            account of the same local part; rows by bare name and owner@this-node still do
+ *            (secaudit2026oct26).
  *   v1.4.0 — 2026-10-12 — The agents hold ext:invoke as well, the word node 4.0.0 asks on the
  *            extension action route (REST scope gates): there the agent tests were refused at the
  *            route, and the stranger-agent refusals of tests 8 and 12 passed on that refusal.
@@ -448,6 +451,34 @@ await test('13. the installer\'s own agent may claim an unclaimed install, and t
         `the owner's agent claims the owner's install: ${JSON.stringify(claim)}`);
     const human = data(await adminOn(EXT3, A.token, 'getState'));
     assert(human.isOwner === true, `the human owner administers an install their agent claimed: ${JSON.stringify(human.isOwner)}`);
+});
+
+/**
+ * secaudit2026oct26: a row written for another node's GHII names that person, not the local account
+ * that shares its local part. The row for B on this node keeps resolving, by bare name or by
+ * owner@this-node.
+ */
+await test('14. a row for bob@other-node is not the local account bob; bob@this-node still is', async () => {
+    const asB = (action: string, input: Record<string, unknown>) =>
+        json(`/v1/ext/${EXT}/${action}`, { method: 'POST', headers: authH(B.token), body: JSON.stringify(input) });
+    const remote = `${B.name}@some-other-node.example`;
+    const set = data(await admin('assign', { ghii: remote, role: 'admin' }));
+    assert(set.ok === true, `the owner assigns a remote GHII: ${JSON.stringify(set)}`);
+    try {
+        const r = data(await asB('check', { permission: 'edit' }));
+        assert(r.via === 'none' && r.allowed === false, `the local namesake does not get the remote row: ${JSON.stringify(r)}`);
+        const st = data(await asB('admin', { op: 'getState' }));
+        assert(st.isOwner === false && Object.keys(st.assignments ?? {}).length === 0, `the local namesake does not administer or read the roster: ${JSON.stringify(st)}`);
+        // Designed use: a row for B on THIS node resolves for B, written either way.
+        for (const key of [`${B.name}@${NODE_ID}`, B.name]) {
+            assert(data(await admin('assign', { ghii: key, role: 'editor' })).ok === true, `assign ${key}`);
+            const mine = data(await asB('check', { permission: 'edit' }));
+            assert(mine.role === 'editor' && mine.via === 'owner' && mine.allowed === true, `${key} resolves for B: ${JSON.stringify(mine)}`);
+            await admin('revoke', { ghii: key });
+        }
+    } finally {
+        await admin('revoke', { ghii: remote });
+    }
 });
 
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

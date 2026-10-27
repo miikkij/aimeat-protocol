@@ -129,6 +129,20 @@ describe('calendar', () => {
     const rows = calendar.occurrences([{ id: 'r', start, end, timeZone: 'UTC', rrule: rule }], { from: '2026-01-01T00:00:00Z', to });
     expect(rows.map(r => r.localStart)).toEqual(starts);
   });
+  // secaudit2026oct26: rrule 2.8.1 builds the whole BYHOUR x BYMINUTE x BYSECOND product before the
+  // first period, outside every budget. A product past 24 x 60 x 60, which no rule of distinct
+  // in-range values reaches, is refused before the engine starts.
+  it('refuses a rule whose BY-time lists multiply past one day of seconds, before the engine builds them', () => {
+    const list = (v: number) => Array(300).fill(v).join(',');
+    const out = probe(`FREQ=DAILY;BYHOUR=${list(9)};BYMINUTE=${list(0)};BYSECOND=${list(0)}`);
+    expect(out).toMatchObject({ ok: false, error: 'Recurrence iteration limit exceeded; shorten the series' });
+    expect('ms' in out && out.ms).toBeLessThan(1500);
+  });
+  it('expands a daily rule with several hours, minutes and seconds as before', () => {
+    const rows = calendar.occurrences([{ id: 't', start: '2026-01-01T08:00:00', end: '2026-01-01T08:01:00', timeZone: 'UTC', rrule: 'FREQ=DAILY;BYHOUR=9,17;BYMINUTE=0,30;BYSECOND=0' }],
+      { from: '2026-01-01T00:00:00Z', to: '2026-01-02T00:00:00Z' });
+    expect(rows.map(r => r.localStart)).toEqual(['2026-01-01T09:00:00', '2026-01-01T09:30:00', '2026-01-01T17:00:00', '2026-01-01T17:30:00']);
+  });
   it('keeps every date of a long range and of a sparse rule that started long ago', () => {
     const daily = calendar.occurrences([{ id: 'd', start: '2026-01-01T09:00:00', end: '2026-01-01T10:00:00', timeZone: 'UTC', rrule: 'FREQ=DAILY' }], { from: '2026-01-01T00:00:00Z', to: '2026-12-31T00:00:00Z' });
     expect(daily).toHaveLength(364);

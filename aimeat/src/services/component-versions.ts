@@ -23,6 +23,10 @@
  *   const r = await resolveExtensionForCall(storage, 'btc-price-data@1.2.0');
  *   const refusal = await keptVersionRefusal(storage, 'extension', name, record.version, extensionCodeOf(record));
  * @version-history
+ *   v1.3.0 — 2026-10-27 — A pinned call to kept code whose action scripts differ from the live ones
+ *     runs without the operator's emailPolicy 'unrestricted' grant, which belongs to the live code; a
+ *     kept version records its writer (installedByPrincipal) and a pinned call names it, falling back
+ *     to the live writer for a snapshot kept before (secaudit2026oct26).
  *   v1.2.0 — 2026-10-25 — The resolvers read the address through services/component-address.ts:
  *     `<owner>/<name>`, the alias of a bare record, and for a call a bare name (the bare record, else
  *     the caller's own);
@@ -68,6 +72,8 @@ export async function snapshotExtensionVersion(storage: Storage, record: Extensi
       version: record.version, description: record.description, author: record.author,
       requiredApis: record.requiredApis, actions: record.actions, limits: record.limits,
       federation: record.federation, instances: record.instances ?? null, config: record.config,
+      // Who wrote this code: a pinned run names the kept version's writer (resolveExtensionForCall).
+      ...(record.installedByPrincipal ? { installedByPrincipal: record.installedByPrincipal } : {}),
     },
     bytes: 0, createdAt: new Date().toISOString(), createdBy,
   });
@@ -205,10 +211,29 @@ export async function resolveExtensionForCall(storage: Storage, raw: string, cal
       : { ok: false, name, reason: 'version', pinned: version };
   }
   const s = kept.snapshot as Partial<ExtensionRecord>;
+  const actions = s.actions ?? live.actions;
+  // The operator's email grant was given to the live code (publish-requests/apply-extension-email-
+  // policy.ts binds it to the live action scripts). Kept code with other scripts runs without it, under
+  // the normal recipient rules; a pin to the same scripts keeps it (secaudit2026oct26).
+  const config = live.config?.[EMAIL_GRANT_KEY] !== 'unrestricted' || actionScriptsOf(actions) === actionScriptsOf(live.actions)
+    ? live.config
+    : Object.fromEntries(Object.entries(live.config ?? {}).filter(([k]) => k !== EMAIL_GRANT_KEY));
   return {
     ok: true, name, pinned: version,
-    ext: { ...live, version, actions: s.actions ?? live.actions, limits: s.limits ?? live.limits, requiredApis: s.requiredApis ?? live.requiredApis },
+    ext: {
+      ...live, version, actions, config, limits: s.limits ?? live.limits, requiredApis: s.requiredApis ?? live.requiredApis,
+      // The kept version's own writer; a snapshot kept before writers were recorded keeps the live one.
+      installedByPrincipal: s.installedByPrincipal ?? live.installedByPrincipal,
+    },
   };
+}
+
+/** The key of the operator's email grant in an extension's config (extension-email-policy-ask.ts). */
+const EMAIL_GRANT_KEY = 'emailPolicy';
+
+/** The action scripts by id, in a canonical form: the code the operator's email grant is bound to. */
+function actionScriptsOf(actions: ExtensionRecord['actions'] | undefined): string {
+  return stableStringify((actions ?? []).map(a => ({ id: a.id, script: a.scriptContent ?? '' })).sort((x, y) => x.id.localeCompare(y.id)));
 }
 
 /**

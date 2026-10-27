@@ -27,6 +27,8 @@
  *   const out = await invokeExtensionAction({ config, storage, enforcePaywall, extRef, actionId, input, caller, paywall: { res } });
  *   if (out.kind === 'ok') ... else if (out.kind === 'refused') ... // 'paywall': the responder already holds the answer
  * @version-history
+ *   v1.4.2 -- 2026-10-27 -- The seller runs one run's ctx.buy calls start go through a per-run queue,
+ *     at most SELLER_RUNS_PER_RUN at once; none is refused (secaudit2026oct26).
  *   v1.4.1 -- 2026-10-25 -- extRef may be `<owner>/<name>`; a bare name is the bare record, else the
  *     caller's own extension of that name (services/component-address.ts; owner namespaces wish,
  *     secaudit2026oct22).
@@ -76,7 +78,7 @@ import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './
 import { resolveExtensionForCall } from './component-versions.js';
 import { readAdult, NOT_VERIFIED } from './adult-assurance.js';
 import { activeSubscriptions } from '../commerce/subscriptions.js';
-import { takeExtensionRunSlot } from './extension-run-slots.js';
+import { takeExtensionRunSlot, createRunQueue, SELLER_RUNS_PER_RUN } from './extension-run-slots.js';
 
 /** Who runs the action. Built by the surface from its own session, once. */
 export interface ExtensionInvokeCaller {
@@ -270,6 +272,7 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
     // A visitor's run reads the extension's memory and may fetch. Everything that acts for a person
     // (their wallet, files, data packages, workspace, notifications, mail, purchases, AI jobs billed
     // to the installer) is left out, and the memory refuses writes (Comicland v3 A-7).
+    const sellerRuns = createRunQueue(SELLER_RUNS_PER_RUN);
     const ctx: ExtensionCtx = visitor ? buildExtensionCtx({
       config, storage, extMemoryOwner,
       extension: { name: ext.name, owner: ext.installedBy },
@@ -322,13 +325,14 @@ async function invokeAdmitted(args: ExtensionInvokeArgs): Promise<ExtensionInvok
           appRef, tool, input: buyInput ?? {},
           // The seller's action runs in-process through this same sequence, for the buying
           // extension's own GEAI; no session of this caller goes with it (secaudit2026oct22).
-          runSellerAction: (run) => invokeExtensionAction({
+          // At most SELLER_RUNS_PER_RUN at once for this run, the rest queued (secaudit2026oct26).
+          runSellerAction: (run) => sellerRuns(() => invokeExtensionAction({
             config, storage, enforcePaywall: args.enforcePaywall, emailService: args.emailService,
             extRef: run.extRef, actionId: run.actionId, method: 'POST', input: run.input,
             caller: run.caller, paywall: { res: run.res, internalPass: run.internalPass },
             // Runs inside this run's slot: taking a second one could refuse a purchase mid-run.
             admission: 'inherited',
-          }),
+          })),
           correlationId: args.correlationId ?? null,
         });
       },
