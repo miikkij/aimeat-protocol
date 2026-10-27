@@ -4,8 +4,12 @@
  * SPDX-License-Identifier: MIT
  * @description Identical entry guards used by the memory batch routes (bulk, import) and the copy.
  * @structure batchKeyRefusal; storageReferenceRefusal; visibilityRefusal; organismWriteRefusalFor;
- *   routePublishAsk; batchCapRefusalFor; batchPublishAnswer
+ *   routePublishAsk; batchCapRefusalFor; batchWriteAsks; fileBatchWriteAsks; batchPublishAnswer
  * @version-history
+ *   2026-10-27 — batchWriteAsks and fileBatchWriteAsks: an entry of the welcome page's switch asks the
+ *     publish gate as PUT /v1/portfolio/config does, and an entry that changes where a mail refinery
+ *     reads and files mail, by a writer that may not run it, asks the owner (services/memory-write-asks.ts;
+ *     secaudit2026oct26).
  *   2026-10-18 — batchCapRefusalFor: an entry of POST /v1/memory/bulk or POST /v1/memory/import that
  *     would raise its record past its label's audience cap fails with LABEL_CAPS_AUDIENCE before the
  *     batch stores anything (plan doc-mvdipuyqraas, L3.2).
@@ -36,6 +40,7 @@ import { MEMORY_WRITE_VISIBILITIES } from '../../utils/visibility-words.js';
 import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
 import { memoryTarget } from '../../services/classification/label-rows.js';
 import { audienceOfVisibility } from '../../services/classification/audience-cap.js';
+import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../../services/memory-write-asks.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
@@ -119,6 +124,40 @@ export function batchCapRefusalFor(ctx: { storage: Storage; config: AimeatConfig
  * What a batch route adds to its answer for the publish gate: the requests per entry (and 202 when any
  * was filed), and a warning per entry whose request could not be filed.
  */
+/** A batch entry's questions held back for the owner (services/memory-write-asks.ts). */
+export type BatchWriteAsks = { key: string; asks: MemoryWriteAsk[] };
+
+/**
+ * The owner's other questions for one batch entry, as the single write asks them: the refusal the
+ * entry fails with, or the value to store (all but the changes asked about: the welcome page's switch,
+ * a mail refinery's destination) and the questions to file after the batch (secaudit2026oct26).
+ */
+export async function batchWriteAsks(
+  deps: { storage: Storage; config: AimeatConfig }, req: Request, gaii: string, key: string, value: unknown,
+): Promise<{ refusal: string } | { value: unknown; ask: BatchWriteAsks | null }> {
+  const who = callerOf(req, deps.config.nodeId, deps.storage);
+  const asked = await memoryWriteAsks(deps, {
+    principal: who.principal, targetGaii: gaii, roles: who.roles, scopes: who.scopes, federated: who.visitor,
+    ...(req.auth!.app ? { app: req.auth!.app } : {}),
+  }, key, value);
+  if ('refused' in asked) return { refusal: `${asked.refused.code}: ${asked.refused.message}` };
+  return asked.asks.length ? { value: asked.value, ask: { key, asks: asked.asks } } : { value, ask: null };
+}
+
+/** File a batch's questions for the entries that landed, into the batch's answer. */
+export async function fileBatchWriteAsks(
+  deps: { storage: Storage; config: AimeatConfig }, asks: readonly BatchWriteAsks[],
+  written: { items: Array<{ key: string; status: string }>; publishRequests: BatchPublishRequest[]; warnings: Array<{ key: string; code: string; message: string }> },
+): Promise<void> {
+  const landed = new Set(written.items.filter(r => r.status === 'created' || r.status === 'updated').map(r => r.key));
+  for (const entry of asks) {
+    if (!landed.has(entry.key)) continue;
+    const filed = await fileMemoryWriteAsks(deps, entry.asks);
+    if (filed.publishRequest) written.publishRequests.push({ key: entry.key, ...filed.publishRequest });
+    written.warnings.push(...filed.warnings.map(w => ({ key: entry.key, ...w })));
+  }
+}
+
 export function batchPublishAnswer(written: { publishRequests: BatchPublishRequest[]; warnings: Array<{ key: string; code: string; message: string }> }): {
   status: 200 | 202; fields: { publish_requests?: BatchPublishRequest[]; warnings?: Array<{ key: string; code: string; message: string }> };
 } {

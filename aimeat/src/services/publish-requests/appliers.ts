@@ -17,6 +17,8 @@
  *     the owner (apply-goal-model-read.ts; secaudit2026oct26).
  *   v1.11.0 — 2026-10-27 — A sibling agent's instruction to another agent's ai schedule, allowed by the
  *     owner (apply-schedule-instruction.ts; secaudit2026oct26).
+ *   2026-10-27 — Where a mail refinery reads and files mail, asked by an app or an agent that may not
+ *     run it and allowed by the owner (apply-refinery-definition.ts; secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — A subscription renewal at a raised price, allowed by the buyer
  *     (apply-subscription-price.ts; secaudit2026oct22).
  *   v1.9.0 — 2026-10-25 — The secret host question switched off at an agent's or app's request
@@ -57,6 +59,7 @@ import { applyAccountSetting } from './apply-account-setting.js';
 import { applySubscriptionPrice } from './apply-subscription-price.js';
 import { applyScheduleInstruction } from './apply-schedule-instruction.js';
 import { applyGoalModelRead } from './apply-goal-model-read.js';
+import { applyRefineryDefinition } from './apply-refinery-definition.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -81,4 +84,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'subscription-price': applySubscriptionPrice,
   'schedule-instruction': applyScheduleInstruction,
   'goal-model-read': applyGoalModelRead,
+  'refinery-definition': applyRefineryDefinition,
 };

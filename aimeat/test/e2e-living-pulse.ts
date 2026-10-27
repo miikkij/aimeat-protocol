@@ -7,6 +7,9 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   2026-10-27 -- A config a Full access agent wrote into the owner's namespace with owner_scope is
+ *     gathered with that agent's reach; the owner's own save of it and an agent holding
+ *     memory:read-as-owner keep the owner's reach (secaudit2026oct26).
  *   2026-10-20 -- The gather asks the organism read rule for the config's holder: an agent-held config
  *     does not gather a record of an organism that admits only listed agents and does not list that
  *     agent; the owner's own config still does (secaudit 2026-10, the v57 shape).
@@ -203,6 +206,56 @@ await test('An agent-held config does not gather a record of an organism that do
         `the unlisted agent's config gathered the organism record: ${JSON.stringify(agentSrc.map(s => s.value?.origin))}`);
     const ownerSrc = (await sourcesOf('orgowndoc')).map(s => s.value?.origin);
     assert(ownerSrc.includes(orgRecordKey(ORG_WORD.owner)), `the owner's config did not gather the organism record: ${JSON.stringify(ownerSrc)}`);
+});
+
+// ── A config held under the owner's own identity, written by an agent (secaudit2026oct26) ─────────
+// An agent with Full access holds memory:write-as-owner and writes a config into the owner's namespace
+// with owner_scope, while memory:read-as-owner is outside every wildcard. The holder's namespace alone
+// gave that config the owner's whole reach. The pulse now reads with the reach of the config's latest
+// writer when that writer is an agent that may read less. One word per case, as above.
+const FULL_WORD = { agent: `lpfull${stamp}`, rewritten: `lpfullre${stamp}`, ticked: `lpfulltick${stamp}` };
+let fullAgent: McpAgent;
+let fullTickedAgent: McpAgent;
+const writeOwnerScope = (bearer: string, key: string, value: unknown) =>
+    json('/v1/memory', { method: 'POST', headers: auth(bearer), body: JSON.stringify({ key, value, visibility: 'private', owner_scope: true }) });
+
+await test('Setup: a private record per word, an owner-visible record, and two Full access agents', async () => {
+    for (const word of Object.values(FULL_WORD)) {
+        const w = await writeAs(token, secretKey(word), { text: `${word} owner-private payload: the vault combination is 4417` }, 'private');
+        assert(w.status === 201, `secret ${word}: ${w.status}: ${JSON.stringify(w.body.error)}`);
+    }
+    const v = await writeAs(token, `lpvisible.${FULL_WORD.agent}`, { text: `${FULL_WORD.agent} a note the owner shows their agents` }, 'owner');
+    assert(v.status === 201, `visible record: ${v.status}: ${JSON.stringify(v.body.error)}`);
+    const owner = { name: ownerName, token };
+    fullAgent = await makeAgent(BASE, owner, ['*'], `lpfull${stamp.toString(36).slice(-5)}`);
+    fullTickedAgent = await makeAgent(BASE, owner, ['*', 'memory:read-as-owner'], `lpfullt${stamp.toString(36).slice(-5)}`);
+});
+
+await test('A Full access agent\'s config in the owner\'s namespace copies no private record of the owner', async () => {
+    const w = await writeOwnerScope(fullAgent.token, `organism.${orgId}.w.${WS}.living.fadoc.latest`, livingConfig(FULL_WORD.agent));
+    assert(w.status === 201, `agent config write: ${w.status}: ${JSON.stringify(w.body.error)}`);
+    assert(w.body.data?.owner_gaii === `${ownerName}@${w.body.node}`, `the config is held by the owner, got ${w.body.data?.owner_gaii}`);
+    await triggerPulse();
+    const src = await sourcesOf('fadoc');
+    const origins = src.map(s => s.value?.origin);
+    assert(!origins.includes(secretKey(FULL_WORD.agent)), `the owner's private record was copied for the agent's config: ${JSON.stringify(origins)}`);
+    assert(!src.some(s => String(s.value?.text ?? '').includes('vault combination')), 'the private text was copied');
+    assert(origins.includes(`lpvisible.${FULL_WORD.agent}`), `the owner-visible record should still be gathered, got ${JSON.stringify(origins)}`);
+});
+
+await test('Usage: the owner saving the agent\'s config again, and a Full access agent holding memory:read-as-owner, keep the owner\'s reach', async () => {
+    const key = `organism.${orgId}.w.${WS}.living.faredoc.latest`;
+    const a = await writeOwnerScope(fullAgent.token, key, livingConfig(FULL_WORD.rewritten));
+    assert(a.status === 201, `agent config write: ${a.status}: ${JSON.stringify(a.body.error)}`);
+    const o = await writeAs(token, key, livingConfig(FULL_WORD.rewritten), 'private');
+    assert(o.status === 200 || o.status === 201, `owner rewrite: ${o.status}: ${JSON.stringify(o.body.error)}`);
+    const t = await writeOwnerScope(fullTickedAgent.token, `organism.${orgId}.w.${WS}.living.fatdoc.latest`, livingConfig(FULL_WORD.ticked));
+    assert(t.status === 201, `ticked agent config write: ${t.status}: ${JSON.stringify(t.body.error)}`);
+    await triggerPulse();
+    const re = (await sourcesOf('faredoc')).map(s => s.value?.origin);
+    assert(re.includes(secretKey(FULL_WORD.rewritten)), `the owner's own save did not give the reach back: ${JSON.stringify(re)}`);
+    const tick = (await sourcesOf('fatdoc')).map(s => s.value?.origin);
+    assert(tick.includes(secretKey(FULL_WORD.ticked)), `the ticked agent's config did not gather the private record: ${JSON.stringify(tick)}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

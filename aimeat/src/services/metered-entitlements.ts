@@ -18,9 +18,12 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
- *   2026-10-27 — The listings read contracts, grants and history only from their own namespaces, so a
- *     record under the same key in an account's namespace is not listed (secaudit2026oct26,
- *     exchange:cross-namespace-prefix-scan-trusts-value).
+ *   2026-10-27 — The lists read only the service's own namespaces (serviceRows): NS for contracts,
+ *     NS_GRANT for grants, NS_HISTORY for past contracts. An entitlement., entgrant. or me-hist. record
+ *     any account wrote into its own memory was listed beside the real ones, so a provider's bulk
+ *     revoke reached another provider's grant and the public offering stats counted it
+ *     (secaudit2026oct26, listAllEntitlements:any-namespace-entitlement-records; the same fix also
+ *     answers exchange:cross-namespace-prefix-scan-trusts-value).
  *   v1.7.0 — 2026-07-27 — A right is keyed to the OWNER, not to the exact caller, because the wallet
  *     already is: `debitBalance` collapses every GAII to its owner, so keying the right per-principal
  *     made one person hold two contracts for one product (measured on production: an agent's contract
@@ -48,7 +51,7 @@
  *     concurrency note on authorizeAndCharge (a dedicated atomic counter is deferred to G5).
  */
 import { createHash, randomUUID } from 'node:crypto';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { recordAccountEvent } from './account-events.js';
@@ -320,14 +323,24 @@ export async function readEntitlementForCall(
  * skipped grants would show a provider a customer roster with their guests missing from it.
  */
 async function listAllEntitlements(storage: Storage): Promise<MeteredEntitlement[]> {
-  // Each from the namespace its writer (persistEntitlement) uses; a record under the same key in an
-  // account's namespace is not a contract (secaudit2026oct26).
   const [bought, granted] = await Promise.all([
-    storage.listAllMemory({ prefix: 'entitlement.', ownerPrefix: NS, limit: 5000 }),
-    storage.listAllMemory({ prefix: 'entgrant.', ownerPrefix: NS_GRANT, limit: 5000 }),
+    serviceRows(storage, NS, 'entitlement.'),
+    serviceRows(storage, NS_GRANT, 'entgrant.'),
   ]);
-  return [...bought.items.filter(r => r.ownerGaii === NS), ...granted.items.filter(r => r.ownerGaii === NS_GRANT)]
-    .map(r => r.value as MeteredEntitlement).filter(Boolean);
+  return [...bought, ...granted].map(r => r.value as MeteredEntitlement).filter(Boolean);
+}
+
+/**
+ * The records under `prefix` in the service namespace `ns`, and nowhere else. The service writes its
+ * rows only there (persistEntitlement, archiveEntitlement), while the key prefixes are open to any
+ * memory writer, so a record of the same key shape in another namespace is not the service's
+ * (the a2apeer rule, services/a2a-foreign.ts). ownerPrefix narrows the scan in the database; the exact
+ * test keeps out a namespace that only starts with the same letters, such as the history namespace,
+ * which starts with the contract namespace's name.
+ */
+export async function serviceRows(storage: Storage, ns: string, prefix: string): Promise<MemoryRecord[]> {
+  const { items } = await storage.listAllMemory({ prefix, ownerPrefix: ns, limit: 5000 });
+  return items.filter(r => r.ownerGaii === ns);
 }
 
 /** Every entitlement a consumer holds (for the app cost/contract surface, G3). Filtered prefix scan. */
@@ -347,8 +360,8 @@ export async function listEntitlementsByApp(storage: Storage, appId: string): Pr
 
 /** Every grant a provider has issued — "who am I carrying, and what has it cost me?". */
 export async function listGrantsByProvider(storage: Storage, providerGhii: string): Promise<MeteredEntitlement[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'entgrant.', ownerPrefix: NS_GRANT, limit: 5000 });
-  return items.filter(r => r.ownerGaii === NS_GRANT).map(r => r.value as MeteredEntitlement).filter(v => v && !!v.grant && v.providerGhii === providerGhii);
+  const items = await serviceRows(storage, NS_GRANT, 'entgrant.');
+  return items.map(r => r.value as MeteredEntitlement).filter(v => v && !!v.grant && v.providerGhii === providerGhii);
 }
 
 /** Mint (or overwrite) an entitlement — called by the contract-acceptance flow after both sides agree.
@@ -723,16 +736,16 @@ export async function archiveEntitlement(
 
 /** Past (archived) contracts a consumer held — newest first. */
 export async function listEntitlementHistoryByConsumer(storage: Storage, consumerGaii: string): Promise<EntitlementHistoryEntry[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', ownerPrefix: NS_HISTORY, limit: 5000 });
-  return items.filter(r => r.ownerGaii === NS_HISTORY).map(r => r.value as EntitlementHistoryEntry)
+  const items = await serviceRows(storage, NS_HISTORY, 'me-hist.');
+  return items.map(r => r.value as EntitlementHistoryEntry)
     .filter(v => v && v.archivedId && v.consumerGaii === consumerGaii)
     .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
 }
 
 /** Past (archived) contracts a provider sold — newest first. */
 export async function listEntitlementHistoryByProvider(storage: Storage, providerGhii: string): Promise<EntitlementHistoryEntry[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', ownerPrefix: NS_HISTORY, limit: 5000 });
-  return items.filter(r => r.ownerGaii === NS_HISTORY).map(r => r.value as EntitlementHistoryEntry)
+  const items = await serviceRows(storage, NS_HISTORY, 'me-hist.');
+  return items.map(r => r.value as EntitlementHistoryEntry)
     .filter(v => v && v.archivedId && v.providerGhii === providerGhii)
     .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
 }

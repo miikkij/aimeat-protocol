@@ -7500,6 +7500,15 @@ components:
         sentence to pass on to the owner. Read and decide it at /v1/publish-requests. On a node that
         shows its content to signed-in accounts only, no request is filed: the change is stored at the
         signed-in level with the warning PUBLIC_IS_SIGNED_IN_HERE (MemoryWriteWarning).
+
+        The welcome page's switch, the memory record `portfolio.config`, written through a memory
+        route (POST, PUT, PATCH /v1/memory, POST /v1/memory/bulk or /import) asks the same as
+        PUT /v1/portfolio/config: a write that would switch the served page on, or open it to anyone,
+        stores the rest of the record and files a request of kind `portfolio`. A mail refinery's
+        definition (`<prefix>.config` in the owner's own namespace), written there by an app grant or an
+        agent that does not hold the four run permissions, keeps the mailbox, the workspace, the spaces
+        and `keepText` it had when the write changes them, and files a request of kind
+        `refinery-definition` that the owner answers with one press; the rest of the write is stored.
       content:
         application/json:
           schema:
@@ -18818,6 +18827,11 @@ paths:
         credential. The owner stores the credential they mean to use there.
 
 
+        An app grant does not put back a reserved owner key (`profile.`,
+        `openrouter.`, `ai-usage.`, `finance.`, `commerce.` and the rest), as it
+        does not write one: 403 RESERVED_KEY. The owner puts it back in person.
+
+
         A restore answers to the write path's rule on the old morsel price: an
         app tool manifest (`apps.{app}.tools`) or an offers document
         (`agents.{agent}.offers`) that still holds the 3.x morsel price stays in
@@ -18925,6 +18939,11 @@ paths:
         Tracked Response check, updates an EXCHANGE listing, and pushes to a connected ecosystem app.
         A field left out keeps its stored value; a visibility or tag edit keeps the record's AI
         provenance statement. A successful answer may carry `warnings` (SHADOWED_BY_OWNER_COPY).
+
+        With `owner_scope=true` an agent edits a sibling agent's record. When that record is one the
+        agent reads as absent (private, without `memory:read-as-owner`), the agent still changes its
+        value and tags, and a change of its `visibility` answers 403 SCOPE_DENIED naming
+        `memory:read-as-owner`, with `details.allow_url` the agent's page where the owner ticks it.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -18967,6 +18986,10 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '202':
           $ref: '#/components/responses/PublishRequested'
+        '403':
+          description: >
+            RESERVED_KEY, SECRET_RECORD, or SCOPE_DENIED: a scope is missing, or an agent changed the
+            visibility of a sibling's record it reads as absent (`memory:read-as-owner`).
         '409':
           description: |
             VERSION_CONFLICT (optimistic lock failure; `details.current_version`, `details.your_version`),
@@ -19012,6 +19035,11 @@ paths:
         the `ai.apikey.*` keys and the per-agent keys) is not removed here, by
         anyone, the owner included: 403 SECRET_RECORD, naming the record's own
         route (for example DELETE /v1/ai/providers/{id}).
+
+
+        An app grant does not remove a reserved owner key (`profile.`,
+        `openrouter.`, `ai-usage.`, `finance.`, `commerce.` and the rest), as it
+        does not write one: 403 RESERVED_KEY. The owner removes it in person.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19071,6 +19099,12 @@ paths:
         when they are omitted, because a writer that owns one subtree has no business restating the
         whole record's metadata. Size, quota, reserved-key, data-area and schema checks all run
         against the MERGED value.
+
+
+        With `owner_scope: true` an agent holding `memory:write-as-owner` merges into its owner's
+        record. When that record is one the agent reads as absent (private, without
+        `memory:read-as-owner`), the merge is stored and the answer carries `value: null` and a
+        `note` naming the permission, and a change of its `visibility` answers 403 SCOPE_DENIED.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19414,6 +19448,12 @@ paths:
         Delete many entries at once by prefix and/or an explicit key list — avoids firing thousands of
         individual DELETE requests when clearing a whole namespace. Owner sessions delete across their
         owner-scope; agent sessions delete from their own keyspace.
+
+
+        Each key gets the answer `DELETE /v1/memory/{key}` gives it: a credential record (403
+        SECRET_RECORD), a reserved owner key for an app grant (403 RESERVED_KEY) and an event of an
+        append-only workspace space (409 WRITE_CONFLICT) are refused when named in `keys`, and nothing
+        is removed; a prefix that matches one leaves it in place and removes the rest.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19445,6 +19485,10 @@ paths:
           description: prefix or keys required
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A named key is a credential record (SECRET_RECORD), a reserved owner key named by an app grant (RESERVED_KEY), or service-owned (RESERVED_KEY).
+        '409':
+          description: A named key is an event of an append-only workspace space (WRITE_CONFLICT, `details.violations`).
 
   /v1/memory/bundle:
     post:
