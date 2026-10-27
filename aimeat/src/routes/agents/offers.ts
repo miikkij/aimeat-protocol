@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent offers routes (publish/read per-agent offers, owner aggregate feed, callable-offer invoke with settlement). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.9.1 — 2026-10-27 — The offer invoke answers 404 CAPABILITY_NOT_FOUND for a backing capability
+ *     the offer's owner cannot reach by id, before any pacing (secaudit2026oct26,
+ *     offer-invoke:action-id-not-owned-by-offer-owner).
  *   v1.9.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:sell on PUT /v1/agents/:name/offers. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.8.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa). PUT stores an old price.morsels as part of tollMorsels; the GETs return
@@ -56,6 +59,7 @@ import { reconcileAfterSourceWrite, exchangeOutcome } from '../../services/excha
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { logger } from '../../utils/logger.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { capabilityHiddenFrom } from '../../services/capability-reach.js';
 
 export function registerOffersRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // ── Agent OFFERS — the "what can I do with my agents" surface ──
@@ -210,7 +214,12 @@ export function registerOffersRoutes(router: Router, config: AimeatConfig, stora
       res.status(422).json(error(config.nodeId, 'OFFER_NOT_CALLABLE', 'This offer has no machine-invocable binding; use the Ask (prompt/task) flow')); return;
     }
     const cap = await storage.getCapability(actionId);
-    if (!cap) { res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${actionId}`)); return; }
+    // An offer names a capability; it does not confer one. A capability the OFFER's owner cannot reach
+    // by id (another owner's private one, or one never published) answers as a missing one, before
+    // any pacing (services/capability-reach.ts; secaudit2026oct26, offer-invoke:action-id-not-owned-by-offer-owner).
+    if (!cap || capabilityHiddenFrom(cap, `${agent.owner}@${config.nodeId}`)) {
+      res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${actionId}`)); return;
+    }
 
     const callerGhii = resolveIdentity(req.auth!, config.nodeId);
     // A money price is paid through the checkout, never here: this route moves no money, so an offer

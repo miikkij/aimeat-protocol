@@ -502,5 +502,45 @@ await test('18. A schedule-born offer is flagged auto in /v1/offers (drives the 
     assert(plain?.auto === false, `plain offer → auto:false, got ${JSON.stringify(plain?.auto)}`);
 });
 
+// secaudit2026oct26, offer-invoke:action-id-not-owned-by-offer-owner. An offer names a capability, it
+// does not confer one: an offer bound to another owner's private capability answers as the direct
+// invoke route does for its owner, 404, before any pacing. 14c above is the use kept: an offer bound
+// to its own owner's private capability, invoked by another owner.
+await test('19. An offer bound to another owner\'s private capability answers 404 CAPABILITY_NOT_FOUND, and nothing is charged', async () => {
+    const foreignCap = `offers-foreign-${Date.now() % 1000000}`;
+    const bExt = `offersb${Date.now() % 1000000}`;
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({
+            manifest: JSON.stringify({ metadata: { name: bExt, version: '1.0.0', description: 'B private action', author: B.name },
+                actions: [{ id: 'echo', method: 'POST', path: '/echo', script: 'echo', description: 'Echo' }], limits: { timeout_ms: 5000, max_api_calls: 1 } }),
+            scripts: { echo: 'export default async function(ctx, input){ return { b: true }; }' },
+        }),
+    });
+    assert(inst.status === 201 || inst.status === 200, `B install ${inst.status}: ${JSON.stringify(inst.body.error)}`);
+    await json(`/v1/extensions/${bExt}/activate`, { method: 'POST', headers: auth(B.token) });
+    const made = await json('/v1/capabilities', {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({
+            id: foreignCap, name: 'B private action', summary: 'B only', visibility: 'private', callable: true,
+            source: { type: 'extension', ref: `ext:${bExt}:echo` }, usage: 'B calls it.',
+        }),
+    });
+    assert(made.status === 201, `B's private capability: ${made.status} ${JSON.stringify(made.body.error)}`);
+    const pub = await json(`/v1/agents/${agentName}/offers`, {
+        method: 'PUT', headers: auth(A.token),
+        body: JSON.stringify({ offers: [{ id: 'fronted', title: 'Fronted', ask: 'x', deliverable: { format: 'document', sample: 'untested' }, tollMorsels: 25, visibility: 'public', callable: { action_id: foreignCap } }] }),
+    });
+    assert(pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body.error)}`);
+    const own = await json(`/v1/agents/${agentName}/offers/fronted/invoke`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ input: {} }) });
+    assert(own.status === 404 && own.body.error?.code === 'CAPABILITY_NOT_FOUND', `A through its own offer: ${own.status} ${JSON.stringify(own.body.error)}`);
+    const w = async (token: string) => Number((await json('/v1/wallet', { headers: auth(token) })).body.data.balance);
+    const before = await w(B.token);
+    const providerGaii = encodeURIComponent(`${agentName}#${A.name}@${NODE_ID}`);
+    const other = await json(`/v1/agents/${providerGaii}/offers/fronted/invoke`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ input: {} }) });
+    assert(other.status === 404 && other.body.error?.code === 'CAPABILITY_NOT_FOUND', `another owner through the public offer: ${other.status} ${JSON.stringify(other.body.error)}`);
+    assert(await w(B.token) === before, 'no pacing was charged');
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);
