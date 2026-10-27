@@ -26,6 +26,10 @@
  *     if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
  *   }
  * @version-history
+ *   v1.7.0 — 2026-10-27 — Readers who miss one face entry at once share one build; when the owner's
+ *     extension runs are all taken the reader gets the stored face or the converted page, uncached
+ *     (secaudit2026oct26, extension-system-run:request-driven-runs-outside-run-slot-pool). The body
+ *     moved unchanged into composeAppAgentFace.
  *   v1.6.0 — 2026-10-25 — `opts.lang` (the reader's `?lang=`) reaches the app's own format-md action,
  *     and an app that declares one is cached per language.
  *   v1.5.0 — 2026-10-08 — A stored face is served with its own record when it carries one; the app's
@@ -52,7 +56,7 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from './markdown-negotiation.js';
 import { cached, TTL } from './cache.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
-import { renderAppMarkdown } from './app-format-md.js';
+import { renderAppMarkdown, FORMAT_MD_BUSY } from './app-format-md.js';
 import {
   loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
 } from './ai-provenance-marks.js';
@@ -138,41 +142,72 @@ export async function buildAppAgentFace(
   app: AppRecord,
   opts: { lang?: string } = {},
 ): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> {
-  const isHtml = /html/i.test(app.mimeType);
   // The reader's language (formatMdLang, already shaped by the caller) only reaches the app's own
   // action, so only an app that declares one gets a cache entry per language.
   const lang = app.manifest?.formatMd ? opts.lang : undefined;
-  return cached(
-    `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}${lang ? `:lang=${lang}` : ''}`,
-    TTL.public,
-    async (): Promise<{ markdown: string; fromFace: boolean; provenanceId?: string } | null> => {
-      // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
-      // extension, declared with aimeat-format-md. Null when the app declares none or the run
-      // gave nothing, and then the stored face or the converted page answers as before.
-      const rendered = await renderAppMarkdown({ storage, config }, app, { lang });
-      const stored = rendered === null
-        ? await loadPublicAgentFaceRecord(storage, config.nodeId, app.ownerName, app.filename) : null;
-      const face = rendered ?? stored?.text ?? null;
-      // WHICH RECORD (aiprov D18): a stored face is its own text, written by whoever wrote that
-      // record, so its own record comes first; the app's record describes the app's bytes, and is
-      // the statement for the page converted from them, for the app's own extension output, and for
-      // a stored face that carries no record of its own.
-      const provenanceId = stored?.aiProvenanceId ?? app.aiProvenanceId;
-      if (face === null && !isHtml) return null;
-      const footer = buildAgentAffordances(config, app.ownerName, app.filename);
-      const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();
-      // TARGET-058: ONE human-readable provenance line, IN THE BODY. Frontmatter alone is not
-      // enough — an agent asked to summarise this page carries the body forward and routinely drops
-      // the metadata, so a statement that lives only in frontmatter stops existing the moment the
-      // page is retold. It goes in here rather than in serveAppAgentFace() so the per-origin
-      // llms.txt / AGENTS.md documents, which compose this same body, carry it too.
-      const prov = await loadServedProvenance(storage, config, provenanceId);
-      const note = provenanceMarkdownNote(prov);
-      const noteBlock = note ? ['', '', note, ''].join('\n') : '';
-      return { markdown: body + noteBlock + footer, fromFace: face !== null, ...(provenanceId ? { provenanceId } : {}) };
-    },
-    ['domain:memory', 'domain:apps'],
-  );
+  const key = `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}${lang ? `:lang=${lang}` : ''}`;
+  // Readers who miss the same entry at once share one build, so one key starts one run of the app's
+  // action (secaudit2026oct26, request-driven-runs-outside-run-slot-pool).
+  const running = facesInFlight.get(key);
+  if (running) return running;
+  const building = (async () => {
+    try {
+      return await cached(key, TTL.public, async () => {
+        // The app's own answer comes first (services/app-format-md.ts): an action of the owner's
+        // extension, declared with aimeat-format-md. Null when the app declares none or the run
+        // gave nothing, and then the stored face or the converted page answers as before.
+        const rendered = await renderAppMarkdown({ storage, config }, app, { lang });
+        if (rendered === FORMAT_MD_BUSY) throw new FormatMdBusy();
+        return composeAppAgentFace(config, storage, app, rendered);
+      }, ['domain:memory', 'domain:apps']);
+    } catch (err) {
+      // The owner's extension runs are all taken: this reader gets the stored face or the converted
+      // page, and nothing is cached, so the next reader asks the action again.
+      if (err instanceof FormatMdBusy) return composeAppAgentFace(config, storage, app, null);
+      throw err;
+    }
+  })();
+  facesInFlight.set(key, building);
+  try {
+    return await building;
+  } finally {
+    facesInFlight.delete(key);
+  }
+}
+
+type AgentFace = { markdown: string; fromFace: boolean; provenanceId?: string };
+
+/** Builds of a face entry in progress, by cache key. */
+const facesInFlight = new Map<string, Promise<AgentFace | null>>();
+
+/** Thrown inside the cached build so that a busy answer is never cached. */
+class FormatMdBusy extends Error {}
+
+/** The face from the app's own markdown (`rendered`), else the stored face, else the converted page. */
+async function composeAppAgentFace(
+  config: AimeatConfig, storage: Storage, app: AppRecord, rendered: string | null,
+): Promise<AgentFace | null> {
+  const isHtml = /html/i.test(app.mimeType);
+  const stored = rendered === null
+    ? await loadPublicAgentFaceRecord(storage, config.nodeId, app.ownerName, app.filename) : null;
+  const face = rendered ?? stored?.text ?? null;
+  // WHICH RECORD (aiprov D18): a stored face is its own text, written by whoever wrote that
+  // record, so its own record comes first; the app's record describes the app's bytes, and is
+  // the statement for the page converted from them, for the app's own extension output, and for
+  // a stored face that carries no record of its own.
+  const provenanceId = stored?.aiProvenanceId ?? app.aiProvenanceId;
+  if (face === null && !isHtml) return null;
+  const footer = buildAgentAffordances(config, app.ownerName, app.filename);
+  const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();
+  // TARGET-058: ONE human-readable provenance line, IN THE BODY. Frontmatter alone is not
+  // enough — an agent asked to summarise this page carries the body forward and routinely drops
+  // the metadata, so a statement that lives only in frontmatter stops existing the moment the
+  // page is retold. It goes in here rather than in serveAppAgentFace() so the per-origin
+  // llms.txt / AGENTS.md documents, which compose this same body, carry it too.
+  const prov = await loadServedProvenance(storage, config, provenanceId);
+  const note = provenanceMarkdownNote(prov);
+  const noteBlock = note ? ['', '', note, ''].join('\n') : '';
+  return { markdown: body + noteBlock + footer, fromFace: face !== null, ...(provenanceId ? { provenanceId } : {}) };
 }
 
 export async function serveAppAgentFace(

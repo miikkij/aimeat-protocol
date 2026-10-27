@@ -13,7 +13,9 @@
  *     from the Host nginx routed on). A password sign-in there used to answer with an owner JWT and
  *     an `aimeat_rt` cookie on the app's own origin, good for 90 days (found 2026-10-04 from
  *     aimeat-commercial's store);
- *   - the `Origin` header names a host in the app family. The family is same-site with the apex, so
+ *   - the same for the portfolio and company host families (`req.portfolioOrigin`, `req.coOrigin`):
+ *     their pages are author HTML with inline script too;
+ *   - the `Origin` header names a host in the app, portfolio or company family. Each family is same-site with the apex, so
  *     a credentialed fetch from an app to the apex login route set the apex session cookie: an app
  *     could sign its visitor in to an account the app controls (login CSRF);
  *   - the `Origin` header is `null`, which is what an app in the node's isolated frame sends. The
@@ -33,6 +35,10 @@
  * @structure SIGN_IN_ROUTES · isSignInRoute() · requestFromApp() · appOriginSignIn(config)
  * @usage app.use(appOriginSignIn(config));   // after corsMiddleware
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Portfolio pages and company front pages count as apps: they serve author
+ *     script same-site with the apex too (req.portfolioOrigin, req.coOrigin, and an Origin in either
+ *     host family). A sign-in route is recognised whatever the case of its path, as Express routes it
+ *     (secaudit2026oct26, requestFromApp-misses-portfolio-company-origins-and-case-variant-paths).
  *   v1.0.0 — 2026-10-04 — Initial.
  */
 import type { RequestHandler, Request } from 'express';
@@ -60,8 +66,10 @@ const SIGN_IN_ROUTES: Array<{ method: string | null; path: RegExp }> = [
 const SAML_ACS = /^\/v1\/ghii\/login\/saml\/[^/]+\/acs$/;
 
 export function isSignInRoute(method: string, rawPath: string): boolean {
-    const path = rawPath.replace(/\/+$/, '') || rawPath;
-    return SIGN_IN_ROUTES.some(r => (r.method === null || r.method === method) && r.path.test(path));
+    // Lowercased: Express routes paths case-insensitively, so /V1/GHII/LOGIN reaches the same handler.
+    const lower = rawPath.toLowerCase();
+    const path = lower.replace(/\/+$/, '') || lower;
+    return SIGN_IN_ROUTES.some(r => (r.method === null || r.method === method.toUpperCase()) && r.path.test(path));
 }
 
 /** The host of an Origin header, or null when it is absent, `null` or does not parse. */
@@ -71,14 +79,16 @@ function originHost(origin: string): string | null {
 
 /** Which signal marks this request as coming from an app, or null when none does. */
 export function requestFromApp(req: Request, config: AimeatConfig): 'app_host' | 'app_origin' | 'opaque_origin' | null {
-    if (req.appOrigin) return 'app_host';
+    if (req.appOrigin || req.portfolioOrigin || req.coOrigin) return 'app_host';
     const origin = typeof req.headers.origin === 'string' ? req.headers.origin.trim() : '';
     if (!origin) return null;
-    if (origin === 'null') return SAML_ACS.test(req.path) ? null : 'opaque_origin';
-    const appHost = (config.appHost || '').toLowerCase();
-    if (!appHost) return null;
+    if (origin === 'null') return SAML_ACS.test(req.path.toLowerCase()) ? null : 'opaque_origin';
     const host = originHost(origin);
-    return host && (host === appHost || host.endsWith(`.${appHost}`)) ? 'app_origin' : null;
+    if (!host) return null;
+    // Every host family that serves author-written script: apps, portfolio pages and company pages.
+    const families = [config.appHost, config.portfolioHost, config.coHost]
+        .map(h => (h || '').toLowerCase()).filter(Boolean);
+    return families.some(f => host === f || host.endsWith(`.${f}`)) ? 'app_origin' : null;
 }
 
 export function appOriginSignIn(config: AimeatConfig): RequestHandler {

@@ -9,6 +9,8 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   v1.13.1 — 2026-10-27 — A file link opens through fetchStorageTabUrl, an inert blob, so another
+ *     member's stored HTML opens as text, not as a page of the node's origin (secaudit2026oct26).
  *   v1.13.0 — 2026-10-18 — A picture's visibility tag is the AudienceBadge (Private / Public in words), still the button that switches it (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.12.0 — 2026-10-16 — The view shows the AI label the page owes (it draws only for a page that is
  *     public, such as one on an open share). The editor asks whether an AI wrote the page and saves
@@ -143,7 +145,8 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     if (!/\/v1\/(?:storage|memory\/files|pub)\//.test(href) || href.startsWith('blob:')) return;
     e.preventDefault();
     const tab = window.open('', '_blank', 'noopener');
-    orgService.fetchStorageObjectUrl(href).then(bu => {
+    // The inert fetch: a file another member stored as HTML, SVG or XML opens as text on this origin.
+    orgService.fetchStorageTabUrl(href).then(bu => {
       if (tab) tab.location.href = bu; else window.open(bu, '_blank', 'noopener');
       setTimeout(() => { try { URL.revokeObjectURL(bu); } catch (err) { swallowed('document: onDocClick', err); } }, 60_000);
     }).catch(() => { try { tab?.close(); } catch (err) { swallowed('document: onDocClick', err); } });

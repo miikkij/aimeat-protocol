@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-27 — A version published through an app's grant also names that app (`publishedByApp`), and the owner hears of it when the app is another author's (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — Every version's manifest names who published it (`publishedBy`), so the owner's own app asks the owner before a version another account published gets a permission the owner's grant lacks (services/own-app-consent.ts; secaudit2026oct22).
  *   2026-10-25 — The aimeat-intake declaration is read from the bytes (services/app-intake-forms.ts): a form the publisher does not manage refuses the publish, a form the code calls undeclared is a warning, and the forms go on the manifest. A new version of an app open to the internet is handed to services/internet-opening/. The input types (RequestedManifest, PublishAppInput, PublishAppRefusal) moved unchanged to app-publish-types.ts (line limit) and are re-exported.
  *   2026-10-22 — The delegated-settings check moved unchanged to app-publish-delegate.ts (line limit), which also refuses a developer of another account without the full right who adds the ?format=md declaration or changes which extension action it names (secaudit 2026-10, r54).
@@ -170,6 +171,7 @@ import { publishExposure } from './app-publish-exposure.js';
 import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, type AppPublishAsked } from './app-publish-gate.js';
 export type { RequestedManifest, PublishAppInput, PublishAppRefusal } from './app-publish-types.js';
 import type { PublishAppInput, PublishAppRefusal } from './app-publish-types.js';
+import { byAnotherAuthorsApp, tellOwnerAppPublishedByApp } from './app-published-by-app.js';
 
 export interface PublishAppResult {
   roadmapHint?: string;
@@ -405,6 +407,8 @@ export async function publishApp(
     usesCortex: requested.usesCortex ?? prev?.usesCortex ?? [],
     // Who published this version, never carried forward (services/own-app-consent.ts).
     publishedBy: callerGaii,
+    // The app whose grant published it, beside the owner it acts for (services/app-published-by-app.ts).
+    ...(input.publishingApp ? { publishedByApp: input.publishingApp } : {}),
   };
   const descriptions = sanitizeDescriptions(requested.descriptions) ?? prev?.descriptions;
   if (descriptions) manifest.descriptions = descriptions;
@@ -669,6 +673,10 @@ export async function publishApp(
     link: `${downloadUrl}?mode=inline`,
     data: { name: manifest.name || filename, version: String(newVersion) },
   }, config);
+  // Another author's app published this through its grant: the owner hears of it (secaudit2026oct26).
+  if (byAnotherAuthorsApp(input.publishingApp, ownerName)) {
+    void tellOwnerAppPublishedByApp(storage, config, { ownerName, filename, version: newVersion, publisher: input.publishingApp });
+  }
 
   // Activation (05-mittaus.md): a published app is one of the three ways an account first
   // produces something durable of its own. Write-once and fire-and-forget — measuring a publish

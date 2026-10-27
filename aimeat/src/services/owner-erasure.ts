@@ -23,6 +23,8 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-10-27 — The app_builder_records step erases the design specs and roadmaps of the person's apps,
+ *     keyed by the reusable app id (secaudit2026oct26, app-builder-records-keyed-by-reusable-name-survive).
  *   2026-10-25 — The scheduled_jobs step deletes every job whose ownerScope is the account, not only
  *     those the person made in person: a job an agent or ecosystem app made carries the maker's
  *     identity as createdBy and survived (secaudit2026oct22).
@@ -79,6 +81,8 @@ import { evictAgentTelemetry } from './telemetry-buffer.js';
 import { purgeClassificationAudit, flushClassificationAudit } from './classification/audit.js';
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
+import { eraseAppDesignSpecsOf } from './app-design-spec.js';
+import { eraseAppRoadmapsOf } from './app-roadmap.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
@@ -362,6 +366,14 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await eraseAppMembership(storage, name);
       const n = c.members + c.requests + c.visits + c.plans + c.blanketGrants + c.invites;
       return n ? `app_membership:${n}` : null;
+    }, deletionLog, storage);
+
+    // The design specs and roadmaps of this person's apps: records in platform namespaces keyed by the
+    // app id `<name>/<filename>`, which the cascade never sees and the next holder of the name reuses
+    // (secaudit2026oct26, owner-erasure:app-builder-records-keyed-by-reusable-name-survive).
+    await step('app_builder_records', async () => {
+      const n = await eraseAppDesignSpecsOf(storage, name) + await eraseAppRoadmapsOf(storage, name);
+      return n ? `app_builder_records:${n}` : null;
     }, deletionLog, storage);
 
     // Exchange contracts and grants (services/entitlement-erasure.ts). Keyed by a hash of the

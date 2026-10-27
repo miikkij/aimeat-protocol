@@ -21,6 +21,10 @@
  *   log line; runScreenshotCapturePass() one batch scan; captureAppScreenshot() one app, with its
  *   own per-owner throttle; renderAndStore() the shared render both paths use.
  * @version-history
+ *   v1.9.0 — 2026-10-27 — secaudit2026oct26: an on-demand capture holds one of the node-wide headless
+ *     slots (headless-slots.ts; past them 503 HEADLESS_BUSY, before the owner's allowance is taken)
+ *     and renders in withHeadlessContext, so its deadline closes a render that does not finish.
+ *     opts.launch and opts.deadlineMs replace the launcher and the deadline in tests.
  *   v1.8.2 — 2026-10-25 — secaudit2026oct22: withHeadlessContext starts its deadline before the
  *     launch, closes a browser that arrives after the deadline, and waits for a close at most until
  *     the deadline plus HEADLESS_CLOSE_GRACE_MS. opts.launch replaces the launcher in tests.
@@ -76,6 +80,7 @@ import {
 import {
   isBrowserBuildMissing, installPinnedBrowser, browserInstallHint, reportBrowserFault, clearBrowserFault, type InstallResult,
 } from './headless-browser-install.js';
+import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from './headless-slots.js';
 
 const VIEWPORT = { width: 1200, height: 750 };
 const PAGE_TIMEOUT = 20_000;
@@ -454,6 +459,7 @@ export async function runScreenshotCapturePass(config: AimeatConfig, storage: St
  */
 export async function captureAppScreenshot(
   config: AimeatConfig, storage: Storage, app: { ownerName: string; filename: string },
+  opts: { launch?: () => Promise<HeadlessBrowser | null>; deadlineMs?: number } = {},
 ): Promise<CaptureResult> {
   if (captureOff()) {
     return {
@@ -475,11 +481,17 @@ export async function captureAppScreenshot(
     };
   }
 
+  // A node-wide slot first, so a busy node takes none of the owner's hourly allowance
+  // (services/headless-slots.ts; secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
+  const slot = takeHeadlessSlot(config);
+  if (!slot) return { ok: false, status: 503, code: 'HEADLESS_BUSY', message: HEADLESS_BUSY_MESSAGE };
+
   const ownerGaii = live.ownerGaii;
   const perHour = Math.max(1, config.screenshotOnDemandPerHour);
   const now = Date.now();
   const recent = (onDemandHistory.get(ownerGaii) ?? []).filter((t) => now - t < 3_600_000);
   if (recent.length >= perHour) {
+    slot.release();
     const waitMin = Math.ceil((3_600_000 - (now - recent[0]!)) / 60_000);
     return {
       ok: false, status: 429, code: 'RATE_LIMITED',
@@ -489,9 +501,17 @@ export async function captureAppScreenshot(
   recent.push(now);
   onDemandHistory.set(ownerGaii, recent);
 
+  // The lent browser (withHeadlessContext): the same context and guard as before, closed by its
+  // deadline when the render does not finish. A launch that finds no browser switches capture off
+  // for an hour, as withBrowser does.
+  const launch = opts.launch ?? (async () => {
+    const b = await launchBrowser();
+    if (!b) offUntil = Date.now() + RETRY_AFTER_MS;
+    return b;
+  });
   try {
-    const bytes = await withBrowser(config, (ctx) => renderAndStore(ctx, config, storage,
-      { ownerName: app.ownerName, ownerGaii, filename: app.filename }));
+    const bytes = await withHeadlessContext(config, VIEWPORT, (ctx) => renderAndStore(ctx as RenderCtx, config, storage,
+      { ownerName: app.ownerName, ownerGaii, filename: app.filename }), { launch, ...(opts.deadlineMs ? { deadlineMs: opts.deadlineMs } : {}) });
     if (bytes === null) {
       return {
         ok: false, status: 503, code: 'NO_BROWSER',
@@ -506,6 +526,8 @@ export async function captureAppScreenshot(
       ok: false, status: 502, code: 'RENDER_FAILED',
       message: `The page did not render: ${(e as Error).message}`,
     };
+  } finally {
+    slot.release();
   }
 }
 

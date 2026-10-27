@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-27 — An app upload passes the token's `publishing_app` (the app whose grant minted it) to publishApp (secaudit2026oct26).
  *   2026-10-26 — The owner is additive: a ZIP keeps its bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — An extension ZIP lands in the installer's namespace, `<owner>/<name>`, or on the
  *     owner's existing or released bare name; a cortex ZIP replaces the uploader's own cortex of that
@@ -386,6 +387,8 @@ async function handleAppUpload(
         // again with the grant its record holds now, so publish:public taken away after the mint
         // applies to this upload too.
         publishGate: await livePublishAsk(storage, config, actor, actorIsAgent, publishAskFromMeta(meta.publish_ask)),
+        // The app whose grant minted this URL, written by the mint into the signed token (routes/apps/publish.ts).
+        publishingApp: typeof meta.publishing_app === 'string' && meta.publishing_app ? meta.publishing_app : undefined,
         roadmap: typeof meta.roadmap === 'string' ? meta.roadmap : undefined,
         // The declaration the caller made when they asked for this URL, carried in the signed token.
         // Re-validated rather than trusted: the token is ours and cannot be forged, but a block that

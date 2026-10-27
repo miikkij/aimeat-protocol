@@ -41,6 +41,8 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-27 — collectAssetRefs reads the tags with one linear scan (utils/html-tag-scan.ts), not a
+ *     `[^>]*` pattern per opener (secaudit2026oct26, collectAssetRefs:unclosed-tag-quadratic-scan).
  *   2026-10-25 — A dead cortex lib path gets one sentence on the owner's namespace, where a cortex installed since then loads from (secaudit2026oct22).
  *   2026-10-17 — The two inline-js-does-not-parse messages give a node command a builder can run, not
  *     `pnpm check:js-syntax`, which exists only in this repository (pitfall-list round).
@@ -105,6 +107,7 @@ import { APP_GRANTABLE_SCOPES } from '../routes/app-grant-vocabulary.js';
 import { registerIsOwed } from './app-build-level-meta.js';
 import { undeclaredScopeFindings } from './app-scope-needs.js';
 import { readTextCapped } from '../utils/read-capped.js';
+import { tagAttributes } from '../utils/html-tag-scan.js';
 
 /** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
 const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
@@ -481,12 +484,13 @@ interface AssetRefs {
  */
 function collectAssetRefs(html: string, config: AimeatConfig): AssetRefs {
   const raw: string[] = [];
-  const scriptRe = /<script\b[^>]*\bsrc\s*=\s*["']([^"']+)["'][^>]*>/gi;
-  const linkRe = /<link\b([^>]*)>/gi;
-  let m: RegExpExecArray | null;
-  while ((m = scriptRe.exec(html)) !== null) raw.push(m[1] as string);
-  while ((m = linkRe.exec(html)) !== null) {
-    const attrs = m[1] ?? '';
+  for (const attrs of tagAttributes(html, 'script')) {
+    // The last src in the tag, as the greedy pattern this replaced read it.
+    let src: string | undefined;
+    for (const s of attrs.matchAll(/\bsrc\s*=\s*["']([^"']+)["']/gi)) src = s[1];
+    if (src) raw.push(src);
+  }
+  for (const attrs of tagAttributes(html, 'link')) {
     // The rel value is read out and then searched, rather than matched with `[^"']*stylesheet[^"']*`
     // in one pattern: that shape has an unbounded run on both sides of the word, so a `<link>` tag
     // with a long rel costs quadratic time on bytes a stranger uploaded.

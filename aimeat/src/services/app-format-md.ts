@@ -29,6 +29,10 @@
  *   formatMdDelegateRefusal(opts) · formatMdLang(raw) · renderAppMarkdown(deps, app, opts)
  * @usage const md = await renderAppMarkdown({ storage, config }, app, { lang: formatMdLang(req.query.lang) }); // string or null
  * @version-history
+ *   v1.3.0 — 2026-10-27 — A run takes a slot of the request-driven run pool on the app owner's share
+ *     (extension-run-slots.ts), as a POST /v1/ext call does; with none free it answers FORMAT_MD_BUSY
+ *     and the reader gets the stored face or the converted page (secaudit2026oct26,
+ *     extension-system-run:request-driven-runs-outside-run-slot-pool).
  *   v1.2.2 — 2026-10-25 — The declaration may name `<owner>/<name>` (encoded as one path segment), and
  *     the extension is found as the run finds it, the owner's own first (owner namespaces wish,
  *     secaudit2026oct22).
@@ -48,6 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AppRecord } from '../storage/types/apps.js';
 import { runExtensionActionAsSystem } from './extension-system-run.js';
+import { takeExtensionRunSlot } from './extension-run-slots.js';
 import { findExtension } from './component-address.js';
 import { logger } from '../utils/logger.js';
 
@@ -155,10 +160,19 @@ export function formatMdLang(raw: unknown): string | undefined {
  * the reader's language from `?lang=` (formatMdLang), passed to the action as `input.lang`; the action
  * decides what to do with it, and an action that ignores it answers as before.
  */
-export async function renderAppMarkdown(deps: { storage: Storage; config: AimeatConfig }, app: AppRecord, opts: { lang?: string } = {}): Promise<string | null> {
+export async function renderAppMarkdown(
+  deps: { storage: Storage; config: AimeatConfig }, app: AppRecord, opts: { lang?: string } = {},
+): Promise<string | null | typeof FORMAT_MD_BUSY> {
   const decl = app.manifest?.formatMd;
   if (!decl) return null;
   const ownerGhii = `${app.ownerName}@${deps.config.nodeId}`;
+  // A reader starts this run, so it takes a slot of the request-driven pool on the owner's share,
+  // as the owner's own POST /v1/ext call would (secaudit2026oct26).
+  const slot = takeExtensionRunSlot(deps.config, ownerGhii);
+  if (!slot.ok) {
+    logger.info('format-md: the owner\'s extension runs are all taken, serving the stored face or the converted page', { app: `${app.ownerName}/${app.filename}` });
+    return FORMAT_MD_BUSY;
+  }
   try {
     const { result } = await runExtensionActionAsSystem(deps, {
       extensionName: decl.extension, actionId: decl.action,
@@ -182,5 +196,10 @@ export async function renderAppMarkdown(deps: { storage: Storage; config: Aimeat
   } catch (err) {
     logger.warn('format-md: the action failed, serving the stored face or the converted page', { app: `${app.ownerName}/${app.filename}`, ...decl, error: String(err) });
     return null;
+  } finally {
+    slot.release();
   }
 }
+
+/** renderAppMarkdown's answer when no run slot is free: the reader gets the fallback, nothing is cached. */
+export const FORMAT_MD_BUSY = Symbol('format-md-busy');

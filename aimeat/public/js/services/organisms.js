@@ -13,6 +13,7 @@
  *   `getConfigStrict`, …, in organisms.records.js) through readForWrite (/js/load-state.js), so a
  *   failed read stops the write (docs/pitfalls.md section 84).
  * @version-history
+ *   v1.13.3 — 2026-10-27 — Re-exports fetchStorageTabUrl, the inert fetch a document's file link opens (secaudit2026oct26).
  *   v1.13.2 — 2026-10-25 — decideWorkspaceAccess sends a role choice as `approve` with `role`; the
  *     participants panel's Add as contributor and as viewer answered 400 and kept their buttons.
  *   v1.13.1 — 2026-10-18 — The share's access keeps 'organism' (the workspace's own members, V3.4), which it read as 'open'.
@@ -74,7 +75,7 @@ export {
 export { buildParticipantsMermaid, buildEditFlowMermaid } from './organisms.charts.js';
 export { buildAccessPrompt, buildContractAgentPrompt } from './organisms.prompts.js';
 export {
-  blobToDataUrl, uploadImage, uploadFile, fetchStorageObjectUrl, listStorageVisibilities,
+  blobToDataUrl, uploadImage, uploadFile, fetchStorageObjectUrl, fetchStorageTabUrl, listStorageVisibilities,
   setImageVisibility, extractStorageImages, applyImageVisibilityUrls,
 } from './organisms.images.js';
 // A member's change to a workspace goes through the node's member change doors (a space, the
