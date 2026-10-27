@@ -18916,6 +18916,11 @@ paths:
         Tracked Response check, updates an EXCHANGE listing, and pushes to a connected ecosystem app.
         A field left out keeps its stored value; a visibility or tag edit keeps the record's AI
         provenance statement. A successful answer may carry `warnings` (SHADOWED_BY_OWNER_COPY).
+
+        With `owner_scope=true` an agent edits a sibling agent's record. When that record is one the
+        agent reads as absent (private, without `memory:read-as-owner`), the agent still changes its
+        value and tags, and a change of its `visibility` answers 403 SCOPE_DENIED naming
+        `memory:read-as-owner`, with `details.allow_url` the agent's page where the owner ticks it.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -18958,6 +18963,10 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '202':
           $ref: '#/components/responses/PublishRequested'
+        '403':
+          description: >
+            RESERVED_KEY, SECRET_RECORD, or SCOPE_DENIED: a scope is missing, or an agent changed the
+            visibility of a sibling's record it reads as absent (`memory:read-as-owner`).
         '409':
           description: |
             VERSION_CONFLICT (optimistic lock failure; `details.current_version`, `details.your_version`),
@@ -19067,6 +19076,12 @@ paths:
         when they are omitted, because a writer that owns one subtree has no business restating the
         whole record's metadata. Size, quota, reserved-key, data-area and schema checks all run
         against the MERGED value.
+
+
+        With `owner_scope: true` an agent holding `memory:write-as-owner` merges into its owner's
+        record. When that record is one the agent reads as absent (private, without
+        `memory:read-as-owner`), the merge is stored and the answer carries `value: null` and a
+        `note` naming the permission, and a change of its `visibility` answers 403 SCOPE_DENIED.
       tags: [Memory]
       security:
         - BearerAuth: []

@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key and CORS management; the public GET /v1/memory/:gaii/:key read is registered from routes/memory/public-read.ts. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — PUT /:key with owner_scope: a caller that reads a sibling's record as absent does not
+ *     change its visibility, 403 SCOPE_DENIED naming memory:read-as-owner; the value and tags it still
+ *     edits (secaudit2026oct26, put-owner-scope-sibling-relabel-bypasses-read-as-owner).
  *   2026-10-25 — PUT /:key with owner_scope reaches the owner's agents only for a principal of this
  *     node that is not an ecosystem app, as GET and the list do (secaudit2026oct22,
  *     memory-key-route:owner-scope-ecosystem-not-excluded). DELETE and restore ask the same in
@@ -96,8 +99,9 @@ import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared
 import { logger } from '../../utils/logger.js';
 import { rolesWithOperator } from '../../services/operator-override.js';
 import { recordOperatorAccess } from '../../services/operator-access-audit.js';
-import { readsAsOwner, ownerScopeView } from '../../services/owner-scope-read.js';
+import { readsAsOwner, ownerScopeView, hiddenRecordRelabel, READ_AS_OWNER_SCOPE } from '../../services/owner-scope-read.js';
 import { callerOf } from '../../middleware/caller.js';
+import { denyScope403 } from '../../auth/deny.js';
 
 /** How many times PUT /v1/memory/cors/:key reads the record again after another write of it. */
 const CORS_ATTEMPTS = 10;
@@ -454,6 +458,19 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    const who = callerOf(req, config.nodeId, storage);
+    // A sibling's record this caller reads as absent (GET answers 404 for it): the value and tags are
+    // still its to edit, who may read the record is not. A relabel to 'owner' handed the agent the
+    // record on its next read without memory:read-as-owner (secaudit2026oct26,
+    // put-owner-scope-sibling-relabel-bypasses-read-as-owner). The owner in person and an app read as
+    // the owner and pass, as does an agent holding the tick.
+    const relabel = effectiveGaii === gaii || isOwnerInPerson(req.auth)
+      ? null : hiddenRecordRelabel(existing, gaii, readsAsOwner(who), visibility);
+    if (relabel) {
+      denyScope403(req, res, [READ_AS_OWNER_SCOPE], relabel);
+      return;
+    }
+
     // From here the write is the shared one (services/memory-write.ts), the same sequence POST
     // /v1/memory and aimeat_memory_write run: the archive guard (record, workspace, organism), the
     // undeclared-space refusal, the schema lock, the ODPS and legacy-pacing refusals, the three
@@ -464,7 +481,6 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // PUT, and an edit from the Memory page or AIMEAT.data.update() started no workflow (QA audit
     // D2-03, F05a-03). What stays here is what only an update says: the record exists, its stored
     // fields are the defaults for the fields left out, and `version` is required.
-    const who = callerOf(req, config.nodeId, storage);
     const written = await writeMemoryRecord({
       storage, config, peers, emitResourceUpdated, emitResourceListChanged, onDirectoryChange: ctx.onDirectoryChange, stats,
       fromAgent: who.kind === 'agent',

@@ -25,6 +25,10 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-27 — With owner_scope, a merge into an owner record the caller reads as absent (an agent
+ *     without memory:read-as-owner, Full access included) is stored and answers `value: null` with a
+ *     note naming the permission, and a visibility change of that record is refused 403 SCOPE_DENIED
+ *     (secaudit2026oct26, owner-scope-patch-answers-value-without-read-as-owner).
  *   2026-10-18 — A patch that would raise the record past its label's audience cap is refused with 409
  *     LABEL_CAPS_AUDIENCE before the publish gate and the write (plan doc-mvdipuyqraas, L3.2).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, visibility 'public' on
@@ -101,6 +105,8 @@ import { presentMemory } from '../../services/classification/present-memory.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { resolveWriteTarget } from './owner-target.js';
+import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../../services/owner-scope-read.js';
+import { denyScope403 } from '../../auth/deny.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
@@ -198,6 +204,17 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // before the publish gate and the write. A patch that names no visibility keeps the stored one.
     const capCaller = callerOf(req, config.nodeId, storage);
     const before = await storage.getMemory(gaii, key);
+    // With owner_scope the record is the owner's. One this caller reads as absent (GET answers 404 for
+    // it) is still its to merge into, but who may read it is not, and the answer below carries no value
+    // of it (secaudit2026oct26, owner-scope-patch-answers-value-without-read-as-owner). The writer is
+    // the caller's own identity; the owner in person and an app read as the owner.
+    const writer = resolveIdentity(req.auth!, config.nodeId);
+    const readsAll = gaii === writer || readsAsOwner(capCaller);
+    const relabel = hiddenRecordRelabel(before, writer, readsAll, visibility);
+    if (relabel) {
+      denyScope403(req, res, [READ_AS_OWNER_SCOPE], relabel);
+      return;
+    }
     const capped = await memoryCapRefusal({ storage, config }, capCaller, [memoryTarget(gaii, key)],
       visibility ?? before?.visibility ?? memoryVisibilityDefault(config), before?.visibility, 'PATCH /v1/memory');
     if (capped) {
@@ -251,6 +268,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Who could read the record before this patch; a patch may move its visibility, and those who
     // could read it until now are told it changed (event-bus.ts emitRecordChange).
     let priorVisibility: string | undefined;
+    // The record the merge landed on was one this writer reads as absent.
+    let hiddenFromWriter = false;
 
     for (let attempt = 0; attempt < MAX_MERGE_ATTEMPTS && !record; attempt++) {
       held = [];
@@ -258,6 +277,7 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // subtree onto what the winner actually stored, not onto the stale copy it started from.
       const existing = await storage.getMemory(gaii, key);
       priorVisibility = existing?.visibility;
+      hiddenFromWriter = !readsAll && !!existing && !visibleToSameOwnerReader(existing, writer);
       // A closed node stores a raise to public at 'members' and says so (plan V1.6), before the gate.
       const closed = closedNodeLevel(config, visibility, 'members' as const, { from: existing?.visibility });
       closedWarning = closed.warning;
@@ -444,8 +464,10 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ...(publishWarning || closedWarning ? { warnings: [publishWarning, closedWarning].filter(w => !!w) } : {}),
       key: record.key,
       owner_gaii: record.ownerGaii,
-      // Echoed through the one presentation of a memory value; null when this caller may not see it.
-      value: (await presentMemory(readerFor({ storage, config }, req.auth), record))?.value ?? null,
+      // Echoed through the one presentation of a memory value; null when this caller may not see it,
+      // and null with the note when the merge landed on a record the caller reads as absent.
+      value: hiddenFromWriter ? null : (await presentMemory(readerFor({ storage, config }, req.auth), record))?.value ?? null,
+      ...(hiddenFromWriter ? { note: READ_AS_OWNER_NOTE } : {}),
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,

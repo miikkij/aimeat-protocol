@@ -184,5 +184,77 @@ await test('6c. The owner in person deletes it; an app grant does not put it bac
   assert(own.status === 200, `owner restore: ${own.status} ${JSON.stringify(own.body)}`);
 });
 
+console.log('\n2. PUT with owner_scope and a sibling\'s private record');
+
+let sibVersion = 0;
+await test('2a. Setup: the maker agent keeps a private record; its sibling reads it as absent', async () => {
+  await write(agents.maker.tok, 'sib.secret', { word: 'parity-sibling-value' });
+  const r = await json(`/v1/memory/sib.secret?agent=${encodeURIComponent(agents.maker.gaii)}`, { headers: auth(agents.peer.tok) });
+  assert(r.status === 404, `the sibling reads it as absent: ${r.status}`);
+  const own = await json('/v1/memory/sib.secret', { headers: auth(agents.maker.tok) });
+  sibVersion = own.body.data.version;
+});
+
+await test('2b. Usage: the sibling still edits the value of the private record', async () => {
+  const p = await json('/v1/memory/sib.secret?owner_scope=true', { method: 'PUT', headers: auth(agents.peer.tok), body: JSON.stringify({ value: { word: 'parity-sibling-value', edited: true }, version: sibVersion }) });
+  assert(p.status === 200, `edit: ${p.status} ${JSON.stringify(p.body)}`);
+  sibVersion = p.body.data.version;
+  assert(p.body.data.visibility === 'private', `the level is kept: ${p.body.data.visibility}`);
+});
+
+await test('2c. The sibling without memory:read-as-owner does not relabel it, and still reads it as absent', async () => {
+  const p = await json('/v1/memory/sib.secret?owner_scope=true', { method: 'PUT', headers: auth(agents.peer.tok), body: JSON.stringify({ visibility: 'owner', version: sibVersion }) });
+  assert(p.status === 403 && p.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${p.status} ${JSON.stringify(p.body)}`);
+  assert(String(p.body.error?.message).includes('memory:read-as-owner'), `the refusal names the permission: ${p.body.error?.message}`);
+  const r = await json(`/v1/memory/sib.secret?agent=${encodeURIComponent(agents.maker.gaii)}`, { headers: auth(agents.peer.tok) });
+  assert(r.status === 404, `still absent to the sibling: ${r.status} ${JSON.stringify(r.body?.data?.value)}`);
+});
+
+await test('2d. Usage: an agent with memory:read-as-owner relabels the sibling\'s record, and the owner in person does too', async () => {
+  const p = await json('/v1/memory/sib.secret?owner_scope=true', { method: 'PUT', headers: auth(agents.ticked.tok), body: JSON.stringify({ visibility: 'owner', version: sibVersion }) });
+  assert(p.status === 200 && p.body.data.visibility === 'owner', `ticked agent: ${p.status} ${JSON.stringify(p.body)}`);
+  const o = await json('/v1/memory/sib.secret', { method: 'PUT', headers: auth(ownerTok), body: JSON.stringify({ visibility: 'private', version: p.body.data.version }) });
+  assert(o.status === 200 && o.body.data.visibility === 'private', `owner: ${o.status} ${JSON.stringify(o.body)}`);
+});
+
+console.log('\n3. PATCH with owner_scope and the owner\'s private record');
+
+await test('3a. Setup: the owner keeps a private record; the Full access agent reads it as absent', async () => {
+  await write(ownerTok, 'probe.private', { secret: 'parity-owner-value', shared: 1 });
+  const r = await json('/v1/memory/probe.private?owner_scope=true', { headers: auth(agents.full.tok) });
+  assert(r.status === 404, `absent to the agent: ${r.status}`);
+});
+
+await test('3b. The Full access agent\'s PATCH is stored, and its answer carries no value of the record', async () => {
+  const p = await json('/v1/memory/probe.private', { method: 'PATCH', headers: auth(agents.full.tok), body: JSON.stringify({ owner_scope: true, patch: { agentNote: 'added' } }) });
+  assert(p.status === 200, `patch: ${p.status} ${JSON.stringify(p.body)}`);
+  assert(p.body.data.value === null, `no value for a record the agent reads as absent: ${JSON.stringify(p.body.data.value)}`);
+  assert(!JSON.stringify(p.body).includes('parity-owner-value'), 'the private value is not in the answer');
+  const o = await json('/v1/memory/probe.private', { headers: auth(ownerTok) });
+  assert(o.body.data.value?.agentNote === 'added' && o.body.data.value?.secret === 'parity-owner-value', `the merge is stored: ${JSON.stringify(o.body.data.value)}`);
+});
+
+await test('3c. The Full access agent does not relabel the owner\'s private record through PATCH', async () => {
+  const p = await json('/v1/memory/probe.private', { method: 'PATCH', headers: auth(agents.full.tok), body: JSON.stringify({ owner_scope: true, patch: {}, visibility: 'owner' }) });
+  assert(p.status === 403 && p.body.error?.code === 'SCOPE_DENIED', `expected 403 SCOPE_DENIED, got ${p.status} ${JSON.stringify(p.body)}`);
+  const r = await json('/v1/memory/probe.private?owner_scope=true', { headers: auth(agents.full.tok) });
+  assert(r.status === 404, `still absent to the agent: ${r.status}`);
+});
+
+await test('3d. Usage: an agent with memory:read-as-owner gets the merged value, and an owner-level record echoes to the Full access agent', async () => {
+  const t = await json('/v1/memory/probe.private', { method: 'PATCH', headers: auth(agents.ticked.tok), body: JSON.stringify({ owner_scope: true, patch: { tickNote: 'x' } }) });
+  assert(t.status === 200 && t.body.data.value?.secret === 'parity-owner-value', `ticked: ${t.status} ${JSON.stringify(t.body.data?.value)}`);
+  await write(ownerTok, 'probe.ownerlevel', { shown: 'yes' }, 'owner');
+  const f = await json('/v1/memory/probe.ownerlevel', { method: 'PATCH', headers: auth(agents.full.tok), body: JSON.stringify({ owner_scope: true, patch: { more: 1 } }) });
+  assert(f.status === 200 && f.body.data.value?.shown === 'yes' && f.body.data.value?.more === 1, `owner-level: ${f.status} ${JSON.stringify(f.body.data?.value)}`);
+});
+
+await test('3e. Usage: the app grant and the owner in person get the merged value of a private record', async () => {
+  const a = await json('/v1/memory/probe.private', { method: 'PATCH', headers: auth(appTok), body: JSON.stringify({ patch: { appNote: 'y' } }) });
+  assert(a.status === 200 && a.body.data.value?.secret === 'parity-owner-value', `app: ${a.status} ${JSON.stringify(a.body.data?.value)}`);
+  const o = await json('/v1/memory/probe.private', { method: 'PATCH', headers: auth(ownerTok), body: JSON.stringify({ patch: { ownerNote: 'z' }, visibility: 'owner' }) });
+  assert(o.status === 200 && o.body.data.value?.secret === 'parity-owner-value' && o.body.data.visibility === 'owner', `owner: ${o.status} ${JSON.stringify(o.body.data)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 process.exit(failed > 0 ? 1 : 0);
