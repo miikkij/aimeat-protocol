@@ -1312,7 +1312,17 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
-            "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose."
+            "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
+            "subdomain_site_origin": "The server could not tell whether these web addresses belong to your own site or to an app that someone published. They work as before until you choose. Choose for each address below. The incident is resolved with your last choice."
+          },
+          "action": {
+            "subdomain": "App only"
+          },
+          "keepAction": {
+            "subdomain": "My own site"
+          },
+          "confirm": {
+            "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1328,7 +1338,8 @@
             "agent_capabilities": "On the shared agent's public card: {technical} technical and {domain} other capabilities, {languages} languages",
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
-            "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})"
+            "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})",
+            "subdomain": "The address {label}, which shows the app {target}"
           }
         },
         "source": {
@@ -25916,7 +25927,7 @@
         "short": "The server does not know whether these addresses belong to your own site or to an app.",
         "what": "A web address on this server, such as name.your-domain, belongs either to your own site or to an app that someone published. An app's address must not show your server's own pages or sign-in. The server could not tell which group these addresses belong to, so they work as before until you choose.",
         "tipLabel": "What you can do",
-        "tip": "Ask the AI that you connected to AIMEAT to sort each address: \"keep it as my own site\" or \"serve it only as an app\". Then resolve this incident on this page."
+        "tip": "Press \"App only\" or \"My own site\" for each address below. Choose \"App only\" when someone other than you published the app. \"My own site\" leaves the address as it is."
       }
     },
     "ecosystem": {

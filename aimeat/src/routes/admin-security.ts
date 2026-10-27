@@ -15,6 +15,8 @@
  *   - POST   /v1/admin/security/incidents/:id/resolve   (with { name, resolution }: decide one case)
  *   - DELETE /v1/admin/security/incidents/:id
  * @version-history
+ *   v1.7.0 -- 2026-10-27 -- An entry's action can be "app_only" (an address of the subdomain incident is
+ *     served only at its app address); the refusal of a malformed body names it (Jouni, 2026-10-27).
  *   v1.6.0 -- 2026-10-25 -- The resolve endpoint decides an entry of an incident that names records to
  *     act on too: its action ("clear" or "delete") or "keep" (services/incident-entries.ts; secaudit2026oct22).
  *   v1.5.0 -- 2026-10-18 -- The resolve endpoint decides one case of either kind through
@@ -104,7 +106,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
     const body = (req.body ?? {}) as { name?: unknown; resolution?: unknown };
     if (body.name !== undefined || body.resolution !== undefined) {
       if (typeof body.name !== 'string' || body.name === '' || typeof body.resolution !== 'string') {
-        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear" or "delete") or "keep" for an entry.'));
+        res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete" or "app_only") or "keep" for an entry.'));
         return;
       }
       // An agent or an ecosystem app decides as an AI, anyone else as a person (the policy history says which).

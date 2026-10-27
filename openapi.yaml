@@ -70005,12 +70005,15 @@ paths:
         token was refused there. The start step of type `erasure_leftover_schedules` names the
         schedules that account erasures before 2026-10-25 left: a schedule whose `ownerScope` names an
         account no one holds now, or an account registered after the schedule was made; the entry id
-        is the schedule id. With
+        is the schedule id. The start step of type `subdomain_site_origin` names the subdomain
+        addresses it could not tell apart as the operator's own site or a label a publish gave an app;
+        the entry id is the label. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
-        none; a capability's visibility is set to private) or `delete` (the skill or the data package is deleted with its files, the schedule is
-        removed from the scheduler and from storage), or `keep`
-        (nothing changes). Deciding an entry again answers 409. The incident resolves itself with its
+        none), `delete` (the skill or the data package is deleted with its files, the schedule is
+        removed from the scheduler and from storage) or `app_only` (the address is served only at its
+        app address, origin `publisher`), or `keep`
+        (nothing changes; an address stays served at both addresses). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
@@ -70028,7 +70031,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear or delete, or keep.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete or app_only, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -70046,7 +70049,7 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: With a name. }
                           entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object

@@ -1311,7 +1311,17 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
-            "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset."
+            "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
+            "subdomain_site_origin": "Palvelin ei tunnistanut, kuuluvatko nämä verkko-osoitteet omalle sivustollesi vai sovellukselle, jonka joku julkaisi. Ne toimivat kuten ennenkin, kunnes valitset. Valitse alla jokaiselle osoitteelle. Tapaus ratkeaa viimeisellä valinnallasi."
+          },
+          "action": {
+            "subdomain": "Vain sovellus"
+          },
+          "keepAction": {
+            "subdomain": "Oma sivusto"
+          },
+          "confirm": {
+            "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1327,7 +1337,8 @@
             "agent_capabilities": "Jaetun agentin julkisella kortilla: {technical} teknistä ja {domain} muuta kyvykkyyttä, {languages} kieltä",
             "skill": "Taito {name} tiedostoineen",
             "datapackage": "Datapaketti {name} tiedostoineen",
-            "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})"
+            "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})",
+            "subdomain": "Osoite {label}, jossa näkyy sovellus {target}"
           }
         },
         "source": {
@@ -26073,7 +26084,7 @@
         "short": "Palvelin ei tiedä, kuuluvatko nämä osoitteet omalle sivustollesi vai sovellukselle.",
         "what": "Tämän palvelimen verkko-osoite, kuten nimi.oma-verkkotunnus, kuuluu joko omalle sivustollesi tai sovellukselle, jonka joku julkaisi. Sovelluksen osoitteessa ei saa näkyä palvelimesi omia sivuja eikä kirjautumista. Palvelin ei tunnistanut, kumpaan ryhmään nämä osoitteet kuuluvat, joten ne toimivat kuten ennenkin, kunnes valitset.",
         "tipLabel": "Mitä voit tehdä",
-        "tip": "Pyydä tekoälyä, jonka olet yhdistänyt AIMEATiin, lajittelemaan jokainen osoite: ”pidä omana sivustona” tai ”näytä vain sovelluksena”. Merkitse sitten tämä tapaus ratkaistuksi tällä sivulla."
+        "tip": "Paina alla jokaisen osoitteen kohdalla ”Vain sovellus” tai ”Oma sivusto”. Valitse ”Vain sovellus”, jos sovelluksen julkaisi joku muu kuin sinä. ”Oma sivusto” jättää osoitteen ennalleen."
       }
     },
     "ecosystem": {

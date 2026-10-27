@@ -10,6 +10,8 @@
  * @structure HeldSection · IncidentsSection (CapOffers, EntryActions) · AccountsSection · SettingsSection · AskAiSection ·
  *   isHeldIncident · entryLine
  * @version-history
+ *   2026-10-27 -- An entry's Keep button takes the kind's own word (entries.keepAction.<kind>) when it has
+ *     one: a subdomain address offers "Own site, keep both addresses" (Jouni, 2026-10-27).
  *   2026-10-27 -- An incident kind with an explanation (explain.incident.<type>) gets a question mark beside
  *     its name that opens it (Jouni, 2026-10-27).
  *   2026-10-26 -- An entry's action button takes the kind's own word (entries.action.<kind>) when it has
@@ -225,7 +227,7 @@ function EntryActions({ i, onDecideEntry }) {
       <${Row} key=${e.id} below=${open ? html`
         <${Actions} tight>
           <${Action} small tone="danger" onClick=${() => onDecideEntry(i.id, e, e.action)}>${tOr('admin.security.incidents.entries.action.' + e.kind, S('incidents.entries.' + (e.action === 'clear' ? 'clear' : 'delete')))}<//>
-          <${Action} small soft onClick=${() => onDecideEntry(i.id, e, 'keep')}>${S('incidents.entries.keep')}<//>
+          <${Action} small soft onClick=${() => onDecideEntry(i.id, e, 'keep')}>${tOr('admin.security.incidents.entries.keepAction.' + e.kind, S('incidents.entries.keep'))}<//>
         <//>` : undefined}>
         <${Cell} line><${Mark} kind="status" tone=${open ? 'danger' : 'fine'}>${open ? S('incidents.held.toDecide') : S('incidents.entries.' + (e.status === 'kept' ? 'kept' : 'done'))}<//><//>
         <${Name}>${entryLine(e)}<//>
