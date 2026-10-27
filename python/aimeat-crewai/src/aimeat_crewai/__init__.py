@@ -26,6 +26,11 @@ Typical use:
 See the package README and `examples/` for full recipes.
 
 Changelog:
+  0.39.0 -- 2026-10-26 -- An agent token from the argument or AIMEAT_AGENT_TOKEN is no longer sent
+    to the node_url in the current folder's .aimeat/config.yaml (secaudit2026oct22). decide._node
+    reads that file only when AIMEAT_HOME is set, or when the token was read from the same home;
+    otherwise it logs one line naming the ignored file and needs node_url= or AIMEAT_NODE_URL.
+    MINOR, NOT PATCH: a call that worked now raises.
   0.38.0 -- 2026-10-25 -- Agent goals: the daemon's default tools take `aimeat_goal_get` and
     `aimeat_goal_work` when the node offers them, so a crew reads the goal its task belongs to and
     leaves the next work for another agent; a node without them starts the crew as before.
@@ -253,7 +258,7 @@ from .workflow_spec import (
 
 # Kept in step with pyproject BY HAND, which is why it was wrong: 0.20.0 shipped announcing
 # itself as 0.19.0, and the first crew to install it reported the mismatch before we saw it.
-__version__ = "0.38.0"
+__version__ = "0.39.0"
 
 __all__ = [  # noqa: RUF022 -- grouped by topic with the version each group arrived in; alphabetical order would scatter those comments away from what they name
     "__version__",
