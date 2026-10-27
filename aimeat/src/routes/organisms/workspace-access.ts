@@ -6,6 +6,7 @@
  *   email invitations, provisioned-code ("key") invitations, and the PUBLIC invitation token flow.
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — A code-key account reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   v1.17.1 — 2026-10-23 — A code-key account passes whether the request came in on a loopback socket (fromLoopback), for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.17.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/:id/workspaces; organism:invite on POST /v1/organisms/:id/workspace-access, GET /v1/organisms/:id/workspace-access. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.16.1 — 2026-10-06 — The comments say how a key holder confirms the address on a node that
@@ -80,7 +81,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js';
-import { isLoopbackAddress } from '../../auth/loopback-pass.js';
+import { fromNodeMachine } from '../../auth/loopback-pass.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, isSameOwner, validateOwnerName, localAccountName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -586,7 +587,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
         // An owner-minted code key is the 'invitation' road: open in 'invite' mode, refused only
         // when the node is fully closed (the backstop below turns that into a clean 403).
         via: 'invitation',
-        fromLoopback: isLoopbackAddress(req.socket.remoteAddress),
+        fromLoopback: fromNodeMachine(req),
         username: uname,
         displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
         passwordHash,

@@ -14,6 +14,7 @@
  *   - GET /v1/setup/wizard + POST /v1/setup/init: serve the wizard and provision the first owner
  *
  * @version-history
+ *   2026-10-27 -- The status and POST /v1/setup/init read fromNodeMachine(req): a request the node replays onto loopback for a remote agent is not this machine's own (secaudit2026oct26).
  *   v1.10.0 -- 2026-10-23 -- The status and POST /v1/setup/init read the request's socket address: a loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   v1.9.0 -- 2026-10-18 -- A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.8.0 -- 2026-10-18 -- The first account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
@@ -53,7 +54,7 @@ import { fileURLToPath } from 'node:url';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { isLoopbackAddress } from '../auth/loopback-pass.js';
+import { fromNodeMachine } from '../auth/loopback-pass.js';
 import { issueJWT } from '../auth/jwt.js';
 import { success, error } from '../middleware/envelope.js';
 import { validateOwnerName, buildGAII } from '../utils/gaii.js';
@@ -115,7 +116,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
             // this request's answer: from outside the machine a loopback node asks for it too.
             res.json(success(config.nodeId, {
                 needsSetup,
-                setupCodeRequired: needsSetup && setupCodeRequired(config, isLoopbackAddress(req.socket.remoteAddress)),
+                setupCodeRequired: needsSetup && setupCodeRequired(config, fromNodeMachine(req)),
                 nodeId: config.nodeId,
                 nodeType: config.nodeType,
                 port: config.port,
@@ -159,7 +160,7 @@ export function setupRouter(config: AimeatConfig, storage: Storage, onSetupCompl
 
             // On a node others can reach, the one-time code from the start log, before anything else
             // is read (services/setup-code.ts; Jouni, 2026-10-16).
-            const fromLoopback = isLoopbackAddress(req.socket.remoteAddress);
+            const fromLoopback = fromNodeMachine(req);
             const codeRefusal = setupCodeRefusal(config, req.body?.setupCode, fromLoopback);
             if (codeRefusal) {
                 res.status(403).json(error(config.nodeId, codeRefusal.code, codeRefusal.message));

@@ -24,6 +24,7 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-27 — The account an identity provider's sign-in makes reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-24 — Step 3 on an account with two-step sign-in armed answers `second_factor` and saves no
  *     link; the code step saves it after a correct code (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-23 — finalizeExternalSignup passes whether the sign-up request came in on a loopback socket,
@@ -45,7 +46,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
-import { isLoopbackAddress } from '../auth/loopback-pass.js';
+import { fromNodeMachine } from '../auth/loopback-pass.js';
 import { establishOwnerSession } from './owner-session.js';
 import { provisionOwner, registrationRefusal, RegistrationClosedError, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
@@ -458,7 +459,7 @@ export async function finalizeExternalSignup(
         emailVerified: pending.emailVerified,
         via: opts.via,
         managedBy: opts.managedBy ?? null,
-        fromLoopback: isLoopbackAddress(req.socket.remoteAddress),
+        fromLoopback: fromNodeMachine(req),
       });
     } catch (e) {
       // An extension bound to pre_owner_registration refused the account (feature-list audit 89).
