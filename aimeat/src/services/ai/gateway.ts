@@ -29,6 +29,8 @@
  *   - openAiChat() / speaksOpenAiChat — an OpenAI chat answer from a provider that does not speak it
  *   - GatewayError — the error shape callers map to their own codes
  * @version-history
+ *   v1.4.1 -- 2026-10-27 -- text() keeps the usage of each attempt that answered nothing (`emptyAttempts`
+ *     on the result and on the empty failure), so the caller records and debits them (secaudit2026oct26).
  *   v1.4.0 — 2026-10-18 — image() takes reference pictures and a mask, passed to the AI SDK as the
  *     prompt's `images` and `mask`, and says how the mask reached the model (MaskMode). An extension
  *     provider refuses input pictures rather than dropping them (Comicland v3 A-1, A-2).
@@ -78,6 +80,8 @@ export interface GatewayError extends Error {
   empty?: true;
   finish_reason?: string;
   attempts?: number;
+  /** With `empty`: what each of those attempts used, for the caller to record. */
+  emptyAttempts?: EmptyAttempt[];
   /** The provider's own reason, redacted and capped (./errors.ts providerReasonFromText). */
   providerMessage?: string;
   /** Seconds from the provider's Retry-After, on a 429. */
@@ -175,7 +179,13 @@ export interface TextResult {
   /** The provider's own finish reason (`stop`, `length`, `content_filter`, ...), when it gave one. */
   finishReason?: string;
   usage: { promptTokens?: number; completionTokens?: number; totalTokens?: number; costUsd?: number };
+  /** The attempts before this one that answered nothing and were asked again: each was a provider
+   *  call, so the caller records and debits them (ai/failed-attempts.ts). Absent when there were none. */
+  emptyAttempts?: EmptyAttempt[];
 }
+
+/** One attempt that answered nothing: the model the provider says answered, and what it used. */
+export interface EmptyAttempt { model: string; usage: TextResult['usage'] }
 
 type UserPart =
   | { type: 'text'; text: string }
@@ -266,9 +276,13 @@ export async function text(req: TextRequest): Promise<TextResult> {
   // attempt, often on another provider behind OpenRouter, answers. So: ask again, a bounded number
   // of times, then fail with the reason.
   const retries = Math.max(0, Math.min(MAX_EMPTY_RETRIES, Math.floor(req.retries ?? DEFAULT_EMPTY_RETRIES)));
+  // Each empty answer was a provider call the payer is billed for: kept, so the caller records it
+  // (secaudit2026oct26, node-key-empty-answer-attempts-not-debited).
+  const emptyAttempts: EmptyAttempt[] = [];
   for (let attempt = 1; ; attempt++) {
     const r = await once();
-    if (r.content.trim()) return r;
+    if (r.content.trim()) return emptyAttempts.length ? { ...r, emptyAttempts } : r;
+    emptyAttempts.push({ model: r.model, usage: r.usage });
     const finish = r.finishReason ?? 'unknown';
     if (attempt <= retries && !req.signal?.aborted) {
       logger.warn(`[ai] empty content: model=${r.model}, finish_reason=${finish}, attempt ${attempt} of ${retries + 1}; asking again`);
@@ -277,7 +291,7 @@ export async function text(req: TextRequest): Promise<TextResult> {
     const err = gatewayError(502,
       `The model returned no content after ${attempt} attempt(s): model=${r.model}, finish_reason=${finish}`
       + (finish === 'length' ? ' (the token cap ran out before an answer; a reasoning model spends it on hidden thinking — raise the cap or set reasoning.enabled=false)' : ''));
-    throw Object.assign(err, { empty: true as const, finish_reason: finish, attempts: attempt });
+    throw Object.assign(err, { empty: true as const, finish_reason: finish, attempts: attempt, emptyAttempts });
   }
 }
 

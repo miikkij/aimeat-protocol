@@ -21,6 +21,8 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.15.0 -- 2026-10-27 -- completeForOwner records and debits the text attempts that answered nothing, and prices a node-key
+ *     call by its pictures and files too (estimate.inputTokens); recordFailedAttempts moved to ai/failed-attempts.ts (secaudit2026oct26).
  *   v3.14.0 -- 2026-10-25 -- completeForOwner holds a node-key call's estimate until it is settled, and its answer is at most ai.node_key_max_output_tokens long (ai/node-key-hold.ts; secaudit2026oct22).
  *   v3.13.1 -- 2026-10-25 -- An app grant's call is checked against the owner's allowlist and per-app cap,
  *     and recorded, under the app the grant names (opts.verifiedApp), not the body's app_id (secaudit2026oct22).
@@ -169,6 +171,8 @@ import { logger } from '../../utils/logger.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
 import { holdNodeKeyCandidates, nodeKeyOutputCap } from './node-key-hold.js';
+import { recordFailedAttempts, emptyAttemptsCostUsd, withEmptyAttemptsCost, emptyAttemptsCostOf } from './failed-attempts.js';
+import { textCallInputTokens } from './call-size.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
 import { agentCapRefusal } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
@@ -345,8 +349,9 @@ export interface PrepareAiCallOptions {
   /** The request's word on the person's language, for the sentence a refusal carries. */
   lang?: RequestLanguage;
   /** The call's size, for the owner's price ceiling per call: without it the ceiling assumes 1,024
-   *  tokens each way, so a long prompt passed a ceiling it was far over (secaudit 2026-10, AI-4). */
-  estimate?: { promptTokens?: number; maxTokens?: number };
+   *  tokens each way, so a long prompt passed a ceiling it was far over (secaudit 2026-10, AI-4).
+   *  `inputTokens`, everything the call sends (ai/call-size.ts), prices a call on the node's key. */
+  estimate?: { promptTokens?: number; maxTokens?: number; inputTokens?: number };
 }
 
 /**
@@ -504,25 +509,8 @@ async function planAiCall(
   }, first);
 }
 
-/**
- * The attempts that failed before an answer, or before the final failure, as usage rows of their
- * own (plan 11, section 7): a provider may bill a timed-out picture, and a fallback the owner cannot
- * see in their records is a fallback they cannot judge. The caller writes them only when the route
- * moved on (`route.fellBack`), so a single failed call records what it always did: nothing.
- */
-export async function recordFailedAttempts(
-  storage: Storage, config: AimeatConfig, gaii: string, plan: AiCallPlan,
-  failed: Array<{ candidate: AiCandidate; error: string; costUsd: number }>,
-  call: { appId?: string; source: string },
-): Promise<void> {
-  for (const f of failed) {
-    await recordAiUsage(storage, gaii, plan.usage, {
-      costUsd: f.costUsd, tokens: 0, appId: plan.appId ?? call.appId, model: f.candidate.model, provider: f.candidate.provider.id,
-      source: `${call.source}:failed-${f.error}`, apiKeyScope: f.candidate.keyScope, ...(plan.agent ? { agent: plan.agent } : {}),
-    }, config);
-    if (f.candidate.keyScope === 'node' && f.costUsd > 0) await debitAllowance(storage, config, gaii, f.costUsd);
-  }
-}
+// The attempts that failed before an answer, as usage rows of their own: ai/failed-attempts.ts.
+export { recordFailedAttempts };
 
 export interface AiCallOutcome {
   /** The model that actually answered, which is not always the one that was asked for. */
@@ -671,6 +659,8 @@ export async function completeForOwner(
     // About four characters to a token; the answer's ceiling when the call set one.
     estimate: {
       promptTokens: Math.ceil((opts.prompt.length + (opts.systemPrompt?.length ?? 0)) / 4),
+      // On the node's key, the pictures and files count too (ai/call-size.ts; secaudit2026oct26).
+      inputTokens: textCallInputTokens(opts),
       ...(typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? { maxTokens: opts.maxTokens | 0 } : {}),
     },
   });
@@ -734,16 +724,23 @@ export async function completeForOwner(
         ...(t.reasoning ? { reasoning: t.reasoning } : {}),
         ...(retries !== undefined ? { retries } : {}),
         ...(opts.signal ? { signal: opts.signal } : {}),
-      });
-    });
+      }).catch((e: unknown) => { throw withEmptyAttemptsCost(e, c); });
+    }, emptyAttemptsCostOf);
     result = run.result;
     answered = planFor(plan, run.candidate);
     route = run.route;
-    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-complete' });
+    // Attempts that answered nothing were provider calls too, and are recorded and debited
+    // (ai/failed-attempts.ts; secaudit2026oct26).
+    const empty = result.emptyAttempts?.length
+      ? [{ candidate: run.candidate, error: 'empty', costUsd: emptyAttemptsCostUsd(run.candidate, result.emptyAttempts) }] : [];
+    const notAnswered = [...(route.fellBack ? run.failed : []), ...empty];
+    if (notAnswered.length) await recordFailedAttempts(storage, config, gaii, plan, notAnswered, { appId: opts.appId, source: 'ai-complete' });
   } catch (e) {
     held.release();
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
-    if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
+    if (moved.failed && (moved.route?.fellBack || moved.failed.some((f) => f.costUsd > 0))) {
+      await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
+    }
     // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
     // model said nothing" from "the provider was down" and act on the finish_reason in the message.
     if ((e as { empty?: boolean }).empty) throw new AiCompletionError('EMPTY_COMPLETION', 502, (e as Error).message);

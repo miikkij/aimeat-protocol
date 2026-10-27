@@ -954,6 +954,9 @@ const ALL_SUITES = [
     // pointed at one stub (each at its own path) and a node key, so which provider a request reached,
     // with which key, is read from what arrived. Follows the runner's backend.
     'test/e2e-ai-providers.ts',
+    // What a call on the node's key costs the account's allowance (secaudit2026oct26): its own node on
+    // 40467 with a node key and the stub as the node's OpenRouter. Follows the runner's backend.
+    'test/e2e-ai-node-key-metering.ts',
     // The model catalogue (System 2, V4): its own node on 40440 whose catalogue sources point at a
     // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
     // catalogue price are read from what the node wrote. Follows the runner's backend.
