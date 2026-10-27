@@ -19,6 +19,8 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   2026-10-27 — A register container outside the register's reach is a gap that says so (not-in-scope,
+ *     secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — The node-wide list reads every app, not only the listed ones, and an app
  *     with no data map is a gap (app-personal-data-unstated): on innokas.aimeat.io the page named 3
  *     apps with personal data where the maps named 15, and said nothing of 18 apps with no map.
@@ -169,7 +171,9 @@ export async function scopeGaps(deps: Deps, scope: ComplianceScope, opts: { now?
     const why = f.outcome === 'off' ? 'classification is off for it, so nothing follows the domain'
       : f.outcome === 'no-label' ? 'the policy has none of the labels its domains ask for'
         : f.outcome === 'suggested' ? `a person set it lower and a raise to ${f.floor} waits for them`
-          : f.outcome === 'failed' ? 'its label could not be read' : `it is below ${f.floor}`;
+          : f.outcome === 'failed' ? 'its label could not be read'
+            : f.outcome === 'not-in-scope' ? 'it is an organism or workspace this register\'s keeper does not manage, so the domain does not raise its label'
+              : `it is below ${f.floor}`;
     out.push({ kind: 'domain-label-below-floor', detail: `A container of the register "${f.register}": ${why}.`, evidence: { ...scopeName(scope), ...f } });
   }
   if (scope.kind !== 'app') {

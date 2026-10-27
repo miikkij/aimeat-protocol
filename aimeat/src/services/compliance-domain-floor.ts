@@ -25,6 +25,10 @@
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C2, decision 10.7).
  *   v1.0.1 — 2026-10-24 — The label rule writes as system@<node>, as the other label rules do;
  *     compliance@ was an owner name nobody had reserved (unit synthetic-owner-names).
+ *   v1.1.0 — 2026-10-27 — An organism or workspace container moves only when it is the register's own
+ *     organism or one the register's keeper creates or administers; any other is reported
+ *     'not-in-scope', with nothing read or written (secaudit2026oct26,
+ *     compliance-docs:register-containers-not-bound-to-scope).
  */
 import type { ContentLabelTarget } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -37,14 +41,33 @@ import { appTarget, organismTarget, workspaceTarget } from './classification/con
 import { readContentLabel, setLabel, type LabelActor, type ClassificationDeps } from './classification/labels.js';
 import type { ComplianceScope } from './compliance-docs.js';
 import type { ComplianceRegister } from './compliance-docs-schemas.js';
+import { isOrgManager } from './workspace-access.js';
 
 export interface FloorOutcome {
   register: string;
   container: { kind: string; organism_id?: string; ws?: string; app?: string };
   floor: string;
   /** raised: the label rose; held: already at or above; suggested: a person's lower label waits for them;
-   *  off: classification is off for it; no-label: the floor's label is not in the policy; failed: could not be read. */
-  outcome: 'raised' | 'held' | 'suggested' | 'off' | 'no-label' | 'failed';
+   *  off: classification is off for it; no-label: the floor's label is not in the policy; failed: could not be read;
+   *  not-in-scope: an organism or workspace the register's keeper does not manage, so it is left alone. */
+  outcome: 'raised' | 'held' | 'suggested' | 'off' | 'no-label' | 'failed' | 'not-in-scope';
+}
+
+/**
+ * Whether a register may move the label of the container it names. An app container is bound to the
+ * scope already (containersOfRegister). The node's registers are the operator's, and the operator
+ * keeps every container. An organism or workspace counts when it is the register's own organism, or
+ * one the register's keeper creates or administers: the writer named in `keeperName`, or for an app's
+ * register its owner. Anything else is someone else's organism (secaudit2026oct26).
+ */
+async function containerInScope(
+  storage: ClassificationDeps['storage'], scope: ComplianceScope, named: FloorOutcome['container'], keeperName: string | undefined,
+): Promise<boolean> {
+  if (named.kind === 'app' || scope.kind === 'node') return true;
+  const org = named.organism_id;
+  if (!org) return false;
+  if (scope.kind === 'organism' && org === scope.organismId) return true;
+  return isOrgManager(storage, org, keeperName ?? (scope.kind === 'app' ? scope.ownerName : undefined));
 }
 
 /** The highest minLabel among a register's known domains that the policy has, or null. */
@@ -79,7 +102,7 @@ export function containersOfRegister(scope: ComplianceScope, reg: ComplianceRegi
  */
 export async function applyDomainFloors(
   deps: { storage: ClassificationDeps['storage']; config: AimeatConfig }, scope: ComplianceScope,
-  registers: readonly ComplianceRegister[], opts: { dryRun?: boolean } = {},
+  registers: readonly ComplianceRegister[], opts: { dryRun?: boolean; keeperName?: string } = {},
 ): Promise<FloorOutcome[]> {
   const out: FloorOutcome[] = [];
   for (const reg of registers) {
@@ -87,6 +110,8 @@ export async function applyDomainFloors(
     for (const { target, named } of containersOfRegister(scope, reg, deps.config.nodeId)) {
       const push = (floor: string, outcome: FloorOutcome['outcome']) => out.push({ register: reg.id, container: named, floor, outcome });
       try {
+        // Read nothing of a container the register may not move: its label state is not the writer's to see.
+        if (!(await containerInScope(deps.storage, scope, named, opts.keeperName))) { push(reg.domains.join(','), 'not-in-scope'); continue; }
         if (!(await classificationActiveFor(deps.storage, deps.config, target.scope))) { push(reg.domains.join(','), 'off'); continue; }
         const policy = await policyFor(deps.storage, deps.config, target.scope);
         const floor = domainFloorOf(reg.domains, policy);
