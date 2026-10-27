@@ -41600,8 +41600,11 @@ paths:
         `AIMEAT_ENTRA_OAUTH_ENABLED`), each needing its client credentials; an operator may register
         others. Discover the enabled providers + start URLs via `GET /v1/auth/providers`. Returns
         503 when the requested provider is not configured on this node. On a node whose base URL is
-        https the response also sets the round's cookie (`aimeat_oauth_<hash>`, httpOnly,
-        SameSite=Lax, path = the callback), so only this browser can finish the round.
+        https the response also sets the round's cookie, so only this browser can finish the round:
+        over https `__Host-aimeat_oauth_<hash>` (httpOnly, Secure, SameSite=Lax, path /), which a
+        same-site app, portfolio or company page cannot write; over plain http
+        `aimeat_oauth_<hash>` (path = the callback). The pending sign-up cookie the callback sets is
+        `__Host-aimeat_pending_signup` over https and `aimeat_pending_signup` over plain http.
       tags: [GHII-Web]
       parameters:
         - name: provider
@@ -41899,8 +41902,9 @@ paths:
         The post-login `redirect` query parameter is parked server-side under the RelayState.
         Gated on the runtime `sso.enabled` flag; a connection with no SAML configuration answers 404.
         On a node whose base URL is https the response also sets the round's cookie
-        (`aimeat_oauth_<hash>`, httpOnly, SameSite=None, Secure, path = the ACS), so only this browser
-        can finish the round.
+        (httpOnly, SameSite=None, Secure), so only this browser can finish the round: over https
+        `__Host-aimeat_oauth_<hash>` with path /, which a same-site app, portfolio or company page
+        cannot write; over plain http `aimeat_oauth_<hash>` with path = the ACS.
       tags: [SSO]
       parameters:
         - name: connectionId
