@@ -19,6 +19,9 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.6.4 — 2026-10-27 — Phase 11b: a campaign app's users (through its grant), one user's agent and
+ *     the channel owner publish through a delegation; another account, its agent and another app's
+ *     grant that only name the app in the body are refused (secaudit2026oct26, delegated-publish).
  *   v1.6.3 — 2026-10-25 — Phase 17: a caption-only scheduled post an agent made does not fire after the agent
  *     is deleted or loses connections:use, and fires while it holds the word (secaudit2026oct22).
  *   v1.6.2 — 2026-10-25 — A second channel's delegation for an app id and action another channel
@@ -116,14 +119,17 @@ ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update
  * Made through POST /v1/agents, so the same name made again is the same GAII, as device
  * authorization makes it.
  */
-async function agentFor(ownerBearer: string, owner: string, name: string): Promise<string> {
+async function agentFor(
+  ownerBearer: string, owner: string, name: string,
+  scopes: string[] = ['connections:read', 'connections:write', 'connections:read-through'],
+): Promise<string> {
   const made = await api('/v1/agents', {
     bearer: ownerBearer, body: { name, owner, capabilities: ['memory'], model: 'test' },
   });
   assert(made.status === 201, `agent ${name}: ${made.status} ${made.data?.error?.message}`);
   const scoped = await api(`/v1/agents/${name}/scopes`, {
     method: 'PATCH', bearer: ownerBearer,
-    body: { scopes: ['connections:read', 'connections:write', 'connections:read-through'] },
+    body: { scopes },
   });
   assert(scoped.status === 200, `agent scopes: ${scoped.status} ${scoped.data?.error?.message}`);
   const gaii = made.data.data.agent.gaii as string;
@@ -186,6 +192,31 @@ async function grantAppToken(ownerBearer: string, owner: string, scopes: string[
     body: { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect },
   });
   assert(tok.status === 200 && tok.data?.ok, `app token: ${tok.status}`);
+  return tok.data.data.access_token as string;
+}
+
+/**
+ * Sign `bearer`'s account in to an app another owner published (`appRef` is owner/filename), through
+ * the same authorize, consent and code exchange the browser runs. Answers the app's access token.
+ */
+async function signInToApp(bearer: string, appRef: string, scopes: string[]): Promise<string> {
+  const redirect = 'http://localhost:9933/callback';
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+  const q = new URLSearchParams({
+    app: appRef, response_type: 'code', scope: scopes.join(' '),
+    redirect_uri: redirect, state: 'x', code_challenge: challenge, code_challenge_method: 'S256',
+  });
+  const auth = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  assert(auth.status === 302, `authorize ${appRef}: ${auth.status}`);
+  const requestId = decodeURIComponent(/req=([^&]+)/.exec(auth.headers.get('location') ?? '')![1]);
+  const consent = await api('/v1/app-grants/authorize-consent', { bearer, body: { request_id: requestId } });
+  assert(consent.status === 200 && consent.data?.ok, `consent ${appRef}: ${consent.status} ${consent.data?.error?.message}`);
+  const code = new URL(consent.data.data.redirect_url as string).searchParams.get('code') ?? '';
+  const tok = await api('/v1/app-grants/token', {
+    body: { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect },
+  });
+  assert(tok.status === 200 && tok.data?.ok, `app token ${appRef}: ${tok.status}`);
   return tok.data.data.access_token as string;
 }
 
@@ -1065,6 +1096,70 @@ async function main(): Promise<void> {
         bearer: jwtA, body: { app_id: 'app:stopper', action: 'publish-video', moderation: 'auto' },
       });
       assert(again.status === 201 && again.data.data.delegation.connectionId === sharedId, `A re-saves its own delegation: ${again.status}`);
+    });
+
+    /**
+     * Phase 11b. A campaign: A publishes an app and gives it one action over A's shared channel, and
+     * many people publish through that app. The delegation names the app by the free label channel
+     * owners have always typed (`app:<file name>`). Who publishes through it: the app's users through
+     * the app's own grant, the agents of people who use the app, and the channel owner. Who does not:
+     * an account that only writes the app's name in the body, its agent, and another app's grant
+     * (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
+     */
+    console.log('\nPhase 11b — Who publishes through a delegation');
+    const campaignFile = `campaign${stamp % 100000}.html`;
+    const campaignLabel = `app:${campaignFile.replace(/\.html$/, '')}`;
+    let jwtC = '', jwtE = '', appTokB = '', appTokC = '', agentTokB = '';
+    const userC = `cxc${stamp}`;
+    const userE = `cxe${stamp}`;
+    const delegated = (bearer: string, caption: string) => api('/v1/connections/publish', {
+      bearer, body: { app_id: campaignLabel, action: 'publish-video', caption: `${caption}-${Date.now()}` },
+    });
+    await test('a campaign app is published and given one action over the shared channel', async () => {
+      const pub = await api('/v1/apps', {
+        bearer: jwtA,
+        body: {
+          filename: campaignFile,
+          content: Buffer.from('<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="connections:use"></head><body>campaign</body></html>', 'utf8').toString('base64'),
+          name: 'Campaign', description: 'delegated publish campaign', category: 'tool',
+        },
+      });
+      assert(pub.status === 201, `publish the campaign app: ${pub.status} ${pub.data?.error?.message}`);
+      const made = await api(`/v1/connections/${sharedId}/delegations`, {
+        bearer: jwtA, body: { app_id: campaignLabel, action: 'publish-video', moderation: 'auto' },
+      });
+      assert(made.status === 201, `campaign delegation: ${made.status} ${made.data?.error?.message}`);
+      jwtC = await registerAndLogin(userC, pw);
+      jwtE = await registerAndLogin(userE, pw);
+      appTokB = await signInToApp(jwtB, `${userA}/${campaignFile}`, ['connections:use']);
+      appTokC = await signInToApp(jwtC, `${userA}/${campaignFile}`, ['connections:use']);
+      const agentName = `cxcamp${stamp % 100000}`;
+      agentTokB = await agentFor(jwtB, userB, agentName, ['connections:read', 'connections:use']);
+    });
+
+    await test('usage: the app\'s users, one user\'s agent and the channel owner publish through the delegation', async () => {
+      const before = provider.stats.publishes;
+      for (const [who, bearer] of [['app user B', appTokB], ['app user C', appTokC], ['B\'s agent', agentTokB], ['channel owner A', jwtA]] as const) {
+        const r = await delegated(bearer, `campaign-${who.replace(/\W/g, '')}`);
+        assert(r.status === 200 && r.data?.data?.attempt?.status === 'done',
+          `${who} could not publish through the campaign delegation: ${r.status} ${r.data?.error?.code} ${r.data?.error?.message}`);
+      }
+      assert(provider.stats.publishes === before + 4, `expected four publishes, the provider saw ${provider.stats.publishes - before}`);
+    });
+
+    await test('a caller that only names the app in the body does not publish through the delegation', async () => {
+      const agentName = `cxstray${stamp % 100000}`;
+      const strayAgent = await agentFor(jwtE, userE, agentName, ['connections:read', 'connections:use']);
+      const otherApp = await grantAppToken(jwtB, userB, ['connections:use']);
+      const before = provider.stats.publishes;
+      for (const [who, bearer] of [['another account', jwtE], ['its agent', strayAgent], ['another app of an app user', otherApp]] as const) {
+        const r = await delegated(bearer, 'stray');
+        assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER',
+          `${who} published through a delegation given to another app: ${r.status} ${r.data?.error?.code ?? ''}`);
+        assert(typeof r.data?.error?.message === 'string' && r.data.error.message.includes(campaignLabel),
+          `${who}'s refusal does not name the app to use: ${r.data?.error?.message}`);
+      }
+      assert(provider.stats.publishes === before, 'a refused caller reached the provider');
     });
 
     await test('a missing file is refused BEFORE an attempt is opened', async () => {
