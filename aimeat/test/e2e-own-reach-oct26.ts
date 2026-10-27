@@ -27,6 +27,8 @@
  *       thread, and an agent with messages:read-as-owner reads the owner's thread.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
+ *   v1.2.0 — 2026-10-27 — LABELS: an agent without the tick relays the person's rejection of a waiting
+ *     lowering, which applies as before, with an answer that names no label.
  *   v1.1.0 — 2026-10-27 — LABELS: the write on a hidden record waits as a suggestion (PERSON_REVIEWS)
  *     instead of a 403, as test/unit/classification-explorer-deleted.test.ts requires.
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
@@ -406,12 +408,26 @@ await test('ATTACK: the plain agent\'s label write neither changes nor describes
     // The answer is the one the label read gives for a record the agent may not read: no stored label.
     assert(w.body.data.source === 'default' && w.body.data.locked === false && w.body.data.from !== 'luottamuksellinen',
         `the answer described the person's label: ${JSON.stringify(w.body.data)}`);
-    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'no' });
-    assert(rev.status === 404 && rev.body?.error?.code === 'NO_SUGGESTION', `review: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
     const still = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, alice.token);
     assert(still.body.data.label === 'luottamuksellinen', `alice's label changed: ${JSON.stringify(still.body.data.label)}`);
     assert(still.body.data.suggestion?.label === 'erittain-luottamuksellinen' && still.body.data.suggestion?.why === 'PERSON_REVIEWS',
         `no suggestion waits for alice: ${JSON.stringify(still.body.data.suggestion)}`);
+    // Rejecting a raise through an AI is the person's to do in person, as before; the refusal names no label.
+    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'no' });
+    assert(rev.status === 403 && rev.body?.error?.code === 'PERSON_REQUIRED' && !JSON.stringify(rev.body).includes('luottamuksellinen'),
+        `review of a raise: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+});
+
+await test('USE: the plain agent relays the person\'s rejection of a waiting lowering; it applies as before, and the answer names no label', async () => {
+    const low = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.private'), label: 'julkinen' });
+    assert(low.status === 200 && low.body.data.pending === 'PERSON_REVIEWS', `the lowering waits: ${low.status} ${JSON.stringify(low.body?.data ?? low.body?.error)}`);
+    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'Alice said: keep it confidential.' });
+    assert(rev.status === 200 && rev.body.data.applied === false, `the relayed rejection: ${rev.status} ${JSON.stringify(rev.body?.data ?? rev.body?.error)}`);
+    assert(rev.body.data.source === 'default' && rev.body.data.locked === false && !JSON.stringify(rev.body.data).includes('luottamuksellinen'),
+        `the review answer described the person's label: ${JSON.stringify(rev.body.data)}`);
+    const after = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, alice.token);
+    assert(after.body.data.label === 'luottamuksellinen' && after.body.data.suggestion === null,
+        `the rejection did not apply: ${JSON.stringify({ label: after.body.data.label, suggestion: after.body.data.suggestion })}`);
 });
 
 await test('USE: the agent with memory:read-as-owner labels the private record; the plain agent labels its own record and one marked owner', async () => {

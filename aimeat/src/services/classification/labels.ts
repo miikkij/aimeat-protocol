@@ -55,8 +55,8 @@
  *   v1.11.1 — 2026-10-27 — setLabel and reviewLabel follow memory:read-as-owner as readContentLabel
  *     does: on a record the caller may not read with owner_scope, a label write applies nothing and
  *     waits as a suggestion for the person (PERSON_REVIEWS), answering the policy default and
- *     READ_AS_OWNER_NOTE, never the record's label, source or lock; a review answers NO_SUGGESTION, as
- *     the read shows none (secaudit2026oct26).
+ *     READ_AS_OWNER_NOTE, never the record's label, source or lock. A review an AI relays with the
+ *     person's words works there as before, and its answer is masked the same way (secaudit2026oct26).
  *   v1.11.0 — 2026-10-22 — readContentLabel follows memory:read-as-owner (owner-scope-labels.ts): a
  *     record of the owner or a sibling that the caller may not read with owner_scope answers as one
  *     with no stored label, and the view carries READ_AS_OWNER_NOTE (secaudit 2026-10, v77).
@@ -404,7 +404,8 @@ export async function setLabel(
   if (actor.kind === 'rule' && humanSaid) throw new ClassificationError('INVALID_INPUT', 400, 'A detection rule has no person to quote.');
 
   await assertMayLabel(deps, actor, target, 'write');
-  if (await ownerScopeLabelView(deps.storage, actor).hidden(target)) {
+  // reviewLabel decides a review on a hidden record itself, and masks its answer.
+  if (opts.via !== 'review' && await ownerScopeLabelView(deps.storage, actor).hidden(target)) {
     return suggestForHiddenRecord(deps, actor, target, input.label, { justification, humanSaid, reason, confidence });
   }
   const policy = await policyFor(deps.storage, deps.config, target.scope);
@@ -530,13 +531,18 @@ export async function reviewLabel(
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
   }
   await assertMayLabel(deps, actor, target, 'write');
-  // A record this caller may not read shows no suggestion on the label read (readContentLabel), so
-  // the review answers as for one with nothing waiting; the person reviews it (secaudit2026oct26).
+  // An AI relaying the person's decision reviews as before, also on a record it may not read with
+  // owner_scope; its answer then names none of the record's label, source or lock, as the label read
+  // and the label write answer such a record (secaudit2026oct26).
   const hidden = await ownerScopeLabelView(deps.storage, actor).hidden(target);
   const policy = await policyFor(deps.storage, deps.config, target.scope);
+  const masked = (out: SetLabelResult): SetLabelResult => (hidden ? {
+    applied: out.applied, label: policy.defaultLabel, from: policy.defaultLabel, source: 'default', locked: false,
+    ...(out.pending ? { pending: out.pending } : {}), note: READ_AS_OWNER_NOTE,
+  } : out);
   const { row: prev, stale } = await currentRow(deps.storage, policy, target);
-  if (prev && !hidden) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
-  if (hidden || !prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
+  if (prev) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
+  if (!prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
   if (input.decision === 'accept') {
     // A lowering that an AI relayed waits for the person in their own session: an AI accepting it,
     // even with their words, is the same relay again.
@@ -544,9 +550,9 @@ export async function reviewLabel(
       throw new ClassificationError('PERSON_REQUIRED', 403,
         'This change lowers the classification, so the person accepts it signed in themselves. Ask them to accept it in their Data Wallet, under the suggestions that wait for them.');
     }
-    return setLabel(deps, actor, target, {
+    return masked(await setLabel(deps, actor, target, {
       label: prev.suggestion.label, justification: input.justification ?? prev.suggestion.justification ?? null, humanSaid,
-    }, { via: 'review' });
+    }, { via: 'review' }));
   }
   // Rejecting a suggestion that would protect the content more gives that protection away, so an AI
   // does not do it with relayed words; the person rejects it signed in themselves (TARGET-082 second
@@ -563,7 +569,7 @@ export async function reviewLabel(
   const row: ContentLabelRow = { ...prev, suggestion: null, updatedAt: at, history: [...prev.history] };
   pushHistory(row, { at, by: actor.principal, source, action: 'reject', from: prev.label, to: prev.suggestion.label, humanSaid });
   await putLabel(deps.storage, row, stale);
-  return { applied: false, label: prev.label, from: prev.label, source: prev.source, locked: prev.locked };
+  return masked({ applied: false, label: prev.label, from: prev.label, source: prev.source, locked: prev.locked });
 }
 
 /**
