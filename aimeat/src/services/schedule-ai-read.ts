@@ -36,6 +36,8 @@
  *   const viewer = await aiScheduleFireViewer(storage, config, job, actor);  // services/scheduler-ai-job.ts
  *   const bad = await aiScheduleInputRefusal(storage, caller, owner, input); // services/schedule-write.ts
  * @version-history
+ *   2026-10-27 -- secaudit2026oct26: only a schedule made before the rule's first try on this node is
+ *     kept, also when the step runs at a later start (keptBefore, madeBefore).
  *   v1.0.0 -- 2026-10-22 -- Initial (secaudit 2026-10 wave 3, r49 the scheduled variant).
  */
 import { createHash } from 'node:crypto';
@@ -45,7 +47,7 @@ import { localAccountName, parseGaiiLoose } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { aiReadViewerOf, hiddenRecordError, type AiReadViewer } from './ai-read-viewer.js';
 import { callerFromAuth } from './caller-context.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
 import { visibleToSameOwnerReader } from './owner-scope-read.js';
 import { agentPageUrl } from './permission-ask.js';
 import { makerOf, type ScheduleActor } from './schedule-actor.js';
@@ -80,7 +82,10 @@ export async function keepAiScheduleReadsOnce(
   if (!claim) return { ran: false, ids: [] };
   try {
     const kept: Array<{ id: string; input: string }> = [];
+    // Only what was made before the rule first took effect here (secaudit2026oct26).
+    const cutoff = keptBefore(claim);
     for (const job of await storage.listScheduledJobs({ type: 'ai' })) {
+      if (!madeBefore(job.createdAt, cutoff)) continue;
       const maker = makerOf(job);
       if (maker === 'unknown-app' || (maker.kind !== 'agent' && maker.kind !== 'ecosystem')) continue;
       kept.push({ id: job.id, input: aiScheduleInputFingerprint(job.input) });

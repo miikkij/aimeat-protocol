@@ -10,6 +10,9 @@
  *   patGone · ecosystemAppGone (the last five module-private)
  * @usage import { credentialRevoked } from './credential-revoked.js';   // re-exported by ./middleware.ts
  * @version-history
+ *   2026-10-27 — credentialRevoked asks a NINTH question, first among the in-memory ones: the shared
+ *     anonymous principal counts only while anonymous mode is on (secaudit2026oct26,
+ *     isAnonymousMode:not-bound-to-live-config).
  *   2026-10-25 — credentialRevoked asks an EIGHTH question (patGone): a JWT minted from a personal
  *     access token counts only while that token is neither revoked nor expired. It named no PAT row,
  *     so revoking the PAT reached nothing of it (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
@@ -27,7 +30,8 @@ import type { AppGrantRecord } from '../storage/interface.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { agentGone } from './agent-alive.js';
 import { visitorPeerRefuses } from './visitor-peer.js';
-import { sessionStorage } from './node-auth.js';
+import { isAnonymousMode, sessionStorage } from './node-auth.js';
+import { isAnonymousPrincipal } from './anonymous-principal.js';
 
 /**
  * Has this token's session been ended? True only for a token that names a session the store has and
@@ -135,6 +139,10 @@ async function ecosystemAppGone(verified: VerifiedToken): Promise<boolean> {
  */
 export async function credentialRevoked(token: string, verified: VerifiedToken): Promise<boolean> {
   if (await isRevoked(token)) return true;
+  // The shared anonymous principal is a credential only while anonymous mode is on: a token minted
+  // before the operator switched the mode off, or before a restart with it off, stops working then
+  // (secaudit2026oct26; decision 2026-10-27). Memory only, so it runs before the storage reads.
+  if (isAnonymousPrincipal(verified) && !isAnonymousMode()) return true;
   // The visitor question reads memory only, so it runs before the storage reads below.
   if (visitorPeerRefuses(verified)) return true;
   if (await sessionRevoked(verified)) return true;

@@ -2096,9 +2096,9 @@
     },
     "src/services/once-only-step.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. No content is shown to anyone."
+      "why": "Reviewed 2026-10-18 (check:atomic-writes, boot migrations), the node's own reads: a boot step's run-once marker under the node's system identity, read to claim it before the work and to release this process's own claim after a failed run. 2026-10-27 (secaudit2026oct26): the third read is the step's own first-seen record beside the marker, {at} only, under the same system identity. No content is shown to anyone."
     },
     "src/services/open-items.ts": {
       "reads": {

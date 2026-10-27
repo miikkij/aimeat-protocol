@@ -67,6 +67,9 @@
  *   const before = new Date().toISOString();
  *   migrateRestScopeKeepWorkingOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: each half's cutoff is never later than the time its rule first
+ *     took effect on the node (once-only-step.ts keptBefore), so a late rerun keeps no principal or
+ *     app made meanwhile.
  *   v1.3.0 — 2026-10-20 — storage:read joins the list: S3-03 (2026-10-16) checks it inline on GET /v1/pub,
  *     which the test's scan did not read, so no app kept it (found on originalmiskate.com). tellAppOwners
  *     is exported for the storage:read step and takes the record it reports.
@@ -88,7 +91,7 @@ import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
 import { recordAccountEvent } from './account-events.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { changeScopeList } from './scope-list-swap.js';
 import {
   AGENT_READ_GRANT_KEY, AGENT_READ_WORDS, REST_SCOPE_GATES_KEY, REST_SCOPE_NEW_WORDS, isSharedAnonymous,
@@ -294,14 +297,15 @@ export async function migrateRestScopeKeepWorkingOnce(
   const principals = await claimOnceOnlyStep(storage, system, REST_SCOPE_KEEP_WORKING_KEY);
   const apps = await claimOnceOnlyStep(storage, system, APP_SCOPE_KEEP_WORKING_KEY);
   if (!principals && !apps) return result;
-  const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
 
   try {
-    if (principals) await keepPrincipals(storage, cutoff, result);
+    // Each half keeps what existed before its own rule first took effect here, also when it runs at a
+    // later start after a failed one (keptBefore; secaudit2026oct26).
+    if (principals) await keepPrincipals(storage, keptBefore(principals, opts.existedBefore), result);
     const anonymous = principals ? await takeBackFromSharedAnonymous(storage, system) : null;
     // The apps, under their own record, so a node that ran the principals' half before apps were part
     // of this step still runs the apps' half once.
-    if (apps) result.apps = await keepWorkingAppsOnce(storage, config, cutoff);
+    if (apps) result.apps = await keepWorkingAppsOnce(storage, config, keptBefore(apps, opts.existedBefore));
 
     const changed = [...result.agents, ...result.ecosystemApps];
     if (principals) await tellOwners(storage, config, changed);

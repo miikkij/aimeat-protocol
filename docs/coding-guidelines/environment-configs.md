@@ -95,5 +95,11 @@ These are example limits. The seal lists dot paths; values still come from norma
 configuration sources. Admin writes, stored overrides and Consul cannot change a
 sealed path. Unknown paths refuse startup.
 
+A host that injects a secret the operator must not read seals that secret, and the seal
+then covers where the secret is sent: `email.smtp_user` or `email.smtp_pass` seals the
+SMTP server rows, `eudiw.ftn_client_secret` seals `eudiw.ftn_provider_url`, and
+`auth.casdoor_client_secret` seals `auth.casdoor_endpoint`
+(`SECRET_DESTINATIONS` in `services/config-sealing.ts`).
+
 See [configuration precedence](../b-config.md) and
 [the original design](https://aimeat-pages.apps.aimeat.io/#org=fbb51de5-56d5-4143-9871-b998a1187655&ws=ws-mq664uyfz21&doc=doc-mv44mc35csxm).

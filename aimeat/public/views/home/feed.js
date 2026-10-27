@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-27: operator_acted for a restored backup names how many of your entries and agents it
+ *     wrote (secaudit2026oct26).
  *   2026-10-25: agent_device_takeover: a new device took over an agent, with or without its other
  *     sessions signed out; filed with trouble (secaudit2026oct22).
  *   2026-10-25: The heading carries a question mark that explains the feed (explain.home.feed.*).
@@ -164,6 +166,10 @@ export function line(item) {
       if (d.area === 'install-set') {
         return tr('home.feed.operatorInstalledSet', 'An operator installed the install package {set} in your account: {packages} packages, and {apps} apps got permissions. You can see and change the permissions of your apps in your settings.')
           .replace('{set}', d.set || '').replace('{packages}', d.packages || '0').replace('{apps}', d.apps || '0');
+      }
+      if (d.area === 'backup' && d.action === 'restore') {
+        return tr('home.feed.operatorRestoredBackup', 'An operator loaded a backup into this installation. It wrote {records} of your entries and {agents} of your agents.')
+          .replace('{records}', d.records || '0').replace('{agents}', d.agents || '0');
       }
       if (d.area === 'account' && d.action === 'disable') return tr('home.feed.operatorAccountDisabled', 'An operator deactivated your account.');
       if (d.area === 'account' && d.action === 'enable') return tr('home.feed.operatorAccountEnabled', 'An operator turned your account back on.');

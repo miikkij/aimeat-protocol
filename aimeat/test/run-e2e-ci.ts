@@ -13,6 +13,8 @@
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
  *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
+ *   2026-10-27 -- e2e-admin-restore-trail.ts joins the list (not the guard tier): POST /v1/admin/restore writes the operator trail and bounds the clearance an operator's agent restores (secaudit2026oct26).
+ *   2026-10-27 -- e2e-anonymous-mode-switch.ts joins the list (not the guard tier): anonymous mode switched off through the config endpoint ends minting, injection and the minted tokens at once (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -892,6 +894,8 @@ const ALL_SUITES = [
     'test/e2e-admin-operator-trail.ts',
     // GET /v1/admin/backup: the classification reader for the operator's agent, and the export trail.
     'test/e2e-admin-backup-reader.ts',
+    // POST /v1/admin/restore: the operator trail in each person's feed and the clearance bound for the operator's agent (secaudit2026oct26).
+    'test/e2e-admin-restore-trail.ts',
     // The realtime upgrade on a node set to signed-in content access admits its own accounts only.
     'test/e2e-realtime-signed-in-only.ts',
     // A live event stream ends when the credential that opened it is revoked.
@@ -1174,6 +1178,8 @@ const ALL_SUITES = [
     // A node closed to strangers stores a public write at the signed-in level; the feed announces an app only while it is public (plan doc-mvcn6c7e4e5q, V1.6).
     'test/e2e-closed-node-levels.ts',
     'test/e2e-anonymous-identity-leaks.ts',
+    // Anonymous mode switched off and on through the config endpoint takes effect at once (secaudit2026oct26).
+    'test/e2e-anonymous-mode-switch.ts',
     'test/e2e-organism-search.ts',
     'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',

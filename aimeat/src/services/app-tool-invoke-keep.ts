@@ -35,13 +35,14 @@
  *   await keepAppToolInvokeOnce(storage, config, { existedBefore });            // boot
  *   if (await appToolInvokeKept(storage, config.nodeId, auth.sub, auth.scopes)) // routes/webmcp-invoke-gate.ts
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v72).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 
 /** The record under `system@<nodeId>` that lists the kept principals. */
@@ -79,7 +80,7 @@ export async function keepAppToolInvokeOnce(
   const system = `system@${config.nodeId}`;
   const claim = await claimOnceOnlyStep(storage, system, APP_TOOL_INVOKE_KEEP_KEY);
   if (!claim) return result;
-  const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
+  const cutoff = keptBefore(claim, opts.existedBefore);   // never later than the rule's first try (secaudit2026oct26)
   try {
     for (const agent of await storage.listAgents()) {
       if (!existed(agent.createdAt, cutoff) || isSharedAnonymous(agent.owner)) continue;

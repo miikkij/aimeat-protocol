@@ -20,6 +20,8 @@
  *     from middleware.ts
  * @usage import { sessionStorage } from './node-auth.js';
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: isAnonymousMode also reads the live node.anonymous_mode, so the
+ *     operator switching it off ends injection and minting at once (decision 2026-10-27).
  *   v1.0.0 — 2026-09-26 — Initial: the auth layer's storage, config and anonymous identity, per node.
  *     The anonymous functions moved here from middleware.ts, which re-exports them.
  */
@@ -96,9 +98,13 @@ export function enableAnonymousAuth(gaii: string, owner: string, nodeId?: string
   anonymous.set({ gaii, owner }, nodeId);
 }
 
-/** Is anonymous mode on for the node the code runs as? */
+/**
+ * Is anonymous mode on for the node the code runs as? The identity is set up at boot when the mode is
+ * on, and the live setting node.anonymous_mode decides from then: the operator switching it off on the
+ * Config tab or through chat ends injection and minting at once, with no restart (secaudit2026oct26).
+ */
 export function isAnonymousMode(): boolean {
-  return anonymous.get() !== undefined;
+  return anonymous.get() !== undefined && sessionConfig()?.anonymousMode !== false;
 }
 
 /** The anonymous identity of the node the code runs as; empty when the mode is off there. */

@@ -13,6 +13,8 @@
  *   - POST /v1/admin/federation/join: introduces this node to a target via key exchange
  *
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: POST /v1/admin/restore hands the restoring actor to restoreBackup,
+ *     which writes the operator trail per person and bounds the clearance an operator's agent restores.
  *   Backup reader — 2026-10-25 — GET /v1/admin/backup reads a delegated caller's memory records through
  *     the classification reader and names what stayed behind in `withheld`; the operator in person gets
  *     the whole file. Each person whose entries the file holds gets one export line in their account
@@ -465,7 +467,12 @@ export function adminMonitoringRouter(
                 400, { fields: notList }));
             return;
         }
-        const outcome = await restoreBackup(storage, body);
+        // The restoring actor: the operator trail per person written into, and the clearance bound
+        // for the operator's agent (services/admin-restore.ts; secaudit2026oct26).
+        const actorGaii = resolveIdentity(req.auth!, config.nodeId);
+        const outcome = await restoreBackup(storage, body, {
+            config, operatorGhii: ownerGhiiOf(actorGaii), actorGaii, inPerson: isOwnerInPerson(req.auth),
+        });
         res.json(success(config.nodeId, outcome));
         emitChange('config');
     });
