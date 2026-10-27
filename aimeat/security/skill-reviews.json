@@ -113,7 +113,7 @@
       "watches": [
         "aimeat/src/services/ai/completion.ts"
       ],
-      "digest": "sha256:84f09c358b2d2bd87e1fde3a"
+      "digest": "sha256:b6df71c9fab7de2f3b198eab"
     },
     "node:aimeat-mail-to-data": {
       "reviewedOn": "2026-10-16",
@@ -541,7 +541,7 @@
       "aimeat/public/components/Suggestion.js": "c8ca8af7c09e778a"
     },
     "node:aimeat-paying-for-the-ai": {
-      "aimeat/src/services/ai/completion.ts": "8ab4624d42f9d2ce"
+      "aimeat/src/services/ai/completion.ts": "42b99eaa2c86b171"
     },
     "node:aimeat-mail-to-data": {
       "aimeat/src/tool-catalog/definitions/connections.ts": "4ed56ffc46c5c924",
