@@ -84,7 +84,10 @@ function New-Venv([string]$name) {
   $exe = $parts[0]
   $exeArgs = @($parts | Select-Object -Skip 1)
   Invoke-Native "[$name] venv" { & $exe @exeArgs -m venv $venv }
-  Invoke-Native "[$name] pip upgrade" { & (Venv-Python $name) -m pip install --quiet pip==26.2.1 }
+  # pip before 26.2.2 trusts the compromised emSign intermediates through its own copy of certifi
+  # (the PSF notice of 2026-10-20), so 26.2.2 comes from the model's hash-locked pip.txt.
+  $pipLock = Join-Path $PSScriptRoot "docker\$name\pip.txt"
+  Invoke-Native "[$name] pip upgrade" { & (Venv-Python $name) -m pip install --quiet --require-hashes -r $pipLock }
 }
 
 # The model's Docker lock with the versions only, as pip constraints: pip then installs the same
