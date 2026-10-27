@@ -5,6 +5,9 @@
  * @description Peer de-peering (grace + emergency), federation ping (cached service-summary hash), and
  *   Ed25519 key-exchange with key-continuity rotation guard. Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.10.2 — 2026-10-27 — key-exchange refuses this node's own id (400 SELF_NODE_ID) and reads the
+ *     approved peering requests by status instead of every request an introduction left
+ *     (secaudit2026oct26).
  *   v1.10.1 — 2026-10-25 — key-exchange keeps the row of a degraded, offline or unreachable peer as
  *     the operator set it, status included, instead of rebuilding it from the peering request
  *     (secaudit2026oct22).
@@ -58,6 +61,7 @@ import { deriveTierFlags, coerceTier, type PeerTier } from '../../services/feder
 import { proveNodeCard } from '../../services/packages/peer/package-peer-register.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { removePeer } from '../../services/federation-peer-remove.js';
+import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 
 /** Cached service summary hash to avoid recomputing on every ping (60s TTL). */
 let cachedSummaryHash = '';
@@ -162,6 +166,11 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
                 'node_id and node_public_key are required'));
             return;
         }
+        // No peer under this node's own id (secaudit2026oct26).
+        if (node_id === config.nodeId) {
+            res.status(400).json(error(config.nodeId, 'SELF_NODE_ID', selfNodeIdMessage(config.nodeId)));
+            return;
+        }
 
         // Find or auto-add the sender as a peer (bidirectional peering)
         let peer = [...peers.values()].find(p => p.nodeId === node_id);
@@ -190,7 +199,11 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             // peer with an attacker-controlled key and then mint via /settle. A genesis/peer is
             // established through the signed introduce → operator-approval flow like any other peer.
             const senderUrl = node_url as string | undefined;
-            const requests = await storage.listPeeringRequests();
+            // The approved requests only, oldest first as the table holds them: this route takes no
+            // sign-in, and reading every pending request an introduction left was work a caller
+            // could grow (secaudit2026oct26).
+            const requests = [...await storage.listPeeringRequests('approved'), ...await storage.listPeeringRequests('auto_approved')]
+                .sort((a, b) => String(a.createdAt).localeCompare(String(b.createdAt)));
             const approvedRequest = requests.find(r => r.fromNodeId === node_id && (r.status === 'approved' || r.status === 'auto_approved'));
             const hasApprovedRequest = !!approvedRequest;
 

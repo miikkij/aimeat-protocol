@@ -5,6 +5,9 @@
  * @description Cross-node template sharing (serve/sync template listings) + peer-to-peer memory listing.
  *   Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.2 — 2026-10-27 — POST /v1/federation/memory/list refuses a person whose account is
+ *     deactivated (403 ACCOUNT_DISABLED, asked after the consent), and a peer under this node's own id
+ *     lists nobody here as its own people (secaudit2026oct26).
  *   v1.6.1 — 2026-10-22 — The inventory consent check names the local person with localAccountOf()
  *     (check:identity-shortening).
  *   v1.6.0 — 2026-10-22 — POST /v1/federation/memory/list lists a principal of the requesting node as
@@ -47,7 +50,7 @@ import {
     signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin, signedGetRefusal,
 } from '../../services/signed-node-request.js';
 import { gatePeer } from '../../services/federation-peer-gate.js';
-import { peerMayActFor, signInConsentRefusal } from '../../services/federation-auth-consent.js';
+import { peerMayActFor, signInConsentRefusal, accountDisabledRefusal } from '../../services/federation-auth-consent.js';
 import { parseGaiiLoose, localAccountOf } from '../../utils/gaii.js';
 
 /** How stale a signed peer request may be. Same window /v1/federation/peer/introduce uses. */
@@ -70,7 +73,8 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
         if (!parsed.owner || !parsed.node) {
             return { code: 'NAMESPACE_NOT_ALLOWED', message: `A memory list names a person or agent of the node that asks or of this node, and "${gaii}" is neither. Send the full identity, such as name@node.` };
         }
-        if (parsed.node === requestingNode) return null;
+        // A peer under this node's own id has no people of its own here (secaudit2026oct26).
+        if (parsed.node === requestingNode && requestingNode !== config.nodeId) return null;
         if (parsed.node !== config.nodeId) {
             return { code: 'NAMESPACE_NOT_ALLOWED', message: `A node lists its own people's records here, and ${gaii} is on ${parsed.node}, not on ${requestingNode}, the node that signed this request.` };
         }
@@ -79,7 +83,8 @@ export function registerTemplatesRoutes(router: Router, config: AimeatConfig, st
             return { code: 'NAMESPACE_NOT_ALLOWED', message: `A memory list names a person or agent of the node that asks or of this node, and "${gaii}" is neither. Send the full identity, such as name@node.` };
         }
         const person = `${account.toLowerCase()}@${config.nodeId}`;
-        if (await peerMayActFor(storage, { tier: peer.tier, nodeId: requestingNode }, person)) return null;
+        // A deactivated account is listed for nobody, asked after the consent (secaudit2026oct26).
+        if (await peerMayActFor(storage, { tier: peer.tier, nodeId: requestingNode }, person)) return await accountDisabledRefusal(storage, person, config.nodeId);
         return { code: 'CONSENT_REQUIRED', message: signInConsentRefusal(person, requestingNode, config.nodeId) };
     };
 

@@ -29,11 +29,14 @@
  *   - PeerCapability — the permission words a door can name
  *   - PeerGateResult — the peer, or the refusal to send
  *   - gatePeer() — find, check active, check the capability
+ *   - selfNodeIdMessage() — the refusal for a peer under this node's own id
  * @usage
  *   const gate = gatePeer(peers, source_node, 'allowMessaging');
  *   if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
  *   // ...then verify the signature against gate.peer.publicKey
  * @version-history
+ *   v1.4.0 — 2026-10-27 — selfNodeIdMessage(): the one sentence every admission path gives a node id
+ *     equal to this node's own (secaudit2026oct26).
  *   v1.3.0 — 2026-10-05 — gatePeer() takes `null` for a door that needs an active, keyed peer and no
  *     capability flag: the home node's answer to a federated sign-in (routes/federation-auth.ts),
  *     which had no peer check at all (secaudit 2026-10, D1).
@@ -135,6 +138,16 @@ export function gatePeer(
   }
 
   return { ok: true, peer };
+}
+
+/**
+ * The refusal sentence for a peer under this node's own node id (400 SELF_NODE_ID). A peer speaks for
+ * the people of its node id, so such a peer would speak for every person here; the introduction, the
+ * key exchange, an approval and a direct add refuse it, and a stored one is not loaded
+ * (secaudit2026oct26, peer-node-id-equal-to-own-node-id).
+ */
+export function selfNodeIdMessage(thisNodeId: string): string {
+  return `${thisNodeId} is this node's own id, so it cannot be a peer here. Nothing was stored. A node joins under its own id.`;
 }
 
 /**

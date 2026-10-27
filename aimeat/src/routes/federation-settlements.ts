@@ -11,6 +11,9 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   2026-10-27 — Copies of one settlement that arrive together credit once: the identity and tracking
+ *     code are claimed in this process before the ledger lookup and released after the ledger row is
+ *     written, so the second copy answers 409 CONFLICT as a later one does (secaudit2026oct26).
  *   2026-10-16 — POST /v1/federation/settle refuses a settlement whose signed timestamp is missing or
  *     more than five minutes from this node's clock (400 STALE_TIMESTAMP), after the signature and
  *     before anything is read or credited (QA audit S6-09).
@@ -45,6 +48,15 @@ import { NONCE_WINDOW_MS } from '../services/request-nonce.js';
 
 export function federationSettlementsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
+
+    /**
+     * Settlements being applied right now, keyed by the credited identity and the tracking code. The
+     * duplicate lookup below reads the ledger, and the ledger row is written after the credit, so two
+     * copies of one settlement arriving together both read "not yet" and both credited. The claim is
+     * taken synchronously before the lookup and released after the row is written, so the second copy
+     * answers 409 as a later one does (secaudit2026oct26, settle duplicate-check-not-atomic-with-credit).
+     */
+    const settling = new Set<string>();
 
     // ── P1-11: Signed Federation Settlements ──
 
@@ -123,6 +135,17 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
                 'The settlement\'s timestamp is missing, invalid, or more than five minutes from this node\'s clock. The sending node signs it again with the current time.'));
             return;
         }
+
+        const claim = `${String(gaii)}\n${String(tracking_code)}`;
+        if (settling.has(claim)) {
+            res.status(409).json(error(config.nodeId, 'CONFLICT',
+                `Settlement already processed for tracking code ${tracking_code}`));
+            return;
+        }
+        settling.add(claim);
+        // Every answer below is sent after the ledger row is written or after a refusal, so the claim
+        // ends when the answer has gone, whichever way the handler ends (a thrown error included).
+        res.once('close', () => { settling.delete(claim); });
 
         // Prevent replay attacks: look the tracking code up EXACTLY.
         //

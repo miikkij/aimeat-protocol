@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
  *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts). seedBundledCortexes gets the node id, for the incident a shipped cortex name held by another account opens (secaudit2026oct22).
  *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
  *     data processing agreements (services/compliance-agreements-gaps.ts, plan doc-mvmr4i2wdk0p D4).
@@ -441,14 +442,13 @@ export async function initializeServices(
 
   // Federation peer registry (shared between routes and heartbeat)
   const peers = new Map<string, PeerInfo>();
-
   // Network directory — aggregated service summaries from federation peers
   const networkDirectory = new Map<string, ServiceSummary>();
-
-  // Load persisted peers from storage
+  // Load persisted peers from storage. A row under this node's own id is not loaded: such a peer would speak for every person here (secaudit2026oct26).
   try {
     const savedPeers = await storage.listFederationPeers();
     for (const sp of savedPeers) {
+      if (sp.nodeId === config.nodeId) { logger.warn('A stored federation peer has this node\'s own id; it is not loaded, and the row stays in storage', { nodeId: sp.nodeId }); continue; }
       peers.set(sp.nodeId, {
         nodeId: sp.nodeId,
         url: sp.url,

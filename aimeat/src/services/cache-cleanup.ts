@@ -19,6 +19,10 @@
  *   - CleanupResult / FEDERATION_PREFIXES: result shape and the scanned key prefixes
  *
  * @version-history
+ *   2026-10-27 — A row dated more than five minutes ahead of this node's clock is rewritten with the
+ *     cycle's time and kept, so it ages out from then; such a row was kept on every cycle for as long
+ *     as the time a peer chose (secaudit2026oct26, replica peer-chosen-updatedAt). Counted in
+ *     `futureClamped`.
  *   2026-10-20 — The cycle enumerates the federation KEY PREFIXES across every owner
  *     (listAllMemoryMeta) instead of walking the local agents table, so a replica stored under a
  *     foreign principal is visited and its 168 h TTL applies. The result counts owners and rows
@@ -30,6 +34,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { NONCE_WINDOW_MS } from './request-nonce.js';
 
 export interface CleanupResult {
   federatedRemoved: number;
@@ -41,6 +46,8 @@ export interface CleanupResult {
   ownersScanned: number;
   /** Rows read under the federation prefixes, removed or kept. */
   rowsScanned: number;
+  /** Rows dated ahead of this node's clock, brought to the present so they age out. */
+  futureClamped: number;
   cleanedAt: string;
 }
 
@@ -84,6 +91,7 @@ export async function runCleanupCycle(
     expiringRemoved: 0,
     ownersScanned: 0,
     rowsScanned: 0,
+    futureClamped: 0,
     cleanedAt: now.toISOString(),
   };
 
@@ -137,6 +145,22 @@ export async function runCleanupCycle(
       for (const row of rows) {
         result.rowsScanned++;
         owners.add(row.ownerGaii);
+        if (new Date(row.updatedAt).getTime() > now.getTime() + NONCE_WINDOW_MS) {
+          // Dated ahead of this node's clock: a replica stored before the replicate route took the
+          // receive time for such a record (secaudit2026oct26). Kept as this cycle's time, so it ages
+          // out from now instead of staying for as long as the time a peer chose.
+          kept++;
+          try {
+            // Written on the version read: a replicate landing in between keeps its own write.
+            const full = await storage.getMemory(row.ownerGaii, row.key);
+            if (full && storage.setMemoryIfVersion && await storage.setMemoryIfVersion({ ...full, version: full.version + 1, updatedAt: now.toISOString() }, full.version)) result.futureClamped++;
+          } catch (err) {
+            logger.warn('runCleanupCycle: a row dated ahead of the clock could not be brought to the present, continuing', {
+              prefix, key: row.key, owner: row.ownerGaii, error: String(err),
+            });
+          }
+          continue;
+        }
         if (new Date(row.updatedAt) >= cutoffFor(prefix, row.key)) { kept++; continue; }
         try {
           if (await storage.deleteMemory(row.ownerGaii, row.key)) countRemoval(prefix, row.key);

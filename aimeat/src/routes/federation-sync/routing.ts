@@ -5,6 +5,10 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — GET /v1/federation/resolve/:gaii remembers an identity no listed peer knew for 30
+ *     seconds (at most 5000 identities), and lookups of one identity at the same moment share one
+ *     round of questions, so an unknown identity repeated does not ask every peer each time
+ *     (secaudit2026oct26, resolve-gaii:peer-fan-out).
  *   2026-10-22 — POST /v1/federation/route refuses a path that does not start with a single "/" or that
  *     would leave the peer's origin (400 INVALID_PATH, before the fee and the fetch); joined as strings,
  *     a path starting with '.' or ':' sent the signed relay to another host or port (secaudit2026oct22).
@@ -113,7 +117,17 @@ function requireOwnerPrincipalOrVerifiedRelay(): RequestHandler {
     };
 }
 
+/** How long an identity no listed peer knew is answered 404 without asking the peers again. */
+const RESOLVE_MISS_TTL_MS = 30_000;
+/** The most unknown identities remembered at once; the oldest goes first past it. */
+const RESOLVE_MISS_MAX = 5_000;
+
 export function registerRoutingRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
+    // Per node (a test process can run two): the identities no peer knew, with when that stops
+    // being the answer, and the rounds of questions under way per identity.
+    const resolveMisses = new Map<string, number>();
+    const resolveRounds = new Map<string, Promise<PeerInfo | null>>();
+
     // ── Cross-Node Query Routing ──
 
     // POST /v1/federation/route — Forward a request to a peer node (multi-hop relay).
@@ -419,7 +433,39 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             }
         }
 
-        // Ask peers (broadcast resolve)
+        // Ask peers (broadcast resolve). An identity no peer knew is answered from memory for a short
+        // while, and lookups of one identity at the same moment share one round, so repeating an
+        // unknown identity does not send one request to every listed peer each time
+        // (secaudit2026oct26, resolve-gaii:peer-fan-out).
+        const missUntil = resolveMisses.get(gaii);
+        if (missUntil !== undefined && missUntil > Date.now()) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `Agent ${gaii} not found on this node or any active peer`));
+            return;
+        }
+        let round = resolveRounds.get(gaii);
+        if (!round) {
+            round = askPeers(gaii, listedPeers).finally(() => { resolveRounds.delete(gaii); });
+            resolveRounds.set(gaii, round);
+        }
+        const found = await round;
+        if (found) {
+            res.json(success(config.nodeId, {
+                gaii,
+                node_id: found.nodeId,
+                node_url: found.url,
+                local: false,
+            }));
+            return;
+        }
+        rememberMiss(gaii);
+
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+            `Agent ${gaii} not found on this node or any active peer`));
+    });
+
+    /** Ask each listed peer in turn whether it hosts `gaii`; the first that does, or null. */
+    async function askPeers(gaii: string, listedPeers: PeerInfo[]): Promise<PeerInfo | null> {
         for (const peer of listedPeers) {
             try {
                 // SSRF validation: block requests to private/reserved IPs
@@ -429,24 +475,25 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     continue;
                 }
                 const resp = await peerFetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {}, { timeoutMs: 5_000 });
-                if (resp.ok && resp.status >= 200 && resp.status < 300) {
-                    res.json(success(config.nodeId, {
-                        gaii,
-                        node_id: peer.nodeId,
-                        node_url: peer.url,
-                        local: false,
-                    }));
-                    return;
-                }
+                if (resp.ok && resp.status >= 200 && resp.status < 300) return peer;
             } catch (err) {
                 // Continue to next peer
               logger.warn('GET /v1/federation/resolve/:gaii: continuing after a suppressed failure', { error: String(err) });
             }
         }
+        return null;
+    }
 
-        res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-            `Agent ${gaii} not found on this node or any active peer`));
-    });
+    /** Remember that no listed peer knows `gaii`, dropping the oldest entry past the bound. */
+    function rememberMiss(gaii: string): void {
+        resolveMisses.delete(gaii);
+        resolveMisses.set(gaii, Date.now() + RESOLVE_MISS_TTL_MS);
+        while (resolveMisses.size > RESOLVE_MISS_MAX) {
+            const oldest = resolveMisses.keys().next().value;
+            if (oldest === undefined) break;
+            resolveMisses.delete(oldest);
+        }
+    }
 
     // POST /v1/federation/cross-node/work — Submit cross-node work request
     router.post('/v1/federation/cross-node/work', requireAuth(), requireRestScope('work:request'), requireRole('agent'), async (req, res) => {
