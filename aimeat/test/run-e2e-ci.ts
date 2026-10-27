@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-memory-door-parity.ts joins the list (not the guard tier): bulk-delete and the bin routes ask the bin's per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller reads as absent (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -803,6 +804,10 @@ const ALL_SUITES = [
     // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
+    // The side doors answer what the main doors answer: bulk-delete and the bin routes ask the bin's
+    // per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller
+    // reads as absent (secaudit2026oct26, round 8).
+    'test/e2e-memory-door-parity.ts',
     // Who sees the hands on a key, and who reads a task's title in the event record (secaudit 2026-10, v88, v89).
     'test/e2e-memory-hands-readers.ts',
     'test/e2e-account-events-readers.ts',

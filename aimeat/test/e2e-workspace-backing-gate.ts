@@ -8,6 +8,8 @@
  *   failure from the same incident: kind:'document' without mode must resolve to document mode,
  *   not fall through to records.
  * @version-history
+ *   2026-10-27 — 8d: POST /v1/memory/bulk-delete keeps an append-only event, by prefix and by name
+ *     (secaudit2026oct26, bulk-delete-skips-bin-refusals).
  *   v1.0.0 — 2026-06-10 — Initial: backing gate (REST update + MCP create/write) + kind→mode inference.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-backing-gate
@@ -303,6 +305,22 @@ await test('8c. MCP aimeat_memory_delete cannot erase an append-only event the R
 
     const still = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH() });
     assert(still.status === 200, `the append-only event survives both doors: ${still.status}`);
+});
+
+// ── The batch door asks the same guard (secaudit2026oct26, bulk-delete-skips-bin-refusals): POST
+// /v1/memory/bulk-delete removed the event the two doors above refuse. A prefix leaves it in place
+// and clears the rest; the key named outright answers what the single delete answers. ──
+
+await test('8d. POST /v1/memory/bulk-delete leaves the append-only event in place by prefix, and refuses it by name', async () => {
+    const key = `organism.${orgId}.w.${wsId}.shared.ledger.e1.latest`;
+    const byPrefix = await json('/v1/memory/bulk-delete', { method: 'POST', headers: authH(), body: JSON.stringify({ prefix: `organism.${orgId}.w.${wsId}.shared.ledger.` }) });
+    assert(byPrefix.status === 200, `prefix: ${byPrefix.status} ${JSON.stringify(byPrefix.body?.error)}`);
+    const afterPrefix = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH() });
+    assert(afterPrefix.status === 200, `the event survives a prefix delete: ${afterPrefix.status}`);
+    const byName = await json('/v1/memory/bulk-delete', { method: 'POST', headers: authH(), body: JSON.stringify({ keys: [key] }) });
+    assert(byName.status === 409 && byName.body?.error?.code === 'WRITE_CONFLICT', `named: ${byName.status} ${JSON.stringify(byName.body?.error)}`);
+    const still = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: authH() });
+    assert(still.status === 200, `the append-only event survives the batch door: ${still.status}`);
 });
 
 // ── Seed upgrade: existing nodes' stale system-seeded schema is replaced at startup (in-process,
