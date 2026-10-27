@@ -20,11 +20,18 @@
  *
  *   THE MARK lives one hour as a service-owned record in the owner's namespace,
  *   `agent-device-return.<user code>` (utils/reserved-keys.ts), so no memory route can write it.
- * @structure RETURN_PROOF_PREFIX · RETURN_PROOF_MAX_AGE_MS · returnProofMessage · proofVerifies ·
- *   markReturnProven · returnProven
+ *
+ *   ECOSYSTEM APPS (secaudit2026oct26, token-pickup-without-pinned-key-proof). A hello for an app the
+ *   owner already connected may carry the same proof, signed with the app's pinned key over
+ *   `aimeat-eco-hello:v1\n<owner>\n<app>\n<signed_at>`. The mark is the same record, holding the GEAI,
+ *   and GET /v1/ecosystem-apps/pending reports it as `key_proven`.
+ * @structure RETURN_PROOF_PREFIX · RETURN_PROOF_MAX_AGE_MS · returnProofMessage · ecoHelloProofMessage ·
+ *   proofVerifies · ecoHelloProofVerifies · markReturnProven · returnProven
  * @usage
  *   if (existing && await proofVerifies(existing.publicKey, owner, name, body.proof)) await markReturnProven(storage, ownerGhii, userCode, gaii);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — ecoHelloProofMessage and ecoHelloProofVerifies: an ecosystem app proves a
+ *     same-key reconnect with its pinned key (secaudit2026oct26, token-pickup-without-pinned-key-proof).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import type { Storage } from '../storage/interface.js';
@@ -40,14 +47,32 @@ export function returnProofMessage(owner: string, agentName: string, signedAt: s
   return `aimeat-device-return:v1\n${owner}\n${agentName}\n${signedAt}`;
 }
 
-/** Does `proof` verify against the agent's current public key, and is it fresh? Never throws. */
-export async function proofVerifies(publicKey: string | undefined, owner: string, agentName: string, proof: unknown, now = Date.now()): Promise<boolean> {
+/**
+ * The exact text an ecosystem app signs with its pinned key when it says hello again for an app the
+ * owner already connected (secaudit2026oct26, token-pickup-without-pinned-key-proof).
+ */
+export function ecoHelloProofMessage(owner: string, app: string, signedAt: string): string {
+  return `aimeat-eco-hello:v1\n${owner}\n${app}\n${signedAt}`;
+}
+
+/** Shared check: `proof` is `{ signed_at, signature }`, fresh, and signs `messageOf(signed_at)` with `publicKey`. */
+async function signedProofVerifies(publicKey: string | undefined, proof: unknown, messageOf: (signedAt: string) => string, now: number): Promise<boolean> {
   if (!publicKey || !proof || typeof proof !== 'object') return false;
   const { signed_at: signedAt, signature } = proof as { signed_at?: unknown; signature?: unknown };
   if (typeof signedAt !== 'string' || typeof signature !== 'string' || signature.length > 200) return false;
   const at = Date.parse(signedAt);
   if (!Number.isFinite(at) || Math.abs(now - at) > RETURN_PROOF_MAX_AGE_MS) return false;
-  return verify(publicKey, returnProofMessage(owner, agentName, signedAt), signature);
+  return verify(publicKey, messageOf(signedAt), signature);
+}
+
+/** Does `proof` verify against the agent's current public key, and is it fresh? Never throws. */
+export async function proofVerifies(publicKey: string | undefined, owner: string, agentName: string, proof: unknown, now = Date.now()): Promise<boolean> {
+  return signedProofVerifies(publicKey, proof, (at) => returnProofMessage(owner, agentName, at), now);
+}
+
+/** Does an ecosystem app's hello `proof` verify against `publicKey`, and is it fresh? Never throws. */
+export async function ecoHelloProofVerifies(publicKey: string | undefined, owner: string, app: string, proof: unknown, now = Date.now()): Promise<boolean> {
+  return signedProofVerifies(publicKey, proof, (at) => ecoHelloProofMessage(owner, app, at), now);
 }
 
 const markKey = (userCode: string) => `${RETURN_PROOF_PREFIX}${userCode}`;

@@ -7882,6 +7882,12 @@ paths:
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
                   description: Requested data-area allowlist (stored at approval; enforcement is a later chunk).
                 bound_ref: { type: string, description: Opaque ecosystem-side account reference (never interpreted by AIMEAT). }
+                proof:
+                  type: object
+                  description: "Optional, for an app the owner already connected under this public_key: a base64 Ed25519 signature by that key over `aimeat-eco-hello:v1\\n<owner>\\n<app>\\n<signed_at>`, with signed_at within five minutes. The owner's pending row then reads `key_proven: true`; without it a same-key reconnect reads `key_proven: false`."
+                  properties:
+                    signed_at: { type: string, format: date-time }
+                    signature: { type: string }
                 manifest:
                   type: object
                   additionalProperties: true
@@ -7931,7 +7937,8 @@ paths:
             the owner already connected this app) and `key_changed` (true when the request carries
             another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
             `key_fingerprint`, so the owner can see that approving replaces the key of a working
-            connection.
+            connection. A reconnect with the pinned key also carries `key_proven`: true when the hello
+            signed its `proof` with that key, false when it only named the key.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:

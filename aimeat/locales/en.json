@@ -18077,6 +18077,8 @@
         "other": "{area}"
       },
       "reconnect": "Reconnects an app you already have",
+      "reconnectUnproven": "Reconnects an app you already have, without proof of its key",
+      "reconnectUnprovenHint": "This request names the key of {app} but does not prove that it holds it. Anyone, not only the app, can send such a request. Approve only if you started this reconnect yourself.",
       "keyChanged": "Replaces the key of a working connection",
       "keyChangedHint": "This request carries another key than the connection to {app} you have now. If you approve, the new key replaces the old one and the app's earlier sessions end. Approve only if you started this reconnect yourself. Old key and new key:",
       "waiting": "waiting",

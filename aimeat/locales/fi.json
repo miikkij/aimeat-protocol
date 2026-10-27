@@ -18249,6 +18249,8 @@
         "other": "{area}"
       },
       "reconnect": "Yhdistää uudelleen sovelluksen, joka sinulla jo on",
+      "reconnectUnproven": "Yhdistää uudelleen sovelluksen, mutta ei todista avainta",
+      "reconnectUnprovenHint": "Pyyntö kertoo sovelluksen {app} avaimen, mutta ei todista, että lähettäjällä on se. Tällaisen pyynnön voi lähettää kuka tahansa, ei vain sovellus. Hyväksy vain, jos aloitit tämän uudelleenyhdistämisen itse.",
       "keyChanged": "Vaihtaa toimivan yhteyden avaimen",
       "keyChangedHint": "Tässä pyynnössä on eri avain kuin nykyisessä yhteydessäsi sovellukseen {app}. Jos hyväksyt, uusi avain korvaa vanhan, ja sovelluksen aiemmat istunnot päättyvät. Hyväksy vain, jos aloitit tämän uudelleenyhdistämisen itse. Vanha ja uusi avain:",
       "waiting": "odottaa",
