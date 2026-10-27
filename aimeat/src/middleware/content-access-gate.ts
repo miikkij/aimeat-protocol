@@ -43,6 +43,10 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.1 — 2026-10-27 — The origin of an app opened to the internet passes the app's own documents
+ *     and the open routes only (isOpenedOriginDocument), not every path outside /v1/: the node-wide
+ *     agent directory, agent skills, UCP and ACP documents reached strangers there while the apex
+ *     answered them 401 (secaudit2026oct26, content-access-gate.ts:opened-app-origin-passes-every-non-v1-path).
  *   v1.4.0 — 2026-10-25 — An app opened to the internet (services/internet-opening/) is the watched
  *     exception: its apex read, its own origin's documents and the public intake routes of the forms
  *     it declares pass. Its other data calls stay closed. The list of openings is in memory
@@ -171,6 +175,33 @@ export function isOpenRoute(method: string, rawPath: string): boolean {
 const APP_ORIGIN_PAGE = /^\/([^/]+\/[^/]+\.html?)?$/i;
 
 /**
+ * The documents an app origin publishes about itself (routes/subdomain-origin-docs.ts and
+ * routes/subdomain-webmcp.ts): llms.txt, robots.txt, the sitemaps, the markdown mirrors, AGENTS.md,
+ * the web-app manifest and icons, the MCP server card, WebMCP, and the app's own legal pages
+ * (services/app-legal.ts LEGAL_KIND_INFO; test/unit/content-access-gate-origin-docs.test.ts holds the
+ * two lists equal). Spelled here because the gate does not load the app services.
+ */
+const APP_ORIGIN_DOCUMENT = new RegExp('^/(?:'
+  + 'llms(?:-full)?\\.txt|robots\\.txt|sitemap\\.(?:xml|md)|\\.md|index\\.md|AGENTS\\.md|agents\\.md'
+  + '|manifest\\.webmanifest|icon\\.svg|apple-touch-icon\\.png'
+  + '|\\.well-known/mcp\\.json|\\.well-known/mcp/server-card\\.json|webmcp(?:/.*)?'
+  + '|terms|privacy|imprint|refunds|accessibility|cookies|support'
+  + ')$');
+
+/**
+ * What the origin of an app opened to the internet serves a stranger beside the page: its own
+ * documents, and the open routes, which hold no content (static files such as the favicon). The
+ * node's other documents outside /v1/ (the agent directory, the agent skills, the commerce profiles)
+ * answer 401 on the apex and so answer 404 here.
+ */
+export function isOpenedOriginDocument(method: string, rawPath: string): boolean {
+  if (method !== 'GET' && method !== 'HEAD') return false;
+  const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
+  if (path.startsWith('/v1/')) return false;
+  return APP_ORIGIN_DOCUMENT.test(path) || isOpenRoute(method, path);
+}
+
+/**
  * The apex app read, GET /v1/apps/:owner/:filename, with the characters an owner name and an app
  * filename are made of, so the segments go into the query without decoding. `ui/catalogue` is a list
  * route of the same shape.
@@ -218,11 +249,11 @@ export function contentAccessGate(
       const page = req.appOrigin ? APP_ORIGIN_PAGE.test(req.path) : req.path === '/';
       if (req.method === 'GET' && page) return next();
       // The origin of an app opened to the internet also serves its own documents (the legal pages,
-      // llms.txt, the manifest) as on an open node. Its data calls under /v1/ stay closed. The
+      // llms.txt, the manifest) as on an open node, and nothing else outside /v1/: the node's own
+      // discovery documents stay closed as on the apex. Its data calls under /v1/ stay closed. The
       // origin's app is one keyed read, made only while some app is open.
       const storage = storageOf?.();
-      if (req.appOrigin && storage && req.subdomain && anyOpenings()
-        && (req.method === 'GET' || req.method === 'HEAD') && !req.path.startsWith('/v1/')) {
+      if (req.appOrigin && storage && req.subdomain && anyOpenings() && isOpenedOriginDocument(req.method, req.path)) {
         const site = await storage.getSubdomainSite(req.subdomain);
         if (site && site.enabled && site.kind === 'app' && isTargetOpenToInternet(site.target)) return next();
       }

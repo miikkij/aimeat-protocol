@@ -19,6 +19,9 @@
  *   Self-spawns its own node (the shared runner keeps the node open), with the app origin provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-internet-opening
  * @version-history
+ *   v1.1.0 — 2026-10-27 — The opened origin serves the app's own documents and none of the node's
+ *     discovery documents (agent card, agent skills, UCP, ACP), which the apex keeps closed
+ *     (secaudit2026oct26, content-access-gate.ts:opened-app-origin-passes-every-non-v1-path).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -209,6 +212,22 @@ async function main() {
             assert(desc.status === 200, `descriptor ${desc.status}`);
             const s = await strangerSubmit('consent');
             assert(s.status === 200 || s.status === 201, `submit ${s.status} ${JSON.stringify(s.body.error)}`);
+        });
+
+        await test('the opened origin serves the app\'s own documents and none of the node\'s (secaudit2026oct26)', async () => {
+            // The app's own documents and the static files every origin has keep answering a stranger.
+            for (const [path, accept] of [['/llms.txt', 'text/plain'], ['/robots.txt', 'text/plain'], ['/manifest.webmanifest', 'application/json'],
+                ['/.well-known/mcp.json', 'application/json'], ['/AGENTS.md', 'text/markdown'], ['/favicon.ico', '*/*']] as const) {
+                const r = await origin(path, accept);
+                assert(r.status === 200, `${path} on the opened origin: ${r.status}`);
+            }
+            // The node-wide discovery documents answer a stranger 401 on the apex, and 404 on the origin.
+            for (const path of ['/.well-known/agent-card.json', '/.well-known/agent-skills/index.json', '/.well-known/ucp', '/.well-known/acp.json']) {
+                const r = await origin(path, 'application/json');
+                assert(r.status === 404, `${path} on the opened origin: ${r.status} ${r.body.slice(0, 120)}`);
+                const apex = await call(path);
+                assert(apex.status === 401, `${path} on the apex: ${apex.status}`);
+            }
         });
 
         await test('FAILURE: the rest of the node stays closed — the undeclared form, the app\'s data calls, its other routes', async () => {
