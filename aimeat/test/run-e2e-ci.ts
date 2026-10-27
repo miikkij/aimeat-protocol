@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-admin-restore-trail.ts joins the list (not the guard tier): POST /v1/admin/restore writes the operator trail and bounds the clearance an operator's agent restores (secaudit2026oct26).
  *   2026-10-27 -- e2e-anonymous-mode-switch.ts joins the list (not the guard tier): anonymous mode switched off through the config endpoint ends minting, injection and the minted tokens at once (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
@@ -887,6 +888,8 @@ const ALL_SUITES = [
     'test/e2e-admin-operator-trail.ts',
     // GET /v1/admin/backup: the classification reader for the operator's agent, and the export trail.
     'test/e2e-admin-backup-reader.ts',
+    // POST /v1/admin/restore: the operator trail in each person's feed and the clearance bound for the operator's agent (secaudit2026oct26).
+    'test/e2e-admin-restore-trail.ts',
     // The realtime upgrade on a node set to signed-in content access admits its own accounts only.
     'test/e2e-realtime-signed-in-only.ts',
     // A live event stream ends when the credential that opened it is revoked.
