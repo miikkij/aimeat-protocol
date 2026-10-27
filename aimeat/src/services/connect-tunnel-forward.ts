@@ -21,6 +21,7 @@
  * @structure ForwardContext / ForwardConn — what the dispatch needs · forwardRequest()
  * @usage import { forwardRequest } from './connect-tunnel-forward.js';
  * @version-history
+ *   2026-10-27 — The forwarded request carries SELF_REQUEST_HEADER, so the setup code's loopback waiver does not take it for this machine's own (secaudit2026oct26).
  *   v1.0.0 — 2026-09-03 — Extracted from connect-tunnel.ts (max-file-lines).
  */
 import type { WebSocket } from 'ws';
@@ -28,6 +29,7 @@ import type { AimeatConfig } from '../config.js';
 import type { ConnectFrame, ConnectTunnelStats } from './connect-tunnel-wire.js';
 import type { Fairness } from './connect-tunnel-multiplex.js';
 import { logger } from '../utils/logger.js';
+import { SELF_REQUEST_HEADER } from '../auth/loopback-pass.js';
 
 /** Just enough of a connection for the dispatch: whose it is, where it writes, what it may use. */
 export interface ForwardConn {
@@ -119,7 +121,9 @@ export async function forwardRequest(ctx: ForwardContext, conn: ForwardConn, fra
       for (const [k, v] of Object.entries(frame.query)) url.searchParams.set(k, String(v));
     }
 
-    const headers: Record<string, string> = { Authorization: `Bearer ${conn.rawToken}` };
+    // The marker says the node sent this for a remote agent, so the request is not this machine's
+    // own for the setup code's loopback waiver (auth/loopback-pass.ts fromNodeMachine; secaudit2026oct26).
+    const headers: Record<string, string> = { Authorization: `Bearer ${conn.rawToken}`, [SELF_REQUEST_HEADER]: '1' };
     if (frame.headers) {
       for (const [k, v] of Object.entries(frame.headers)) {
         if (FORWARDABLE_HEADERS.has(k.toLowerCase())) headers[k] = String(v);

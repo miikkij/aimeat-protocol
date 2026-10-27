@@ -6,6 +6,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — register-web reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-24 — POST /v1/ghii/verify-email takes only rows of purpose 'registration' (the codes register-web
  *     and attach-email mail); a sign-in link's or another code's row answers 404 and is left unspent
  *     (secaudit2026oct22, verify-email:no-purpose-binding).
@@ -74,7 +75,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { isLoopbackAddress } from '../../auth/loopback-pass.js';
+import { fromNodeMachine } from '../../auth/loopback-pass.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -299,7 +300,7 @@ export function registerWebVerifyRoutes(
                 loginCount: 0,
                 createdAt: now,
                 updatedAt: now,
-            }, { setupCode: req.body?.setupCode, fromLoopback: isLoopbackAddress(req.socket.remoteAddress) });
+            }, { setupCode: req.body?.setupCode, fromLoopback: fromNodeMachine(req) });
         } catch (err) {
             if (err instanceof SetupCodeRefusedError) {
                 res.status(403).json(error(config.nodeId, err.code, err.message));

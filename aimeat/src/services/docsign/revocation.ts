@@ -13,6 +13,8 @@
  * @structure RevocationResult · checkRevocation · _setRevocationFetcher (test seam)
  * @usage const r = await checkRevocation(cert, issuer, { embeddedOcsp, online: true });
  * @version-history
+ *   2026-10-27 — An OCSP request and a CRL download each take one from the check's outbound budget
+ *     (online-budget.ts); when it is spent the note says so and the status stays unknown (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: an embedded good OCSP answer stands in for a fresh one
  *     only when it was made at or after a proven signing time (opts.provenTime); otherwise the
@@ -27,6 +29,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readBodyCapped } from '../../utils/read-capped.js';
 import { verifySignature } from './cms-verify.js';
 import { readCert, safeVerify, OID, type CertInfo } from './x509-info.js';
+import { BUDGET_SPENT_NOTE, takeOnlineFetch } from './online-budget.js';
 
 const FETCH_TIMEOUT_MS = 15_000;
 const MAX_OCSP_BYTES = 256 * 1024;
@@ -279,6 +282,7 @@ export async function checkRevocation(
   }
 
   for (const url of cert.ocspUrls.filter((u) => /^https?:\/\//i.test(u)).slice(0, 2)) {
+    if (!takeOnlineFetch()) { notes.push(`OCSP ${safeHost(url)}: ${BUDGET_SPENT_NOTE}`); continue; }
     try {
       const der = await fetchBytes(url, { body: buildOcspRequest(cert, issuer), contentType: 'application/ocsp-request', max: MAX_OCSP_BYTES });
       const r = await readOcsp(der, cert, issuer, opts.trustResponder);
@@ -294,6 +298,7 @@ export async function checkRevocation(
       let der: Buffer;
       if (cached && cached.until > Date.now()) der = cached.crl;
       else {
+        if (!takeOnlineFetch()) { notes.push(`CRL ${safeHost(url)}: ${BUDGET_SPENT_NOTE}`); continue; }
         der = await fetchBytes(url, { max: MAX_CRL_BYTES });
         if (crlCache.size >= CRL_CACHE_MAX) crlCache.delete(crlCache.keys().next().value!);
       }

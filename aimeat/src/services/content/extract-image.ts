@@ -15,9 +15,15 @@
  *
  *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
  *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
- * @structure readImageFacts · opensAsSvg · readSvgFacts · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
+ * @structure readImageFacts · opensAsSvg · readSvgFacts · svgRootAttributes · svgTitle · svgMetadata · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
  * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
  * @version-history
+ *   2026-10-27 — readSvgFacts finds the <svg>, <title> and <metadata> tags in one pass with indexOf, and
+ *     reads the AI mark and the creator tool with bounded runs that cannot overlap, from the first 1 MB
+ *     of the metadata block; the old patterns rescanned the file per unclosed tag and tried every split
+ *     of a whitespace run on the shared event loop. The facts read are the same (secaudit2026oct26).
+ *     exifr parses a picture's XMP packet only when xmp-shape.ts finds it well-formed and of normal
+ *     depth; another packet is recorded in errors.xmp and not read.
  *   v1.2.1 — 2026-10-22 — The SVG sniff skips leading comments with indexOf (opensAsSvg) instead of a
  *     regex that backtracked exponentially on repeated "--><!--" (CodeQL js/redos, alert 1760).
  *   v1.2.0 — 2026-10-21 — SVG: its size, title and the XMP in <metadata> are read (readSvgFacts), with no
@@ -28,6 +34,7 @@
  */
 import exifr from 'exifr';
 import { sniffImage } from '../openrouter.js';
+import { xmpIsBounded } from './xmp-shape.js';
 import type { ImageFacts } from './types.js';
 
 type Seg = Record<string, unknown>;
@@ -109,13 +116,61 @@ function svgLength(v: string | undefined): number | undefined {
   return m ? Math.round(Number(m[1])) : undefined;
 }
 
+/** How much of the <metadata> block the AI mark and the creator tool are looked for in. An XMP packet is a few kilobytes. */
+const SVG_XMP_MAX = 1024 * 1024;
+
+/*
+ * The three tags below are found with a literal search and indexOf, in one pass. They give what the
+ * patterns `<svg\b([^>]*)>`, `<title[^>]*>([^<]{1,300})<\/title>` and `<metadata[^>]*>([\s\S]*?)<\/metadata>`
+ * (case-insensitive) gave, but a backtracking engine ran each of those to the end of the file once
+ * for every opening that never closed, and this runs on the shared event loop for every stored SVG
+ * (secaudit2026oct26, readImageFacts:superlinear-svg-and-xmp-patterns-on-arrival).
+ */
+
+/** The attribute text of the first `<svg` element that closes, or '' when none does. */
+function svgRootAttributes(svg: string): string {
+  const open = /<svg\b/gi.exec(svg);
+  if (!open) return '';
+  const end = svg.indexOf('>', open.index + 4);
+  return end < 0 ? '' : svg.slice(open.index + 4, end);
+}
+
+/** The text of the first `<title ...>text</title>` whose text is 1 to 300 characters with no '<'. */
+function svgTitle(svg: string): string | undefined {
+  const opens = /<title/gi;
+  for (let m = opens.exec(svg); m; m = opens.exec(svg)) {
+    const gt = svg.indexOf('>', m.index + 6);
+    if (gt < 0) return undefined;
+    const lt = svg.indexOf('<', gt + 1);
+    if (lt < 0) return undefined;
+    const length = lt - gt - 1;
+    if (length >= 1 && length <= 300 && svg.slice(lt, lt + 8).toLowerCase() === '</title>') return svg.slice(gt + 1, lt);
+    // Every opening before `gt` closes at the same '>' and fails the same way.
+    opens.lastIndex = gt + 1;
+  }
+  return undefined;
+}
+
+/** The content of the first `<metadata ...>` block that closes, or '' when none does. */
+function svgMetadata(svg: string): string {
+  const open = /<metadata/gi.exec(svg);
+  if (!open) return '';
+  const gt = svg.indexOf('>', open.index + 9);
+  if (gt < 0) return '';
+  const close = /<\/metadata>/gi;
+  close.lastIndex = gt + 1;
+  const end = close.exec(svg);
+  // A later opening has a later '>', so it finds no closing tag either.
+  return end ? svg.slice(gt + 1, end.index) : '';
+}
+
 /**
  * What an SVG says about itself: its size (width and height, else the viewBox), its <title>, and
  * the IPTC DigitalSourceType and dc:title an XMP packet in its <metadata> carries.
  */
 export function readSvgFacts(svg: string): { facts: ImageFacts; digitalSourceType?: string; software?: string; errors: Record<string, string> } {
   const facts: ImageFacts = { format: 'svg+xml' };
-  const root = /<svg\b([^>]*)>/i.exec(svg)?.[1] ?? '';
+  const root = svgRootAttributes(svg);
   const attr = (name: string) => new RegExp(`\\s${name}\\s*=\\s*["']([^"']*)["']`, 'i').exec(root)?.[1];
   let width = svgLength(attr('width'));
   let height = svgLength(attr('height'));
@@ -123,11 +178,12 @@ export function readSvgFacts(svg: string): { facts: ImageFacts; digitalSourceTyp
   if ((!width || !height) && box?.length === 4 && box.every(Number.isFinite)) { width = width ?? Math.round(box[2]); height = height ?? Math.round(box[3]); }
   if (width) facts.width = width;
   if (height) facts.height = height;
-  const title = /<title[^>]*>([^<]{1,300})<\/title>/i.exec(svg)?.[1]?.trim();
+  const title = svgTitle(svg)?.trim();
   if (title) facts.title = title;
-  const meta = /<metadata[^>]*>([\s\S]*?)<\/metadata>/i.exec(svg)?.[1] ?? '';
-  const dst = /DigitalSourceType(?:\s*=\s*["']([^"']+)["']|>\s*([^<\s]+)\s*<)/i.exec(meta);
-  const tool = /CreatorTool(?:\s*=\s*["']([^"']+)["']|>\s*([^<]+?)\s*<)/i.exec(meta);
+  const meta = svgMetadata(svg).slice(0, SVG_XMP_MAX);
+  // Bounded runs that cannot overlap: a value is one run up to its delimiter, trimmed afterwards.
+  const dst = /DigitalSourceType(?:\s*=\s*["']([^"']{1,2000})["']|>\s*([^<\s]{1,2000})\s*<)/i.exec(meta);
+  const tool = /CreatorTool(?:\s*=\s*["']([^"']{1,2000})["']|>([^<]{1,2000})<)/i.exec(meta);
   return {
     facts, errors: {},
     ...(dst ? { digitalSourceType: (dst[1] ?? dst[2]).trim() } : {}),
@@ -212,10 +268,22 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
   const isWebp = bytes.length >= 12 && bytes.toString('latin1', 0, 4) === 'RIFF' && bytes.toString('latin1', 8, 12) === 'WEBP';
   const source = isWebp ? webpMetadataAsJpeg(bytes) : bytes;
   if (source) try {
-    const parsed: unknown = await exifr.parse(source, {
+    const options = {
       tiff: true, ifd0: true, exif: true, gps: true, iptc: true, xmp: true, icc: true, ihdr: true,
       mergeOutput: false, reviveValues: false, translateValues: false, translateKeys: true,
-    } as never);
+    };
+    // The XMP packet comes out raw first, and exifr parses it only when its shape keeps exifr's
+    // element search linear (xmp-shape.ts; secaudit2026oct26). A well-formed packet is then read
+    // with the same options as before, so its facts are the same.
+    let parsed: unknown = await exifr.parse(source, { ...options, xmp: { parse: false } } as never);
+    const raw = parsed && typeof parsed === 'object' ? (parsed as { xmp?: unknown }).xmp : undefined;
+    if (typeof raw === 'string' && raw) {
+      if (xmpIsBounded(raw)) parsed = await exifr.parse(source, options as never);
+      else {
+        delete (parsed as { xmp?: unknown }).xmp;
+        errors.xmp = 'The XMP metadata is not well-formed XML, so it was not read.';
+      }
+    }
     if (parsed && typeof parsed === 'object') out = parsed as Record<string, Seg>;
   } catch (err) {
     errors.exif = (err as Error).message || String(err);

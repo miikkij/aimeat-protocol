@@ -21,9 +21,10 @@
  *   checks, and confirmOp() is the operator's yes or no. Nothing the model says signs anything.
  *   The version is signed when both the controller and the processor have a signature; the version
  *   in force before it is superseded.
- * @structure syncDocsign · signedCopyOp · confirmOp · completeIfSigned
+ * @structure docsignLevel · signedLine · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
  * @usage const a = await syncDocsign(deps, agreement);
  * @version-history
+ *   2026-10-27 — A wallet signature on the EU reference wallet's test roots is recorded with the level `test`, not `advanced`, and its history line and the in-force line say it has no legal effect; the flow is unchanged (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -57,15 +58,39 @@ function partyOf(a: Agreement, v: AgreementVersion, account: string): Party | nu
   return null;
 }
 
-/** Signed by both sides: mark it, supersede the one before, and say so. Pure. */
-function completeIfSigned(a: Agreement, v: AgreementVersion, now: string): Agreement {
+/**
+ * The level a docsign signature proves on the agreement. Pure. A wallet signature on the EU reference
+ * wallet's test roots is `test`, never `advanced`: the validator reports it as a test with no legal
+ * effect (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
+ */
+export function docsignLevel(wallet?: { validation: { level: string; test: boolean } }): AgreementSignature['level'] {
+  if (!wallet) return 'aimeat';
+  if (wallet.validation.test) return 'test';
+  return wallet.validation.level === 'qualified' ? 'qualified' : 'advanced';
+}
+
+const NO_LEGAL_EFFECT = 'a test wallet signature with no legal effect';
+
+/** The history line of a recorded signature. Pure. */
+export function signedLine(s: AgreementSignature): string {
+  return s.level === 'test' ? `${s.party} signed (${s.method}, ${NO_LEGAL_EFFECT}).` : `${s.party} signed (${s.method}, ${s.level}).`;
+}
+
+/**
+ * Signed by both sides: mark it, supersede the one before, and say so. Pure. A version that a test
+ * wallet signature completed comes into force as before, and its in-force line names that signature.
+ */
+export function completeIfSigned(a: Agreement, v: AgreementVersion, now: string): Agreement {
   const sides = new Set(v.signatures.map(s => s.party));
   if (!(sides.has('controller') && sides.has('processor'))) return { ...a, versions: a.versions.map(x => (x.n === v.n ? v : x)) };
   const signed: AgreementVersion = { ...v, status: 'signed', signedAt: now, effectiveFrom: now };
+  const tests = v.signatures.filter(s => s.level === 'test').map(s => s.party);
+  const line = `Version ${v.n} signed by both parties; in force.`
+    + (tests.length ? ` The ${tests.join(' and ')} signature is ${NO_LEGAL_EFFECT}.` : '');
   return {
     ...a,
     versions: a.versions.map(x => (x.n === v.n ? signed : x.status === 'signed' ? { ...x, status: 'superseded' as const } : x)),
-    history: [...a.history, historyEntry('system', 'in-force', `Version ${v.n} signed by both parties; in force.`)].slice(-500),
+    history: [...a.history, historyEntry('system', 'in-force', line)].slice(-500),
   };
 }
 
@@ -87,7 +112,7 @@ export async function syncDocsign(deps: Deps, a: Agreement): Promise<Agreement> 
     const party = partyOf(a, v, identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity);
     if (!party || v.signatures.some(s => s.party === party)) continue;
     const wallet = sig.wallet;
-    const level = wallet ? (wallet.validation.level === 'qualified' && !wallet.validation.test ? 'qualified' : 'advanced') : 'aimeat';
+    const level = docsignLevel(wallet);
     fresh.push({
       party, method: wallet ? 'eudi-wallet' : 'aimeat', level, signer: identity, at: sig.statement.signedAt,
       evidence: { docsign: rec.id, method: sig.statement.method, ...(wallet ? { test: wallet.validation.test, trust: wallet.validation.trustSource } : {}) },
@@ -101,7 +126,7 @@ export async function syncDocsign(deps: Deps, a: Agreement): Promise<Agreement> 
     const add = fresh.filter(f => !n.signatures.some(s => s.party === f.party));
     if (!add.length) return UNCHANGED;
     const next = { ...n, signatures: [...n.signatures, ...add] };
-    const withHistory = { ...cur, history: [...cur.history, ...add.map(s => historyEntry(s.signer, 'signed', `${s.party} signed (${s.method}, ${s.level}).`))].slice(-500) };
+    const withHistory = { ...cur, history: [...cur.history, ...add.map(s => historyEntry(s.signer, 'signed', signedLine(s)))].slice(-500) };
     return completeIfSigned(withHistory, next, new Date().toISOString());
   });
   if (!saved) return a;

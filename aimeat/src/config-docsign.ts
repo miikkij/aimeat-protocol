@@ -12,6 +12,8 @@
  * @structure DocsignConfig · docsignDefaults() · docsignMaxBytes()
  * @usage const config = { ...docsignDefaults(), ... };
  * @version-history
+ *   2026-10-27 — docsignMaxSignatures and docsignMaxFetches: how many signature fields one checked PDF
+ *     may name and how many outbound requests one check makes (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  *   v1.1.0 — 2026-10-10 — Signing with an EU Digital Identity Wallet: docsignEudiEnabled,
  *     docsignEudiRpCredentialPath, docsignEudiTestRoots (wish-allekirjoitus-eudi-lompakolla).
@@ -57,6 +59,23 @@ export interface DocsignConfig {
    * that chains to one is reported as a test with no legal effect, never as qualified.
    */
   docsignEudiTestRoots: boolean;
+  /**
+   * The most signature fields one checked PDF may name (secaudit2026oct26). A file with more is
+   * refused, because each field is checked on its own. 50 by default; 0 is no limit.
+   */
+  docsignMaxSignatures: number;
+  /**
+   * The most outbound requests one signature check makes to the addresses the file's certificates
+   * name (issuer certificates, OCSP, CRL). When they are spent, the rest of the check says so and
+   * leaves revocation and trust open (secaudit2026oct26). 200 by default; 0 is no limit.
+   */
+  docsignMaxFetches: number;
+}
+
+/** A whole number of 0 or more from the environment, else the default. */
+function wholeOrDefault(raw: string | undefined, fallback: number): number {
+  const n = Number(raw);
+  return raw !== undefined && raw.trim() !== '' && Number.isInteger(n) && n >= 0 ? n : fallback;
 }
 
 /** The largest file a validation reads, in bytes. */
@@ -78,5 +97,7 @@ export function docsignDefaults(): DocsignConfig {
     docsignEudiEnabled: process.env.AIMEAT_DOCSIGN_EUDI_ENABLED === 'true',
     docsignEudiRpCredentialPath: (process.env.AIMEAT_DOCSIGN_EUDI_RP_CREDENTIAL ?? '').trim(),
     docsignEudiTestRoots: process.env.AIMEAT_DOCSIGN_EUDI_TEST_ROOTS !== 'false',
+    docsignMaxSignatures: wholeOrDefault(process.env.AIMEAT_DOCSIGN_MAX_SIGNATURES, 50),
+    docsignMaxFetches: wholeOrDefault(process.env.AIMEAT_DOCSIGN_MAX_FETCHES, 200),
   };
 }
