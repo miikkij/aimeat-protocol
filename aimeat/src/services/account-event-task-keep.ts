@@ -40,13 +40,14 @@
  *   await keepTaskContentForAppGrantsOnce(storage, config, { existedBefore });     // boot
  *   const reader = await accountEventReader(callerOf(req, …), req.auth!, storage, config.nodeId); // the three reads
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v89; the developer's ruling of 2026-10-22).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { isSharedAnonymous } from './rest-scope-gates-migration.js';
 import type { CallerContext } from './caller-context.js';
 import type { AccountEventReader } from './account-event-view.js';
@@ -80,7 +81,7 @@ export async function keepTaskContentForAppGrantsOnce(
   const result: TaskContentKeepResult = { ran: false, kept: [] };
   const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, TASK_CONTENT_KEEP_KEY);
   if (!claim) return result;
-  const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
+  const cutoff = keptBefore(claim, opts.existedBefore);   // never later than the rule's first try (secaudit2026oct26)
   try {
     for (const grant of await storage.listAppGrants()) {
       if (grant.revoked || !existed(grant.createdAt, cutoff) || isSharedAnonymous(grant.owner)) continue;

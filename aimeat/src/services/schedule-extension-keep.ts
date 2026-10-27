@@ -30,6 +30,8 @@
  *   await keepAppExtensionSchedulesOnce(storage, config);              // server-bootstrap/service-init.ts
  *   if (await isKeptExtensionSchedule(storage, nodeId, job.id)) ...   // schedule-fire-refusal.ts, schedule-write.ts
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: only a schedule made before the rule's first try on this node is
+ *     kept, also when the step runs at a later start (keptBefore, madeBefore).
  *   v1.0.1 — 2026-10-21 — The list is read by "run now" too (services/schedule-write.ts
  *     triggerScheduleRecord): the app that made a kept schedule runs it now as its fire runs.
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10, capability-loss review of the ext:invoke fix).
@@ -38,7 +40,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
 import { makerOf, scheduleActor } from './schedule-actor.js';
 
 /** The record under `system@<nodeId>` that lists the kept schedules and says the step has run. */
@@ -59,7 +61,10 @@ export async function keepAppExtensionSchedulesOnce(
   if (!claim) return { ran: false, ids: [] };
   try {
     const ids: string[] = [];
+    // Only what was made before the rule first took effect here (secaudit2026oct26).
+    const cutoff = keptBefore(claim);
     for (const job of await storage.listScheduledJobs({ type: 'extension' })) {
+      if (!madeBefore(job.createdAt, cutoff)) continue;
       const maker = makerOf(job);
       if (maker === 'unknown-app' || (maker.kind !== 'app' && maker.kind !== 'ecosystem')) continue;
       const actor = await scheduleActor(storage, job);

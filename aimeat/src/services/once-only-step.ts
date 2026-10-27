@@ -18,12 +18,21 @@
  *   twice. The steps take seconds.
  *
  *   The done record keeps the value each step always wrote, so whatever reads it reads it unchanged.
- * @structure ONCE_ONLY_LEASE_MS · OnceOnlyClaim · claimOnceOnlyStep(storage, owner, key, now?)
+ *
+ *   WHEN THE RULE TOOK EFFECT. A keep step exempts what existed before its rule. A step that runs
+ *   late (after a throw or a lapsed claim) ran at a time the node already served under the rule, so
+ *   "now" is the wrong cutoff. The first claim writes `<key>.first-seen` once, release() leaves it,
+ *   and every claim carries it as `ruleSince`; a keep step keeps only what was made before it
+ *   (keptBefore, madeBefore; secaudit2026oct26, late-rerun-keeps-state-made-under-new-rule).
+ * @structure ONCE_ONLY_LEASE_MS · OnceOnlyClaim · ruleSinceKey · keptBefore · madeBefore ·
+ *   claimOnceOnlyStep(storage, owner, key, now?)
  * @usage
  *   const claim = await claimOnceOnlyStep(storage, `system@${nodeId}`, KEY);
  *   if (!claim) return { ran: false };
  *   try { ...work...; await claim.finish({ at, ... }); } catch (err) { await claim.release(); throw err; }
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: a claim carries ruleSince, the time the node first tried the
+ *     step, kept in `<key>.first-seen` across a release; keptBefore and madeBefore for the steps.
  *   v1.0.0 — 2026-10-18 — Initial (check:atomic-writes, the boot migration sites).
  */
 import { randomUUID } from 'node:crypto';
@@ -48,6 +57,49 @@ export interface OnceOnlyClaim {
   finish(value: Record<string, unknown>): Promise<void>;
   /** Remove the claim after a failed run, so the next start runs the step again. */
   release(): Promise<void>;
+  /**
+   * When this node first tried the step (ISO): the time its rule took effect here. Written once and
+   * never removed, so a step that failed or whose claim lapsed and runs at a later start still keeps
+   * only what existed then, never what was made under the new rule meanwhile (secaudit2026oct26).
+   */
+  ruleSince: string;
+}
+
+/** The record beside a step's own that holds when the node first tried it. */
+export function ruleSinceKey(key: string): string { return `${key}.first-seen`; }
+
+/**
+ * The time `key`'s rule took effect on this node: the first-seen record, written now when there is
+ * none. Two processes that start together both read the one that landed first.
+ */
+async function ruleSince(storage: Storage, owner: string, key: string, at: string): Promise<string> {
+  const k = ruleSinceKey(key);
+  const read = async (): Promise<string | null> => {
+    const v = (await storage.getMemory(owner, k))?.value as { at?: unknown } | undefined;
+    return typeof v?.at === 'string' ? v.at : null;
+  };
+  const known = await read();
+  if (known) return known;
+  const rec: MemoryRecord = {
+    key: k, ownerGaii: owner, value: { at }, visibility: 'private', tags: ['migration'],
+    ttlHours: null, version: 1, createdAt: at, updatedAt: at,
+  };
+  if (storage.createMemoryIfAbsent) await storage.createMemoryIfAbsent(rec);
+  else await storage.setMemory(rec);
+  return (await read()) ?? at;
+}
+
+/** The cutoff a keep step compares creation times with: the earlier of `existedBefore` and the rule's first-seen time. */
+export function keptBefore(claim: Pick<OnceOnlyClaim, 'ruleSince'>, existedBefore?: string): number {
+  const since = Date.parse(claim.ruleSince);
+  const given = Date.parse(existedBefore ?? claim.ruleSince);
+  return Math.min(Number.isNaN(since) ? Date.now() : since, Number.isNaN(given) ? Date.now() : given);
+}
+
+/** Made before `cutoff`? A record with no readable time counts as made before, as the steps treated it. */
+export function madeBefore(at: string | undefined | null, cutoff: number): boolean {
+  const t = at ? Date.parse(at) : NaN;
+  return Number.isNaN(t) || t < cutoff;
 }
 
 /**
@@ -63,6 +115,7 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
   }
   const claimId = randomUUID();
   const at = new Date(now).toISOString();
+  const since = await ruleSince(storage, owner, key, at);
   const claim: MemoryRecord = {
     key, ownerGaii: owner, value: { state: 'running', claimId, claimedAt: at }, visibility: 'private', tags: ['migration'],
     // Never swept: a record that expired would run the step again at the next start.
@@ -76,6 +129,7 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
   if (prior) logger.warn(`Boot step ${key}: a claim from ${runningClaim(prior.value)?.claimedAt} never finished; running the step now`);
 
   return {
+    ruleSince: since,
     async finish(value: Record<string, unknown>): Promise<void> {
       const done: MemoryRecord = { ...claim, value, version: claim.version + 1, updatedAt: new Date().toISOString() };
       const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(done, claim.version) : (await storage.setMemory(done), true);

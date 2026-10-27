@@ -31,6 +31,7 @@
  * @usage
  *   await keepStorageReadForAppsOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
@@ -40,7 +41,7 @@ import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../utils/rest-scope-release.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { tellAppOwners } from './rest-scope-keep-working-migration.js';
 
 /** The record under `system@<nodeId>` that says this node has run the step. */
@@ -68,7 +69,7 @@ export async function keepStorageReadForAppsOnce(
   if (!versionAtLeast(opts.version ?? getSoftwareVersion(), REST_SCOPE_GATES_ENFORCED_IN)) return result;
   const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, APP_STORAGE_READ_KEEP_KEY);
   if (!claim) return result;
-  const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
+  const cutoff = keptBefore(claim, opts.existedBefore);   // never later than the rule's first try (secaudit2026oct26)
   try {
     result.apps = await keepWorkingAppsOnce(storage, config, cutoff, {
       only: [WORD],
