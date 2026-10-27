@@ -25,13 +25,16 @@
  *   const all = await listAllEntitlementsForMerge(storage);   // { key, value } — the key matters
  *   await mergeOwnerEntitlements(storage, group, { dryRun });
  * @version-history
+ *   2026-10-27 — listAllEntitlementsForMerge reads the two service namespaces only (serviceRows): a
+ *     record of the same key shape in an account's own memory was grouped with real ones and could be
+ *     picked as the survivor (secaudit2026oct26, listAllEntitlements:any-namespace-entitlement-records).
  *   v1.0.0 — 2026-07-28 — Extracted from metered-entitlements.ts (max-file-lines) with the deletion
  *     and idempotence fixes.
  */
 import type { Storage } from '../storage/interface.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 import {
-  entitlementKey, grantKey, archiveEntitlement, persistEntitlement,
+  entitlementKey, grantKey, archiveEntitlement, persistEntitlement, serviceRows,
   NS_ENTITLEMENT, NS_GRANT_PUBLIC, type MeteredEntitlement,
 } from './metered-entitlements.js';
 
@@ -41,10 +44,10 @@ import {
  */
 export async function listAllEntitlementsForMerge(storage: Storage): Promise<Array<{ key: string; value: MeteredEntitlement }>> {
   const [bought, granted] = await Promise.all([
-    storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 }),
-    storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 }),
+    serviceRows(storage, NS_ENTITLEMENT, 'entitlement.'),
+    serviceRows(storage, NS_GRANT_PUBLIC, 'entgrant.'),
   ]);
-  return [...bought.items, ...granted.items]
+  return [...bought, ...granted]
     .filter(r => r.value)
     .map(r => ({ key: r.key, value: r.value as MeteredEntitlement }));
 }
