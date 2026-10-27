@@ -13,6 +13,10 @@
  *   - notifications: GET/PATCH preferences with channel/cooldown/quiet-hours/type validation
  *
  * @version-history
+ *   2026-10-27 — POST /v1/personal/anchor checks the slots and inserts one anchor at a time in the
+ *     process, and checks again after the insert in an order every process agrees on, taking out an
+ *     anchor past a limit: anchors sent together passed one count and one owner held more than
+ *     personal_nodes.max_per_owner (secaudit2026oct26, personal-anchor-per-owner-cap-check-then-create-race).
  *   2026-10-25 — POST /v1/personal/anchor refuses an owner's anchor past personal_nodes.max_per_owner
  *     (default 3, 0 = no limit) with 409 PERSONAL_NODE_LIMIT, naming the limit and the delete call that
  *     frees a slot; anchors that exist stay (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
@@ -40,6 +44,19 @@ import { AnchorRequestSchema, VisibilityUpdateSchema, validateBody } from '../mo
 import { logger } from '../utils/logger.js';
 import { errorFields } from '../utils/error-fields.js';
 import { operatorOverride } from '../services/operator-override.js';
+
+/**
+ * The anchors of this process, one at a time. The slot checks read every anchored node and the insert
+ * is a separate storage call, so anchors sent together read the same count and all passed it
+ * (secaudit2026oct26). A failed anchor does not stop the ones after it.
+ */
+let anchorQueue: Promise<unknown> = Promise.resolve();
+function oneAnchorAtATime<T>(work: () => Promise<T>): Promise<T> {
+  const run = anchorQueue.then(work);
+  // The queue waits for the anchor to settle either way; the caller awaits `run` and handles its error.
+  anchorQueue = Promise.allSettled([run]);
+  return run;
+}
 import { isPersonalNodeAgentOf } from '../services/federation.js';
 
 export function personalRouter(
@@ -90,22 +107,24 @@ export function personalRouter(
         return;
       }
 
-      // Check if already registered
-      const existing = await storage.getPersonalNode(node_id);
-      if (existing) {
-        res.status(409).json(error(config.nodeId, 'CONFLICT', `Personal node ${node_id} is already anchored`));
-        return;
-      }
+      // The slot checks and the insert run one anchor at a time in this process, and are checked again
+      // after the insert, so anchors sent together cannot all pass one count (secaudit2026oct26).
+      const record = await oneAnchorAtATime(async () => {
+        // Check if already registered
+        const existing = await storage.getPersonalNode(node_id);
+        if (existing) {
+          res.status(409).json(error(config.nodeId, 'CONFLICT', `Personal node ${node_id} is already anchored`));
+          return null;
+        }
 
-      // Check slot availability. The slots are shared by every owner of this node, so one owner
-      // holds at most personalNodeMaxPerOwner of them (0 = no limit). Anchors that already exist
-      // are not touched; the limit decides only the next one (secaudit2026oct22).
-      const allNodes = await storage.listPersonalNodes();
-      const perOwner = config.personalNodeMaxPerOwner;
-      const ownNodes = allNodes.filter(n => n.ownerName === owner_name);
-      if (perOwner > 0 && ownNodes.length >= perOwner) {
-        res.status(409).json(error(config.nodeId, 'PERSONAL_NODE_LIMIT',
-          `You already connect ${ownNodes.length} of your own servers here, and one owner may connect ${perOwner} on this server. `
+        // Check slot availability. The slots are shared by every owner of this node, so one owner
+        // holds at most personalNodeMaxPerOwner of them (0 = no limit). Anchors that already exist
+        // are not touched; the limit decides only the next one (secaudit2026oct22).
+        const allNodes = await storage.listPersonalNodes();
+        const perOwner = config.personalNodeMaxPerOwner;
+        const ownNodes = allNodes.filter(n => n.ownerName === owner_name);
+        const ownLimitRefusal = (count: number) => res.status(409).json(error(config.nodeId, 'PERSONAL_NODE_LIMIT',
+          `You already connect ${count} of your own servers here, and one owner may connect ${perOwner} on this server. `
           + 'To free a slot, remove one you no longer use under Your own servers in your profile, or with DELETE /v1/personal/anchor/<id>. '
           + 'The operator sets the limit (personal_nodes.max_per_owner).',
           undefined, {
@@ -114,28 +133,49 @@ export function personalRouter(
             free_a_slot: 'DELETE /v1/personal/anchor/:nodeId',
             setting: 'personal_nodes.max_per_owner',
           }));
-        return;
-      }
-      if (allNodes.length >= config.personalNodeMaxSlots) {
-        res.status(503).json(error(config.nodeId, 'CAPACITY_FULL', `This operator already runs ${config.personalNodeMaxSlots} personal nodes, which is the limit here. Ask them to free one.`));
-        return;
-      }
+        const capacityRefusal = () => res.status(503).json(error(config.nodeId, 'CAPACITY_FULL', `This operator already runs ${config.personalNodeMaxSlots} personal nodes, which is the limit here. Ask them to free one.`));
+        if (perOwner > 0 && ownNodes.length >= perOwner) {
+          ownLimitRefusal(ownNodes.length);
+          return null;
+        }
+        if (allNodes.length >= config.personalNodeMaxSlots) {
+          capacityRefusal();
+          return null;
+        }
 
-      const now = new Date().toISOString();
-      const record = await storage.createPersonalNode({
-        nodeId: node_id,
-        ownerName: owner_name,
-        anchorNodeId: config.nodeId,
-        publicKey: public_key,
-        status: 'offline',
-        agentGaiis: agent_gaiis ?? [],
-        lastSeen: now,
-        mailboxQuotaBytes: config.personalNodeMailboxQuotaMb * 1024 * 1024,
-        mailboxUsedBytes: 0,
-        visibility: visibility ?? 'private',
-        createdAt: now,
-        updatedAt: now,
+        const now = new Date().toISOString();
+        const created = await storage.createPersonalNode({
+          nodeId: node_id,
+          ownerName: owner_name,
+          anchorNodeId: config.nodeId,
+          publicKey: public_key,
+          status: 'offline',
+          agentGaiis: agent_gaiis ?? [],
+          lastSeen: now,
+          mailboxQuotaBytes: config.personalNodeMailboxQuotaMb * 1024 * 1024,
+          mailboxUsedBytes: 0,
+          visibility: visibility ?? 'private',
+          createdAt: now,
+          updatedAt: now,
+        });
+
+        // Another process of this node may have inserted at the same moment. The anchors are put in
+        // one order (oldest first, then by id) every process agrees on, and the one past a limit is
+        // taken out again, so the limits hold whichever process counted.
+        const after = (await storage.listPersonalNodes())
+          .sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.nodeId.localeCompare(b.nodeId));
+        const ownAfter = after.filter(n => n.ownerName === owner_name);
+        const pastOwnLimit = perOwner > 0 && ownAfter.findIndex(n => n.nodeId === node_id) >= perOwner;
+        const pastNodeLimit = after.findIndex(n => n.nodeId === node_id) >= config.personalNodeMaxSlots;
+        if (pastOwnLimit || pastNodeLimit) {
+          await storage.deletePersonalNode(node_id);
+          if (pastOwnLimit) ownLimitRefusal(ownAfter.length - 1);
+          else capacityRefusal();
+          return null;
+        }
+        return created;
       });
+      if (!record) return;
 
       const tunnelUrl = config.baseUrl.replace(/^http/, 'ws') + '/v1/personal/tunnel';
 
