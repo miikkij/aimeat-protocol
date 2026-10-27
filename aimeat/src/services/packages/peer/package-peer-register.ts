@@ -41,6 +41,10 @@
  *   if (!link.ok) return link;                          // nothing was written
  *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId, proves);   // before verifyPackageNode
  * @version-history
+ *   v2.4.0 — 2026-10-27 — linkPackagePeer asks peerUrlRefusal before the card read: with
+ *     `securityProfile: 'public'` in the deps a new plain http:// address is refused
+ *     (PEER_HTTPS_REQUIRED, nothing written), as every other peer admission does (secaudit2026oct26,
+ *     linkPackagePeer-no-peerUrlRefusal). A local node links over http as before.
  *   v2.3.0 — 2026-10-10 — adoptPendingPeer takes `proves`: the request must be signed with the key the
  *     grant named before the card is read or anything is written; an unsigned request naming a pending
  *     node registered it (secaudit 2026-10-10 I7).
@@ -58,7 +62,9 @@
  *     character (CodeQL js/polynomial-redos, alert 1678).
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 5).
  */
+import type { AimeatConfig } from '../../../config.js';
 import type { Storage } from '../../../storage/interface.js';
+import { peerUrlRefusal } from '../../peer-url-policy.js';
 import { stripTrailingSlashes } from '../../../utils/url-validator.js';
 import type { PeerInfo } from '../../federation.js';
 import { deriveTierFlags } from '../../federation-tiers.js';
@@ -130,6 +136,8 @@ export interface PeerLinkDeps {
     thisNodeId?: string;
     /** The most packages-only peers this node registers (config.packagePeerCap; package-peer-limits.ts). */
     cap?: number;
+    /** config.securityProfile: on 'public' a new peer address must be https (peer-url-policy.ts, FED-13). */
+    securityProfile?: AimeatConfig['securityProfile'];
 }
 
 /** Record a refusal on the Security page when the deps name this node. Never throws. */
@@ -160,6 +168,10 @@ export async function linkPackagePeer(
     }
     if (!check.add) return { ok: true, registered: false, pending: false };
     const add = check.add;
+    // The address rule every other peer admission asks (Core FED-13): a public node takes a new peer
+    // only at an https:// address. A peer already registered is not touched.
+    const plain = peerUrlRefusal({ securityProfile: deps.securityProfile ?? 'local' }, add.url);
+    if (plain) return { ok: false, status: 400, code: plain.code, message: `${plain.message} Give the node's https:// address; nothing was written.` };
     const waiting = await readPendingPeer(deps.storage, nodeId);
     const pending = waiting && !pendingExpired(waiting) ? waiting : null;
     if (pending && pending.publicKey !== add.publicKey) {

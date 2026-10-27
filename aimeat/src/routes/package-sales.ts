@@ -18,6 +18,8 @@
  *   who could make it would sell the author's packages in the node's name.
  * @structure registerPackageSaleRoutes(router, config, storage, peers)
  * @version-history
+ *   2026-10-27 — Claim redemption and the sale grant pass config.securityProfile to the node link
+ *     (secaudit2026oct26, linkPackagePeer-no-peerUrlRefusal).
  *   v1.7.0 — 2026-10-06 — PUT .../auto-renew names the agent that turns automatic renewal on, so each
  *     renewal is held to its daily purchase limit (secaudit 2026-10 follow-up, A6).
  *   v1.6.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail (secaudit 2026-10, C2).
@@ -175,7 +177,7 @@ export function registerPackageSaleRoutes(
         const groupId = decodeURIComponent(req.params.groupId as string);
         const pkg = (await storage.listVersions(groupId, 1, 0)).versions[0];
         if (!pkg) { res.status(404).json(error(config.nodeId, 'CLAIM_NOT_FOUND', 'No claim with that code waits for this package.')); return; }
-        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository }, {
+        const out = await redeemClaim({ storage, peers, timeoutMs: config.federationTimeoutMs, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository, securityProfile: config.securityProfile }, {
             groupId, author: pkg.author, code: body.code, nodeId: who.nodeId, node: { url: str(body.url), public_key: publicKey },
         });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
@@ -200,7 +202,7 @@ export function registerPackageSaleRoutes(
         const out = await grantEntitlement(storage, { owner: act.author, isOperator: false }, {
             groupId: act.groupId, nodeId: req.params.nodeId as string,
             updatesUntil: body.updates_until, channel: body.channel, note, node: body.node, terms: terms ?? undefined,
-        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository });
+        }, peers, { timeoutMs: config.federationTimeoutMs, seller: act.seller, thisNodeId: config.nodeId, peerCap: config.packagePeerCap, repository: config.packageRepository, securityProfile: config.securityProfile });
         if (!out.ok) { res.status(out.status).json(error(config.nodeId, out.code, out.message)); return; }
         res.json(success(config.nodeId, { entitlement: out.entitlement, peer_registered: out.peerRegistered === true, peer_pending: out.peerPending === true }));
     });

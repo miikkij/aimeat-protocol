@@ -17,6 +17,8 @@
  * @structure SaleRepositoryRef · saleRequest() · saleConfigNeeds() · saleGrant() · saleRevoke() ·
  *   saleOffer() · saleClaim() · redeemClaimAt()
  * @version-history
+ *   2026-10-27 — The repository link passes config.securityProfile, so a public node takes only an https
+ *     repository address (secaudit2026oct26, linkPackagePeer-no-peerUrlRefusal).
  *   v1.3.0 — 2026-10-05 — A sale request names the repository it is for (signedSaleHeaders audience;
  *     secaudit 2026-10, PKG-10).
  *   v1.2.0 — 2026-10-02 — saleOffer (the author's terms), saleClaim (a code for a node not known yet),
@@ -53,7 +55,7 @@ async function repositoryUrl(deps: SaleDeps, ref: unknown): Promise<Refusal | { 
         return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'repository is the repository\'s node id, or { node_id, url, public_key } the first time.' };
     }
     if (typeof ref === 'object' && ref !== null) {
-        const link = await linkPackagePeer({ storage, peers, timeoutMs: deps.config.federationTimeoutMs ?? 10000, thisNodeId: deps.config.nodeId }, nodeId, ref,
+        const link = await linkPackagePeer({ storage, peers, timeoutMs: deps.config.federationTimeoutMs ?? 10000, thisNodeId: deps.config.nodeId, securityProfile: deps.config.securityProfile }, nodeId, ref,
             { source: 'sale-repository', by: 'operator' }, { pendingWhenUnreachable: false });
         if (!link.ok) return link.code === 'PEER_UNREACHABLE' ? { ...link, status: 502, code: 'REPOSITORY_UNREACHABLE' } : link;
     }
