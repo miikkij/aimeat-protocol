@@ -55,6 +55,9 @@
  *     ? handleEnrolOffer(frame.input, { receiver: entry, ...deps }).then(r => tunnel.replyInvoke(frame.id, r.ok, r.result))
  *     : inv.handleInvoke(frame)
  * @version-history
+ *   2026-10-27 -- An enrolment that takes a held runner or wake command into use prints one line
+ *     naming the command and the owner's approval on the node, and logs it (secaudit2026oct26,
+ *     node-offer-trusts-held-commands; designed use, decision 2026-10-27).
  *   2026-10-25 -- An enrolment the person approved writes its config with saveConnectedAgentConfig, so
  *     the runner and wake command it keeps are recorded as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  *   v1.2.0 — 2026-10-02 — The offering node is proven by its card at the connector's own address
@@ -66,8 +69,9 @@
  *   v1.0.0 — 2026-08-31 — Initial (Agent v2, V1).
  */
 import {
-  saveConnectedAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor, type AimeatPerAgentConfig,
+  saveConnectedAgentConfig, loadPerAgentConfig, peekPerAgentConfig, fallbackConfigFor, getConfigDir, type AimeatPerAgentConfig,
 } from './config.js';
+import { heldBackCommands, enrolmentTookHeldNotice } from './command-trust.js';
 import {
   generateAgentKey, signCompact, storeAgentKey, cacheToken, getAgentKey, hasAgentKey, type AgentKey,
 } from './agent-key.js';
@@ -407,7 +411,18 @@ export async function handleEnrolOffer(offer: unknown, deps: EnrolDeps): Promise
       const existing = loadPerAgentConfig(e.name, offer.owner) ?? {};
       const perAgent: AimeatPerAgentConfig = { ...existing, node_url: deps.receiver.config.node_url };
       // An enrolment the person approved is a connect: what it keeps is recorded as trusted (command-trust.ts).
+      // A runner or wake command that was held until now is taken into use by that approval, and
+      // the daemon says so, on its console and in its log (decision 2026-10-27).
+      const { held } = heldBackCommands(perAgent, getConfigDir());
       saveConnectedAgentConfig(e.name, offer.owner, perAgent);
+      if (held) {
+        console.error(enrolmentTookHeldNotice(e.gaii, held));
+        logger.info('enrolment: the owner\'s approval on the node took held commands into use', {
+          gaii: e.gaii, home: held.home,
+          runner: held.runner ? [held.runner.command, ...(held.runner.args ?? [])].join(' ') : null,
+          wake: held.wakeCommand ?? null,
+        });
+      }
       // The identity the node just confirmed, carried straight through: the registry keys by it
       // and must never have to assemble one from a name.
       await deps.attach({ agent: e.name, owner: offer.owner, gaii: e.gaii, config: perAgent });
