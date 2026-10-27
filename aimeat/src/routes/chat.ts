@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.10.1 -- 2026-10-27 -- DELETE /v1/chat/threads/:id ends the conversation's session MCP token
+ *     (chat-session.ts endChatSession; secaudit2026oct26).
  *   v1.10.0 — 2026-10-02 — A turn takes `lang`, the language of the lines the node writes into it
  *     (progress, and the stopped line when the turn's ceiling ends it); Accept-Language otherwise.
  *   v1.9.0 — 2026-10-02 — /v1/chat/status answers `own_key`: what an own key pays for on this node
@@ -52,7 +54,7 @@ import {
     createThread, readThread, showThread, showThreads, deleteThread,
 } from '../services/chat-threads.js';
 import { readerFor } from '../services/classification/reader.js';
-import { chatEnabled, chatPayer, runChatTurn, resetChatSession } from '../services/chat-session.js';
+import { chatEnabled, chatPayer, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
@@ -163,6 +165,8 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
             return;
         }
+        // Its session's MCP token ends with it (secaudit2026oct26).
+        await endChatSession({ storage, config }, gaii, id);
         await deleteThread(storage, gaii, id);
         res.json(success(config.nodeId, { deleted: true }));
     });
