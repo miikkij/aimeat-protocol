@@ -3,7 +3,9 @@
 #   uv pip compile requirements-ci.in -o requirements-ci.txt --generate-hashes --universal --python-version 3.12
 # The workflows install it with --require-hashes. To move a version, change it here, run the line
 # above from this folder, and commit both files.
-pip==26.2.1
+# 26.2.2 or newer: an older pip trusts the compromised emSign intermediates through its own copy of
+# certifi (the PSF notice of 2026-10-20).
+pip==26.2.2
 build==1.6.1
 hatchling==1.32.4
 # hatchling's editable build (the test job's `pip install -e .`) imports it.
