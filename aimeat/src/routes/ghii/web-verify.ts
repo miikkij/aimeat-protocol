@@ -6,6 +6,9 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — POST /v1/ghii/verify-email answers 409 EMAIL_CHANGED, and marks nothing, when the account's
+ *     recovery address changed after the code was sent (secaudit2026oct26,
+ *     email-confirm-binds-hash-not-current-recovery-address).
  *   2026-10-24 — POST /v1/ghii/verify-email takes only rows of purpose 'registration' (the codes register-web
  *     and attach-email mail); a sign-in link's or another code's row answers 404 and is left unspent
  *     (secaudit2026oct22, verify-email:no-purpose-binding).
@@ -93,6 +96,7 @@ import { registrationRefusal, createAccountRows, createdAccountIsOperator, owner
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
 import { checkSecondFactor } from '../../services/password-check.js';
+import { recoveryAddressIs, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
 
 /**
  * The agent credential both mailbox proofs hand out (a verified e-mail code, a clicked sign-in link):
@@ -463,6 +467,13 @@ export function registerWebVerifyRoutes(
         const mintOwner = await storage.getOwner(record.ownerName);
         if (mintOwner?.disabledAt) {
             res.status(403).json(error(config.nodeId, 'ACCOUNT_DISABLED', 'The account this agent acts for has been deactivated'));
+            return;
+        }
+
+        // The code proves the address it was sent to, and only while that is still the account's
+        // recovery address; a later address is proven by its own code (secaudit2026oct26).
+        if (!(await recoveryAddressIs(storage, `${record.ownerName}@${config.nodeId}`, record.emailHash))) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_CHANGED', EMAIL_CHANGED_MESSAGE));
             return;
         }
 

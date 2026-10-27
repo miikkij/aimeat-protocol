@@ -6,6 +6,12 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — POST /v1/ghii/email/confirm answers 409 EMAIL_CHANGED, and marks nothing, when the recovery
+ *     address changed after the code was sent; the reset code and the username go only to the address
+ *     whose hash is the proven one (services/recovery-address.ts). A reset code's guess is counted
+ *     before it is compared, in one conditional write, and a right code is spent before the password
+ *     is set (secaudit2026oct26: email-confirm-binds-hash-not-current-recovery-address,
+ *     password-reset-attempt-cap-read-then-write).
  *   2026-10-22 — A password reset ends every sign-in session of the person, and a password change every
  *     one but the session it was made from; the account's agents keep theirs (secaudit2026oct22,
  *     password-reset-keeps-owner-sessions).
@@ -61,6 +67,7 @@ import { recordAuthFailure } from '../../services/auth-audit.js';
 import { auditContext } from '../../auth/deny.js';
 import { sixDigitCode } from '../../utils/one-time-code.js';
 import { endPersonSessionsAfterPasswordChange } from '../../services/owner-session.js';
+import { recoveryAddressIs, provenRecoveryAddress, EMAIL_CHANGED_MESSAGE } from '../../services/recovery-address.js';
 
 /**
  * Replace the owner's Ed25519 signing key and hand the new private half to nobody. The key signs in
@@ -201,6 +208,16 @@ export function registerRecoveryRoutes(
             return;
         }
 
+        // The code proves the address it was sent to. When the recovery address changed after that
+        // (a second address started, or an agent wrote another), the proof belongs to an address the
+        // reset would no longer mail, so it marks nothing and the row stays pending
+        // (secaudit2026oct26, email-confirm-binds-hash-not-current-recovery-address).
+        const ghii = `${ownerName}@${config.nodeId}`;
+        if (!(await recoveryAddressIs(storage, ghii, record.emailHash))) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_CHANGED', EMAIL_CHANGED_MESSAGE));
+            return;
+        }
+
         // Mark as verified
         const now = new Date().toISOString();
         await storage.updateEmailVerification(record.id, {
@@ -209,7 +226,6 @@ export function registerRecoveryRoutes(
         });
 
         // Update GHII with verified email info
-        const ghii = `${ownerName}@${config.nodeId}`;
         // One-email-per-account-per-node: don't claim an email hash already verified on another account
         // (clean 409 ahead of the DB partial-unique index backstop).
         const emailOwner = await storage.getGHIIByEmailHash(record.emailHash);
@@ -261,7 +277,10 @@ export function registerRecoveryRoutes(
         const ghii = `${username}@${config.nodeId}`;
         const ghiiRecord = await storage.getGHII(ghii);
 
-        if (ghiiRecord && ghiiRecord.notificationEmail && ghiiRecord.emailVerifiedAt && emailService?.enabled) {
+        // Only to the address that was proven: notificationEmail whose hash is the proven emailHash
+        // (secaudit2026oct26).
+        const resetTo = ghiiRecord?.emailVerifiedAt ? provenRecoveryAddress(ghiiRecord) : null;
+        if (ghiiRecord && resetTo && emailService?.enabled) {
             const code = sixDigitCode();
             const codeHash = createHash('sha256').update(code).digest('hex');
             const now = new Date().toISOString();
@@ -299,7 +318,7 @@ export function registerRecoveryRoutes(
             // The reset template, not the email-verification one: that mail said "verify your email
             // address" under the same subject as the sign-up code (email-template-reset.ts).
             const m = passwordResetEmail(code, ghiiRecord.locale);
-            const sent = await emailService.sendRaw(ghiiRecord.notificationEmail, m.subject, m.html, m.text);
+            const sent = await emailService.sendRaw(resetTo, m.subject, m.html, m.text);
             if (sent) {
                 await appendMailLog(storage, ghiiRecord.ghii, { kind: 'password_reset', subject: 'password reset code' });
                 logger.info('Password reset code sent successfully');
@@ -307,7 +326,7 @@ export function registerRecoveryRoutes(
                 logger.warn('Password reset code email failed to send');
             }
         } else if (ghiiRecord) {
-            logger.info(`Password reset skipped: email=${!!ghiiRecord.notificationEmail} verified=${!!ghiiRecord.emailVerifiedAt} service=${!!emailService?.enabled}`);
+            logger.info(`Password reset skipped: email=${!!ghiiRecord.notificationEmail} verified=${!!ghiiRecord.emailVerifiedAt} proven=${!!resetTo} service=${!!emailService?.enabled}`);
         }
 
         // Always return same response to not reveal if account exists
@@ -355,14 +374,17 @@ export function registerRecoveryRoutes(
             return;
         }
 
-        if (record.attempts >= 5) {
+        // The guess is counted BEFORE it is compared, in one conditional write, so guesses that overlap
+        // are each counted and no more than five are ever compared. A read, a compare and a write of
+        // the read value + 1 let overlapping guesses on PostgreSQL pass the cap together and count as
+        // about one (secaudit2026oct26, password-reset-attempt-cap-read-then-write).
+        if (record.attempts >= 5 || !(await storage.reserveEmailVerificationAttempt(record.id, 5))) {
             res.status(429).json(error(config.nodeId, 'TOO_MANY_ATTEMPTS', 'Too many failed attempts'));
             return;
         }
 
         const codeHash = createHash('sha256').update(code).digest('hex');
         if (codeHash !== record.code) {
-            await storage.updateEmailVerification(record.id, { attempts: record.attempts + 1 });
             // A wrong code is a refused credential, answered 400 as it always was; the refusal log holds
             // it with the name tried, so the guesses before a takeover are on record (QA audit E2-03).
             recordAuthFailure(auditContext(req), {
@@ -373,7 +395,12 @@ export function registerRecoveryRoutes(
             return;
         }
 
-        // Code valid — update password
+        // Code valid: spend it first, in one conditional write, so of two requests with the right code
+        // only one sets a password.
+        if (!(await storage.spendEmailVerification(record.id, new Date().toISOString()))) {
+            res.status(400).json(error(config.nodeId, 'INVALID_CODE', 'Invalid or expired reset code'));
+            return;
+        }
         const newHash = await hashPassword(newPassword);
         const ghii = `${username}@${config.nodeId}`;
         await storage.updateGHII(ghii, { passwordHash: newHash });
@@ -385,11 +412,6 @@ export function registerRecoveryRoutes(
         // through the reset. Agents keep theirs (secaudit2026oct22).
         await endPersonSessionsAfterPasswordChange(storage, username);
 
-        // Mark verification as used
-        await storage.updateEmailVerification(record.id, {
-            status: 'verified',
-            verifiedAt: new Date().toISOString(),
-        });
         // A change to how this account is entered is always news (storage/types/account-events.ts):
         // the person reads it on their account feed, and the operator has a line to search.
         logger.info('Password reset with an emailed code', { account: ghii });
@@ -482,13 +504,16 @@ export function registerRecoveryRoutes(
             const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
             const ghiiRecord = await storage.getGHIIByEmailHash(emailHash);
 
-            if (ghiiRecord && ghiiRecord.notificationEmail && emailService?.enabled) {
+            // The username goes to the address that was proven, never to one written since
+            // (secaudit2026oct26).
+            const recoverTo = provenRecoveryAddress(ghiiRecord);
+            if (ghiiRecord && recoverTo && emailService?.enabled) {
                 const locale = ghiiRecord.locale;
                 const subject = locale === 'fi' ? 'AIMEAT-tilisi käyttäjätunnus' : 'Your AIMEAT Username';
                 const body = locale === 'fi'
                     ? `Käyttäjätunnuksesi on: ${ghiiRecord.username}\n\nJos et pyytänyt tätä, voit ohittaa tämän viestin.`
                     : `Your username is: ${ghiiRecord.username}\n\nIf you did not request this, you can safely ignore this email.`;
-                const sent = await emailService.sendNotification(ghiiRecord.notificationEmail, subject, body);
+                const sent = await emailService.sendNotification(recoverTo, subject, body);
                 if (sent) await appendMailLog(storage, ghiiRecord.ghii, { kind: 'username', subject });
             }
         }
