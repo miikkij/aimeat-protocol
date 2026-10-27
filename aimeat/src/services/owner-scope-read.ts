@@ -22,11 +22,17 @@
  *   record of the owner or a sibling is left out. A consent or a key-space share the owner gave an
  *   agent is not consulted on this code path, because doing so costs storage reads per record on
  *   listings of thousands; the owner who wants the agent to read those grants the word.
- * @structure readsAsOwner(caller) · visibleToSameOwnerReader(record, principal) · ownerScopeView(records, principal, all)
+ * @structure readsAsOwner(caller) · visibleToSameOwnerReader(record, principal) · ownerScopeView(records, principal, all) ·
+ *   hiddenRecordRelabel(record, principal, all, visibility)
  * @usage
  *   const all = readsAsOwner(callerOf(req, config.nodeId, storage));
  *   const shown = ownerScopeView(records, caller.principal, all);
  * @version-history
+ *   2026-10-27 — hiddenRecordRelabel: a caller that reads a same-owner record as absent does not
+ *     change that record's visibility. PUT with owner_scope relabelled a sibling's private record to
+ *     'owner' and PATCH with owner_scope relabelled the owner's, and the next read showed it
+ *     (secaudit2026oct26, put-owner-scope-sibling-relabel-bypasses-read-as-owner,
+ *     owner-scope-patch-answers-value-without-read-as-owner).
  *   2026-10-15 — Initial: memory:read-as-owner (feature-list audit #42).
  */
 import type { CallerContext } from './caller-context.js';
@@ -52,6 +58,25 @@ export function ownerScopeView<T extends { ownerGaii: string; visibility: string
   records: readonly T[], principal: string, readsAll: boolean,
 ): T[] {
   return readsAll ? [...records] : records.filter((r) => visibleToSameOwnerReader(r, principal));
+}
+
+/**
+ * The refusal for a visibility change of a same-owner record this caller reads as absent, or null when
+ * the change may go ahead. The write itself stays allowed (an agent edits its siblings' and its owner's
+ * records, decision 2026-10-12): only who may read the record is not the caller's to change, because a
+ * change to 'owner', 'members' or 'public' would hand the caller the record on its next read. The
+ * caller's own records, a record it already sees, an unchanged level and a caller that reads as the
+ * owner pass. The words name memory:read-as-owner and where the owner ticks it.
+ */
+export function hiddenRecordRelabel(
+  record: { key: string; ownerGaii: string; visibility: string } | null | undefined,
+  principal: string, readsAll: boolean, visibility: unknown,
+): string | null {
+  if (!record || readsAll || visibility === undefined || visibility === null || visibility === record.visibility) return null;
+  if (visibleToSameOwnerReader(record, principal)) return null;
+  return `"${record.key}" is a record the owner or another of their agents keeps ${record.visibility}, and you read it as absent, `
+    + `so changing who may read it is not yours to do. You may still change its value and tags. Changing its visibility needs the "${READ_AS_OWNER_SCOPE}" permission, `
+    + 'which the owner grants per agent in Profile -> Agents -> this agent -> permissions -> Memory.';
 }
 
 /** The note an answer carries when records were left out, so an agent knows what to ask for. */
