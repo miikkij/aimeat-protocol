@@ -16322,6 +16322,8 @@
         "other": "{area}"
       },
       "reconnect": "Vuelve a conectar una aplicación que ya tienes",
+      "reconnectUnproven": "Vuelve a conectar una aplicación que ya tienes, sin probar su clave",
+      "reconnectUnprovenHint": "Esta solicitud indica la clave de {app}, pero no demuestra que la tenga. Cualquiera, no solo la aplicación, puede enviar una solicitud así. Apruébala solo si iniciaste tú esta reconexión.",
       "keyChanged": "Reemplaza la clave de una conexión que funciona",
       "keyChangedHint": "Esta solicitud trae una clave distinta a la de tu conexión actual con {app}. Si la apruebas, la clave nueva reemplaza a la anterior y las sesiones anteriores de la aplicación terminan. Apruébala solo si iniciaste tú esta reconexión. Clave anterior y clave nueva:",
       "waiting": "esperando",
