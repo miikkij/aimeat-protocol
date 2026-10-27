@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-anonymous-member-reads.ts joins the list (not the guard tier): the shared anonymous credential reads no app listed to members over MCP, as over REST (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -491,6 +492,8 @@ const ALL_SUITES = [
     'test/e2e-agent-activity.ts',
     'test/e2e-agent-capabilities.ts',
     'test/e2e-anonymous.ts',
+    // The shared anonymous credential and an app listed to members: MCP answers as REST (secaudit2026oct26).
+    'test/e2e-anonymous-member-reads.ts',
     'test/e2e-auth-lib.ts',
     'test/e2e-account-security-gate.ts',
     'test/e2e-totp-lifecycle.ts',
