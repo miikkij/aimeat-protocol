@@ -1278,8 +1278,11 @@
           "config_setting": "Asetus, jota palvelin ei hyväksynyt, joten se käyttää oletusarvoa",
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
-          "erasure_leftover_schedules": "Poistettujen tilien jäljelle jääneet ajastukset",
-          "capability_visibility_words": "Kyvykkyydet, joiden näkyvyyttä palvelin ei tunne"
+          "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
+          "subdomain_site_origin": "Verkko-osoitteet, joiden tyyppiä palvelin ei tunnistanut"
+        },
+        "detail": {
+          "subdomain_site_origin": "Palvelin ei tunnistanut, kuuluvatko nämä verkko-osoitteet ({count}) omalle sivustollesi vai jonkun julkaisemalle sovellukselle: {labels}. Ne toimivat kuten ennenkin, kunnes valitset. Pyydä tekoälyä, jonka olet yhdistänyt AIMEATiin, lajittelemaan jokainen osoite, ja merkitse sitten tämä tapaus ratkaistuksi tällä sivulla."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1308,8 +1311,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
-            "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Poisto poisti vain ajastukset, jotka ihminen teki itse. Hänen agenttiensa ja sovellustensa tekemät ajastukset jäivät. Tällainen ajastus näkyy sille, joka rekisteröi käyttäjätunnuksen seuraavaksi, ja se voi toimia hänen samannimisenä agenttinaan. Mikään ei muutu ennen kuin päätät. Poista jokainen, jota et tarvitse. Tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
-            "capability_visibility_words": "Nämä kyvykkyydet tallennettiin ennen 26.10.2026, ja niiden näkyvyys on sana, jota tämä palvelin ei tunne. Kunnes päätät, jokainen niistä on yksityinen: vain omistaja, omistajan agentit ja sinä näette sen ja voitte käyttää sitä. Muu ei muutu. Tee jokaisesta yksityinen tai pidä se ennallaan. Tapahtuma on hoidettu, kun teet viimeisen päätöksen."
+            "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1319,20 +1321,13 @@
           "kept": "ennallaan",
           "confirmClear": "Poistetaanko tämä jaetulta anonyymiltä agentilta? {line}",
           "confirmDelete": "Poistetaanko tämä pysyvästi? {line}",
-          "confirm": {
-            "capability_visibility": "Tehdäänkö tästä kyvykkyydestä yksityinen? Sen jälkeen vain omistaja, omistajan agentit ja sinä näette sen ja voitte käyttää sitä. {line}"
-          },
-          "action": {
-            "capability_visibility": "Tee yksityiseksi"
-          },
           "kind": {
             "agent_webhook": "Webhook osoitteeseen {url}. Se saa viestit, jotka lähetetään jaetulle agentille.",
             "agent_tags": "Jaetun agentin tunnisteet: {tags}",
             "agent_capabilities": "Jaetun agentin julkisella kortilla: {technical} teknistä ja {domain} muuta kyvykkyyttä, {languages} kieltä",
             "skill": "Taito {name} tiedostoineen",
             "datapackage": "Datapaketti {name} tiedostoineen",
-            "schedule": "Ajastus \"{label}\", jonka {maker} teki tilille {owner} ({cron})",
-            "capability_visibility": "Kyvykkyys \"{name}\", omistaja {owner}, näkyvyys \"{word}\""
+            "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})"
           }
         },
         "source": {
@@ -3781,10 +3776,10 @@
         "registers": "Rekisterit",
         "registersWhy": "Henkilötietoja on {personal} rekisterissä. Tämä asennus {node}, yhteiset paikat {organism}, sovellukset {app}.",
         "gapHolds": "Pitää henkilötietoa: {list}",
-        "gapFamilies":"Ei kerro, ovatko nämä henkilötietoja: {list}",
+        "gapFamilies": "Ei kerro, ovatko nämä henkilötietoja: {list}",
         "gapNoMap": "Ei tietokarttaa, joten mikään ei kerro, mitä sovellus pitää tai minne tieto lähtee.",
         "gapNode": "Tämä asennus",
-        "registersDrafts":"{n} luonnosta odottaa tarkistusta: tämän asennuksen omat {node}, sovellukset {apps}. Asennus teki ne tietokartoista, eikä niitä ole tallennettu.",
+        "registersDrafts": "{n} luonnosta odottaa tarkistusta: tämän asennuksen omat {node}, sovellukset {apps}. Asennus teki ne tietokartoista, eikä niitä ole tallennettu.",
         "domains": "Säännelty tieto",
         "domainsNone": "Mikään rekisteri ei nimeä säänneltyä tietoa.",
         "requests": "Rekisteröityjen pyynnöt",
@@ -10114,8 +10109,8 @@
   "notifpage.group.otherSub": "kaikki muu, myös se, minkä lähetät itsellesi",
   "notiftext.docsign_request.title": "{from} pyytää sinua allekirjoittamaan: {title}",
   "notiftext.docsign_request.body": "Dokumentti {document}. Avaa allekirjoituspyyntö, tai pyydä tekoälyäsi näyttämään se.",
-  "notiftext.app_published_by_app.title": "Sovellus {publisher} julkaisi sovelluksesi {app}",
-  "notiftext.app_published_by_app.body": "Se julkaisi version {version} oikeudella, jonka annoit sille julkaista sovelluksia. Kun seuraavaksi avaat sovelluksen {app}, kysymme yhden kerran, sallitko uudet oikeudet, joita tämä versio pyytää.",
+  "notiftext.app_published_by_app.title": "{publisher} teki sovelluksestasi {app} uuden version",
+  "notiftext.app_published_by_app.body": "Annoit sovellukselle {publisher} luvan julkaista sovelluksia puolestasi, ja se julkaisi version {version}. Kun avaat sovelluksen {app} seuraavan kerran, näet, mitä uusi versio haluaa tehdä, ja päätät, sallitko sen.",
   "notiftext.agreement_sent_cp.title": "{operator} pyytää sinua allekirjoittamaan käsittelysopimuksen",
   "notiftext.agreement_sent_cp.body": "Lue tiivistelmä ja valitse, miten allekirjoitat. Sopimus {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Allekirjoitettua kopiotasi ei voitu hyväksyä",
@@ -10259,8 +10254,8 @@
   "notiftext.payment_not_delivered.body": "Tilausta ei voitu toimittaa, eikä maksu palannut ostajalle, joten raha on sinulla. Palauta maksu ostajalle tai toimita tilaus. Tilauksen tunniste: {session}.",
   "notiftext.payment_possible.title": "Maksu {amount} on ehkä tullut",
   "notiftext.payment_possible.body": "Maksupalvelu ei vastannut, kun ostaja maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Jos raha tuli, toimita tilaus tai palauta maksu. Tunniste: {reference}.",
-  "notiftext.payout_possible.title": "Tilitys {amount} on ehkä tullut",
-  "notiftext.payout_possible.body": "Maksupalvelu ei vastannut, kun {provider} maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Tunniste: {reference}.",
+  "notiftext.payout_possible.title": "Sait ehkä maksun {amount}",
+  "notiftext.payout_possible.body": "{provider} lähetti sinulle {amount}, mutta maksuverkko ei vahvistanut, että siirto meni perille. Katso, onko tilitysosoitteeseesi tullut siirto osoitteesta {payer}. Viite: {reference}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",
@@ -10301,20 +10296,20 @@
   "notiftext.approval_answer_allowed.body": "{who} salli pyynnön. Muutos on nyt voimassa.",
   "notiftext.approval_answer_declined.title": "Ei sallittu: {what}",
   "notiftext.approval_answer_declined.body": "{who} ei sallinut pyyntöä. Mikään ei muuttunut.",
-  "notiftext.ai_app_name_match.title": "{app} käytti tekoälyä listasi nimellä ”{entry}”",
-  "notiftext.ai_app_name_match.body": "Listassasi sovelluksista, jotka saavat käyttää tekoälyä, on nimi ”{entry}”. Sovellus {app} on toisen tekijän, mutta sen tiedostonimi on sama, joten sekin saa käyttää tekoälyä. Jos tarkoitit toista sovellusta, kirjoita listaan sen koko nimi (tekijä/sovellus) nimen ”{entry}” tilalle.",
+  "notiftext.ai_app_name_match.title": "{app} sai käyttää tekoälyä, koska listallasi on nimi ”{entry}”",
+  "notiftext.ai_app_name_match.body": "Annoit sovelluksille, joiden nimi on ”{entry}”, luvan käyttää tekoälyä. Sovelluksella {app} on sama nimi, mutta sen on tehnyt joku muu. Jos tarkoitit vain omaa sovellustasi, kirjoita listaan sen koko nimi, esimerkiksi tekijä/sovellus.",
   "notiftext.approval_answer_expired.title": "Ei vastausta: {what}",
   "notiftext.approval_answer_expired.body": "Kukaan ei vastannut pyyntöön ajoissa. Mikään ei muuttunut. Pyydä uudelleen, jos tarvitset sitä yhä.",
   "notiftext.approval_answer_outdated.title": "Ei tehty: {what}",
   "notiftext.approval_answer_outdated.body": "Kohde muuttui pyynnön jälkeen, joten mitään ei tehty. Pyydä uudelleen, jos tarvitset sitä yhä.",
-  "notiftext.agent_standing_work_stopped.title": "{agent} on poistettu, ja sen toistuvat työt pysähtyvät",
-  "notiftext.agent_standing_work_stopped.body": "Agentin {agent} tekemät ajastukset ({schedules}) ja tallennetut työnkulut ({workflows}) eivät enää käynnisty. Jos hyväksyt uuden agentin nimeltä {agent}, ne käynnistyvät taas sen nimissä ja niillä oikeuksilla, jotka silloin annat sille. Poista ne Ajastukset-sivulla, jos haluat lopettaa ne kokonaan.",
-  "notiftext.agent_standing_work_resumed.title": "Uusi agentti {agent} jatkaa aiemman agentin töitä",
-  "notiftext.agent_standing_work_resumed.body": "Aiemman samannimisen agentin {agent} tekemät ajastukset ({schedules}) ja tallennetut työnkulut ({workflows}) käynnistyvät taas tämän agentin nimissä ja niillä oikeuksilla, jotka sillä nyt on. Poista ne Ajastukset-sivulla, jos tämä agentti ei saa ajaa niitä.",
-  "notiftext.agent_mode_self_set.title": "Agenttisi {agent} vaihtoi itse toimintatilansa",
-  "notiftext.agent_mode_self_set.body": "Agentin {agent} tila on nyt ”{mode}”. Tilassa ”workstation” agentti voi vastata puolestasi tavoitteidesi vaiheisiin, jotka odottavat sinua. Voit vaihtaa tilan agentin sivulla.",
-  "notiftext.agent_mode_set_by_agent.title": "Agenttisi {by} vaihtoi agentin {agent} toimintatilan",
-  "notiftext.agent_mode_set_by_agent.body": "Agentin {agent} tila on nyt ”{mode}”. Tilassa ”workstation” agentti voi vastata puolestasi tavoitteidesi vaiheisiin, jotka odottavat sinua. Voit vaihtaa tilan agentin sivulla.",
+  "notiftext.agent_standing_work_stopped.title": "Poistit agentin {agent}, joten sen toistuvat työt pysähtyivät",
+  "notiftext.agent_standing_work_stopped.body": "{agent} oli tehnyt ajastuksia ({schedules}) ja tallentanut työnkulkuja ({workflows}). Ne säilyvät, mutta ne eivät käynnisty. Jos hyväksyt uuden agentin, jonka nimi on {agent}, ne käynnistyvät taas sen nimissä. Jos haluat lopettaa ne kokonaan, poista ne Ajastin-välilehdellä.",
+  "notiftext.agent_standing_work_resumed.title": "Uusi agentti {agent} jatkaa vanhan agentin toistuvia töitä",
+  "notiftext.agent_standing_work_resumed.body": "Aiempi agentti, jonka nimi oli myös {agent}, oli tehnyt ajastuksia ({schedules}) ja tallentanut työnkulkuja ({workflows}). Ne käynnistyvät nyt taas tämän agentin nimissä ja niillä oikeuksilla, jotka annoit sille. Jos et halua, että tämä agentti tekee niitä, poista ne Ajastin-välilehdellä.",
+  "notiftext.agent_mode_self_set.title": "{agent} vaihtoi itse toimintatilaansa",
+  "notiftext.agent_mode_self_set.body": "{agent} toimii nyt tilassa ”{mode}”. Tilassa ”workstation” (työasema) agentti voi vastata puolestasi, kun jokin tavoitteistasi odottaa vastaustasi. Voit vaihtaa tilan agentin sivulla.",
+  "notiftext.agent_mode_set_by_agent.title": "{by} vaihtoi agentin {agent} toimintatilan",
+  "notiftext.agent_mode_set_by_agent.body": "{agent} toimii nyt tilassa ”{mode}”. Tilassa ”workstation” (työasema) agentti voi vastata puolestasi, kun jokin tavoitteistasi odottaa vastaustasi. Voit vaihtaa tilan agentin sivulla.",
   "notiftext.approval_email_policy.title": "{who} pyytää, että laajennus {extension} saa lähettää postia mihin tahansa osoitteeseen",
   "notiftext.approval_email_policy.body": "Laajennus kuuluu tilille {account}. Posti mihin tahansa osoitteeseen lähtee tämän palvelimen omalla postinimellä, joten operaattori päättää asiasta. Jos sallit, muutos tulee voimaan heti. Jos et salli, laajennus lähettää postia vain osoitteisiin, jotka tavalliset säännöt sallivat. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_email_policy_code.title": "{who} muutti laajennuksen {extension} koodia: vahvista, saako se yhä lähettää postia mihin tahansa osoitteeseen",
@@ -10323,24 +10318,24 @@
   "notiftext.approval_email_policy_sent.body": "Palvelimen operaattori päättää asiasta. Siihen asti laajennus lähettää postia vain osoitteisiin, jotka tavalliset säännöt sallivat. Saat vastauksen tänne.",
   "notiftext.approval_email_policy_code_sent.title": "Laajennuksen {extension} koodi muuttui: operaattori vahvistaa sen postiluvan",
   "notiftext.approval_email_policy_code_sent.body": "{who} muutti koodia. Kunnes operaattori vahvistaa luvan uudelle koodille, laajennus lähettää postia vain osoitteisiin, jotka tavalliset säännöt sallivat. Saat vastauksen tänne.",
-  "notiftext.approval_secret_host_ask_off.title": "{who} pyytää, ettei sinulta enää kysytä ennen kuin salaisuutesi menevät uuteen osoitteeseen",
-  "notiftext.approval_secret_host_ask_off.body": "Kun kysymys on päällä, agenttiesi kirjoittama koodi ja niiden asettamat osoitteet eivät voi lähettää tallennettuja salaisuuksiasi uuteen paikkaan ilman painallustasi. Jos sallit tämän, ne voivat. Jos et salli, kysymys pysyy päällä. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_secret_host_ask_off.title": "{who} pyytää, että agenttisi saavat lähettää salasanojasi ja avaimiasi uusiin osoitteisiin kysymättä sinulta",
+  "notiftext.approval_secret_host_ask_off.body": "Nyt sinulta kysytään, ennen kuin agenttisi lähettävät tallennetun salasanan tai avaimen osoitteeseen, johon sitä ei ole aiemmin lähetetty. Jos sallit tämän, ne voivat lähettää niitä uusiin osoitteisiin kysymättä sinulta. Jos et salli, sinulta kysytään yhä.",
   "notiftext.approval_crew_model.title": "{who} pyytää, että agenttisi {agent} käyttää mallin osoitetta {host}",
   "notiftext.approval_crew_model.body": "Kun agenttisi miehistö kysyy mallilta, se lähettää palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistö käyttää osoitetta seuraavasta ajosta alkaen. Jos et salli, miehistö pitää nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_crew_model_default.title": "{who} pyytää, että kaikki agenttisi käyttävät mallin osoitetta {host}",
   "notiftext.approval_crew_model_default.body": "Kun agenttiesi miehistöt kysyvät mallilta, ne lähettävät palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistöt käyttävät osoitetta seuraavasta ajosta alkaen. Jos et salli, ne pitävät nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
-  "notiftext.approval_goal_model_read.title": "{who} pyytää, että AIMEATin malli saa lukea yksityiset tietueesi {records}",
-  "notiftext.approval_goal_model_read.body": "{agent} nimesi tavoitteessa \"{goal}\" tietueet {records}, mutta {agent} ei itse saa lukea yksityisiä tietueitasi. Malli käyttäisi niitä työssä \"{work}\", ja {agent} näkee mallin vastauksen. Jos sallit, työ tehdään tietueiden kanssa. Jos et salli, työ tehdään ilman niitä. {who} saa vastauksen kummassakin tapauksessa.",
-  "notiftext.approval_schedule_instruction.title": "{who} pyytää lupaa ajaa ajastuksen \"{schedule}\" antamallaan uudella ohjeella",
-  "notiftext.approval_schedule_instruction.body": "{who} muutti ohjetta, jonka ajastus \"{schedule}\" antaa mallille. Ajastuksen teki {maker}, ja ajastus lukee tietojasi samoilla oikeuksilla kuin {maker}. {maker} saa lukea tietoja, joita {who} ei saa lukea. Siksi ajastus odottaa vastaustasi ennen seuraavaa ajoa. Jos sallit, seuraava ajo käyttää uutta ohjetta. Jos et salli, ajastus palaa aiempaan ohjeeseen. {who} saa vastauksen kummassakin tapauksessa.",
-  "notiftext.approval_refinery_definition.title": "{who} pyytää, että postinjalostamo {refinery} lukee postilaatikkoa {mailbox} ja tallentaa viestit työtilaan {workspace}",
-  "notiftext.approval_refinery_definition.body": "Postinjalostamo lukee postiasi aikataulusi mukaan ja tallentaa jokaisen viestin sinne rivinä. Muutoksen teki sovellus tai agentti, joka ei saa itse ajaa postinjalostamoa, joten vahvistat sen ensin. Jos sallit, seuraava ajo lukee tätä postilaatikkoa ja tallentaa sinne. Jos et salli, postinjalostamo jatkaa entisellä postilaatikolla ja työtilalla. {who} saa vastauksen kummassakin tapauksessa.",
-  "notiftext.approval_refinery_definition_text.title": "{who} pyytää, että postinjalostamo {refinery} lukee postilaatikkoa {mailbox} ja tallentaa viestit koko tekstin kanssa työtilaan {workspace}",
-  "notiftext.approval_refinery_definition_text.body": "Postinjalostamo lukee postiasi aikataulusi mukaan ja tallentaa jokaisen viestin sinne rivinä. Rivillä on viestin ja sen liitteiden teksti. Muutoksen teki sovellus tai agentti, joka ei saa itse ajaa postinjalostamoa, joten vahvistat sen ensin. Jos sallit, seuraava ajo lukee tätä postilaatikkoa ja tallentaa sinne. Jos et salli, postinjalostamo jatkaa entisellä postilaatikolla ja työtilalla. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_goal_model_read.title": "{who} pyytää, että AIMEATin tekoäly saa lukea yksityiset merkintäsi {records}",
+  "notiftext.approval_goal_model_read.body": "{agent} tarvitsee merkinnät {records} tehtävään ”{work}” tavoitteessasi ”{goal}”. {agent} ei saa lukea yksityisiä merkintöjäsi, mutta se näkee tekoälyn vastauksen. Jos sallit, tekoäly käyttää näitä merkintöjä tehtävässä. Jos et salli, tehtävä tehdään ilman niitä.",
+  "notiftext.approval_schedule_instruction.title": "{who} muutti ajastusta ”{schedule}”, ja muutos odottaa hyväksyntääsi",
+  "notiftext.approval_schedule_instruction.body": "Ajastuksen teki {maker}, joten se lukee tietojasi samoilla oikeuksilla kuin {maker}. {who} muutti sen ohjeita, mutta {who} ei saa lukea kaikkea, mitä {maker} saa. Siksi muutos odottaa hyväksyntääsi. Jos sallit, ajastus käyttää uusia ohjeita. Jos et salli, se palaa vanhoihin ohjeisiin.",
+  "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
+  "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
+  "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
+  "notiftext.approval_refinery_definition_text.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace} koko tekstin ja liitteiden kanssa. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_subscription_price.title": "{who} pyytää uusimaan tilauksesi {name} uudella hinnalla {to}",
   "notiftext.approval_subscription_price.body": "Hyväksyit hinnan {from}. Hinta on noussut sen jälkeen, joten korttiasi veloitetaan vain, jos sallit sen. Jos sallit, tilaus uusitaan nyt hintaan {to}. Jos et salli, korttiasi ei veloiteta, ja tilaus päättyy {date}. {who} saa vastauksen kummassakin tapauksessa.",
-  "notiftext.approval_subscription_period.title": "{who} pyytää uusimaan tilauksesi {name} hintaan {to} {toDays} päivän välein",
-  "notiftext.approval_subscription_period.body": "Hyväksyit hinnan {from} {fromDays} päivän välein. Jakso on nyt lyhyempi, joten maksaisit useammin. Korttiasi veloitetaan vain, jos sallit sen. Jos sallit, tilaus uusitaan nyt hintaan {to} {toDays} päivän välein. Jos et salli, korttiasi ei veloiteta, ja tilaus päättyy {date}. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_subscription_period.title": "{who} pyytää lupaa veloittaa tilauksesta {name} useammin",
+  "notiftext.approval_subscription_period.body": "Olet hyväksynyt, että maksat {from} {fromDays} päivän välein. Uudet ehdot ovat {to} {toDays} päivän välein. Jos sallit, korttiasi veloitetaan nyt uusilla ehdoilla. Jos et salli, mitään ei veloiteta, ja tilaus päättyy {date}.",
   "notiftext.agent_permission_ask_page.title": "{agent} tarvitsee oikeuden, jonka annat sen sivulla",
   "notiftext.agent_permission_ask_page.body": "{agent} yritti tehdä puolestasi jotain, mitä et ole sallinut. Tämän oikeuden annat agentin sivulla, jos haluat. Avaa sivu, niin näet, mistä on kyse.",
   "notiftext.agent_permission_ask_page.open": "Avaa agentin sivu",
@@ -10356,19 +10351,21 @@
   "notiftext.eco_capability_ask.body": "Käyttäjän {registrant} \"{name}\" haluaa, että ulkoinen sovelluksesi {app} tekee toiminnon {action}. Avaa ilmoitus, niin näet, mitä se lähettää, tai vastaa tästä.",
   "notiftext.eco_capability_ask.allow": "Salli",
   "notiftext.eco_capability_ask.deny": "Älä salli",
-  "notiftext.peer_replace_ask.title": "Kutsun saanut palvelin haluaa vertaisen {node} paikan",
-  "notiftext.peer_replace_ask.body": "Osoitteessa {url} oleva palvelin esitti yhden kutsuistasi{label} ja sanoo olevansa {node}. Tällä palvelimella on jo vertainen {node}, mutta eri avaimella. Salli korvaa vertaisen uudella palvelimella kutsun tasolla ({tier}) ja käyttää kutsun. Älä salli pitää vertaisen ja kutsun ennallaan. Salli vain, jos tiedät, että palvelin on rakennettu uudelleen uudella avaimella.",
+  "notiftext.peer_replace_ask.title": "Palvelin väittää olevansa {node} ja yrittää korvata sen",
+  "notiftext.peer_replace_ask.body": "Osoitteessa {url} oleva palvelin käytti yhtä kutsuistasi{label}. Se väittää olevansa {node}, mutta sen avain ei ole sama kuin sen palvelimen {node} avain, joka on jo yhteydessä palvelimeesi. Salli vain, jos tiedät, että {node} on asennettu uudelleen. Jos et salli, mikään ei muutu.",
   "notiftext.peer_replace_ask.allow": "Salli",
   "notiftext.peer_replace_ask.deny": "Älä salli",
   "notiftext.approval_change.federation": "Muuta Federaatio-sivulla",
   "notiftext.agent_narrowed.title": "AIMEAT rajasi agentin {agent} oikeudet",
   "notiftext.agent_narrowed.body": "AIMEAT rajasi agentin {agent} oikeudet niihin, joita se käytti kahden viikon aikana: {what}. Jos se myöhemmin tarvitsee jotain muuta, saat pyynnön ja voit sallia sen yhdellä painalluksella.",
   "notiftext.agent_narrowed.open": "Avaa agentin sivu",
+  "notiftext.capability_visibility_private.title": "Nyt vain sinä ja agenttisi voitte käyttää näitä kyvykkyyksiä: {names}",
+  "notiftext.capability_visibility_private.body": "Kyvykkyys on palvelu, jonka sinä tai agenttisi tarjoatte muiden käyttöön. Näiden kyvykkyyksien näkyvyysasetuksessa oli arvo, jota tämä palvelin ei tunne, joten palvelin rajasi ne sinulle ja agenteillesi. Jos muidenkin pitää voida käyttää jotakin kyvykkyyttä, valitse Kyvykkyydet-sivulla, kuka sen näkee.",
   "notiftext.owner_tokens_kept.title": "Käyttöavaimesi toimivat yhä",
-  "notiftext.owner_tokens_kept.body": "Uloskirjautuminen ja uusi salasana eivät lopeta käyttöavaimiasi. Nämä avaimet voivat yhä toimia nimissäsi: {names}. Jos et tunnista jotakin niistä, poista se Pääsy-sivulla.",
+  "notiftext.owner_tokens_kept.body": "Käyttöavaimesi toimivat, vaikka kirjaudut ulos tai vaihdat salasanan. Nämä avaimet voivat yhä toimia nimissäsi: {names}. Jos et tunnista jotakin niistä, poista se Pääsy-sivulla.",
   "notiftext.owner_tokens_kept.open": "Avaa Pääsy-sivu",
-  "notiftext.sso_signed_in_past_code.title": "{organisation} avasi tilisi ilman koodiasi",
-  "notiftext.sso_signed_in_past_code.body": "Organisaatiosi hakemisto hallitsee tiliäsi, joten {organisation} avasi sen omalla kirjautumisellaan ilman kaksivaiheisen kirjautumisen koodiasi. Jos et kirjautunut itse, vaihda salasanasi Pääsy-sivulla ja kerro asiasta organisaatiollesi.",
+  "notiftext.sso_signed_in_past_code.title": "Tilillesi kirjauduttiin organisaation {organisation} kautta ilman kirjautumiskoodia",
+  "notiftext.sso_signed_in_past_code.body": "Tiliäsi hallitsee {organisation}, joten sen oma kirjautuminen riittää, eikä AIMEAT kysy koodiasi. Jos et kirjautunut itse, vaihda salasanasi Pääsy-sivulla ja kerro asiasta organisaatiollesi.",
   "notiftext.sso_signed_in_past_code.open": "Avaa Pääsy-sivu",
   "agentAllow.badge": "Agenttisi pyytää",
   "agentAllow.title": "{agent} haluaa tehdä tämän puolestasi",
@@ -15356,7 +15353,7 @@
       "operatorExportedEntries": "Operaattori otti tästä asennuksesta varmuuskopion. Siinä on {count} merkintääsi.",
       "operatorInstalledSet": "Operaattori asensi tiliisi asennuspaketin {set}: {packages} pakettia, ja {apps} sovellusta sai oikeuksia. Näet ja muutat sovellustesi oikeudet asetuksistasi.",
       "operatorActed": "Operaattori teki muutoksen tiliisi ({area}: {action}).",
-      "operatorRestoredBackup": "Operaattori palautti tähän asennukseen varmuuskopion. Se kirjoitti tiliisi {records} merkintää ja {agents} agenttia.",
+      "operatorRestoredBackup": "Palvelun ylläpitäjä palautti tietoja varmuuskopiosta. Takaisin tuli merkintöjäsi: {records}, agenttejasi: {agents}. Tarkista, että merkintäsi näyttävät oikeilta.",
       "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",
       "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
       "scopeWordsKeptOne": "{name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se sai oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne agentin asetuksista.",
@@ -15475,13 +15472,13 @@
       "daysLabel": "Viestit ajalta",
       "noneFresh": "Tältä ajalta mikään keskustelu ei odota vastaustasi.",
       "days": {
+        "0": "koko aika",
         "1": "viimeinen päivä",
         "3": "3 viime päivää",
         "7": "viime viikko",
         "14": "2 viime viikkoa",
         "30": "viime kuukausi",
-        "90": "3 viime kuukautta",
-        "0": "koko aika"
+        "90": "3 viime kuukautta"
       }
     }
   },
@@ -18291,7 +18288,11 @@
       "areaLine": "{rights}: {what} ({which})",
       "areaAll": "kaikki",
       "areaPattern": "ne, jotka vastaavat kuviota {pattern}",
-      "areaRights": { "read": "Lukea", "write": "Kirjoittaa", "readWrite": "Lukea ja kirjoittaa" },
+      "areaRights": {
+        "read": "Lukea",
+        "write": "Kirjoittaa",
+        "readWrite": "Lukea ja kirjoittaa"
+      },
       "areaName": {
         "memory": "tietueesi",
         "storage": "tiedostosi",
@@ -18300,8 +18301,8 @@
         "other": "{area}"
       },
       "reconnect": "Yhdistää uudelleen sovelluksen, joka sinulla jo on",
-      "reconnectUnproven": "Yhdistää uudelleen sovelluksen, mutta ei todista avainta",
-      "reconnectUnprovenHint": "Pyyntö kertoo sovelluksen {app} avaimen, mutta ei todista, että lähettäjällä on se. Tällaisen pyynnön voi lähettää kuka tahansa, ei vain sovellus. Hyväksy vain, jos aloitit tämän uudelleenyhdistämisen itse.",
+      "reconnectUnproven": "Sovellus haluaa yhteyden takaisin, mutta ei todistanut olevansa sama sovellus",
+      "reconnectUnprovenHint": "{app} on jo yhdistetty. Tämä pyyntö käyttää sen nimeä ja julkista avainta, ja kuka tahansa voi kopioida ne. Hyväksy vain, jos aloitit tämän itse, esimerkiksi asentamalla sovelluksen {app} uudelleen.",
       "keyChanged": "Vaihtaa toimivan yhteyden avaimen",
       "keyChangedHint": "Tässä pyynnössä on eri avain kuin nykyisessä yhteydessäsi sovellukseen {app}. Jos hyväksyt, uusi avain korvaa vanhan, ja sovelluksen aiemmat istunnot päättyvät. Hyväksy vain, jos aloitit tämän uudelleenyhdistämisen itse. Vanha ja uusi avain:",
       "waiting": "odottaa",
@@ -25924,6 +25925,170 @@
   },
   "explain": {
     "open": "Ohje: {term}",
+    "notice": {
+      "app_published_by_app": {
+        "title": "Toinen sovellus julkaisi sovelluksestasi uuden version",
+        "short": "Toinen sovellus teki yhdestä sovelluksestasi uuden version luvalla, jonka annoit sille.",
+        "what": "Voit antaa sovellukselle luvan rakentaa ja julkaista sovelluksia puolestasi. Nyt jonkun muun tekemä sovellus julkaisi uuden version yhdestä sovelluksestasi. Uusi versio voi pyytää enemmän kuin vanha, esimerkiksi luvan lukea useampia tietojasi. Siksi näet, kun avaat sovelluksen seuraavan kerran, mitä uutta versio pyytää, ja päätät itse.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Avaa sovelluksesi ja katso, mitä uusi versio pyytää. Jos et odottanut muutosta, älä salli sitä, ja ota julkaisulupa pois sovellukselta, joka teki muutoksen."
+      },
+      "payout_possible": {
+        "title": "Maksu, joka on ehkä tullut perille",
+        "short": "Joku lähetti sinulle rahaa, mutta maksuverkko ei vahvistanut sitä.",
+        "what": "Kun joku maksaa sinulle, maksuverkko yleensä vahvistaa, että siirto meni perille. Tällä kertaa vahvistusta ei tullut. Raha on voinut silti tulla perille, joten tarkista asia.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Katso tilitysosoitteestasi, onko siirto tullut. Jos rahaa ei ole tullut muutamassa päivässä, ota yhteyttä maksajaan ja kerro ilmoituksen viite."
+      },
+      "ai_app_name_match": {
+        "title": "Toinen sovellus pääsi käyttämään tekoälyä samalla nimellä",
+        "short": "Sovellus, jolla on sama nimi kuin listallasi olevalla, käytti tekoälyä tililläsi.",
+        "what": "Pidät listaa sovelluksista, jotka saavat käyttää tekoälyä tililläsi. Jos listalla on pelkkä nimi ilman tekijää, se koskee jokaista sovellusta, jolla on sama nimi, myös muiden tekemiä.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Kirjoita jokainen sovellus listaan tekijän kanssa, esimerkiksi tekijä/sovellus. Silloin lista koskee vain sitä yhtä sovellusta."
+      },
+      "agent_standing_work_stopped": {
+        "title": "Työt, jotka pysähtyivät, kun poistit agentin",
+        "short": "Poistit agentin, ja sen toistuvat työt pysähtyivät.",
+        "what": "Agentti voi tehdä toistuvia töitä, esimerkiksi raportin joka aamu. Kun poistat agentin, nämä työt pysähtyvät, koska kukaan ei enää tee niitä. Töitä ei poisteta siltä varalta, että yhdistät agentin uudelleen.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Poista ajastukset Ajastin-välilehdellä, jos et tarvitse niitä. Säilytä ne, jos aiot yhdistää agentin uudelleen."
+      },
+      "agent_standing_work_resumed": {
+        "title": "Uusi agentti jatkaa vanhan agentin töitä",
+        "short": "Uudella agentilla on sama nimi kuin poistamallasi agentilla, ja se tekee nyt poistetun agentin toistuvat työt.",
+        "what": "Hyväksyit agentin, jolla on sama nimi kuin aiemmin poistamallasi agentilla. Aiemman agentin toistuvat työt käynnistyvät nyt uuden agentin nimissä ja niillä oikeuksilla, jotka annoit uudelle agentille.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Tarkista, että uusi agentti on se, jota tarkoitit. Jos ei ole, poista ajastukset Ajastin-välilehdellä tai poista agentti."
+      },
+      "agent_mode_self_set": {
+        "title": "Agentin toimintatila",
+        "short": "Toimintatila kertoo, kuinka paljon agentti saa tehdä tavoitteissasi kysymättä sinulta.",
+        "what": "Tavoite voi pysähtyä odottamaan vastaustasi. Tilassa ”workstation” (työasema) agentti saa vastata tällaiseen kysymykseen puolestasi, joten tavoite ei jää odottamaan. Muissa tiloissa tavoite odottaa, kunnes vastaat itse.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Jos et pyytänyt tätä muutosta, avaa agentin sivu ja vaihda tila takaisin."
+      },
+      "approval_goal_model_read": {
+        "title": "Agentti pyytää tekoälyä lukemaan merkintöjä, joita se ei itse saa lukea",
+        "short": "Tekoäly lukisi yksityisiä merkintöjäsi tehtävää varten, ja agentti näkisi vastauksen.",
+        "what": "Agenttisi saavat lukea vain sen, mihin olet antanut luvan. Tavoitteessa agentti voi antaa AIMEATin tekoälylle tehtävän. Jos tehtävä tarvitsee yksityisiä merkintöjäsi, tekoäly lukee ne, ja agentti näkee vastauksen. Näin agentti voisi saada tietää, mitä merkinnöissä lukee, vaikka se ei saa lukea niitä. Siksi sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Tekoäly lukee nämä merkinnät vain tätä yhtä tehtävää varten, ja agentti näkee vastauksen.",
+        "highLabel": "Jos et salli",
+        "high": "Tehtävä tehdään ilman näitä merkintöjä.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos sinulle sopii, että agentti tietää, mitä näissä merkinnöissä lukee. Jos agentti saa lukea kaikki merkintäsi, voit antaa sille tämän luvan agentin sivulla. Silloin se ei enää kysy."
+      },
+      "approval_schedule_instruction": {
+        "title": "Joku muutti ajastusta",
+        "short": "Joku, jolla on vähemmän oikeuksia, muutti ajastusta, joka lukee tietojasi.",
+        "what": "Ajastus käynnistyy itsestään, esimerkiksi joka aamu, ja se lukee tietojasi tekijänsä oikeuksilla. Jos joku, jolla on vähemmän oikeuksia, muuttaa ajastuksen ohjeita, hän voisi ajastuksen avulla nähdä tietoja, joita hän ei itse saa lukea. Siksi muutos odottaa sinua.",
+        "lowLabel": "Jos sallit",
+        "low": "Ajastus käyttää uusia ohjeita.",
+        "highLabel": "Jos et salli",
+        "high": "Ajastus palaa vanhoihin ohjeisiin.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos tiedät muutoksesta ja se näyttää sinusta oikealta."
+      },
+      "approval_refinery_definition": {
+        "title": "Muutos postinjalostamoon",
+        "short": "Postinjalostamo tallentaa sähköpostisi työtilaan. Muutos koskee sitä, mistä postilaatikosta posti luetaan ja mihin työtilaan se tallennetaan.",
+        "what": "Postinjalostamo lukee sähköpostiasi sovittuina aikoina ja tallentaa jokaisen viestin rivinä työtilaan. Työtila voi olla jaettu muiden kanssa, joten työtila ratkaisee, kuka voi lukea postiasi. Muutosta pyysi sovellus tai agentti, joka ei saa tehdä sitä yksin.",
+        "lowLabel": "Jos sallit",
+        "low": "Seuraavasta ajosta alkaen postinjalostamo lukee tätä postilaatikkoa ja tallentaa tähän työtilaan.",
+        "highLabel": "Jos et salli",
+        "high": "Postinjalostamo jatkaa entisellä postilaatikolla ja työtilalla.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Tarkista ennen sallimista, kuka näkee työtilan."
+      },
+      "approval_subscription_period": {
+        "title": "Tilaus, josta veloitettaisiin useammin",
+        "short": "Myyjä haluaa muuttaa tilaustasi niin, että maksaisit useammin.",
+        "what": "Tilaus veloittaa korttiasi uudelleen jokaisen jakson jälkeen. Myyjä haluaa lyhentää jaksoa, joten maksaisit useammin. Korttiasi ei koskaan veloiteta muutetuilla ehdoilla ilman lupaasi.",
+        "lowLabel": "Jos sallit",
+        "low": "Korttiasi veloitetaan nyt ja jatkossa uusilla ehdoilla.",
+        "highLabel": "Jos et salli",
+        "high": "Mitään ei veloiteta, ja tilaus päättyy maksamasi jakson lopussa.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli vain, jos haluat jatkaa tilausta uusilla ehdoilla."
+      },
+      "peer_replace_ask": {
+        "title": "Palvelin, joka yrittää korvata toisen",
+        "short": "Palvelin väittää olevansa palvelin, joka on yhteydessä palvelimeesi, mutta sen avain on eri.",
+        "what": "Palvelimeesi yhteydessä olevat palvelimet tunnistetaan avaimesta. Uusi avain tarkoittaa yhtä kahdesta: palvelin on asennettu uudelleen, tai joku muu käyttää sen nimeä. Jos sallit, uusi palvelin tulee vanhan tilalle ja saa ne oikeudet, jotka kutsu antaa.",
+        "lowLabel": "Jos sallit",
+        "low": "Uusi palvelin korvaa vanhan, ja kutsu käytetään.",
+        "highLabel": "Jos et salli",
+        "high": "Vanha palvelin jää, eikä kutsua käytetä.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Kysy palvelimen ylläpitäjiltä, asensivatko he sen uudelleen. Salli vain, jos he vastaavat kyllä."
+      },
+      "owner_tokens_kept": {
+        "title": "Käyttöavaimet",
+        "short": "Käyttöavaimella ohjelma voi toimia nimissäsi, ja avain toimii, kunnes poistat sen.",
+        "what": "Käyttöavain on ohjelman pitkä salasana. Sen avulla esimerkiksi skripti tai tietokoneesi työkalu voi toimia nimissäsi. Avain on erillinen omasta salasanastasi. Siksi se toimii, vaikka kirjaudut ulos tai vaihdat salasanan.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Poista jokainen avain, jota et tunnista tai jota et enää käytä. Sen voi tehdä Pääsy-sivulla."
+      },
+      "sso_signed_in_past_code": {
+        "title": "Kirjautuminen organisaatiosi kautta",
+        "short": "Organisaatiosi kirjautuminen tarkistaa, kuka olet, joten AIMEAT ei kysy koodiasi.",
+        "what": "Kaksivaiheinen kirjautuminen kysyy salasanan lisäksi koodin. Kun organisaatiosi hallitsee tiliäsi, sen oma kirjautuminen tarkistaa, kuka olet, eikä AIMEAT kysy koodia. Saat tämän ilmoituksen joka kerta, jotta huomaat, jos joku muu kirjautui.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Jos et kirjautunut itse, vaihda salasanasi Pääsy-sivulla ja kerro asiasta organisaatiollesi."
+      },
+      "approval_secret_host_ask_off": {
+        "title": "Vahvistus, ennen kuin salasana tai avain lähtee uuteen osoitteeseen",
+        "short": "Sinulta kysytään, ennen kuin agenttisi lähettävät tallennetun salasanan tai avaimen uuteen osoitteeseen.",
+        "what": "Voit tallentaa AIMEATiin salaisuuksia, kuten salasanoja ja API-avaimia, jotta agenttisi voivat käyttää niitä. Ennen kuin tallennettu salasana tai avain lähtee osoitteeseen, johon sitä ei ole aiemmin lähetetty, sinulta kysytään kerran. Näin virhe tai haittaohjelma ei voi lähettää salasanaasi jollekulle toiselle.",
+        "lowLabel": "Jos sallit",
+        "low": "Agenttisi lähettävät salasanoja ja avaimia uusiin osoitteisiin kysymättä sinulta.",
+        "highLabel": "Jos et salli",
+        "high": "Sinulta kysytään yhä, ennen kuin salasana tai avain lähtee uuteen osoitteeseen.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli vain, jos kysymys estää työtä, jota tarvitset, ja luotat kaikkiin agentteihisi."
+      },
+      "capability_visibility_private": {
+        "title": "Kyvykkyys, josta tuli yksityinen",
+        "short": "Palvelin rajasi kyvykkyytesi näkymään vain sinulle ja agenteillesi.",
+        "what": "Kyvykkyys on palvelu, jota sinä tai agenttisi tarjoatte, esimerkiksi työkalu, jota toinen ohjelma voi käyttää. Sillä on asetus, joka kertoo, kuka voi nähdä ja käyttää sitä. Palvelimen vanhemmat versiot hyväksyivät asetukseen minkä tahansa arvon, ja tuntematon arvo jätti kyvykkyyden avoimeksi kaikille, jotka tiesivät sen osoitteen. Siksi palvelin muutti tällaiset asetukset turvallisiksi.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Jos muut käyttivät tätä kyvykkyyttä aiemmin, avaa Kyvykkyydet-sivu ja valitse, kuka saa nähdä sen."
+      }
+    },
+    "incident": {
+      "erasure_leftover_schedules": {
+        "title": "Poistetuilta tileiltä jääneet ajastukset",
+        "short": "Poistettujen tilien ajastukset, jotka saman nimen uusi tili voisi saada.",
+        "what": "Ennen 25.10.2026 tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku rekisteröi saman käyttäjänimen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään.",
+        "lowLabel": "Poista",
+        "low": "Ajastus poistetaan pysyvästi.",
+        "highLabel": "Pidä ennallaan",
+        "high": "Ajastus jää ennalleen.",
+        "tipLabel": "Mitä kannattaa tehdä",
+        "tip": "Pidä ajastus vain, jos tiedät, että joku tarvitsee sitä yhä."
+      },
+      "subdomain_site_origin": {
+        "title": "Verkko-osoitteet, joiden tyyppiä palvelin ei tunnistanut",
+        "short": "Palvelin ei tiedä, kuuluvatko nämä osoitteet omalle sivustollesi vai sovellukselle.",
+        "what": "Tämän palvelimen verkko-osoite, kuten nimi.oma-verkkotunnus, kuuluu joko omalle sivustollesi tai sovellukselle, jonka joku julkaisi. Sovelluksen osoitteessa ei saa näkyä palvelimesi omia sivuja eikä kirjautumista. Palvelin ei tunnistanut, kumpaan ryhmään nämä osoitteet kuuluvat, joten ne toimivat kuten ennenkin, kunnes valitset.",
+        "tipLabel": "Mitä voit tehdä",
+        "tip": "Pyydä tekoälyä, jonka olet yhdistänyt AIMEATiin, lajittelemaan jokainen osoite: ”pidä omana sivustona” tai ”näytä vain sovelluksena”. Merkitse sitten tämä tapaus ratkaistuksi tällä sivulla."
+      }
+    },
+    "ecosystem": {
+      "reconnectUnproven": {
+        "title": "Yhteyspyyntö ilman todistetta",
+        "short": "Pyyntö ei todistanut tulevansa sovellukselta, joka on jo yhdistetty.",
+        "what": "Ulkoinen sovellus todistaa, kuka se on, salaisella avaimella, joka on vain sovelluksella. Tämä pyyntö ei käyttänyt sitä avainta. Se näyttää vain sovelluksen julkisen avaimen, jonka kuka tahansa voi nähdä. Pyyntö voi siis tulla sovellukselta tai joltakulta, joka esiintyy sovelluksena.",
+        "lowLabel": "Jos hyväksyt",
+        "low": "Lähettäjä pääsee tietoihisi niillä oikeuksilla, jotka valitset.",
+        "highLabel": "Jos hylkäät",
+        "high": "Mikään ei muutu, ja sovellus jatkaa nykyisellä yhteydellään.",
+        "tipLabel": "Milloin kannattaa hyväksyä",
+        "tip": "Hyväksy vain, jos aloitit tämän itse, esimerkiksi asentamalla sovelluksen uudelleen. Muuten hylkää."
+      }
+    },
     "content": {
       "on_arrival": {
         "title": "Lue uusi sisältö, kun se saapuu",

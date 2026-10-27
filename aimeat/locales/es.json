@@ -378,8 +378,11 @@
           "config_setting": "Un ajuste que el servidor no aceptó, así que usa el valor predeterminado",
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
-          "erasure_leftover_schedules": "Programaciones que dejaron cuentas borradas",
-          "capability_visibility_words": "Capacidades con una visibilidad que este servidor no conoce"
+          "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
+          "subdomain_site_origin": "Direcciones web de tipo desconocido para el servidor"
+        },
+        "detail": {
+          "subdomain_site_origin": "El servidor no pudo saber si estas direcciones web ({count}) son de tu propio sitio o de una aplicación que alguien publicó: {labels}. Funcionan como antes hasta que elijas. Pide a la IA que conectaste a AIMEAT que decida el tipo de cada dirección, y después resuelve este incidente aquí."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -408,8 +411,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
-            "erasure_leftover_schedules": "Estas programaciones son de cuentas que se borraron antes del 25 de octubre de 2026. El borrado eliminó solo las programaciones que hizo la persona, no las que hicieron sus agentes o sus apps. Una programación así se muestra a quien registre después ese nombre de usuario, y puede ejecutarse como su agente del mismo nombre. Nada cambia hasta que decidas. Elimina cada una que no necesites, y el incidente se resuelve con tu última decisión.",
-            "capability_visibility_words": "Estas capacidades se guardaron antes del 26 de octubre de 2026 con una visibilidad que este servidor no conoce. Hasta que decidas, cada una es privada: solo su propietario, los agentes del propietario y tú pueden verla o usarla. Nada más cambia. Haz privada cada una o déjala como está. El incidente se resuelve con tu última decisión."
+            "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas."
           },
           "rowResolved": "Todos los registros están decididos.",
           "clear": "Vaciar",
@@ -419,20 +421,13 @@
           "kept": "sin cambio",
           "confirmClear": "¿Quitar esto del agente anónimo compartido? {line}",
           "confirmDelete": "¿Eliminar esto para siempre? {line}",
-          "confirm": {
-            "capability_visibility": "¿Hacer privada esta capacidad? Después solo su propietario, los agentes del propietario y tú pueden verla o usarla. {line}"
-          },
-          "action": {
-            "capability_visibility": "Hacer privada"
-          },
           "kind": {
             "agent_webhook": "Un webhook a {url}. Recibe los mensajes enviados al agente compartido.",
             "agent_tags": "Etiquetas del agente compartido: {tags}",
             "agent_capabilities": "En la ficha pública del agente compartido: {technical} capacidades técnicas y {domain} de otro tipo, {languages} idiomas",
             "skill": "La habilidad {name}, con sus archivos",
             "datapackage": "El paquete de datos {name}, con sus archivos",
-            "schedule": "La programación \"{label}\" que {maker} hizo para {owner} ({cron})",
-            "capability_visibility": "La capacidad \"{name}\" de {owner}, con la visibilidad \"{word}\""
+            "schedule": "La programación «{label}», que {maker} hizo para la cuenta {owner} (se ejecuta: {cron})"
           }
         },
         "source": {
@@ -2726,10 +2721,10 @@
         "registers": "Registros",
         "registersWhy": "{personal} contienen datos personales. Esta instalación {node}, lugares compartidos {organism}, aplicaciones {app}.",
         "gapHolds": "Guarda datos personales: {list}",
-        "gapFamilies":"No dice si esto son datos personales: {list}",
+        "gapFamilies": "No dice si esto son datos personales: {list}",
         "gapNoMap": "Sin mapa de datos, así que nada dice qué guarda la aplicación ni adónde va.",
         "gapNode": "Esta instalación",
-        "registersDrafts":"{n} borradores esperan revisión: los de esta instalación {node}, aplicaciones {apps}. Esta instalación los hizo a partir de los mapas de datos y ninguno está guardado.",
+        "registersDrafts": "{n} borradores esperan revisión: los de esta instalación {node}, aplicaciones {apps}. Esta instalación los hizo a partir de los mapas de datos y ninguno está guardado.",
         "domains": "Datos regulados",
         "domainsNone": "Ningún registro nombra datos regulados.",
         "requests": "Solicitudes de las personas",
@@ -8831,8 +8826,8 @@
   "notifpage.group.otherSub": "todo lo demás, incluido lo que te envías a ti",
   "notiftext.docsign_request.title": "{from} te pide que firmes: {title}",
   "notiftext.docsign_request.body": "Documento {document}. Abre la solicitud de firma o pide a tu IA que te la muestre.",
-  "notiftext.app_published_by_app.title": "La app {publisher} publicó tu app {app}",
-  "notiftext.app_published_by_app.body": "Publicó la versión {version} con el permiso que le diste para publicar apps. La próxima vez que abras {app}, te preguntaremos una vez si permites los nuevos permisos que pide esta versión.",
+  "notiftext.app_published_by_app.title": "{publisher} hizo una nueva versión de tu aplicación {app}",
+  "notiftext.app_published_by_app.body": "Le diste permiso a {publisher} para publicar aplicaciones por ti, y publicó la versión {version}. La próxima vez que abras {app}, verás qué quiere hacer la nueva versión, y tú eliges si lo permites.",
   "notiftext.agreement_sent_cp.title": "{operator} te pide que firmes un contrato de encargo del tratamiento",
   "notiftext.agreement_sent_cp.body": "Lee el resumen y elige cómo firmas. Contrato {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "No se pudo aceptar tu copia firmada",
@@ -8976,8 +8971,8 @@
   "notiftext.payment_not_delivered.body": "No se pudo entregar el pedido y el pago no volvió al comprador, así que lo tienes tú. Devuelve el pago al comprador o entrega el pedido. Referencia del pedido: {session}.",
   "notiftext.payment_possible.title": "Puede que haya llegado un pago de {amount}",
   "notiftext.payment_possible.body": "El servicio de pagos no respondió cuando un comprador te pagó, así que no se sabe si el dinero llegó. Mira si tu dirección de cobro recibió una transferencia desde {payer}. Si llegó, entrega el pedido o devuelve el pago. Referencia: {reference}.",
-  "notiftext.payout_possible.title": "Puede que haya llegado un pago de {amount}",
-  "notiftext.payout_possible.body": "El servicio de pagos no respondió cuando {provider} te pagó, así que no se sabe si el dinero llegó. Mira si tu dirección de cobro recibió una transferencia desde {payer}. Referencia: {reference}.",
+  "notiftext.payout_possible.title": "Puede que hayas recibido {amount}",
+  "notiftext.payout_possible.body": "{provider} te envió {amount}, pero la red de pagos no confirmó que la transferencia se completara. Revisa si a tu dirección de cobro llegó una transferencia desde {payer}. Referencia: {reference}.",
   "notiftext.package_sale_request_approved.title": "Se aprobó tu solicitud de {name}",
   "notiftext.package_sale_request_approved.body": "El vendedor la aprobó. Abre tu página de Paquetes para ver qué sigue.",
   "notiftext.package_sale_request_refused.title": "No se aprobó tu solicitud de {name}",
@@ -9018,20 +9013,20 @@
   "notiftext.approval_answer_allowed.body": "{who} permitió lo que se pidió. Ya está en vigor.",
   "notiftext.approval_answer_declined.title": "No permitido: {what}",
   "notiftext.approval_answer_declined.body": "{who} no permitió lo que se pidió. No ha cambiado nada.",
-  "notiftext.ai_app_name_match.title": "{app} usó la IA con la entrada «{entry}» de tu lista",
-  "notiftext.ai_app_name_match.body": "Tu lista de apps que pueden usar la IA incluye «{entry}». La app {app} es de otra persona, pero tiene ese nombre de archivo, así que también puede usar la IA. Si te referías a otra app, escribe en la lista su nombre completo (autor/app) en lugar de «{entry}».",
+  "notiftext.ai_app_name_match.title": "{app} pudo usar la IA porque tu lista tiene el nombre «{entry}»",
+  "notiftext.ai_app_name_match.body": "Permitiste usar la IA a las aplicaciones que se llaman «{entry}». {app} tiene el mismo nombre, pero la hizo otra persona. Si te referías solo a tu propia aplicación, escribe en la lista su nombre completo, por ejemplo autor/app.",
   "notiftext.approval_answer_expired.title": "Sin respuesta: {what}",
   "notiftext.approval_answer_expired.body": "Nadie respondió a la solicitud a tiempo. No ha cambiado nada. Vuelve a pedirlo si aún lo necesitas.",
   "notiftext.approval_answer_outdated.title": "No se hizo: {what}",
   "notiftext.approval_answer_outdated.body": "Cambió después de pedirlo, así que no se hizo nada. Vuelve a pedirlo si aún lo necesitas.",
-  "notiftext.agent_standing_work_stopped.title": "{agent} se ha eliminado y su trabajo recurrente se detiene",
-  "notiftext.agent_standing_work_stopped.body": "Las programaciones ({schedules}) y los flujos de trabajo guardados ({workflows}) que hizo {agent} ya no se ejecutan. Si apruebas un agente nuevo llamado {agent}, vuelven a ejecutarse a su nombre, con los permisos que le des entonces. Elimínalos en la página de programaciones para terminarlos del todo.",
-  "notiftext.agent_standing_work_resumed.title": "El nuevo agente {agent} retoma trabajo recurrente anterior",
-  "notiftext.agent_standing_work_resumed.body": "Las programaciones ({schedules}) y los flujos de trabajo guardados ({workflows}) que hizo un agente anterior llamado {agent} vuelven a ejecutarse a nombre de este agente, con los permisos que tiene ahora. Elimínalos en la página de programaciones si este agente no debe ejecutarlos.",
-  "notiftext.agent_mode_self_set.title": "Tu agente {agent} cambió su propio modo",
-  "notiftext.agent_mode_self_set.body": "El modo de {agent} es ahora «{mode}». En el modo «workstation» un agente puede responder por ti los pasos de tus objetivos que te esperan. Puedes cambiar el modo en la página del agente.",
-  "notiftext.agent_mode_set_by_agent.title": "Tu agente {by} cambió el modo de {agent}",
-  "notiftext.agent_mode_set_by_agent.body": "El modo de {agent} es ahora «{mode}». En el modo «workstation» un agente puede responder por ti los pasos de tus objetivos que te esperan. Puedes cambiar el modo en la página del agente.",
+  "notiftext.agent_standing_work_stopped.title": "Eliminaste a {agent}, y su trabajo recurrente se detuvo",
+  "notiftext.agent_standing_work_stopped.body": "{agent} había hecho programaciones ({schedules}) y flujos de trabajo guardados ({workflows}). Se conservan, pero no se ejecutan. Si apruebas un agente nuevo con el nombre {agent}, vuelven a ejecutarse a su nombre. Para detenerlos del todo, elimínalos en la pestaña Programador.",
+  "notiftext.agent_standing_work_resumed.title": "El nuevo agente {agent} retomó el trabajo recurrente de un agente anterior",
+  "notiftext.agent_standing_work_resumed.body": "Un agente anterior con el nombre {agent} había hecho programaciones ({schedules}) y flujos de trabajo guardados ({workflows}). Ahora vuelven a ejecutarse a nombre de este agente, con los permisos que le diste. Si este agente no debe hacerlos, elimínalos en la pestaña Programador.",
+  "notiftext.agent_mode_self_set.title": "{agent} cambió su propio modo de trabajo",
+  "notiftext.agent_mode_self_set.body": "Ahora {agent} trabaja en el modo «{mode}». En el modo «workstation», un agente puede responder por ti cuando uno de tus objetivos espera tu respuesta. Puedes cambiar el modo en la página del agente.",
+  "notiftext.agent_mode_set_by_agent.title": "{by} cambió el modo de trabajo de {agent}",
+  "notiftext.agent_mode_set_by_agent.body": "Ahora {agent} trabaja en el modo «{mode}». En el modo «workstation», un agente puede responder por ti cuando uno de tus objetivos espera tu respuesta. Puedes cambiar el modo en la página del agente.",
   "notiftext.approval_email_policy.title": "{who} pide que la extensión {extension} pueda enviar correo a cualquier dirección",
   "notiftext.approval_email_policy.body": "La extensión es de {account}. Un correo a cualquier dirección sale con la identidad de correo de este servidor, así que lo decide un operador. Si lo permites, se aplica en el acto. Si no, la extensión solo envía correo a las direcciones que permiten las reglas normales. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_email_policy_code.title": "{who} cambió el código de {extension}: confirma si aún puede enviar correo a cualquier dirección",
@@ -9040,24 +9035,24 @@
   "notiftext.approval_email_policy_sent.body": "Lo decide un operador de este servidor. Hasta entonces, la extensión solo envía correo a las direcciones que permiten las reglas normales. Recibirás la respuesta aquí.",
   "notiftext.approval_email_policy_code_sent.title": "El código de {extension} cambió: un operador confirma su permiso de correo",
   "notiftext.approval_email_policy_code_sent.body": "{who} cambió el código. Hasta que un operador confirme el permiso para enviar correo a cualquier dirección con el código nuevo, la extensión solo envía correo a las direcciones que permiten las reglas normales. Recibirás la respuesta aquí.",
-  "notiftext.approval_secret_host_ask_off.title": "{who} pide que ya no se te pregunte antes de que tus secretos vayan a una dirección nueva",
-  "notiftext.approval_secret_host_ask_off.body": "Mientras la pregunta está activada, el código que escriben tus agentes y las direcciones que ponen no pueden enviar tus secretos guardados a un sitio nuevo sin tu clic. Si lo permites, podrán hacerlo. Si no, la pregunta sigue activada. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_secret_host_ask_off.title": "{who} pide que tus agentes puedan enviar tus contraseñas y claves a direcciones nuevas sin preguntarte",
+  "notiftext.approval_secret_host_ask_off.body": "Ahora se te pregunta antes de que tus agentes envíen una contraseña o una clave guardada a una dirección a la que nunca ha ido. Si lo permites, podrán enviarlas a direcciones nuevas sin preguntarte. Si no lo permites, se te sigue preguntando.",
   "notiftext.approval_crew_model.title": "{who} pide que tu agente {agent} use la dirección de modelo {host}",
   "notiftext.approval_crew_model.body": "Cuando el equipo de tu agente llama a su modelo, envía tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, el equipo la usa desde su próxima ejecución. Si no, el equipo sigue con el modelo que tiene. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_crew_model_default.title": "{who} pide que todos tus agentes usen la dirección de modelo {host}",
   "notiftext.approval_crew_model_default.body": "Cuando los equipos de tus agentes llaman a su modelo, envían tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, los equipos la usan desde su próxima ejecución. Si no, siguen con el modelo que tienen. {who} recibe la respuesta en ambos casos.",
-  "notiftext.approval_goal_model_read.title": "{who} pide que el modelo de AIMEAT pueda leer tus registros privados {records}",
-  "notiftext.approval_goal_model_read.body": "{agent} nombró {records} en el objetivo \"{goal}\", y {agent} no puede leer tus registros privados por sí mismo. El modelo los usaría para el trabajo \"{work}\", y {agent} puede leer la respuesta del modelo. Si lo permites, el trabajo se hace con ellos. Si no, el trabajo se hace sin ellos. {who} recibe la respuesta en ambos casos.",
-  "notiftext.approval_schedule_instruction.title": "{who} pide que la programación \"{schedule}\" funcione con la nueva instrucción que le dio",
-  "notiftext.approval_schedule_instruction.body": "{who} cambió lo que la programación \"{schedule}\" pide al modelo. La creó {maker}, y lee tus registros con los permisos de {maker}, que puede leer registros que {who} no puede leer. Por eso su próxima ejecución espera tu respuesta. Si lo permites, la próxima ejecución usa la nueva instrucción. Si no, la programación vuelve a la instrucción que tenía. {who} recibe la respuesta en ambos casos.",
-  "notiftext.approval_refinery_definition.title": "{who} pide que el procesador de correo {refinery} lea el buzón {mailbox} y guarde los mensajes en {workspace}",
-  "notiftext.approval_refinery_definition.body": "El procesador de correo lee tu correo según tu programación y guarda allí cada mensaje como una fila. Este cambio lo hizo una app o un agente que no puede ejecutar el procesador por sí mismo, así que lo confirmas tú primero. Si lo permites, la próxima tanda lee ese buzón y guarda allí. Si no, el procesador sigue con el buzón y el espacio de trabajo que tenía. {who} recibe la respuesta en ambos casos.",
-  "notiftext.approval_refinery_definition_text.title": "{who} pide que el procesador de correo {refinery} lea el buzón {mailbox} y guarde los mensajes con su texto completo en {workspace}",
-  "notiftext.approval_refinery_definition_text.body": "El procesador de correo lee tu correo según tu programación y guarda allí cada mensaje como una fila. Las filas guardan el texto de cada mensaje y de sus adjuntos. Este cambio lo hizo una app o un agente que no puede ejecutar el procesador por sí mismo, así que lo confirmas tú primero. Si lo permites, la próxima tanda lee ese buzón y guarda allí. Si no, el procesador sigue con el buzón y el espacio de trabajo que tenía. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_goal_model_read.title": "{who} pide que la IA de AIMEAT lea tus entradas privadas {records}",
+  "notiftext.approval_goal_model_read.body": "{agent} necesita {records} para la tarea «{work}» de tu objetivo «{goal}». {agent} no puede leer tus entradas privadas, pero ve lo que responde la IA. Si lo permites, la IA usa estas entradas en la tarea. Si no lo permites, la tarea se hace sin ellas.",
+  "notiftext.approval_schedule_instruction.title": "{who} cambió la programación «{schedule}», y el cambio espera tu aprobación",
+  "notiftext.approval_schedule_instruction.body": "{maker} hizo esta programación, así que lee tus datos con los permisos de {maker}. {who} cambió sus instrucciones, pero {who} no puede leer todo lo que {maker} puede leer. Por eso el cambio espera tu aprobación. Si lo permites, la programación usa las nuevas instrucciones. Si no lo permites, vuelve a las anteriores.",
+  "notiftext.approval_refinery_definition.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
+  "notiftext.approval_refinery_definition.body": "El procesador de correo toma tu correo y guarda los mensajes en un espacio de trabajo. Después del cambio, lee el buzón {mailbox} y guarda cada mensaje en el espacio de trabajo {workspace}. {who} no puede hacer este cambio por su cuenta, así que el cambio espera tu aprobación. Si no lo permites, nada cambia.",
+  "notiftext.approval_refinery_definition_text.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
+  "notiftext.approval_refinery_definition_text.body": "El procesador de correo toma tu correo y guarda los mensajes en un espacio de trabajo. Después del cambio, lee el buzón {mailbox} y guarda cada mensaje en el espacio de trabajo {workspace}, con el texto completo del mensaje y sus adjuntos. {who} no puede hacer este cambio por su cuenta, así que el cambio espera tu aprobación. Si no lo permites, nada cambia.",
   "notiftext.approval_subscription_price.title": "{who} pide renovar tu suscripción {name} con el nuevo precio {to}",
   "notiftext.approval_subscription_price.body": "Aceptaste {from}. El precio subió desde entonces, así que solo se cobra a tu tarjeta si lo permites. Si lo permites, la suscripción se renueva ahora por {to}. Si no, no se cobra nada a tu tarjeta y la suscripción termina el {date}. {who} recibe la respuesta en ambos casos.",
-  "notiftext.approval_subscription_period.title": "{who} pide renovar tu suscripción {name} por {to} cada {toDays} días",
-  "notiftext.approval_subscription_period.body": "Aceptaste {from} cada {fromDays} días. Ahora el periodo es más corto, así que pagarías más a menudo, y solo se cobra a tu tarjeta si lo permites. Si lo permites, la suscripción se renueva ahora por {to} cada {toDays} días. Si no, no se cobra nada a tu tarjeta y la suscripción termina el {date}. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_subscription_period.title": "{who} pide permiso para cobrar tu suscripción {name} con más frecuencia",
+  "notiftext.approval_subscription_period.body": "Aceptaste pagar {from} cada {fromDays} días. Las nuevas condiciones son {to} cada {toDays} días. Si lo permites, se cobra ahora a tu tarjeta con las nuevas condiciones. Si no lo permites, no se cobra nada y la suscripción termina el {date}.",
   "notiftext.agent_permission_ask_page.title": "{agent} necesita un permiso que das en su página",
   "notiftext.agent_permission_ask_page.body": "{agent} intentó hacer por ti algo que no has permitido. Este permiso lo das en la página del agente, si quieres. Ábrela para ver de qué se trata.",
   "notiftext.agent_permission_ask_page.open": "Abrir la página del agente",
@@ -9073,19 +9068,21 @@
   "notiftext.eco_capability_ask.body": "\"{name}\", de {registrant}, quiere que tu aplicación externa {app} ejecute su acción {action}. Ábrelo para ver qué envía, o responde aquí.",
   "notiftext.eco_capability_ask.allow": "Permitir",
   "notiftext.eco_capability_ask.deny": "No permitir",
-  "notiftext.peer_replace_ask.title": "Un servidor con una invitación quiere ocupar el lugar del par {node}",
-  "notiftext.peer_replace_ask.body": "Un servidor en {url} presentó una de tus invitaciones{label} y dice ser {node}. Este servidor ya tiene a {node} como par, pero con otra clave. Permitir sustituye ese par por el servidor nuevo al nivel de la invitación ({tier}) y usa la invitación. No permitir deja el par y la invitación como están. Permítelo solo si sabes que el servidor se reconstruyó con una clave nueva.",
+  "notiftext.peer_replace_ask.title": "Un servidor afirma ser {node} y quiere sustituirlo",
+  "notiftext.peer_replace_ask.body": "Un servidor en {url} usó una de tus invitaciones{label}. Afirma ser {node}, pero su clave no es la del servidor {node} que ya está conectado al tuyo. Permítelo solo si sabes que {node} se instaló de nuevo. Si no lo permites, nada cambia.",
   "notiftext.peer_replace_ask.allow": "Permitir",
   "notiftext.peer_replace_ask.deny": "No permitir",
   "notiftext.approval_change.federation": "Cámbialo en la página Federación",
   "notiftext.agent_narrowed.title": "AIMEAT limitó los permisos de {agent}",
   "notiftext.agent_narrowed.body": "AIMEAT limitó los permisos de {agent} a los que usó en dos semanas: {what}. Si más adelante necesita otra cosa, recibirás una solicitud y podrás permitirla con un solo clic.",
   "notiftext.agent_narrowed.open": "Abrir la página del agente",
+  "notiftext.capability_visibility_private.title": "Ahora solo tú y tus agentes pueden usar estas capacidades: {names}",
+  "notiftext.capability_visibility_private.body": "Una capacidad es un servicio que tú o tus agentes ofrecen a otros. El ajuste de visibilidad de estas capacidades tenía un valor que este servidor no conoce, así que el servidor las limitó a ti y a tus agentes. Si otras personas también deben usar una capacidad, elige en la página Capacidades quién puede verla.",
   "notiftext.owner_tokens_kept.title": "Tus tokens de acceso siguen funcionando",
-  "notiftext.owner_tokens_kept.body": "Cerrar sesión y cambiar la contraseña no detienen tus tokens de acceso. Estos todavía pueden actuar en tu nombre: {names}. Si no reconoces alguno, elimínalo en tu página Acceso.",
+  "notiftext.owner_tokens_kept.body": "Tus tokens de acceso siguen funcionando cuando cierras sesión o cambias tu contraseña. Estos tokens todavía pueden actuar como tú: {names}. Si no reconoces alguno, elimínalo en tu página Acceso.",
   "notiftext.owner_tokens_kept.open": "Abrir la página Acceso",
-  "notiftext.sso_signed_in_past_code.title": "El inicio de sesión de {organisation} abrió tu cuenta sin tu código",
-  "notiftext.sso_signed_in_past_code.body": "El directorio de tu organización administra tu cuenta, así que el inicio de sesión de {organisation} la abrió sin tu código de verificación en dos pasos. Si no fuiste tú, cambia tu contraseña en tu página Acceso y avisa a tu organización.",
+  "notiftext.sso_signed_in_past_code.title": "Alguien inició sesión en tu cuenta mediante {organisation}, y no se pidió ningún código",
+  "notiftext.sso_signed_in_past_code.body": "{organisation} administra tu cuenta, así que basta con su propio inicio de sesión, y AIMEAT no te pide tu código. Si no fuiste tú, cambia tu contraseña en tu página Acceso y avisa a {organisation}.",
   "notiftext.sso_signed_in_past_code.open": "Abrir la página Acceso",
   "agentAllow.badge": "Tu agente pide",
   "agentAllow.title": "{agent} quiere hacer esto por ti",
@@ -13506,7 +13503,7 @@
       "operatorExportedEntries": "Un operador hizo una copia de seguridad de esta instalación. Incluye {count} de tus entradas.",
       "operatorInstalledSet": "Un operador instaló el paquete de instalación {set} en tu cuenta: {packages} paquetes, y {apps} apps recibieron permisos. Puedes ver y cambiar los permisos de tus apps en tus ajustes.",
       "operatorActed": "Un operador hizo un cambio en tu cuenta ({area}: {action}).",
-      "operatorRestoredBackup": "Un operador cargó una copia de seguridad en esta instalación. Escribió {records} de tus entradas y {agents} de tus agentes.",
+      "operatorRestoredBackup": "Quienes gestionan este servicio AIMEAT restauraron datos de una copia de seguridad. La copia recuperó {records} de tus entradas y {agents} de tus agentes. Revisa que tus entradas estén bien.",
       "operatorAdminGrantedOne": "{name} recibió el permiso para administrar esta instalación porque tenía acceso total. Puedes quitárselo en la configuración del agente.",
       "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "scopeWordsKeptOne": "{name} sigue funcionando como antes tras la actualización de AIMEAT: recibió los permisos que la actualización ahora pide ({words}). Puedes quitárselos en la configuración del agente.",
@@ -13624,13 +13621,13 @@
       "daysLabel": "Mensajes de",
       "noneFresh": "Ninguna conversación de este periodo espera tu respuesta.",
       "days": {
+        "0": "cualquier fecha",
         "1": "el último día",
         "3": "los últimos 3 días",
         "7": "la última semana",
         "14": "las últimas 2 semanas",
         "30": "el último mes",
-        "90": "los últimos 3 meses",
-        "0": "cualquier fecha"
+        "90": "los últimos 3 meses"
       }
     }
   },
@@ -16364,7 +16361,11 @@
       "areaLine": "{rights}: {what} ({which})",
       "areaAll": "todos",
       "areaPattern": "los que coinciden con {pattern}",
-      "areaRights": { "read": "Leer", "write": "Escribir", "readWrite": "Leer y escribir" },
+      "areaRights": {
+        "read": "Leer",
+        "write": "Escribir",
+        "readWrite": "Leer y escribir"
+      },
       "areaName": {
         "memory": "tus registros",
         "storage": "tus archivos",
@@ -16373,8 +16374,8 @@
         "other": "{area}"
       },
       "reconnect": "Vuelve a conectar una aplicación que ya tienes",
-      "reconnectUnproven": "Vuelve a conectar una aplicación que ya tienes, sin probar su clave",
-      "reconnectUnprovenHint": "Esta solicitud indica la clave de {app}, pero no demuestra que la tenga. Cualquiera, no solo la aplicación, puede enviar una solicitud así. Apruébala solo si iniciaste tú esta reconexión.",
+      "reconnectUnproven": "La aplicación quiere recuperar su conexión, pero no demostró que sea la misma aplicación",
+      "reconnectUnprovenHint": "{app} ya está conectada. Esta solicitud usa su nombre y su clave pública, y cualquiera puede copiarlos. Apruébala solo si tú la iniciaste, por ejemplo al instalar {app} de nuevo.",
       "keyChanged": "Reemplaza la clave de una conexión que funciona",
       "keyChangedHint": "Esta solicitud trae una clave distinta a la de tu conexión actual con {app}. Si la apruebas, la clave nueva reemplaza a la anterior y las sesiones anteriores de la aplicación terminan. Apruébala solo si iniciaste tú esta reconexión. Clave anterior y clave nueva:",
       "waiting": "esperando",
@@ -23567,6 +23568,170 @@
   },
   "explain": {
     "open": "Explicación: {term}",
+    "notice": {
+      "app_published_by_app": {
+        "title": "Una aplicación publicó una nueva versión de tu aplicación",
+        "short": "Otra aplicación hizo una nueva versión de una de tus aplicaciones, con el permiso que le diste.",
+        "what": "Puedes permitir que una aplicación cree y publique aplicaciones por ti. Esta vez, una aplicación que hizo otra persona publicó una nueva versión de una de tus aplicaciones. Una nueva versión puede pedir más que la anterior, por ejemplo leer más de tus datos. Por eso, la próxima vez que abras tu aplicación, verás qué es nuevo, y tú eliges.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Abre tu aplicación y mira qué pide la nueva versión. Si no esperabas el cambio, no lo permitas, y quítale el permiso de publicar a la aplicación que lo hizo."
+      },
+      "payout_possible": {
+        "title": "Un pago que puede haber llegado",
+        "short": "Alguien te envió dinero, pero la red de pagos no lo confirmó.",
+        "what": "Cuando alguien te paga, normalmente la red de pagos confirma que la transferencia se completó. Esta vez no llegó ninguna confirmación. Puede que el dinero haya llegado de todos modos, así que revísalo.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Mira tu dirección de cobro para ver si llegó la transferencia. Si el dinero no llega en unos días, contacta a quien te pagó y dale la referencia que aparece en el aviso."
+      },
+      "ai_app_name_match": {
+        "title": "Otra aplicación con el mismo nombre pudo usar la IA",
+        "short": "Una aplicación con el mismo nombre que una de tu lista usó la IA con tu cuenta.",
+        "what": "Tienes una lista de aplicaciones que pueden usar la IA con tu cuenta. Un nombre de la lista sin su autor coincide con todas las aplicaciones que se llaman así, incluidas las que hicieron otras personas.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Escribe cada aplicación de la lista con su autor, por ejemplo autor/app. Así solo coincide esa aplicación."
+      },
+      "agent_standing_work_stopped": {
+        "title": "Trabajo que se detuvo cuando eliminaste un agente",
+        "short": "Eliminaste un agente, y el trabajo que repetía se detuvo.",
+        "what": "Un agente puede preparar trabajo que se repite, por ejemplo un informe cada mañana. Cuando eliminas el agente, ese trabajo se detiene, porque ya no queda nadie que lo haga. El trabajo no se borra, por si vuelves a conectar el agente.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Elimina las programaciones en la pestaña Programador si no las necesitas. Consérvalas si vas a conectar el agente de nuevo."
+      },
+      "agent_standing_work_resumed": {
+        "title": "Un agente nuevo continúa el trabajo de un agente anterior",
+        "short": "Un agente nuevo tiene el mismo nombre que uno que eliminaste, y ahora hace el trabajo recurrente del agente eliminado.",
+        "what": "Aprobaste un agente con el mismo nombre que un agente que eliminaste antes. El trabajo recurrente del agente anterior ahora se ejecuta con el nuevo, con los permisos que le diste al nuevo.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Comprueba que el nuevo agente sea el que querías. Si no lo es, elimina las programaciones en la pestaña Programador, o elimina el agente."
+      },
+      "agent_mode_self_set": {
+        "title": "El modo de trabajo de un agente",
+        "short": "El modo dice cuánto puede hacer un agente en tus objetivos sin preguntarte.",
+        "what": "Un objetivo puede detenerse y esperar tu respuesta. En el modo «workstation», un agente puede responder esa pregunta por ti, así que el objetivo no espera. En los otros modos, el objetivo espera hasta que respondas.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Si no pediste este cambio, abre la página del agente y vuelve a poner el modo anterior."
+      },
+      "approval_goal_model_read": {
+        "title": "Un agente pide a la IA que lea entradas que el agente no puede leer",
+        "short": "La IA leería tus entradas privadas para una tarea, y el agente vería la respuesta.",
+        "what": "Tus agentes solo pueden leer lo que permitiste. En un objetivo, un agente puede darle una tarea a la IA de AIMEAT. Si la tarea necesita tus entradas privadas, la IA las lee, y el agente ve la respuesta. Así el agente podría saber lo que dicen las entradas, aunque no pueda leerlas. Por eso se te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "La IA lee estas entradas solo para esta tarea, y el agente ve la respuesta.",
+        "highLabel": "Si no lo permites",
+        "high": "La tarea se hace sin estas entradas.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si no te molesta que el agente sepa lo que dicen estas entradas. Si el agente puede leer todas tus entradas, puedes darle ese permiso en la página del agente, y así ya no pregunta."
+      },
+      "approval_schedule_instruction": {
+        "title": "Alguien cambió una programación",
+        "short": "Alguien con menos permisos cambió una programación que lee tus datos.",
+        "what": "Una programación se ejecuta sola, por ejemplo cada mañana, y lee tus datos con los permisos de quien la hizo. Si alguien con menos permisos cambia lo que hace la programación, podría usarla para ver datos que no puede leer. Por eso el cambio te espera.",
+        "lowLabel": "Si lo permites",
+        "low": "La programación se ejecuta con las nuevas instrucciones.",
+        "highLabel": "Si no lo permites",
+        "high": "La programación vuelve a sus instrucciones anteriores.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si conoces el cambio y te parece correcto."
+      },
+      "approval_refinery_definition": {
+        "title": "Un cambio en tu procesador de correo",
+        "short": "El procesador de correo guarda tu correo en un espacio de trabajo. El cambio decide qué buzón lee y en qué espacio de trabajo guarda.",
+        "what": "El procesador de correo lee tu correo a horas fijas y guarda cada mensaje como una fila en un espacio de trabajo. Un espacio de trabajo se puede compartir con otras personas, así que el espacio de trabajo decide quién puede leer tu correo. Una aplicación o un agente pidió este cambio, y no puede hacerlo por su cuenta.",
+        "lowLabel": "Si lo permites",
+        "low": "Desde la próxima vez que se ejecute, el procesador lee este buzón y guarda en este espacio de trabajo.",
+        "highLabel": "Si no lo permites",
+        "high": "El procesador sigue con el buzón y el espacio de trabajo que tenía.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Antes de permitirlo, revisa quién puede ver el espacio de trabajo."
+      },
+      "approval_subscription_period": {
+        "title": "Una suscripción que cobraría con más frecuencia",
+        "short": "El vendedor quiere cambiar tu suscripción para que pagues con más frecuencia.",
+        "what": "Una suscripción vuelve a cobrar a tu tarjeta al final de cada periodo. El vendedor quiere un periodo más corto, así que pagarías más a menudo. Nunca se cobra a tu tarjeta con condiciones cambiadas si tú no lo permites.",
+        "lowLabel": "Si lo permites",
+        "low": "Se cobra a tu tarjeta ahora, y después según las nuevas condiciones.",
+        "highLabel": "Si no lo permites",
+        "high": "No se cobra nada, y la suscripción termina al final del periodo que pagaste.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo solo si quieres mantener la suscripción con las nuevas condiciones."
+      },
+      "peer_replace_ask": {
+        "title": "Un servidor que intenta sustituir a otro",
+        "short": "Un servidor afirma ser uno de los que están conectados al tuyo, pero su clave es distinta.",
+        "what": "Los servidores conectados al tuyo se reconocen por su clave. Una clave nueva significa una de dos cosas: el servidor se instaló de nuevo, u otra persona usa su nombre. Si lo permites, el nuevo servidor ocupa el lugar del anterior y recibe los permisos que da la invitación.",
+        "lowLabel": "Si lo permites",
+        "low": "El nuevo servidor sustituye al anterior, y se usa la invitación.",
+        "highLabel": "Si no lo permites",
+        "high": "El servidor anterior se queda, y la invitación sigue sin usar.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Pregunta a quienes gestionan ese servidor si lo instalaron de nuevo. Permítelo solo si dicen que sí."
+      },
+      "owner_tokens_kept": {
+        "title": "Tokens de acceso",
+        "short": "Un token de acceso permite que un programa actúe como tú, y funciona hasta que lo eliminas.",
+        "what": "Un token de acceso es una contraseña larga para un programa, por ejemplo un script o una herramienta en tu computadora, para que pueda actuar como tú. Es distinto de tu propia contraseña. Por eso, cerrar sesión o cambiar tu contraseña no lo detiene.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Elimina todos los tokens que no reconozcas o que ya no uses. Lo haces en la página Acceso."
+      },
+      "sso_signed_in_past_code": {
+        "title": "Inicio de sesión con tu organización",
+        "short": "El inicio de sesión de tu organización comprueba quién eres, así que AIMEAT no te pide tu código.",
+        "what": "El inicio de sesión en dos pasos pide un código además de tu contraseña. Cuando tu organización administra tu cuenta, su propio inicio de sesión comprueba quién eres, y AIMEAT no te pide el código. Recibes este aviso cada vez, para que notes si otra persona inició sesión.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Si no iniciaste sesión, cambia tu contraseña en la página Acceso y avisa a tu organización."
+      },
+      "approval_secret_host_ask_off": {
+        "title": "La pregunta antes de que una contraseña o una clave vaya a una dirección nueva",
+        "short": "Se te pregunta antes de que tus agentes envíen una contraseña o una clave guardada a una dirección nueva.",
+        "what": "Puedes guardar secretos en AIMEAT, como contraseñas y claves de API, para que tus agentes los usen. Antes de que una contraseña o clave guardada vaya a una dirección a la que nunca ha ido, se te pregunta una vez. Así un error o un programa dañino no puede enviar tu contraseña a otra persona.",
+        "lowLabel": "Si lo permites",
+        "low": "Tus agentes envían contraseñas y claves a direcciones nuevas sin preguntarte.",
+        "highLabel": "Si no lo permites",
+        "high": "Se te sigue preguntando antes de que una contraseña o clave vaya a una dirección nueva.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo solo si la pregunta te impide un trabajo que necesitas y confías en todos tus agentes."
+      },
+      "capability_visibility_private": {
+        "title": "Una capacidad que pasó a ser privada",
+        "short": "El servidor limitó tu capacidad a ti y a tus agentes.",
+        "what": "Una capacidad es un servicio que tú o tus agentes ofrecen, por ejemplo una herramienta que otro programa puede usar. Tiene un ajuste que dice quién puede verla y usarla. Las versiones anteriores del servidor aceptaban cualquier valor en ese ajuste, y un valor desconocido dejaba la capacidad abierta a cualquiera que supiera su dirección. Por eso el servidor cambió esos ajustes a la opción segura.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Si otras personas usaban esta capacidad antes, abre la página Capacidades y elige quién puede verla."
+      }
+    },
+    "incident": {
+      "erasure_leftover_schedules": {
+        "title": "Programaciones que quedaron de cuentas eliminadas",
+        "short": "Programaciones de cuentas eliminadas que una cuenta nueva con el mismo nombre podría recibir.",
+        "what": "Antes del 25 de octubre de 2026, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si alguien registra el mismo nombre de usuario, ve estas programaciones, y pueden ejecutarse a su nombre.",
+        "lowLabel": "Eliminar",
+        "low": "La programación se elimina para siempre.",
+        "highLabel": "Dejar como está",
+        "high": "La programación se queda como está.",
+        "tipLabel": "Qué hacer",
+        "tip": "Deja la programación solo si sabes que alguien todavía la necesita."
+      },
+      "subdomain_site_origin": {
+        "title": "Direcciones web de tipo desconocido para el servidor",
+        "short": "El servidor no sabe si estas direcciones son de tu propio sitio o de una aplicación.",
+        "what": "Una dirección web de este servidor, como nombre.tu-dominio, es de tu propio sitio o de una aplicación que alguien publicó. La dirección de una aplicación no debe mostrar las páginas propias del servidor ni su inicio de sesión. El servidor no pudo saber a qué grupo pertenecen estas direcciones, así que funcionan como antes hasta que elijas.",
+        "tipLabel": "Qué puedes hacer",
+        "tip": "Pide a la IA que conectaste a AIMEAT que decida el tipo de cada dirección: «mantenerla como mi propio sitio» o «servirla solo como aplicación». Después resuelve este incidente en esta página."
+      }
+    },
+    "ecosystem": {
+      "reconnectUnproven": {
+        "title": "Una solicitud de conexión sin prueba",
+        "short": "La solicitud no demostró que venga de la aplicación que ya está conectada.",
+        "what": "Una aplicación externa demuestra quién es con una clave secreta que solo ella tiene. Esta solicitud no usó esa clave. Solo muestra la clave pública de la aplicación, que cualquiera puede ver. Así que la solicitud puede venir de la aplicación o de alguien que se hace pasar por ella.",
+        "lowLabel": "Si apruebas",
+        "low": "Quien envió la solicitud obtiene acceso a tus datos con los permisos que elijas.",
+        "highLabel": "Si deniegas",
+        "high": "Nada cambia, y la aplicación mantiene su conexión actual.",
+        "tipLabel": "Cuándo aprobar",
+        "tip": "Aprueba solo si tú iniciaste esto, por ejemplo al instalar la aplicación de nuevo. Si no, deniega."
+      }
+    },
     "content": {
       "on_arrival": {
         "title": "Leer el contenido nuevo cuando llega",

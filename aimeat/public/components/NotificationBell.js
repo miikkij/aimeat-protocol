@@ -13,6 +13,8 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.10.0 — 2026-10-27 — A notice whose kind has an explanation shows a question mark under it that
+ *     opens the explanation (helpTermOf; Jouni, 2026-10-27).
  *   v1.9.0 — 2026-10-25 — A decided notice shows who decided what and when, and where to change it,
  *     and no buttons; a button that answered marks its notice answered (secaudit2026oct22).
  *   v1.8.0 — 2026-09-26 — A link that names an agent (?tab=agents&agent=<name>) opens that agent's
@@ -44,7 +46,8 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
-import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, markAnswered, alreadyDecided, answerTextOf, answerChangeOf } from '/js/services/notifications.js';
+import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, markAnswered, alreadyDecided, answerTextOf, answerChangeOf, helpTermOf } from '/js/services/notifications.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -254,6 +257,8 @@ export function NotificationBell({ t, onNavigate }) {
     const actions = decided ? [] : (Array.isArray(n.actions) ? n.actions : []);
     const res = results[n.id];
     const replyAction = actions.find(a => a.kind === 'reply');
+    // The question mark stands outside the item's button: a button inside a button is not a control.
+    const help = helpTermOf(n);
     return html`
       <div class="notif-item ${n.read ? '' : 'unread'}" key=${n.id}>
         <button class="notif-item-main" onClick=${() => clickNotif(n)}>
@@ -261,6 +266,7 @@ export function NotificationBell({ t, onNavigate }) {
           ${bodyOf(n) ? html`<div class="notif-item-body">${bodyOf(n)}</div>` : null}
           <div class="notif-item-time">${sourceName(n)} · ${relTime(n.createdAt)}</div>
         </button>
+        ${help ? html`<div class="notif-actions"><${HelpTip} term=${help} label=${titleOf(n)} /></div>` : null}
         ${decided ? html`<div class="notif-result ok">${decided}</div>` : null}
         ${change ? html`<div class="notif-actions"><button class="notif-action-btn poster-menu-row" onClick=${(e) => { e.stopPropagation(); setOpen(false); openNotificationLink(change.link, onNavigate); }}>${change.label}</button></div>` : null}
         ${actions.length ? html`<div class="notif-actions">${actions.map(a => renderAction(n, a))}</div>` : null}

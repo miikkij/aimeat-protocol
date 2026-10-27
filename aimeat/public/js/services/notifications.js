@@ -10,6 +10,8 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   v1.4.0 — 2026-10-27 — helpTermOf: a notice whose kind has an explanation gets a question mark that
+ *     opens it, on the bell and the page alike (Jouni, 2026-10-27).
  *   v1.3.0 — 2026-10-25 — A decided notice: markAnswered after a button ran, answerTextOf (who decided
  *     what and when) and answerChangeOf (where to change it), read by the bell and the page alike
  *     (secaudit2026oct22; the developer's review of the sandbox).
@@ -158,6 +160,20 @@ export function titleOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.ke
 export function bodyOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key}.body`, n.i18n.vars || {})) || n?.body || ''; }
 /** A button's words in the reader's language when the button says how (a key under `notiftext.`); else null. */
 export function actionTextOf(a) { return (a?.i18n?.key && said(`notiftext.${a.i18n.key}`, a.i18n.vars || {})) || null; }
+
+/** Notices that share one explanation with another key. */
+const HELP_ALIAS = { agent_mode_set_by_agent: 'agent_mode_self_set', approval_refinery_definition_text: 'approval_refinery_definition' };
+/**
+ * The explanation term of a notice (`explain.notice.<key>.*`, components/ExplainDialog.js), or null
+ * when its kind has none. The bell and the Notifications page draw a question mark for it.
+ */
+export function helpTermOf(n) {
+  const key = n?.i18n?.key;
+  if (!key) return null;
+  const term = `notice.${HELP_ALIAS[key] || key}`;
+  const probe = `explain.${term}.what`;
+  return t(probe) !== probe ? term : null;
+}
 /** The sender as a person reads it: the node's own name, or the app's, extension's, agent's name. */
 export function sourceName(n) { const s = n?.source; if (!s || s.kind === 'aimeat') return 'AIMEAT'; if (s.kind === 'owner') return t('notifpage.kind.owner'); return s.name || s.id || ''; }
 export function kindWord(kind) { return t('notifpage.kind.' + (kind || 'aimeat')); }

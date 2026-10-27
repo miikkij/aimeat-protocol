@@ -69703,8 +69703,9 @@ paths:
         produces zone/status unknown. The sample includes refusals, distinct
         sources, walled addresses, each with a zone decided from this instance's own readable
         history), the refusal log grouped by door, source, credential kind and credential
-        fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count,
-        who holds the operator role and which accounts are deactivated or use two-step sign-in,
+        fingerprint plus its newest 200 lines, the refused-and-kept incidents with the open count
+        (an incident may carry `params`, the values the page's own sentence for its type names,
+        beside the English `detail`), who holds the operator role and which accounts are deactivated or use two-step sign-in,
         how apps are kept apart (`apps`, with a warning and the settings to change on a node several
         people share with no app origin), and the door settings. The same data the
         `aimeat_admin_security_overview` tool returns.
@@ -70004,10 +70005,7 @@ paths:
         token was refused there. The start step of type `erasure_leftover_schedules` names the
         schedules that account erasures before 2026-10-25 left: a schedule whose `ownerScope` names an
         account no one holds now, or an account registered after the schedule was made; the entry id
-        is the schedule id. The start step of type `capability_visibility_words` names the
-        capabilities saved before 2026-10-26 with a visibility word the node does not know (one entry
-        per capability, its owner and its word; the entry id is the capability id); until decided,
-        such a capability is private to everyone but its owner's side and the operator. With
+        is the schedule id. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
         none; a capability's visibility is set to private) or `delete` (the skill or the data package is deleted with its files, the schedule is
