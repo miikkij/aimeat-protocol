@@ -23603,13 +23603,17 @@ paths:
         Accepting records the signature with its method and level (qualified, advanced or scanned);
         when both parties have signed, the version is in force and both receive the PDF. Rejecting
         needs a reason, which the counterparty receives. Operator only, `compliance:write`.
+        `uploaded_at` names the copy the operator looked at (the review's uploadedAt): when another
+        copy replaced it meanwhile, the answer is 409 COPY_CHANGED and nothing is recorded. The
+        signature's evidence names the sha256 of the checked bytes and the copy the node keeps of
+        them (409 COPY_MISSING when that copy is gone).
       security:
         - BearerAuth: []
       requestBody:
         required: true
         content:
           application/json:
-            schema: { type: object, required: [accept], properties: { accept: { type: boolean }, reason: { type: string } } }
+            schema: { type: object, required: [accept], properties: { accept: { type: boolean }, reason: { type: string }, uploaded_at: { type: string, description: 'The uploadedAt of the copy reviewed.' } } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
