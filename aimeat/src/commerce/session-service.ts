@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-27 -- A subscription line whose plan period changed since the quote is refused PRICE_CHANGED (secaudit2026oct26).
  *   2026-10-25 -- A collect whose x402 settlement outcome is unknown (PossiblePaymentError) is kept as a possible payment for the seller and the operator before the session opens again (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
  *   2026-10-25 — A refunded fulfilment failure keeps the payment's tracking code on the session; a retry whose collect answers it again is refused PAYMENT_REFUNDED, and the next collect carries `attempt` (session-claim.ts; secaudit2026oct22).
  *   2026-10-18 — getSession expires an overdue session on its version (session-claim.ts expireOverdueSession): of two reads at the same moment one writes it and counts the stage.
@@ -565,7 +566,9 @@ async function completeSessionInner(
   // (QA audit 2026-10-14, K4).
   const quotedTotal = session.items.reduce((n, item) => n + item.unitPrice * item.quantity, 0);
   const changed = session.items.findIndex((item, i) =>
-    sellables[i].unitPrice !== item.unitPrice || sellables[i].tollMorsels !== (item.tollMorsels ?? sellables[i].tollMorsels));
+    sellables[i].unitPrice !== item.unitPrice || sellables[i].tollMorsels !== (item.tollMorsels ?? sellables[i].tollMorsels)
+    // A subscription's line title names its period: a period changed since the quote is a changed price (secaudit2026oct26).
+    || (item.kind === 'subscription' && sellables[i].title !== item.title));
   if (changed >= 0 || quotedTotal !== session.total) {
     throw new CommerceError('PRICE_CHANGED', 409, changed >= 0
       ? `The price of "${session.items[changed].title}" changed after this checkout was opened. Update the items to get a new quote, then complete again.`

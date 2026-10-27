@@ -10,6 +10,8 @@
  * @structure applySubscriptionPrice
  * @usage registered in appliers.ts under the kind 'subscription-price'
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A question that named the plan's period passes it on, so the period the buyer
+ *     allowed is checked and becomes the agreed one (secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, renewal-skips-agent-limit, the price part).
  */
 import { allowRaisedPrice } from '../../commerce/subscriptions.js';
@@ -20,6 +22,7 @@ export async function applySubscriptionPrice(ctx: PublishStoreCtx, ownerGhii: st
   const out = await allowRaisedPrice(ctx.storage, ctx.config, ownerGhii, {
     ext: String(t.ext ?? ''), plan: String(t.plan ?? ''), period: String(t.period ?? ''),
     amount: Number(t.amount), currency: String(t.currency ?? ''),
+    ...(t.period_days !== undefined ? { period_days: Number(t.period_days) } : {}),
   });
   return out.ok ? { ok: true } : { ok: false, reason: out.reason };
 }
