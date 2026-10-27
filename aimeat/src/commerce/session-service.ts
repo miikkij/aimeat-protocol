@@ -17,6 +17,7 @@
  *   updateSessionItems · cancelSession · completeSession
  * @usage import { createSession, completeSession } from '../commerce/session-service.js';
  * @version-history
+ *   2026-10-27 -- updateSessionItems and cancelSession write the stored session only while it is open (session-claim.ts changeOpenSession; secaudit2026oct26).
  *   2026-10-25 -- A collect whose x402 settlement outcome is unknown (PossiblePaymentError) is kept as a possible payment for the seller and the operator before the session opens again (commerce/possible-payment.ts; secaudit2026oct22, lead 4432).
  *   2026-10-25 — A refunded fulfilment failure keeps the payment's tracking code on the session; a retry whose collect answers it again is refused PAYMENT_REFUNDED, and the next collect carries `attempt` (session-claim.ts; secaudit2026oct22).
  *   2026-10-18 — getSession expires an overdue session on its version (session-claim.ts expireOverdueSession): of two reads at the same moment one writes it and counts the stage.
@@ -94,7 +95,7 @@ import { emitChange } from '../services/event-bus.js';
 import { localAccountName } from '../utils/gaii.js';
 import { agentPurchaseRefusal, reserveAgentPurchase, releaseAgentPurchase } from './agent-purchase-limit.js';
 import { recordPurchase, recordCheckoutStage } from '../services/visibility/visibility-counter.js';
-import { claimSessionForCompletion, releaseSessionClaim, releaseAfterRefund, refundedPaymentRefusal, recordCollected, invoiceRailRefusal, expireOverdueSession } from './session-claim.js';
+import { claimSessionForCompletion, releaseSessionClaim, releaseAfterRefund, refundedPaymentRefusal, recordCollected, invoiceRailRefusal, expireOverdueSession, changeOpenSession } from './session-claim.js';
 
 export { CommerceError } from './errors.js';
 // Moved to platform-fee.ts (2026-10-11); re-exported for the callers that import it from here.
@@ -389,10 +390,10 @@ export async function updateSessionItems(
   requireOpen(session);
   legacyMorselSessionRefusal(session);
   const { items, sellerOwner, sellerGhii, total, pacing } = await resolveItems(storage, config, rawItems, session.buyerOwner, session.currency);
-  const updated: CheckoutSessionRecord = {
-    ...session, items, sellerOwner, sellerGhii, total, pacingMorsels: pacing, updatedAt: new Date().toISOString(),
-  };
-  await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
+  // Written on the stored session while it is still open (session-claim.ts changeOpenSession).
+  const updated = await changeOpenSession(storage, session, sessionKey(session.id), cur => ({
+    ...cur, items, sellerOwner, sellerGhii, total, pacingMorsels: pacing, updatedAt: new Date().toISOString(),
+  }));
   agentStage(storage, config, updated, 'updated');
   return updated;
 }
@@ -404,7 +405,9 @@ export async function cancelSession(
   config?: AimeatConfig,
 ): Promise<CheckoutSessionRecord> {
   requireOpen(session);
-  const updated: CheckoutSessionRecord = { ...session, status: 'cancelled', updatedAt: new Date().toISOString() };
+  // Decided on the stored session: a cancel that read before a completion does not overwrite the
+  // completed record and its receipt (secaudit2026oct26).
+  const updated = await changeOpenSession(storage, session, sessionKey(session.id), cur => ({ ...cur, status: 'cancelled', updatedAt: new Date().toISOString() }));
   // Only the buyer. A cancelled checkout never reached the seller as anything but an open session,
   // so telling them one was abandoned would report a non-event on somebody else's account.
   void recordAccountEvent(storage, {
@@ -412,7 +415,6 @@ export async function cancelSession(
     subject: session.id,
     data: { what: session.items.map(i => i.title).filter(Boolean).join(', ').slice(0, 120) },
   });
-  await putRecord(storage, session.buyerGhii, sessionKey(session.id), updated);
   agentStage(storage, config, updated, 'canceled');
   return updated;
 }

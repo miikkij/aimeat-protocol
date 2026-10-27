@@ -20,6 +20,8 @@
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
  *   2026-10-27 — A signature's level may be `test`: a wallet signature on the EU reference wallet's test roots (secaudit2026oct26).
+ *   2026-10-27 — Agreement.counterpartyNamedAt; a review keeps the sha256 of the checked bytes and the
+ *     node's copy of them (sha256, copyKey) (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1).
  */
 import { z } from 'zod';
@@ -142,6 +144,9 @@ export const ReviewSchema = z.object({
   kind: z.enum(['scan', 'pdf']),
   storageKey: z.string().max(500),
   storageOwner: z.string().max(300),
+  /** sha256 of the bytes the node checked, and the copy of them the node keeps (`owner:key`, beside the version's PDF). */
+  sha256: z.string().max(64).optional(),
+  copyKey: z.string().max(500).optional(),
   uploadedBy: z.string().max(300),
   uploadedAt: iso,
   party: z.enum(['controller', 'processor']),
@@ -197,6 +202,12 @@ export const AgreementSchema = z.object({
   /** What the agreement covers, in a few words ("AIMEAT-ympäristö ja sovitut palvelimet"). */
   subject: text(300),
   counterparty: PartySchema,
+  /**
+   * When the operator named `counterparty.account` (create, or a patch that changed it). An account
+   * registered after this is a later holder of a released name, not the counterparty
+   * (compliance-agreements-access.ts counterpartyHolds).
+   */
+  counterpartyNamedAt: iso.optional(),
   registerId: z.string().max(120).optional(),
   /** An outside reference the operator's own systems use: a shop order, a fleet host. */
   externalRef: z.string().max(200).optional(),

@@ -33,6 +33,9 @@
  *   deliverOrderWebhook · runUcpUpkeep
  * @usage const s = await createGuestCheckout(storage, config, { profileUrl, lineItems, buyer });
  * @version-history
+ *   2026-10-27 — The PUT and the cancel change the stored checkout only while it may change
+ *     (changeStoredCheckout), so one read before a completion's claim cannot reopen it
+ *     (secaudit2026oct26, commerce/session-service:stale-session-write-reopens-consumed-payment).
  *   v1.2.1 — 2026-10-25 — The per-seller limit of 500 counts open checkouts that have not run out of
  *     time; every kept record counts toward a bound of 2000 (openCheckoutsOf; secaudit2026oct22).
  *   v1.2.0 — 2026-10-25 — A line's total is its exact amount rounded once to cents, the checkout's
@@ -353,23 +356,40 @@ export async function updateGuestCheckout(
   requireChangeable(session);
   const priced = await priceLines(storage, config, args.lineItems);
   if (priced.sellerGhii !== session.sellerGhii) throw new UcpError(200, 'item_unavailable', 'A checkout keeps its seller; open a new one for another seller.', 'unrecoverable');
-  session.lines = priced.lines;
-  session.buyer = cleanBuyer(args.buyer);
-  session.status = statusOf(session);
-  session.updatedAt = nowIso();
-  await putRecord(storage, session.sellerGhii, sessionKey(id), session, KEEP_HOURS);
+  const buyer = cleanBuyer(args.buyer);
+  const updated = await changeStoredCheckout(storage, session, id, (cur) => {
+    const next = { ...cur, lines: priced.lines, buyer, updatedAt: nowIso() };
+    return { ...next, status: statusOf(next) };
+  });
   recordCheckoutStage(storage, config, { sellerGhii: session.sellerGhii, family: session.platformFamily, stage: 'updated' });
-  return session;
+  return updated;
+}
+
+/**
+ * Change the STORED checkout while it may still change, on its version (services/record-cas.ts). A PUT
+ * or a cancel built on a copy read before a completion's claim put it back to changeable, and the next
+ * completion charged the same shared payment token again (secaudit2026oct26).
+ */
+async function changeStoredCheckout(
+  storage: Storage, session: UcpGuestSession, id: string, change: (cur: UcpGuestSession) => UcpGuestSession,
+): Promise<UcpGuestSession> {
+  let refusal: unknown = null;
+  const out = await updateRecord(storage, session.sellerGhii, sessionKey(id), (v) => (v ?? null) as UcpGuestSession | null, (cur) => {
+    if (!cur) { refusal = new UcpError(404, 'not_found', 'No such checkout.', 'unrecoverable'); return UNCHANGED; }
+    try { requireChangeable(cur); } catch (e) { refusal = e; return UNCHANGED; }
+    refusal = null;
+    return change(cur);
+  }, { tag: 'ucp', tags: UCP_TAGS, ttlHours: KEEP_HOURS, visibility: 'owner' });
+  if (refusal) throw refusal;
+  return out!;
 }
 
 export async function cancelGuestCheckout(storage: Storage, config: AimeatConfig, id: string, profileUrl: string): Promise<UcpGuestSession> {
   const session = await readGuestCheckout(storage, config, id, profileUrl);
   requireChangeable(session);
-  session.status = 'canceled';
-  session.updatedAt = nowIso();
-  await putRecord(storage, session.sellerGhii, sessionKey(id), session, KEEP_HOURS);
+  const updated = await changeStoredCheckout(storage, session, id, (cur) => ({ ...cur, status: 'canceled', updatedAt: nowIso() }));
   recordCheckoutStage(storage, config, { sellerGhii: session.sellerGhii, family: session.platformFamily, stage: 'canceled' });
-  return session;
+  return updated;
 }
 
 interface InstrumentInput { id?: unknown; handler_id?: unknown; type?: unknown; selected?: unknown; credential?: { type?: unknown; token?: unknown } }

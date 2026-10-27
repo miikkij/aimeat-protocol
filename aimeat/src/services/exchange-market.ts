@@ -19,6 +19,9 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   2026-10-27 — Offerings, needs and bids are read only from the namespace of the party they name
+ *     (writtenFor), and an ext-action offering whose provider does not own the extension is refused
+ *     (OFFERING_PROVIDER_MISMATCH) (secaudit2026oct26, exchange:cross-namespace-prefix-scan-trusts-value).
  *   v1.12.2 — 2026-10-13 — ActionCommercial, resolveActionPricing, resolveExtActionPricing,
  *     extActionDeclaredToll and OfferingPlan moved unchanged to services/exchange-action-pricing.ts and
  *     re-exported here (pure extraction; the file had passed 800 lines).
@@ -66,6 +69,7 @@ import { readCallTiming } from './call-timing.js';
 import { resolvePacingToll } from './metered-settlement.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { logger } from '../utils/logger.js';
+import { localAccountName } from '../utils/gaii.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
@@ -306,6 +310,11 @@ export async function resolveOfferingPricing(
   const extRec = await storage.getExtension(o.ext);
   const act = extRec?.actions.find(a => a.id === o.action);
   if (!extRec || !act) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Offering capability no longer exists' };
+  // The provider is the extension's installer, as on the (ext, action) path and as the listing route
+  // checks: a listing that names someone else is not that extension's offering (secaudit2026oct26).
+  if (localAccountName(o.providerGhii) !== localAccountName(extRec.installedBy)) {
+    return { ok: false, status: 409, code: 'OFFERING_PROVIDER_MISMATCH', message: 'This listing names a provider that does not own the extension behind it, so it cannot be accepted. Accept the extension\'s own listing instead.' };
+  }
   const priced = resolveExtActionPricing(act, planId);
   if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
   return {
@@ -389,6 +398,22 @@ const OFFERING_PREFIX = 'exchange.offering.';
 const NEED_PREFIX = 'exchange.need.';
 const bidPrefix = (needId: string) => `exchange.bid.${needId}.`;
 
+/**
+ * Whether a record is the one its writer service wrote: offerings, needs and bids are stored in the
+ * namespace of the party they name (putOffering, putNeed, putBid), and that party's account name
+ * matches the owner field beside it. The keys are not reserved, so an account can write a record
+ * under the same key in its own namespace through the memory routes; such a record names nobody
+ * here (secaudit2026oct26, exchange:cross-namespace-prefix-scan-trusts-value).
+ */
+function writtenFor(rec: { ownerGaii: string }, party: unknown, partyOwner: unknown): boolean {
+  return typeof party === 'string' && !!party && rec.ownerGaii === party
+    && (partyOwner === undefined || partyOwner === localAccountName(party));
+}
+const offeringOf = (rec: { ownerGaii: string; value: unknown }): Offering | null => {
+  const v = rec.value as Offering | null;
+  return v && v.offeringId && writtenFor(rec, v.providerGhii, v.providerOwner) ? v : null;
+};
+
 async function putPublic(storage: Storage, ownerGhii: string, key: string, value: unknown, tag: string): Promise<void> {
   const now = new Date().toISOString();
   await storage.setMemory({ key, ownerGaii: ownerGhii, value, visibility: 'public', tags: [tag], ttlHours: null, version: 1, createdAt: now, updatedAt: now });
@@ -415,8 +440,8 @@ export async function getOffering(storage: Storage, id: string): Promise<Offerin
 export async function getOfferingWithMeta(
   storage: Storage, id: string,
 ): Promise<{ offering: Offering; aiProvenanceId?: string } | null> {
-  const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX + id, limit: 2 });
-  const rec = items.find(r => r.key === OFFERING_PREFIX + id);
+  const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX + id, limit: 200 });
+  const rec = items.find(r => r.key === OFFERING_PREFIX + id && offeringOf(r));
   if (!rec) return null;
   return {
     offering: rec.value as Offering,
@@ -425,12 +450,12 @@ export async function getOfferingWithMeta(
 }
 export async function listOfferings(storage: Storage): Promise<Offering[]> {
   const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX, limit: 5000 });
-  return items.map(r => r.value as Offering).filter(v => v && v.offeringId && v.state === 'listed');
+  return items.map(offeringOf).filter((v): v is Offering => !!v && v.state === 'listed');
 }
 /** Every offering including delisted ones — the reconcile needs to revive a listing rather than duplicate it. */
 export async function listAllOfferings(storage: Storage): Promise<Offering[]> {
   const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX, limit: 5000 });
-  return items.map(r => r.value as Offering).filter(v => v && v.offeringId);
+  return items.map(offeringOf).filter((v): v is Offering => !!v);
 }
 export async function deleteOffering(storage: Storage, id: string): Promise<boolean> {
   const o = await getOffering(storage, id);
@@ -488,14 +513,18 @@ export async function putNeed(storage: Storage, n: Need): Promise<Need> {
   return n;
 }
 export async function getNeed(storage: Storage, id: string): Promise<Need | null> {
-  const { items } = await storage.listAllMemory({ prefix: NEED_PREFIX + id, limit: 2 });
-  const rec = items.find(r => r.key === NEED_PREFIX + id);
+  const { items } = await storage.listAllMemory({ prefix: NEED_PREFIX + id, limit: 200 });
+  const rec = items.find(r => r.key === NEED_PREFIX + id && needOf(r));
   return rec ? (rec.value as Need) : null;
 }
+const needOf = (rec: { ownerGaii: string; value: unknown }): Need | null => {
+  const v = rec.value as Need | null;
+  return v && v.needId && writtenFor(rec, v.requesterGaii, v.requesterOwner) ? v : null;
+};
 export async function listNeeds(storage: Storage, opts?: { openOnly?: boolean; owner?: string }): Promise<Need[]> {
   const { items } = await storage.listAllMemory({ prefix: NEED_PREFIX, limit: 5000 });
-  return items.map(r => r.value as Need).filter(v =>
-    v && v.needId &&
+  return items.map(needOf).filter((v): v is Need =>
+    !!v &&
     (!opts?.openOnly || v.state === 'open') &&
     (!opts?.owner || v.requesterOwner === opts.owner));
 }
@@ -509,12 +538,16 @@ export async function putBid(storage: Storage, b: Bid): Promise<Bid> {
 }
 export async function listBids(storage: Storage, needId: string): Promise<Bid[]> {
   const { items } = await storage.listAllMemory({ prefix: bidPrefix(needId), limit: 2000 });
-  return items.map(r => r.value as Bid).filter(v => v && v.bidId);
+  return items.map(bidOf).filter((v): v is Bid => !!v);
 }
 export async function getBid(storage: Storage, needId: string, bidId: string): Promise<Bid | null> {
-  const rec = (await storage.listAllMemory({ prefix: bidPrefix(needId) + bidId, limit: 2 })).items.find(r => r.key === bidPrefix(needId) + bidId);
+  const rec = (await storage.listAllMemory({ prefix: bidPrefix(needId) + bidId, limit: 200 })).items.find(r => r.key === bidPrefix(needId) + bidId && bidOf(r));
   return rec ? (rec.value as Bid) : null;
 }
+const bidOf = (rec: { ownerGaii: string; value: unknown }): Bid | null => {
+  const v = rec.value as Bid | null;
+  return v && v.bidId && writtenFor(rec, v.bidderGhii, v.bidderOwner) ? v : null;
+};
 
 // ── METRICS / REPUTATION (the measurability layer) ───────────────────────────
 /**

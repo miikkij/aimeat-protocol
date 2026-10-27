@@ -13,6 +13,9 @@
  *   normal case when the person did come back, and is answered as such.
  * @structure completeFromStripeCheckout
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Completes only from a card page the node opened for the checkout
+ *     (session.cardPages), when the checkout records them (secaudit2026oct26,
+ *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-4).
  */
 import type { AimeatConfig } from '../config-types.js';
@@ -31,6 +34,13 @@ export async function completeFromStripeCheckout(
   const session = id && buyer ? await getSession(storage, buyer, id, config) : null;
   if (!session || session.sellerGhii !== sellerGhii || !cs) return 'checkout_not_found';
   if (session.status !== 'open') return 'checkout_already_closed';
+  // Only a card page the node opened for this checkout completes it from the webhook. A Checkout
+  // Session the seller made on its own account with the same metadata is not the buyer's payment
+  // (secaudit2026oct26). A checkout whose page was opened before the node kept them is taken as before.
+  if (session.cardPages && !session.cardPages.includes(cs)) {
+    logger.warn('[stripe-checkout] a webhook named a Stripe session the node did not open for this checkout; not completed', { session: id, seller: sellerGhii, stripeSession: cs });
+    return 'checkout_not_found';
+  }
   try {
     // No caller: the person approved the payment on Stripe's page, and the card page route asked an
     // app's spend permission before opening it.

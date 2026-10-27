@@ -9,6 +9,7 @@
  * @structure registerComplianceAgreementTools(mcp, storage, config, caller)
  * @usage registerComplianceAgreementTools(mcp, storage, config, caller);   // mcp/register-all.ts
  * @version-history
+ *   2026-10-27 — confirm passes uploaded_at, the copy reviewed (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.5).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -63,7 +64,7 @@ export function registerComplianceAgreementTools(mcp: McpServer, storage: Storag
         case 'notice': return ok(await noticeOp(deps, c, needId()));
         case 'object': return ok(await objectOp(deps, c, needId(), { reason: a.reason }));
         case 'signed_copy': return ok(await signedCopyOp(deps, c, needId(), { storage_key: a.storage_key, kind: a.kind, party: a.party }));
-        case 'confirm': return ok(await confirmOp(deps, c, needId(), { accept: a.accept, reason: a.reason }));
+        case 'confirm': return ok(await confirmOp(deps, c, needId(), { accept: a.accept, reason: a.reason, uploaded_at: a.uploaded_at }));
         case 'end': return ok(await endOp(deps, c, needId(), { choice: a.choice, reason: a.reason }));
         case 'deletion_done': return ok(await deletionDoneOp(deps, c, needId(), { note: a.note }));
         case 'breach_notice': return ok(await breachNoticeOp(deps, c, input));

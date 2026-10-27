@@ -25,13 +25,17 @@
  *   refunded puts the session back to `open` with that payment's tracking code kept
  *   (releaseAfterRefund); a later collect that answers the same code is refused (refundedPaymentRefusal)
  *   and the buyer pays again.
- * @structure claimSessionForCompletion · expireOverdueSession · releaseSessionClaim · releaseAfterRefund ·
+ * @structure claimSessionForCompletion · expireOverdueSession · changeOpenSession · rememberCardPage · releaseSessionClaim · releaseAfterRefund ·
  *   refundedPaymentRefusal · recordCollected · deliversOnCompletion · sellerAcceptsImmediateInvoice ·
  *   invoiceRailRefusal
  * @usage
  *   await claimSessionForCompletion(storage, session, key);   // throws SESSION_NOT_OPEN
  *   const refusal = invoiceRailRefusal(handler?.id, sellables); if (refusal) throw refusal;
  * @version-history
+ *   v1.3.0 — 2026-10-27 — changeOpenSession: the buyer's item change and cancel write the stored session
+ *     only while it is open (secaudit2026oct26, commerce/session-service:stale-session-write-reopens-consumed-payment).
+ *     rememberCardPage: the card pages the node opened, for the webhook completion (secaudit2026oct26,
+ *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
  *   v1.2.0 — 2026-10-25 — releaseAfterRefund and refundedPaymentRefusal (secaudit2026oct22).
  *   v1.1.0 — 2026-10-18 — expireOverdueSession, for getSession's lazy expiry
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
@@ -87,6 +91,36 @@ export async function expireOverdueSession(
     return expired ? { ...cur!, status: 'expired' as const, updatedAt: new Date().toISOString() } : UNCHANGED;
   }, { tag: 'commerce', visibility: 'owner' });
   return { stored, expired };
+}
+
+/**
+ * Change the STORED session, and only while it is open, on its version (services/record-cas.ts). The
+ * buyer's item change and cancel go through here. Written from a copy read before a completion
+ * claimed the session, they put it back to `open` and dropped the claim's and the refund's marks, so
+ * the same payment completed it again (secaudit2026oct26). Throws SESSION_NOT_OPEN or
+ * SESSION_NOT_FOUND as the stored record says.
+ */
+export async function changeOpenSession(
+  storage: Storage, session: CheckoutSessionRecord, key: string, change: (cur: CheckoutSessionRecord) => CheckoutSessionRecord,
+): Promise<CheckoutSessionRecord> {
+  let refusal: CommerceError | null = null;
+  const out = await updateRecord<CheckoutSessionRecord | null>(storage, session.buyerGhii, key, v => (v ?? null) as CheckoutSessionRecord | null, cur => {
+    refusal = !cur ? new CommerceError('SESSION_NOT_FOUND', 404, `Checkout session not found: ${session.id}`)
+      : cur.status !== 'open' ? NOT_OPEN(cur.status) : null;
+    return refusal ? UNCHANGED : change(cur!);
+  }, { tag: 'commerce', visibility: 'owner', tags: ['commerce'] });
+  if (refusal) throw refusal;
+  return out!;
+}
+
+/**
+ * Keep the id of a card page the node opened for this checkout (`cardPages`, the newest 20), so the
+ * webhook completion takes only those (stripe-checkout-complete.ts). updatedAt stays as it was: the
+ * card page's idempotency key is built from it, and opening the page again gives the same page.
+ */
+export async function rememberCardPage(storage: Storage, session: CheckoutSessionRecord, stripeSession: string): Promise<void> {
+  await changeOpenSession(storage, session, `commerce.session.${session.id}`, cur => (
+    { ...cur, cardPages: [...(cur.cardPages ?? []).filter(id => id !== stripeSession), stripeSession].slice(-20) }));
 }
 
 /** Put a claimed session back to `open`, after a refusal that moved no money (or refunded it). */

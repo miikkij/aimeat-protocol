@@ -15,6 +15,7 @@
  *   // on delivery the exchange route settles via settleMeteredCoordinate against the consumer.
  *   res.json(success(nodeId, { work: await workView(storage, config, w) }));
  * @version-history
+ *   2026-10-27 — The work listings read only the service's own namespace (secaudit2026oct26).
  *   v1.3.0 — 2026-10-18 — claimWorkForDelivery / releaseWorkClaim: a delivery claims the work on its
  *     record's version before it settles, so two deliveries at the same moment settle once
  *     (wish-rahapolkujen-kilpatilanteet).
@@ -113,15 +114,20 @@ export async function getWork(storage: Storage, id: string): Promise<AgentWork |
   return rec ? (rec.value as AgentWork) : null;
 }
 
+/** Every work item the service wrote: only its own namespace holds one. A record under the same key in
+ *  an account's namespace, written through the memory routes, is not a work item (secaudit2026oct26). */
+async function listAllWork(storage: Storage): Promise<AgentWork[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'xwork.', ownerPrefix: NS, limit: 5000 });
+  return items.filter(r => r.ownerGaii === NS).map(r => r.value as AgentWork).filter(v => v && v.workId);
+}
+
 export async function listWorkByConsumer(storage: Storage, owner: string): Promise<AgentWork[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'xwork.', limit: 5000 });
-  return items.map(r => r.value as AgentWork).filter(v => v && v.workId && v.consumerOwner === owner)
+  return (await listAllWork(storage)).filter(v => v.consumerOwner === owner)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 
 export async function listWorkByProvider(storage: Storage, owner: string): Promise<AgentWork[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'xwork.', limit: 5000 });
-  return items.map(r => r.value as AgentWork).filter(v => v && v.workId && v.providerOwner === owner)
+  return (await listAllWork(storage)).filter(v => v.providerOwner === owner)
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
 

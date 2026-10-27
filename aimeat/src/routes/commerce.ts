@@ -17,6 +17,8 @@
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  *   - PUT    /v1/commerce/payout/invoice               invoice credit for items delivered at once
  * @version-history
+ *   2026-10-27 — The card page route keeps the Stripe session it opened on the checkout (rememberCardPage),
+ *     so the webhook completes only from it (secaudit2026oct26).
  *   2026-10-18 — POST /v1/commerce/checkout-sessions/:id/card: Stripe's own card page for a person,
  *     on the seller's Stripe account; completion takes handler com.stripe.checkout (Comicland v3 A-4).
  *     Line kind `subscription`; GET /v1/commerce/subscriptions and POST …/:ext/:plan/cancel (A-5).
@@ -83,6 +85,7 @@ import { readPsp, writePsp, setInvoiceAcceptImmediate, type PspRecord } from '..
 import { getEncryptionKey } from '../services/encryption.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
 import { openStripeCheckout, STRIPE_CHECKOUT_HANDLER_ID } from '../commerce/stripe-checkout.js';
+import { rememberCardPage } from '../commerce/session-claim.js';
 import { appSpendRefusal } from '../services/metered-access.js';
 import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
 
@@ -530,6 +533,8 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const page = await openStripeCheckout(config, session, await readPsp(storage, session.sellerGhii), returnUrl);
+      // The webhook completes the checkout only from a page the node opened (stripe-checkout-complete.ts).
+      await rememberCardPage(storage, session, page.stripeSession);
       res.json(success(config.nodeId, { url: page.url, stripe_session: page.stripeSession, handler: STRIPE_CHECKOUT_HANDLER_ID }, [
         { description: 'Send the person to the card page', method: 'GET', url: page.url },
         { description: 'Then complete with the stripe_session they return with', method: 'POST', url: `/v1/commerce/checkout-sessions/${encodeURIComponent(session.id)}/complete` },

@@ -8,6 +8,7 @@
  * @structure complianceAgreementTools — the one definition
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   2026-10-27 — confirm takes uploaded_at, the copy reviewed (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.5).
  */
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
@@ -37,6 +38,7 @@ export const complianceAgreementTools = [
       party: { type: 'string', enum: ['controller', 'processor'], description: 'For signed_copy by the operator: whose signature the copy carries (default the counterparty\'s side).' },
       accept: { type: 'boolean', description: 'For confirm: true to accept the copy, false to reject it (then reason is needed).' },
       reason: { type: 'string', description: 'For confirm (a rejection), object and end: why, in a sentence or two.' },
+      uploaded_at: { type: 'string', description: 'For confirm: the uploadedAt of the copy you looked at (versions[].review.uploadedAt from get). A copy that replaced it meanwhile answers COPY_CHANGED.' },
       choice: { type: 'string', enum: ['delete', 'return'], description: 'For end: whether the data is deleted or returned.' },
       note: { type: 'string', description: 'For deletion_done: what was done.' },
       version: { type: 'number', description: 'For document: which version (default the newest).' },

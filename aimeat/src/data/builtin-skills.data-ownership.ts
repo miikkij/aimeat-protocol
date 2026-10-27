@@ -27,6 +27,9 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-10-27 — Section 6: erasure also takes back an accountant role and the beneficiary check, and an
+ *     agreement with the operator stays without the account (secaudit2026oct26, owner-erasure.ts
+ *     step name_bound_grants).
  *   2026-10-23 — Sections 1 and 6: the account export and an erasure each leave one line in the node's
  *     list of data subject requests (plan doc-mvlftkh9zmc9 C4.3; routes/owners/export.ts,
  *     services/owner-erasure.ts v1.14.0).
@@ -267,9 +270,11 @@ let knowledge age, and you should offer them, not wait to be asked:
   which no MCP tool and no page offers today. **It is immediate and has no window.** It removes the
   account, every agent, all their memory and files, consents, memberships, schedules, connections and
   apps. It also takes their name out of every group's list of owners, admins and members, and takes
-  back what other people granted to them and to their agents. What stays, under a pseudonym: finished
-  work and disputes (the other party has a right to them), other people's ledger lines and receipts,
-  and AI provenance records. One line stays in the node's list of data subject requests too: the
+  back what other people granted to them and to their agents, an accountant role a client gave them
+  and the operator's check that they may be paid as a beneficiary included. What stays, under a
+  pseudonym: finished work and disputes (the other party has a right to them), other people's ledger
+  lines and receipts, and AI provenance records. A data processing agreement the operator made with
+  them stays as the operator's record, without their account. One line stays in the node's list of data subject requests too: the
   account name and when the erasure was done, as the proof that it was. Their name becomes free for
   someone else.
 - **A group they alone own** cannot be left without an owner, and an erasure cannot ask. It goes to

@@ -25,9 +25,16 @@
  * @usage const a = await syncDocsign(deps, agreement);
  * @version-history
  *   2026-10-27 — A wallet signature on the EU reference wallet's test roots is recorded with the level `test`, not `advanced`, and its history line and the in-force line say it has no legal effect; the flow is unchanged (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
+ *   2026-10-27 — A returned copy keeps the sha256 of the checked bytes and a copy of them beside the
+ *     version's PDF, and the accepted signature's evidence names both; confirmOp takes the reviewed
+ *     copy's uploaded_at and answers 409 COPY_CHANGED when another copy replaced it, and a new upload
+ *     that replaces a waiting copy says so in the history; a later holder of the counterparty's
+ *     released name does not sign for the counterparty (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D3).
  */
+import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
+import { writeStorageFile } from './storage-file-write.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import type { CallerContext } from './caller-context.js';
@@ -40,7 +47,7 @@ import { readerFor } from './classification/reader.js';
 import { fileTarget } from './classification/labels.js';
 import type { Agreement, AgreementReview, AgreementSignature, AgreementVersion } from './compliance-agreements-schemas.js';
 import { historyEntry, newest, readAgreement, updateAgreement } from './compliance-agreements.js';
-import { AgreementError, agreementAccess, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
+import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
 import { versionTag } from './compliance-agreements-render.js';
 import { tellAgreement } from './compliance-agreements-notify.js';
 
@@ -106,10 +113,12 @@ export async function syncDocsign(deps: Deps, a: Agreement): Promise<Agreement> 
     return null;
   });
   if (!rec) return a;
+  // A later holder of the counterparty's released name does not sign for the counterparty (counterpartyHolds).
+  const sides = await counterpartyHolds(deps.storage, a) ? a : { ...a, counterparty: { ...a.counterparty, account: undefined } };
   const fresh: AgreementSignature[] = [];
   for (const [identity, sig] of Object.entries(rec.signatures)) {
     if (v.signatures.some(s => (s.evidence as { docsign?: string } | undefined)?.docsign === rec.id && s.signer === identity)) continue;
-    const party = partyOf(a, v, identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity);
+    const party = partyOf(sides, v, identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity);
     if (!party || v.signatures.some(s => s.party === party)) continue;
     const wallet = sig.wallet;
     const level = docsignLevel(wallet);
@@ -238,6 +247,34 @@ async function checkScan(deps: Deps, caller: CallerContext, a: Agreement, v: Agr
   }
 }
 
+/**
+ * Keep the bytes the node checked beside the version's PDF (the same owner's files), named by the
+ * agreement, the version, the party and the hash. Answers `owner:key`, or undefined when the version
+ * has no stored PDF or the write failed (logged; the hash still binds the review).
+ */
+async function keepCheckedCopy(
+  deps: Deps, a: Agreement, v: AgreementVersion, party: Party, file: { data: Buffer; mimeType: string; sha256: string },
+): Promise<string | undefined> {
+  if (!v.pdfKey) return undefined;
+  const owner = v.pdfKey.slice(0, v.pdfKey.indexOf(':'));
+  const ext = file.mimeType === 'application/pdf' ? 'pdf' : (file.mimeType.split('/')[1] ?? 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
+  const key = `agreements/${a.id}-v${v.n}-${party}-${file.sha256.slice(0, 16)}.${ext}`;
+  const w = await writeStorageFile(deps, owner, { key, data: file.data, mimeType: file.mimeType, visibility: 'private', tags: ['agreement', 'signed-copy'] });
+  if (!w.ok) {
+    logger.warn('agreements: the node could not keep a copy of the signed copy; the review keeps its hash', { agreement: a.id, version: v.n, error: w.message });
+    return undefined;
+  }
+  return `${owner}:${key}`;
+}
+
+/** Whether the node's copy of a review's bytes is still there and still those bytes. True for a review from before copies were kept. */
+async function checkedCopyHolds(deps: Deps, review: AgreementReview): Promise<boolean> {
+  if (!review.copyKey || !review.sha256) return true;
+  const at = review.copyKey.indexOf(':');
+  const file = await deps.storage.getStorageFile(review.copyKey.slice(0, at), review.copyKey.slice(at + 1));
+  return !!file && createHash('sha256').update(file.data).digest('hex') === review.sha256;
+}
+
 /** A signed copy came back: check it, and leave it for the operator to confirm. */
 export async function signedCopyOp(deps: Deps, caller: CallerContext, id: string, body: { storage_key?: unknown; kind?: unknown; party?: unknown }): Promise<Record<string, unknown>> {
   const a = await readAgreement(deps.storage, deps.config.nodeId, id);
@@ -256,15 +293,23 @@ export async function signedCopyOp(deps: Deps, caller: CallerContext, id: string
   const result = kind === 'pdf'
     ? await checkSignedPdf(deps, a, v, file.data, party)
     : await checkScan(deps, caller, a, v, { data: file.data, mimeType: file.mimeType, owner: caller.principal, key }, party);
+  // The checked bytes are the evidence: their hash, and a copy the node keeps beside the version's PDF.
+  // The uploader's own file can be replaced or deleted later (secaudit2026oct26).
+  const sha256 = createHash('sha256').update(file.data).digest('hex');
+  const copyKey = await keepCheckedCopy(deps, a, v, party, { data: file.data, mimeType: file.mimeType, sha256 });
   const review: AgreementReview = {
-    kind, storageKey: key, storageOwner: caller.principal, uploadedBy: caller.principal, uploadedAt: new Date().toISOString(), party, ...result,
+    kind, storageKey: key, storageOwner: caller.principal, sha256, ...(copyKey ? { copyKey } : {}),
+    uploadedBy: caller.principal, uploadedAt: new Date().toISOString(), party, ...result,
   };
   const saved = await updateAgreement(deps.storage, deps.config.nodeId, id, cur => {
     const n = newest(cur);
     if (n.n !== v.n || (n.status !== 'sent' && n.status !== 'review')) return UNCHANGED;
+    // A copy that waited for the operator is replaced; the history says which one, so the operator sees it.
+    const replaces = n.status === 'review' && n.review
+      ? ` It replaces the copy for the ${n.review.party} uploaded at ${n.review.uploadedAt}, which waited for a decision.` : '';
     return {
       ...cur, versions: [...cur.versions.slice(0, -1), { ...n, status: 'review', review }],
-      history: [...cur.history, historyEntry(who.ownerGhii, 'copy-received', `A ${kind === 'pdf' ? 'signed PDF' : 'scanned copy'} for the ${party}; check: ${review.verdict}.`)].slice(-500),
+      history: [...cur.history, historyEntry(who.ownerGhii, 'copy-received', `A ${kind === 'pdf' ? 'signed PDF' : 'scanned copy'} for the ${party}; check: ${review.verdict}.${replaces}`)].slice(-500),
     };
   });
   if (!saved) throw new AgreementError(409, 'NOT_WAITING', 'The version changed meanwhile.');
@@ -272,8 +317,11 @@ export async function signedCopyOp(deps: Deps, caller: CallerContext, id: string
   return { id, version: v.n, review, status: 'review', told };
 }
 
+const copyChanged = (): AgreementError => new AgreementError(409, 'COPY_CHANGED',
+  'Another signed copy came in after you looked, and it replaced the one you saw. Open the agreement again and decide on the copy that waits now.');
+
 /** The operator accepts or rejects the copy that came back. */
-export async function confirmOp(deps: Deps, caller: CallerContext, id: string, body: { accept?: unknown; reason?: unknown }): Promise<Record<string, unknown>> {
+export async function confirmOp(deps: Deps, caller: CallerContext, id: string, body: { accept?: unknown; reason?: unknown; uploaded_at?: unknown }): Promise<Record<string, unknown>> {
   const who = await operatorAccess(deps, caller.auth, 'write');
   const a = await readAgreement(deps.storage, deps.config.nodeId, id);
   if (!a) throw new AgreementError(404, 'NOT_FOUND', 'No such agreement.');
@@ -282,10 +330,19 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
   const accept = body.accept === true;
   const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, 1000) : '';
   if (!accept && !reason) throw new AgreementError(400, 'INVALID_INPUT', 'A rejection says why (reason), so the counterparty knows what to fix.');
+  // The copy the operator looked at, by its upload time (the screen and the MCP tool send it): a copy
+  // that came in after the operator looked is not the one decided on (secaudit2026oct26).
+  const seen = typeof body.uploaded_at === 'string' && body.uploaded_at ? body.uploaded_at : v.review.uploadedAt;
+  if (seen !== v.review.uploadedAt) throw copyChanged();
+  if (accept && !await checkedCopyHolds(deps, v.review)) {
+    throw new AgreementError(409, 'COPY_MISSING', 'The copy the node kept of this signed copy is gone or changed, so it cannot be recorded as evidence. Ask the counterparty to send the copy again.');
+  }
   const now = new Date().toISOString();
+  let changed = false;
   const saved = await updateAgreement(deps.storage, deps.config.nodeId, id, cur => {
     const n = newest(cur);
     if (n.status !== 'review' || !n.review) return UNCHANGED;
+    if (n.review.uploadedAt !== seen) { changed = true; return UNCHANGED; }
     const review: AgreementReview = { ...n.review, decidedBy: who.by, decidedAt: now, decision: accept ? 'accepted' : 'rejected', ...(reason ? { reason } : {}) };
     if (!accept) {
       return { ...cur, versions: [...cur.versions.slice(0, -1), { ...n, status: 'sent', review }], history: [...cur.history, historyEntry(who.ownerGhii, 'copy-rejected', reason)].slice(-500) };
@@ -299,6 +356,7 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
       signer: (side.signerName || side.name).slice(0, 300), at: now,
       evidence: {
         uploadedBy: n.review.uploadedBy, storageOwner: n.review.storageOwner, storageKey: n.review.storageKey, verdict: n.review.verdict,
+        ...(n.review.sha256 ? { sha256: n.review.sha256 } : {}), ...(n.review.copyKey ? { copyKey: n.review.copyKey } : {}),
         confirmedBy: who.by, ...(n.review.checkedBy ? { checkedBy: n.review.checkedBy } : {}),
       },
     };
@@ -306,6 +364,7 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
     const withHistory = { ...cur, history: [...cur.history, historyEntry(who.ownerGhii, 'copy-accepted', `${sig.party} signature recorded (${sig.method}, ${sig.level}).`)].slice(-500) };
     return completeIfSigned(withHistory, next, now);
   });
+  if (changed) throw copyChanged();
   if (!saved) throw new AgreementError(409, 'NOTHING_TO_CONFIRM', 'The copy was decided meanwhile.');
   if (!accept) await tellAgreement(deps, saved, 'copy-rejected', { reason });
   else if (newest(saved).status === 'signed') await tellInForce(deps, saved);

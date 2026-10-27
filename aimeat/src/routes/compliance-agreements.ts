@@ -30,6 +30,7 @@
  *   - GET    /v1/compliance/agreements/:id/document       a version's PDF (format=text: its canonical text; format=json: that text in the envelope)
  * @usage app.use(complianceAgreementsRouter(config, storage));   // server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-27 — POST .../confirm takes uploaded_at, the copy the operator reviewed (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1–D4).
  */
 import { Router, type Request, type Response } from 'express';
@@ -120,7 +121,7 @@ export function complianceAgreementsRouter(config: AimeatConfig, storage: Storag
 
   router.post('/v1/compliance/agreements/:id/confirm', requireAuth(), requireScope(COMPLIANCE_WRITE_SCOPE), async (req, res) => {
     try {
-      res.json(success(config.nodeId, await confirmOp(deps, who(req), req.params.id as string, { accept: req.body?.accept, reason: req.body?.reason })));
+      res.json(success(config.nodeId, await confirmOp(deps, who(req), req.params.id as string, { accept: req.body?.accept, reason: req.body?.reason, uploaded_at: req.body?.uploaded_at })));
     } catch (err) { fail(res, err); }
   });
 
