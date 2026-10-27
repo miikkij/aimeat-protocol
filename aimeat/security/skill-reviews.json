@@ -337,7 +337,7 @@
       "digest": "sha256:0997433c638d579ea7b4dc89"
     },
     "node:aimeat-html-page": {
-      "reviewedOn": "2026-10-20",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/services/html-page.ts",
         "aimeat/src/services/page-frame.ts",
@@ -345,11 +345,11 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:51cb619fd163e7f03de9f232",
+      "digest": "sha256:a50345d10c168fae5e1a4e6a",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,10 +359,10 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:7502bb80862fa8dfb81f4b62"
+      "digest": "sha256:4aaf6c52336aa508cd8b28fa"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:0f28fb76f0425399f155d5c4",
+      "digest": "sha256:ce0fe929469e1c73e0eaae5f",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -760,7 +760,7 @@
       "aimeat/src/services/memory-bin.ts": "d9582548ed79b319",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
-      "aimeat/src/services/owner-erasure.ts": "fc9fc257ed2ab91a",
+      "aimeat/src/services/owner-erasure.ts": "1c7d99964f625705",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },
@@ -788,7 +788,7 @@
       "aimeat/src/commerce/app-tool-catalog.ts": "dfb27bab240a9d9c",
       "aimeat/src/services/extension-ctx-contract.ts": "6861be8a58b438ec",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
-      "aimeat/src/services/workspace-rows/row-service.ts": "323d5c020473993b",
+      "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
       "aimeat/src/services/refinery/pipeline.ts": "5a26add0ca7f5509",
       "aimeat/src/routes/outbound.ts": "d5e03c7e8dcc48ef"
     },
@@ -797,7 +797,7 @@
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
       "aimeat/src/services/workspace-share.ts": "c1c220512506f738",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
-      "aimeat/src/routes/page-host.ts": "fed8aae26b7b9e02"
+      "aimeat/src/routes/page-host.ts": "11cf872797b054ef"
     },
     "node:agent-avatar": {
       "aimeat/src/services/agent-avatar.ts": "e723ba76d91fa56a",
