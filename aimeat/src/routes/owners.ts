@@ -11,6 +11,7 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   2026-10-27 — The operator claim reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-23 — The operator claim reads the request's socket address: a loopback base URL waives the
  *     setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-21 — GET /v1/owners/:name asks isAnonymousPrincipal: the minted anonymous token read the
@@ -54,7 +55,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
-import { isLoopbackAddress } from '../auth/loopback-pass.js';
+import { fromNodeMachine } from '../auth/loopback-pass.js';
 import { requireAuth, requireOwnerPrincipal, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
@@ -117,7 +118,7 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
     // the one-time setup code from the start log (`setupCode`), refused before any row (services/owner-provisioning.ts; Jouni, 2026-10-16).
     let claim: OperatorClaim;
     try {
-      claim = await claimOperatorSetupCode(storage, config, roles, req.body?.setupCode, isLoopbackAddress(req.socket.remoteAddress));
+      claim = await claimOperatorSetupCode(storage, config, roles, req.body?.setupCode, fromNodeMachine(req));
     } catch (err) {
       if (err instanceof SetupCodeRefusedError) {
         res.status(403).json(error(config.nodeId, err.code, err.message));

@@ -22,6 +22,9 @@
  * @structure PdfSignatureField · extractPdfSignatures · classifyAppended
  * @usage const sigs = extractPdfSignatures(buffer);
  * @version-history
+ *   2026-10-27 — extractPdfSignatures takes maxFields and refuses a file with more distinct signature
+ *     fields (TOO_MANY_SIGNATURES) before reading any of them, and a field's signedBytes is made when
+ *     read instead of held, so memory no longer grows with fields x file size (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  */
 
@@ -31,8 +34,8 @@ export interface PdfSignatureField {
   byteRange: [number, number, number, number];
   /** The DER bytes of the CMS SignedData (or RFC 3161 token), trailing zero padding removed. */
   cms: Buffer;
-  /** The bytes the signature covers: [a, a+b) followed by [c, c+d). */
-  signedBytes: Buffer;
+  /** The bytes the signature covers: [a, a+b) followed by [c, c+d). A fresh copy on each read; read it once per check. */
+  readonly signedBytes: Buffer;
   subFilter: string | null;
   /** /Type /DocTimeStamp: a document timestamp rather than a person's signature. */
   isDocTimestamp: boolean;
@@ -223,11 +226,25 @@ export function classifyAppended(text: string, from: number): AppendedContent {
  * Every signature in the file, in file order. Throws PdfExtractError for a file that is not a PDF;
  * a PDF with no signatures returns an empty list.
  */
-export function extractPdfSignatures(pdf: Buffer): PdfSignatureField[] {
+export function extractPdfSignatures(pdf: Buffer, opts: { maxFields?: number } = {}): PdfSignatureField[] {
   if (pdf.length < 8 || pdf.subarray(0, 1024).indexOf('%PDF-') < 0) {
     throw new PdfExtractError('NOT_A_PDF', 'The file is not a PDF (no %PDF- header).');
   }
   const text = asText(pdf);
+  // Each field is checked on its own, so the count is bounded before any of them is read
+  // (docsign.max_signatures; 0 or absent is no limit; secaudit2026oct26).
+  const max = opts.maxFields ?? 0;
+  if (max > 0) {
+    const distinct = new Set<string>();
+    for (const m of text.matchAll(BYTE_RANGE_RE)) {
+      if (m[2] === '0' && m[3] === '0' && m[4] === '0') continue;
+      distinct.add(`${m[1]},${m[2]},${m[3]},${m[4]}`);
+      if (distinct.size > max) {
+        throw new PdfExtractError('TOO_MANY_SIGNATURES',
+          `The file has more than ${max} signatures, and this node checks at most ${max} in one file. The operator sets the number with the setting docsign.max_signatures.`);
+      }
+    }
+  }
   const out: PdfSignatureField[] = [];
   const seen = new Set<string>();
   for (const m of text.matchAll(BYTE_RANGE_RE)) {
@@ -249,13 +266,13 @@ export function extractPdfSignatures(pdf: Buffer): PdfSignatureField[] {
     const len = derLength(cms);
     if (len && len <= cms.length) cms = cms.subarray(0, len);
     const dict = enclosingDictionary(text, m.index!, a + b, c);
-    const signedBytes = Buffer.concat([pdf.subarray(a, a + b), pdf.subarray(c, c + d)]);
     const coversWholeFile = c + d === pdf.length;
     out.push({
       index: out.length,
       byteRange: br,
       cms,
-      signedBytes,
+      // Made when read, not held: a held copy per field made memory grow with fields x file size.
+      get signedBytes() { return Buffer.concat([pdf.subarray(a, a + b), pdf.subarray(c, c + d)]); },
       subFilter: nameField(dict, 'SubFilter'),
       isDocTimestamp: nameField(dict, 'Type') === 'DocTimeStamp' || nameField(dict, 'SubFilter') === 'ETSI.RFC3161',
       claimedSigningTime: pdfDateToIso(stringField(dict, 'M')),

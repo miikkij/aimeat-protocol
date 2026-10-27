@@ -32,7 +32,8 @@
  *   Not single use, unlike routes/extensions/internal-pass.ts: one `aimeat_invoke` may make several
  *   REST calls for one capability, and every one of them is the same caller's.
  * @structure LOOPBACK_PASS_HEADER · mintLoopbackPass(bearer) · revokeLoopbackPass(pass) ·
- *   loopbackPassCovers(pass, bearer, remoteAddress) · isLoopbackAddress(addr)
+ *   loopbackPassCovers(pass, bearer, remoteAddress) · isLoopbackAddress(addr) · SELF_REQUEST_HEADER ·
+ *   fromNodeMachine(req)
  * @usage
  *   const pass = mintLoopbackPass(bearer);
  *   try { await fetch(`http://127.0.0.1:${port}/v1/...`, { headers: { Authorization, [LOOPBACK_PASS_HEADER]: pass } }); }
@@ -40,6 +41,8 @@
  *   // auth/mcp-token-on-rest.ts:
  *   if (loopbackPassCovers(req.header(LOOPBACK_PASS_HEADER), token, req.socket.remoteAddress)) accept();
  * @version-history
+ *   2026-10-27 — SELF_REQUEST_HEADER and fromNodeMachine(req): a request the node makes to itself for a
+ *     principal is not the node's own machine for the setup code's loopback waiver (secaudit2026oct26).
  *   v1.0.0 — 2026-10-12 — Initial (wish-mcp-tokeni-ei-kelpaa-rest-reiteill-4-0-0-sta-ensin-kolme-mcp).
  */
 import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
@@ -86,6 +89,25 @@ export function isLoopbackAddress(address: string | undefined | null): boolean {
   if (!address) return false;
   const a = address.startsWith('::ffff:') ? address.slice('::ffff:'.length) : address;
   return a === '::1' || /^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(a);
+}
+
+/**
+ * The header every request the node makes to itself FOR a principal carries: the connector tunnel's
+ * forward of an agent's request frame, `aimeat_invoke` and the capability invoke. Its presence is all
+ * it says, and it can only take a waiver away, so a caller who sends it gains nothing.
+ */
+export const SELF_REQUEST_HEADER = 'x-aimeat-self-request';
+
+/**
+ * True when the request comes from a person on the node's own machine: it came in on a loopback
+ * socket, and it is not a request the node made to itself for someone else. The setup code's
+ * loopback waiver asks this (services/setup-code.ts): a request the connector tunnel replays onto
+ * loopback for a remote agent arrives on a loopback socket too (secaudit2026oct26,
+ * setup-code/loopback-waiver-honours-connect-tunnel-self-fetch).
+ */
+export function fromNodeMachine(req: { socket?: { remoteAddress?: string | null } | null; headers: Record<string, unknown> }): boolean {
+  if (!isLoopbackAddress(req.socket?.remoteAddress)) return false;
+  return req.headers[SELF_REQUEST_HEADER] === undefined && req.headers[LOOPBACK_PASS_HEADER] === undefined;
 }
 
 /**

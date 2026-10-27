@@ -29,6 +29,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-27 — A delegated publish passes only for the delegation's app (its signed grant or eco id), a person who uses that app or their agents, and the channel owner; any other caller is 403 DELEGATION_NOT_FOR_CALLER naming the app to use (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-25 — An (app id, action) belongs to one channel: a delegation for a pair another channel holds is 409 DELEGATION_IN_USE, the 201 reads its own row back, and a delegated publish of a pair held on two channels is 409 DELEGATION_AMBIGUOUS (secaudit2026oct22, h50/connections-delegation-lookup-unscoped).
  *   2026-10-16 — POST /v1/connections/:id/read/:resource answers 403 READ_AS_OWNER_REQUIRED, with the MCP
  *     mail tools' sentence (readAsOwnerRefusal), when an agent reads its owner's mailbox without
@@ -92,6 +93,7 @@ import { readResource } from '../services/connections/read.js';
 import { answerStoredAttachment } from './connections-attachment.js';
 import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus, openPublish } from '../services/connections/publish-gate.js';
+import { delegationCallerRefusal } from '../services/connections/delegation-caller.js';
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
@@ -524,6 +526,13 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     if ((await delegationChannels(appId, action)).size > 1) {
       res.status(409).json(error(config.nodeId, 'DELEGATION_AMBIGUOUS',
         `More than one channel has given app "${appId}" the action "${action}", so it is not clear which one to publish on. Ask the channel owners to give the app distinct ids.`));
+      return;
+    }
+    // The body's app id names the delegation; the signed token says whether the caller is that app,
+    // one of its users, or the channel owner (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
+    const notYours = await delegationCallerRefusal(storage, config.nodeId, req.auth!, appId, action);
+    if (notYours) {
+      res.status(403).json(error(config.nodeId, notYours.code, notYours.reason));
       return;
     }
     let file: { bytes: Buffer; mimeType: string; name: string } | null = null;
