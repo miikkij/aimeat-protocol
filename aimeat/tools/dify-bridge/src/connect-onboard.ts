@@ -17,6 +17,8 @@
  *   taking it over (src/services/device-return-proof.ts). No stored token is sent with the device
  *   request: the node refuses a dead one.
  * @version-history
+ *   v1.1.1 - 2026-10-27 - The reconnect proof is the v2 text, which names the node's id from GET
+ *     /.well-known/aimeat (secaudit2026oct26, return-proof-unbound-to-node-and-request).
  *   v1.1.0 - 2026-10-26 - Keep the token and the agent's key, and sign a reconnect with the key
  *     (secaudit2026oct22, unbound-reapproval-of-existing-agent).
  *   v1.0.0 - 2026-06-05 - Initial (Dify integration prototype).
@@ -24,7 +26,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { sign } from '../../../src/auth/keypair.js';
-import { returnProofMessage } from '../../../src/services/device-return-proof.js';
+import { returnProofMessageV2 } from '../../../src/services/device-return-proof.js';
 
 const env = (k: string, d = ''): string => process.env[k] ?? d;
 const BASE = env('AIMEAT_BASE_URL', 'http://127.0.0.1:40050').replace(/\/+$/, '');
@@ -48,9 +50,19 @@ async function returnProof(): Promise<{ signed_at: string; signature: string } |
   if (!existsSync(keyFile())) return undefined;
   const key = readFileSync(keyFile(), 'utf-8').trim();
   if (!key) return undefined;
+  // The v2 text names the node, so the proof verifies on this node only (secaudit2026oct26).
+  let nodeId = '';
+  try {
+    const res = await fetch(`${BASE}/.well-known/aimeat`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+    nodeId = String(((await res.json()) as { data?: { node_id?: unknown } }).data?.node_id ?? '');
+  } catch (e) {
+    console.warn(`  The node did not say its id (${(e as Error).message}); connecting without proof that this is the same agent.`);
+    return undefined;
+  }
+  if (!nodeId) return undefined;
   const signedAt = new Date().toISOString();
   try {
-    return { signed_at: signedAt, signature: await sign(key, returnProofMessage(OWNER, AGENT, signedAt)) };
+    return { signed_at: signedAt, signature: await sign(key, returnProofMessageV2(nodeId, OWNER, AGENT, signedAt)) };
   } catch (e) {
     console.warn(`  The key in ${keyFile()} could not sign (${(e as Error).message}); connecting without proof that this is the same agent.`);
     return undefined;

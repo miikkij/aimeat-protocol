@@ -12768,8 +12768,12 @@ paths:
                   description: |
                     An EXISTING agent coming back proves it with the private key its last approval
                     gave it: `signature` is base64 Ed25519 over the text
-                    `aimeat-device-return:v1\n<owner as sent>\n<agent_name>\n<signed_at>`, and
-                    `signed_at` is an ISO time within five minutes. A verified proof shows the owner
+                    `aimeat-device-return:v2\n<node id>\n<owner as sent>\n<agent_name>\n<signed_at>`
+                    (the node id is `node_id` of GET /.well-known/aimeat, so the proof verifies on
+                    this node only), and `signed_at` is an ISO time within five minutes. The older
+                    text `aimeat-device-return:v1\n<owner as sent>\n<agent_name>\n<signed_at>` is
+                    still accepted. A proof counts once: sent again, the request is shown as a new
+                    device. A verified proof shows the owner
                     a return with "keep its current access"; without one (or with one that does not
                     verify) the owner is told that a new device is taking the agent over, the
                     approval records an account event, and the owner may sign the agent's other

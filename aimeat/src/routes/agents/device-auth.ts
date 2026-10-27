@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-27 — A return proof may name this node (v2) and is taken once: a proof sent again, or made
+ *     for another node, leaves the request unproven (secaudit2026oct26, return-proof-unbound-to-node-and-request).
  *   2026-10-25 — A request that names an existing agent may carry `proof` (a signature by the agent's
  *     current key; services/device-return-proof.ts): a verified one marks the request a proven return
  *     (answered as return_proof, and as return_proven on GET /v1/agents/verify/info). POST
@@ -126,7 +128,7 @@ import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from './constants.js';
 import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
-import { proofVerifies, markReturnProven, returnProven } from '../../services/device-return-proof.js';
+import { proofVerifies, spendReturnProof, markReturnProven, returnProven } from '../../services/device-return-proof.js';
 
 /**
  * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
@@ -312,8 +314,11 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
     // An existing agent coming back proves it with a signature by its current key; the owner then
     // sees a return, and otherwise a new device taking the agent over (services/device-return-proof.ts).
+    // The proof names this node (v2) or no node (v1), and is taken once (secaudit2026oct26).
     const returnProof = existingTarget && req.body?.proof !== undefined
-      ? await proofVerifies(existingTarget.publicKey, String(owner), agent_name, req.body.proof) : undefined;
+      ? await proofVerifies(existingTarget.publicKey, String(owner), agent_name, req.body.proof, Date.now(), config.nodeId)
+        && await spendReturnProof(storage, `${ownerName}@${config.nodeId}`, req.body.proof)
+      : undefined;
     if (returnProof) await markReturnProven(storage, `${ownerName}@${config.nodeId}`, userCode, targetGaii);
     const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
