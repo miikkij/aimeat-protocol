@@ -15,6 +15,7 @@
  *
  * @version-history
  *   2026-10-27 -- The status and POST /v1/setup/init read fromNodeMachine(req): a request the node replays onto loopback for a remote agent is not this machine's own (secaudit2026oct26).
+ *   2026-10-27 -- The status and POST /v1/setup/init read requestFromThisMachine: a forwarded request, or one with a Host that is not loopback, is asked for the code (secaudit2026oct26).
  *   v1.10.0 -- 2026-10-23 -- The status and POST /v1/setup/init read the request's socket address: a loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   v1.9.0 -- 2026-10-18 -- A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.8.0 -- 2026-10-18 -- The first account's app agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).

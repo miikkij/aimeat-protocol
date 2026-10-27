@@ -6,13 +6,14 @@
  *   code matches only itself, that take() lets one caller through, and that release() puts a code
  *   back when the owner could not be created.
  * @version-history
+ *   2026-10-27 — requestFromThisMachine: a loopback socket, a loopback Host and no forwarding header (secaudit2026oct26).
  *   2026-10-23 — Both functions take fromLoopback: a loopback base URL waives the code only for a request
  *     from loopback (secaudit2026oct22).
  *   2026-10-16 — setupCodeRefusal: the refusal the setup and the registration routes answer (Jouni, 2026-10-16).
  *   2026-10-16 — Initial (Jouni, 2026-10-16: first-owner setup needs a one-time code on a public node).
  */
 import { describe, it, expect } from 'vitest';
-import { SetupCodeGate, normalizeSetupCode, setupCodeGateFor, setupCodeRefusal, setupCodeRequired } from '../../src/services/setup-code.js';
+import { SetupCodeGate, normalizeSetupCode, setupCodeGateFor, setupCodeRefusal, setupCodeRequired, requestFromThisMachine } from '../../src/services/setup-code.js';
 
 describe('setupCodeRequired', () => {
     it('asks on any base URL that is not loopback, a private LAN address included, whoever asks', () => {
@@ -29,6 +30,26 @@ describe('setupCodeRequired', () => {
     // publishes its port on every address of the host; the base URL alone let the first visitor in.
     it('asks a request from another machine on a loopback base URL', () => {
         expect(setupCodeRequired({ baseUrl: 'http://localhost:40050' }, false)).toBe(true);
+    });
+});
+
+// secaudit2026oct26: a tunnel client or a reverse proxy on the same machine hands outside requests to
+// the node on a loopback socket.
+describe('requestFromThisMachine', () => {
+    const at = (remoteAddress: string, headers: Record<string, string>) => ({ socket: { remoteAddress }, headers });
+    it('is a loopback socket with a loopback Host and no forwarding header (local development, the E2E runner, pnpm sandbox)', () => {
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'localhost:40050' }))).toBe(true);
+        expect(requestFromThisMachine(at('::ffff:127.0.0.1', { host: '127.0.0.1:40600' }))).toBe(true);
+        expect(requestFromThisMachine(at('::1', { host: '[::1]:40050' }))).toBe(true);
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'node.localhost' }))).toBe(true);
+    });
+    it('is not a request a forwarder handed on, or one that names another host', () => {
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'localhost:40050', 'x-forwarded-for': '203.0.113.9' }))).toBe(false);
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'localhost:40050', forwarded: 'for=203.0.113.9' }))).toBe(false);
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'localhost:40050', 'x-real-ip': '203.0.113.9' }))).toBe(false);
+        expect(requestFromThisMachine(at('127.0.0.1', { host: 'example.test' }))).toBe(false);
+        expect(requestFromThisMachine(at('127.0.0.1', {}))).toBe(false);
+        expect(requestFromThisMachine(at('192.168.1.20', { host: 'localhost:40050' }))).toBe(false);
     });
 });
 

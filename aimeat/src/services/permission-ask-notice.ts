@@ -31,6 +31,8 @@
  *   sendPermissionAsk(deps, ownerGhii, agent, words)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   2026-10-27 — The email's heading escapes its subject, which carries the agent's display name
+ *     (secaudit2026oct26, wrapHtml unescaped-heading-agent-display-name).
  *   v1.3.0 — 2026-10-25 — The one-press notice carries its question's ref, and closePermissionAsk() shows
  *     the answer on it and takes its buttons away (the developer's review of the sandbox).
  *   v1.2.0 — 2026-10-25 — The one-press notice carries Don't allow beside Allow, and
@@ -131,7 +133,9 @@ function permissionAskEmail(agent: AgentRecord, words: readonly string[], baseUr
   const what = words.map((w) => plainPermission(w, locale) ?? w);
   const button = t(`${prefix}.button`);
   const after = t(`${prefix}.after`);
-  const html = wrapHtml(subject, `
+  // The subject carries the agent's display name, which the device requester chose: text, never
+  // HTML, in the heading as in the body (secaudit2026oct26).
+  const html = wrapHtml(esc(subject), `
     <p>${esc(lead)}</p>
     <ul>${what.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
     <p style="text-align: center;"><a href="${esc(page)}" class="btn">${esc(button)}</a></p>

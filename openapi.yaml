@@ -12791,8 +12791,12 @@ paths:
                   description: |
                     An EXISTING agent coming back proves it with the private key its last approval
                     gave it: `signature` is base64 Ed25519 over the text
-                    `aimeat-device-return:v1\n<owner as sent>\n<agent_name>\n<signed_at>`, and
-                    `signed_at` is an ISO time within five minutes. A verified proof shows the owner
+                    `aimeat-device-return:v2\n<node id>\n<owner as sent>\n<agent_name>\n<signed_at>`
+                    (the node id is `node_id` of GET /.well-known/aimeat, so the proof verifies on
+                    this node only), and `signed_at` is an ISO time within five minutes. The older
+                    text `aimeat-device-return:v1\n<owner as sent>\n<agent_name>\n<signed_at>` is
+                    still accepted. A proof counts once: sent again, the request is shown as a new
+                    device. A verified proof shows the owner
                     a return with "keep its current access"; without one (or with one that does not
                     verify) the owner is told that a new device is taking the agent over, the
                     approval records an account event, and the owner may sign the agent's other
@@ -41361,6 +41365,15 @@ paths:
                         properties:
                           code:
                             example: NOT_FOUND
+        '409':
+          description: |
+            EMAIL_CHANGED: the account's address changed after this code was sent, so the code marks
+            nothing; confirm the code sent to the current address. EMAIL_TAKEN: the address is
+            verified on another account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '422':
           description: Invalid verification code
           content:
@@ -41722,8 +41735,11 @@ paths:
         `AIMEAT_ENTRA_OAUTH_ENABLED`), each needing its client credentials; an operator may register
         others. Discover the enabled providers + start URLs via `GET /v1/auth/providers`. Returns
         503 when the requested provider is not configured on this node. On a node whose base URL is
-        https the response also sets the round's cookie (`aimeat_oauth_<hash>`, httpOnly,
-        SameSite=Lax, path = the callback), so only this browser can finish the round.
+        https the response also sets the round's cookie, so only this browser can finish the round:
+        over https `__Host-aimeat_oauth_<hash>` (httpOnly, Secure, SameSite=Lax, path /), which a
+        same-site app, portfolio or company page cannot write; over plain http
+        `aimeat_oauth_<hash>` (path = the callback). The pending sign-up cookie the callback sets is
+        `__Host-aimeat_pending_signup` over https and `aimeat_pending_signup` over plain http.
       tags: [GHII-Web]
       parameters:
         - name: provider
@@ -42021,8 +42037,9 @@ paths:
         The post-login `redirect` query parameter is parked server-side under the RelayState.
         Gated on the runtime `sso.enabled` flag; a connection with no SAML configuration answers 404.
         On a node whose base URL is https the response also sets the round's cookie
-        (`aimeat_oauth_<hash>`, httpOnly, SameSite=None, Secure, path = the ACS), so only this browser
-        can finish the round.
+        (httpOnly, SameSite=None, Secure), so only this browser can finish the round: over https
+        `__Host-aimeat_oauth_<hash>` with path /, which a same-site app, portfolio or company page
+        cannot write; over plain http `aimeat_oauth_<hash>` with path = the ACS.
       tags: [SSO]
       parameters:
         - name: connectionId
@@ -74152,6 +74169,15 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            EMAIL_CHANGED: the account's recovery address changed after this code was sent, so the
+            code proves an address the account no longer uses and marks nothing. Send a new code to
+            the address to keep. EMAIL_TAKEN: the address is verified on another account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/ghii/password/reset-request:

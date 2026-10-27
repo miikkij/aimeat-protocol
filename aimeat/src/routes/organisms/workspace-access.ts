@@ -7,6 +7,7 @@
  *   Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
  *   2026-10-27 — A code-key account reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
+ *   2026-10-27 — fromLoopback is read through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   v1.17.1 — 2026-10-23 — A code-key account passes whether the request came in on a loopback socket (fromLoopback), for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.17.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): organism:read on GET /v1/organisms/:id/workspaces; organism:invite on POST /v1/organisms/:id/workspace-access, GET /v1/organisms/:id/workspace-access. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.16.1 — 2026-10-06 — The comments say how a key holder confirms the address on a node that

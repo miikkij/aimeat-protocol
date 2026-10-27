@@ -17,6 +17,8 @@
  *   /v1/ghii/username-available, GET /v1/auth/providers (OIDC providers + listed SSO connections).
  * @usage const providers = buildOidcProviders(config); app.use(oauthLoginRouter(config, storage, providers));
  * @version-history
+ *   2026-10-27 — GET /v1/ghii/login/pending reads the pending sign-up through readPendingSignup (the
+ *     `__Host-` cookie over https; secaudit2026oct26).
  *   2026-10-25 — The callback applies the provider's link-domain fence (OidcProvider.emailLinkFence)
  *     before the mapping tree: a Casdoor or Entra address outside the provider's link domains counts
  *     as unverified (secaudit2026oct22, oidc-email-verified-without-idp-proof).
@@ -52,7 +54,7 @@ import { success, error } from '../middleware/envelope.js';
 import { AccountDisabledError } from '../auth/jwt.js';
 import {
   mapExternalIdentity, finalizeExternalSignup, establishForGhii,
-  signPendingToken, verifyPendingToken, readPendingCookie, setPendingCookie,
+  signPendingToken, readPendingSignup, setPendingCookie,
   normalizeUsername,
 } from '../services/external-login.js';
 import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
@@ -250,8 +252,7 @@ export function oauthLoginRouter(
   // provider) so the SPA can render the one-time username-choice step + finalize to the right route.
   // Reads the signed httpOnly cookie set by the callback; 404s when absent/expired.
   router.get('/v1/ghii/login/pending', async (req, res) => {
-    const raw = readPendingCookie(req);
-    const pending = raw ? await verifyPendingToken(raw) : null;
+    const pending = await readPendingSignup(req);
     if (!pending) {
       res.status(404).json(error(config.nodeId, 'NO_PENDING_SIGNUP', 'No pending sign-up'));
       return;

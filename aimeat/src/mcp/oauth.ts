@@ -12,6 +12,13 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   2026-10-27 — An authorization code carries its issue time, and the exchange refuses a code from
+ *     before the agent's credential cut, for an agent gone or made later, or for a deactivated account.
+ *     The refresh grant goes on only when its delete removed the row, refuses a missing agent or a
+ *     deactivated account, and reads the agent again after writing the rotated row, taking the row
+ *     back if a cut ran in between (services/mcp-oauth-grant-cut.ts). The discovery documents moved to
+ *     mcp/oauth-metadata.ts unchanged (secaudit2026oct26: authorization-code-outlives-agent-credential-cut,
+ *     refresh-rotation-loses-grant-lineage).
  *   v1.8.5 — 2026-10-25 — GET /v1/mcp/consent-info (mcp/oauth-consent-info.ts): the consent page's
  *     client name, whether it is self-declared, the client_id host and the checked redirect
  *     (secaudit2026oct22, mcp-oauth:consent-identity-from-request-not-verified-client).
@@ -65,12 +72,12 @@ import type { Storage } from '../storage/interface.js';
 import { issueJWT } from '../auth/jwt.js';
 import { credentialRevoked, isOwnerPrincipal } from '../auth/middleware.js';
 import { withCurrentScopes } from '../auth/effective-scopes.js';
-import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
+import { recordIssuedAt } from '../auth/credential-age.js';
+import { grantCutRefusal, agentCutMark, cutHappenedSince } from '../services/mcp-oauth-grant-cut.js';
 import { signatureTimestampFresh, spendSignature } from '../auth/signed-request.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
-import { buildAgentAuthMetadata } from '../services/auth-md.js';
-import { buildProtectedResourceMetadata, mcpResourceMetadata, MCP_RESOURCE_METADATA_PATH } from '../services/protected-resource.js';
+import { registerOAuthMetadataRoutes } from './oauth-metadata.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
 import { redirectUriRegistered } from './oauth-redirect.js';
 import { registerOAuthConsentInfo } from './oauth-consent-info.js';
@@ -93,6 +100,8 @@ interface AuthorizationCode {
     /** The `resource` values the authorization request named (RFC 8707), already checked. */
     resources: string[];
     expiresAt: number;
+    /** When it was issued: the exchange refuses a code from before the agent's credential cut. */
+    issuedAt: string;
 }
 
 /**
@@ -307,6 +316,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 codeChallengeMethod: codeChallenge ? 'S256' : undefined,
                 resources,
                 expiresAt: Date.now() + 600_000,
+                issuedAt: new Date().toISOString(),
             };
             authCodes.set(code, authCode);
             noteIssuedCode(config, codeChallenge, resources);
@@ -483,6 +493,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             codeChallengeMethod: code_challenge ? 'S256' : undefined,
             resources: consentResources,
             expiresAt: Date.now() + 600_000,
+            issuedAt: new Date().toISOString(),
         });
         noteIssuedCode(config, code_challenge, consentResources);
 
@@ -604,13 +615,19 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
             // issueJWT's `?? ['*']` default, so every MCP OAuth session was a wildcard — which
             // makes the per-tool scope filter in catalog/scopes.ts decorative on exactly the
             // surface it was written for.
-            const codeAgent = await storage.getAgent(authCode.gaii);
+            // A code from before the agent's credential cut redeems into nothing (services/mcp-oauth-grant-cut.ts).
+            const cut = await grantCutRefusal(storage, authCode.gaii, recordIssuedAt(authCode.issuedAt));
+            if (!cut.ok) {
+                res.status(400).json({ error: 'invalid_grant', error_description: cut.refusal });
+                return;
+            }
+            const codeAgent = cut.agent;
             const accessToken = await issueJWT({
                 sub: authCode.gaii,
                 owner: authCode.owner,
                 node: config.nodeId,
                 roles: authCode.roles,
-                scopes: codeAgent?.defaultScopes ?? config.defaultAgentScopes,
+                scopes: codeAgent.defaultScopes ?? config.defaultAgentScopes,
                 mcp_client: authCode.clientName || client_id,
                 aud: audience,
             }, config.jwtTtlSeconds);
@@ -654,23 +671,28 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 return;
             }
 
-            // Rotate: revoke old, issue new
-            await storage.deleteOAuthRefreshToken(hashToken(refresh_token));
-
-            // A refresh must not widen what the original grant carried.
-            const refreshAgent = await storage.getAgent(existing.gaii);
-            // A refresh token made before the agent's key rotation mints nothing: the rotation deletes
-            // them, and this covers one written while it ran (routes/agents/rekey.ts; secaudit2026oct22).
-            if (madeAfter(refreshAgent?.credentialsValidAfter, recordIssuedAt(existing.createdAt))) {
-                res.status(400).json({ error: 'invalid_grant', error_description: 'The agent\'s key was rotated. Connect again and approve the connection once more.' });
+            // Rotate: revoke old, issue new. Only the request whose delete removed the row goes on, so
+            // two redemptions of one token mint once (secaudit2026oct26).
+            if (!(await storage.deleteOAuthRefreshToken(hashToken(refresh_token)))) {
+                res.status(400).json({ error: 'invalid_grant', error_description: 'Invalid refresh token' });
                 return;
             }
+
+            // A refresh token made before the agent's credential cut mints nothing, and neither does one
+            // for an agent or an account that is gone (services/mcp-oauth-grant-cut.ts; secaudit2026oct22, 2026oct26).
+            const cut = await grantCutRefusal(storage, existing.gaii, recordIssuedAt(existing.createdAt));
+            if (!cut.ok) {
+                res.status(400).json({ error: 'invalid_grant', error_description: cut.refusal });
+                return;
+            }
+            // A refresh must not widen what the original grant carried.
+            const refreshAgent = cut.agent;
             const newAccessToken = await issueJWT({
                 sub: existing.gaii,
                 owner: existing.owner,
                 node: config.nodeId,
                 roles: existing.roles,
-                scopes: refreshAgent?.defaultScopes ?? config.defaultAgentScopes,
+                scopes: refreshAgent.defaultScopes ?? config.defaultAgentScopes,
                 aud: audience,
             }, config.jwtTtlSeconds);
 
@@ -684,6 +706,13 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                 roles: existing.roles,
                 createdAt: new Date().toISOString(),
             });
+            // A cut that ran after the agent read above deleted the rows present then, not this one:
+            // read again, and take this row back if one did.
+            if (await cutHappenedSince(storage, existing.gaii, agentCutMark(refreshAgent))) {
+                await storage.deleteOAuthRefreshToken(hashToken(newRefreshTok));
+                res.status(400).json({ error: 'invalid_grant', error_description: 'The connection was ended while it renewed. Connect again and approve the connection once more.' });
+                return;
+            }
 
             res.json({
                 access_token: newAccessToken,
@@ -732,62 +761,6 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         res.status(200).json({ revoked: true });
     });
 
-    // GET /.well-known/oauth-protected-resource — Resource metadata (RFC 9728)
-    // MCP clients discover this URL from the WWW-Authenticate header on 401 responses.
-    // It tells them WHERE the authorization server is and WHAT scopes are needed.
-    //
-    // Answered PER ORIGIN (services/protected-resource.ts). The apex keeps the document it has
-    // always served; an app origin (`<sub>.apps.<apex>`) and a portfolio origin describe
-    // themselves, because each is a distinct protected resource with its own grant and scopes.
-    // Serving the apex's identifier there was a wrong answer: RFC 9728 §3.3 has the client reject
-    // metadata whose `resource` is not the resource it is talking to.
-    router.get('/.well-known/oauth-protected-resource', async (req: Request, res: Response) => {
-        res.json(await buildProtectedResourceMetadata(req, config, storage));
-    });
-
-    // THE MCP ENDPOINT'S OWN DOCUMENT, at the address RFC 9728 gives a resource that has a path.
-    // The bare URL above describes the ORIGIN; this one describes `${apex}/v1/mcp`, and it is the
-    // one the 401 challenge names, so a client following the challenge reads a `resource` that
-    // matches what it is talking to. Registered AFTER the bare path, which Express matches exactly,
-    // so neither shadows the other.
-    router.get(MCP_RESOURCE_METADATA_PATH, (_req: Request, res: Response) => {
-        res.json(mcpResourceMetadata(config));
-    });
-
-    // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414), extended with
-    // the agent-registration discovery of the auth.md convention (github.com/workos/auth.md):
-    // `skill` points at the human/agent-readable /auth.md document, and `agent_auth` is the
-    // machine-readable summary of how agents get identities on THIS node — the RFC 8628 device
-    // flow (register → owner approval → claim), the Ed25519 re-auth token endpoint, revocation,
-    // and the three identity types (GHII/GAII/GEAI) with their registration entry points.
-    // Keep in sync with services/auth-md.ts, which narrates the same flow.
-    router.get('/.well-known/oauth-authorization-server', (_req: Request, res: Response) => {
-        const baseUrl = config.baseUrl;
-        res.json({
-            issuer: baseUrl,
-            authorization_endpoint: `${baseUrl}/v1/mcp/authorize`,
-            token_endpoint: `${baseUrl}/v1/mcp/token`,
-            registration_endpoint: `${baseUrl}/v1/mcp/register`,
-            // A client may hand us an https URL as its `client_id` and let the document there say
-            // who it is. Declared, because a client cannot try a mechanism it has no way to learn
-            // about: without this line the only discoverable road in is the registration endpoint
-            // above, which 2026-07-28 deprecates. Both work; this one stores nothing and goes stale
-            // for nobody. → services/oauth-client-metadata.ts
-            client_id_metadata_document_supported: true,
-            revocation_endpoint: `${baseUrl}/v1/mcp/token/revoke`,
-            response_types_supported: ['code'],
-            grant_types_supported: ['authorization_code', 'refresh_token'],
-            token_endpoint_auth_methods_supported: ['client_secret_post'],
-            // PKCE with S256, which the MCP authorization spec has a client check for before it starts.
-            // Required from 4.0.0, accepted without until then (mcp/oauth-binding.ts).
-            code_challenge_methods_supported: ['S256'],
-            // RFC 8707: a client names the resource it wants a token for, and the token names it back
-            // as its audience. Not a registered RFC 8414 field; read by clients that look for it, and
-            // harmless to the rest. The protected resource document names the identifier to send.
-            resource_indicators_supported: true,
-            scopes_supported: ['aimeat:full'],
-            skill: `${baseUrl}/auth.md`,
-            agent_auth: buildAgentAuthMetadata(config),
-        });
-    });
+    // The discovery documents (RFC 9728, RFC 8414): mcp/oauth-metadata.ts.
+    registerOAuthMetadataRoutes(router, config, storage);
 }

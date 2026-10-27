@@ -34,6 +34,8 @@
  * @usage
  *   const decision = decideTaskStart(await startFactsOf({ storage, config }, agent), { policy, todos });
  * @version-history
+ *   2026-10-27 — The email's heading escapes its subject, which carries the agent's display name
+ *     (secaudit2026oct26, wrapHtml unescaped-heading-agent-display-name).
  *   v1.0.0 — 2026-10-18 — Initial: the node narrows a ready `*` agent instead of holding its tasks.
  */
 import type { AimeatConfig } from '../config.js';
@@ -154,7 +156,9 @@ function agentNarrowedEmail(agent: AgentRecord, baseUrl: string, locale: Locale)
     const lines = permissionLines(agent.defaultScopes ?? [], locale);
     const button = t('agentNarrowed.email.button');
     const after = t('agentNarrowed.email.after');
-    const html = wrapHtml(subject, `
+    // The subject carries the agent's display name: text, never HTML, in the heading as in the body
+    // (secaudit2026oct26).
+    const html = wrapHtml(esc(subject), `
     <p>${esc(lead)}</p>
     <ul>${lines.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
     <p>${esc(after)}</p>

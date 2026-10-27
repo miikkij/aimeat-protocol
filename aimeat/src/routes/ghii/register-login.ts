@@ -7,6 +7,7 @@
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
  *   2026-10-27 — POST /v1/ghii reads fromNodeMachine(req) for the setup code: a registration the node replays onto loopback for a remote agent is not this machine's own (secaudit2026oct26).
+ *   2026-10-27 — POST /v1/ghii reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — POST /v1/ghii passes whether the request came in on a loopback socket (fromLoopback): a
  *     loopback base URL waives the setup code only for a request from loopback (secaudit2026oct22).
  *   2026-10-16 — POST /v1/ghii takes `setupCode`: the first account on a node whose base URL is not

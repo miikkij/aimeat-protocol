@@ -25,6 +25,7 @@
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
  *   2026-10-27 — An account made here reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
+ *   2026-10-27 — fromLoopback is read through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — An account made here passes whether the request came in on a loopback socket
  *     (fromLoopback), for the setup code of a node without an operator (secaudit2026oct22).
  *   2026-10-22 — A signed-in accept joins and mints no session: only an account made here gets a token

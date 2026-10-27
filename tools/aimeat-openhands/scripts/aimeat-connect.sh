@@ -11,6 +11,8 @@
 #         AIMEAT_SECRETS_FILE (default ./secrets/aimeat.env),
 #         AIMEAT_KEY_FILE (default <secrets dir>/<agent>@<owner>.key)
 # @version-history
+#   2026-10-27 — The reconnect proof is the v2 text, which names the node's id from
+#     /.well-known/aimeat (secaudit2026oct26, return-proof-unbound-to-node-and-request).
 #   2026-10-26 — Keeps the agent's private key of each approval beside the token (0600) and signs a
 #     reconnect's device request with it (`proof`), so the owner sees the agent coming back and not a
 #     takeover (secaudit2026oct22, unbound-reapproval-of-existing-agent). The default scope "*" is no
@@ -82,13 +84,19 @@ KEY_FILE="${AIMEAT_KEY_FILE:-$(dirname "$SECRETS_FILE")/${AGENT_NAME}@${OWNER}.k
 return_proof_json() { # prints ,"proof":{...} or nothing
   [ -s "$KEY_FILE" ] || return 0
   command -v openssl >/dev/null 2>&1 || return 0
-  local dir signed_at sig
+  local dir signed_at sig node_id
+  # The proof names the node it goes to (v2), so it verifies on no other node (secaudit2026oct26).
+  node_id="$(curl -s -H 'Accept: application/json' "$BASE_URL/.well-known/aimeat" | json node_id)"
+  if [ -z "$node_id" ]; then
+    echo "WARNING: the node did not say its id; connecting without proof that this is the same agent." >&2
+    return 0
+  fi
   dir="$(mktemp -d)" || return 0
   ( umask 077
     # PKCS#8 DER prefix for a raw 32-byte Ed25519 seed, then the seed itself.
     { printf '\x30\x2e\x02\x01\x00\x30\x05\x06\x03\x2b\x65\x70\x04\x22\x04\x20'; base64 -d < "$KEY_FILE"; } > "$dir/key.der" ) 2>/dev/null
   signed_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf 'aimeat-device-return:v1\n%s\n%s\n%s' "$OWNER" "$AGENT_NAME" "$signed_at" > "$dir/msg"
+  printf 'aimeat-device-return:v2\n%s\n%s\n%s\n%s' "$node_id" "$OWNER" "$AGENT_NAME" "$signed_at" > "$dir/msg"
   if openssl pkeyutl -sign -rawin -keyform DER -inkey "$dir/key.der" -in "$dir/msg" -out "$dir/sig" >/dev/null 2>&1; then
     sig="$(base64 < "$dir/sig" | tr -d '\r\n')"
     printf ',"proof":{"signed_at":"%s","signature":"%s"}' "$signed_at" "$sig"
