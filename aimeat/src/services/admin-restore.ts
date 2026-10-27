@@ -9,6 +9,9 @@
  * @structure restoreBackup(storage, body) · RestoreOutcome
  * @usage const outcome = await restoreBackup(storage, req.body);
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: with the restoring actor, one operator-trail line per person the
+ *     restore wrote into, and an agent the operator's agent restores gets no looser a clearance than
+ *     the restoring agent's own (clearanceBoundByApprover). The operator in person restores as before.
  *   v1.0.0 — 2026-10-16 — Extracted from routes/admin-monitoring.ts. Every create error was logged as
  *     "skip duplicates" at warn level and the answer always said `restored: true`; a duplicate is now
  *     told apart from any other failure (the record with the same key exists afterwards), other
@@ -16,7 +19,11 @@
  *     (QA audit P6-07).
  */
 import type { Storage, MemoryRecord, WalletTransaction } from '../storage/interface.js';
+import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
+import { recordOperatorAction } from './operator-access-audit.js';
+import { clearanceBoundByApprover } from './agent-clearance.js';
 
 type Kind = 'owners' | 'agents' | 'actions' | 'boards' | 'memories' | 'transactions';
 type Counts = Record<Kind, number>;
@@ -57,12 +64,31 @@ function isUniqueViolation(err: unknown): boolean {
   return /unique constraint|UNIQUE constraint failed|duplicate key/i.test(e.message || '');
 }
 
+/** Who restores, for the operator trail and the clearance bound. Absent: the import alone, as before. */
+export interface RestoreActor {
+  config: AimeatConfig;
+  /** The operator's GHII. */
+  operatorGhii: string;
+  /** The exact principal: the operator in person, or their agent holding operator:admin. */
+  actorGaii: string;
+  /** True for the operator in person; false for the operator's agent. */
+  inPerson: boolean;
+}
+
 /**
  * Import a backup body. Owners, agents, actions and boards are created; a create that throws is a
  * duplicate when the record with that key exists afterwards, and a failure otherwise. Memory records
  * are written with setMemory (an existing key is replaced, as before) and transactions appended.
+ *
+ * With `actor` (POST /v1/admin/restore), two more things happen (secaudit2026oct26,
+ * restoreBackup:raw-cross-account-writes-without-guard-or-trail). Each person whose records or agents
+ * the restore wrote reads one line in their account feed naming the operator and the counts
+ * (operator-access-audit.ts recordOperatorAction; the operator's own account gets none). And when
+ * the operator's AGENT restores, an agent row it creates gets no looser a clearance than the
+ * restoring agent's own, as an agent an agent approves does (agent-clearance.ts
+ * clearanceBoundByApprover): the backup export reads through that clearance for the same agent.
  */
-export async function restoreBackup(storage: Storage, body: unknown): Promise<RestoreOutcome> {
+export async function restoreBackup(storage: Storage, body: unknown, actor?: RestoreActor): Promise<RestoreOutcome> {
   const b = (body ?? {}) as {
     owners?: unknown[]; agents?: unknown[]; actions?: unknown[]; boards?: unknown[];
     agent_data?: Record<string, { memories?: MemoryRecord[]; transactions?: WalletTransaction[] }>;
@@ -96,9 +122,25 @@ export async function restoreBackup(storage: Storage, body: unknown): Promise<Re
     const name = String(o?.name ?? '');
     await createOne('owners', o as never, name, r => storage.createOwner(r), () => name ? storage.getOwner(name) : null);
   }
-  for (const a of (b.agents ?? []) as Array<{ gaii?: string }>) {
+  // The persons the restore wrote into, with what it wrote, for the operator trail.
+  const touched = new Map<string, { records: number; agents: number }>();
+  const tally = (principal: string, kind: 'records' | 'agents'): void => {
+    const ghii = ownerGhiiOf(principal);
+    const t = touched.get(ghii) ?? { records: 0, agents: 0 };
+    t[kind]++;
+    touched.set(ghii, t);
+  };
+  // The restoring agent's own clearance; null for the operator in person or an agent with none.
+  const boundBy = actor && !actor.inPerson ? (await storage.getAgent(actor.actorGaii))?.clearance ?? null : null;
+
+  for (const a of (b.agents ?? []) as Array<{ gaii?: string; clearance?: string | null }>) {
     const gaii = String(a?.gaii ?? '');
-    await createOne('agents', a as never, gaii, r => storage.createAgent(r), () => gaii ? storage.getAgent(gaii) : null);
+    const row = boundBy !== null && gaii
+      ? { ...a, clearance: await clearanceBoundByApprover({ storage, config: actor!.config }, ownerGhiiOf(gaii), a.clearance ?? null, boundBy) }
+      : a;
+    const before = out.imported.agents;
+    await createOne('agents', row as never, gaii, r => storage.createAgent(r), () => gaii ? storage.getAgent(gaii) : null);
+    if (out.imported.agents > before) tally(gaii, 'agents');
   }
   for (const a of (b.actions ?? []) as Array<{ id?: string; providerGaii?: string }>) {
     const id = String(a?.id ?? '');
@@ -112,13 +154,28 @@ export async function restoreBackup(storage: Storage, body: unknown): Promise<Re
   }
   for (const [gaii, data] of Object.entries(b.agent_data ?? {})) {
     for (const m of data?.memories ?? []) {
-      try { await storage.setMemory(m); out.imported.memories++; } catch (err) { fail('memories', `${gaii}/${m?.key ?? ''}`, err); }
+      try {
+        await storage.setMemory(m);
+        out.imported.memories++;
+        tally(String(m?.ownerGaii ?? gaii), 'records');
+      } catch (err) { fail('memories', `${gaii}/${m?.key ?? ''}`, err); }
     }
     for (const tx of data?.transactions ?? []) {
       try { await storage.addTransaction(tx); out.imported.transactions++; } catch (err) {
         if (isUniqueViolation(err)) out.skipped_duplicates.transactions++;
         else fail('transactions', `${gaii}/${(tx as { id?: string })?.id ?? ''}`, err);
       }
+    }
+  }
+
+  // One line per person, before the answer (recordOperatorAction never throws).
+  if (actor) {
+    for (const [ownerGhii, t] of touched) {
+      await recordOperatorAction(storage, actor.config, {
+        operatorGhii: actor.operatorGhii, actorGaii: actor.actorGaii, ownerOf: ownerGhii,
+        area: 'backup', action: 'restore', subject: 'backup.restore',
+        data: { records: String(t.records), agents: String(t.agents) },
+      });
     }
   }
 

@@ -34,13 +34,15 @@
  *   await keepExtensionPublishOnce(storage, config);                 // server-bootstrap/once-only-keep-steps.ts
  *   if (await keepsPrePublishGate(storage, nodeId, ext)) ...         // services/publish-actors.ts
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: only an extension installed before the rule's first try on this
+ *     node is kept, also when the step runs at a later start (keptBefore, madeBefore).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v68 and v69; purpose rule 6).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore, madeBefore } from './once-only-step.js';
 
 /** The record under `system@<nodeId>` that says the step has run, when, and which extensions it kept. */
 export const PUBLISH_KEEP_STEP_KEY = 'migrations.extension-publish-gate-keep';
@@ -91,8 +93,11 @@ export async function keepExtensionPublishOnce(
     try {
         const at = new Date().toISOString();
         const kept: Record<string, string> = {};
+        // Only what was installed before the rule first took effect here (secaudit2026oct26).
+        const cutoff = keptBefore(claim);
         for (const lean of await storage.listExtensions({ lean: true })) {
             if (!(lean.installedByPrincipal ?? '').includes('#')) continue;
+            if (!madeBefore(lean.installedAt, cutoff)) continue;
             // The lean list leaves the scripts out; the digest needs them.
             const ext = await storage.getExtension(lean.name);
             if (ext) kept[ext.name] = scriptsDigest(ext.actions ?? []);

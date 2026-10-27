@@ -10,6 +10,7 @@
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
  *   v1.4.0 — 2026-10-27 — federation.introductions_per_hour (secaudit2026oct26, unbounded pending peering requests).
+ *   2026-10-27 — realtime.echat_max_rooms and realtime.max_docs_per_room (secaudit2026oct26).
  *   v1.3.0 — 2026-10-25 — apps.held_label_days and apps.held_labels_per_owner (secaudit2026oct22,
  *     app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — email.company_smtp_private_hosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
@@ -44,4 +45,10 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'federationIntroductionsPerHour', dotPath: 'federation.introductions_per_hour', envVar: 'AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'Peering requests one address may leave for the operator per hour through an introduction. A node that introduces itself again with the same key keeps one waiting request. Past the limit the node is told when to try again. 0 = no limit',
     range: '0-100000' },
+  { key: 'realtimeEchatMaxRooms', dotPath: 'realtime.echat_max_rooms', envVar: 'AIMEAT_REALTIME_ECHAT_MAX_ROOMS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most rooms anonymous echat visitors hold open together, inside realtime.max_rooms, so visitors without an account cannot take every room your apps use. 0 = no separate limit',
+    range: '0-10000' },
+  { key: 'realtimeMaxDocsPerRoom', dotPath: 'realtime.max_docs_per_room', envVar: 'AIMEAT_REALTIME_MAX_DOCS_PER_ROOM', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most shared documents one realtime room keeps the latest state of, for players who join later. A document past it is still sent to the room. 0 = no limit',
+    range: '0-10000' },
 ];

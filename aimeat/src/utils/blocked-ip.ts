@@ -9,6 +9,9 @@
  * @structure blockedIpReason(ip) · isLoopbackIp(ip) · isLoopbackLiteral(host) · loopbackEgressAllowed()
  * @usage if (blockedIpReason(address) && !(loopbackEgressAllowed() && isLoopbackIp(address))) refuse();
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: IPv6 loopback and unspecified are decided on the expanded groups
+ *     in blockedIpReason and isLoopbackIp, so a long, zero-padded or dotted spelling of ::1 or :: is
+ *     the address it spells (blockedIpReason/noncanonical-ipv6-loopback-unspecified).
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: NAT64 (64:ff9b::/96), 6to4 (2002::/16) and the long
  *     IPv4-mapped form are decided on the IPv4 address they carry; local-use NAT64, Teredo,
  *     IPv4-compatible (::/96), site-local (fec0::/10), 198.18.0.0/15 and 192.0.0.0/24 are refused.
@@ -47,6 +50,11 @@ export function blockedIpReason(ipRaw: string): string | null {
     else if (h0 === 0x2001 && h1 === 0) return 'IPv6 Teredo (2001::/32)';
     else if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0 && (h6 !== 0 || h7 > 1)) {
       return 'IPv4-compatible IPv6 address (::/96)';
+    }
+    // Loopback and unspecified are decided on the groups, so every spelling of ::1 and :: is caught
+    // (0:0:0:0:0:0:0:1, zero-padded groups, ::0.0.0.1), not only the compressed text.
+    else if (h0 === 0 && h1 === 0 && h2 === 0 && h3 === 0 && h4 === 0 && h5 === 0 && h6 === 0) {
+      return h7 === 1 ? 'IPv6 loopback' : 'IPv6 unspecified';
     }
   }
 
@@ -124,6 +132,9 @@ const LOOPBACK_V4 = /^127(?:\.\d{1,3}){3}$/;
 export function isLoopbackIp(ipRaw: string): boolean {
   const ip = ipRaw.toLowerCase().replace(/^\[|\]$/g, '');
   if (ip === '::1') return true;
+  // Any other spelling of ::1, decided on its groups as blockedIpReason decides it.
+  const groups = ip.includes(':') ? expandIpv6(ip) : null;
+  if (groups && groups.slice(0, 7).every(g => g === 0) && groups[7] === 1) return true;
   const mapped = /^::ffff:(\d+\.\d+\.\d+\.\d+)$/.exec(ip);
   if (mapped) return LOOPBACK_V4.test(mapped[1]);
   if (ip === '::ffff:7f00:1') return true;

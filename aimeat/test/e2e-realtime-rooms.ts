@@ -168,6 +168,14 @@ class Sock {
         });
     }
 
+    /** The close code the server ended the socket with. */
+    closeCode(timeoutMs = 4000): Promise<number> {
+        return new Promise((resolve, reject) => {
+            const timer = setTimeout(() => reject(new Error('socket stayed open')), timeoutMs);
+            this.ws.once('close', (code: number) => { clearTimeout(timer); resolve(code); });
+        });
+    }
+
     close(): void { try { this.ws.close(); } catch { /* already gone */ } }
 }
 
@@ -745,6 +753,29 @@ await test('error MESSAGE_TOO_LARGE — a frame over the size ceiling is refused
     await bob.expectNone('broadcast');
 });
 
+// secaudit2026oct26 realtimeWss:no-maxPayload. The socket carried frames up to the ws default of
+// 100 MiB, held whole before the 16 KB check. The transport limit now sits above the largest frame
+// the size check lets through (three bytes per character), so every frame relayed before still is.
+await test('a frame at the size ceiling in three-byte characters is still relayed whole', async () => {
+    const wide = '€'.repeat(16_000);
+    const frame = JSON.stringify({ type: 'broadcast', payload: wide });
+    assert(frame.length <= 16384 && Buffer.byteLength(frame) > 48_000, `the test frame: ${frame.length} chars, ${Buffer.byteLength(frame)} bytes`);
+    alice.sendRaw(frame);
+    const got = await bob.waitFor('broadcast');
+    assert(got.payload === wide, 'the whole payload arrives');
+});
+
+await test('a frame far over the size ceiling closes the socket before the node holds it (1009)', async () => {
+    const big = await Sock.open(`room=${publicRoomId}&nick=big`);
+    const bigJoined = await big.waitFor('joined');
+    const closed = big.closeCode(6000);
+    big.sendRaw(JSON.stringify({ type: 'broadcast', payload: 'x'.repeat(400_000) }));
+    const code = await closed;
+    assert(code === 1009, `close code: ${code}`);
+    await bob.waitFor('peer-left', m => m.peerId === bigJoined.peerId);
+    await bob.expectNone('broadcast');
+});
+
 await test('error INVALID_MESSAGE — a frame that is not JSON is answered, not dropped', async () => {
     alice.sendRaw('this is not json');
     const err = await alice.waitFor('error');
@@ -873,6 +904,39 @@ await test('echat — with the flag on, an anonymous socket joins a room named b
 await test('echat — a room name outside [a-zA-Z0-9-]{1,64} is refused on the upgrade', async () => {
     assert(await upgradeStatus('echat=1&room=bad_name') === 400, 'underscore must be refused');
     assert(await upgradeStatus('echat=1&room=') === 400, 'an empty name must be refused');
+});
+
+// secaudit2026oct26 getOrCreateRoomByName:anonymous-room-cap-exhaustion. An echat room was made
+// before the WebSocket handshake, so a handshake that failed left a room nobody could join until the
+// idle reaper an hour later; and echat visitors could hold every room of the node.
+async function echatRoomNamed(name: string): Promise<any> {
+    const { body } = await json('/v1/admin/realtime', { headers: authA() });
+    return (body.data.rooms as any[]).find(r => r.name === name && r.app_type === 'echat');
+}
+
+await test('echat — a handshake that fails leaves no room behind', async () => {
+    const name = `rt-echat-broken-${Date.now().toString(36)}`;
+    const answer = await upgradeAnswer(`echat=1&room=${name}`, { 'Sec-WebSocket-Key': 'not-a-key' });
+    assert(answer.status === 400, `a malformed handshake is refused by the socket library: ${answer.status}`);
+    let left: any = await echatRoomNamed(name);
+    for (let i = 0; i < 20 && left; i++) { await sleep(50); left = await echatRoomNamed(name); }
+    assert(left === undefined, `the room stayed: ${JSON.stringify(left)}`);
+});
+
+await test('echat — visitors hold no more rooms than realtime.echat_max_rooms, and the apps still get theirs', async () => {
+    await setConfig('realtime.echat_max_rooms', 1);
+    const held = await Sock.open(`echat=1&room=rt-echat-held-${Date.now().toString(36)}`);
+    try {
+        await held.waitFor('joined');
+        const second = await upgradeStatus(`echat=1&room=rt-echat-second-${Date.now().toString(36)}`);
+        assert(second === 503, `a second echat room past the echat limit must be 503, got ${second}`);
+        const app = await createRoom({ app_type: 'whiteboard', name: 'rt-beside-echat' });
+        assert(app.status === 201, `a signed-in app still gets a room: ${app.status} ${JSON.stringify(app.body)}`);
+        await json(`/v1/realtime/rooms/${app.body.data.id}`, { method: 'DELETE', headers: authA() });
+    } finally {
+        held.close();
+        await setConfig('realtime.echat_max_rooms', 50);
+    }
 });
 
 // ─── Phase 6: The room ceiling ───

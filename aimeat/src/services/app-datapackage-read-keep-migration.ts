@@ -34,6 +34,7 @@
  * @usage
  *   await keepDatapackageReadForAppsOnce(storage, config, { existedBefore: before });
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: the cutoff is never later than the rule's first try (keptBefore).
  *   v1.0.0 — 2026-10-21 — Initial (secaudit 2026-10 v41, capability-loss review).
  */
 import type { AimeatConfig } from '../config.js';
@@ -41,7 +42,7 @@ import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 import { recordSecurityIncident } from './security-incident.js';
 import { keepWorkingAppsOnce, type KeptApp } from './app-scope-allowance.js';
-import { claimOnceOnlyStep } from './once-only-step.js';
+import { claimOnceOnlyStep, keptBefore } from './once-only-step.js';
 import { tellAppOwners } from './rest-scope-keep-working-migration.js';
 import { DATAPACKAGE_READ_RULE } from './app-scope-needs.js';
 
@@ -69,7 +70,7 @@ export async function keepDatapackageReadForAppsOnce(
   const result: DatapackageReadKeepResult = { ran: false, apps: [] };
   const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, APP_DATAPACKAGE_READ_KEEP_KEY);
   if (!claim) return result;
-  const cutoff = Date.parse(opts.existedBefore ?? new Date().toISOString());
+  const cutoff = keptBefore(claim, opts.existedBefore);   // never later than the rule's first try (secaudit2026oct26)
   try {
     result.apps = await keepWorkingAppsOnce(storage, config, cutoff, {
       only: [WORD], rules: [DATAPACKAGE_READ_RULE],
