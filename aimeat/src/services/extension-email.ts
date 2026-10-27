@@ -9,6 +9,9 @@
  * @structure buildExtensionEmail() · MULTI_RECIPIENT_REFUSAL · isSingleRecipient() · unavailableEmail()
  * @usage email: buildExtensionEmail({ storage, config, extName, extConfig, ownerName, emailService })
  * @version-history
+ *   v1.1.1 — 2026-10-27 — isSingleRecipient also asks the transport's own parser (nodemailer
+ *     addressparser) for exactly one recipient, so a quote inside a comment no longer hides a list
+ *     (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — One message names one recipient: a `to` with several addresses is refused
  *     with a sentence telling the script to send one per recipient, so each recipient passes its own
  *     tier check. A send the tiers allow draws on the account's hourly allowance, the operator setting
@@ -23,6 +26,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { ExtensionCtx } from './extension-runtime.js';
 import type { EmailService } from './email.js';
+import addressparser from 'nodemailer/lib/addressparser';
 import { logger } from '../utils/logger.js';
 import { extensionConsentHolds } from './extension-consent.js';
 import { rateBuckets } from './rate-buckets.js';
@@ -87,11 +91,16 @@ export const MULTI_RECIPIENT_REFUSAL = 'INVALID_INPUT: ctx.email sends one messa
  * Whether `to` names exactly one address, the way a mail library splits a recipient list: quoted
  * display names and comments set aside, no list separator (`,` `;`), no group (`:`), no line break,
  * and one `@`. `"Smith, John" <john@example.com>` is one recipient.
+ *
+ * The transport's own parser has the last word: `to` passes only when nodemailer's addressparser
+ * also reads exactly one recipient from it. The two regexes alone disagreed with that parser on a
+ * double quote inside a comment, which it treats as comment text (secaudit2026oct26).
  */
 export function isSingleRecipient(to: unknown): boolean {
     if (typeof to !== 'string') return false;
     const bare = to.replace(/"(?:[^"\\]|\\.)*"/g, '""').replace(/\([^()]*\)/g, '');
-    return !/[,;:\r\n]/.test(bare) && (bare.match(/@/g)?.length ?? 0) === 1;
+    if (/[,;:\r\n]/.test(bare) || (bare.match(/@/g)?.length ?? 0) !== 1) return false;
+    return addressparser(to, { flatten: true }).length === 1;
 }
 
 /** One fixed one-hour window per account, the arithmetic every limiter on this node shares. */
