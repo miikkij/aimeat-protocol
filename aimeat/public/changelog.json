@@ -4,6 +4,29 @@
     {
       "date": "2026-10-27",
       "kind": "feature",
+      "id": "2026-10-27-long-tool-calls-no-longer-time-out",
+      "highlight": false,
+      "audience": [
+        "agent",
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "Long tool calls no longer time out, and an AI finds everything in one document",
+        "fi": "Pitkät työkalukutsut eivät enää katkea, ja tekoäly löytää kaiken yhdestä dokumentista"
+      },
+      "summary": {
+        "en": "A slow tool call no longer times out, and an AI finds all AIMEAT offers in one document.",
+        "fi": "Hidas työkalukutsu ei enää katkea, ja tekoäly löytää kaiken AIMEATin tarjonnan yhdestä dokumentista."
+      },
+      "body": {
+        "en": "When your AI client supports MCP tasks, a tool call that runs longer than 10 seconds answers at once and your AI fetches the result when it is ready. AIMEAT also lists its MCP server, API, offered agents and public skills in one discovery document (ARD), and every front page offers its WebMCP tools.",
+        "fi": "Kun tekoälyasiakkaasi tukee MCP-tehtäviä, yli 10 sekuntia kestävä työkalukutsu vastaa heti, ja tekoäly hakee tuloksen, kun se on valmis. AIMEAT kokoaa MCP-palvelimen, rajapinnan, tarjolla olevat agentit ja julkiset skillit yhteen löytödokumenttiin (ARD), ja jokainen etusivu tarjoaa WebMCP-työkalunsa."
+      }
+    },
+    {
+      "date": "2026-10-27",
+      "kind": "feature",
       "id": "2026-10-27-skills-in-the-agent-skills-format",
       "highlight": false,
       "audience": [
