@@ -71,10 +71,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/routes/commerce-ucp.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/routes/federation-peer/introduce.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -84,14 +80,6 @@
         "why": "UNREVIEWED"
       },
       "src/routes/site.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/routes/work.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
-      "src/services/a2a-foreign.ts": {
         "count": 1,
         "why": "UNREVIEWED"
       },
@@ -119,10 +107,6 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/services/connections/instance.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/services/connections/metrics.ts": {
         "count": 5,
         "why": "UNREVIEWED"
@@ -144,10 +128,6 @@
         "why": "UNREVIEWED"
       },
       "src/services/federation-book.ts": {
-        "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/services/federation-helpers.ts": {
         "count": 2,
         "why": "UNREVIEWED"
       },

@@ -91,7 +91,7 @@ const PEER_NS = '__a2a_peer__';
 const legacyPeerKey = (gaii: string) => `a2apeer.${Buffer.from(gaii).toString('base64url').slice(0, 100)}`;
 /**
  * Where a pin lives (secaudit2026oct26, jwks-origin-unbound-to-claimed-node). A card whose JWKS host
- * is the node its gaii names (a federation peer's address, or the gaii's own DNS name) holds the pin
+ * is the node its gaii names (the gaii's node part is a DNS name and the host is it) holds the pin
  * of the gaii alone. Any other card holds the pin of the gaii together with the host that publishes
  * its key, so a card published elsewhere cannot take a name first and lock its agent out. A full
  * hash, so two long names that share a start are two pins.
@@ -112,14 +112,12 @@ function isDnsName(name: string): boolean {
 }
 
 /**
- * Is the JWKS host the node the gaii names? True for a federation peer of that node id at that
- * host, and for a DNS node name served from itself or a subdomain of itself.
+ * Is the JWKS host the node the gaii names? True for a DNS node name served from itself or a
+ * subdomain of itself. An opaque node name (an AIMEAT node id, or a non-AIMEAT client's own word)
+ * names no host, so its pin is keyed with the JWKS host: the agent's own host keeps its own pin.
  */
-async function jwksHostIsClaimedNode(storage: Storage, claimedNode: string, jwksHost: string): Promise<boolean> {
-  if (!jwksHost) return false;
-  const peer = (await storage.listFederationPeers()).find(p => p.nodeId.toLowerCase() === claimedNode);
-  if (peer) return hostOf(peer.url) === jwksHost;
-  return isDnsName(claimedNode) && (jwksHost === claimedNode || jwksHost.endsWith(`.${claimedNode}`));
+function jwksHostIsClaimedNode(claimedNode: string, jwksHost: string): boolean {
+  return !!jwksHost && isDnsName(claimedNode) && (jwksHost === claimedNode || jwksHost.endsWith(`.${claimedNode}`));
 }
 
 /**
@@ -308,7 +306,7 @@ export async function identifyForeignCaller(
 
   // ── Trust on first use, and compared on every use after it ──
   const jwksHost = hostOf(card.jwksUri);
-  const hostIsNode = await jwksHostIsClaimedNode(storage, claimedNode, jwksHost);
+  const hostIsNode = jwksHostIsClaimedNode(claimedNode, jwksHost);
   const pinKey = peerKey(card.gaii, hostIsNode ? null : jwksHost);
   const pinned = await readPeer(storage, card.gaii, pinKey, jwksHost);
   const nowIso = new Date().toISOString();
