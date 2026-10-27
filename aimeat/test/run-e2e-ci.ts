@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-portfolio-memory-gate.ts joins the list (not the guard tier): the welcome page's switch written through POST, PATCH or the bulk memory door asks the publish gate as PUT /v1/portfolio/config does (secaudit2026oct26).
  *   2026-10-27 -- e2e-service-namespace-lists.ts joins the list (not the guard tier): beneficiary splits, metered contracts, grants and their history, and the operator's money platform fees take only the service's own records (secaudit2026oct26).
  *   2026-10-27 -- e2e-memory-door-parity.ts joins the list (not the guard tier): bulk-delete and the bin routes ask the bin's per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller reads as absent (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
@@ -812,6 +813,9 @@ const ALL_SUITES = [
     // A service that lists a key prefix across the node takes only its own namespace: beneficiary
     // splits, metered contracts and grants, the operator's money platform fees (secaudit2026oct26).
     'test/e2e-service-namespace-lists.ts',
+    // The welcome page's switch written through a memory door asks the publish gate as
+    // PUT /v1/portfolio/config does (secaudit2026oct26).
+    'test/e2e-portfolio-memory-gate.ts',
     // Who sees the hands on a key, and who reads a task's title in the event record (secaudit 2026-10, v88, v89).
     'test/e2e-memory-hands-readers.ts',
     'test/e2e-account-events-readers.ts',

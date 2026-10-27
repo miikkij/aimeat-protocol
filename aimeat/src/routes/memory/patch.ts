@@ -25,6 +25,8 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-27 — A merge of the welcome page's switch (portfolio.config) asks the publish gate as
+ *     PUT /v1/portfolio/config does: 202 with `publish_request`, the rest stored (secaudit2026oct26).
  *   2026-10-27 — With owner_scope, a merge into an owner record the caller reads as absent (an agent
  *     without memory:read-as-owner, Full access included) is stored and answers `value: null` with a
  *     note naming the permission, and a visibility change of that record is refused 403 SCOPE_DENIED
@@ -107,6 +109,8 @@ import { classifyAfterWrite } from '../../services/classify-on-write.js';
 import { resolveWriteTarget } from './owner-target.js';
 import { readsAsOwner, visibleToSameOwnerReader, hiddenRecordRelabel, READ_AS_OWNER_SCOPE, READ_AS_OWNER_NOTE } from '../../services/owner-scope-read.js';
 import { denyScope403 } from '../../auth/deny.js';
+import { portfolioMemoryWriteGate, type PortfolioMemoryGate } from '../../services/portfolio-memory-gate.js';
+import { filePortfolioAsk } from '../../services/portfolio-publish-gate.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
@@ -270,6 +274,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let priorVisibility: string | undefined;
     // The record the merge landed on was one this writer reads as absent.
     let hiddenFromWriter = false;
+    // The welcome page's switch held back for the owner (portfolioMemoryWriteGate), filed after the write.
+    let portfolioAsk: Extract<PortfolioMemoryGate, { kind: 'ask' }> | null = null;
 
     for (let attempt = 0; attempt < MAX_MERGE_ATTEMPTS && !record; attempt++) {
       held = [];
@@ -304,7 +310,20 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
         return;
       }
 
-      const merged = applyMergePatch(existing?.value ?? {}, patch);
+      let merged = applyMergePatch(existing?.value ?? {}, patch);
+      // The welcome page's switch asks the publish gate as PUT /v1/portfolio/config does: all but the
+      // change that makes the served page public is stored, and the request is filed after
+      // (services/portfolio-memory-gate.ts; secaudit2026oct26).
+      const portfolioGate = await portfolioMemoryWriteGate({ storage, config }, {
+        principal: writer, targetGaii: gaii, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [],
+        federated: isForeignPrincipal(req.auth), ...(req.auth!.app ? { app: req.auth!.app } : {}),
+      }, key, merged);
+      if (portfolioGate.kind === 'refused') {
+        res.status(portfolioGate.status).json(error(config.nodeId, portfolioGate.code, portfolioGate.message));
+        return;
+      }
+      portfolioAsk = portfolioGate.kind === 'ask' ? portfolioGate : null;
+      if (portfolioAsk) merged = portfolioAsk.value as typeof merged;
 
       mergedSize = Buffer.byteLength(JSON.stringify(merged), 'utf8');
       if (mergedSize > MAX_VALUE_SIZE) {
@@ -457,6 +476,10 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       });
       if (filed.ok) publishRequest = publishRequestedBody({ storage, config }, filed);
       else publishWarning = { code: 'PUBLISH_NOT_ASKED', message: `Saved as ${record.visibility}, not public: ${filed.message}` };
+    }
+    if (portfolioAsk) {
+      const asked = await filePortfolioAsk({ storage, config }, portfolioAsk.ownerName, portfolioAsk);
+      if ('publishRequest' in asked) publishRequest = asked.publishRequest; else publishWarning = asked.warning;
     }
 
     res.status(publishRequest ? 202 : created ? 201 : 200).json(success(config.nodeId, {

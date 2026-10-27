@@ -7500,6 +7500,11 @@ components:
         sentence to pass on to the owner. Read and decide it at /v1/publish-requests. On a node that
         shows its content to signed-in accounts only, no request is filed: the change is stored at the
         signed-in level with the warning PUBLIC_IS_SIGNED_IN_HERE (MemoryWriteWarning).
+
+        The welcome page's switch, the memory record `portfolio.config`, written through a memory
+        route (POST, PUT, PATCH /v1/memory, POST /v1/memory/bulk or /import) asks the same as
+        PUT /v1/portfolio/config: a write that would switch the served page on, or open it to anyone,
+        stores the rest of the record and files a request of kind `portfolio`.
       content:
         application/json:
           schema:
