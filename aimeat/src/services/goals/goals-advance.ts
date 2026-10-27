@@ -15,6 +15,8 @@
  * @structure OFFER_GRACE_MS · NOBODY_MS · computeAdvance() · advanceGoal()
  * @usage await advanceGoal(deps, ownerGhii, goalId);
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A model work waiting for the owner's answer on a record (readAsk) stays
+ *     waiting until it is answered (goals-model-reach.ts; secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — An open work with `runner: 'model'` is started by the node's model
  *     (goals-model.ts) inside the spending limit; a proposed goal does not move.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -60,7 +62,8 @@ export function computeAdvance(goal: GoalRecord, agents: GoalAgent[], free: Set<
 
   // 1. A waiting work opens when the works before it are done.
   for (const w of g.works) {
-    if (w.status === 'waiting' && (w.after ?? []).every(a => byId().get(a)?.status === 'done')) {
+    // A model work that waits for the owner's answer on a record (readAsk) opens when it is answered.
+    if (w.status === 'waiting' && !w.readAsk && (w.after ?? []).every(a => byId().get(a)?.status === 'done')) {
       if (!w.waitUntil || Date.parse(w.waitUntil) <= now) w.status = 'open';
     }
   }

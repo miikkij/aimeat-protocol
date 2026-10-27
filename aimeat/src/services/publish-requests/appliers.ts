@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.12.0 — 2026-10-27 — AIMEAT's model reading private records an agent named in a goal, allowed by
+ *     the owner (apply-goal-model-read.ts; secaudit2026oct26).
  *   v1.11.0 — 2026-10-27 — A sibling agent's instruction to another agent's ai schedule, allowed by the
  *     owner (apply-schedule-instruction.ts; secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — A subscription renewal at a raised price, allowed by the buyer
@@ -54,6 +56,7 @@ import { applyCrewModel } from './apply-crew-model.js';
 import { applyAccountSetting } from './apply-account-setting.js';
 import { applySubscriptionPrice } from './apply-subscription-price.js';
 import { applyScheduleInstruction } from './apply-schedule-instruction.js';
+import { applyGoalModelRead } from './apply-goal-model-read.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -77,4 +80,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'account-setting': applyAccountSetting,
   'subscription-price': applySubscriptionPrice,
   'schedule-instruction': applyScheduleInstruction,
+  'goal-model-read': applyGoalModelRead,
 };
