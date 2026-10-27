@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-28 -- keepOperatorOwnAddressesOnce, after the entries step: a redirect and an operator's own
+ *     app are kept as they are without a question (Jouni, 2026-10-28).
  *   2026-10-27 -- addSubdomainIncidentEntriesOnce, after the subdomain step: an open subdomain incident
  *     recorded before entries gets one per undecided address (Jouni, 2026-10-27).
  *   2026-10-27 -- settleUnknownCapabilityVisibilityOnce in its place: an unknown word is set to private and
@@ -81,7 +83,7 @@ import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
-import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce } from '../services/subdomain-site-origin-keep.js';
+import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
 import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js';
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
@@ -164,6 +166,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // has its entries already.
   await addSubdomainIncidentEntriesOnce(storage, config)
     .catch(err => logger.error('Failed to list the undecided subdomain addresses on their incident; the next boot tries again', { error: String(err) }));
+  // The undecided addresses that need no decision, a redirect and an operator's own app, are kept as
+  // they are, and an incident with nothing left to decide is resolved. After the step above, so the
+  // entries it marks exist.
+  await keepOperatorOwnAddressesOnce(storage, config)
+    .catch(err => logger.error('Failed to keep the operators\' own subdomain addresses; the next boot tries again', { error: String(err) }));
   // The workspace share records stored before the search text left out the password hash are stored
   // again, so the index holds no word of it (services/share-search-reindex.ts). Awaited, so no search
   // meets the old index first.

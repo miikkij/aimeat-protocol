@@ -10,6 +10,12 @@
  * @structure HeldSection · IncidentsSection (CapOffers, EntryActions) · AccountsSection · SettingsSection · AskAiSection ·
  *   isHeldIncident · entryLine
  * @version-history
+ *   2026-10-28 -- What Jouni could not read on the subdomain incident (2026-10-28): an incident the server's
+ *     start recorded shows only where it came from, not "On behalf of node" and "not kept, too large",
+ *     which belong to a refused upload; while an entry is open Resolve reads "Keep all as they are" and
+ *     Delete waits; the count stands on its own line above the lead; an entry's place is not repeated
+ *     under a sentence that names it; only Clear and Delete are coral; an app target is named as its
+ *     owner and file.
  *   2026-10-27 -- An entry's Keep button takes the kind's own word (entries.keepAction.<kind>) when it has
  *     one: a subdomain address offers "Own site, keep both addresses" (Jouni, 2026-10-27).
  *   2026-10-27 -- An incident kind with an explanation (explain.incident.<type>) gets a question mark beside
@@ -212,8 +218,14 @@ const capsOf = (i) => (Array.isArray(i.caps) ? i.caps : []);
 /** An incident that names records to act on (services/incident-entries.ts), decided one by one. */
 const entriesOf = (i) => (Array.isArray(i.entries) ? i.entries : []);
 
+/** An app target `<owner>/<file>` as the two values a sentence names, or nothing for any other value. */
+const targetParts = (target) => {
+  const slash = typeof target === 'string' ? target.indexOf('/') : -1;
+  return slash > 0 && !target.includes('://') ? { owner: target.slice(0, slash), app: target.slice(slash + 1) } : {};
+};
+
 /** One record of such an incident in the page's language: its kind's sentence with its values. */
-export const entryLine = (e) => tOr('admin.security.incidents.entries.kind.' + e.kind, e.what, e.params || {});
+export const entryLine = (e) => tOr('admin.security.incidents.entries.kind.' + e.kind, e.what, { ...targetParts(e.params?.target), ...(e.params || {}) });
 
 /**
  * Under an incident that names records to act on: each record in words, and while it is open its
@@ -223,15 +235,16 @@ function EntryActions({ i, onDecideEntry }) {
   return html`
     <${List} under dense keepCols cols="state-name-who-doors" rows=${entriesOf(i)} render=${(e) => {
       const open = e.status === 'open';
+      const line = entryLine(e);
       return html`
       <${Row} key=${e.id} below=${open ? html`
         <${Actions} tight>
-          <${Action} small tone="danger" onClick=${() => onDecideEntry(i.id, e, e.action)}>${tOr('admin.security.incidents.entries.action.' + e.kind, S('incidents.entries.' + (e.action === 'clear' ? 'clear' : 'delete')))}<//>
+          <${Action} small tone=${e.action === 'clear' || e.action === 'delete' ? 'danger' : undefined} onClick=${() => onDecideEntry(i.id, e, e.action)}>${tOr('admin.security.incidents.entries.action.' + e.kind, S('incidents.entries.' + (e.action === 'clear' ? 'clear' : 'delete')))}<//>
           <${Action} small soft onClick=${() => onDecideEntry(i.id, e, 'keep')}>${tOr('admin.security.incidents.entries.keepAction.' + e.kind, S('incidents.entries.keep'))}<//>
         <//>` : undefined}>
         <${Cell} line><${Mark} kind="status" tone=${open ? 'danger' : 'fine'}>${open ? S('incidents.held.toDecide') : S('incidents.entries.' + (e.status === 'kept' ? 'kept' : 'done'))}<//><//>
-        <${Name}>${entryLine(e)}<//>
-        <${Who}>${e.where}<//>
+        <${Name}>${line}<//>
+        <${Who}>${line.includes(e.where) ? '' : e.where}<//>
         ${open ? null : html`<${Doors} />`}
       <//>`;
     }} />`;
@@ -274,7 +287,10 @@ export function HeldSection({ items, number, onResolve, onDelete, onDecide, swit
     <//>`;
 }
 
-/** Section "Refused and kept": the incidents of refused uploads, whose bytes were kept when small enough. */
+/**
+ * Section "Refused and kept": what the server refused (an upload's bytes kept when small enough) and
+ * what it could not decide on its own and left to the operator.
+ */
 export function IncidentsSection({ items, number, onResolve, onDelete, onPayload, onDecideCap, onDecideEntry }) {
   const open = items.filter(i => i.status === 'open').length;
   const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
@@ -290,12 +306,16 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
           const caps = capsOf(i);
           const undecided = caps.filter(c => c.status === 'open').length;
           const capsLine = caps.length ? (undecided ? S('incidents.held.rowOpen', { n: num(undecided), total: num(caps.length) }) : S('incidents.caps.rowResolved')) : '';
-          // Records to act on: Resolve and Delete stay beside them, since resolving keeps the open ones.
+          // Records to act on: while one is open, Resolve says what it does (keep every open record as
+          // it is) and Delete waits until each is decided, as beside a held name.
           const entries = entriesOf(i);
           const entriesOpen = entries.filter(e => e.status === 'open').length;
           const entriesLine = entries.length
-            ? `${entriesOpen ? S('incidents.held.rowOpen', { n: num(entriesOpen), total: num(entries.length) }) : S('incidents.entries.rowResolved')} ${tOr('admin.security.incidents.entries.lead.' + i.type, i.detail || '')}`
+            ? [entriesOpen ? S('incidents.held.rowOpen', { n: num(entriesOpen), total: num(entries.length) }) : S('incidents.entries.rowResolved'), tOr('admin.security.incidents.entries.lead.' + i.type, i.detail || '')]
             : '';
+          // The server's own start step recorded it: no person acted, and no upload was refused.
+          const byServer = caps.length || i.source === 'boot';
+          const upload = Boolean(i.quarantine_key) || (i.size_bytes || 0) > 0;
           // A type whose page sentence takes the incident's params says it in the reader's language;
           // the stored detail (English, with the API steps an AI uses) is the fallback.
           const plain = i.params ? tOr('admin.security.incidents.detail.' + i.type, '', i.params) : '';
@@ -305,13 +325,14 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
           <${Row} key=${i.id} below=${below}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
             <${Name} after=${html`${typeHelp(i.type)} <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : entriesLine || plain || i.detail || undefined}>${typeWord(i.type)}<//>
-            ${caps.length ? html`<${Who}>${sourceWord(i.source)}<//>` : html`
-            <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
+            ${byServer ? html`<${Who}>${sourceWord(i.source)}<//>` : html`
+            <${Who} sub=${`${sourceWord(i.source)}${upload ? ' · ' + (i.quarantine_key ? S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : S('incidents.notKept')) : ''}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
             <${When}>${whenLine(i)}<//>
             <${Doors}>
               ${i.quarantine_key ? html`<${Action} small onClick=${() => onPayload(i.id)}>${S('incidents.payload')}<//>` : null}
-              ${i.status === 'open' && !undecided ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
-              ${!undecided ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
+              ${i.status === 'open' && !undecided && entriesOpen ? html`<${Action} small soft onClick=${() => onResolve(i.id)}>${S('incidents.entries.keepAll')}<//>` : null}
+              ${i.status === 'open' && !undecided && !entriesOpen ? html`<${Loud} control onClick=${() => onResolve(i.id)}>${S('resolve')}<//>` : null}
+              ${!undecided && !entriesOpen ? html`<${Action} small tone="danger" onClick=${() => onDelete(i.id)}>${S('delete')}<//>` : null}
             <//>
           <//>`;
         }} />` : null}

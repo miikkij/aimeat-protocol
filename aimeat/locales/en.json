@@ -1262,7 +1262,7 @@
       },
       "incidents": {
         "title": "Refused and kept",
-        "lead": "An upload that failed a safety check was refused, and when it was small enough the bytes were kept for you to look at. Resolve it once you have; delete it to drop the bytes as well.",
+        "lead": "What the server refused, or could not decide on its own and left for you. Each item says what happened and what you can do. When a refused upload was small enough, its bytes are kept for you to look at.",
         "none": "Nothing has been refused and kept.",
         "noneOpen": "Nothing is open. The last incident was resolved on {date}.",
         "noneOpenPlain": "Nothing is open.",
@@ -1280,10 +1280,10 @@
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
-          "subdomain_site_origin": "Web addresses whose type the server could not tell"
+          "subdomain_site_origin": "Other people's apps at addresses on your own domain"
         },
         "detail": {
-          "subdomain_site_origin": "The server could not tell whether these web addresses ({count}) belong to your own site or to an app that someone published: {labels}. They work as before until you choose. Ask the AI that you connected to AIMEAT to sort each address, then resolve this incident here."
+          "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1313,7 +1313,7 @@
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
             "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
-            "subdomain_site_origin": "The server could not tell whether these web addresses belong to your own site or to an app that someone published. They work as before until you choose. Choose for each address below. The incident is resolved with your last choice."
+            "subdomain_site_origin": "Each address below shows an app that another person published. The server does not know whether you gave the address to the app yourself, or the app got it automatically when it was published. At an address on your own domain, the app runs in the same site as your server's sign-in. An app that another person published belongs only at its app address. The addresses work as before until you choose."
           },
           "action": {
             "subdomain": "App only"
@@ -1328,6 +1328,7 @@
           "clear": "Clear",
           "delete": "Delete",
           "keep": "Keep as it is",
+          "keepAll": "Keep all as they are",
           "done": "done",
           "kept": "kept",
           "confirmClear": "Remove this from the shared anonymous agent? {line}",
@@ -1339,7 +1340,7 @@
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
             "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})",
-            "subdomain": "The address {label}, which shows the app {target}"
+            "subdomain": "{label}: the app {app}, published by {owner}"
           }
         },
         "source": {
@@ -25923,11 +25924,11 @@
         "tip": "Keep the task only if you know that someone still needs it."
       },
       "subdomain_site_origin": {
-        "title": "Web addresses whose type the server could not tell",
-        "short": "The server does not know whether these addresses belong to your own site or to an app.",
-        "what": "A web address on this server, such as name.your-domain, belongs either to your own site or to an app that someone published. An app's address must not show your server's own pages or sign-in. The server could not tell which group these addresses belong to, so they work as before until you choose.",
+        "title": "Other people's apps at addresses on your own domain",
+        "short": "Apps that other people published also work at addresses on your own domain.",
+        "what": "Every published app has its own address, for example notes.apps.your-domain. Older versions of the server also showed some apps at notes.your-domain. That address is in the same site as your server's sign-in, so an app that another person published must not be there. The server does not know who gave these addresses, so they work as before until you choose.",
         "tipLabel": "What you can do",
-        "tip": "Press \"App only\" or \"My own site\" for each address below. Choose \"App only\" when someone other than you published the app. \"My own site\" leaves the address as it is."
+        "tip": "Choose \"App only\" unless you gave the address to the app yourself. The app keeps working at its app address, and a visitor who opens the old address is taken there. \"My own site\" keeps the address on your own domain as well."
       }
     },
     "ecosystem": {

@@ -1261,7 +1261,7 @@
       },
       "incidents": {
         "title": "Hylätty ja säilytetty",
-        "lead": "Lataus, joka ei läpäissyt turvatarkistusta, hylättiin, ja jos se oli riittävän pieni, tavut säilytettiin sinun katsottavaksesi. Merkitse se hoidetuksi kun olet katsonut; poistaminen pudottaa myös tavut.",
+        "lead": "Tässä ovat asiat, jotka palvelin hylkäsi tai joita se ei voinut ratkaista itse ja jätti sinulle. Jokainen kertoo, mitä tapahtui ja mitä voit tehdä. Jos hylätty lataus oli riittävän pieni, sen tavut säilytetään, jotta voit katsoa ne.",
         "none": "Mitään ei ole hylätty ja säilytetty.",
         "noneOpen": "Mikään ei ole auki. Viimeisin tapahtuma hoidettiin {date}.",
         "noneOpenPlain": "Mikään ei ole auki.",
@@ -1279,10 +1279,10 @@
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
-          "subdomain_site_origin": "Verkko-osoitteet, joiden tyyppiä palvelin ei tunnistanut"
+          "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa"
         },
         "detail": {
-          "subdomain_site_origin": "Palvelin ei tunnistanut, kuuluvatko nämä verkko-osoitteet ({count}) omalle sivustollesi vai jonkun julkaisemalle sovellukselle: {labels}. Ne toimivat kuten ennenkin, kunnes valitset. Pyydä tekoälyä, jonka olet yhdistänyt AIMEATiin, lajittelemaan jokainen osoite, ja merkitse sitten tämä tapaus ratkaistuksi tällä sivulla."
+          "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1312,7 +1312,7 @@
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
-            "subdomain_site_origin": "Palvelin ei tunnistanut, kuuluvatko nämä verkko-osoitteet omalle sivustollesi vai sovellukselle, jonka joku julkaisi. Ne toimivat kuten ennenkin, kunnes valitset. Valitse alla jokaiselle osoitteelle. Tapaus ratkeaa viimeisellä valinnallasi."
+            "subdomain_site_origin": "Jokainen alla oleva osoite näyttää sovellusta, jonka toinen henkilö julkaisi. Palvelin ei tiedä, annoitko osoitteen sovellukselle itse vai saiko sovellus sen automaattisesti, kun se julkaistiin. Oman verkkotunnuksesi osoitteessa sovellus toimii samalla sivustolla kuin palvelimesi kirjautuminen. Toisen henkilön julkaisema sovellus kuuluu vain omaan sovellusosoitteeseensa. Osoitteet toimivat kuten ennenkin, kunnes valitset."
           },
           "action": {
             "subdomain": "Vain sovellus"
@@ -1327,6 +1327,7 @@
           "clear": "Tyhjennä",
           "delete": "Poista",
           "keep": "Pidä ennallaan",
+          "keepAll": "Pidä kaikki ennallaan",
           "done": "tehty",
           "kept": "ennallaan",
           "confirmClear": "Poistetaanko tämä jaetulta anonyymiltä agentilta? {line}",
@@ -1338,7 +1339,7 @@
             "skill": "Taito {name} tiedostoineen",
             "datapackage": "Datapaketti {name} tiedostoineen",
             "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})",
-            "subdomain": "Osoite {label}, jossa näkyy sovellus {target}"
+            "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}"
           }
         },
         "source": {
@@ -26080,11 +26081,11 @@
         "tip": "Pidä ajastus vain, jos tiedät, että joku tarvitsee sitä yhä."
       },
       "subdomain_site_origin": {
-        "title": "Verkko-osoitteet, joiden tyyppiä palvelin ei tunnistanut",
-        "short": "Palvelin ei tiedä, kuuluvatko nämä osoitteet omalle sivustollesi vai sovellukselle.",
-        "what": "Tämän palvelimen verkko-osoite, kuten nimi.oma-verkkotunnus, kuuluu joko omalle sivustollesi tai sovellukselle, jonka joku julkaisi. Sovelluksen osoitteessa ei saa näkyä palvelimesi omia sivuja eikä kirjautumista. Palvelin ei tunnistanut, kumpaan ryhmään nämä osoitteet kuuluvat, joten ne toimivat kuten ennenkin, kunnes valitset.",
+        "title": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
+        "short": "Muiden julkaisemat sovellukset toimivat myös oman verkkotunnuksesi osoitteissa.",
+        "what": "Jokaisella julkaistulla sovelluksella on oma osoite, esimerkiksi muistiot.apps.oma-verkkotunnus. Palvelimen vanhat versiot näyttivät osan sovelluksista myös osoitteessa muistiot.oma-verkkotunnus. Se osoite on samalla sivustolla kuin palvelimesi kirjautuminen, joten toisen henkilön julkaisema sovellus ei saa olla siellä. Palvelin ei tiedä, kuka nämä osoitteet antoi, joten ne toimivat kuten ennenkin, kunnes valitset.",
         "tipLabel": "Mitä voit tehdä",
-        "tip": "Paina alla jokaisen osoitteen kohdalla ”Vain sovellus” tai ”Oma sivusto”. Valitse ”Vain sovellus”, jos sovelluksen julkaisi joku muu kuin sinä. ”Oma sivusto” jättää osoitteen ennalleen."
+        "tip": "Valitse ”Vain sovellus”, ellet itse antanut osoitetta sovellukselle. Sovellus toimii edelleen omassa sovellusosoitteessaan, ja vanhan osoitteen avaaja ohjataan sinne. ”Oma sivusto” pitää osoitteen myös omassa verkkotunnuksessasi."
       }
     },
     "ecosystem": {

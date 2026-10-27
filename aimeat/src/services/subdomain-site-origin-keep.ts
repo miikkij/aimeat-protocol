@@ -28,15 +28,20 @@
  *   /v1/admin/security/incidents/:id/resolve { name: <label>, resolution }, or with the MCP tool
  *   aimeat_admin_incident_resolve and its CLI twin. An incident recorded before it carried entries
  *   gets them once, from the addresses still without an origin (addSubdomainIncidentEntriesOnce).
+ *   Then the addresses that need no decision, a redirect and an operator's own app, are kept as they
+ *   are with origin 'operator' and leave the incident's list (keepOperatorOwnAddressesOnce), so the
+ *   incident names only apps that other accounts published, and goes when there are none.
  *
  *   WHERE. The step's record is SUBDOMAIN_SITE_ORIGIN_STEP_KEY under `system@<nodeId>`:
  *   { at, operator, publisher, unclassified }. It runs before the node serves
  *   (server-bootstrap/once-only-keep-steps.ts).
  * @structure SUBDOMAIN_SITE_ORIGIN_STEP_KEY · SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE ·
  *   classifySubdomainSiteOriginsOnce(storage, config) · addSubdomainIncidentEntriesOnce(storage, config) ·
- *   serveAtAppAddressOnly()
+ *   keepOperatorOwnAddressesOnce(storage, config) · serveAtAppAddressOnly()
  * @usage await classifySubdomainSiteOriginsOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   v1.4.0 — 2026-10-28 — keepOperatorOwnAddressesOnce: a redirect and an operator's own app are kept as
+ *     they are without a question (Jouni, 2026-10-28).
  *   v1.3.0 — 2026-10-27 — Each undecided address is an entry of the incident, decided with one press
  *     ("app_only" or "keep"), and an open incident recorded before that gets its entries once (Jouni, 2026-10-27).
  *   v1.2.0 — 2026-10-27 — The incident carries `params` (count, labels), so the Security page says it in
@@ -51,7 +56,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { logger } from '../utils/logger.js';
 import { claimOnceOnlyStep } from './once-only-step.js';
 import {
-  recordSecurityIncident, listSecurityIncidents, findSecurityIncident, saveSecurityIncident,
+  recordSecurityIncident, listSecurityIncidents, findSecurityIncident, saveSecurityIncident, deleteSecurityIncident,
   type IncidentEntry, type SecurityIncidentValue,
 } from './security-incident.js';
 import { classifySiteOrigin } from './subdomain-site-origin.js';
@@ -62,6 +67,9 @@ export const SUBDOMAIN_SITE_ORIGIN_STEP_KEY = 'migrations.secaudit2026oct22.subd
 
 /** The record that says the open incidents recorded before entries got theirs. */
 export const SUBDOMAIN_INCIDENT_ENTRIES_STEP_KEY = 'migrations.secaudit2026oct22.subdomain-site-origin-entries';
+
+/** The record that says the redirects and the operators' own apps were kept as they are. */
+export const SUBDOMAIN_OPERATOR_OWN_STEP_KEY = 'migrations.secaudit2026oct22.subdomain-site-origin-operator-own';
 
 /** The incident's type, which services/incident-decisions.ts dispatches on. */
 export const SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE = 'subdomain_site_origin';
@@ -81,6 +89,15 @@ function targetOwner(site: { kind: string; target: string }): string | null {
   return site.kind === 'app' && slash > 0 ? site.target.slice(0, slash) : null;
 }
 
+/** Whether an account is an operator, read once per distinct account the rows name. */
+function operatorTest(storage: Storage): (name: string) => Promise<boolean> {
+  const operatorOf = new Map<string, boolean>();
+  return async (name) => {
+    if (!operatorOf.has(name)) operatorOf.set(name, isOperatorAccount(await storage.getOwner(name)));
+    return operatorOf.get(name)!;
+  };
+}
+
 interface Outcome { operator: number; publisher: number; unclassified: string[] }
 
 /**
@@ -96,12 +113,7 @@ export async function classifySubdomainSiteOriginsOnce(
   try {
     const out: Outcome = { operator: 0, publisher: 0, unclassified: [] };
     const undecided: SubdomainSiteRecord[] = [];
-    // Whether an account is an operator, read once per distinct account the rows name.
-    const operatorOf = new Map<string, boolean>();
-    const isOperator = async (name: string): Promise<boolean> => {
-      if (!operatorOf.has(name)) operatorOf.set(name, isOperatorAccount(await storage.getOwner(name)));
-      return operatorOf.get(name)!;
-    };
+    const isOperator = operatorTest(storage);
     // The table a bounded page at a time, in label order; a write sets only `origin`, so the keyset holds.
     let after: string | undefined;
     for (;;) {
@@ -187,6 +199,64 @@ export async function addSubdomainIncidentEntriesOnce(storage: Storage, config: 
     }
     await claim.finish({ at: new Date().toISOString(), labels: named });
     return named;
+  } catch (err) {
+    await claim.release();
+    throw err;
+  }
+}
+
+/**
+ * Keep as they are the undecided addresses that need no decision: a redirect, which runs no script, and
+ * an app whose owner is an operator, which is the operator's own code on the operator's own domain.
+ * Each gets origin 'operator', which serves it exactly as before, and leaves the list of an open
+ * subdomain incident; this step's record names it. An incident that asked about nothing else is
+ * deleted, and one whose other addresses are all decided is resolved. What stays on the incident is an
+ * app another account published (Jouni, 2026-10-28: the question was asked of the operator's own
+ * apps, where neither answer protects anyone from anyone).
+ * Throws when a write fails, and then leaves no record, so the next start tries again.
+ * @returns the labels kept, or null on a node that ran the step before
+ */
+export async function keepOperatorOwnAddressesOnce(storage: Storage, config: AimeatConfig): Promise<string[] | null> {
+  const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, SUBDOMAIN_OPERATOR_OWN_STEP_KEY);
+  if (!claim) return null;
+  try {
+    const kept: string[] = [];
+    const left = new Set<string>();
+    const isOperator = operatorTest(storage);
+    let after: string | undefined;
+    for (;;) {
+      const page = await storage.listSubdomainSitesPage({ after, limit: PAGE });
+      if (!page.length) break;
+      after = page[page.length - 1]!.subdomain;
+      for (const site of page.filter(s => !s.origin)) {
+        const owner = targetOwner(site);
+        if (site.kind === 'app' && !(owner && await isOperator(owner))) { left.add(site.subdomain); continue; }
+        // updatedAt is kept: the row's content did not change.
+        await storage.updateSubdomainSite(site.subdomain, { origin: 'operator', updatedAt: site.updatedAt });
+        kept.push(site.subdomain);
+      }
+      if (page.length < PAGE) break;
+    }
+    const now = new Date().toISOString();
+    const keptSet = new Set(kept);
+    const open = (await listSecurityIncidents(storage, config)).items
+      .filter(i => i.type === SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE && i.status === 'open');
+    for (const i of open) {
+      const rec = await findSecurityIncident(storage, config, i.id);
+      if (!rec) continue;
+      const value = rec.value as SecurityIncidentValue;
+      // An address kept here was never a question, so it leaves the list; this step's record names it.
+      const entries = (value.entries ?? []).filter(e => !(e.status === 'open' && keptSet.has(e.id)));
+      // Nothing was ever to decide: the incident asked only about such addresses, and it goes.
+      if (!entries.length && !left.size) { await deleteSecurityIncident(storage, config, i.id); continue; }
+      // Resolved when no entry is open and no undecided address is missing from the list.
+      const listed = new Set(entries.map(e => e.id));
+      const resolved = entries.every(e => e.status !== 'open') && [...left].every(l => listed.has(l));
+      if (entries.length === (value.entries ?? []).length && !resolved) continue;
+      await saveSecurityIncident(storage, rec, { ...value, entries, ...(resolved ? { status: 'resolved' as const, resolvedAt: now } : {}) });
+    }
+    await claim.finish({ at: now, kept, left: [...left] });
+    return kept;
   } catch (err) {
     await claim.release();
     throw err;

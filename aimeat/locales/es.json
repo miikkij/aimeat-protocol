@@ -361,7 +361,7 @@
       },
       "incidents": {
         "title": "Rechazado y guardado",
-        "lead": "Una subida que no pasó una comprobación de seguridad se rechazó y, cuando era lo bastante pequeña, sus bytes se guardaron para que los mires. Resuélvela cuando lo hayas hecho; eliminarla borra también los bytes.",
+        "lead": "Lo que el servidor rechazó, o lo que no pudo decidir por sí solo y dejó para ti. Cada elemento dice qué pasó y qué puedes hacer. Si una subida rechazada era lo bastante pequeña, sus bytes se guardan para que los revises.",
         "none": "No se ha rechazado ni guardado nada.",
         "noneOpen": "No hay nada abierto. El último incidente se resolvió el {date}.",
         "noneOpenPlain": "No hay nada abierto.",
@@ -379,10 +379,10 @@
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
           "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
-          "subdomain_site_origin": "Direcciones web de tipo desconocido para el servidor"
+          "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio"
         },
         "detail": {
-          "subdomain_site_origin": "El servidor no pudo saber si estas direcciones web ({count}) son de tu propio sitio o de una aplicación que alguien publicó: {labels}. Funcionan como antes hasta que elijas. Pide a la IA que conectaste a AIMEAT que decida el tipo de cada dirección, y después resuelve este incidente aquí."
+          "subdomain_site_origin": "Estas direcciones ({count}) muestran una aplicación que publicó otra persona y también funcionan en tu dominio: {labels}. Funcionan como antes hasta que elijas."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -412,7 +412,7 @@
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
             "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas.",
-            "subdomain_site_origin": "El servidor no pudo saber si estas direcciones web son de tu propio sitio o de una aplicación que alguien publicó. Funcionan como antes hasta que elijas. Elige abajo para cada dirección. El incidente se resuelve con tu última elección."
+            "subdomain_site_origin": "Cada dirección de abajo muestra una aplicación que publicó otra persona. El servidor no sabe si tú le diste la dirección a la aplicación o si la aplicación la recibió automáticamente al publicarse. En una dirección de tu dominio, la aplicación funciona en el mismo sitio que el inicio de sesión de tu servidor. Una aplicación que publicó otra persona debe estar solo en su dirección de aplicación. Las direcciones funcionan como antes hasta que elijas."
           },
           "action": {
             "subdomain": "Solo aplicación"
@@ -427,6 +427,7 @@
           "clear": "Vaciar",
           "delete": "Eliminar",
           "keep": "Dejar como está",
+          "keepAll": "Dejar todo como está",
           "done": "hecho",
           "kept": "sin cambio",
           "confirmClear": "¿Quitar esto del agente anónimo compartido? {line}",
@@ -438,7 +439,7 @@
             "skill": "La habilidad {name}, con sus archivos",
             "datapackage": "El paquete de datos {name}, con sus archivos",
             "schedule": "La programación «{label}», que {maker} hizo para la cuenta {owner} (se ejecuta: {cron})",
-            "subdomain": "La dirección {label}, que muestra la aplicación {target}"
+            "subdomain": "{label}: la aplicación {app}, publicada por {owner}"
           }
         },
         "source": {
@@ -23723,11 +23724,11 @@
         "tip": "Deja la programación solo si sabes que alguien todavía la necesita."
       },
       "subdomain_site_origin": {
-        "title": "Direcciones web de tipo desconocido para el servidor",
-        "short": "El servidor no sabe si estas direcciones son de tu propio sitio o de una aplicación.",
-        "what": "Una dirección web de este servidor, como nombre.tu-dominio, es de tu propio sitio o de una aplicación que alguien publicó. La dirección de una aplicación no debe mostrar las páginas propias del servidor ni su inicio de sesión. El servidor no pudo saber a qué grupo pertenecen estas direcciones, así que funcionan como antes hasta que elijas.",
+        "title": "Aplicaciones de otras personas en direcciones de tu dominio",
+        "short": "Aplicaciones que publicaron otras personas también funcionan en direcciones de tu dominio.",
+        "what": "Cada aplicación publicada tiene su propia dirección, por ejemplo notas.apps.tu-dominio. Las versiones anteriores del servidor también mostraban algunas aplicaciones en notas.tu-dominio. Esa dirección está en el mismo sitio que el inicio de sesión de tu servidor, así que una aplicación que publicó otra persona no debe estar ahí. El servidor no sabe quién dio estas direcciones, así que funcionan como antes hasta que elijas.",
         "tipLabel": "Qué puedes hacer",
-        "tip": "Presiona abajo «Solo aplicación» o «Mi propio sitio» para cada dirección. Elige «Solo aplicación» si otra persona publicó la aplicación. «Mi propio sitio» deja la dirección como está."
+        "tip": "Elige «Solo aplicación», salvo que tú le hayas dado la dirección a la aplicación. La aplicación sigue funcionando en su dirección de aplicación, y quien abra la dirección anterior irá allí. «Mi propio sitio» mantiene la dirección también en tu dominio."
       }
     },
     "ecosystem": {

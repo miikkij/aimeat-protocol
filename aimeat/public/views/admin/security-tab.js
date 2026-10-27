@@ -14,6 +14,7 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-28 -- The confirmation of "App only" is not a warning: it removes nothing (Jouni, 2026-10-28).
  *   2026-10-26 -- decideEntry asks with the entry kind's own confirmation (entries.confirm.<kind>) when it
  *     has one, so a capability's 'clear' says it makes the capability private (secaudit2026oct22).
  *   2026-10-25 -- decideEntry: a record an incident names is cleared or deleted after a confirmation
@@ -205,7 +206,8 @@ export default function SecurityTab(props) {
     if (resolution === 'keep') return run();
     // A kind whose 'clear' is not "remove from the shared anonymous agent" says what its own does.
     const general = S(resolution === 'clear' ? 'incidents.entries.confirmClear' : 'incidents.entries.confirmDelete', { line: entryLine(e) });
-    return confirm(tOr('admin.security.incidents.entries.confirm.' + e.kind, general, { line: entryLine(e) }), run, { danger: true, title: S('title') });
+    // Serving an address only at its app address removes nothing, so its confirmation is not a warning.
+    return confirm(tOr('admin.security.incidents.entries.confirm.' + e.kind, general, { line: entryLine(e) }), run, { danger: resolution !== 'app_only', title: S('title') });
   };
   const downloadQuarantine = async (id) => {
     try {
