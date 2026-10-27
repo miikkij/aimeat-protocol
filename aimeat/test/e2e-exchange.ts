@@ -9,6 +9,8 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   2026-10-27 — A provider accepting a proposal after the consumer paused keeps the pause; after a
+ *     revoke it answers 409 CONTRACT_ENDED (secaudit2026oct26).
  *   v1.9.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
  *     fixtures use the 4.0.0 form, which 3.x accepts too: the extension actions state `tollMorsels`, the
  *     app tools `tollMorsels`, the agent-work listing `toll_morsels`, and a need's budget is money. The
@@ -1150,6 +1152,40 @@ await test('A usage note past the ODPS restrictions cap is refused on write, and
   const tooLong = (validator.errors ?? []).filter(e => e.keyword === 'maxLength').map(e => e.instancePath);
   assert(JSON.stringify(tooLong) === JSON.stringify(['/product/license/scope/restrictions']), `validator refuses exactly the warned field: ${JSON.stringify(tooLong)}`);
   assert(String(doc.product.license.scope.restrictions).endsWith(note), 'and the restriction is published as written, never cut');
+});
+
+// ── A proposal accepted after the contract was switched off (secaudit2026oct26) ──
+const cheapOf = async (): Promise<any> =>
+  (await json('/v1/exchange/entitlements', { headers: auth(consumer.token) })).body.data.entitlements.find((x: any) => x.action === 'cheap');
+
+await test('A provider accepting the consumer’s proposal after the consumer paused keeps the contract paused, at the new terms', async () => {
+  const back = await accept(consumer.token, 'cheap', { app_id: appId });
+  assert(back.status === 201 && back.body.data.entitlement.state === 'active', `active again: ${back.status}`);
+  const p = await propose(consumer.token, { ext: EXT, action: 'cheap', new_cap_units: 500 });
+  assert(p.status === 201, `propose ${p.status}: ${JSON.stringify(p.body?.error)}`);
+  const off = await json('/v1/exchange/entitlements/off', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ ext: EXT, action: 'cheap', mode: 'pause' }) });
+  assert(off.status === 200 && off.body.data.applied, `pause ${off.status}`);
+  const r = await json(`/v1/exchange/proposals/${p.body.data.proposal.proposal_id}/accept`, { method: 'POST', headers: auth(provider.token), body: '{}' });
+  assert(r.status === 200, `accept ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const e = await cheapOf();
+  assert(e?.state === 'paused', `the consumer's pause stands: ${e?.state}`);
+  assert(e?.budget?.cap_units === 500, `the agreed terms apply: ${JSON.stringify(e?.budget)}`);
+});
+
+await test('A provider accepting the consumer’s proposal after the consumer revoked does not bring the contract back', async () => {
+  const back = await accept(consumer.token, 'cheap', { app_id: appId });
+  assert(back.status === 201 && back.body.data.entitlement.state === 'active', `active again: ${back.status}`);
+  const p = await propose(consumer.token, { ext: EXT, action: 'cheap', new_cap_units: 400 });
+  assert(p.status === 201, `propose ${p.status}`);
+  const off = await json('/v1/exchange/entitlements/off', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ ext: EXT, action: 'cheap', mode: 'revoke' }) });
+  assert(off.status === 200 && off.body.data.applied, `revoke ${off.status}`);
+  const r = await json(`/v1/exchange/proposals/${p.body.data.proposal.proposal_id}/accept`, { method: 'POST', headers: auth(provider.token), body: '{}' });
+  assert(r.status === 409 && r.body?.error?.code === 'CONTRACT_ENDED', `expected 409 CONTRACT_ENDED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  const e = await cheapOf();
+  assert(!e || e.state === 'revoked', `the contract stays ended: ${e?.state}`);
+  // The consumer resumes the way the refusal names: accepting the offering again.
+  const again = await accept(consumer.token, 'cheap', { app_id: appId });
+  assert(again.status === 201 && again.body.data.entitlement.state === 'active', `re-accept ${again.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
