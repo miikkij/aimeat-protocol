@@ -12,6 +12,8 @@
  * @structure SWEEP_MS · sweepGoals() · sweepOne() · scheduleGoalSweep()
  * @usage scheduleGoalSweep({ storage, config });   // server-bootstrap/service-init.ts
  * @version-history
+ *   v1.3.0 — 2026-10-27 — A model work whose question on a private record was declined or expired
+ *     opens and runs without that record (goals-model-reach.ts settleModelReadAsks; secaudit2026oct26).
  *   v1.2.0 — 2026-10-27 — A deactivated account's goals wait: the sweep starts no round and no model
  *     work and expires nothing, and a finished job does not move the goal on, until reactivation
  *     (secaudit2026oct26, goals-sweep.ts:deactivated-account-goals-keep-running).
@@ -28,6 +30,7 @@ import { logEntry, parseGoal, updateGoal, type GoalDeps } from './goals-store.js
 import { advanceGoal } from './goals-advance.js';
 import { startRound } from './goals-ops.js';
 import { checkModelWorks, settleModelJob } from './goals-model.js';
+import { settleModelReadAsks } from './goals-model-reach.js';
 import { onAiJobFinished } from '../ai-jobs/finished-listeners.js';
 import { deactivatedAccountSkip } from '../account-deactivated.js';
 import { GOAL_PREFIX, MAX_ATTEMPTS, MODEL_TAKER, goalSettled, type GoalRecord } from './goals-types.js';
@@ -116,6 +119,8 @@ export async function sweepOne(deps: GoalDeps, ownerGhii: string, goal: GoalReco
   }
   await returnStuck(deps, ownerGhii, goal, now);
   await checkModelWorks(deps, ownerGhii, goal, now);
+  // A model work whose question on a record was declined or expired opens without that record.
+  await settleModelReadAsks(deps, ownerGhii, goal);
   await advanceGoal(deps, ownerGhii, goal.id);
 }
 

@@ -22,9 +22,10 @@
  * @structure runModelWork() · settleModelJob() · checkModelWorks()
  * @usage runModelWork(deps, ownerGhii, goalId, workId);   // goals-advance.ts; settleModelJob from goals-sweep.ts's job listener
  * @version-history
- *   v1.1.0 — 2026-10-27 — A record goes to the model with the reach of whoever named it in the goal; one
- *     an agent named and may not read stops the work with the reason before any read
- *     (goals-model-reach.ts; secaudit2026oct26, goals:model-work-runs-as-owner-without-requesting-agent-authority).
+ *   v1.1.0 — 2026-10-27 — A record goes to the model with the reach of whoever named it in the goal; a
+ *     private one an agent named and may not read waits for the owner's one press before the work is
+ *     taken, and one the owner did not allow is left out (goals-model-reach.ts; secaudit2026oct26,
+ *     goals:model-work-runs-as-owner-without-requesting-agent-authority).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { getActiveAiJobService } from '../ai-jobs/service.js';
@@ -33,7 +34,7 @@ import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import { logEntry, readGoal, updateGoal, type GoalDeps } from './goals-store.js';
 import { countTake, taskBody } from './goals-work.js';
-import { modelWorkInputRefusal } from './goals-model-reach.js';
+import { askOwnerForModelRead, modelInputKeys, modelWorkReadNeed } from './goals-model-reach.js';
 import {
   MAX_ATTEMPTS, MAX_RESULTS, MODEL_TAKER, TEXT_MAX, goalSettled, parseRunKey, resultsKey, runKey,
   type GoalRecord, type GoalWork,
@@ -61,6 +62,15 @@ function modelWords(work: GoalWork): string {
 
 /** Take a model work and start its job. A second caller finds it taken and stops; nothing throws out. */
 export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: string, workId: string): Promise<void> {
+  // Each record goes to the model with the reach of whoever named it in the goal. A private record an
+  // agent named and may not read waits for the owner's one press, before the work is taken and before
+  // any read (goals-model-reach.ts; secaudit2026oct26).
+  const before = await readGoal(deps, ownerGhii, goalId);
+  const open = before?.works.find(w => w.id === workId && w.status === 'open' && w.runner === 'model');
+  if (before && open) {
+    const need = await modelWorkReadNeed(deps, ownerGhii, before, open, modelInputKeys(open, taskBody(before, open, true).memoryKeys));
+    if (need) { await askOwnerForModelRead(deps, ownerGhii, before, open, need); return; }
+  }
   const claimedAt = new Date().toISOString();
   let taken: GoalRecord;
   try {
@@ -87,17 +97,19 @@ export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: st
   try {
     if (!service) throw new Error('This node runs no background model jobs.');
     const body = taskBody(taken, work, true);
-    // Each record goes to the model with the reach of whoever named it in the goal; one an agent named
-    // and may not read stops the work here, before any read (goals-model-reach.ts; secaudit2026oct26).
-    const refused = await modelWorkInputRefusal(deps, ownerGhii, taken, body.memoryKeys);
-    if (refused) throw refused.error;
+    // The records the owner did not allow are left out; a work left with none of the records it was
+    // given stops with the reason (goals-model-reach.ts; secaudit2026oct26).
+    const inputKeys = modelInputKeys(work, body.memoryKeys);
+    if (body.memoryKeys.length && !inputKeys.length) {
+      throw new Error('the owner did not allow the model to read the records this work builds on, so nothing is left for it to work from');
+    }
     const started = await service.startJob({
       prompt: `${body.title}\n\n${body.description}`,
       // The records the work builds on (an earlier work's deliverable, the goal's material): the
       // model has no tools, so the job reads them and pastes them into the prompt. Without them an
       // agent's result reached the model only as its one-line summary ("deliverable published to
       // memory at …") and the model wrote from what it knew (aimeat.io, 2026-10-25).
-      ...(body.memoryKeys.length ? { input_keys: body.memoryKeys } : {}),
+      ...(inputKeys.length ? { input_keys: inputKeys } : {}),
       system_prompt: 'You do one work of a goal for the person who owns it. Write the result itself, complete and ready to use, with no preamble.',
       result_key: runKey(goalId, workId),
       result_visibility: 'private',

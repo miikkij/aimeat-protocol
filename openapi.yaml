@@ -23798,7 +23798,11 @@ paths:
       tags: [Agent Goals]
       description: >
         The goal with its works (status, who took it, result, cost), material, reactions, rounds, the
-        log of what happened and why, and its changes. `task:read`.
+        log of what happened and why, and its changes. `task:read`. A model work that waits because an
+        agent without `memory:read-as-owner` named a private record in the goal has status `waiting`,
+        a `reason`, and `read_request` { request_id, records, agent }: the owner's one-press question
+        (kind `goal-model-read`, readable at GET /v1/publish-requests/{id}). Allow: the work runs with
+        the records. Don't allow: it runs without them, or stops when none of its records remain.
       security:
         - BearerAuth: []
       responses:
