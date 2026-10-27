@@ -58216,7 +58216,29 @@ paths:
                     an empty prompt is refused 400 INVALID_INPUT.
       responses:
         '200':
-          description: Schedule updated
+          description: >
+            Schedule updated. When an agent without `memory:read-as-owner` changes the prompt or input of
+            an ai schedule a sibling agent made, and that schedule reads with more reach than the editor
+            has (its maker holds `memory:read-as-owner`, or its input names the maker's own namespace),
+            the edit is stored and the answer carries `approval_request` (pending): the schedule's next
+            run waits for the owner's one press. Allow: the next run uses the new instruction. Don't
+            allow: the next run puts back the instruction the schedule had. `warnings` says why no
+            request was filed, when none could be.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      schedule: { type: object }
+                      approval_request:
+                        type: object
+                        description: The pending request (as GET /v1/publish-requests/{id} reads it), kind `schedule-instruction`.
+                      warnings:
+                        type: array
+                        items: { type: object, properties: { code: { type: string }, message: { type: string } } }
         '400':
           description: INVALID_CRON, INVALID_INPUT (an empty prompt) or NO_PROMPT (a kind that has no prompt)
           content:
