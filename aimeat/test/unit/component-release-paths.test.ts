@@ -9,6 +9,7 @@
  *   provider the environment names, as component-address.test.ts is.
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
+ *   v1.0.1 — 2026-10-27 — Refuses a missing DATABASE_URL when the run asks for PostgreSQL, like every two-provider unit file.
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { rmSync, existsSync } from 'node:fs';
@@ -16,6 +17,9 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import { installNameFor } from '../../src/services/component-address.js';
 import { deleteComponent } from '../../src/services/component-registrar.js';
+import { requirePostgresWhenAsked } from './postgres-arm.js';
+
+requirePostgresWhenAsked('component-release-paths');
 
 const SQLITE_PATH = `./test/.component-release-${process.pid}.db`;
 const PG_URL = process.env.DATABASE_URL ?? '';
