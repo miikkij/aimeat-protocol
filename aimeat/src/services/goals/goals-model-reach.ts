@@ -31,6 +31,7 @@ import { aiReadViewerOf, hiddenRecordError, type AiInputHiddenError } from '../a
 import { saverAuthority } from '../workflow/trigger-authority.js';
 import { agentPageUrl } from '../permission-ask.js';
 import { noteAgentRefusal } from '../agent-refusals.js';
+import { agentSessionCaller } from '../caller-context.js';
 import type { GoalDeps } from './goals-store.js';
 import { MODEL_TAKER, type GoalRecord } from './goals-types.js';
 
@@ -65,11 +66,13 @@ export async function modelWorkInputRefusal(
       if (visibleToSameOwnerReader(rec, gaii)) continue;
       const now = await saverAuthority(deps.storage, { kind: 'agent', id: gaii });
       const name = parseGAII(gaii)?.agent ?? gaii;
-      const viewer = aiReadViewerOf({ principal: gaii, owner: ownerName, roles: ['agent'], scopes: now.scopes },
+      // The agent as its own session would be, with the words it holds now (caller-context.ts).
+      const agent = agentSessionCaller(gaii, ownerName, now.scopes, nodeId, deps.storage).auth;
+      const viewer = aiReadViewerOf({ principal: gaii, owner: ownerName, roles: agent.roles, scopes: now.scopes },
         `The goal's model reads what ${name}, which named this record in the goal, may read. The agent's page: ${agentPageUrl(baseUrl, name)}`);
       if (!viewer || viewer.readsAll) continue;
       // On the agent's card and in the owner's bell, as a scheduled ai job's refused read is.
-      noteAgentRefusal({ sub: gaii, roles: ['agent'] }, [READ_AS_OWNER_SCOPE], false, `goal ${goal.id}`);
+      noteAgentRefusal(agent, [READ_AS_OWNER_SCOPE], false, `goal ${goal.id}`);
       return { error: hiddenRecordError(key, viewer), agent: gaii };
     }
   }
