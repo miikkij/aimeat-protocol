@@ -12,6 +12,7 @@
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · RefundOutcome · PaymentHandler
  * @usage import type { CheckoutSessionRecord, PaymentHandler } from '../commerce/types.js';
  * @version-history
+ *   2026-10-27 — CheckoutSessionRecord.cardPages, the card pages the node opened (secaudit2026oct26).
  *   2026-10-25 — CheckoutSessionRecord: refundedTrackingCodes and collectAttempt; collect takes
  *     `attempt` (secaudit2026oct22).
  *   2026-10-16 — PaymentHandler.refund answers a RefundOutcome (refunded, not_possible, failed,
@@ -201,6 +202,11 @@ export interface CheckoutSessionRecord {
   refundedTrackingCodes?: string[];
   /** How many collects of this checkout were refunded; a money rail keys a new charge on it. */
   collectAttempt?: number;
+  /**
+   * The Stripe Checkout Session ids of the card pages the node opened for this checkout, newest last.
+   * The webhook completion takes only one of these (commerce/stripe-checkout-complete.ts).
+   */
+  cardPages?: string[];
   /** Buyer: bare owner name + owner GHII (the balance holder) + the acting principal for attribution. */
   buyerOwner: string;
   buyerGhii: string;
