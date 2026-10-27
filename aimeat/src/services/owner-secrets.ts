@@ -36,6 +36,9 @@
  *   const r = await putOwnerSecret(storage, config, ownerGhii, name, value);
  *   if (!r.ok) res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-27 — An owner's approval counts only while the installer account it names is the one that
+ *     existed when it was given (installerPredates): an account registered later under an erased
+ *     installer's name does not inherit it (secaudit2026oct26).
  *   2026-10-25 — Storing a secret again or removing it closes the owner's notices about its waiting
  *     questions: they say so and lose their buttons (services/notification-answers.ts; secaudit2026oct22).
  *   v1.4.0 — 2026-10-24 — A value from the extension's shared map that has no host yet is bound only
@@ -503,6 +506,19 @@ export function secretUnknownMessage(headerName: string, secretName: string): st
  * it put into the headers, so ctx.fetch can remove them from whatever the far end sends back
  * (services/extension-fetch-scrub.ts; secrets audit 2026-10-09, item 10).
  */
+/**
+ * Did the installer account an approval names exist when the owner gave it? The approval names the
+ * installer by account name, and an erased account's name can be registered again: an account created
+ * after the approval is not the one the owner allowed (secaudit2026oct26). An installer with no account
+ * record here (`system`, a name from before accounts were recorded) is decided as before.
+ */
+async function installerPredates(storage: Storage, config: AimeatConfig, installer: string, approvedAt: string): Promise<boolean> {
+  const ghii = installer.includes('@') ? installer : `${installer}@${config.nodeId}`;
+  const account = await storage.getGHII(ghii);
+  if (!account?.createdAt) return true;
+  return !(Date.parse(account.createdAt) > Date.parse(approvedAt));
+}
+
 export async function resolveSecretForHeaders(deps: {
   storage: Storage;
   config: AimeatConfig;
@@ -578,9 +594,11 @@ export async function resolveSecretForHeaders(deps: {
         // THE OWNER'S OWN ANSWER FIRST. An approval the owner gave in person lets this extension,
         // installed by this account, send this secret to this host, whatever the secret's own
         // address says, and binds nothing (services/secret-approvals.ts).
-        const approved = deps.approvedFor && host
-          && (record.approvals ?? []).some(a => !!a.approvedAt && a.extension === deps.approvedFor!.extension
-            && a.installer === deps.approvedFor!.installer && a.host === host);
+        const match = deps.approvedFor && host
+          ? (record.approvals ?? []).find(a => !!a.approvedAt && a.extension === deps.approvedFor!.extension
+            && a.installer === deps.approvedFor!.installer && a.host === host)
+          : undefined;
+        const approved = !!match && await installerPredates(storage, config, match.installer, match.approvedAt!);
         if (approved) { resolved.set(name, plain); fromVault.push(name); continue; }
         // THE HOST. The address comes from the extension's script, so without this any extension a
         // person ran could send their credential to its author. The first use binds the host;
