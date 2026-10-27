@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.20.3 — 2026-10-27 — ctx.memory.search runs one call at a time per run, queued, so a script that
+ *     starts many at once holds one namespace copy in host memory, not one per call (secaudit2026oct26).
  *   v1.20.2 — 2026-10-25 — The in-flight fetch budget is the operator setting extensions.fetch_inflight_mb (secaudit2026oct22, lead 782).
  *   v1.20.1 — 2026-10-25 — buildExtensionEmail and unavailableEmail moved to services/extension-email.ts by pure
  *     extraction (max-file-lines), re-exported here; ctx.email's tier 1 asks extensionConsentHolds
@@ -449,6 +451,7 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
     // The classification readers (TARGET-082): the extension reading its own namespace is the node's
     // own work; a read of somebody's public memory is made for the caller who invoked the action.
     const ownReader = systemReader({ storage, config }, extMemoryOwner);
+    let searchQueue: Promise<unknown> = Promise.resolve();
     const callerReader = readerForCaller({ storage, config }, deps.caller);
     // One gate per run: fetches started together are queued past the run's in-flight budget, the
     // operator setting extensions.fetch_inflight_mb (0 is no limit).
@@ -549,9 +552,17 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                 return { ok: false, version: current?.version ?? null };
             },
 
-            search: async (prefix) => {
-                const records = await presentMemories(ownReader, await storage.listMemory(extMemoryOwner, { prefix }));
-                return records.map(r => ({ key: r.key, value: r.value }));
+            // One search at a time per run, queued and not refused: each answer holds the matching
+            // namespace in host memory until the guest has it, and a script may start every host call
+            // at once (secaudit2026oct26).
+            search: (prefix) => {
+                const run = searchQueue.then(async () => {
+                    const records = await presentMemories(ownReader, await storage.listMemory(extMemoryOwner, { prefix }));
+                    return records.map(r => ({ key: r.key, value: r.value }));
+                });
+                // The next search waits for this one to settle either way; the caller gets a failure through `run`.
+                searchQueue = Promise.allSettled([run]);
+                return run;
             },
 
             delete: async (key) => {
