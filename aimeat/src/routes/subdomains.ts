@@ -14,6 +14,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.36.2 — 2026-10-27 — A label's page sets the owner cookie and clears the origin's storage once
+ *     when the label passed to another owner (routes/origin-owner-cookie.ts; secaudit2026oct26).
  *   v1.36.1 — 2026-10-25 — ensureAppSubdomain clears the held mark of its own target's label: the owner
  *     published the removed app again (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.36.0 — 2026-10-25 — `?format=md&lang=<tag>` passes the reader's language to the app's own format-md
@@ -197,6 +199,7 @@ import { detectLocale, type Locale } from '../i18n.js';
 import { resolveServableApp, appIsRestricted, unlockRedirect } from './subdomain-app-gate.js';
 import { pageOriginRefused } from './page-open.js';
 import { originGrant, APP_ACCESS_COOKIE } from './origin-grant-cookie.js';
+import { markOriginOwner } from './origin-owner-cookie.js';
 import { isNodeApexLabel, nodeLabelAppOrigin } from '../services/subdomain-node-labels.js';
 import { relaxAppCspMeta } from './subdomain-app-html.js';
 import { apexServesSite, autoLabelCandidates } from '../services/subdomain-site-origin.js';
@@ -692,6 +695,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (await serveAppAgentFace(res, config, storage, app, { lang: formatMdLang(req.query.lang) })) return;
     }
 
+    // The label's origin clears its visitors' storage once when the label passed to another owner
+    // since the browser last saw it (routes/origin-owner-cookie.ts; secaudit2026oct26).
+    await markOriginOwner(req, res, storage, config, app);
     const discover = {
       baseUrl: config.baseUrl,
       toolNames: await appToolNames(storage, app.ownerGaii, app.filename),

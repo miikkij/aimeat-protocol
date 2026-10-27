@@ -843,6 +843,41 @@ async function main() {
             assert(s.ok === true, `the version the owner's own app published asks: ${JSON.stringify({ ...s, access_token: !!s.access_token })}`);
         });
 
+        // secaudit2026oct26 (held-app-labels.ts:sweepHeldAppLabels/released-label-reassigned-to-other-owner),
+        // the coordinator's decision of 2026-10-27. A label released after its hold can pass to another
+        // owner's app, and the visitors' browsers still hold the old app's storage on that origin. The
+        // first page load after the label changed owner clears it once; nothing else changes.
+        const visitLabel = async (sub: string, cookie?: string) => {
+            const r = await hostRequest(BASE, '/', `${sub}.${APP_HOST}:${PORT}`, { headers: {
+                'x-app-origin': '1', 'x-subdomain': sub, Accept: 'text/html', ...(cookie ? { Cookie: cookie } : {}) } });
+            const set = /aimeat_origin_owner=[^;]*/.exec(r.header('set-cookie') ?? '')?.[0];
+            return { status: r.status, clear: r.header('clear-site-data'), cookie: set ?? cookie };
+        };
+        await test('an origin that keeps its owner keeps its visitors\' storage across visits', async () => {
+            await publish(A.token, 'keep-a.html');
+            await assignSub(A.token, 'pbkeep', `${a}/keep-a.html`);
+            const first = await visitLabel('pbkeep');
+            const second = await visitLabel('pbkeep', first.cookie);
+            const third = await visitLabel('pbkeep', second.cookie);
+            assert(first.status === 200 && second.status === 200 && third.status === 200, `served: ${first.status} ${second.status} ${third.status}`);
+            assert(!first.clear && !second.clear && !third.clear, `an unchanged origin cleared its storage: ${first.clear} ${second.clear} ${third.clear}`);
+        });
+
+        await test('the first visit after a label passed to another owner\'s app clears the old app\'s storage, once', async () => {
+            await publish(A.token, 'lbl-a.html');
+            await publish(B.token, 'lbl-b.html');
+            await assignSub(A.token, 'pbrecyc', `${a}/lbl-a.html`);
+            const before = await visitLabel('pbrecyc');
+            assert(before.status === 200 && !before.clear && !!before.cookie, `the first visit marks the origin's owner: ${JSON.stringify(before)}`);
+            const del = await json('/v1/admin/subdomains/pbrecyc', { method: 'DELETE', headers: { Authorization: `Bearer ${A.token}` } });
+            assert(del.status === 200, `release the label: ${del.status} ${JSON.stringify(del.body?.error)}`);
+            await assignSub(A.token, 'pbrecyc', `${bn}/lbl-b.html`);
+            const after = await visitLabel('pbrecyc', before.cookie);
+            assert(after.status === 200 && /"storage"/.test(after.clear ?? ''), `the old app's storage stays readable to the new owner's app: ${JSON.stringify(after)}`);
+            const again = await visitLabel('pbrecyc', after.cookie);
+            assert(!again.clear, `cleared again on the next visit: ${again.clear}`);
+        });
+
         await test('a subdomain ending in --draft cannot be registered', async () => {
             const r = await json('/v1/admin/subdomains', { method: 'POST', headers: { Authorization: `Bearer ${A.token}` },
                 body: JSON.stringify({ subdomain: 'bbb--draft', kind: 'app', target: `${a}/app-a.html` }) });
