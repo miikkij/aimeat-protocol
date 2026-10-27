@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Agent registration routes (owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-10-27 — POST /v1/agents tells the owner when the new agent takes over schedules or
+ *     saved workflows an earlier agent of the same name made (secaudit2026oct26).
  *   v1.10.0 — 2026-10-25 — The pending listing says of an existing agent's request whether it proved it is
  *     coming back (`return_proven`; services/device-return-proof.ts; secaudit2026oct22).
  *   v1.9.0 — 2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
@@ -53,6 +55,8 @@ import { exceedsCeiling } from '../../utils/scope-coverage.js';
 import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance } from '../../services/agent-clearance.js';
 import { returnProven } from '../../services/device-return-proof.js';
+import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerRegistrationRoutes(
   router: Router, config: AimeatConfig, storage: Storage, dirnameAgents: string,
@@ -135,6 +139,11 @@ export function registerRegistrationRoutes(
 
     // Extension hook: post_agent_registration (fire-and-forget)
     fireHook(config, storage, 'post_agent_registration', { gaii: agent.gaii, owner: agent.owner });
+    // A new agent under a name an earlier agent had runs that agent's standing work again; the owner
+    // is told what (services/agent-standing-work.ts; secaudit2026oct26).
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    await noticeStandingWork(storage, ownerGhii, name, await standingWorkOf(storage, ownerGhii, agent.gaii), 'resumed')
+      .catch(err => logger.warn('agent registration: standing work not counted', { gaii: agent.gaii, error: String(err) }));
 
     // The platform the User-Agent names belongs to the agent from the moment it exists. This route
     // wrote it AFTER the response, in the onboarding block below, so a caller that registered and
