@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — An entry of POST /v1/memory/bulk or /import of the welcome page's switch
+ *     (portfolio.config) asks the publish gate as PUT /v1/portfolio/config does: all but the change
+ *     that makes the served page public is stored, and the request is in `publish_requests`
+ *     (batch-guards.ts batchPortfolioGate; secaudit2026oct26).
  *   2026-10-27 — The bulk delete asks the bin's per-key rules (services/memory-bin.ts
  *     bulkDeleteKeyRefusal): a credential record, a reserved owner key for an app grant and an event of
  *     an append-only space are refused when named (403 SECRET_RECORD, 403 RESERVED_KEY, 409
@@ -116,7 +120,7 @@ import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import {
   batchKeyRefusal, storageReferenceRefusal, visibilityRefusal, organismWriteRefusalFor, routePublishAsk, batchPublishAnswer,
-  batchCapRefusalFor,
+  batchCapRefusalFor, batchPortfolioGate, fileBatchPortfolioAsks, type BatchPortfolioAsk,
 } from './batch-guards.js';
 import { registerCopyRoute } from './copy.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
@@ -184,6 +188,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // raise their record to public is decided by the batch write, which reads what each key holds.
     const publishAsk = routePublishAsk({ storage, config }, req);
     const capRefusal = batchCapRefusalFor({ storage, config }, req, 'POST /v1/memory/bulk');
+    const portfolioAsks: BatchPortfolioAsk[] = [];
     for (const e of rawEntries) {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
@@ -220,9 +225,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // A level wider than the record's label allows: that entry is refused (plan doc-mvdipuyqraas, L3.2).
       const capped = await capRefusal(gaii, key, e.visibility ?? memoryVisibilityDefault(config));
       if (capped) { preFailed.push({ key, status: 'failed', reason: capped }); continue; }
+      // The welcome page's switch asks the publish gate as PUT /v1/portfolio/config does (secaudit2026oct26).
+      const portfolio = await batchPortfolioGate({ storage, config }, req, gaii, key, e.value);
+      if ('refusal' in portfolio) { preFailed.push({ key, status: 'failed', reason: portfolio.refusal }); continue; }
+      if (portfolio.ask) portfolioAsks.push(portfolio.ask);
       items.push({
         key,
-        value: e.value,
+        value: portfolio.value,
         // No visibility named: the node's starting level (plan V5.1).
         visibility: (e.visibility ?? memoryVisibilityDefault(config)) as MemoryRecord['visibility'],
         tags: Array.isArray(e.tags) ? e.tags : [],
@@ -243,6 +252,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
     }, 'bulk');
+    await fileBatchPortfolioAsks({ storage, config }, portfolioAsks, result);
 
     // Fire the same reactive/live-update signals a single write does, for each entry actually written.
     for (const it of result.items) {
@@ -429,10 +439,15 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
 
+    const portfolioAsks: BatchPortfolioAsk[] = [];
     for (const s of survivors) {
+      // The welcome page's switch asks the publish gate as PUT /v1/portfolio/config does (secaudit2026oct26).
+      const portfolio = await batchPortfolioGate({ storage, config }, req, gaii, s.key, s.entry.value);
+      if ('refusal' in portfolio) { failed.push({ key: renameOf.get(s.key) ?? s.key, reason: portfolio.refusal }); continue; }
+      if (portfolio.ask) portfolioAsks.push(portfolio.ask);
       items.push({
         key: s.key,
-        value: s.entry.value,
+        value: portfolio.value,
         // An entry with no visibility takes the node's starting level (plan V5.1); a word this
         // import does not restore is still stored private.
         visibility: (s.entry.visibility === undefined ? memoryVisibilityDefault(config)
@@ -456,6 +471,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
     }, 'import');
+    await fileBatchPortfolioAsks({ storage, config }, portfolioAsks, result);
 
     for (const it of result.items) {
       if (it.status === 'created' || it.status === 'updated') {
