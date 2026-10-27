@@ -22,6 +22,9 @@
  * @structure runModelWork() · settleModelJob() · checkModelWorks()
  * @usage runModelWork(deps, ownerGhii, goalId, workId);   // goals-advance.ts; settleModelJob from goals-sweep.ts's job listener
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A record goes to the model with the reach of whoever named it in the goal; one
+ *     an agent named and may not read stops the work with the reason before any read
+ *     (goals-model-reach.ts; secaudit2026oct26, goals:model-work-runs-as-owner-without-requesting-agent-authority).
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
  */
 import { getActiveAiJobService } from '../ai-jobs/service.js';
@@ -30,6 +33,7 @@ import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import { logEntry, readGoal, updateGoal, type GoalDeps } from './goals-store.js';
 import { countTake, taskBody } from './goals-work.js';
+import { modelWorkInputRefusal } from './goals-model-reach.js';
 import {
   MAX_ATTEMPTS, MAX_RESULTS, MODEL_TAKER, TEXT_MAX, goalSettled, parseRunKey, resultsKey, runKey,
   type GoalRecord, type GoalWork,
@@ -83,6 +87,10 @@ export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: st
   try {
     if (!service) throw new Error('This node runs no background model jobs.');
     const body = taskBody(taken, work, true);
+    // Each record goes to the model with the reach of whoever named it in the goal; one an agent named
+    // and may not read stops the work here, before any read (goals-model-reach.ts; secaudit2026oct26).
+    const refused = await modelWorkInputRefusal(deps, ownerGhii, taken, body.memoryKeys);
+    if (refused) throw refused.error;
     const started = await service.startJob({
       prompt: `${body.title}\n\n${body.description}`,
       // The records the work builds on (an earlier work's deliverable, the goal's material): the
