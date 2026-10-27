@@ -10,6 +10,8 @@
  * @structure deleteInstalledCortexes(db, name, ghiis, opts)
  * @usage deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A released-name row for each bare cortex name deleted, held by an erasure
+ *     pseudonym, as removeCortex writes for an uninstall (secaudit2026oct26).
  *   v1.1.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  *   v1.1.0 — 2026-09-26 — `names`, for the operator's decision on a held name (repos/held-names.ts);
  *     the start step and that decision call this same function.
@@ -17,7 +19,7 @@
  *     2026-09, R4 "found": the cortex record).
  */
 import type Database from 'better-sqlite3';
-import { partyIdentities } from '../../../erased-party.js';
+import { partyIdentities, erasedPartyPseudonym } from '../../../erased-party.js';
 import { erasedCortexParts } from '../../../erased-cortex.js';
 import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
 
@@ -89,6 +91,18 @@ export function deleteInstalledCortexes(
   const drop = db.prepare('DELETE FROM cortex_extensions WHERE installedBy = ? AND name = ?');
   let removed = 0;
   for (const row of rows) removed += drop.run(name, row.name).changes;
+  // A bare name is written down as released, held by a pseudonym no account matches, so the next
+  // account's install of it goes to `<installer>/<name>` and the apps that load the old library never
+  // run the new installer's code (services/component-address.ts; secaudit2026oct26). The account name
+  // is released for reuse, so the holder is never the name itself.
+  const bare = rows.map(r => r.name).filter(n => !n.includes('/'));
+  if (bare.length) {
+    const holder = erasedPartyPseudonym();
+    const releasedAt = new Date().toISOString();
+    const release = db.prepare(`INSERT INTO released_component_names (kind, name, holder, releasedAt) VALUES ('cortex', ?, ?, ?)
+       ON CONFLICT (kind, name) DO UPDATE SET holder = excluded.holder, releasedAt = excluded.releasedAt`);
+    for (const n of bare) release.run(n, holder, releasedAt);
+  }
   // Every memory write reads the schema locks from a process cache, which a delete refreshes.
   if (locks > 0) invalidateSchemaLockCache();
   return removed;
