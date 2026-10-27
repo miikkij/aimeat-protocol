@@ -15,6 +15,8 @@
 // asks the node the question directly, which is the only thing that would have caught it.
 //
 // Version history:
+//   2026-10-27 -- Case 8b expects the directory's own interface (1.0 and 0.3 at /v1/a2a/directory)
+//     instead of an empty list, and no 0.3 top-level url; cases 8c and 8d call it.
 //   2026-10-16 -- Case 4 expects 403 ACCESS_DENIED. Its setup no longer matched the product: since
 //     QA audit S2-03 (2026-10-16) an owner session's task-list read names one of the owner's own
 //     agents or is refused, so a literal `me` from an owner is refused instead of answering the owner
@@ -161,15 +163,56 @@ await test('8b. The directory validates as an A2A Agent Card, because this path 
   for (const field of ['version', 'capabilities', 'supportedInterfaces', 'defaultInputModes', 'defaultOutputModes', 'skills']) {
     assert(r.body[field] !== undefined, `the A2A schema requires ${field}, and it is missing`);
   }
-  // NOT AN ENDPOINT. Work goes to an agent's own interface, and an empty list is how this document
-  // says it has none of its own. A non-empty one here would send a stranger's task nowhere.
-  assert(Array.isArray(r.body.supportedInterfaces) && r.body.supportedInterfaces.length === 0,
-    `the directory offers no interface of its own, got ${JSON.stringify(r.body.supportedInterfaces)}`);
+  // ONE INTERFACE, AND IT ANSWERS (2026-10-27). The list was empty until then, which A2A 1.0 does not
+  // allow; it names the directory's own JSON-RPC address now, at 1.0 and 0.3, and case 8c sends it a
+  // message. The A2A 0.3 top-level `url` is gone: it told a 0.3 client to post work to the root.
+  const ifaces = r.body.supportedInterfaces as Array<{ url: string; protocolBinding: string; protocolVersion: string }>;
+  assert(Array.isArray(ifaces) && ifaces.length === 2, `1.0 and 0.3 at one address, got ${JSON.stringify(ifaces)}`);
+  assert(ifaces.every(i => i.url.endsWith('/v1/a2a/directory') && i.protocolBinding === 'JSONRPC'),
+    `every interface is the directory's JSON-RPC address, got ${JSON.stringify(ifaces)}`);
+  assert(JSON.stringify(ifaces.map(i => i.protocolVersion).sort()) === JSON.stringify(['0.3', '1.0']),
+    `versions ${JSON.stringify(ifaces.map(i => i.protocolVersion))}`);
+  assert(r.body.url === undefined, `no A2A 0.3 top-level url, got ${r.body.url}`);
   assert(r.body.capabilities.streaming === false, 'a directory streams nothing');
   assert(r.body.skills.length === 1 && r.body.skills[0].id === 'directory',
     `its one skill is being a directory, got ${JSON.stringify(r.body.skills)}`);
   // The point of the document survived the fields being added to it.
   assert(Array.isArray(r.body.agents), 'the directory is still a directory');
+});
+
+await test('8c. The directory interface answers a message with the list the card carries, and needs no credential', async () => {
+  const card = (await json('/.well-known/agent-card.json')).body;
+  const send = async (version: string, method: string, params: unknown) => {
+    const res = await fetch(new URL('/v1/a2a/directory', BASE), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'A2A-Version': version },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    });
+    return { status: res.status, body: await res.json() as any };
+  };
+  const r = await send('1.0', 'SendMessage', { message: { messageId: 'dir-1', role: 'ROLE_USER', parts: [{ text: 'Who can I hire?' }] } });
+  assert(r.status === 200 && !r.body.error, `SendMessage: ${r.status} ${JSON.stringify(r.body).slice(0, 300)}`);
+  const parts = r.body.result?.message?.parts as any[] | undefined;
+  const data = parts?.find(p => p.data !== undefined)?.data;
+  assert(data && Array.isArray(data.agents), `a data part with agents, got ${JSON.stringify(r.body.result).slice(0, 300)}`);
+  assert(JSON.stringify(data.agents) === JSON.stringify(card.agents), 'the answer is the list the card carries');
+  // The 0.3 shape a 0.3 client sends reaches the same answer through the SDK's compat layer.
+  const legacy = await send('0.3', 'message/send', { message: { kind: 'message', messageId: 'dir-2', role: 'user', parts: [{ kind: 'text', text: 'list' }] } });
+  assert(legacy.status === 200 && !legacy.body.error, `message/send (0.3): ${legacy.status} ${JSON.stringify(legacy.body).slice(0, 300)}`);
+});
+
+await test('8d. FAILURE: the directory keeps no tasks, so asking for one is "not found", and an empty message is refused', async () => {
+  const call = async (method: string, params: unknown) => {
+    const res = await fetch(new URL('/v1/a2a/directory', BASE), {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'A2A-Version': '1.0' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 2, method, params }),
+    });
+    return await res.json() as any;
+  };
+  const task = await call('GetTask', { id: 'anything' });
+  assert(task.error?.code === -32001, `GetTask answers TaskNotFound (-32001), got ${JSON.stringify(task).slice(0, 200)}`);
+  const empty = await call('SendMessage', { message: { messageId: 'dir-3', role: 'ROLE_USER', parts: [] } });
+  assert(empty.error, `an empty message is refused, got ${JSON.stringify(empty).slice(0, 200)}`);
 });
 
 await test('9. The per-agent card still answers at its own address', async () => {
