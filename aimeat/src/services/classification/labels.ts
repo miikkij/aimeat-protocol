@@ -53,8 +53,10 @@
  *   await setLabel({ storage, config }, actor, memoryTarget(owner, key), { label: 'luottamuksellinen' });
  * @version-history
  *   v1.11.1 — 2026-10-27 — setLabel and reviewLabel follow memory:read-as-owner as readContentLabel
- *     does: a record the caller may not read with owner_scope is refused with ReadAsOwnerRequired,
- *     which names no label, source or lock (secaudit2026oct26).
+ *     does: on a record the caller may not read with owner_scope, a label write applies nothing and
+ *     waits as a suggestion for the person (PERSON_REVIEWS), answering the policy default and
+ *     READ_AS_OWNER_NOTE, never the record's label, source or lock; a review answers NO_SUGGESTION, as
+ *     the read shows none (secaudit2026oct26).
  *   v1.11.0 — 2026-10-22 — readContentLabel follows memory:read-as-owner (owner-scope-labels.ts): a
  *     record of the owner or a sibling that the caller may not read with owner_scope answers as one
  *     with no stored label, and the view carries READ_AS_OWNER_NOTE (secaudit 2026-10, v77).
@@ -123,7 +125,7 @@ import {
   assertMayLabelContainer, containerTargetOf, isContainerKind, resolveContainer, CONTAINER_KINDS,
 } from './containers.js';
 import { effectiveLabels, type EffectiveLabel } from './effective.js';
-import { ownerScopeLabelView, READ_AS_OWNER_NOTE, ReadAsOwnerRequired } from './owner-scope-labels.js';
+import { ownerScopeLabelView, READ_AS_OWNER_NOTE } from './owner-scope-labels.js';
 
 export { ClassificationError, isAppActor, isOwnerPerson, appNameOf, type ClassificationDeps, type LabelActor } from './label-core.js';
 export { documentKeyOf, memoryTarget, labelAddressOf, documentContentKeys, labelsFor, targetId } from './label-rows.js';
@@ -311,8 +313,11 @@ export interface SetLabelResult {
   source: ContentLabelRow['source'];
   locked: boolean;
   /** Set when the change waits for a person: HUMAN_LABEL, CANNOT_LOWER, AI_SUGGESTS, BELOW_THRESHOLD,
-   *  PERSON_APPROVES (an AI relayed a person's words that lower the label or change a person's). */
+   *  PERSON_APPROVES (an AI relayed a person's words that lower the label or change a person's),
+   *  PERSON_REVIEWS (the writer may not read the record; suggestForHiddenRecord). */
   pending?: string;
+  /** With PERSON_REVIEWS: READ_AS_OWNER_NOTE, what the writer would need to see the record. */
+  note?: string;
 }
 
 function blankRow(target: ContentLabelTarget, policy: ClassificationPolicy, at: string, by: string): ContentLabelRow {
@@ -335,16 +340,51 @@ async function putLabel(storage: Storage, row: ContentLabelRow, stale: readonly 
   emitChange('classification', ownerOfScope(row.scope) ?? undefined);
 }
 
+/** Why a suggestion waits when its writer may not read the record (suggestForHiddenRecord). */
+const PERSON_REVIEWS = 'PERSON_REVIEWS';
+
 /**
- * The label write doors answer what the label read answers (secaudit2026oct26,
- * classification-labels:label-write-ignores-read-as-owner): a record of the owner or a sibling agent
- * that this caller may not read with owner_scope (owner-scope-labels.ts hidden) is neither labelled nor
- * described. The refusal carries memory:read-as-owner, so the caller is handed the address where the
- * owner gives it. A caller holding the word, the owner in person and an app grant see no change, and
- * every agent still labels its own records and the owner's records marked owner, members or public.
+ * A label write on a record this caller may not read with owner_scope (owner-scope-labels.ts hidden:
+ * a private record of the owner or a sibling agent, and the caller without memory:read-as-owner)
+ * applies nothing and refuses nothing: it waits as a suggestion for the person, whichever way it goes,
+ * and the answer is the one the label read gives for such a record, the policy's default with nothing
+ * stored, plus that the suggestion waits (secaudit2026oct26,
+ * classification-labels:label-write-ignores-read-as-owner). The record's own label, its source and
+ * its lock are never in the answer. A caller holding the word, the owner in person and an app grant
+ * never reach this; every agent labels its own records and the owner's records marked owner,
+ * members or public as before.
  */
-async function assertReadsRecord(deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget): Promise<void> {
-  if (await ownerScopeLabelView(deps.storage, actor).hidden(target)) throw new ReadAsOwnerRequired();
+async function suggestForHiddenRecord(
+  deps: ClassificationDeps, actor: LabelActor, target: ContentLabelTarget, label: SetLabelInput['label'],
+  input: { justification: string | null; humanSaid: string | null; reason: string | null; confidence?: number },
+): Promise<SetLabelResult> {
+  const policy = await policyFor(deps.storage, deps.config, target.scope);
+  const next = activeLabel(policy, label);
+  const { row: prev, stale } = await currentRow(deps.storage, policy, target);
+  const answer: SetLabelResult = {
+    applied: false, label: policy.defaultLabel, from: policy.defaultLabel, source: 'default', locked: false,
+    pending: PERSON_REVIEWS, note: READ_AS_OWNER_NOTE,
+  };
+  const source: 'ai' | 'rule' = actor.kind === 'rule' ? 'rule' : 'ai';
+  // The same suggestion from the same kind of source already waits: nothing new to write.
+  if (prev?.suggestion && prev.suggestion.label === next.id && prev.suggestion.source === source) return answer;
+  if (!prev && next.id === policy.defaultLabel) return answer;
+  const at = (deps.now ?? (() => new Date().toISOString()))();
+  const row: ContentLabelRow = prev ? { ...prev, history: [...prev.history] } : blankRow(target, policy, at, actor.principal);
+  row.suggestion = {
+    label: next.id, by: actor.principal, at, source, why: PERSON_REVIEWS,
+    ...(input.confidence !== undefined ? { confidence: input.confidence } : {}),
+    ...(input.reason || input.humanSaid ? { reason: input.humanSaid ?? input.reason ?? undefined } : {}),
+    ...(input.humanSaid ? { humanSaid: input.humanSaid } : {}),
+    ...(input.justification ? { justification: input.justification } : {}),
+  };
+  row.updatedAt = at;
+  pushHistory(row, {
+    at, by: actor.principal, source: input.humanSaid ? 'human-via-ai' : source, action: 'suggest', from: row.label, to: next.id,
+    justification: input.justification, humanSaid: input.humanSaid, confidence: input.confidence, reason: input.reason ?? undefined,
+  });
+  await putLabel(deps.storage, row, stale);
+  return answer;
 }
 
 /**
@@ -364,7 +404,9 @@ export async function setLabel(
   if (actor.kind === 'rule' && humanSaid) throw new ClassificationError('INVALID_INPUT', 400, 'A detection rule has no person to quote.');
 
   await assertMayLabel(deps, actor, target, 'write');
-  await assertReadsRecord(deps, actor, target);
+  if (await ownerScopeLabelView(deps.storage, actor).hidden(target)) {
+    return suggestForHiddenRecord(deps, actor, target, input.label, { justification, humanSaid, reason, confidence });
+  }
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const next = activeLabel(policy, input.label);
   const { row: prev, stale } = await currentRow(deps.storage, policy, target);
@@ -488,11 +530,13 @@ export async function reviewLabel(
     throw new ClassificationError('PERSON_REQUIRED', 403, 'A person reviews a suggestion. An AI relays their decision with their own words in humanSaid.');
   }
   await assertMayLabel(deps, actor, target, 'write');
-  await assertReadsRecord(deps, actor, target);
+  // A record this caller may not read shows no suggestion on the label read (readContentLabel), so
+  // the review answers as for one with nothing waiting; the person reviews it (secaudit2026oct26).
+  const hidden = await ownerScopeLabelView(deps.storage, actor).hidden(target);
   const policy = await policyFor(deps.storage, deps.config, target.scope);
   const { row: prev, stale } = await currentRow(deps.storage, policy, target);
-  if (prev) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
-  if (!prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
+  if (prev && !hidden) await assertInsideCurrent(deps, actor, target, labelById(policy, prev.label));
+  if (hidden || !prev?.suggestion) throw new ClassificationError('NO_SUGGESTION', 404, 'Nothing is waiting for a review on this content.');
   if (input.decision === 'accept') {
     // A lowering that an AI relayed waits for the person in their own session: an AI accepting it,
     // even with their words, is the same relay again.

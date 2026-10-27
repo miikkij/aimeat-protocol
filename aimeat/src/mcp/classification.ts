@@ -15,8 +15,6 @@
  * @structure registerClassificationTools(mcp, storage, config, getAgentGaii, scopes, caller)
  * @usage registerClassificationTools(mcp, storage, config, agentGaii, scopes, caller);
  * @version-history
- *   2026-10-27 — set and review on a record the agent may not read with owner_scope answer with the
- *     permission ask for memory:read-as-owner, as REST does (secaudit2026oct26).
  *   2026-10-23 — pack_list and pack_set: the TL and NATO label packs (services/classification/packs.ts,
  *     plan doc-mvlftkh9zmc9 C3.2); pack_set needs memory:write and writes the node policy.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -44,9 +42,6 @@ import { scopeIsCovered } from '../utils/scope-coverage.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { toolError } from './tool-error.js';
-import { scopeDeniedText } from './scope-denied-answer.js';
-import { noteMcpScopeRefusal } from './tool-usage-wrap.js';
-import { ReadAsOwnerRequired } from '../services/classification/owner-scope-labels.js';
 import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
 } from '../services/classification/labels.js';
@@ -154,13 +149,6 @@ export function registerClassificationTools(
           }
         }
       } catch (err) {
-        // A label write on a record the agent may not read: the same ask every scope refusal gives,
-        // with the address where the person allows it (mcp/scope-denied-answer.ts; secaudit2026oct26).
-        if (err instanceof ReadAsOwnerRequired) {
-          const principal = labelActorOf(caller().auth, config.nodeId).principal;
-          noteMcpScopeRefusal(principal, err.needed, 'aimeat_classification');
-          return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_classification', err.needed, { baseUrl: config.baseUrl, agentGaii: principal }) }], isError: true };
-        }
         if (err instanceof ClassificationError) return toolError(err.code, err.message);
         throw err;
       }
