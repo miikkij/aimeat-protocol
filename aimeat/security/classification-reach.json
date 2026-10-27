@@ -2262,6 +2262,13 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: how a federation peer arrived, the package registrations waiting for their node, and the markers of its Security page events, in the federation-peer-origin system namespace. No content of a person's."
     },
+    "src/services/peer-replace-ask.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the waiting peer-replacement requests (peer-replace-ask.*) under the link invites' system identity, read to answer a repeated invite and to decide one on the operator's answer. No content of a person's."
+    },
     "src/services/portfolio-config.ts": {
       "reads": {
         "getMemory": 2,

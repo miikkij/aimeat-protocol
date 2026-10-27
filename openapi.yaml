@@ -31448,6 +31448,43 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           description: SELF_NODE_ID — the request names this node's own id, so approving it would make a peer of this node itself; reject it instead
+        '409':
+          description: PEER_KEY_REQUIRED — the request carries no key; INVITE_NOT_OPEN — a replacement request whose invite was used, revoked or ran out meanwhile, so nothing was replaced
+
+  /v1/admin/peering/requests/{id}/decision:
+    post:
+      operationId: decidePeeringByPost
+      summary: Approve/reject peering request (notice buttons)
+      description: |
+        The same decision as PUT /v1/admin/peering/requests/{id}, in the form a notice's Allow and
+        Don't allow buttons call. A request that asks to replace a peer held under another key (an
+        invite that names no node, presented for a held node id) is replaced on approve, with the
+        invite used then, and left as it was on reject; either answer closes the operators' notices.
+        Operator only.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PeeringDecision'
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          description: SELF_NODE_ID — the request names this node's own id
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: PEER_KEY_REQUIRED or INVITE_NOT_OPEN, as on the PUT
 
   /v1/federation/peer/activate:
     post:
@@ -53586,10 +53623,14 @@ paths:
         AN EXISTING PEER. An active peer of that node id answers 409 CONFLICT. A peer that is offline
         or leaving is replaced only by an admission (an invite, or open join under the same key); a
         pending request leaves it in place, and an open join under another key answers 409
-        PEER_KEY_MISMATCH. An invite replaces a peer held under another key only when the invite
-        names that node id (`node_id` at mint); an invite that names no node answers 409
-        PEER_KEY_MISMATCH there and stays unused, and an invite that names another node is not used
-        (the pending path). A node id held under another key is recorded on the Security page.
+        PEER_KEY_MISMATCH. An invite that names that node id (`node_id` at mint) replaces a peer held
+        under another key at once. An invite that names no node does not: the replacement becomes a
+        pending request (202) and the operators get a notice with Allow and Don't allow (POST
+        /v1/admin/peering/requests/{id}/decision). The invite is used only on Allow, which replaces the
+        held peer at the invite's tier; the status route reads `approved` or `rejected`. Presenting
+        the same invite again while it waits answers with the same request. An invite that names
+        another node is not used (the pending path). A node id held under another key is recorded on
+        the Security page.
 
         THIS NODE'S OWN ID. A `node_id` equal to this node's own id is refused with 400 SELF_NODE_ID,
         before an invite is used or a request is stored.
@@ -53625,7 +53666,7 @@ paths:
         '200':
           description: Auto-admitted (open join, or a valid invite) — carries the tier admitted at
         '202':
-          description: Pending operator approval (default; also an unknown/expired/used invite, or an invite that names another node)
+          description: Pending operator approval (default; also an unknown/expired/used invite, an invite that names another node, or an invite that names no node presented for a node id held under another key)
         '400':
           description: SELF_NODE_ID — the node id is this node's own; or a missing field, a stale timestamp or an address this node does not take
         '409':

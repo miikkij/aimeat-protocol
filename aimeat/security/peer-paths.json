@@ -45,6 +45,10 @@
       "count": 1,
       "why": "registerPackagePeer, from linkPackagePeer and adoptPendingPeer only: a package author, an operator or a seller node of the author asked, and the node's own card answered with the same id and key. Written packages-only (contact tier, messaging off). The card does not prove the id is the asker's; the readers below keep such a peer to packages."
     },
+    "src/services/peer-replace-ask.ts": {
+      "count": 1,
+      "why": "decidePeerReplacement, from the operator's decision on a peering request (requireOperator on PUT /v1/admin/peering/requests/:id and POST …/:id/decision): replaces a peer held under another key only after an operator allowed it, with the key and url the presenting node signed its introduction with and an invite this operator minted, used at that moment at its own tier (secaudit2026oct26)."
+    },
     "src/services/relay-claim-policy.ts": {
       "count": 2,
       "why": "The operator's relay-claim setting for one peer, and the timestamps of verified relays. Neither touches the url or the key."

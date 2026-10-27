@@ -5,6 +5,9 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — An invite that names no node, presented for a node id held under another key, files a
+ *     pending request the operators allow with one press (services/peer-replace-ask.ts) instead of the
+ *     409 PEER_KEY_MISMATCH the entry below names; the invite is used only on Allow (coordinator's ruling, secaudit2026oct26).
  *   2026-10-27 — The introduction refuses this node's own id (400 SELF_NODE_ID). An invite replaces a
  *     peer held under another key only when it names that node (409 PEER_KEY_MISMATCH otherwise, the
  *     invite unused, the held id recorded). A note is stored up to 10 000 characters; introductions
@@ -66,6 +69,7 @@ import { logger } from '../../utils/logger.js';
 import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
+import { askPeerReplacement } from '../../services/peer-replace-ask.js';
 import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config-federation.js';
 
 /** Peers whose unsigned service summary request was answered since this process started, logged once each. */
@@ -350,12 +354,22 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         // lifecycle.ts). An unknown, expired or already-used token is not an error: it falls through
         // to the ordinary pending path below, so a leaked token is worth one link, at one tier, once.
         const invited = await consumeLinkInvite(storage, invite_token, node_id, { heldUnderAnotherKey });
-        // An invite replaces a peer held under another key only when it names that node: the record
-        // of the operator's decision for this node id (secaudit2026oct26). The invite stays unused.
+        // An invite that names no node does not replace a peer held under another key on its own: the
+        // replacement waits as a pending request the operators allow with one press, and the invite is
+        // used only then (services/peer-replace-ask.ts; secaudit2026oct26). An invite that names this
+        // node goes straight through below.
         if (!invited.ok && invited.reason === 'held') {
-            reportHeld('invite');
-            res.status(409).json(error(config.nodeId, 'PEER_KEY_MISMATCH',
-                `Node "${node_id}" is a peer of this node under another key. An invite replaces it only when the invite names that node; nothing was admitted and the invite was not used.`));
+            const asked = await askPeerReplacement({ storage, config }, {
+                inviteKey: invited.key, invite: invited.invite, nodeId: node_id, nodeUrl: node_url,
+                publicKey: public_key, held: existingPeer!, message: boundedNote(message),
+            });
+            res.status(202).json(success(config.nodeId, {
+                request_id: asked.requestId,
+                status: 'pending',
+                message: `This server holds ${node_id} as a peer under another key. Its operator decides whether this node takes that place; the invite is used only if they allow it.`,
+            }, [
+                { description: 'Check introduction status', method: 'GET', url: `/v1/federation/peer/introduce/${asked.requestId}/status` },
+            ]));
             return;
         }
 

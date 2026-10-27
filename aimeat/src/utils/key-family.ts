@@ -19,6 +19,7 @@
  *   classifyKey(key, hints?) · familyOf(key, hints?) · baseKeyOf(key)
  * @usage import { classifyKey } from '../utils/key-family.js';
  * @version-history
+ *   2026-10-27 — `peer-replace-ask.` (services/peer-replace-ask.ts) is a platform-written prefix (secaudit2026oct26).
  *   v1.1.1 — 2026-08-24 — SECURITY (CodeQL js/loop-bound-injection): split() scanned to the caller's
  *     key length; bounded by MAX_KEY_LEN so an over-long string cannot force O(n) work. No change for
  *     a real key, which runs to tens of characters.
@@ -127,6 +128,7 @@ export const PLATFORM_WRITTEN_PREFIXES: readonly { prefix: string; writtenBy: st
   { prefix: 'network-policy.', writtenBy: 'services/network-policy.ts' },
   { prefix: 'federation-book.', writtenBy: 'services/federation-book.ts' },
   { prefix: 'link-invite.', writtenBy: 'services/link-invites.ts' },
+  { prefix: 'peer-replace-ask.', writtenBy: 'services/peer-replace-ask.ts' },
   { prefix: 'living.template.', writtenBy: 'services/living-pulse.ts' },
   { prefix: 'tracked-response', writtenBy: 'services/tracked-response.ts' },
   { prefix: 'open-items.', writtenBy: 'services/open-items.ts' },
