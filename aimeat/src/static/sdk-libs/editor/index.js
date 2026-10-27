@@ -12,6 +12,7 @@
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script><script src="/v1/libs/aimeat-editor.js"></script>
  *   const { adapter } = AIMEAT.editor.split(host, { value: md, onChange: t => dirty = true });
  * @version-history
+ *   v1.0.1 — 2026-10-27 — The two CodeMirror modules load by exact version, not by the major-6 range (secaudit2026oct26).
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-editor.ts (SDK-libs migration Phase 1).
  */
 import { attach } from '../_core/namespace.js';
@@ -22,8 +23,9 @@ var FENCE = BT + BT + BT;
 // CDN import specifiers held in variables so tsc can't resolve them (Promise<any>) and esbuild
 // leaves them as runtime dynamic imports (not bundled) — the browser imports them at mount time.
 var CM_URL = 'https://esm.sh/codemirror@6.0.2'; // exact pin — the "@6" range resolves to a CM5 build on esm.sh
-var CM_MD_URL = 'https://esm.sh/@codemirror/lang-markdown@6';
-var CM_DARK_URL = 'https://esm.sh/@codemirror/theme-one-dark@6';
+// Exact versions, never a range: a range loads the newest release on the day the app opens (secaudit2026oct26).
+var CM_MD_URL = 'https://esm.sh/@codemirror/lang-markdown@6.3.2';
+var CM_DARK_URL = 'https://esm.sh/@codemirror/theme-one-dark@6.1.2';
 
 var CSS = '.aimeat-ed-host .cm-editor{border:1px solid var(--color-base-300,#3a3a3a);border-radius:8px;font-size:.95rem;background:transparent;}' +
   '.aimeat-ed-host .cm-editor.cm-focused{outline:none;border-color:var(--color-primary,#4f9eff);}' +

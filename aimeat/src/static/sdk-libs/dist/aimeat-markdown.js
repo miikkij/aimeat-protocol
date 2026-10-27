@@ -352,14 +352,14 @@
   function ensureRich() {
     if (window.markdownit && window.DOMPurify) return Promise.resolve();
     if (_richP) return _richP;
-    _richP = loadScript("https://cdn.jsdelivr.net/npm/markdown-it@14/dist/markdown-it.min.js").then(function() {
+    _richP = loadScript("https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js").then(function() {
       return Promise.all([
-        loadScript("https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2/dist/markdown-it-task-lists.min.js").catch(function() {
+        loadScript("https://cdn.jsdelivr.net/npm/markdown-it-task-lists@2.1.1/dist/markdown-it-task-lists.min.js").catch(function() {
         }),
-        loadScript("https://cdn.jsdelivr.net/npm/markdown-it-footnote@4/dist/markdown-it-footnote.min.js").catch(function() {
+        loadScript("https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js").catch(function() {
         }),
-        loadScript("https://cdn.jsdelivr.net/npm/dompurify@3/dist/purify.min.js"),
-        loadScript("https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11/highlight.min.js").catch(function() {
+        loadScript("https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js"),
+        loadScript("https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js").catch(function() {
         })
       ]);
     }).catch(function(e) {
