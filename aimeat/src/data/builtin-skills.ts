@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-27 -- diagnose-a-workflow: a deactivated account's run in flight and goals wait, and an ai
+ *     schedule waiting for the owner's answer on another agent's instruction (secaudit2026oct26).
  *   2026-10-26 -- aimeat-node-guide, use-app-bound-skills and install-skills-locally: the registry
  *     is the Agent Skills format, a skill loads in steps (body_only, then path), and a file whose
  *     index entry says encoding base64 is written as its decoded bytes. set-up-content-pipeline moved
@@ -591,7 +593,13 @@ metadata:
    with a message starting \`Missed:\` and is not made up. While the operator has deactivated the
    account, its schedules are logged as skipped with outcome \`stopped\` and a message that names
    the deactivation, its workflow triggers start nothing, and nothing is deleted: they run again at
-   their next time after the account is reactivated.
+   their next time after the account is reactivated. A workflow run already going dispatches no
+   further step while the account is deactivated, and its goals start no round; both go on after
+   reactivation.
+   An \`ai\` schedule logged as skipped with outcome \`stopped\` and a message starting \`Waiting for the
+   owner:\` has a new instruction from another agent that waits for the owner's answer in the
+   notifications. If the owner allows it, the next run uses it; if not, the next run uses the
+   instruction the schedule had before.
    **A schedule acts as whoever made it**, asked again at every fire, so a run can fail for the
    maker rather than for the work. The message says which: the agent or app that made it is gone
    ("no longer connected", "no longer holds your permission"), it no longer holds the permission the

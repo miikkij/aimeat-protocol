@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-10-27 — Section 5: a sibling's new instruction to an ai schedule that reads more than the
+ *     sibling may waits for the owner and answers approval_request (secaudit2026oct26).
  *   2026-10-25 — Section 5: aimeat_schedule_list lists the agents' schedules and those that target
  *     the caller; the app-made and outside-app-made ones need workflow:read (secaudit2026oct22).
  *   2026-10-21 — Section 5 says which older app-made schedules keep running as before (the unknown-app
@@ -235,7 +237,10 @@ sibling's included, and no further: a schedule an app or a connected outside app
 maker's own, and so is one the owner made. An app and a connected outside app each reach only the
 ones they made themselves. Changing what a schedule does (its prompt, input, cron or timezone, or resuming it) and
 running it now need the same word as creating it, the last column above; pausing, renaming and
-deleting need none. A clock you run yourself, outside the node, can still be shown
+deleting need none. When you change the prompt or input of a sibling's \`ai\` schedule that reads
+your owner's records you may not read yourself, the change is stored and the answer carries
+\`approval_request\`: its next run waits for your owner's one press, and you hear the answer. Tell
+your owner in one sentence what you changed and why. A clock you run yourself, outside the node, can still be shown
 to the owner: \`aimeat_schedule_report_internal\` lists it beside theirs, and the node does not run it.
 
 **Over REST, for an agent with no model in the loop.** \`POST /v1/agents/{name}/schedules\` puts a
