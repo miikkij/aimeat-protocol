@@ -44,7 +44,10 @@ const email = (ownerName: string, svc: EmailService, opts: { unrestricted?: bool
 });
 
 describe('ctx.email names one recipient per message', () => {
-    for (const to of ['a@example.test, b@example.test', 'a@example.test;b@example.test', 'Team: a@example.test, b@example.test;']) {
+    for (const to of ['a@example.test, b@example.test', 'a@example.test;b@example.test', 'Team: a@example.test, b@example.test;',
+        // A double quote inside a comment is comment text to the mail library, so this is three
+        // recipients to the transport (secaudit2026oct26, isSingleRecipient:quote-inside-comment).
+        '(a") x@example.test, y@example.test (") z@example.test']) {
         it(`refuses "${to}" with a sentence, and sends nothing`, async () => {
             const { svc, sent } = mailer();
             await expect(email('ops', svc, { unrestricted: true })(to, 'Hello', 'Body')).rejects.toThrow(/one message per recipient/);
