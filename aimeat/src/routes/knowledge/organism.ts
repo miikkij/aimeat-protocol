@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — The reputation read shows the last review only to the account that holds the oldest
+ *     copy of the package's manifest key, as the reviews read does (secaudit2026oct26).
  *   2026-10-19 — POST /v1/knowledge/:id/contribute adds the organism tag on the manifest's version
  *     (record-cas.ts updateMemoryRecord), where it wrote back the manifest it had read (check:atomic-writes).
  *   2026-10-15 — GET /v1/knowledge/:id/reputation reads the manifest by helpers.ts findReadableManifest
@@ -36,6 +38,7 @@ import { classificationWarningOf } from '../../services/classification/present-m
 import { memoryTarget } from '../../services/classification/labels.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
 import { presentKnowledgeManifest } from '../../services/toll-morsels-names.js';
+import { holdsOldestPackageCopy } from '../../services/knowledge-review-reach.js';
 
 export function registerOrganismRoutes(
   router: Router,
@@ -205,7 +208,11 @@ export function registerOrganismRoutes(
     const flagCount = manifest.flagCount ?? 0;
 
     // Reviews
-    const reviews = await storage.listReviews(manifestKey);
+    // The moderation record is the package owner's: the account that holds the oldest copy of the key,
+    // as GET /v1/knowledge/:id/reviews decides it (services/knowledge-review-reach.ts, secaudit2026oct26).
+    const ownsPackage = !!readable?.own && !!req.auth && await holdsOldestPackageCopy(storage, manifestKey,
+      [`${req.auth.owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(req.auth.owner)).map(a => a.gaii)]);
+    const reviews = ownsPackage ? await storage.listReviews(manifestKey) : [];
     const lastReview = reviews.length > 0 ? reviews[reviews.length - 1] : null;
 
     res.json(success(config.nodeId, {
@@ -219,7 +226,7 @@ export function registerOrganismRoutes(
       maturity: value.maturity,
       last_updated: value.updated || manifest.updatedAt,
       // The moderation record is the package owner's to see, as GET /v1/knowledge/:id/reviews rules.
-      last_review: lastReview && readable?.own ? {
+      last_review: lastReview ? {
         action: lastReview.action,
         reason: lastReview.reason,
         timestamp: lastReview.timestamp,

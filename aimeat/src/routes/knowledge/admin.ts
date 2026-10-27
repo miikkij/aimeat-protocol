@@ -6,6 +6,10 @@
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-10-27 — GET /v1/knowledge/:id/reviews answers a caller who is not the operator only
+ *     when the caller's account holds the oldest copy of the package's manifest key: another account's
+ *     record written at the same key read the operator's review (secaudit2026oct26,
+ *     GET-reviews:mine-by-global-manifest-key; services/knowledge-review-reach.ts).
  *   v1.7.0 — 2026-10-13 — The operator's import writes sharing.toll_morsels, the 4.0.0 name of the
  *     pacing amount (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.6.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/knowledge/:id/reviews. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -45,6 +49,7 @@ import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowled
 import { readerFor } from '../../services/classification/reader.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { holdsOldestPackageCopy } from '../../services/knowledge-review-reach.js';
 
 export function registerAdminRoutes(
   router: Router,
@@ -356,9 +361,9 @@ export function registerAdminRoutes(
     if (!(await isOperatorCaller(storage, req.auth))) {
       const owner = req.auth!.owner;
       const identities = [`${owner}@${config.nodeId}`, ...(await storage.getAgentsByOwner(owner)).map(a => a.gaii)];
-      const mine = (await storage.listMemoryForOwners(identities, { prefix: manifestKey }))
-        .some(r => r.key === manifestKey);
-      if (!mine) {
+      // The package is the copy its import made first; a record another account writes at the same
+      // key is younger and reads no review (services/knowledge-review-reach.ts, secaudit2026oct26).
+      if (!(await holdsOldestPackageCopy(storage, manifestKey, identities))) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such package.'));
         return;
       }
