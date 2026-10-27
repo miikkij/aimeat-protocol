@@ -56,6 +56,8 @@
  *   const r = await decideForOwner(storage, config, { gaii, principal, appId, isOwner }, { state, questions });
  *   const g = await decideForOwner(storage, config, caller, { state, rule: 'send-reply' });
  * @version-history
+ *   2026-10-27 -- The owner is told once when a bare allowlist entry lets another author's app in
+ *     (ai/app-name-notice.ts; secaudit2026oct26).
  *   2026-10-25 — DecideCaller.readerAs: the agent a decision run reads as (runs.ts; secaudit2026oct22).
  *   2026-10-22 — DecideCaller.readsAll: whether the caller reads the owner's private records, which a
  *     decision run's keys and prefix and its run store follow (runs.ts; secaudit 2026-10, v83, v84).
@@ -117,6 +119,7 @@ import { ruleForCaller, type RuleCallerKind } from './rules.js';
 import { evaluateRule, fieldsOutside, type DecisionRule } from './rule-validate.js';
 import { gateSettingOf, gateApplies, openGateItem } from './gate.js';
 import { requireAiCallTurn, type AiCallLimitMark } from '../account-limits.js';
+import { noticeBareNameMatch } from '../ai/app-name-notice.js';
 
 export interface DecideCaller {
   /** The resolved identity whose account pays and owns the record. */
@@ -452,6 +455,8 @@ export async function decideForOwner(
   const prefsRec = await storage.getMemory(caller.gaii, 'openrouter.settings');
   const prefs = (prefsRec?.value as Record<string, unknown>) ?? {};
   assertAppAllowed(prefs, caller.appId, caller.gaii);
+  // Another author's app let in by its file name alone: the owner is told once (secaudit2026oct26).
+  if (caller.appId) void noticeBareNameMatch(storage, caller.gaii, prefs, caller.appId);
   const usageToday = await getTodayUsage(storage, caller.gaii);
   if (!local) {
     assertWithinBudget(usageToday, prefs, caller.appId, caller.gaii);

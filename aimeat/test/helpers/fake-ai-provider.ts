@@ -42,6 +42,9 @@
  *   // … point the node at provider.baseUrl and drive it …
  *   await provider.close();
  * @version-history
+ *   v1.6.0 -- 2026-10-27 -- `sse-partial`: a stream that stops after its first frames, dropped by the
+ *     provider or held until releaseHeld() writes the rest; a request records `aborted` when the caller
+ *     closed it before the reply ended (secaudit2026oct26).
  *   v1.5.0 — 2026-10-18 — POST …/images (OpenRouter's image endpoint) and …/images/edits (the OpenAI
  *     images API's edit) are the `images` route too, for image calls with reference pictures.
  *   v1.4.0 — 2026-10-08 — A json or text reply sends `headers` (a Retry-After on a 429), a text body
@@ -74,6 +77,8 @@ export interface RecordedRequest {
     body: string;
     /** The body parsed as JSON, or null when it is not JSON. */
     json: Record<string, unknown> | null;
+    /** True once the caller closed the connection before the reply ended. */
+    aborted?: boolean;
 }
 
 export type StubReply =
@@ -83,7 +88,13 @@ export type StubReply =
     /** Server-sent events, written verbatim. `body` is the exact bytes, so a suite can compare. */
     | { kind: 'sse'; body: string }
     /** Hold the socket open until releaseHeld(), which is how a job is kept `running` on purpose. */
-    | { kind: 'hold' };
+    | { kind: 'hold' }
+    /**
+     * A stream that stops part-way: `head` is written at once. With `tail`, the socket is held and
+     * releaseHeld() writes the tail and ends it; without, the provider drops the connection after the
+     * head, as a provider that fails mid-answer does.
+     */
+    | { kind: 'sse-partial'; head: string; tail?: string };
 
 export type Reply = StubReply | ((req: RecordedRequest) => StubReply);
 
@@ -370,7 +381,7 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
         chat: [], models: [], transcriptions: [], images: [], messages: [], embeddings: [], speech: [], other: [],
     };
     const defaults: Record<StubRoute, Reply> = { ...BUILT_IN_DEFAULTS };
-    const held: Array<{ route: StubRoute; req: RecordedRequest; res: ServerResponse }> = [];
+    const held: Array<{ route: StubRoute; req: RecordedRequest; res: ServerResponse; tail?: string }> = [];
 
     const resolveReply = (req: RecordedRequest): StubReply => {
         const queue = scripted[req.route];
@@ -427,8 +438,16 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
                 json,
             };
             requests.push(req);
+            res.on('close', () => { if (!res.writableEnded) req.aborted = true; });
             const reply = resolveReply(req);
             if (reply.kind === 'hold') { held.push({ route: req.route, req, res }); return; }
+            if (reply.kind === 'sse-partial') {
+                res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache', 'Connection': 'keep-alive' });
+                res.write(reply.head);
+                if (reply.tail !== undefined) held.push({ route: req.route, req, res, tail: reply.tail });
+                else setTimeout(() => res.destroy(), 100);
+                return;
+            }
             write(res, reply);
         });
     });
@@ -441,6 +460,11 @@ export async function startFakeAiProvider(port: number): Promise<FakeAiProvider>
         while (held.length) {
             const entry = held.shift();
             if (!entry) continue;
+            // A part-way stream gets the rest of its frames.
+            if (entry.tail !== undefined) {
+                try { entry.res.end(entry.tail); } catch { /* the caller hung up */ }
+                continue;
+            }
             const fallback = defaults[entry.route];
             const resolved = typeof fallback === 'function' ? fallback(entry.req) : fallback;
             // A default that is itself 'hold' would hold for ever, so the release answers something.

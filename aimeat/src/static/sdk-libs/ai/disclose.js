@@ -33,11 +33,15 @@
  *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
  *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
  * @version-history
+ *   v1.0.2 -- 2026-10-27 -- The "How this was made" link of disclose() and chatNotice() takes only an
+ *     http(s), mailto or relative address (_core/safe-href.js, the rule AIMEAT.md applies); any other
+ *     draws the label without a link (secaudit2026oct26).
  *   v1.0.1 — 2026-10-05 — The language comes from _core/lang.js, the one resolver (secaudit 2026-10, M7).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { APEX_URL } from '../_core/config.js';
 import { storedLang } from '../_core/lang.js';
+import { sanitizeHref } from '../_core/safe-href.js';
 import { euIconFor } from '../../../../public/components/ai-label-icons.js';
 import LABEL_CSS from '../../../../public/css/components/ai-label.css';
 import { pick } from './strings.js';
@@ -186,7 +190,9 @@ export function buildLabel(record, recordUrl, opts = {}) {
   }
   root.appendChild(textWrap);
 
-  const url = recordUrl || (record.attestation && record.attestation.recordUrl);
+  // The record can be an item another person stored, so its address is checked by the same rule
+  // AIMEAT.md applies to a link: http(s), mailto or relative, else the label is drawn without a link.
+  const url = sanitizeHref(recordUrl || (record.attestation && record.attestation.recordUrl));
   if (url) {
     const a = el('a', 'ai-label__link', t('aiLabel.detailsLink'));
     a.href = url;
@@ -241,9 +247,10 @@ export function chatNotice(opts = {}) {
   textWrap.appendChild(el('span', 'ai-label__short', opts.title || t('aiLabel.interactionTitle')));
   textWrap.appendChild(el('span', 'ai-label__long', opts.body || t('aiLabel.interactionBody')));
   root.appendChild(textWrap);
-  if (opts.recordUrl) {
+  const recordUrl = sanitizeHref(opts.recordUrl);
+  if (recordUrl) {
     const a = el('a', 'ai-label__link', t('aiLabel.detailsLink'));
-    a.href = opts.recordUrl;
+    a.href = recordUrl;
     a.target = '_blank';
     a.rel = 'noopener noreferrer';
     root.appendChild(a);

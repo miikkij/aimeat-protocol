@@ -28,6 +28,7 @@
  *   const held = holdNodeKeyCandidates(gaii, plan.candidates);
  *   try { ... runRoute({ candidates: held.candidates, ... }) ... settle ... } finally { held.release(); }
  * @version-history
+ *   v1.0.1 -- 2026-10-27 -- A text model the catalogue does not price is held too (route-plan.ts; secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -41,7 +42,8 @@ export interface NodeKeyRoom {
 
 /** What a node-key candidate carries from the planner to the call. */
 export interface NodeKeyHold {
-  /** The call's price by the catalogue, at most; 0 when the model has no price there. */
+  /** The call's price by the catalogue, at most. A text model it does not price: the settlement's
+   *  fallback rates, at most what was left (route-plan.ts). */
   estimateUsd: number;
   /** The answer's length the call is sent with, when the node's limit applies. */
   maxTokens?: number;

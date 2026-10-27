@@ -10129,6 +10129,8 @@
   "notiftext.approval_answer_allowed.body": "{who} allowed what was asked. It is in effect now.",
   "notiftext.approval_answer_declined.title": "Not allowed: {what}",
   "notiftext.approval_answer_declined.body": "{who} did not allow what was asked. Nothing changed.",
+  "notiftext.ai_app_name_match.title": "{app} used AI under your list entry \"{entry}\"",
+  "notiftext.ai_app_name_match.body": "Your list of apps that may use AI names \"{entry}\". The app {app} belongs to another author but has that file name, so it may use AI too. If you meant a different app, write its full name (author/app) in the list in place of \"{entry}\".",
   "notiftext.approval_answer_expired.title": "No answer: {what}",
   "notiftext.approval_answer_expired.body": "Nobody answered the request in time. Nothing changed. Ask again if it is still needed.",
   "notiftext.approval_answer_outdated.title": "Not done: {what}",

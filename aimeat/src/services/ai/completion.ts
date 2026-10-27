@@ -21,6 +21,9 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.15.1 -- 2026-10-27 -- prepareAiCall tells the owner once when a bare allowlist entry lets another author's app in (ai/app-name-notice.ts; secaudit2026oct26).
+ *   v3.15.0 -- 2026-10-27 -- completeForOwner records and debits the text attempts that answered nothing, and prices a node-key
+ *     call by its pictures and files too (estimate.inputTokens); AiCallOutcome and AiCallSettlement moved to ai/call-outcome.ts (secaudit2026oct26).
  *   v3.14.0 -- 2026-10-25 -- completeForOwner holds a node-key call's estimate until it is settled, and its answer is at most ai.node_key_max_output_tokens long (ai/node-key-hold.ts; secaudit2026oct22).
  *   v3.13.1 -- 2026-10-25 -- An app grant's call is checked against the owner's allowlist and per-app cap,
  *     and recorded, under the app the grant names (opts.verifiedApp), not the body's app_id (secaudit2026oct22).
@@ -150,7 +153,7 @@ import {
 } from './call-guards.js';
 import { appAiMetaOf } from './policy-store.js';
 import { text as gatewayText, type TextFile } from './gateway.js';
-import type { AiCapability, AiOp, CostSource } from './types.js';
+import type { AiCapability, AiOp } from './types.js';
 import { loadPolicyDecision, freeModelAllowed } from './policy-gate.js';
 import type { CallerClass } from './policy.js';
 import { AiCompletionError, PROVIDER_KEY_REFUSED_STATUS, providerFailureOf } from './errors.js';
@@ -163,12 +166,14 @@ import { runRoute, type AiRoute } from './route-run.js';
 import { callCost } from './catalog/price.js';
 import { mintProvenance } from '../ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
-import type { AiMediaKind, AiProvenanceMethod } from '../../models/ai-provenance-schemas.js';
-import type { SurfaceContext } from '../ai-disclosure.js';
 import { logger } from '../../utils/logger.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
 import { holdNodeKeyCandidates, nodeKeyOutputCap } from './node-key-hold.js';
+import { emptyAttemptsCostUsd, withEmptyAttemptsCost, emptyAttemptsCostOf } from './failed-attempts.js';
+import type { AiCallOutcome, AiCallSettlement } from './call-outcome.js';
+import { textCallInputTokens } from './call-size.js';
+import { noticeBareNameMatch } from './app-name-notice.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
 import { agentCapRefusal } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
@@ -345,8 +350,9 @@ export interface PrepareAiCallOptions {
   /** The request's word on the person's language, for the sentence a refusal carries. */
   lang?: RequestLanguage;
   /** The call's size, for the owner's price ceiling per call: without it the ceiling assumes 1,024
-   *  tokens each way, so a long prompt passed a ceiling it was far over (secaudit 2026-10, AI-4). */
-  estimate?: { promptTokens?: number; maxTokens?: number };
+   *  tokens each way, so a long prompt passed a ceiling it was far over (secaudit 2026-10, AI-4).
+   *  `inputTokens`, everything the call sends (ai/call-size.ts), prices a call on the node's key. */
+  estimate?: { promptTokens?: number; maxTokens?: number; inputTokens?: number };
 }
 
 /**
@@ -389,6 +395,8 @@ async function planAiCall(
   // per-app cap and usage row key on it (the voiceAppId rule; secaudit2026oct22).
   const appId = opts.verifiedApp ?? opts.appId;
   assertAppAllowed(prefs, appId, gaii);
+  // Another author's app let in by its file name alone: the owner is told once (ai/app-name-notice.ts).
+  void noticeBareNameMatch(storage, gaii, prefs, appId);
 
   const capability: AiCapability = opts.capability
     ?? OP_CAPABILITY[op] ?? (opts.hasImages ? 'vision' : 'text');
@@ -524,36 +532,8 @@ export async function recordFailedAttempts(
   }
 }
 
-export interface AiCallOutcome {
-  /** The model that actually answered, which is not always the one that was asked for. */
-  model: string;
-  promptTokens: number;
-  completionTokens: number;
-  totalTokens: number;
-  costUsd: number;
-  /** The text the model produced, hashed into the provenance record. */
-  content: string;
-  /** Observed binary output, hashed incrementally without retaining the audio. */
-  contentHash?: string;
-  appId?: string;
-  /** Where this call came from, for the usage record. */
-  source: string;
-  /** What was consumed besides tokens: audio seconds for a transcription, pictures for an image. */
-  units?: { seconds?: number; images?: number };
-  /** The output's medium for the record (text when there is `content` and nobody says), its IANA
-   *  type, a method other than fully-generated (`transcribed`), and the surface it lands on. */
-  media?: { mediaKind?: AiMediaKind; mediaType?: string; method?: AiProvenanceMethod; surface?: SurfaceContext };
-  /** Where `costUsd` came from (services/ai/types.ts). Logged with the settlement. */
-  costSource?: CostSource;
-  /** What the ledger cites for the price: the catalogue snapshot, `estimate`, … (services/ai/catalog/price.ts). */
-  priceRef?: string;
-}
-
-export interface AiCallSettlement {
-  usage: UsageRecord;
-  allowanceRemainingUsd?: number;
-  provenance?: AiProvenanceRecordRow;
-}
+// What a settlement takes and gives back: ai/call-outcome.ts (types only, re-exported).
+export type { AiCallOutcome, AiCallSettlement };
 
 /**
  * Everything recorded AFTER a model answered: usage, the allowance draw-down, and provenance.
@@ -671,6 +651,8 @@ export async function completeForOwner(
     // About four characters to a token; the answer's ceiling when the call set one.
     estimate: {
       promptTokens: Math.ceil((opts.prompt.length + (opts.systemPrompt?.length ?? 0)) / 4),
+      // On the node's key, the pictures and files count too (ai/call-size.ts; secaudit2026oct26).
+      inputTokens: textCallInputTokens(opts),
       ...(typeof opts.maxTokens === 'number' && opts.maxTokens > 0 ? { maxTokens: opts.maxTokens | 0 } : {}),
     },
   });
@@ -734,16 +716,23 @@ export async function completeForOwner(
         ...(t.reasoning ? { reasoning: t.reasoning } : {}),
         ...(retries !== undefined ? { retries } : {}),
         ...(opts.signal ? { signal: opts.signal } : {}),
-      });
-    });
+      }).catch((e: unknown) => { throw withEmptyAttemptsCost(e, c); });
+    }, emptyAttemptsCostOf);
     result = run.result;
     answered = planFor(plan, run.candidate);
     route = run.route;
-    if (route.fellBack) await recordFailedAttempts(storage, config, gaii, plan, run.failed, { appId: opts.appId, source: 'ai-complete' });
+    // Attempts that answered nothing were provider calls too, and are recorded and debited
+    // (ai/failed-attempts.ts; secaudit2026oct26).
+    const empty = result.emptyAttempts?.length
+      ? [{ candidate: run.candidate, error: 'empty', costUsd: emptyAttemptsCostUsd(run.candidate, result.emptyAttempts) }] : [];
+    const notAnswered = [...(route.fellBack ? run.failed : []), ...empty];
+    if (notAnswered.length) await recordFailedAttempts(storage, config, gaii, plan, notAnswered, { appId: opts.appId, source: 'ai-complete' });
   } catch (e) {
     held.release();
     const moved = e as { route?: AiRoute; failed?: Array<{ candidate: AiCandidate; error: string; costUsd: number }> };
-    if (moved.route?.fellBack && moved.failed) await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
+    if (moved.failed && (moved.route?.fellBack || moved.failed.some((f) => f.costUsd > 0))) {
+      await recordFailedAttempts(storage, config, gaii, plan, moved.failed, { appId: opts.appId, source: 'ai-complete' });
+    }
     // The provider answered, every attempt, with nothing. Its own name so a caller can tell "the
     // model said nothing" from "the provider was down" and act on the finish_reason in the message.
     if ((e as { empty?: boolean }).empty) throw new AiCompletionError('EMPTY_COMPLETION', 502, (e as Error).message);
