@@ -23,6 +23,8 @@
  *   const { rows, leftOut, truncated } = await collectRowSpaces(deps, { orgId, ws, manifest, reader });
  *   const plan = await prepareRowRestore(deps, { orgId, ws: newWs, manifest, rows, importerIdentity });
  * @version-history
+ *   2026-10-27 — A row's classification label is read at its rowId, where it is set; the surrogate id
+ *     found none, so a row label never kept a row out of the export (secaudit2026oct26).
  *   2026-10-15 — Initial (feature-list audit #68).
  */
 import { randomUUID } from 'node:crypto';
@@ -75,7 +77,8 @@ export async function collectRowSpaces(
         organismId: orgId, wsId: ws, namespace: space.namespace, order: 'asc',
         limit: Math.min(PAGE, limit - rows.length), ...(cursor ? { cursor } : {}),
       });
-      const target = (r: WorkspaceRowRecord) => rowTarget(orgId, ws, space.name, r.id);
+      // A row label is set at the caller-visible rowId (classification/labels.ts targetOf).
+      const target = (r: WorkspaceRowRecord) => rowTarget(orgId, ws, space.name, r.rowId);
       const shown = await reader.show(page.rows, target);
       const { kept, left } = await reader.leave(shown, target, { kind: 'export', organismId: orgId });
       leftOut.push(...leftOutOf(left, (r) => `${space.namespace}/${r.rowId}`));
