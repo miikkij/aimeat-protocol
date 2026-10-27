@@ -21,6 +21,9 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.7.2 — 2026-10-27 — One bench holds a node-wide headless slot for its six launches; a busy node
+ *     answers ran:false with words (services/headless-slots.ts; secaudit2026oct26). The viewport loop
+ *     moved unchanged into measureAtViewports.
  *   v1.7.1 — 2026-10-08 — The browser bench's rewrite of a part keeps the part's provenance record
  *     (aiprov E2): the bench result is the node's note on the part, not new writing in it.
  *   v1.7.0 — 2026-10-05 — The bench page's requests go through the headless browser's guard
@@ -62,6 +65,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { withHeadlessContext, NO_HEADLESS_BROWSER } from '../screenshot-capture.js';
+import { takeHeadlessSlot, HEADLESS_BUSY_MESSAGE } from '../headless-slots.js';
 import { serveDocumentOnce, type HeadlessRoutable } from '../headless-network.js';
 import { DesignBookService, partKey, type DesignBookPart } from './service.js';
 import { DesignBookError } from './validate.js';
@@ -194,6 +198,21 @@ export async function runPartBench(
   const url = `http://127.0.0.1:${config.port}/v1/designbook/${encodeURIComponent(id)}/bench-page`;
   const at = new Date().toISOString();
 
+  // One node-wide headless slot for the six launches below, shared with the on-demand screenshots
+  // (services/headless-slots.ts; secaudit2026oct26). A busy node answers ran:false with words.
+  const slot = takeHeadlessSlot();
+  if (!slot) return { ran: false, reason: HEADLESS_BUSY_MESSAGE, at };
+  try {
+    return await measureAtViewports(config, part, html, url, at);
+  } finally {
+    slot.release();
+  }
+}
+
+/** The two themes at the three bench viewports, one browser each, measured and judged (moved unchanged out of runPartBench). */
+async function measureAtViewports(
+  config: AimeatConfig, part: Awaited<ReturnType<DesignBookService['storedPart']>>, html: string, url: string, at: string,
+): Promise<DesignBookBenchResult> {
   const viewports: BenchViewportResult[] = [];
   for (const theme of ['light', 'dark']) for (const vp of BENCH_VIEWPORTS) {
     let consoleErrors = 0;
