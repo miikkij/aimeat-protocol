@@ -18,6 +18,9 @@
  *     - ORGANISM META: a copy of the organism manifest or the workspace registry written by an admin
  *       who has since been demoted decides neither the gate policy nor who decides an access request;
  *       the creator's copies decide as before.
+ *     - LABELS: an agent without memory:read-as-owner neither changes nor learns the label of a record
+ *       of its owner it may not read, and is handed the address to ask for the permission; with the
+ *       permission, and on records it may read, it labels as before.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
@@ -366,6 +369,50 @@ await test('USE: the workspace creator decides the request, and a current admin\
     assert(looser.status === 200 || looser.status === 201, `zorg's L5: ${looser.status} ${JSON.stringify(looser.body?.error)}`);
     const r = await askApproval();
     assert(r.status === 201 && r.body.data.gated === false, `the creator's own L5 did not decide: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+});
+
+// ─── LABELS (classification-labels:label-write-ignores-read-as-owner) ───
+console.log('\nLABELS: the label write answers what the label read answers for an agent without memory:read-as-owner');
+
+let plainBot!: McpAgent, ownerReader!: McpAgent;
+const MEM = (key: string, owner?: string) => ({ kind: 'memory', key, ...(owner ? { owner } : {}) });
+
+await test('Setup: alice keeps a private record and labels it in person; two agents, one with memory:read-as-owner', async () => {
+    for (const [key, visibility] of [['probe.private', 'private'], ['probe.shared', 'owner']] as const) {
+        const w = await call('POST', '/v1/memory', alice.token, { key, value: { text: 'dummy' }, visibility });
+        assert(w.status === 201 || w.status === 200, `${key}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    }
+    const set = await call('PUT', '/v1/classification/label', alice.token, { ...MEM('probe.private'), label: 'luottamuksellinen' });
+    assert(set.status === 200 && set.body.data.applied === true, `alice's label: ${set.status} ${JSON.stringify(set.body?.error ?? set.body?.data)}`);
+    plainBot = await makeAgent(BASE, alice, ['memory:read', 'memory:write']);
+    ownerReader = await makeAgent(BASE, alice, ['memory:read', 'memory:write', 'memory:read-as-owner']);
+});
+
+await test('the label read hides the private record\'s label from the plain agent (the control)', async () => {
+    const r = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, plainBot.token);
+    assert(r.status === 200 && r.body.data.source === 'default' && r.body.data.locked === false, `read: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+});
+
+await test('ATTACK: the plain agent\'s label write neither changes nor describes the private record; it gets the ask', async () => {
+    const w = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.private'), label: 'erittain-luottamuksellinen' });
+    assert(w.status === 403 && w.body?.error?.code === 'SCOPE_DENIED', `write: ${w.status} ${JSON.stringify(w.body?.data ?? w.body?.error)}`);
+    assert(!JSON.stringify(w.body).includes('"locked"') && !JSON.stringify(w.body).includes('"source"'), `the refusal described the label: ${JSON.stringify(w.body)}`);
+    assert(typeof w.body.error.details?.allow_url === 'string' || JSON.stringify(w.body).includes('/v1/profile?tab=agents'), `no address to allow it: ${JSON.stringify(w.body.error)}`);
+    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'no' });
+    assert(rev.status === 403 && rev.body?.error?.code === 'SCOPE_DENIED', `review: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+    const still = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, alice.token);
+    assert(still.body.data.label === 'luottamuksellinen', `alice's label changed: ${JSON.stringify(still.body.data.label)}`);
+});
+
+await test('USE: the agent with memory:read-as-owner labels the private record; the plain agent labels its own record and one marked owner', async () => {
+    const r = await call('PUT', '/v1/classification/label', ownerReader.token, { ...MEM('probe.private'), label: 'erittain-luottamuksellinen' });
+    assert(r.status === 200, `with the word: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const own = await call('POST', '/v1/memory', plainBot.token, { key: 'probe.bot', value: { text: 'mine' }, visibility: 'private' });
+    assert(own.status === 201 || own.status === 200, `bot record: ${own.status}`);
+    const o = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.bot', plainBot.gaii), label: 'luottamuksellinen' });
+    assert(o.status === 200, `own record: ${o.status} ${JSON.stringify(o.body?.error)}`);
+    const s = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.shared'), label: 'luottamuksellinen' });
+    assert(s.status === 200, `record marked owner: ${s.status} ${JSON.stringify(s.body?.error)}`);
 });
 
 await test('Cleanup: the operator turns classification off', async () => {

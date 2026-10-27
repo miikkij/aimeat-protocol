@@ -31,16 +31,32 @@
  *   const view = ownerScopeLabelView(deps.storage, actor);
  *   const shown = []; for (const row of rows) if (!(await view.hidden(row))) shown.push(row);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — ReadAsOwnerRequired, the refusal of a label write on a hidden record
+ *     (secaudit2026oct26).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v76 and v77).
  */
 import type { Storage, ContentLabelKind } from '../../storage/interface.js';
 import { READ_AS_OWNER_NOTE, visibleToSameOwnerReader } from '../owner-scope-read.js';
 import { READ_AS_OWNER_SCOPE, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { isOwnerInPerson } from '../../utils/gaii.js';
-import { rolesOf, type LabelActor } from './label-core.js';
+import { rolesOf, ClassificationError, type LabelActor } from './label-core.js';
 import { scopeOwner } from './policy.js';
 
 export { READ_AS_OWNER_NOTE };
+
+/**
+ * The refusal of a label write on a record the caller may not read (setLabel, reviewLabel). It
+ * carries the permission word, so the REST route answers it with the scope refusal that hands the
+ * person the agent's page (auth/deny.ts denyScope403) and the MCP tool with the same ask
+ * (mcp/scope-denied-answer.ts). It names no label, source or lock of the record (secaudit2026oct26,
+ * classification-labels:label-write-ignores-read-as-owner).
+ */
+export class ReadAsOwnerRequired extends ClassificationError {
+  readonly needed = [READ_AS_OWNER_SCOPE];
+  constructor() {
+    super('SCOPE_DENIED', 403, `Labelling this record needs the "${READ_AS_OWNER_SCOPE}" permission: the owner or another of their agents keeps it private, and reading it with owner_scope needs the same permission. The owner grants it per agent in Profile -> Agents -> this agent -> permissions -> Memory.`);
+  }
+}
 
 /**
  * True when this label actor reads every same-owner record, private ones too: the same answer
