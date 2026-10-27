@@ -9013,6 +9013,8 @@
   "notiftext.approval_answer_allowed.body": "{who} permitió lo que se pidió. Ya está en vigor.",
   "notiftext.approval_answer_declined.title": "No permitido: {what}",
   "notiftext.approval_answer_declined.body": "{who} no permitió lo que se pidió. No ha cambiado nada.",
+  "notiftext.ai_app_name_match.title": "{app} usó la IA con la entrada «{entry}» de tu lista",
+  "notiftext.ai_app_name_match.body": "Tu lista de apps que pueden usar la IA incluye «{entry}». La app {app} es de otra persona, pero tiene ese nombre de archivo, así que también puede usar la IA. Si te referías a otra app, escribe en la lista su nombre completo (autor/app) en lugar de «{entry}».",
   "notiftext.approval_answer_expired.title": "Sin respuesta: {what}",
   "notiftext.approval_answer_expired.body": "Nadie respondió a la solicitud a tiempo. No ha cambiado nada. Vuelve a pedirlo si aún lo necesitas.",
   "notiftext.approval_answer_outdated.title": "No se hizo: {what}",

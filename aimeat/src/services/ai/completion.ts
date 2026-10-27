@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.15.1 -- 2026-10-27 -- prepareAiCall tells the owner once when a bare allowlist entry lets another author's app in (ai/app-name-notice.ts; secaudit2026oct26).
  *   v3.15.0 -- 2026-10-27 -- completeForOwner records and debits the text attempts that answered nothing, and prices a node-key
  *     call by its pictures and files too (estimate.inputTokens); recordFailedAttempts moved to ai/failed-attempts.ts (secaudit2026oct26).
  *   v3.14.0 -- 2026-10-25 -- completeForOwner holds a node-key call's estimate until it is settled, and its answer is at most ai.node_key_max_output_tokens long (ai/node-key-hold.ts; secaudit2026oct22).
@@ -173,6 +174,7 @@ import { debitAllowance, nodeKeyStanding } from '../ai-allowance.js';
 import { holdNodeKeyCandidates, nodeKeyOutputCap } from './node-key-hold.js';
 import { recordFailedAttempts, emptyAttemptsCostUsd, withEmptyAttemptsCost, emptyAttemptsCostOf } from './failed-attempts.js';
 import { textCallInputTokens } from './call-size.js';
+import { noticeBareNameMatch } from './app-name-notice.js';
 import { todayKey, getTodayUsage, recordAiUsage, emptyUsage, type UsageRecord } from '../ai-usage-record.js';
 import { agentCapRefusal } from '../agent-ai-keys.js';
 import { withPersonFix, type RequestLanguage } from './ai-fix-words.js';
@@ -394,6 +396,8 @@ async function planAiCall(
   // per-app cap and usage row key on it (the voiceAppId rule; secaudit2026oct22).
   const appId = opts.verifiedApp ?? opts.appId;
   assertAppAllowed(prefs, appId, gaii);
+  // Another author's app let in by its file name alone: the owner is told once (ai/app-name-notice.ts).
+  void noticeBareNameMatch(storage, gaii, prefs, appId);
 
   const capability: AiCapability = opts.capability
     ?? OP_CAPABILITY[op] ?? (opts.hasImages ? 'vision' : 'text');
