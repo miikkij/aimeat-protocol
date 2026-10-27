@@ -42,6 +42,8 @@
  *   - WorkspaceRowRevision -- an earlier content of a row, kept when another writer family replaced it
  * @usage import type { WorkspaceRowRecord } from '../storage/interface.js';
  * @version-history
+ *   v1.1.1 — 2026-10-27 — The comment on WorkspaceRowRevision.id says the row label is addressed by
+ *     rowId, as every label writer and reader does since secaudit2026oct26.
  *   v1.1.0 — 2026-10-22 — `updatedBy` on a row, and WorkspaceRowRevision: a replacement by another
  *     writer family keeps the old content as a revision the delete authority can restore (secaudit
  *     2026-10, v80; developer ruling 2026-10-22).
@@ -108,7 +110,7 @@ export interface WorkspaceRowRevision {
   wsId: string;
   namespace: string;
   rowId: string;
-  /** The row's surrogate id, which the classification label of the row is addressed by. */
+  /** The row's surrogate id. The row's classification label is addressed by `rowId`, not by this. */
   id: string;
   occurredAt: string;
   createdAt: string;

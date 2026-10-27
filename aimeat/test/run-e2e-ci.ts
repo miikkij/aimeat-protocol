@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-27 -- e2e-own-reach-oct26.ts joins the list (not the guard tier): round 8 of secaudit2026oct26, group memory-b.
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -1435,6 +1436,8 @@ const ALL_SUITES = [
     'test/e2e-capability-extension-ref.ts',
     // A draft is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
     'test/e2e-capability-reach.ts',
+    // Round 8, group memory-b: the side routes answer what the main route answers (secaudit2026oct26).
+    'test/e2e-own-reach-oct26.ts',
     // A capability write stores only a visibility word the node knows (secaudit2026oct22).
     'test/e2e-capability-visibility-word.ts',
     'test/e2e-upload.ts',
