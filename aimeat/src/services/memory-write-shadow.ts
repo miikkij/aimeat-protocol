@@ -9,13 +9,14 @@
  * @version-history
  *   2026-10-27 — Extracted from services/memory-write.ts, unchanged (secaudit2026oct26 needed the lines).
  */
-import type { MemoryWriteWarning } from './memory-write.js';
+/** The warning's shape; it is one of memory-write.ts MemoryWriteWarning, named here so the two files import in one direction. */
+export interface ShadowedWarning { code: 'SHADOWED_BY_OWNER_COPY'; message: string; [detail: string]: unknown }
 
 /**
  * The SHADOWED_BY_OWNER_COPY warning, worded once for every door. `landedIn` is the namespace this
  * copy was written to; `ownerCopy` is the owner GHII holding the copy owner-scope reads resolve to.
  */
-export function shadowWarning(key: string, landedIn: string, ownerCopy: string): MemoryWriteWarning {
+export function shadowWarning(key: string, landedIn: string, ownerCopy: string): ShadowedWarning {
     return {
         code: 'SHADOWED_BY_OWNER_COPY',
         message: `Saved under ${landedIn}, but "${key}" also exists under ${ownerCopy}. `

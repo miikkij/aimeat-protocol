@@ -316,8 +316,8 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // page's switch and a mail refinery's destination store all but the change asked about, and the
       // request is filed after the write.
       const asked = await memoryWriteAsks({ storage, config }, {
-        principal: writer, targetGaii: gaii, roles: req.auth!.roles, scopes: req.auth!.scopes ?? [],
-        federated: isForeignPrincipal(req.auth), ...(req.auth!.app ? { app: req.auth!.app } : {}),
+        principal: writer, targetGaii: gaii, roles: capCaller.roles, scopes: capCaller.scopes, federated: capCaller.visitor,
+        ...(req.auth!.app ? { app: req.auth!.app } : {}),
       }, key, merged);
       if ('refused' in asked) {
         res.status(asked.refused.status).json(error(config.nodeId, asked.refused.code, asked.refused.message));
