@@ -46,6 +46,9 @@
  *   import { isSealed, sealRefusal } from '../services/config-sealing.js';
  *   if (isSealed(config, path)) { const r = sealRefusal(path); ... }
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: sealing a secret seals the settings that decide where it is sent
+ *     (SECRET_DESTINATIONS): the SMTP user or password seals the SMTP server rows, the FTN client secret
+ *     the FTN provider address, the Casdoor client secret its endpoint.
  *   v1.1.0 — 2026-09-16 — isSecretField, and sealedView shows a sealed secret as `configured` only.
  *     A host could seal ai.chat_agent_key to lock it, and the view then gave the key to the
  *     operator it was locked against.
@@ -83,10 +86,24 @@ export function sealedKeysFromEnv(raw: string | undefined): string[] {
             + 'Refusing to start, because a node that boots with a mistyped seal looks sealed and is not.',
         );
     }
+    // A sealed secret seals where it is sent: an immutable secret could not be sealed at all, and the
+    // operator could point it at a server of their own (secaudit2026oct26).
+    const withDestinations = keys.flatMap(k => [k, ...(SECRET_DESTINATIONS[k] ?? [])]);
     // Sealing the seal list would be circular and sealing an already-immutable path does nothing;
     // both are dropped rather than refused, so a host can pass one list to every node it runs.
-    return [...new Set(keys)].filter(k => k !== SEALED_KEYS_PATH && !ALL_CONFIG_MAP[k].immutable);
+    return [...new Set(withDestinations)].filter(k => k !== SEALED_KEYS_PATH && !ALL_CONFIG_MAP[k].immutable);
 }
+
+/**
+ * The settings that decide where a secret is sent. The host that seals the secret seals these with
+ * it, so a secret the operator may not read cannot be sent to an address the operator chose.
+ */
+export const SECRET_DESTINATIONS: Readonly<Record<string, readonly string[]>> = {
+    'email.smtp_user': ['email.smtp_host', 'email.smtp_port', 'email.smtp_secure', 'email.smtp_reject_unauthorized'],
+    'email.smtp_pass': ['email.smtp_host', 'email.smtp_port', 'email.smtp_secure', 'email.smtp_reject_unauthorized'],
+    'eudiw.ftn_client_secret': ['eudiw.ftn_provider_url'],
+    'auth.casdoor_client_secret': ['auth.casdoor_endpoint'],
+};
 
 /** Is this setting one the node's host nominated as read-only? */
 export function isSealed(config: SealedConfig, dotPath: string): boolean {
