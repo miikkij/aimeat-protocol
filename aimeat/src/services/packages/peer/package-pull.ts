@@ -24,6 +24,8 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.7.2 — 2026-10-27 — A pull also checks the signed component metadata (verifyComponentMetadata)
+ *     where the source signs it, and stops before any write on a mismatch (secaudit2026oct26).
  *   v1.7.1 — 2026-10-27 — checkUpstream strips the stored upstream address with stripTrailingSlashes
  *     too; a ZIP import stores the archive's source_url there unchecked (secaudit2026oct26).
  *   v1.7.0 — 2026-10-25 — A pull is bound to the group it was requested and verified for: the signed
@@ -64,7 +66,7 @@ import { readBodyCapped } from '../../../utils/read-capped.js';
 import { parseZip, ZipValidationError, type ParsedPackage } from '../compose/package-zip.js';
 import { installSetRepositories } from '../../install-set-trust.js';
 import {
-    verifyAttestation, verifyComponentDigests, type AttestationDoc,
+    verifyAttestation, verifyComponentDigests, verifyComponentMetadata, type AttestationDoc,
 } from './package-attestation.js';
 import { importParsedPackage } from '../compose/package-import.js';
 import { getPackageFor } from '../compose/package-read.js';
@@ -363,6 +365,12 @@ export async function pullPackage(
     const digests = verifyComponentDigests(doc.descriptor, parsed.components);
     if (!digests.ok) {
         return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: digests.reason };
+    }
+    // 8b. And what manifest.yaml says about each component, which the install reads (an app's tools,
+    //     data map, name and icon), is what the node signed, where it signed it (secaudit2026oct26).
+    const metadata = await verifyComponentMetadata(source.publicKey, doc, parsed.components);
+    if (!metadata.ok) {
+        return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: metadata.reason };
     }
 
     const upstream: UpstreamRef = {

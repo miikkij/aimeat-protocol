@@ -26,10 +26,15 @@
  *   because JSON.parse happens to preserve wire order. A signature whose input depends on how a
  *   parser felt is a signature that fails for the wrong reason one day.
  * @structure AttestationDescriptor · AttestationDoc · buildDescriptor · attestationSignString ·
- *   signAttestation · verifyAttestation · verifyComponentDigests
+ *   componentMetadataDigest · metadataSignString · signAttestation · verifyAttestation ·
+ *   verifyComponentDigests · verifyComponentMetadata
  * @usage
  *   import { buildDescriptor, signAttestation, verifyAttestation } from './package-attestation.js';
  * @version-history
+ *   v1.2.0 — 2026-10-27 — The node also signs each component's install-relevant metadata from
+ *     manifest.yaml (label, dependencies, meta): metadata_sha256 in the descriptor, signed by a second
+ *     signature, metadata_signature, so the sign string of `signature` and every node that verifies
+ *     only it are unchanged. verifyComponentMetadata checks it where present (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — verifyComponentDigests also compares each arrived component's type with
  *     its signed type, since the type decides how a part is installed (secaudit2026oct22).
  *   v1.0.0 — 2026-09-05 — Initial.
@@ -37,6 +42,7 @@
 import { createHash } from 'node:crypto';
 import type { PackageRecord } from '../../../storage/interface.js';
 import { sign, verify } from '../../../auth/keypair.js';
+import { stableStringify } from '../../../utils/stable-json.js';
 
 export const ATTESTATION_SPEC = 'aimeat-package-attestation/1.0';
 
@@ -58,11 +64,44 @@ export interface AttestationDescriptor {
     manifest_sha256: string;
     /** Sorted by id, so the same package always produces the same string. */
     component_digests: ComponentDigest[];
+    /**
+     * sha256 of each component's install-relevant metadata from manifest.yaml (label, dependencies,
+     * meta: an app's tools, data map, name and icon), canonical (componentMetadataDigest). Signed by
+     * `metadata_signature`, not by `signature`, so a node that does not know the field still verifies
+     * the rest. Absent on an attestation made before 2026-10-27.
+     */
+    metadata_sha256?: string;
 }
 
 export interface AttestationDoc {
     descriptor: AttestationDescriptor;
     signature: string;
+    /** The signature over the sign string plus metadata_sha256 (metadataSignString). */
+    metadata_signature?: string;
+}
+
+/**
+ * The canonical digest of what manifest.yaml says about each component and the install reads: its
+ * label, its dependencies and its `meta`. Normalised the way the ZIP round trip leaves them (an empty
+ * meta is no meta, a missing dependency list is empty), so the record a node signs and the parts a
+ * puller parses from the archive give the same digest.
+ */
+export function componentMetadataDigest(components: Array<{ id: string; label?: string; dependencies?: string[]; meta?: unknown }>): string {
+    const rows = components
+        .map(c => ({
+            id: c.id,
+            label: c.label ?? '',
+            dependencies: c.dependencies ?? [],
+            meta: c.meta && typeof c.meta === 'object' && !Array.isArray(c.meta) && Object.keys(c.meta).length > 0 ? c.meta : null,
+        }))
+        .sort((a, b) => a.id.localeCompare(b.id));
+    return sha256(stableStringify(rows));
+}
+
+/** The bytes `metadata_signature` signs: the attestation's sign string and the metadata digest. */
+export function metadataSignString(d: AttestationDescriptor): string {
+    const value = d.metadata_sha256 ?? '';
+    return `${attestationSignString(d)}\nmetadata_sha256:${value.length}:${value}`;
 }
 
 /** sha256 of a UTF-8 string, hex, the same shape the registrar uses. */
@@ -90,6 +129,7 @@ export function buildDescriptor(
         component_digests: pkg.components
             .map(c => ({ id: c.id, type: c.type, sha256: sha256(c.content ?? '') }))
             .sort((a, b) => a.id.localeCompare(b.id)),
+        metadata_sha256: componentMetadataDigest(pkg.components),
     };
 }
 
@@ -122,7 +162,29 @@ export function attestationSignString(d: AttestationDescriptor): string {
 export async function signAttestation(
     privateKeyBase64: string, descriptor: AttestationDescriptor,
 ): Promise<AttestationDoc> {
-    return { descriptor, signature: await sign(privateKeyBase64, attestationSignString(descriptor)) };
+    const signature = await sign(privateKeyBase64, attestationSignString(descriptor));
+    if (descriptor.metadata_sha256 === undefined) return { descriptor, signature };
+    return { descriptor, signature, metadata_signature: await sign(privateKeyBase64, metadataSignString(descriptor)) };
+}
+
+/**
+ * Step three: does the metadata that arrived in manifest.yaml match what the node signed? An
+ * attestation from a node that signs no metadata (made before 2026-10-27) answers `checked: false`
+ * and is decided as before; one that signs it must match, or the pull stops before any write.
+ */
+export async function verifyComponentMetadata(
+    publicKeyBase64: string, doc: AttestationDoc,
+    components: Array<{ id: string; label?: string; dependencies?: string[]; meta?: unknown }>,
+): Promise<{ ok: true; checked: boolean } | { ok: false; reason: string }> {
+    const d = doc.descriptor;
+    if (typeof doc.metadata_signature !== 'string' || typeof d.metadata_sha256 !== 'string') return { ok: true, checked: false };
+    if (!(await verify(publicKeyBase64, metadataSignString(d), doc.metadata_signature))) {
+        return { ok: false, reason: 'the signature over the package metadata does not check out' };
+    }
+    if (componentMetadataDigest(components) !== d.metadata_sha256) {
+        return { ok: false, reason: 'the component metadata in manifest.yaml (labels, dependencies, app tools, data map, name or icon) is not what was signed' };
+    }
+    return { ok: true, checked: true };
 }
 
 /** Step one: did the node that claims to have signed this actually sign it? */
