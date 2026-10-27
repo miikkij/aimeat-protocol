@@ -24,6 +24,9 @@
  *   const caps = packageCapabilities(pkg.components, config, owner);
  *   if (caps.carriesCode) ...   // an extension, app, cortex or skill part
  * @version-history
+ *   v1.4.1 — 2026-10-27 — widenedItems reports `extension:<c>:network-any-host` when an update drops
+ *     every host item of an extension that keeps network access, so an auto-update that removes a
+ *     host allowlist waits for the owner (secaudit2026oct26).
  *   v1.4.0 — 2026-10-09 — An extension's `network.host_fields` are capabilities
  *     (`extension:<c>:network-host-field:<field>`): the approval names the field whose value the
  *     installer sets, never the value. `network_hosts` lists only the author's fixed hosts.
@@ -197,8 +200,24 @@ export function packageCapabilities(components: PackageComponent[], config: Aime
   return { capabilities: caps, items, hash, carriesCode };
 }
 
-/** The items of `next` that `approved` did not have: what an update would add. */
+/**
+ * The items of `next` that `approved` did not have: what an update would add.
+ *
+ * A host allowlist is a restriction, written as positive items (network-host, network-host-field), so
+ * its loss adds no item of its own: an extension that keeps `network` and drops every host item can
+ * reach any public address. That loss is reported as `extension:<c>:network-any-host`. It is derived
+ * here rather than listed by packageCapabilities, so every approval recorded before keeps its exact
+ * item list and an extension that never had a host list is not a widening (secaudit2026oct26).
+ */
 export function widenedItems(approved: string[], next: string[]): string[] {
   const had = new Set(approved);
-  return next.filter(i => !had.has(i));
+  const added = next.filter(i => !had.has(i));
+  const restricted = (items: Iterable<string>, c: string) =>
+    [...items].some(i => i.startsWith(`extension:${c}:network-host:`) || i.startsWith(`extension:${c}:network-host-field:`));
+  const nextSet = new Set(next);
+  for (const item of next) {
+    const m = /^extension:(.+):network$/.exec(item);
+    if (m && restricted(had, m[1]!) && !restricted(nextSet, m[1]!)) added.push(`extension:${m[1]}:network-any-host`);
+  }
+  return added;
 }
