@@ -92,9 +92,10 @@ export const beneficiaryCliTools: ConnectCliToolDefinition[] = [
             const beneficiary = requiredString(input, 'beneficiary');
             const currency = optionalString(input, 'currency');
             const notArrived = optionalString(input, 'possible_payment_not_arrived');
-            if (notArrived) return client.post('/v1/commerce/beneficiary/payout', { beneficiary, currency, possible_payment_not_arrived: notArrived });
-            if (!input.payment) return client.get(`/v1/commerce/beneficiary/payout${query({ beneficiary, currency })}`);
-            return client.post('/v1/commerce/beneficiary/payout', { beneficiary, currency, payment: input.payment });
+            if (!input.payment && !notArrived) return client.get(`/v1/commerce/beneficiary/payout${query({ beneficiary, currency })}`);
+            return client.post('/v1/commerce/beneficiary/payout', {
+                beneficiary, currency, ...(notArrived ? { possible_payment_not_arrived: notArrived } : { payment: input.payment }),
+            });
         },
     },
 ];

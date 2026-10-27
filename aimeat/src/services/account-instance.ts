@@ -18,6 +18,7 @@
  *     compliance-agreements counterparty name reuse).
  */
 import type { Storage } from '../storage/interface.js';
+import { localAccountOf } from '../utils/gaii.js';
 
 /**
  * True when the account that holds the name in `ghii` (`name@node`) now was registered at or before
@@ -26,7 +27,8 @@ import type { Storage } from '../storage/interface.js';
  * shows a change of person, and the check never takes a right away on a guess.
  */
 export async function heldSince(storage: Storage, ghii: string, at: string | null | undefined): Promise<boolean> {
-  const name = ghii.split('@')[0] ?? '';
+  // An identity of another node names no account here (localAccountOf answers null for it).
+  const name = localAccountOf(ghii);
   if (!name) return false;
   const owner = await storage.getOwner(name);
   if (!owner) return false;
