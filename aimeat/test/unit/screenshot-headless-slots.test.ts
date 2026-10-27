@@ -12,6 +12,7 @@
  *   none of the owner's hourly allowance.
  * @usage cd aimeat && pnpm exec vitest run test/unit/screenshot-headless-slots.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — The count is the setting apps.renders_at_once; 0 is no limit.
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
@@ -68,6 +69,19 @@ describe('on-demand screenshots share a node-wide headless slot and a deadline',
     const busy = out.filter(r => !r.ok && r.code === 'HEADLESS_BUSY');
     expect(busy.length).toBe(6 - state.launches);
     expect(busy.every(r => !r.ok && r.status === 503 && /try again/i.test(r.message))).toBe(true);
+  });
+
+  it('the count is the operator setting apps.renders_at_once, and 0 is no limit', async () => {
+    for (const [setting, expected] of [[2, 2], [0, 6]] as const) {
+      const { state, launch } = hangingLauncher();
+      const cfg = { ...config, appRendersAtOnce: setting } as AimeatConfig;
+      const runs = Array.from({ length: 6 }, (_, i) =>
+        captureAppScreenshot(cfg, storage, { ownerName: `set${setting}-${i}`, filename: 'a.html' }, { launch }));
+      await settle();
+      expect(state.launches).toBe(expected);
+      state.release.forEach(f => f());
+      await Promise.all(runs);
+    }
   });
 
   it('a render that never finishes is closed by the deadline and answered', async () => {
