@@ -9,6 +9,8 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   2026-10-27 — A work item or an offering written through the memory routes is not an EXCHANGE record:
+ *     not listed, and no contract to a provider that does not own the extension (secaudit2026oct26).
  *   2026-10-27 — A provider accepting a proposal after the consumer paused keeps the pause; after a
  *     revoke it answers 409 CONTRACT_ENDED (secaudit2026oct26).
  *   v1.9.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED), so the
@@ -1186,6 +1188,40 @@ await test('A provider accepting the consumer’s proposal after the consumer re
   // The consumer resumes the way the refusal names: accepting the offering again.
   const again = await accept(consumer.token, 'cheap', { app_id: appId });
   assert(again.status === 201 && again.body.data.entitlement.state === 'active', `re-accept ${again.status}`);
+});
+
+// ── Records written past the EXCHANGE services are not EXCHANGE records (secaudit2026oct26) ──
+const memWrite = (token: string, key: string, value: unknown) =>
+  json('/v1/memory', { method: 'POST', headers: auth(token), body: JSON.stringify({ key, value, visibility: 'public' }) });
+
+await test('A work item someone wrote into their own memory naming another owner is not in that owner\'s work list', async () => {
+  const id = `xw-forged-${Date.now()}`;
+  const w = await memWrite(buyer.token, `xwork.${id}`, { workId: id, consumerOwner: consumer.name, providerOwner: buyer.name, state: 'delivered', createdAt: new Date().toISOString() });
+  assert(w.status === 201 || w.status === 200, `the memory write itself: ${w.status}`);
+  const list = await json('/v1/exchange/work', { headers: auth(consumer.token) });
+  assert(list.status === 200 && !list.body.data.work.some((x: any) => x.work_id === id || x.workId === id), `not listed: ${JSON.stringify(list.body.data.work.map((x: any) => x.work_id ?? x.workId))}`);
+});
+
+await test('An ext-action offering written past the listing route mints no contract for a provider that does not own the extension', async () => {
+  const id = `off-forged${Date.now() % 1_000_000}`;
+  const buyerGhii = `${buyer.name}@${NODE_ID}`;
+  const w = await memWrite(buyer.token, `exchange.offering.${id}`, {
+    offeringId: id, providerGhii: buyerGhii, providerOwner: buyer.name, kind: 'ext-action', ext: EXT, action: 'cheap', surface: null,
+    title: 'Not mine', description: 'x', unit: 'morsels', basePrice: 1, currency: null, plans: [], provenance: null, state: 'listed',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  });
+  assert(w.status === 201 || w.status === 200, `the memory write itself: ${w.status}`);
+  const r = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ offering_id: id }) });
+  assert(r.status === 404 || r.status === 409, `no contract to a provider that does not own ${EXT}: ${r.status} ${JSON.stringify(r.body?.data?.entitlement?.provider_ghii ?? r.body?.error)}`);
+  // A record in one namespace that names another owner as the provider is not an offering at all.
+  const id2 = `off-forged2${Date.now() % 1_000_000}`;
+  await memWrite(buyer.token, `exchange.offering.${id2}`, {
+    offeringId: id2, providerGhii: `${provider.name}@${NODE_ID}`, providerOwner: provider.name, kind: 'ext-action', ext: EXT, action: 'cheap',
+    surface: null, title: 'Theirs', description: 'x', unit: 'morsels', basePrice: 1, currency: null, plans: [], provenance: null, state: 'listed',
+    createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+  });
+  const g = await json(`/v1/exchange/offerings/${id2}`);
+  assert(g.status === 404, `a record outside the provider's namespace is no offering: ${g.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

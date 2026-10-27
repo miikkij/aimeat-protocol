@@ -24342,7 +24342,9 @@ paths:
         cross-owner). PREFERRED: pass `offering_id` (works for both ext-action and app-tool offerings; an
         app-tool contract is pinned to the offering's interface version). LEGACY: pass `ext` + `action` +
         `contract_ref` for a raw ext-action. Body: `{ offering_id?, ext?, action?, contract_ref?,
-        cap_units?, plan_id?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`.
+        cap_units?, plan_id?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`. An
+        ext-action offering whose provider does not own the extension answers 409
+        OFFERING_PROVIDER_MISMATCH.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -24369,6 +24371,8 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
         '404':
+          $ref: '#/components/responses/AimeatError'
+        '409':
           $ref: '#/components/responses/AimeatError'
     get:
       operationId: exchangeListEntitlements

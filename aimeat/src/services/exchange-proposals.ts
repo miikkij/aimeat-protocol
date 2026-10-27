@@ -16,6 +16,7 @@
  *   const p = await putProposal(storage, {...});
  *   const ent = await supersedeWithProposal(storage, proposal, existingEntitlement);
  * @version-history
+ *   2026-10-27 — listProposalsForOwner reads only the service's own namespace (secaudit2026oct26).
  *   2026-10-27 — supersedeWithProposal answers 'ended' for a revoked contract instead of minting an
  *     active one, and keeps a consumer's pause when the provider accepts (secaudit2026oct26,
  *     exchange-proposals:accept-reactivates-ended-contract).
@@ -86,8 +87,9 @@ export async function getProposal(storage: Storage, id: string): Promise<Contrac
 
 /** Every proposal an owner is party to (as proposer OR counterparty, either role), newest first. */
 export async function listProposalsForOwner(storage: Storage, owner: string): Promise<ContractProposal[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'xprop.', limit: 5000 });
-  return items.map(r => r.value as ContractProposal)
+  // Only the service's own namespace holds a proposal; a record under the same key elsewhere is not one (secaudit2026oct26).
+  const { items } = await storage.listAllMemory({ prefix: 'xprop.', ownerPrefix: NS, limit: 5000 });
+  return items.filter(r => r.ownerGaii === NS).map(r => r.value as ContractProposal)
     .filter(v => v && v.proposalId && (v.proposerOwner === owner || v.counterpartyOwner === owner))
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 }
