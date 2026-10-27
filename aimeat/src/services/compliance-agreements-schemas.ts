@@ -19,6 +19,7 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   2026-10-27 — A signature's level may be `test`: a wallet signature on the EU reference wallet's test roots (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1).
  */
 import { z } from 'zod';
@@ -121,11 +122,15 @@ export const AnnexesSchema = z.object({
   IV: z.object({ subprocessors: z.array(SubprocessorSchema).max(50) }),
 });
 
-/** One signature on a version. `level` is what it proves, strongest first. */
+/**
+ * One signature on a version. `level` is what it proves, strongest first. `test` is a wallet
+ * signature that chains to the EU reference wallet's test roots: it proves nothing in law
+ * (docsign/validate.ts TEST_TRUST_ANCHOR), and the history says so.
+ */
 export const SignatureSchema = z.object({
   party: z.enum(['controller', 'processor']),
   method: z.enum(['aimeat', 'eudi-wallet', 'external-pdf', 'scan']),
-  level: z.enum(['qualified', 'advanced', 'aimeat', 'scanned']),
+  level: z.enum(['qualified', 'advanced', 'aimeat', 'scanned', 'test']),
   signer: z.string().max(300),
   at: iso,
   /** The docsign request, the validation summary, or the scan check, by reference. */
