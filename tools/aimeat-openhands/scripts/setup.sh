@@ -4,6 +4,9 @@
 #   1) ensure .env exists  2) connect to AIMEAT (device auth)  3) render config + install skill
 #   4) bring the stack up  5) post-up: install user microagent + preconfigure GUI LLM profile.
 #   After this, OpenHands is permanently wired to AIMEAT.
+# @version-history
+#   2026-10-27 -- Warns when the UI is published on every network interface, and names the SSH
+#     tunnel when it is not (secaudit2026oct26, ui-published-all-interfaces-default).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -21,6 +24,19 @@ if [ ! -f .env ]; then
 fi
 set -a && . ./.env && set +a
 : "${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in .env}"
+
+# The UI has no login, can run code on this host and holds the agent token. Say so when it is
+# published on every network interface (no OPENHANDS_PORT_BIND, or a bind that is not loopback).
+case "${OPENHANDS_PORT_BIND:-}" in
+  127.0.0.1:*|localhost:*|"[::1]:"*) UI_ON_NETWORK=0 ;;
+  *) UI_ON_NETWORK=1 ;;
+esac
+if [ "$UI_ON_NETWORK" = 1 ]; then
+  echo "WARNING: the OpenHands UI will listen on every network interface (OPENHANDS_PORT_BIND=${OPENHANDS_PORT_BIND:-3000})." >&2
+  echo "         It has no login, it can run code on this host, and it holds your AIMEAT agent token." >&2
+  echo "         Anyone who can reach this port can use it. To keep it on this computer only, add" >&2
+  echo "         OPENHANDS_PORT_BIND=127.0.0.1:3000 to .env and re-run setup.sh." >&2
+fi
 
 # 2) connect (skip if a valid-looking token already present)
 if [ ! -f secrets/aimeat.env ]; then
@@ -51,5 +67,9 @@ echo "== Post-up configuration =="
 bash scripts/postup.sh
 
 echo
-echo "Open http://localhost:3000  (or http://<this-host-ip>:3000 from another machine)."
+if [ "$UI_ON_NETWORK" = 1 ]; then
+  echo "Open http://localhost:3000  (or http://<this-host-ip>:3000 from another machine; see the warning above)."
+else
+  echo "Open http://localhost:3000  (from another machine: ssh -L 3000:localhost:3000 <user>@<this-host>)."
+fi
 echo "Ask it: \"Build an AIMEAT app that ...\" and it will fetch the spec, build, and publish."

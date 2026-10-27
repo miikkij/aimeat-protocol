@@ -3,3 +3,5 @@
 secrets/
 *.token
 agent_token.txt
+# render-config.sh writes the OpenRouter key and the agent token into it.
+config.toml
