@@ -97,6 +97,7 @@ import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app
 import type { AppRecord } from '../../../storage/types/apps.js';
 import type { Scheduler } from '../../scheduler.js';
 import { logger } from '../../../utils/logger.js';
+import { isOwnerInPerson } from '../../../utils/gaii.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -125,8 +126,8 @@ export interface PackageInstallCaller {
  * owner's approval of a request, the owner's own update job), else the acting principal, an agent or
  * an app (secaudit2026oct26).
  */
-export function codeWriterOf(caller: Pick<PackageInstallCaller, 'roles' | 'sub'>): string | undefined {
-    return caller.roles.includes('owner') ? undefined : caller.sub;
+export function codeWriterOf(caller: Pick<PackageInstallCaller, 'roles' | 'sub' | 'federated'>): string | undefined {
+    return isOwnerInPerson(caller) ? undefined : caller.sub;
 }
 
 export interface PackageInstallInput {

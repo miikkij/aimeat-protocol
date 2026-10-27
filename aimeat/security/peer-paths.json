@@ -176,8 +176,8 @@
       "why": "Messages and read receipts go only to a peer that takes messages (peerTakesMessages: active or degraded, messaging on); the plain fetch is the federation carve-out of security/outbound-fetch-exemptions.json (2026-10-01)."
     },
     "src/services/packages/compose/package-import.ts": {
-      "count": 2,
-      "why": "A pulled package's statement is verified with the pinned key of the node it names as signer; a node id with no key here is imported as not verified. A packages-only peer registered under a node id that is not its owner's would verify statements in that id's name: the pull gate (shareCatalogue) is what stands in front of it."
+      "count": 3,
+      "why": "A pulled package's statement, and its signed component metadata (2026-10-27), are verified with the pinned key of the node it names as signer; a node id with no key here is imported as not verified. A packages-only peer registered under a node id that is not its owner's would verify statements in that id's name: the pull gate (shareCatalogue) is what stands in front of it."
     },
     "src/services/packages/peer/package-node-auth.ts": {
       "count": 1,
