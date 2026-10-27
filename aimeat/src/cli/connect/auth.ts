@@ -27,12 +27,26 @@
  * @version-history v2.1.1 -- 2026-10-14 -- Print the approval address with the user code (approvalUrl); the bare verification_uri opened the consent page on "Missing code parameter".
  * @version-history v2.3.0 -- 2026-10-25 -- The agent's private key of each approval is kept beside its token, and a reconnect signs the device-authorize request with it (`proof`), so the owner sees the agent coming back rather than a new device taking it over (services/device-return-proof.ts; secaudit2026oct22, lead 2150).
  * @version-history v2.3.1 -- 2026-10-26 -- A stored token the node answers 401 is not sent with the device-authorize request: the node refuses a dead bearer, so a reconnect after the token expired (the path aimeat-crewai names for an expired token) failed with "Authorization request failed" before the owner saw anything (secaudit2026oct22, lead 2150 follow-up).
+ * @version-history v2.3.2 -- 2026-10-27 -- The return proof is the v2 text, which names the node's id (read from GET /.well-known/aimeat), so a proof made for one node verifies on no other one; without the id the request goes without proof (secaudit2026oct26, device-return-proof:return-proof-unbound-to-node-and-request).
  * @version-history v2.2.0 -- 2026-10-25 -- The per-agent config is written with saveConnectedAgentConfig: connecting records the runner and wake command it keeps as trusted (command-trust.ts; secaudit2026oct22, lead 4763).
  */
 import { AimeatClient } from './api-client.js';
 import { storeToken, getToken, listAllTokens, storeAgentKey, getAgentKey } from './keychain.js';
 import { sign } from '../../auth/keypair.js';
-import { returnProofMessage } from '../../services/device-return-proof.js';
+import { returnProofMessageV2 } from '../../services/device-return-proof.js';
+
+/** The node's id as its discovery document says it, for the return proof; null when it does not answer. */
+async function nodeIdAt(nodeUrl: string, warn: (msg: string) => void): Promise<string | null> {
+  try {
+    const res = await fetch(`${nodeUrl.replace(/\/$/, '')}/.well-known/aimeat`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+    const body = await res.json() as { data?: { node_id?: unknown } };
+    return typeof body.data?.node_id === 'string' && body.data.node_id ? body.data.node_id : null;
+  } catch (e) {
+    // No answer is no id: the request then goes without proof, and the owner sees what it is.
+    warn(`The node's discovery document could not be read (${(e as Error).message}).`);
+    return null;
+  }
+}
 import { saveConfig, saveConnectedAgentConfig, loadPerAgentConfig } from './config.js';
 import { downloadSkillBundle, readSkillBundleGuide } from './skill-bundle.js';
 import { buildAgentOnboardingInstruction } from './onboarding-prompt.js';
@@ -299,12 +313,16 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   // An agent this machine connected before proves it is coming back with the key its last approval
   // gave it, so the owner sees a return rather than a new device taking it over
   // (services/device-return-proof.ts). No key here: the request goes without proof, as before.
+  // The proof names the node it goes to (v2), so a proof made for this node verifies on no other one
+  // (secaudit2026oct26).
   const heldKey = await getAgentKey(agentName, owner);
   let proof: { signed_at: string; signature: string } | undefined;
-  if (heldKey) {
+  const nodeId = heldKey ? await nodeIdAt(nodeUrl, warn) : null;
+  if (heldKey && !nodeId) warn('The node did not say its id; connecting without proof that it is the same agent.');
+  if (heldKey && nodeId) {
     const signedAt = new Date().toISOString();
     try {
-      proof = { signed_at: signedAt, signature: await sign(heldKey, returnProofMessage(owner, agentName, signedAt)) };
+      proof = { signed_at: signedAt, signature: await sign(heldKey, returnProofMessageV2(nodeId, owner, agentName, signedAt)) };
     } catch {
       warn('The key this machine kept for the agent could not sign; connecting without proof that it is the same agent.');
     }

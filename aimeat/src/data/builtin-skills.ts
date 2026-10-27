@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-27 -- The device-authorization guide names the v2 return proof (with the node id), which counts once; v1 is still accepted (secaudit2026oct26).
  *   2026-10-26 -- aimeat-node-guide, use-app-bound-skills and install-skills-locally: the registry
  *     is the Agent Skills format, a skill loads in steps (body_only, then path), and a file whose
  *     index entry says encoding base64 is written as its decoded bytes. set-up-content-pipeline moved
@@ -334,8 +335,9 @@ Agents are never created implicitly. The paved path:
 
 An agent that already exists and comes back (its token expired) proves it in step 1 with the key
 its last approval gave it: \`proof: { signed_at, signature }\`, an Ed25519 signature over
-\`aimeat-device-return:v1\\n<owner>\\n<agent name>\\n<signed_at>\` made within five minutes
-(\`aimeat connect add\` does this). The owner then sees the agent coming back. Without that proof the
+\`aimeat-device-return:v2\\n<node id>\\n<owner>\\n<agent name>\\n<signed_at>\` made within five
+minutes, where the node id is \`node_id\` from \`GET /.well-known/aimeat\` (\`aimeat connect add\` does
+this). A proof counts once, and the older v1 text without the node id is still accepted. The owner then sees the agent coming back. Without that proof the
 owner sees a new device taking the agent over, the approval is recorded in the owner's account
 events, and the owner may sign the agent out everywhere else with it.
 
