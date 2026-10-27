@@ -17,7 +17,8 @@
   node_manager.rs and ai_connector.rs: get_node_status, start_node, stop_node { pid },
   open_portal, read_config, write_config { config }, node_login { port, username, password },
   get_ai_settings { port, token }, detect_ai_services, save_ai_endpoint { port, token, baseUrl,
-  model }, read_node_logs { lines }, clear_node_logs, open_external { url }. The update check is
+  model }, remember_local_ai { baseUrl, model } (local_ai.rs), read_node_logs { lines },
+  clear_node_logs, open_external { url }. The update check is
   the front door's, not this page's.
 
   NO INLINE HANDLER AND NO STYLE ATTRIBUTE. Every listener is attached from the script and every
@@ -164,6 +165,15 @@
           <p class="hint" id="t-setPortHint"></p>
         </div>
         <div class="field">
+          <label class="poster-label" for="setBind" id="t-setBind"></label>
+          <select id="setBind">
+            <option value="127.0.0.1" id="t-bindLocal"></option>
+            <option value="0.0.0.0" id="t-bindNetwork"></option>
+            <option value="" id="t-bindAsBefore"></option>
+          </select>
+          <p class="hint" id="t-setBindHint"></p>
+        </div>
+        <div class="field">
           <label class="poster-label" for="setRole" id="t-setRole"></label>
           <select id="setRole">
             <option value="standalone" id="t-roleStandalone"></option>
@@ -269,6 +279,11 @@
         setIdHint: 'Given when it was set up. It does not change.',
         setPort: 'Port',
         setPortHint: 'The port it answers on. 41050 unless something else already uses it. A change takes effect the next time you start it.',
+        setBind: 'Who can reach it',
+        bindLocal: 'This computer only',
+        bindNetwork: 'Also other devices on the local network',
+        bindAsBefore: 'Every network, as set before this choice existed',
+        setBindHint: 'This computer only is the safe choice. On the local network, anyone who reaches this computer can open its sign-in page, and it then uses the safety rules of a public server. The AI server on this computer that you chose above keeps working; nothing else on this computer is in its reach. A change takes effect the next time you start it.',
         setRole: 'Its place among others',
         roleStandalone: 'On its own',
         rolePersonal: 'Anchored to another AIMEAT',
@@ -292,6 +307,7 @@
         footBack: '← Your AI tools',
         saved: 'Saved.',
         aiSaved: 'Your AIMEAT now uses {model}.',
+        aiSavedForNode: 'Saved. Your AIMEAT uses {model} from the next time you start it.',
         needSignIn: 'Sign in first, above.',
         needBoth: 'Give the username and the password.',
         needUrl: 'Give the address.',
@@ -352,6 +368,11 @@
         setIdHint: 'Annettu käyttöönotossa. Se ei muutu.',
         setPort: 'Portti',
         setPortHint: 'Portti, jossa se vastaa. 41050, ellei jokin muu jo käytä sitä. Muutos tulee voimaan, kun käynnistät sen seuraavan kerran.',
+        setBind: 'Kuka siihen pääsee',
+        bindLocal: 'Vain tämä kone',
+        bindNetwork: 'Myös muut laitteet lähiverkossa',
+        bindAsBefore: 'Kaikki verkot, kuten ennen tätä valintaa',
+        setBindHint: 'Vain tämä kone on turvallinen valinta. Lähiverkossa kuka tahansa, joka yltää tähän koneeseen, voi avata sen kirjautumissivun. Silloin se noudattaa julkisen palvelimen turvasääntöjä. Ylempänä valitsemasi tekoälypalvelin tällä koneella toimii edelleen, mutta mihinkään muuhun tällä koneella se ei yllä. Muutos tulee voimaan, kun käynnistät sen seuraavan kerran.',
         setRole: 'Suhde muihin AIMEATeihin',
         roleStandalone: 'Yksin',
         rolePersonal: 'Ankkuroitu toiseen AIMEATiin',
@@ -375,6 +396,7 @@
         footBack: '← Tekoälysi',
         saved: 'Tallennettu.',
         aiSaved: 'AIMEATisi käyttää nyt mallia {model}.',
+        aiSavedForNode: 'Tallennettu. AIMEATisi käyttää mallia {model}, kun käynnistät sen seuraavan kerran.',
         needSignIn: 'Kirjaudu ensin, yllä.',
         needBoth: 'Anna käyttäjätunnus ja salasana.',
         needUrl: 'Anna osoite.',
@@ -524,6 +546,11 @@
       $('setPort').value = c.port || 41050;
       $('setRole').value = c.federation_role || 'standalone';
       $('setGenesis').value = c.genesis_url || '';
+      // An install from before this choice has no listen address and answers on every network. It
+      // keeps that until the person picks one: the third option, sent back empty, changes nothing.
+      const bind = c.bind_host === '127.0.0.1' || c.bind_host === '0.0.0.0' ? c.bind_host : '';
+      $('t-bindAsBefore').hidden = bind !== '';
+      $('setBind').value = bind;
       $('setEnc').textContent = c.encryption_configured ? t('encOn') : t('encOff');
     }
 
@@ -549,6 +576,7 @@
         federation_role: $('setRole').value,
         genesis_url: $('setGenesis').value.trim() || null,
         ai_endpoint: loadedConfig ? (loadedConfig.ai_endpoint || null) : null,
+        bind_host: $('setBind').value || null,
       };
       try {
         await invoke('write_config', { config });
@@ -673,6 +701,15 @@
     async function saveAi(baseUrl, model) {
       if (!jwt) { toast(t('needSignIn'), 'error'); $('aiUser').focus(); return; }
       if (!model) { toast(t('needModel'), 'error'); return; }
+      // The choice is also kept in the node's own settings: in local-network mode the node then
+      // carries an AI server on this computer as its own provider (local_ai.rs), since there an
+      // account's provider cannot be on the node's machine.
+      let carried = false;
+      try {
+        carried = await invoke('remember_local_ai', { baseUrl, model });
+      } catch (e) {
+        toast(t('failed', { why: String(e) }), 'error');
+      }
       try {
         await invoke('save_ai_endpoint', { port, token: jwt, baseUrl, model });
         toast(t('aiSaved', { model }));
@@ -681,6 +718,9 @@
       } catch (e) {
         // A refused token means the sign-in ran out: drop it so the person signs in again.
         if (/401|auth/i.test(String(e))) { signOut(); toast(t('signedOutExpired'), 'error'); return; }
+        // In local-network mode the account's provider is refused for a server on this computer;
+        // the node's own provider carries it instead, from the node's next start.
+        if (carried) { toast(t('aiSavedForNode', { model })); return; }
         toast(t('failed', { why: String(e) }), 'error');
       }
     }

@@ -11,6 +11,9 @@
 #      what OpenHands SDK expects for a raw Bearer token — NOT `headers.Authorization`).
 #      Requires secrets/aimeat.env to exist (created by scripts/aimeat-connect.sh).
 # Idempotent. Safe to re-run.
+# @version-history
+#   2026-10-27 -- The settings and MCP bodies (the OpenRouter key, the agent token) go to curl on
+#     stdin, not as arguments (secaudit2026oct26, secrets-on-curl-argv).
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -89,9 +92,11 @@ print(json.dumps({
 }))
 PY
 )
-curl -sf -X POST "$UI_BASE/api/v1/settings" \
+# The body carries the OpenRouter key, so it goes to curl on stdin (printf is a builtin), never as
+# an argument every local account can read.
+printf '%s' "$SETTINGS_BODY" | curl -sf -X POST "$UI_BASE/api/v1/settings" \
     -H 'Content-Type: application/json' \
-    -d "$SETTINGS_BODY" > /dev/null
+    --data-binary @- > /dev/null
 echo "Saved settings (agent_settings.llm)."
 
 # Save profile from current settings (include_secrets=true copies the api_key too).
@@ -139,9 +144,10 @@ print(json.dumps({
 }))
 PY
         )
-        curl -sf -X POST "$UI_BASE/api/v1/settings" \
+        # The body carries the agent token: on stdin, as above.
+        printf '%s' "$MCP_BODY" | curl -sf -X POST "$UI_BASE/api/v1/settings" \
             -H 'Content-Type: application/json' \
-            -d "$MCP_BODY" > /dev/null
+            --data-binary @- > /dev/null
         echo "Configured MCP server 'aimeat' (auth via RemoteMCPServer.auth)."
     else
         echo "WARNING: secrets/aimeat.env has no AIMEAT_AGENT_TOKEN — skipping MCP config" >&2
