@@ -15310,6 +15310,7 @@
       "operatorExportedEntries": "Operaattori otti tästä asennuksesta varmuuskopion. Siinä on {count} merkintääsi.",
       "operatorInstalledSet": "Operaattori asensi tiliisi asennuspaketin {set}: {packages} pakettia, ja {apps} sovellusta sai oikeuksia. Näet ja muutat sovellustesi oikeudet asetuksistasi.",
       "operatorActed": "Operaattori teki muutoksen tiliisi ({area}: {action}).",
+      "operatorRestoredBackup": "Operaattori palautti tähän asennukseen varmuuskopion. Se kirjoitti tiliisi {records} merkintää ja {agents} agenttia.",
       "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",
       "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
       "scopeWordsKeptOne": "{name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se sai oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne agentin asetuksista.",
