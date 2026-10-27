@@ -13,7 +13,7 @@
  *   - GET /.well-known/mcp.json: the node's extended MCP card (registry server.json shape) describing the
  *     /v1/mcp server + the WebMCP bridge + the priced tool catalog
  *   - GET /v1/mcp/server-card and /.well-known/mcp/server-card.json: the SEP-2127 Server Card
- *     (services/mcp-server-card.ts)
+ *     (mcp/server-card.ts)
  *   - GET /.well-known/api-catalog: RFC 9727 linkset (application/linkset+json) pointing at spec/docs/descriptors
  *   - GET /.well-known/ucp: UCP business profile (transports, checkout capability, payment handlers, signing keys)
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
@@ -80,7 +80,7 @@ import {
   getWebBotAuthState, signatureDirectoryBody, signDirectoryResponse, SIGNATURES_DIRECTORY_MEDIA_TYPE,
 } from '../services/web-bot-auth.js';
 import { aiCatalogRouter } from './ard-manifest.js';
-import { mcpServerCard, SERVER_CARD_MEDIA_TYPE } from '../services/mcp-server-card.js';
+import { mcpServerCard, SERVER_CARD_MEDIA_TYPE } from '../mcp/server-card.js';
 
 /**
  * RFC 8288 discovery Link headers on every GET/HEAD response, so agents that land on
