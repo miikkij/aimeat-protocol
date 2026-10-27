@@ -16,11 +16,14 @@
  *   else's form to the internet. A form the code calls with literal ids and the meta does not name is
  *   a warning, never a refusal: the publish says which form would stay closed.
  * @structure IntakeFormRef · parseDeclaredIntakeForms · scanCalledIntakeForms · intakeFormKey · checkDeclaredIntakeForms ·
- *   undeclaredCalledForms · intakeDeclarationOf
+ *   managedIntakeForms · undeclaredCalledForms · intakeDeclarationOf
  * @usage
  *   const declared = parseDeclaredIntakeForms(html);
  *   const refusal = await checkDeclaredIntakeForms(storage, ownerName, declared);
  * @version-history
+ *   v1.1.0 — 2026-10-27 — managedIntakeForms: a fork into another account and a backup restore keep
+ *     only the forms the new owner manages (secaudit2026oct26, forkApp/manifest-spread-carries-intake-forms
+ *     and apps-backup-import.ts:restoredManifest:archive-intake-declaration-kept).
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
 import type { Storage } from '../storage/interface.js';
@@ -102,6 +105,39 @@ export async function checkDeclaredIntakeForms(storage: Storage, ownerName: stri
     }
   }
   return null;
+}
+
+/**
+ * The forms of a declaration that arrived WITHOUT a publish (a fork of another account's app, a
+ * restored backup) split into those `ownerName` manages, by the rule checkDeclaredIntakeForms applies,
+ * and those it does not, with the sentence why. A publish checks the declaration it reads from the
+ * bytes; these doors stored the list they were handed, so another owner's form reached the app and,
+ * through an opening, the internet (secaudit2026oct26). A value that is not an org/ws/form id triple
+ * is dropped too.
+ */
+export async function managedIntakeForms(
+  storage: Storage, ownerName: string, forms: unknown,
+): Promise<{ kept: IntakeFormRef[]; dropped: Array<{ form: string; why: string }> }> {
+  const kept: IntakeFormRef[] = [];
+  const dropped: Array<{ form: string; why: string }> = [];
+  const list = Array.isArray(forms) ? forms : [];
+  for (const raw of list) {
+    const f = raw as Partial<IntakeFormRef> | null;
+    const ref = f && typeof f.org === 'string' && typeof f.ws === 'string' && typeof f.formId === 'string'
+      ? { org: f.org, ws: f.ws, formId: f.formId } : null;
+    if (!ref || !REF_RE.test(intakeFormKey(ref))) {
+      dropped.push({ form: JSON.stringify(raw).slice(0, 120), why: 'It is not org/workspace/formId.' });
+      continue;
+    }
+    if (kept.length >= MAX_INTAKE_FORMS) {
+      dropped.push({ form: intakeFormKey(ref), why: `An app may name at most ${MAX_INTAKE_FORMS} intake forms.` });
+      continue;
+    }
+    const why = await checkDeclaredIntakeForms(storage, ownerName, [ref]);
+    if (why) dropped.push({ form: intakeFormKey(ref), why });
+    else kept.push(ref);
+  }
+  return { kept: dedupe(kept), dropped };
 }
 
 /** The forms the code calls that the declaration leaves out. */

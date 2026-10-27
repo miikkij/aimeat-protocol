@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.4 — 2026-10-27 — A fork into another account keeps only the intake forms the forker manages
+ *     (secaudit2026oct26, forkApp/manifest-spread-carries-intake-forms).
  *   v1.10.3 — 2026-10-27 — publishAppDraft passes `publishingApp`, the app whose grant publishes
  *     (secaudit2026oct26, app-grant-publisher-reads-as-owner).
  *   v1.10.2 — 2026-10-25 — deleteOwnedApp marks the app's own address held (held-app-labels.ts;
@@ -129,6 +131,7 @@ import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, t
 import type { PublishAsk } from './publish-requests/ask.js';
 import { removeComplianceDocs } from './compliance-docs.js';
 import { holdAppLabels } from './held-app-labels.js';
+import { managedIntakeForms } from './app-intake-forms.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
 /**
@@ -520,6 +523,13 @@ export async function forkApp(
     if (forkedManifest.dataMap?.gap) {
       forkedManifest.dataMap = { ...forkedManifest.dataMap };
       delete forkedManifest.dataMap.gap;
+    }
+    // The intake forms an opening opens with the app: only those the forker manages, by the rule a
+    // publish applies, since a fork is stored without one (secaudit2026oct26).
+    if (forkedManifest.intake?.length) {
+      const { kept } = await managedIntakeForms(storage, callerOwner, forkedManifest.intake);
+      if (kept.length) forkedManifest.intake = kept;
+      else delete forkedManifest.intake;
     }
   }
   // A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest spread above brings the
