@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.16.2 — 2026-10-27 — An extension component stamps installedByPrincipal from `codeWriter` when the
+ *     install or migration was not the owner's authority, as every other code write stamps it
+ *     (secaudit2026oct26).
  *   v1.16.1 — 2026-10-25 — rewriteComponentRefs moved to component-ref-rewrite.ts, which also rewrites a name written with its owner (secaudit2026oct22).
  *   2026-10-25 — Removing an app component keeps its subdomain row as a held name (held-app-labels.ts) instead of deleting it, so no other owner's app gets the old origin (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.16.0 — 2026-10-20 — A memory component writes no `skills.` or `organism.` key: the raw setMemory below wrote the author's key verbatim under the installer's identity, so a package planted a workspace skill in an organism its installer is not a member of, and shadowed a node built-in skill (secaudit 2026-10; package-memory-component.ts v1.4.0 says why each prefix).
@@ -151,6 +154,14 @@ export interface ComponentRegistrationInput {
    * back to the owner's own identity, which is what a self-install is.
    */
   callerGaii?: string;
+  /**
+   * Who wrote extension code this registration brings in, stamped as the record's
+   * installedByPrincipal as every other code write stamps it: an agent or app that installed or
+   * migrated without the owner's authority. Absent when the owner's authority did it (in person, or
+   * the owner's approval of a request), and the record then counts as the owner's own code, as before
+   * (secaudit2026oct26).
+   */
+  codeWriter?: string;
   /**
    * URL rewrites applied to app HTML content at install time. Built by the
    * installer from already-registered cortex/extension components in the same
@@ -319,6 +330,7 @@ export async function registerComponent(
           // A package component is live as soon as its package is installed; there is no separate
           // activate step in that flow.
           status: 'active',
+          ...(input.codeWriter ? { installedByPrincipal: input.codeWriter } : {}),
         });
         await aggregateExtensionNow(config, storage, registeredAs); // its tools answer when the install does
         break;

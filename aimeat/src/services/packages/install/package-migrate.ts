@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.7.3 — 2026-10-27 — A replaced, custom or new extension names its writer (codeWriterOf): the
+ *     agent or app that migrated without the owner's authority (secaudit2026oct26).
  *   v1.7.2 — 2026-10-21 — A replaced extension of byte-identical code keeps the old-code first-use
  *     mark (services/extension-first-use-keep.ts).
  *   v1.7.1 — 2026-10-05 —The owner test is isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
@@ -60,7 +62,7 @@ import type {
 import {
     registerComponent, validateComponentContent, deleteComponent, computeHash,
 } from '../../component-registrar.js';
-import { registeredNameFor } from './package-install.js';
+import { registeredNameFor, codeWriterOf } from './package-install.js';
 import { reservedKeysInComponent, reservedComponentMessage, memoryComponentWriteRefusal } from './package-memory-component.js';
 import { planInstanceUpdate } from './package-update-plan.js';
 import { forkedUpdateRefusal } from './package-managed.js';
@@ -458,6 +460,7 @@ export async function applyInstanceMigration(
                     packageDescription: targetPkg.description,
                     meta: targetComp?.meta,
                     callerGaii: caller.sub,
+                    codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,
                 });
@@ -514,6 +517,7 @@ export async function applyInstanceMigration(
                     packageDescription: targetPkg.description,
                     meta: targetComp.meta,
                     callerGaii: caller.sub,
+                    codeWriter: codeWriterOf(caller),
                     urlRewrites,
                     packageContext,
                 });

@@ -450,5 +450,43 @@ await test('An ordinary memory component still installs, and the uninstall takes
     assert(after.status === 404, `the uninstall removed what the memory component wrote: ${after.status} ${JSON.stringify(after.body)}`);
 });
 
+// secaudit2026oct26: extension code a package install brings in names who wrote it, as every other
+// code write does, so the secret first-use rule and ctx.ai read the right writer.
+console.log('\nPhase 7 — Who wrote a package extension');
+
+const extComponent = (id: string) => ({
+    id, type: 'extension', label: id, dependencies: [],
+    content: JSON.stringify({
+        manifest: `metadata:\n  name: ${id}\n  version: 1.0.0\n  description: a guards fixture\n  author: e2e\nactions:\n  - id: ping\n    method: POST\n    path: /ping\n    script: ping\n`,
+        scripts: { ping: 'export default async function(){ return { ok: true }; }' },
+    }),
+});
+const writerOf = async (token: string, instanceBody: any): Promise<string | undefined> => {
+    const comps = (instanceBody?.data?.installedComponents ?? instanceBody?.data?.components ?? []) as Array<{ type: string; registeredAs: string }>;
+    const name = comps.find(c => c.type === 'extension')?.registeredAs;
+    assert(!!name, `the install names its extension: ${JSON.stringify(instanceBody?.data)}`);
+    const det = await json(`/v1/extensions/${encodeURIComponent(name!)}`, { headers: authed(token) });
+    assert(det.status === 200, `extension ${name}: ${det.status} ${JSON.stringify(det.body?.error)}`);
+    const rec = det.body.data.extension ?? det.body.data;
+    return rec.installedByPrincipal ?? rec.installed_by_principal;
+};
+
+await test('An agent\'s package install stamps the agent as the writer of the extension code', async () => {
+    const group = await publish(bToken, `guardext${stamp}`, [extComponent(`guardext${stamp}`)]);
+    const agentToken = await newAgent(bToken, B, `guardextbot${stamp}`, ['packages:write', 'packages:install-code', 'ext:read', 'ext:write']);
+    const r = await install(agentToken, group);
+    assert(r.status === 201, `agent install: ${r.status} ${JSON.stringify(r.body)}`);
+    const writer = await writerOf(bToken, r.body);
+    assert(typeof writer === 'string' && writer.includes(`#${B}@`), `the agent is named as the writer: ${JSON.stringify(writer)}`);
+});
+
+await test('The owner\'s own package install is the owner\'s code, as before', async () => {
+    const group = await publish(bToken, `guardextown${stamp}`, [extComponent(`guardextown${stamp}`)]);
+    const r = await install(bToken, group);
+    assert(r.status === 201, `owner install: ${r.status} ${JSON.stringify(r.body)}`);
+    const writer = await writerOf(bToken, r.body);
+    assert(!writer || !writer.includes('#'), `no agent is named for the owner's own install: ${JSON.stringify(writer)}`);
+});
+
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
 process.exit(failed > 0 ? 1 : 0);
