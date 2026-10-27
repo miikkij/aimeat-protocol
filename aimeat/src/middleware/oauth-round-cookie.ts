@@ -18,6 +18,9 @@
  * @structure browserCanBind · issueRoundBinding · newRoundBinding · setRoundBinding · readRoundBinding · clearRoundBinding
  * @usage const bind = browserCanBind(req, caller.inPerson) ? issueRoundBinding(req, res, state, path, ttl) : null;
  * @version-history
+ *   2026-10-27 — setRoundBinding, readRoundBinding and clearRoundBinding take `host`: the `__Host-` cookie,
+ *     Secure with Path=/, which a same-site app, portfolio or company page cannot write; the sign-in
+ *     rounds use it on https (secaudit2026oct26, login-round-binding-cookie-settable-from-same-site-author-origin).
  *   2026-10-25 — setRoundBinding and clearRoundBinding take `sameSite` ('lax' by default; 'none', always
  *     Secure, for the SAML ACS form post), for the sign-in rounds (./login-round-binding.ts;
  *     secaudit2026oct22, oidc-saml-login-round-not-browser-bound).
@@ -32,12 +35,17 @@ import { logger } from '../utils/logger.js';
 
 const COOKIE_PREFIX = 'aimeat_oauth_';
 
-/** The cookie that binds this one round. Derived from the state, so it names one round only. */
-function cookieName(state: string): string {
-  return `${COOKIE_PREFIX}${createHash('sha256').update(state).digest('hex').slice(0, 16)}`;
+/**
+ * The cookie that binds this one round. Derived from the state, so it names one round only. `host`
+ * names the `__Host-` cookie (Secure, Path=/, no Domain), which a same-site page of another host
+ * cannot write (the sign-in rounds on https; ./login-round-binding.ts).
+ */
+function cookieName(state: string, host = false): string {
+  return `${host ? '__Host-' : ''}${COOKIE_PREFIX}${createHash('sha256').update(state).digest('hex').slice(0, 16)}`;
 }
 
-function cookieSecure(req: Request): boolean {
+/** Whether this request came over https, directly or through the node's proxy. */
+export function cookieSecure(req: Request): boolean {
   return req.secure || req.headers['x-forwarded-proto'] === 'https';
 }
 
@@ -75,18 +83,18 @@ export function newRoundBinding(): { value: string; hash: string } {
  */
 export function setRoundBinding(
   req: Request, res: Response, state: string, callbackPath: string, ttlMs: number, value: string,
-  sameSite: 'lax' | 'none' = 'lax',
+  sameSite: 'lax' | 'none' = 'lax', host = false,
 ): void {
-  res.cookie(cookieName(state), value, {
-    httpOnly: true, secure: sameSite === 'none' || cookieSecure(req), sameSite, path: callbackPath, maxAge: ttlMs,
+  res.cookie(cookieName(state, host), value, {
+    httpOnly: true, secure: host || sameSite === 'none' || cookieSecure(req), sameSite, path: host ? '/' : callbackPath, maxAge: ttlMs,
   });
 }
 
-/** The binding value this request carries for `state`, or '' when it carries none. */
-export function readRoundBinding(req: Request, state: string): string {
+/** The binding value this request carries for `state` (the `__Host-` cookie when `host`), or ''. */
+export function readRoundBinding(req: Request, state: string, host = false): string {
   const header = req.headers.cookie;
   if (!header) return '';
-  const name = cookieName(state);
+  const name = cookieName(state, host);
   for (const part of header.split(';')) {
     const eq = part.indexOf('=');
     if (eq === -1 || part.slice(0, eq).trim() !== name) continue;
@@ -103,7 +111,11 @@ export function readRoundBinding(req: Request, state: string): string {
 
 /** Remove the round's cookie: the round is finished or refused either way. */
 export function clearRoundBinding(
-  req: Request, res: Response, state: string, callbackPath: string, sameSite: 'lax' | 'none' = 'lax',
+  req: Request, res: Response, state: string, callbackPath: string, sameSite: 'lax' | 'none' = 'lax', host = false,
 ): void {
+  if (host) {
+    res.clearCookie(cookieName(state, true), { httpOnly: true, secure: true, sameSite, path: '/' });
+    return;
+  }
   res.clearCookie(cookieName(state), { httpOnly: true, secure: sameSite === 'none' || cookieSecure(req), sameSite, path: callbackPath });
 }

@@ -24,6 +24,10 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-27 — Over https the pending sign-up cookie is `__Host-aimeat_pending_signup` (Secure,
+ *     Path=/), and readPendingSignup reads the old name only for a token signed before this change:
+ *     an app, portfolio or company page could write the old name for the apex (secaudit2026oct26,
+ *     login-round-binding-cookie-settable-from-same-site-author-origin).
  *   2026-10-24 — Step 3 on an account with two-step sign-in armed answers `second_factor` and saves no
  *     link; the code step saves it after a correct code (secaudit2026oct22, external-login-skips-second-factor).
  *   2026-10-23 — finalizeExternalSignup passes whether the sign-up request came in on a loopback socket,
@@ -53,9 +57,12 @@ import { validateOwnerName } from '../utils/gaii.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 import { twoStepArmed } from './passkeys.js';
+import { logger } from '../utils/logger.js';
 
 /** Name of the short-lived, signed cookie that carries a not-yet-finalized external signup. */
 export const PENDING_COOKIE = 'aimeat_pending_signup';
+/** Its name over https: Secure, Path=/, no Domain, so a same-site page of another host cannot write it. */
+export const HOST_PENDING_COOKIE = '__Host-aimeat_pending_signup';
 /** Cookie path — covers /v1/ghii/login/pending and every /v1/ghii/login/<provider>/finalize. */
 const PENDING_COOKIE_PATH = '/v1/ghii';
 /** Pending-signup token lifetime — long enough to pick a name, short enough to limit exposure. */
@@ -117,6 +124,8 @@ export async function signPendingToken(data: PendingSignup): Promise<string> {
     redirect: data.redirect,
     mode: data.mode,
     existingHint: data.existingHint,
+    // Signed since 2026-10-27: over https it goes out under the `__Host-` cookie only (readPendingSignup).
+    hc: 1,
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setIssuedAt()
@@ -126,11 +135,19 @@ export async function signPendingToken(data: PendingSignup): Promise<string> {
 
 /** Verify + decode a pending-signup token. Returns null on any tamper/expiry/wrong-purpose. */
 export async function verifyPendingToken(token: string): Promise<PendingSignup | null> {
+  return (await verifyPendingPayload(token))?.pending ?? null;
+}
+
+/**
+ * Verify + decode a pending-signup token, and say whether it was signed since 2026-10-27, when every
+ * new token went out under the `__Host-` cookie on https (claim `hc`).
+ */
+async function verifyPendingPayload(token: string): Promise<{ pending: PendingSignup; hostCookie: boolean } | null> {
   try {
     const { publicKey } = getNodeCryptoKeys();
     const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
     if (payload.purpose !== PENDING_PURPOSE || typeof payload.providerSub !== 'string' || typeof payload.provider !== 'string') return null;
-    return {
+    return { hostCookie: payload.hc === 1, pending: {
       provider: payload.provider,
       providerSub: payload.providerSub,
       email: typeof payload.email === 'string' ? payload.email : null,
@@ -140,7 +157,7 @@ export async function verifyPendingToken(token: string): Promise<PendingSignup |
       redirect: typeof payload.redirect === 'string' ? payload.redirect : '/',
       mode: payload.mode === 'link_existing' ? 'link_existing' : 'new',
       existingHint: typeof payload.existingHint === 'string' ? payload.existingHint : null,
-    };
+    } };
   } catch {
     // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return null;
@@ -152,33 +169,64 @@ function cookieSecure(req: Request): boolean {
   return req.secure || req.headers['x-forwarded-proto'] === 'https';
 }
 
-/** Read the raw pending-signup token from the Cookie header (no cookie-parser dep). */
-export function readPendingCookie(req: Request): string | null {
+/** The first value of one cookie name in the Cookie header, decoded, or null. */
+function cookieValue(req: Request, name: string): string | null {
   const header = req.headers.cookie;
   if (!header) return null;
   for (const part of header.split(';')) {
     const eq = part.indexOf('=');
     if (eq === -1) continue;
-    if (part.slice(0, eq).trim() === PENDING_COOKIE) {
-      return decodeURIComponent(part.slice(eq + 1).trim());
+    if (part.slice(0, eq).trim() === name) {
+      try {
+        return decodeURIComponent(part.slice(eq + 1).trim());
+      } catch {
+        // A value that is not valid percent-encoding is no token of ours; the sign-up step then
+        // answers as for a missing cookie.
+        logger.warn('external-login: a pending sign-up cookie could not be decoded and was ignored');
+        return null;
+      }
     }
   }
   return null;
 }
 
-/** Set the httpOnly, host-only pending-signup cookie (Lax so it survives the IdP→callback redirect). */
+/**
+ * Read the raw pending-signup token from the Cookie header (no cookie-parser dep). Over https the
+ * `__Host-` cookie is read first, and the old name only for a token signed before 2026-10-27 (it
+ * lives 30 minutes): an app, portfolio or company page can write the old name for the apex, and a
+ * token the node signed since went out under the new name only (secaudit2026oct26).
+ */
+export async function readPendingSignup(req: Request): Promise<PendingSignup | null> {
+  if (cookieSecure(req)) {
+    const host = cookieValue(req, HOST_PENDING_COOKIE);
+    if (host) return verifyPendingToken(host);
+    const legacy = cookieValue(req, PENDING_COOKIE);
+    const read = legacy ? await verifyPendingPayload(legacy) : null;
+    return read && !read.hostCookie ? read.pending : null;
+  }
+  const raw = cookieValue(req, PENDING_COOKIE);
+  return raw ? verifyPendingToken(raw) : null;
+}
+
+/**
+ * Set the httpOnly, host-only pending-signup cookie (Lax so it survives the IdP→callback redirect).
+ * Over https it is `__Host-aimeat_pending_signup`, Secure with Path=/, which a same-site page of
+ * another host cannot write (secaudit2026oct26).
+ */
 export function setPendingCookie(req: Request, res: Response, token: string): void {
-  res.cookie(PENDING_COOKIE, token, {
+  const host = cookieSecure(req);
+  res.cookie(host ? HOST_PENDING_COOKIE : PENDING_COOKIE, token, {
     httpOnly: true,
-    secure: cookieSecure(req),
+    secure: host,
     sameSite: 'lax',
-    path: PENDING_COOKIE_PATH,
+    path: host ? '/' : PENDING_COOKIE_PATH,
     maxAge: PENDING_TTL_SECONDS * 1000,
   });
 }
 
-/** Clear the pending-signup cookie. */
+/** Clear the pending-signup cookie: both names over https. */
 export function clearPendingCookie(req: Request, res: Response): void {
+  if (cookieSecure(req)) res.clearCookie(HOST_PENDING_COOKIE, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
   res.clearCookie(PENDING_COOKIE, {
     httpOnly: true,
     secure: cookieSecure(req),
@@ -404,8 +452,7 @@ export async function finalizeExternalSignup(
   res: Response,
   opts: { providerId: string; via: RegistrationVia; managedBy?: string | null; onLogin?: (ghii: GHIIRecord) => Promise<void> },
 ): Promise<FinalizeResult> {
-  const raw = readPendingCookie(req);
-  const pending = raw ? await verifyPendingToken(raw) : null;
+  const pending = await readPendingSignup(req);
   if (!pending || pending.provider !== opts.providerId) {
     return { ok: false, status: 400, code: 'NO_PENDING_SIGNUP', message: 'No pending sign-up — start sign-in again' };
   }
