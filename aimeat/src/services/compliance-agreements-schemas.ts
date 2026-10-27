@@ -192,6 +192,12 @@ export const AgreementSchema = z.object({
   /** What the agreement covers, in a few words ("AIMEAT-ympäristö ja sovitut palvelimet"). */
   subject: text(300),
   counterparty: PartySchema,
+  /**
+   * When the operator named `counterparty.account` (create, or a patch that changed it). An account
+   * registered after this is a later holder of a released name, not the counterparty
+   * (compliance-agreements-access.ts counterpartyHolds).
+   */
+  counterpartyNamedAt: iso.optional(),
   registerId: z.string().max(120).optional(),
   /** An outside reference the operator's own systems use: a shop order, a fleet host. */
   externalRef: z.string().max(200).optional(),

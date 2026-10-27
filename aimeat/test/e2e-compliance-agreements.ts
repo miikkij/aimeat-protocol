@@ -19,6 +19,8 @@
  *     - the MCP tool: an agent with the words lists and reads the text, one without them is refused.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-agreements
  * @version-history
+ *   2026-10-27 — The next holder of an erased counterparty name reads nothing and the operator keeps
+ *     the agreement; a draft's new counterparty account is checked as on create (secaudit2026oct26).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -36,7 +38,7 @@ function assert(cond: unknown, msg: string): asserts cond { if (!cond) throw new
 
 // Runtime assertions below check the HTTP contract at this untyped JSON boundary.
 type Body = Record<string, any>;
-async function call(method: 'GET' | 'POST' | 'PATCH' | 'PUT', path: string, token?: string, body?: unknown): Promise<{ status: number; body: Body; raw: Buffer; type: string }> {
+async function call(method: 'GET' | 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, token?: string, body?: unknown): Promise<{ status: number; body: Body; raw: Buffer; type: string }> {
     const res = await fetch(BASE + path, {
         method,
         headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
@@ -267,6 +269,38 @@ await test('The MCP tool: an agent with the words lists and reads the canonical 
     assert(!doc.isError && String(doc.data.text).includes('LIITE I'), `document: ${doc.text.slice(0, 200)}`);
     const refused = await callTool(bareMcp, 'aimeat_compliance_agreement', { action: 'list' });
     assert(refused.isError, `no words, no list: ${refused.text.slice(0, 200)}`);
+});
+
+await test('Erasure: the next holder of an erased counterparty name reads nothing; the operator keeps the agreement (secaudit2026oct26)', async () => {
+    const gone = await registerOwner(BASE, `dpagone${stamp}`);
+    const r = await call('POST', A, op.token, { counterparty: { ...counterparty(), name: `Poistuva ${stamp} Oy`, account: gone.ghii }, product: 'place', language: 'fi' });
+    assert(r.status === 200, `create: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const goneId = r.body.data.id as string;
+    // Usage: the counterparty reads its own before the erasure.
+    const before = await call('GET', `${A}/${goneId}`, gone.token);
+    assert(before.status === 200 && before.body.data.viewer === 'counterparty', `the counterparty reads it: ${before.status}`);
+    const del = await call('DELETE', `/v1/owners/${gone.name}`, gone.token);
+    assert(del.status === 200, `erase: ${del.status} ${JSON.stringify(del.body?.error)}`);
+    const next = await registerOwner(BASE, gone.name);
+    const mine = await call('GET', `${A}/mine`, next.token);
+    assert(mine.status === 200 && !mine.body.data.items.some((i: Body) => i.id === goneId), `the next holder lists nothing: ${JSON.stringify(mine.body?.data)}`);
+    const seen = await call('GET', `${A}/${goneId}`, next.token);
+    assert(seen.status === 404, `the next holder reads nothing: ${seen.status}`);
+    const kept = await call('GET', `${A}/${goneId}`, op.token);
+    assert(kept.status === 200 && kept.body.data.counterparty.name === `Poistuva ${stamp} Oy`, `the operator keeps the agreement: ${kept.status}`);
+    assert(!kept.body.data.counterparty.account, `the erased account is off the agreement: ${kept.body.data.counterparty.account}`);
+    await call('DELETE', `/v1/owners/${next.name}`, next.token);
+});
+
+await test('A draft\'s counterparty account is checked on a change as on a new agreement', async () => {
+    const r = await call('POST', A, op.token, { counterparty: { name: `Luonnos ${stamp} Oy`, contactEmail: `luonnos${stamp}@example.invalid` }, product: 'custom', language: 'en' });
+    assert(r.status === 200, `create: ${r.status}`);
+    const nobody = await call('PATCH', `${A}/${r.body.data.id}`, op.token, { counterparty: { name: `Luonnos ${stamp} Oy`, account: `nobody${stamp}@${cust.ghii.split('@')[1]}` } });
+    assert(nobody.status === 404 && nobody.body.error.code === 'NOT_FOUND', `an unregistered account is refused as on create: ${nobody.status}`);
+    const named = await call('PATCH', `${A}/${r.body.data.id}`, op.token, { counterparty: { name: `Luonnos ${stamp} Oy`, account: other.ghii } });
+    assert(named.status === 200, `a registered account is taken: ${named.status} ${JSON.stringify(named.body?.error)}`);
+    const reads = await call('GET', `${A}/${r.body.data.id}`, other.token);
+    assert(reads.status === 200 && reads.body.data.viewer === 'counterparty', `the named account reads it: ${reads.status}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

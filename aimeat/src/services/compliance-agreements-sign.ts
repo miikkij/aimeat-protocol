@@ -39,7 +39,7 @@ import { readerFor } from './classification/reader.js';
 import { fileTarget } from './classification/labels.js';
 import type { Agreement, AgreementReview, AgreementSignature, AgreementVersion } from './compliance-agreements-schemas.js';
 import { historyEntry, newest, readAgreement, updateAgreement } from './compliance-agreements.js';
-import { AgreementError, agreementAccess, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
+import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
 import { versionTag } from './compliance-agreements-render.js';
 import { tellAgreement } from './compliance-agreements-notify.js';
 
@@ -81,10 +81,12 @@ export async function syncDocsign(deps: Deps, a: Agreement): Promise<Agreement> 
     return null;
   });
   if (!rec) return a;
+  // A later holder of the counterparty's released name does not sign for the counterparty (counterpartyHolds).
+  const sides = await counterpartyHolds(deps.storage, a) ? a : { ...a, counterparty: { ...a.counterparty, account: undefined } };
   const fresh: AgreementSignature[] = [];
   for (const [identity, sig] of Object.entries(rec.signatures)) {
     if (v.signatures.some(s => (s.evidence as { docsign?: string } | undefined)?.docsign === rec.id && s.signer === identity)) continue;
-    const party = partyOf(a, v, identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity);
+    const party = partyOf(sides, v, identity.includes('#') ? identity.slice(identity.indexOf('#') + 1) : identity);
     if (!party || v.signatures.some(s => s.party === party)) continue;
     const wallet = sig.wallet;
     const level = wallet ? (wallet.validation.level === 'qualified' && !wallet.validation.test ? 'qualified' : 'advanced') : 'aimeat';

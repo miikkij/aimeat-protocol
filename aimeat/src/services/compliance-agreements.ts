@@ -16,9 +16,12 @@
  *   into the version in force on the next write, and the sweep does the same once an hour.
  * @structure AGREEMENT_PREFIX · agreementKey() · newAgreementId() · readAgreement() · listAgreements() ·
  *   writeNewAgreement() · updateAgreement() · inForce() · newest() · statusOf() · summaryOf() ·
- *   finalizeNotices() · historyEntry()
+ *   finalizeNotices() · releaseCounterpartyAccount() · historyEntry()
  * @usage const a = await updateAgreement(storage, nodeId, id, cur => ({ ...cur, ... }));
  * @version-history
+ *   2026-10-27 — releaseCounterpartyAccount: the account erasure takes the erased account off the
+ *     agreements that name it as the counterparty's (secaudit2026oct26,
+ *     compliance-agreements:counterparty-bound-by-reusable-account-name).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1.1, D2.3).
  */
 import { randomBytes } from 'node:crypto';
@@ -99,6 +102,28 @@ export async function updateAgreement(
   if (missing) return null;
   emitChange('compliance');
   return out as Agreement;
+}
+
+/**
+ * The account erasure of `ghii`: every agreement that names it as the counterparty's account keeps
+ * the party (the operator's legal record) without the account, with a history line. The name is
+ * released for reuse, and the next holder is not the counterparty (services/name-bound-grants-erasure.ts).
+ * Answers how many agreements changed.
+ */
+export async function releaseCounterpartyAccount(storage: Storage, nodeId: string, ghii: string): Promise<number> {
+  let n = 0;
+  for (const a of await listAgreements(storage, nodeId)) {
+    if (a.counterparty.account !== ghii) continue;
+    const saved = await updateAgreement(storage, nodeId, a.id, cur => {
+      if (cur.counterparty.account !== ghii) return UNCHANGED;
+      return {
+        ...cur, counterparty: { ...cur.counterparty, account: undefined }, counterpartyNamedAt: undefined,
+        history: [...cur.history, historyEntry('system', 'counterparty-account-erased', `The account ${ghii} was erased; the agreement keeps the party without it.`)].slice(-500),
+      };
+    });
+    if (saved) n++;
+  }
+  return n;
 }
 
 export function historyEntry(by: string, event: string, detail?: string): Agreement['history'][number] {
