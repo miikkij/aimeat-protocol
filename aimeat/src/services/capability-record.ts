@@ -354,7 +354,7 @@ export async function updateCapability(
 
     // A CHANGED visibility must be a word the node knows, as at create. The stored word sent back
     // unchanged passes, so a client that PUTs the whole record back keeps working on a record that
-    // carries an older unknown word (named on the operator's Security page,
+    // carries an older unknown word (set to private at start, and its owner told,
     // services/capability-visibility-words.ts).
     if ('visibility' in updates && updates.visibility !== cap.visibility) {
         const refusal = capabilityVisibilityRefusal(updates.visibility);

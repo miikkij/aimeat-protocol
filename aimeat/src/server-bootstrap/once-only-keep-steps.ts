@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-27 -- settleUnknownCapabilityVisibilityOnce in its place: an unknown word is set to private and
+ *     the owner is told, in place of the Security page question (developer decision 2026-10-27).
  *   2026-10-26 -- reportUnknownCapabilityVisibilityOnce, last: the capabilities stored with a visibility word
  *     the node does not know are named on the Security page, nothing changed (secaudit2026oct22; developer
  *     decision 2026-10-26; services/capability-visibility-words.ts).
@@ -82,7 +84,7 @@ import { reindexShareSearchTextOnce } from '../services/share-search-reindex.js'
 import { reindexCredentialSearchTextOnce } from '../services/credential-search-reindex.js';
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
-import { reportUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
+import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -171,9 +173,8 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // per schedule, nothing changed (services/erasure-leftover-schedules.ts).
   await reportErasureLeftoverSchedulesOnce(storage, config)
     .catch(err => logger.error('Failed to look for the schedules older account erasures left; the next boot tries again', { error: String(err) }));
-  // The capabilities stored with a visibility word the node does not know are named on the Security
-  // page, one entry per capability, nothing changed; the read treats them as private meanwhile
-  // (services/capability-visibility-words.ts).
-  await reportUnknownCapabilityVisibilityOnce(storage, config)
+  // The capabilities stored with a visibility word the node does not know are set to private, which
+  // changes no reach, and each owner is told (services/capability-visibility-words.ts).
+  await settleUnknownCapabilityVisibilityOnce(storage, config)
     .catch(err => logger.error('Failed to look for the capabilities with an unknown visibility word; the next boot tries again', { error: String(err) }));
 }

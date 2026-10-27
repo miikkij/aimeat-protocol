@@ -23,6 +23,9 @@
  *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.7.0 -- 2026-10-27 -- `params`: the values the Security page's own sentence for the incident's type
+ *     names, so the page can say it plainly in the reader's language; `detail` stays as it was (Jouni,
+ *     2026-10-27, on the subdomain incident).
  *   v1.6.0 -- 2026-10-25 -- An incident can name records the operator acts on one by one (`entries`:
  *     clear or delete, or keep; services/incident-entries.ts). An open entry does not stop a resolve
  *     or a delete (secaudit2026oct22).
@@ -106,6 +109,8 @@ export interface SecurityIncidentInput {
   caps?: IncidentCapOffer[];
   /** Records the operator may act on one by one (services/incident-entries.ts). */
   entries?: IncidentEntry[];
+  /** The values the Security page's own sentence for this type names (`incidents.detail.<type>`), so the page says it in the reader's language. */
+  params?: Record<string, string>;
 }
 
 /**
@@ -189,6 +194,8 @@ export interface SecurityIncidentValue {
   caps?: IncidentCapOffer[];
   /** Records the operator may clear, delete or keep one by one; the incident resolves with the last. */
   entries?: IncidentEntry[];
+  /** The values the page's own sentence for this type names; `detail` stays the full English text. */
+  params?: Record<string, string>;
 }
 
 type IncidentRecord = Awaited<ReturnType<Storage['listAllMemory']>>['items'][number];
@@ -234,6 +241,7 @@ export async function recordSecurityIncident(
         ...(input.setting ? { setting: input.setting } : {}),
         ...(input.caps ? { caps: input.caps } : {}),
         ...(input.entries ? { entries: input.entries } : {}),
+        ...(input.params ? { params: input.params } : {}),
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });

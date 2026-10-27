@@ -9,13 +9,16 @@
  *     tooltip of components/HelpTip.js),
  *   - `what`, `range`, `low`, `high`, `ex1` … `ex6`, `tip`, each drawn only when the key exists,
  *   - `lowLabel`, `highLabel` (optional: the names of the two rows when "lower value" and "higher
- *     value" do not fit, as for a choice of levels).
+ *     value" do not fit, as for a choice of levels or the two answers to a question),
+ *   - `tipLabel` (optional: the heading of `tip` when "when to change it" does not fit, as for a notice).
  *   It is the site's Modal with the library's parts inside (Note lead, Facts, the row label, the
  *   dashed aside); its own sheet, css/components/explain-dialog.css, only spaces the examples and
  *   the aside.
  * @structure ExplainDialog({ term, label, open, onClose }) · explainOf(term, part)
  * @usage html`<${ExplainDialog} term="ai.temperature" open=${open} onClose=${() => setOpen(false)} />`
  * @version-history
+ *   v1.1.0 — 2026-10-27 — `tipLabel`, so a notice, a Security page incident and a waiting request can
+ *     explain themselves with the same dialog (Jouni, 2026-10-27: "kysymysmerkki + help dialogi").
  *   v1.0.0 — 2026-10-02 — Initial, extracted from HelpTip so a link or a menu can open the same
  *     explanation (wish "Ohjenappi ja vihjeteksti asetuksille").
  */
@@ -60,7 +63,7 @@ export function ExplainDialog({ term, label, open, onClose }) {
         </div>` : null}
       ${part('tip') ? html`
         <aside class="poster-aside poster-aside--small explain-when">
-          <span class="poster-label poster-label--block">${t('explain.when')}</span>
+          <span class="poster-label poster-label--block">${part('tipLabel') || t('explain.when')}</span>
           ${part('tip')}
         </aside>` : null}
     <//>`;

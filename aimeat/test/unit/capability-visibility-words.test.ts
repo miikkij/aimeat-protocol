@@ -2,17 +2,18 @@
  * @file test/unit/capability-visibility-words.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The capabilities stored with a visibility word the node does not know are named once
- *   on the Security page, one entry per capability with its owner and word, nothing changed; the
- *   operator makes each one private or keeps it (services/capability-visibility-words.ts,
- *   services/incident-entries.ts; secaudit2026oct22).
+ * @description The capabilities stored with a visibility word the node does not know are set to
+ *   private once, and each owner gets one notice that names theirs; the operator is asked nothing
+ *   (services/capability-visibility-words.ts; secaudit2026oct22, developer decision 2026-10-27).
  *
  *   With the real store (PostgreSQL too when DATABASE_URL is set): two capabilities with unknown words
- *   are named and the ones with private, owner and public are not; a second run opens no second
- *   incident; nothing is changed by the step; 'clear' sets the word to private and 'keep' leaves it;
- *   the last decision resolves the incident. A node with none opens no incident.
+ *   become private and the ones with private, owner and public keep their words; the run record keeps
+ *   the former words; the owner gets one notice for both; a second run does nothing; no Security page
+ *   incident is opened. A node with none changes nothing and tells nobody.
  * @usage cd aimeat && pnpm exec vitest run test/unit/capability-visibility-words.test.ts
  * @version-history
+ *   v2.0.0 — 2026-10-27 — The step sets an unknown word to private and tells the owner, in place of the
+ *     Security page incident (developer decision 2026-10-27).
  *   v1.0.0 — 2026-10-26 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
@@ -28,11 +29,11 @@ vi.mock('../../src/utils/logger.js', async (importOriginal) => {
 
 import { createStorage } from '../../src/storage/storage-factory.js';
 import {
-    reportUnknownCapabilityVisibilityOnce, CAPABILITY_VISIBILITY_INCIDENT_TYPE, CAPABILITY_VISIBILITY_WORDS_KEY,
+    settleUnknownCapabilityVisibilityOnce, CAPABILITY_VISIBILITY_WORDS_KEY,
 } from '../../src/services/capability-visibility-words.js';
 import { buildCapabilityRecord } from '../../src/services/capability-record.js';
-import { decideIncidentCase } from '../../src/services/incident-decisions.js';
-import { listSecurityIncidents, type SecurityIncidentValue } from '../../src/services/security-incident.js';
+import { listSecurityIncidents } from '../../src/services/security-incident.js';
+import { NOTIF_PREFIX } from '../../src/services/notify.js';
 import type { Storage } from '../../src/storage/interface.js';
 
 requirePostgresWhenAsked('capability-visibility-words');
@@ -66,56 +67,57 @@ function capability(owner: string, visibility: string) {
     );
 }
 
+const noticesOf = async (storage: Storage, owner: string) => (await storage.listMemory(owner, { prefix: NOTIF_PREFIX }))
+    .map(r => r.value as { type?: string; i18n?: { key?: string; vars?: Record<string, unknown> }; link?: string })
+    .filter(v => v.type === 'capability_visibility_private');
+
 describe.each([['sqlite'], ...(PG_URL ? [['postgres-kysely']] : [])])('capabilities with an unknown visibility word (%s)', (provider) => {
-    it('are named once, nothing changed, and the operator makes each one private or keeps it', async () => {
+    it('become private once, the owner is told once, and the operator is asked nothing', async () => {
         const storage = provs.find(p => p.name === provider)!.storage;
         const node = `aimeat-capvis-${randomUUID().slice(0, 8)}`;
         const config = { nodeId: node } as never;
         const owner = `alice@${node}`;
         const friends = capability(owner, 'friends');
-        const group = capability(`claude#alice@${node}`, 'group');
+        const group = capability(owner, 'group');
         const known = ['private', 'owner', 'public'].map(w => capability(owner, w));
         for (const c of [friends, group, ...known]) await storage.createCapability(c);
 
-        const found = await reportUnknownCapabilityVisibilityOnce(storage, config);
-        const ids = found?.map(e => e.id) ?? [];
+        const settled = await settleUnknownCapabilityVisibilityOnce(storage, config);
+        const ids = settled?.map(s => s.id) ?? [];
         expect(ids).toEqual(expect.arrayContaining([friends.id, group.id]));
         for (const c of known) expect(ids).not.toContain(c.id);
-        expect(await reportUnknownCapabilityVisibilityOnce(storage, config)).toBeNull();
-        expect((await storage.getCapability(friends.id))?.visibility).toBe('friends');
-        expect((await storage.getCapability(group.id))?.visibility).toBe('group');
-
-        const incidents = (await listSecurityIncidents(storage, config)).items.filter(i => i.type === CAPABILITY_VISIBILITY_INCIDENT_TYPE);
-        expect(incidents).toHaveLength(1);
-        const inc = incidents[0] as SecurityIncidentValue;
-        expect(inc.entries?.every(e => e.action === 'clear' && e.status === 'open')).toBe(true);
-        expect(inc.entries?.find(e => e.id === friends.id)?.params).toMatchObject({ owner, word: 'friends' });
-        expect(inc.detail).toMatch(/treated as private/);
-
-        const by = { principal: `op@${node}`, kind: 'human' as const };
-        const clear = await decideIncidentCase(config, storage, { incidentId: inc.id, name: friends.id, resolution: 'clear', by });
-        expect(clear).toMatchObject({ ok: true });
+        expect(settled?.find(s => s.id === friends.id)).toMatchObject({ owner, word: 'friends' });
         expect((await storage.getCapability(friends.id))?.visibility).toBe('private');
-        const others = (inc.entries ?? []).filter(e => e.id !== friends.id);
-        for (const e of others) {
-            const keep = await decideIncidentCase(config, storage, { incidentId: inc.id, name: e.id, resolution: 'keep', by });
-            expect(keep).toMatchObject({ ok: true });
-        }
-        expect((await storage.getCapability(group.id))?.visibility).toBe('group');
-        const after = (await listSecurityIncidents(storage, config)).items.find(i => i.id === inc.id) as SecurityIncidentValue;
-        expect(after.status).toBe('resolved');
+        expect((await storage.getCapability(group.id))?.visibility).toBe('private');
+        for (const c of known) expect((await storage.getCapability(c.id))?.visibility).toBe(c.visibility);
+
+        // The run record keeps each former word, so the change can be read back.
+        const run = await storage.getMemory(`system@${node}`, CAPABILITY_VISIBILITY_WORDS_KEY);
+        expect(JSON.stringify(run?.value)).toContain('"word":"friends"');
+
+        // One notice for the owner, naming both, pointing at the Capabilities page.
+        const notices = await noticesOf(storage, owner);
+        expect(notices).toHaveLength(1);
+        expect(notices[0]!.i18n?.key).toBe('capability_visibility_private');
+        expect(String(notices[0]!.i18n?.vars?.names)).toContain(friends.name);
+        expect(notices[0]!.link).toBe('/v1/profile?tab=capabilities');
+
+        expect(await settleUnknownCapabilityVisibilityOnce(storage, config)).toBeNull();
+        expect(await noticesOf(storage, owner)).toHaveLength(1);
+        expect((await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'capability_visibility_words')).toHaveLength(0);
 
         for (const c of [friends, group, ...known]) await storage.deleteCapability(c.id);
         await storage.deleteMemory(`system@${node}`, CAPABILITY_VISIBILITY_WORDS_KEY);
     });
 });
 
-it('a node with no such capability opens no incident', async () => {
+it('a node with no such capability changes nothing and tells nobody', async () => {
     const storage = provs.find(p => p.name === 'clean')!.storage;
     const node = `aimeat-capvis-${randomUUID().slice(0, 8)}`;
     const config = { nodeId: node } as never;
-    for (const w of ['private', 'owner', 'public']) await storage.createCapability(capability(`bob@${node}`, w));
-    expect(await reportUnknownCapabilityVisibilityOnce(storage, config)).toEqual([]);
-    expect((await listSecurityIncidents(storage, config)).items.filter(i => i.type === CAPABILITY_VISIBILITY_INCIDENT_TYPE)).toHaveLength(0);
-    expect(await reportUnknownCapabilityVisibilityOnce(storage, config)).toBeNull();
+    const owner = `bob@${node}`;
+    for (const w of ['private', 'owner', 'public']) await storage.createCapability(capability(owner, w));
+    expect(await settleUnknownCapabilityVisibilityOnce(storage, config)).toEqual([]);
+    expect(await noticesOf(storage, owner)).toHaveLength(0);
+    expect(await settleUnknownCapabilityVisibilityOnce(storage, config)).toBeNull();
 });

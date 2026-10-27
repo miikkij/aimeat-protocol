@@ -9,6 +9,7 @@
  *   once, leaving them as they were.
  * @usage pnpm exec vitest run test/unit/subdomain-site-origin.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — The incident also carries `params` for the page's plain sentence; the detail assertions are unchanged.
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -111,6 +112,8 @@ describe('classifySubdomainSiteOriginsOnce', () => {
         expect(incidents).toHaveLength(1);
         expect(incidents[0]!.detail).toContain('opnotes');
         expect(incidents[0]!.detail).toContain('PATCH /v1/admin/subdomains/{label}');
+        // The page's own plain sentence takes these (Jouni, 2026-10-27).
+        expect(incidents[0]!.params).toEqual({ count: '1', labels: 'opnotes' });
 
         expect(await classifySubdomainSiteOriginsOnce(storage, config)).toBeNull();
         expect((await listSecurityIncidents(storage, config)).items.filter(i => i.type === 'subdomain_site_origin')).toHaveLength(1);

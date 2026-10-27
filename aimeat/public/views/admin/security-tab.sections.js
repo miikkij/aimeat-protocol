@@ -10,6 +10,8 @@
  * @structure HeldSection · IncidentsSection (CapOffers, EntryActions) · AccountsSection · SettingsSection · AskAiSection ·
  *   isHeldIncident · entryLine
  * @version-history
+ *   2026-10-27 -- An incident kind with an explanation (explain.incident.<type>) gets a question mark beside
+ *     its name that opens it (Jouni, 2026-10-27).
  *   2026-10-26 -- An entry's action button takes the kind's own word (entries.action.<kind>) when it has
  *     one: a capability with an unknown visibility word offers "Make private" (secaudit2026oct22).
  *   v2.6.0 -- 2026-10-25 -- An incident that names records to act on (`entries`) lists under its row
@@ -60,6 +62,8 @@ import { Mark, Code } from '/components/Mark.js';
 import { Readings } from '/components/Readings.js';
 import { SettingBox } from '/components/Box.js';
 import { List, Row, Name, Who, When, Cell, Doors } from '/components/List.js';
+import { HelpTip } from '/components/HelpTip.js';
+import { explainOf } from '/components/ExplainDialog.js';
 
 const html = htm.bind(h);
 const S = (key, params) => t('admin.security.' + key, params);
@@ -232,6 +236,8 @@ function EntryActions({ i, onDecideEntry }) {
 }
 
 const typeWord = (type) => tOr('admin.security.incidents.type.' + type, type);
+/** The question mark of an incident kind that has an explanation (`explain.incident.<type>.*`), else null. */
+const typeHelp = (type) => (explainOf('incident.' + type, 'what') ? html` <${HelpTip} term=${'incident.' + type} label=${typeWord(type)} />` : null);
 const sourceWord = (source) => source ? tOr('admin.security.incidents.source.' + source, source) : '';
 const whenLine = (i) => `${dt(i.createdAt)}${i.resolvedAt ? ' · ' + S('incidents.resolvedOn', { date: dt(i.resolvedAt) }) : ''}`;
 
@@ -288,12 +294,15 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
           const entriesLine = entries.length
             ? `${entriesOpen ? S('incidents.held.rowOpen', { n: num(entriesOpen), total: num(entries.length) }) : S('incidents.entries.rowResolved')} ${tOr('admin.security.incidents.entries.lead.' + i.type, i.detail || '')}`
             : '';
+          // A type whose page sentence takes the incident's params says it in the reader's language;
+          // the stored detail (English, with the API steps an AI uses) is the fallback.
+          const plain = i.params ? tOr('admin.security.incidents.detail.' + i.type, '', i.params) : '';
           const below = caps.length ? html`<${CapOffers} i=${i} onDecideCap=${onDecideCap} />`
             : entries.length ? html`<${EntryActions} i=${i} onDecideEntry=${onDecideEntry} />` : undefined;
           return html`
           <${Row} key=${i.id} below=${below}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>
-            <${Name} after=${html` <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : entriesLine || i.detail || undefined}>${typeWord(i.type)}<//>
+            <${Name} after=${html`${typeHelp(i.type)} <${Code}>${i.code}<//>`} desc=${caps.length ? `${capsLine} ${S('incidents.caps.lead')}` : entriesLine || plain || i.detail || undefined}>${typeWord(i.type)}<//>
             ${caps.length ? html`<${Who}>${sourceWord(i.source)}<//>` : html`
             <${Who} sub=${`${sourceWord(i.source)}${i.quarantine_key ? ' · ' + S('incidents.kept', { size: fmtBytes(i.size_bytes || 0) }) : ' · ' + S('incidents.notKept')}`}>${S('actor')} <b>${i.actor_name || i.actor || '?'}</b><//>`}
             <${When}>${whenLine(i)}<//>

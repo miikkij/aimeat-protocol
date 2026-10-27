@@ -18,7 +18,8 @@
  * @version-history
  *   v1.1.0 — 2026-10-27 — A same-key reconnect that did not prove it holds the pinned key
  *     (`key_proven` false) is marked with the danger tone and a hint (secaudit2026oct26,
- *     token-pickup-without-pinned-key-proof).
+ *     token-pickup-without-pinned-key-proof). A question mark beside the mark explains it
+ *     (explain.ecosystem.reconnectUnproven; Jouni, 2026-10-27).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { h } from 'preact';
@@ -27,6 +28,7 @@ import { t } from '/js/i18n.js';
 import { Check } from '/components/Check.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Hint } from '/components/Hint.js';
+import { HelpTip } from '/components/HelpTip.js';
 import { Stack } from '/components/Layout.js';
 import { areaSentence, initialTicks } from './ecosystem-tab.helpers.js';
 
@@ -51,6 +53,7 @@ export function EcoPendingAccess({ request, ticks, onTick }) {
           <${Mark} kind="status" tone=${request.key_changed || unproven ? 'danger' : 'attention'}>
             ${t(label)}
           <//>
+          ${unproven && html` <${HelpTip} term="ecosystem.reconnectUnproven" label=${t(label)} />`}
         </span>`}
       ${unproven && html`<${Hint}>${t('profile.ecosystem.reconnectUnprovenHint', { app: request.display_name || request.app })}<//>`}
       ${request.key_changed && html`

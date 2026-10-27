@@ -1279,8 +1279,11 @@
           "config_setting": "A setting the server did not accept, so it runs the default",
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
-          "erasure_leftover_schedules": "Schedules that erased accounts left",
-          "capability_visibility_words": "Capabilities with a visibility this server does not know"
+          "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
+          "subdomain_site_origin": "Web addresses whose type the server could not tell"
+        },
+        "detail": {
+          "subdomain_site_origin": "The server could not tell whether these web addresses ({count}) belong to your own site or to an app that someone published: {labels}. They work as before until you choose. Ask the AI that you connected to AIMEAT to sort each address, then resolve this incident here."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1309,8 +1312,7 @@
         "entries": {
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
-            "erasure_leftover_schedules": "These schedules belong to accounts that were erased before 25 October 2026. The erasure deleted only the schedules the person made, not the ones their agents or apps made. A schedule like this is shown to whoever registers the username next, and it can run as their agent of the same name. Nothing changes until you decide. Delete each one you do not need, and the incident is resolved with your last decision.",
-            "capability_visibility_words": "These capabilities were saved before 26 October 2026 with a visibility this server does not know. Until you decide, each one is private: only its owner, the owner's agents and you can see or use it. Nothing else changes. Make each one private, or keep it as it is. The incident is resolved with your last decision."
+            "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1320,20 +1322,13 @@
           "kept": "kept",
           "confirmClear": "Remove this from the shared anonymous agent? {line}",
           "confirmDelete": "Delete this for good? {line}",
-          "confirm": {
-            "capability_visibility": "Make this capability private? Only its owner, the owner's agents and you can then see or use it. {line}"
-          },
-          "action": {
-            "capability_visibility": "Make private"
-          },
           "kind": {
             "agent_webhook": "A webhook to {url}. It receives the messages sent to the shared agent.",
             "agent_tags": "Tags on the shared agent: {tags}",
             "agent_capabilities": "On the shared agent's public card: {technical} technical and {domain} other capabilities, {languages} languages",
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
-            "schedule": "The schedule \"{label}\" that {maker} made for {owner} ({cron})",
-            "capability_visibility": "The capability \"{name}\" of {owner}, with the visibility \"{word}\""
+            "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})"
           }
         },
         "source": {
@@ -9942,8 +9937,8 @@
   "notifpage.group.otherSub": "everything else, including what you send yourself",
   "notiftext.docsign_request.title": "{from} asks you to sign: {title}",
   "notiftext.docsign_request.body": "Document {document}. Open the signing request, or ask your AI to show it to you.",
-  "notiftext.app_published_by_app.title": "The app {publisher} published your app {app}",
-  "notiftext.app_published_by_app.body": "It published version {version} with the permission you gave it to publish apps. The next time you open {app}, you are asked once whether to allow the new permissions this version asks for.",
+  "notiftext.app_published_by_app.title": "{publisher} made a new version of your app {app}",
+  "notiftext.app_published_by_app.body": "You gave {publisher} permission to publish apps for you, and it published version {version}. The next time you open {app}, you see what the new version wants to do, and you choose whether to allow it.",
   "notiftext.agreement_sent_cp.title": "{operator} asks you to sign a data processing agreement",
   "notiftext.agreement_sent_cp.body": "Read the summary and choose how you sign. Agreement {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Your signed copy could not be accepted",
@@ -10087,8 +10082,8 @@
   "notiftext.payment_not_delivered.body": "The order could not be delivered and the payment did not go back to the buyer, so you hold it. Return the payment to the buyer or deliver the order. Checkout reference: {session}.",
   "notiftext.payment_possible.title": "A payment of {amount} may have arrived",
   "notiftext.payment_possible.body": "The payment service did not answer when a buyer paid you, so it is not known whether the money arrived. Check your payout address for a transfer from {payer}. If it arrived, deliver the order or return the payment. Reference: {reference}.",
-  "notiftext.payout_possible.title": "A payout of {amount} may have arrived",
-  "notiftext.payout_possible.body": "The payment service did not answer when {provider} paid you, so it is not known whether the money arrived. Check your payout address for a transfer from {payer}. Reference: {reference}.",
+  "notiftext.payout_possible.title": "You may have received {amount}",
+  "notiftext.payout_possible.body": "{provider} sent you {amount}, but the payment network did not confirm that the transfer went through. Check your payout address for a transfer from {payer}. Reference: {reference}.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",
@@ -10129,20 +10124,20 @@
   "notiftext.approval_answer_allowed.body": "{who} allowed what was asked. It is in effect now.",
   "notiftext.approval_answer_declined.title": "Not allowed: {what}",
   "notiftext.approval_answer_declined.body": "{who} did not allow what was asked. Nothing changed.",
-  "notiftext.ai_app_name_match.title": "{app} used AI under your list entry \"{entry}\"",
-  "notiftext.ai_app_name_match.body": "Your list of apps that may use AI names \"{entry}\". The app {app} belongs to another author but has that file name, so it may use AI too. If you meant a different app, write its full name (author/app) in the list in place of \"{entry}\".",
+  "notiftext.ai_app_name_match.title": "{app} could use AI because your list has the name \"{entry}\"",
+  "notiftext.ai_app_name_match.body": "You allowed apps named \"{entry}\" to use AI. {app} has the same name, but someone else made it. If you meant only your own app, write its full name on the list, for example author/app.",
   "notiftext.approval_answer_expired.title": "No answer: {what}",
   "notiftext.approval_answer_expired.body": "Nobody answered the request in time. Nothing changed. Ask again if it is still needed.",
   "notiftext.approval_answer_outdated.title": "Not done: {what}",
   "notiftext.approval_answer_outdated.body": "It changed after it was asked, so nothing was done. Ask again if it is still needed.",
-  "notiftext.agent_standing_work_stopped.title": "{agent} is removed, and its standing work stops",
-  "notiftext.agent_standing_work_stopped.body": "{schedules} schedule(s) and {workflows} saved workflow(s) that {agent} made no longer run. If you approve a new agent named {agent}, they run again as it, with the permissions you give it then. Delete them on the Schedules page to end them for good.",
-  "notiftext.agent_standing_work_resumed.title": "The new agent {agent} takes over earlier standing work",
-  "notiftext.agent_standing_work_resumed.body": "{schedules} schedule(s) and {workflows} saved workflow(s) that an earlier agent named {agent} made run again as this agent, with the permissions it has now. Delete them on the Schedules page if it should not run them.",
-  "notiftext.agent_mode_self_set.title": "Your agent {agent} changed its own mode",
-  "notiftext.agent_mode_self_set.body": "The mode of {agent} is now \"{mode}\". In the \"workstation\" mode an agent may answer for you the steps of your goals that wait for you. You can change the mode on the agent's page.",
-  "notiftext.agent_mode_set_by_agent.title": "Your agent {by} changed the mode of {agent}",
-  "notiftext.agent_mode_set_by_agent.body": "The mode of {agent} is now \"{mode}\". In the \"workstation\" mode an agent may answer for you the steps of your goals that wait for you. You can change the mode on the agent's page.",
+  "notiftext.agent_standing_work_stopped.title": "You removed {agent}, so its repeating work stopped",
+  "notiftext.agent_standing_work_stopped.body": "{agent} had made scheduled tasks ({schedules}) and saved workflows ({workflows}). They are kept, but they do not run. If you approve a new agent with the name {agent}, they start again under it. To stop them for good, delete them on the Scheduler tab.",
+  "notiftext.agent_standing_work_resumed.title": "The new agent {agent} took over repeating work from an earlier agent",
+  "notiftext.agent_standing_work_resumed.body": "An earlier agent with the name {agent} had made scheduled tasks ({schedules}) and saved workflows ({workflows}). They now run again under this agent, with the permissions you gave it. If this agent should not do them, delete them on the Scheduler tab.",
+  "notiftext.agent_mode_self_set.title": "{agent} changed its own working mode",
+  "notiftext.agent_mode_self_set.body": "{agent} now works in the \"{mode}\" mode. In the \"workstation\" mode, an agent can answer for you when one of your goals waits for your answer. You can change the mode on the agent's page.",
+  "notiftext.agent_mode_set_by_agent.title": "{by} changed the working mode of {agent}",
+  "notiftext.agent_mode_set_by_agent.body": "{agent} now works in the \"{mode}\" mode. In the \"workstation\" mode, an agent can answer for you when one of your goals waits for your answer. You can change the mode on the agent's page.",
   "notiftext.approval_email_policy.title": "{who} asks to let the extension {extension} email any address",
   "notiftext.approval_email_policy.body": "The extension belongs to {account}. Emailing any address goes out under this server's own mail identity, so an operator decides it. If you allow it, it is in effect at once. If you do not, the extension emails only the addresses the normal rules allow. {who} hears the answer either way.",
   "notiftext.approval_email_policy_code.title": "{who} changed the code of {extension}: confirm that it may still email any address",
@@ -10151,24 +10146,24 @@
   "notiftext.approval_email_policy_sent.body": "An operator of this server decides it. Until then the extension emails only the addresses the normal rules allow. You hear the answer here.",
   "notiftext.approval_email_policy_code_sent.title": "The code of {extension} changed: an operator confirms its email permission",
   "notiftext.approval_email_policy_code_sent.body": "{who} changed the code. Until an operator confirms the permission to email any address for the new code, the extension emails only the addresses the normal rules allow. You hear the answer here.",
-  "notiftext.approval_secret_host_ask_off.title": "{who} asks to stop asking you before your secrets go to a new address",
-  "notiftext.approval_secret_host_ask_off.body": "While the question is on, code your agents write and addresses they set cannot send your stored secrets anywhere new without your press. If you allow this, they can. If you do not, the question stays on. {who} hears the answer either way.",
+  "notiftext.approval_secret_host_ask_off.title": "{who} asks that your agents may send your passwords and keys to new addresses without asking you",
+  "notiftext.approval_secret_host_ask_off.body": "Now you are asked before your agents send a saved password or key to an address it has not gone to before. If you allow this, they can send them to new addresses without asking you. If you do not, you are still asked.",
   "notiftext.approval_crew_model.title": "{who} asks to point your agent {agent} at the model address {host}",
   "notiftext.approval_crew_model.body": "When your agent's crew thinks, it sends your provider key ({key}) to that address. An app set the address, so you confirm it first. If you allow it, the crew uses it from its next run. If you do not, the crew keeps the model it has. {who} hears the answer either way.",
   "notiftext.approval_crew_model_default.title": "{who} asks to point all your agents at the model address {host}",
   "notiftext.approval_crew_model_default.body": "When your agents' crews think, they send your provider key ({key}) to that address. An app set the address, so you confirm it first. If you allow it, the crews use it from their next run. If you do not, they keep the model they have. {who} hears the answer either way.",
-  "notiftext.approval_goal_model_read.title": "{who} asks to let AIMEAT's model read your private records {records}",
-  "notiftext.approval_goal_model_read.body": "{agent} named {records} in the goal \"{goal}\", and {agent} may not read your private records itself. The model would use them for the work \"{work}\", and {agent} can read the model's answer. If you allow it, the work runs with them. If you do not, the work runs without them. {who} hears the answer either way.",
-  "notiftext.approval_schedule_instruction.title": "{who} asks to run the schedule \"{schedule}\" with the new instruction it gave",
-  "notiftext.approval_schedule_instruction.body": "{who} changed what the schedule \"{schedule}\" asks the model. {maker} made the schedule, and it reads your records with what {maker} may read, which includes records {who} may not read. So its next run waits for you. If you allow it, the next run uses the new instruction. If you do not, the schedule goes back to the instruction it had. {who} hears the answer either way.",
-  "notiftext.approval_refinery_definition.title": "{who} asks to let the mail refinery {refinery} read the mailbox {mailbox} and save the messages in {workspace}",
-  "notiftext.approval_refinery_definition.body": "The refinery reads your mail on your schedule and saves each message there as a row. An app or an agent that may not run the refinery itself made this change, so you confirm it first. If you allow it, the next batch reads that mailbox and saves there. If you do not, the refinery keeps the mailbox and the workspace it had. {who} hears the answer either way.",
-  "notiftext.approval_refinery_definition_text.title": "{who} asks to let the mail refinery {refinery} read the mailbox {mailbox} and save the messages with their full text in {workspace}",
-  "notiftext.approval_refinery_definition_text.body": "The refinery reads your mail on your schedule and saves each message there as a row. The rows keep the text of each message and of its attachments. An app or an agent that may not run the refinery itself made this change, so you confirm it first. If you allow it, the next batch reads that mailbox and saves there. If you do not, the refinery keeps the mailbox and the workspace it had. {who} hears the answer either way.",
+  "notiftext.approval_goal_model_read.title": "{who} asks to let AIMEAT's AI read your private entries {records}",
+  "notiftext.approval_goal_model_read.body": "{agent} needs {records} for the task \"{work}\" in your goal \"{goal}\". {agent} may not read your private entries, but it sees what the AI answers. If you allow it, the AI uses these entries in the task. If you do not, the task is done without them.",
+  "notiftext.approval_schedule_instruction.title": "{who} changed the scheduled task \"{schedule}\", and the change waits for your approval",
+  "notiftext.approval_schedule_instruction.body": "{maker} made this scheduled task, so it reads your data with the permissions of {maker}. {who} changed its instructions, but {who} may not read everything that {maker} can. So the change waits for your approval. If you allow it, the task uses the new instructions. If you do not, it goes back to the old ones.",
+  "notiftext.approval_refinery_definition.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
+  "notiftext.approval_refinery_definition.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
+  "notiftext.approval_refinery_definition_text.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
+  "notiftext.approval_refinery_definition_text.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}, with the full text of the message and its attachments. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
   "notiftext.approval_subscription_price.title": "{who} asks to renew your subscription {name} at the new price {to}",
   "notiftext.approval_subscription_price.body": "You agreed to {from}. The price went up since then, so your card is charged only if you allow it. If you allow it, the subscription renews now at {to}. If you do not, your card is not charged and the subscription ends on {date}. {who} hears the answer either way.",
-  "notiftext.approval_subscription_period.title": "{who} asks to renew your subscription {name} at {to} every {toDays} days",
-  "notiftext.approval_subscription_period.body": "You agreed to {from} every {fromDays} days. The period is now shorter, so you would pay more often, and your card is charged only if you allow it. If you allow it, the subscription renews now at {to} every {toDays} days. If you do not, your card is not charged and the subscription ends on {date}. {who} hears the answer either way.",
+  "notiftext.approval_subscription_period.title": "{who} asks for permission to charge for your subscription {name} more often",
+  "notiftext.approval_subscription_period.body": "You agreed to pay {from} every {fromDays} days. The new terms are {to} every {toDays} days. If you allow it, your card is charged now on the new terms. If you do not, nothing is charged, and the subscription ends on {date}.",
   "notiftext.agent_permission_ask_page.title": "{agent} needs a permission you give on its page",
   "notiftext.agent_permission_ask_page.body": "{agent} tried to do something for you that you have not allowed. You give this permission on the agent's page, if you want to. Open it to see what it is.",
   "notiftext.agent_permission_ask_page.open": "Open the agent's page",
@@ -10184,19 +10179,21 @@
   "notiftext.eco_capability_ask.body": "\"{name}\" from {registrant} would like your outside app {app} to run its action {action}. Open this to see what it sends, or answer here.",
   "notiftext.eco_capability_ask.allow": "Allow",
   "notiftext.eco_capability_ask.deny": "Don't allow",
-  "notiftext.peer_replace_ask.title": "A server with an invite wants to take the place of the peer {node}",
-  "notiftext.peer_replace_ask.body": "A server at {url} presented one of your invites{label} and says it is {node}. This server already holds {node} as a peer under a different key. Allow replaces that peer with the new server at the invite's level ({tier}) and uses the invite. Don't allow keeps the peer and the invite as they are. Allow only if you know the server was rebuilt with a new key.",
+  "notiftext.peer_replace_ask.title": "A server claims to be {node} and wants to replace it",
+  "notiftext.peer_replace_ask.body": "A server at {url} used one of your invitations{label}. It claims to be {node}, but its key is not the key of the {node} that is already connected to your server. Allow only if you know that {node} was installed again. If you do not allow it, nothing changes.",
   "notiftext.peer_replace_ask.allow": "Allow",
   "notiftext.peer_replace_ask.deny": "Don't allow",
   "notiftext.approval_change.federation": "Change it on the Federation page",
   "notiftext.agent_narrowed.title": "AIMEAT narrowed the permissions of {agent}",
   "notiftext.agent_narrowed.body": "AIMEAT narrowed the permissions of {agent} to the ones it used in two weeks: {what}. If it later needs something else, you get a request and can allow it with one press.",
   "notiftext.agent_narrowed.open": "Open the agent's page",
+  "notiftext.capability_visibility_private.title": "Now only you and your agents can use these capabilities: {names}",
+  "notiftext.capability_visibility_private.body": "A capability is a service that you or your agents offer to others. Their visibility setting had a value this server does not know, so the server limited them to you and your agents. If other people should use a capability too, choose on the Capabilities page who can see it.",
   "notiftext.owner_tokens_kept.title": "Your access tokens still work",
-  "notiftext.owner_tokens_kept.body": "Signing out and a new password do not end your access tokens. These can still act as you: {names}. If you do not know one of them, remove it on your Access page.",
+  "notiftext.owner_tokens_kept.body": "Your access tokens keep working when you sign out or change your password. These tokens can still act as you: {names}. If you do not recognise one, remove it on your Access page.",
   "notiftext.owner_tokens_kept.open": "Open the Access page",
-  "notiftext.sso_signed_in_past_code.title": "{organisation} sign-in opened your account without your code",
-  "notiftext.sso_signed_in_past_code.body": "Your organisation's directory manages your account, so the sign-in of {organisation} opened it without your two-step sign-in code. If this was not you, change your password on your Access page and tell your organisation.",
+  "notiftext.sso_signed_in_past_code.title": "Someone signed in to your account through {organisation}, and no code was asked",
+  "notiftext.sso_signed_in_past_code.body": "{organisation} manages your account, so its own sign-in is enough, and AIMEAT does not ask for your code. If this was not you, change your password on your Access page and tell {organisation}.",
   "notiftext.sso_signed_in_past_code.open": "Open the Access page",
   "agentAllow.badge": "Your agent asks",
   "agentAllow.title": "{agent} wants to do this for you",
@@ -15184,7 +15181,7 @@
       "operatorExportedEntries": "An operator took a backup of this installation. It holds {count} of your entries.",
       "operatorInstalledSet": "An operator installed the install package {set} in your account: {packages} packages, and {apps} apps got permissions. You can see and change the permissions of your apps in your settings.",
       "operatorActed": "An operator made a change in your account ({area}: {action}).",
-      "operatorRestoredBackup": "An operator loaded a backup into this installation. It wrote {records} of your entries and {agents} of your agents.",
+      "operatorRestoredBackup": "The people who run this AIMEAT service restored data from a backup. It brought back {records} of your entries and {agents} of your agents. Check that your entries look right.",
       "operatorAdminGrantedOne": "{name} got the permission to administer this installation because it had full access. You can take it away in the agent's settings.",
       "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
       "scopeWordsKeptOne": "{name} keeps working as before after the AIMEAT update: it got the permissions the update now asks for ({words}). You can take them away in the agent's settings.",
@@ -18128,8 +18125,8 @@
         "other": "{area}"
       },
       "reconnect": "Reconnects an app you already have",
-      "reconnectUnproven": "Reconnects an app you already have, without proof of its key",
-      "reconnectUnprovenHint": "This request names the key of {app} but does not prove that it holds it. Anyone, not only the app, can send such a request. Approve only if you started this reconnect yourself.",
+      "reconnectUnproven": "The app wants its connection back, but did not prove it is the same app",
+      "reconnectUnprovenHint": "{app} is already connected. This request uses its name and public key, and anyone can copy those. Approve only if you started this yourself, for example by installing {app} again.",
       "keyChanged": "Replaces the key of a working connection",
       "keyChangedHint": "This request carries another key than the connection to {app} you have now. If you approve, the new key replaces the old one and the app's earlier sessions end. Approve only if you started this reconnect yourself. Old key and new key:",
       "waiting": "waiting",
@@ -25771,6 +25768,170 @@
   },
   "explain": {
     "open": "Explain: {term}",
+    "notice": {
+      "app_published_by_app": {
+        "title": "An app published a new version of your app",
+        "short": "Another app made a new version of one of your apps, with the permission you gave it.",
+        "what": "You can let an app build and publish apps for you. This time an app that someone else made published a new version of one of your apps. A new version can ask for more than the old one, for example to read more of your data. So the next time you open your app, you see what is new, and you choose.",
+        "tipLabel": "What you can do",
+        "tip": "Open your app and look at what the new version asks for. If you did not expect the change, do not allow it, and take the publishing permission away from the app that made it."
+      },
+      "payout_possible": {
+        "title": "A payment that may have arrived",
+        "short": "Someone sent you money, but the payment network did not confirm it.",
+        "what": "When someone pays you, the payment network normally confirms that the transfer went through. This time no confirmation came. The money may have arrived anyway, so check.",
+        "tipLabel": "What you can do",
+        "tip": "Look at your payout address to see whether the transfer came. If the money has not arrived in a few days, contact the payer and give them the reference in the notice."
+      },
+      "ai_app_name_match": {
+        "title": "Another app could use AI with the same name",
+        "short": "An app with the same name as one on your list used AI with your account.",
+        "what": "You keep a list of apps that may use AI with your account. A name on the list without its maker matches every app with that name, including apps that other people made.",
+        "tipLabel": "What you can do",
+        "tip": "Write each app on the list with its maker, for example author/app. Then only that one app matches."
+      },
+      "agent_standing_work_stopped": {
+        "title": "Work that stopped when you removed an agent",
+        "short": "You removed an agent, and the work it repeated has stopped.",
+        "what": "An agent can set up work that repeats, for example a report every morning. When you remove the agent, that work stops, because nobody is left to do it. The work is not deleted, in case you connect the agent again.",
+        "tipLabel": "What you can do",
+        "tip": "Delete the scheduled tasks on the Scheduler tab if you do not need them. Keep them if you will connect the agent again."
+      },
+      "agent_standing_work_resumed": {
+        "title": "A new agent continues an old agent's work",
+        "short": "A new agent has the same name as one you removed, and it now does the removed agent's repeating work.",
+        "what": "You approved an agent with the same name as an agent that you removed earlier. The repeating work of the earlier agent now runs under the new one, with the permissions you gave the new one.",
+        "tipLabel": "What you can do",
+        "tip": "Check that the new agent is the one you meant. If it is not, delete the scheduled tasks on the Scheduler tab, or remove the agent."
+      },
+      "agent_mode_self_set": {
+        "title": "An agent's working mode",
+        "short": "The mode says how much an agent may do in your goals without asking you.",
+        "what": "A goal can stop and wait for your answer. In the \"workstation\" mode, an agent may answer such a question for you, so the goal does not wait. In the other modes, the goal waits until you answer.",
+        "tipLabel": "What you can do",
+        "tip": "If you did not ask for this change, open the agent's page and set the mode back."
+      },
+      "approval_goal_model_read": {
+        "title": "An agent asks the AI to read entries it may not read",
+        "short": "The AI would read your private entries for a task, and the agent would see the answer.",
+        "what": "Your agents can read only what you allowed. In a goal, an agent can give AIMEAT's AI a task. If the task needs your private entries, the AI reads them, and the agent sees the answer. So the agent could learn what the entries say, although it may not read them. That is why you are asked.",
+        "lowLabel": "If you allow",
+        "low": "The AI reads these entries for this one task, and the agent sees the answer.",
+        "highLabel": "If you do not allow",
+        "high": "The task is done without these entries.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if it is fine with you that the agent knows what these entries say. If the agent may read all your entries, you can give it that permission on the agent's page, and then it no longer asks."
+      },
+      "approval_schedule_instruction": {
+        "title": "Someone changed a scheduled task",
+        "short": "Someone with fewer permissions changed a scheduled task that reads your data.",
+        "what": "A scheduled task runs by itself, for example every morning, and it reads your data with the permissions of whoever made it. If someone with fewer permissions changes what the task does, they could use the task to see data that they may not read themselves. That is why the change waits for you.",
+        "lowLabel": "If you allow",
+        "low": "The task runs with the new instructions.",
+        "highLabel": "If you do not allow",
+        "high": "The task goes back to its old instructions.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you know about the change and it looks right to you."
+      },
+      "approval_refinery_definition": {
+        "title": "A change to your mail refinery",
+        "short": "The mail refinery saves your email in a workspace. The change is about which mailbox it reads and which workspace it saves to.",
+        "what": "The mail refinery reads your email at set times and saves each message as a row in a workspace. A workspace can be shared with other people, so the workspace decides who can read your mail. An app or an agent asked for this change, and it may not make it alone.",
+        "lowLabel": "If you allow",
+        "low": "From the next run, the refinery reads this mailbox and saves in this workspace.",
+        "highLabel": "If you do not allow",
+        "high": "The refinery keeps the mailbox and the workspace that it had.",
+        "tipLabel": "When to allow",
+        "tip": "Check who can see the workspace before you allow it."
+      },
+      "approval_subscription_period": {
+        "title": "A subscription that would charge more often",
+        "short": "The seller wants to change your subscription so that you would pay more often.",
+        "what": "A subscription charges your card again after each period. The seller wants a shorter period, so you would pay more often. Your card is never charged on changed terms unless you allow it.",
+        "lowLabel": "If you allow",
+        "low": "Your card is charged now, and then on the new terms.",
+        "highLabel": "If you do not allow",
+        "high": "Nothing is charged, and the subscription ends at the end of the period you paid for.",
+        "tipLabel": "When to allow",
+        "tip": "Allow only if you want to keep the subscription on the new terms."
+      },
+      "peer_replace_ask": {
+        "title": "A server that tries to replace another",
+        "short": "A server claims to be one that is connected to yours, but its key is different.",
+        "what": "Servers that are connected to yours are recognised by their key. A new key means one of two things: the server was installed again, or someone else uses its name. If you allow it, the new server takes the place of the old one and gets the rights that the invitation gives.",
+        "lowLabel": "If you allow",
+        "low": "The new server replaces the old one, and the invitation is used.",
+        "highLabel": "If you do not allow",
+        "high": "The old server stays, and the invitation stays unused.",
+        "tipLabel": "When to allow",
+        "tip": "Ask the people who run that server whether they installed it again. Allow only if they say yes."
+      },
+      "owner_tokens_kept": {
+        "title": "Access tokens",
+        "short": "An access token lets a program act as you, and it works until you remove it.",
+        "what": "An access token is a long password for a program, for example a script or a tool on your computer, so that it can act as you. It is separate from your own password. That is why signing out or changing your password does not stop it.",
+        "tipLabel": "What you can do",
+        "tip": "Remove every token that you do not recognise or no longer use. You do that on the Access page."
+      },
+      "sso_signed_in_past_code": {
+        "title": "Sign-in through your organisation",
+        "short": "Your organisation's sign-in checks who you are, so AIMEAT does not ask for your code.",
+        "what": "Two-step sign-in asks for a code in addition to your password. When your organisation manages your account, its own sign-in checks who you are, and AIMEAT does not ask for the code. You get this notice each time, so you notice if someone else signed in.",
+        "tipLabel": "What you can do",
+        "tip": "If you did not sign in, change your password on the Access page and tell your organisation."
+      },
+      "approval_secret_host_ask_off": {
+        "title": "The question before a password or key goes to a new address",
+        "short": "You are asked before your agents send a saved password or key to a new address.",
+        "what": "You can save secrets in AIMEAT, such as passwords and API keys, so that your agents can use them. Before a saved password or key goes to an address that it has not gone to before, you are asked once. This stops a mistake or harmful software from sending your password to someone else.",
+        "lowLabel": "If you allow",
+        "low": "Your agents send passwords and keys to new addresses without asking you.",
+        "highLabel": "If you do not allow",
+        "high": "You are still asked before a password or key goes to a new address.",
+        "tipLabel": "When to allow",
+        "tip": "Allow only if the question stops work that you need and you trust all your agents."
+      },
+      "capability_visibility_private": {
+        "title": "A capability that became private",
+        "short": "The server limited your capability to you and your agents.",
+        "what": "A capability is a service that you or your agents offer, for example a tool another program can use. It has a setting for who can see and use it. Older versions of the server accepted any value there, and a value it did not know left the capability open to anyone who knew its address. So the server changed such settings to the safe choice.",
+        "tipLabel": "What you can do",
+        "tip": "If other people used this capability before, open the Capabilities page and choose who may see it."
+      }
+    },
+    "incident": {
+      "erasure_leftover_schedules": {
+        "title": "Scheduled tasks left behind by deleted accounts",
+        "short": "Scheduled tasks of deleted accounts that a new account with the same name could get.",
+        "what": "Before 25 October 2026, deleting an account removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone registers the same username, they see these tasks, and the tasks can run in their name.",
+        "lowLabel": "Delete",
+        "low": "The scheduled task is deleted for good.",
+        "highLabel": "Keep as it is",
+        "high": "The task stays as it is.",
+        "tipLabel": "What to do",
+        "tip": "Keep the task only if you know that someone still needs it."
+      },
+      "subdomain_site_origin": {
+        "title": "Web addresses whose type the server could not tell",
+        "short": "The server does not know whether these addresses belong to your own site or to an app.",
+        "what": "A web address on this server, such as name.your-domain, belongs either to your own site or to an app that someone published. An app's address must not show your server's own pages or sign-in. The server could not tell which group these addresses belong to, so they work as before until you choose.",
+        "tipLabel": "What you can do",
+        "tip": "Ask the AI that you connected to AIMEAT to sort each address: \"keep it as my own site\" or \"serve it only as an app\". Then resolve this incident on this page."
+      }
+    },
+    "ecosystem": {
+      "reconnectUnproven": {
+        "title": "A connection request without proof",
+        "short": "The request did not prove that it comes from the app that is already connected.",
+        "what": "An outside app proves who it is with a secret key that only the app has. This request did not use that key. It only shows the app's public key, which anyone can see. So the request may come from the app, or from someone who pretends to be the app.",
+        "lowLabel": "If you approve",
+        "low": "The sender gets access to your data with the permissions that you choose.",
+        "highLabel": "If you deny",
+        "high": "Nothing changes, and the app keeps its current connection.",
+        "tipLabel": "When to approve",
+        "tip": "Approve only if you started this yourself, for example by installing the app again. Otherwise deny."
+      }
+    },
     "content": {
       "on_arrival": {
         "title": "Read new content when it arrives",

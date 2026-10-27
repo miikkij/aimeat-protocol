@@ -30,6 +30,8 @@
  * @structure SUBDOMAIN_SITE_ORIGIN_STEP_KEY · classifySubdomainSiteOriginsOnce(storage, config)
  * @usage await classifySubdomainSiteOriginsOnce(storage, config);   // server-bootstrap/once-only-keep-steps.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — The incident carries `params` (count, labels), so the Security page says it in
+ *     plain words in the reader's language; the detail text is unchanged (Jouni, 2026-10-27).
  *   v1.1.0 — 2026-10-25 — The rows are read in pages of PAGE (listSubdomainSitesPage), and an owner's
  *     operator role per owner the rows name (getOwner), instead of two whole-table reads (check:unbounded-lists).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
@@ -108,6 +110,7 @@ export async function classifySubdomainSiteOriginsOnce(
           + '<label>.<app host>, because the node\'s own pages and sign-in answer on <label>.<apex>. Decide each one: '
           + 'PATCH /v1/admin/subdomains/{label} with {"origin":"publisher"} to serve it only at its app address, or {"origin":"operator"} '
           + 'to keep it at <label>.<apex> too (aimeat_app_manage subdomain_set with origin does the same). Then resolve this incident.',
+        params: { count: String(out.unclassified.length), labels: shown + (more ? ` (+${out.unclassified.length - INCIDENT_ROWS})` : '') },
       });
     }
     await claim.finish({ at: new Date().toISOString(), operator: out.operator, publisher: out.publisher, unclassified: out.unclassified });
