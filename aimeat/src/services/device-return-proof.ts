@@ -87,14 +87,15 @@ export async function spendReturnProof(storage: Storage, ownerGhii: string, proo
   for (const [k, until] of spentHere) if (until < now) spentHere.delete(k);
   if (spentHere.has(id)) return false;
   spentHere.set(id, now + 2 * RETURN_PROOF_MAX_AGE_MS);
-  const key = `${RETURN_PROOF_PREFIX}spent-${id}`;
-  if (await storage.getMemory(ownerGhii, key)) return false;
   const at = new Date(now).toISOString();
-  await storage.setMemory({
-    key, ownerGaii: ownerGhii, value: { spent_at: at }, visibility: 'private',
+  const record = {
+    key: `${RETURN_PROOF_PREFIX}spent-${id}`, ownerGaii: ownerGhii, value: { spent_at: at }, visibility: 'private' as const,
     tags: ['agent', 'device-return'], ttlHours: 1, version: 1, createdAt: at, updatedAt: at,
-  });
-  return true;
+  };
+  // One conditional insert: of two processes taking the same proof, one wins. Both providers have it;
+  // a store without it is held by this process's own record above.
+  if (!storage.createMemoryIfAbsent) return true;
+  return (await storage.createMemoryIfAbsent(record)) !== null;
 }
 
 const markKey = (userCode: string) => `${RETURN_PROOF_PREFIX}${userCode}`;

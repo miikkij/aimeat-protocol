@@ -11,7 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
- *   2026-10-27 -- The device-authorization guide names the v2 return proof (with the node id), which counts once; v1 is still accepted (secaudit2026oct26).
+ *   2026-10-27 -- The device-authorization guide names the v2 return proof (with the node id), which counts once; v1 is still accepted. aimeat-node-guide: a request a same-host proxy or tunnel passes on is asked for the setup code (secaudit2026oct26).
  *   2026-10-26 -- aimeat-node-guide, use-app-bound-skills and install-skills-locally: the registry
  *     is the Agent Skills format, a skill loads in steps (body_only, then path), and a file whose
  *     index entry says encoding base64 is written as its decoded bytes. set-up-content-pipeline moved
@@ -312,7 +312,8 @@ Fetch these in order of depth; each is self-describing:
   no operator, the account that would become it (the first one, or the next one when no operator
   exists) needs \`setupCode\`, the one-time code the node printed in its start log; a 403
   \`SETUP_CODE_REQUIRED\` says so. Only a request made on the node's own machine, to a node whose
-  address is localhost, goes without it; a node in Docker asks for it from outside its container.
+  address is localhost, goes without it; a node in Docker asks for it from outside its container,
+  and so does a request that a proxy or tunnel on the same machine passes on.
   Once it has an operator, no account needs it.
 - Log in (web/API): \`POST /v1/ghii/login\` with \`{ username, password }\` → a session JWT.
 - Sign in with the password, as above. The older sign-in with the account's Ed25519 key

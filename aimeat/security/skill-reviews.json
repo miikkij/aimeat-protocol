@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:11c6255278aaeea621a42c17"
+      "digest": "sha256:2befc4e9d7a8c1ba629e3b92"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-18",
@@ -275,7 +275,7 @@
       "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -283,7 +283,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:d0aa9695ca5cdc314a3ae401"
+      "digest": "sha256:d6ba2a19d778f747e130a0bd"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-21",
@@ -325,7 +325,7 @@
       "digest": "sha256:8baa34c1b4642d1875c2b84a"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:0997433c638d579ea7b4dc89"
+      "digest": "sha256:9a02cd5b26a41e03719bad62"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -617,8 +617,8 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "0f8b2677c7e8ca6f",
-      "aimeat/src/routes/ghii/register-login.ts": "c60b76bc22aaea67",
+      "aimeat/src/routes/agents/device-auth.ts": "bc61e16b5b8b565a",
+      "aimeat/src/routes/ghii/register-login.ts": "a205707d7d29c283",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
@@ -636,7 +636,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "0f8b2677c7e8ca6f",
+      "aimeat/src/routes/agents/device-auth.ts": "bc61e16b5b8b565a",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
@@ -741,7 +741,7 @@
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
       "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15",
-      "aimeat/src/routes/organisms/workspace-access.ts": "6bee2a50409a1cf7",
+      "aimeat/src/routes/organisms/workspace-access.ts": "c7e57ef6a7bed592",
       "aimeat/src/services/agent-profile-write.ts": "27b8a03e2ea5d74c",
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
     },
