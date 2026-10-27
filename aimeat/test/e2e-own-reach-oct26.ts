@@ -19,14 +19,18 @@
  *       who has since been demoted decides neither the gate policy nor who decides an access request;
  *       the creator's copies decide as before.
  *     - LABELS: an agent without memory:read-as-owner neither changes nor learns the label of a record
- *       of its owner it may not read, and is handed the address to ask for the permission; with the
- *       permission, and on records it may read, it labels as before.
+ *       of its owner it may not read: its write waits as a suggestion for the person, and the answer
+ *       is the label read's default; with the permission, and on records it may read, it labels as before.
  *     - THREADS: a message naming another pair's conversation lands in the sender's own pair thread, so
  *       no account writes into a thread between others and no agent reads its owner's thread through
  *       one row of its own; the agent's own thread keeps its owner's word in it, replies stay in their
  *       thread, and an agent with messages:read-as-owner reads the owner's thread.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
+ *   v1.2.0 — 2026-10-27 — LABELS: an agent without the tick relays the person's rejection of a waiting
+ *     lowering, which applies as before, with an answer that names no label.
+ *   v1.1.0 — 2026-10-27 — LABELS: the write on a hidden record waits as a suggestion (PERSON_REVIEWS)
+ *     instead of a 403, as test/unit/classification-explorer-deleted.test.ts requires.
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -398,15 +402,32 @@ await test('the label read hides the private record\'s label from the plain agen
     assert(r.status === 200 && r.body.data.source === 'default' && r.body.data.locked === false, `read: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
 });
 
-await test('ATTACK: the plain agent\'s label write neither changes nor describes the private record; it gets the ask', async () => {
+await test('ATTACK: the plain agent\'s label write neither changes nor describes the private record; it waits for the person', async () => {
     const w = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.private'), label: 'erittain-luottamuksellinen' });
-    assert(w.status === 403 && w.body?.error?.code === 'SCOPE_DENIED', `write: ${w.status} ${JSON.stringify(w.body?.data ?? w.body?.error)}`);
-    assert(!JSON.stringify(w.body).includes('"locked"') && !JSON.stringify(w.body).includes('"source"'), `the refusal described the label: ${JSON.stringify(w.body)}`);
-    assert(typeof w.body.error.details?.allow_url === 'string' || JSON.stringify(w.body).includes('/v1/profile?tab=agents'), `no address to allow it: ${JSON.stringify(w.body.error)}`);
-    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'no' });
-    assert(rev.status === 403 && rev.body?.error?.code === 'SCOPE_DENIED', `review: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+    assert(w.status === 200 && w.body.data.applied === false && w.body.data.pending === 'PERSON_REVIEWS', `write: ${w.status} ${JSON.stringify(w.body?.data ?? w.body?.error)}`);
+    // The answer is the one the label read gives for a record the agent may not read: no stored label.
+    assert(w.body.data.source === 'default' && w.body.data.locked === false && w.body.data.from !== 'luottamuksellinen',
+        `the answer described the person's label: ${JSON.stringify(w.body.data)}`);
     const still = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, alice.token);
     assert(still.body.data.label === 'luottamuksellinen', `alice's label changed: ${JSON.stringify(still.body.data.label)}`);
+    assert(still.body.data.suggestion?.label === 'erittain-luottamuksellinen' && still.body.data.suggestion?.why === 'PERSON_REVIEWS',
+        `no suggestion waits for alice: ${JSON.stringify(still.body.data.suggestion)}`);
+    // Rejecting a raise through an AI is the person's to do in person, as before; the refusal names no label.
+    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'no' });
+    assert(rev.status === 403 && rev.body?.error?.code === 'PERSON_REQUIRED' && !JSON.stringify(rev.body).includes('luottamuksellinen'),
+        `review of a raise: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+});
+
+await test('USE: the plain agent relays the person\'s rejection of a waiting lowering; it applies as before, and the answer names no label', async () => {
+    const low = await call('PUT', '/v1/classification/label', plainBot.token, { ...MEM('probe.private'), label: 'julkinen' });
+    assert(low.status === 200 && low.body.data.pending === 'PERSON_REVIEWS', `the lowering waits: ${low.status} ${JSON.stringify(low.body?.data ?? low.body?.error)}`);
+    const rev = await call('POST', '/v1/classification/label/review', plainBot.token, { ...MEM('probe.private'), decision: 'reject', humanSaid: 'Alice said: keep it confidential.' });
+    assert(rev.status === 200 && rev.body.data.applied === false, `the relayed rejection: ${rev.status} ${JSON.stringify(rev.body?.data ?? rev.body?.error)}`);
+    assert(rev.body.data.source === 'default' && rev.body.data.locked === false && !JSON.stringify(rev.body.data).includes('luottamuksellinen'),
+        `the review answer described the person's label: ${JSON.stringify(rev.body.data)}`);
+    const after = await call('GET', `/v1/classification/label?kind=memory&key=probe.private`, alice.token);
+    assert(after.body.data.label === 'luottamuksellinen' && after.body.data.suggestion === null,
+        `the rejection did not apply: ${JSON.stringify({ label: after.body.data.label, suggestion: after.body.data.suggestion })}`);
 });
 
 await test('USE: the agent with memory:read-as-owner labels the private record; the plain agent labels its own record and one marked owner', async () => {
