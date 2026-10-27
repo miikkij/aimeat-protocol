@@ -98,6 +98,10 @@ The first real owner on a node gets the `operator` role (`POST /v1/owners` in `s
 ### Request Validation
 
 - Request bodies: Zod, through `validateBody(schema, config.nodeId)` from `src/models/schemas.ts`. JSON Schema contracts use AJV (`src/services/schema-validator.ts`).
+- Every string has a length limit from `src/models/input-limits.ts`, chosen by what the field holds (id, key, name, title, line, url, email, description, text). Text a person reads uses `safeText(max)` (no control character other than tab and line breaks) or `requiredText(max)` (also not only white space); a whole document uses `documentText()`, which the request body limit bounds. `pnpm check:string-bounds` refuses a `z.string()` with no limit.
+- A writing route that reads its body checks it with a schema. `pnpm check:write-validation` refuses a new one that does not, and the routes that did not on 2026-10-27 are listed in `aimeat/security/write-validation-baseline.json`, a list that only shrinks.
+- A refusal answers 400 `VALIDATION_ERROR` with `details: [{ path, code, message, max? }]` (`src/models/validation-issues.ts`), the message in the caller's language. A route that calls `safeParse` itself answers with `validationFailure(...)` so a form can show each message under its field (`public/js/field-errors.js`).
+- A NUL character or a lone UTF-16 surrogate anywhere in a body, the query or the path is refused before any route runs (`src/middleware/input-junk.ts`): PostgreSQL cannot store U+0000, and a lone surrogate is stored as U+FFFD.
 - Express 5 types `req.params` values as `string | string[]`: cast with `as string` (`.claude/rules/backend.md`).
 - Check query parameters with explicit type checks.
 - Reject unexpected fields. Do not ignore extra input without a reason.
