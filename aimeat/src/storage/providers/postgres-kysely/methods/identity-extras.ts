@@ -6,12 +6,13 @@
  *   Postgres+Kysely backend — the parts of the identity repository not in methods/identity.ts.
  *   Translated 1:1 from the Prisma provider.
  * @version-history
+ *   2026-10-27 — reserveEmailVerificationAttempt (secaudit2026oct26, password-reset-attempt-cap-read-then-write).
  *   v1.2.1 — 2026-10-23 — getActiveEmailVerification reads with LIMIT 1 (check:unbounded-lists).
  *   v1.2.0 — 2026-10-05 — spendEmailVerification (secaudit 2026-10, AUTH-3).
  *   v1.1.0 — 2026-09-09 — getEmailVerificationsByOwner and deleteExpiredEmailVerifications deleted: no caller.
  *   v1.0.0 — 2026-07-15 — Phase 5: chat instances + email verifications on Postgres+Kysely.
  */
-import type { Selectable } from 'kysely';
+import { sql, type Selectable } from 'kysely';
 import type { ChatInstanceRecord, EmailVerificationRecord } from '../../../interface.js';
 import type { ChatInstance, EmailVerification } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -103,6 +104,12 @@ export const identityExtraMethods = {
   async spendEmailVerification(this: PostgresKyselyStorage, id: string, verifiedAt: string): Promise<boolean> {
     const r = await this.db.updateTable('EmailVerification').set({ status: 'verified', verifiedAt: new Date(verifiedAt) } as never)
       .where('id', '=', id).where('status', '=', 'pending').executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) === 1;
+  },
+  /** One conditional UPDATE, so overlapping guesses of one code are each counted against its cap. */
+  async reserveEmailVerificationAttempt(this: PostgresKyselyStorage, id: string, max: number): Promise<boolean> {
+    const r = await this.db.updateTable('EmailVerification').set({ attempts: sql`"attempts" + 1` } as never)
+      .where('id', '=', id).where('status', '=', 'pending').where('attempts', '<', max).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) === 1;
   },
 };

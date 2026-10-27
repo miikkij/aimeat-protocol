@@ -10,6 +10,8 @@
  *   - IdentityRepository: interface for GHII CRUD + lookups, chat-instance CRUD, and email-verification lifecycle
  *
  * @version-history
+ *   2026-10-27 — reserveEmailVerificationAttempt: a conditional increment of a code's guess count, so
+ *     the five-guess cap holds under overlapping guesses (secaudit2026oct26, password-reset-attempt-cap-read-then-write).
  *   v1.3.0 — 2026-10-05 — spendEmailVerification: a conditional spend, so a single-use link is spent
  *     once under concurrent redeems (secaudit 2026-10, AUTH-3).
  *   v1.2.0 — 2026-09-09 — getGHIIsByGhiis, getGHIIByGoogleSub, deleteExpiredEmailVerifications and
@@ -47,4 +49,10 @@ export interface IdentityRepository {
   updateEmailVerification(id: string, updates: Partial<EmailVerificationRecord>): Promise<EmailVerificationRecord | null>;
   /** Mark a pending record verified, only if it is still pending: true for the one caller that spent it. */
   spendEmailVerification(id: string, verifiedAt: string): Promise<boolean>;
+  /**
+   * Count one guess against a pending record, only while fewer than `max` were counted: one
+   * conditional increment, so overlapping guesses are each counted. True when this guess may be
+   * compared, false when the cap is reached or the record is no longer pending.
+   */
+  reserveEmailVerificationAttempt(id: string, max: number): Promise<boolean>;
 }

@@ -41230,6 +41230,15 @@ paths:
                         properties:
                           code:
                             example: NOT_FOUND
+        '409':
+          description: |
+            EMAIL_CHANGED: the account's address changed after this code was sent, so the code marks
+            nothing; confirm the code sent to the current address. EMAIL_TAKEN: the address is
+            verified on another account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '422':
           description: Invalid verification code
           content:
@@ -73927,6 +73936,15 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: |
+            EMAIL_CHANGED: the account's recovery address changed after this code was sent, so the
+            code proves an address the account no longer uses and marks nothing. Send a new code to
+            the address to keep. EMAIL_TAKEN: the address is verified on another account.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '429':
           $ref: '#/components/responses/RateLimited'
   /v1/ghii/password/reset-request:
