@@ -16,6 +16,9 @@
  *   const p = await putProposal(storage, {...});
  *   const ent = await supersedeWithProposal(storage, proposal, existingEntitlement);
  * @version-history
+ *   2026-10-27 — supersedeWithProposal answers 'ended' for a revoked contract instead of minting an
+ *     active one, and keeps a consumer's pause when the provider accepts (secaudit2026oct26,
+ *     exchange-proposals:accept-reactivates-ended-contract).
  *   v1.1.1 — 2026-09-26 — ownerOfGaii takes the account name from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  *   v1.1.0 — 2026-07-27 — Supersede reads the CONTRACT, not whatever currently authorises the call: a
  *     provider's grant is not terms to renegotiate.
@@ -25,7 +28,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import {
-  archiveEntitlement, createEntitlement, readContractForCall,
+  archiveEntitlement, createEntitlement, pauseEntitlement, readContractForCall,
   type EntitlementUnit, type MeteredEntitlement,
 } from './metered-entitlements.js';
 
@@ -59,6 +62,10 @@ export interface ContractProposal {
   createdAt: string;
   resolvedAt: string | null;
 }
+
+/** The refusal when the contract a proposal changes was revoked: what happened and what to do. */
+export const CONTRACT_ENDED_TEXT = 'This contract was ended (revoked by the consumer or by an account erasure), so a change to its terms '
+  + 'cannot apply. The consumer starts a new contract by accepting the offering again; decline this proposal to close it.';
 
 export function newProposalId(): string { return `prop-${randomUUID().slice(0, 12)}`; }
 
@@ -94,14 +101,20 @@ export async function listProposalsForOwner(storage: Storage, owner: string): Pr
  */
 export async function supersedeWithProposal(
   storage: Storage, proposal: ContractProposal,
-): Promise<MeteredEntitlement | null> {
+): Promise<MeteredEntitlement | null | 'ended'> {
   const existing = await readContractForCall(storage, proposal.consumerGaii, proposal.ext, proposal.action);
   if (!existing) return null;
+  // A renegotiation changes the terms of a contract; it never brings back one that was switched off.
+  // Revoked (by the consumer or by an account erasure) is terminal: the consumer resumes by accepting
+  // the offering again. A pause the consumer set stands when the provider accepts; the consumer's own
+  // accept is the consumer's act and resumes it, as before (secaudit2026oct26).
+  if (existing.state === 'revoked') return 'ended';
+  const keepPaused = existing.state === 'paused' && proposal.proposedByRole === 'consumer';
   await archiveEntitlement(storage, existing, 'superseded', proposal.proposalId);
   const newPrice = proposal.newPricePerCall ?? existing.pricePerCall;
   const priceChanged = proposal.newPricePerCall != null && proposal.newPricePerCall !== existing.pricePerCall;
   const newCap = proposal.newCapUnits != null ? proposal.newCapUnits : existing.budget.capUnits;
-  return createEntitlement(storage, {
+  const minted = await createEntitlement(storage, {
     consumerGaii: existing.consumerGaii, appId: existing.appId, providerGhii: existing.providerGhii,
     ext: existing.ext, action: existing.action, capabilityLabel: existing.capabilityLabel,
     unit: existing.unit, pricePerCall: newPrice, currency: existing.currency,
@@ -113,4 +126,7 @@ export async function supersedeWithProposal(
     tollMorsels: existing.tollMorsels ?? null,
     carrySpend: null,   // renegotiation = a fresh meter; the old spend is preserved in the archive
   });
+  if (!keepPaused) return minted;
+  await pauseEntitlement(storage, minted.consumerGaii, minted.ext, minted.action);
+  return (await readContractForCall(storage, minted.consumerGaii, minted.ext, minted.action)) ?? minted;
 }

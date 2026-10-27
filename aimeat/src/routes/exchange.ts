@@ -23,6 +23,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   2026-10-27 — Accepting a proposal on a revoked contract answers 409 CONTRACT_ENDED; a consumer's pause
+ *     stands when the provider accepts (secaudit2026oct26, exchange-proposals:accept-reactivates-ended-contract).
  *   v1.10.0 — 2026-10-12 — Accepting an extension action prices it with resolveExtActionPricing, so an
  *     action in the 4.0.0 form (its own tollMorsels, no payMorsels) is contracted instead of NOT_PRICED.
  *   v1.9.0 — 2026-10-11 — A morsel is pacing, never a price (decision-morseli-on-tahdistus-ei-hinta-
@@ -81,7 +83,7 @@ import {
 } from '../services/exchange-market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
-  supersedeWithProposal, ownerOfGaii,
+  supersedeWithProposal, ownerOfGaii, CONTRACT_ENDED_TEXT,
 } from '../services/exchange-proposals.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -597,6 +599,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     if (p.counterpartyOwner !== owner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the counterparty may accept this proposal'));
     const ent = await supersedeWithProposal(storage, p);
     if (!ent) return res.status(409).json(error(config.nodeId, 'CONTRACT_GONE', 'The contract no longer exists'));
+    if (ent === 'ended') return res.status(409).json(error(config.nodeId, 'CONTRACT_ENDED', CONTRACT_ENDED_TEXT));
     p.status = 'accepted'; p.resolvedAt = new Date().toISOString(); await putProposal(storage, p);
     await notify(owner, p.proposerOwner, 'EXCHANGE — contract change accepted',
       `${owner} accepted your proposed change to ${p.capabilityLabel}. The new contract is in effect; the previous one is in your contract history.`);

@@ -24641,7 +24641,7 @@ paths:
     post:
       operationId: exchangeAcceptProposal
       summary: Accept a proposed contract change — supersede (EXCHANGE / TARGET-045)
-      description: "The COUNTERPARTY accepts: the old contract is archived to history (with its final spend + period) and a fresh one takes effect at the agreed terms. Returns `{ proposal, entitlement }`."
+      description: "The COUNTERPARTY accepts: the old contract is archived to history (with its final spend + period) and a fresh one takes effect at the agreed terms. Returns `{ proposal, entitlement }`. A contract the consumer paused stays paused when the provider accepts; a revoked contract answers 409 CONTRACT_ENDED, and the consumer starts a new one by accepting the offering again."
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
