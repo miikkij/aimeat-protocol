@@ -37715,7 +37715,7 @@ paths:
         '502':
           description: RENDER_FAILED - the page did not render; the message carries the reason
         '503':
-          description: NO_BROWSER - this node has no usable browser to render with
+          description: NO_BROWSER - this node has no usable browser to render with; HEADLESS_BUSY - the node is running as many on-demand renders as it runs at once, try again in a minute (the owner's hourly allowance is not taken)
   /v1/apps/{owner}/{filename}/draft/write:
     post:
       operationId: writeAppDraft
