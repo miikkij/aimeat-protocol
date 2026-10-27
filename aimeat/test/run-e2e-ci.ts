@@ -15,6 +15,10 @@
  *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
  *   2026-10-27 -- e2e-admin-restore-trail.ts joins the list (not the guard tier): POST /v1/admin/restore writes the operator trail and bounds the clearance an operator's agent restores (secaudit2026oct26).
  *   2026-10-27 -- e2e-anonymous-mode-switch.ts joins the list (not the guard tier): anonymous mode switched off through the config endpoint ends minting, injection and the minted tokens at once (secaudit2026oct26).
+ *   2026-10-27 -- e2e-refinery-definition-ask.ts joins the list (not the guard tier): a mail refinery definition's mailbox, workspace and keepText changed by an app or an agent that may not run it wait for the owner's one-press answer (secaudit2026oct26).
+ *   2026-10-27 -- e2e-portfolio-memory-gate.ts joins the list (not the guard tier): the welcome page's switch written through POST, PATCH or the bulk memory door asks the publish gate as PUT /v1/portfolio/config does (secaudit2026oct26).
+ *   2026-10-27 -- e2e-service-namespace-lists.ts joins the list (not the guard tier): beneficiary splits, metered contracts, grants and their history, and the operator's money platform fees take only the service's own records (secaudit2026oct26).
+ *   2026-10-27 -- e2e-memory-door-parity.ts joins the list (not the guard tier): bulk-delete and the bin routes ask the bin's per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller reads as absent (secaudit2026oct26).
  *   2026-10-26 -- e2e-capability-visibility-word.ts joins the list (not the guard tier): POST and PUT /v1/capabilities store only a visibility word the node knows (secaudit2026oct22).
  *   2026-10-26 -- e2e-capability-reach.ts joins the list (not the guard tier): a draft capability is reached by id only by its owner, the owner's agents and the operator (secaudit2026oct22).
  *   2026-10-25 -- e2e-ext-operator-limits.ts joins the list (not the guard tier): the operator's limits on extension load, each refusal naming its setting (secaudit2026oct22, round 7).
@@ -806,6 +810,19 @@ const ALL_SUITES = [
     // bulk/export/import/bulk-delete, discover and copy, TTL expiry on read, the anonymous
     // namespace refusals, the 413 and 422 arms, the CORS inheritance ladder and the bin listing.
     'test/e2e-memory-doors.ts',
+    // The side doors answer what the main doors answer: bulk-delete and the bin routes ask the bin's
+    // per-key rules, and an owner_scope PUT or PATCH neither relabels nor echoes a record the caller
+    // reads as absent (secaudit2026oct26, round 8).
+    'test/e2e-memory-door-parity.ts',
+    // A service that lists a key prefix across the node takes only its own namespace: beneficiary
+    // splits, metered contracts and grants, the operator's money platform fees (secaudit2026oct26).
+    'test/e2e-service-namespace-lists.ts',
+    // The welcome page's switch written through a memory door asks the publish gate as
+    // PUT /v1/portfolio/config does (secaudit2026oct26).
+    'test/e2e-portfolio-memory-gate.ts',
+    // Where a mail refinery reads and files mail waits for the owner when an app or an agent that may
+    // not run it changes it (secaudit2026oct26).
+    'test/e2e-refinery-definition-ask.ts',
     // Who sees the hands on a key, and who reads a task's title in the event record (secaudit 2026-10, v88, v89).
     'test/e2e-memory-hands-readers.ts',
     'test/e2e-account-events-readers.ts',

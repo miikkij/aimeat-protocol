@@ -36,6 +36,8 @@
  *     memory:read-as-owner named in a goal waits for the owner (services/goals/goals-model-reach.ts).
  *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
  *     ai schedule waits for the owner (services/schedule-instruction-hold.ts; secaudit2026oct26).
+ *   2026-10-27 — The kind `refinery-definition`: where a mail refinery reads and files mail, changed by
+ *     an app or an agent that may not run it, waits for the owner (refinery/definition-ask.ts; secaudit2026oct26).
  *   2026-10-25 — The kind `subscription-price`: a renewal at a raised plan price waits for the buyer
  *     (commerce/subscription-price-ask.ts; secaudit2026oct22).
  *   2026-10-25 — A settled request's notices show the answer and lose their buttons (closeQuestion,
@@ -105,7 +107,9 @@ export type PublishKind =
   // A sibling agent's new instruction to another agent's ai schedule (services/schedule-instruction-hold.ts).
   | 'schedule-instruction'
   // AIMEAT's model reading private records an agent named in a goal (services/goals/goals-model-reach.ts).
-  | 'goal-model-read';
+  | 'goal-model-read'
+  // Where a mail refinery reads and files mail, changed by a writer that may not run it (refinery/definition-ask.ts).
+  | 'refinery-definition';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

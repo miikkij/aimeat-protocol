@@ -20,6 +20,9 @@
  *     SECOND_FACTOR_REQUIRED naming the password sign-in, and the token is bound to a session row
  *     (secaudit2026oct22, admin-setup-token/owner-key-sign-in-after-removal-without-second-factor).
  *   2026-10-19 — GET /v1/admin/owners gives every listed agent its `avatar` (services/agent-avatar.ts), one batched read for all owners' agents.
+ *   2026-10-27 — The dashboard's platform-fee receivable counts only the records the checkout writes
+ *     (commerce/platform-fee.ts sumPlatformFees): an account holder's namespace and a positive numeric
+ *     fee (secaudit2026oct26, routes/admin.ts:dashboard:any-namespace-platform-fee-records).
  *   2026-10-16 — The dashboard's checkout counts, money volume and platform-fee receivable read every
  *     record under their prefix (storage/memory-pages.ts), not the first 2000 in key order (QA audit S8-10).
  *   2026-10-16 — Setup's owner row, profile row and welcome bonus are written in one transaction, and
@@ -97,6 +100,7 @@ import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-paci
 import { OWNER_KEY_LOGIN_REMOVED_IN, ownerKeyLoginAllowed } from '../config-security.js';
 import { noteDeprecatedUse, removedFrom } from '../services/deprecation.js';
 import { listAllMemoryPages } from '../storage/memory-pages.js';
+import { sumPlatformFees } from '../commerce/platform-fee.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 
 export function adminRouter(
@@ -486,11 +490,9 @@ export function adminRouter(
                 }
             }
             // Operator platform-fee records for money sales (commerce.platform-fee.*).
+            // Only the records commerce/platform-fee.ts writes count (sumPlatformFees; secaudit2026oct26).
             const { items: feeRecs } = await listAllMemoryPages(storage, { prefix: 'commerce.platform-fee.' });
-            for (const r of feeRecs) {
-                const v = r.value as { fee?: number; currency?: string } | undefined;
-                if (v?.currency && v.fee) operatorMoneyFees[v.currency] = (operatorMoneyFees[v.currency] ?? 0) + v.fee;
-            }
+            Object.assign(operatorMoneyFees, sumPlatformFees(feeRecs));
         } catch (err) { logger.warn('GET /v1/admin/dashboard: commerce metrics must never break the dashboard', { error: String(err) }); }
 
         // Inflation rate = net new morsels over 30d as % of current supply

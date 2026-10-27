@@ -31,6 +31,8 @@
  *   const split = await readSplit(storage, providerGhii, ext, action);
  *   const { pool, lines, providerNet } = computeSplit(providerGross, split, designations);
  * @version-history
+ *   2026-10-27 — listSplitsByProvider reads the book's own namespace only; a bensplit. record another
+ *     account wrote into its own memory was listed as the provider's split (secaudit2026oct26).
  *   2026-10-05 — BENEFICIARIES_MAX moved unchanged to models/tool-input-vocabulary.ts and is
  *     re-exported: the tool catalog states it (secaudit 2026-10, M3).
  *   v1.0.1 — 2026-09-04 — listSplitsByProvider sorts null-safe: a record without capabilityLabel threw
@@ -278,8 +280,13 @@ export async function readSplit(
 
 /** Every split a provider has declared — the "what am I sharing, and with whom" surface. */
 export async function listSplitsByProvider(storage: Storage, providerGhii: string): Promise<BeneficiarySplit[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'bensplit.', limit: 5000 });
+  // Only the book's own namespace, where putSplit writes: a bensplit. key any account wrote into its
+  // own memory is not a split (secaudit2026oct26, listSplitsByProvider:any-namespace-bensplit-records).
+  // ownerPrefix narrows the scan in the database; the exact test keeps a namespace that merely starts
+  // with the same letters out.
+  const { items } = await storage.listAllMemory({ prefix: 'bensplit.', ownerPrefix: NS_BENEFICIARY_SPLIT, limit: 5000 });
   return items
+    .filter(r => r.ownerGaii === NS_BENEFICIARY_SPLIT)
     .map(r => r.value as BeneficiarySplit)
     .filter(v => v && v.providerGhii === providerGhii)
     // A record written before `capabilityLabel` existed has none; sorting must not throw on it.

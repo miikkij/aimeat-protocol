@@ -4,6 +4,16 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — An entry of POST /v1/memory/bulk or /import of the welcome page's switch
+ *     (portfolio.config) asks the publish gate as PUT /v1/portfolio/config does: all but the change
+ *     that makes the served page public is stored, and the request is in `publish_requests`
+ *     (batch-guards.ts batchWriteAsks; secaudit2026oct26). An entry that changes where a mail refinery
+ *     reads and files mail, by a writer that may not run it, asks the owner the same way.
+ *   2026-10-27 — The bulk delete asks the bin's per-key rules (services/memory-bin.ts
+ *     bulkDeleteKeyRefusal): a credential record, a reserved owner key for an app grant and an event of
+ *     an append-only space are refused when named (403 SECRET_RECORD, 403 RESERVED_KEY, 409
+ *     WRITE_CONFLICT) and stay in place when a prefix matches them (secaudit2026oct26,
+ *     bulk-delete-skips-bin-refusals).
  *   2026-10-22 — The bulk delete removes a finished hold or beneficiary share of the account holder in
  *     person (OWNER_REMOVABLE_SERVICE_PREFIXES), as it did before those ledgers became service-owned
  *     (secaudit2026oct22).
@@ -101,6 +111,7 @@ import { fileTarget } from '../../services/classification/labels.js';
 import { leaveMemories } from '../../services/classification-exits.js';
 import { undeclaredSpaceForKey } from '../../services/workspace-write-items.js';
 import { fencedKeysRefusal } from '../../services/fenced-space.js';
+import { bulkDeleteKeyRefusal } from '../../services/memory-bin.js';
 import { callerOf } from '../../middleware/caller.js';
 import { odpsWriteRefusal } from '../../services/exchange-odps-write.js';
 import { legacyPacingWriteRefusal } from '../../services/legacy-pacing-write.js';
@@ -110,7 +121,7 @@ import { type MemoryRouteCtx } from './shared.js';
 import { logger } from '../../utils/logger.js';
 import {
   batchKeyRefusal, storageReferenceRefusal, visibilityRefusal, organismWriteRefusalFor, routePublishAsk, batchPublishAnswer,
-  batchCapRefusalFor,
+  batchCapRefusalFor, batchWriteAsks, fileBatchWriteAsks, type BatchWriteAsks,
 } from './batch-guards.js';
 import { registerCopyRoute } from './copy.js';
 import { writeMemoryBatch } from '../../services/memory-batch-write.js';
@@ -178,6 +189,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // raise their record to public is decided by the batch write, which reads what each key holds.
     const publishAsk = routePublishAsk({ storage, config }, req);
     const capRefusal = batchCapRefusalFor({ storage, config }, req, 'POST /v1/memory/bulk');
+    const ownerAsks: BatchWriteAsks[] = [];
     for (const e of rawEntries) {
       const key = e?.key;
       if (typeof key !== 'string' || !key) { preFailed.push({ key: String(key), status: 'failed', reason: 'missing key' }); continue; }
@@ -214,9 +226,13 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // A level wider than the record's label allows: that entry is refused (plan doc-mvdipuyqraas, L3.2).
       const capped = await capRefusal(gaii, key, e.visibility ?? memoryVisibilityDefault(config));
       if (capped) { preFailed.push({ key, status: 'failed', reason: capped }); continue; }
+      // The owner's other questions, as the single write asks them (batch-guards.ts batchWriteAsks; secaudit2026oct26).
+      const asked = await batchWriteAsks({ storage, config }, req, gaii, key, e.value);
+      if ('refusal' in asked) { preFailed.push({ key, status: 'failed', reason: asked.refusal }); continue; }
+      if (asked.ask) ownerAsks.push(asked.ask);
       items.push({
         key,
-        value: e.value,
+        value: asked.value,
         // No visibility named: the node's starting level (plan V5.1).
         visibility: (e.visibility ?? memoryVisibilityDefault(config)) as MemoryRecord['visibility'],
         tags: Array.isArray(e.tags) ? e.tags : [],
@@ -237,6 +253,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
     }, 'bulk');
+    await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 
     // Fire the same reactive/live-update signals a single write does, for each entry actually written.
     for (const it of result.items) {
@@ -423,10 +440,15 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
 
+    const ownerAsks: BatchWriteAsks[] = [];
     for (const s of survivors) {
+      // The owner's other questions, as the single write asks them (batch-guards.ts batchWriteAsks; secaudit2026oct26).
+      const asked = await batchWriteAsks({ storage, config }, req, gaii, s.key, s.entry.value);
+      if ('refusal' in asked) { failed.push({ key: renameOf.get(s.key) ?? s.key, reason: asked.refusal }); continue; }
+      if (asked.ask) ownerAsks.push(asked.ask);
       items.push({
         key: s.key,
-        value: s.entry.value,
+        value: asked.value,
         // An entry with no visibility takes the node's starting level (plan V5.1); a word this
         // import does not restore is still stored private.
         visibility: (s.entry.visibility === undefined ? memoryVisibilityDefault(config)
@@ -450,6 +472,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       },
       validate: (key, value) => validateMemoryWrite(key, value, storage),
     }, 'import');
+    await fileBatchWriteAsks({ storage, config }, ownerAsks, result);
 
     for (const it of result.items) {
       if (it.status === 'created' || it.status === 'updated') {
@@ -532,11 +555,31 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // The bin's per-key rules, as DELETE /v1/memory/:key asks them (services/memory-bin.ts
+    // bulkDeleteKeyRefusal): a credential record, a reserved owner key for an app grant, an event of an
+    // append-only space. A key named outright refuses the request before anything is removed; a key a
+    // prefix matched stays in place (secaudit2026oct26, bulk-delete-skips-bin-refusals). Decided for
+    // every record first, so a manifest removed in the same request does not change an event's answer.
+    const keep = new Set<string>();
+    const appendOnlySpaces = new Map<string, boolean>();
+    for (const r of records) {
+      if (keys && !keys.has(r.key)) continue;
+      const refusal = await bulkDeleteKeyRefusal({ storage }, { key: r.key, roles: session.roles }, appendOnlySpaces);
+      if (!refusal) continue;
+      if (keys) {
+        res.status(refusal.status ?? 403).json(error(config.nodeId, refusal.code, refusal.message,
+          refusal.status ?? 403, refusal.violations ? { violations: refusal.violations } : undefined));
+        return;
+      }
+      keep.add(`${r.ownerGaii}\u0000${r.key}`);
+    }
+
     let deleted = 0;
     const deletedVisibility: string[] = [];
     for (const r of records) {
       if (keys && !keys.has(r.key)) continue;
       if (isServiceOwnedKey(r.key) && !ownerMayRemove(r.key)) continue;
+      if (keep.has(`${r.ownerGaii}\u0000${r.key}`)) continue;
       if (await storage.deleteMemory(r.ownerGaii, r.key)) {
         deleted++;
         deletedVisibility.push(r.visibility);

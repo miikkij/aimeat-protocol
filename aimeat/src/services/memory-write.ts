@@ -29,6 +29,11 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-27 — A `gatePublic` write asks services/memory-write-asks.ts, which adds a mail refinery
+ *     definition's destination changed by a writer that may not run it (secaudit2026oct26).
+ *   2026-10-27 — A `gatePublic` write of the welcome page's switch (portfolio.config) asks the publish
+ *     gate as PUT /v1/portfolio/config does (services/portfolio-memory-gate.ts); shadowWarning moved to
+ *     services/memory-write-shadow.ts and is re-exported (secaudit2026oct26).
  *   v1.21.0 — 2026-10-21 — `noTriggers`: an AI job's answer, now written here, starts no Tracked Response, connector
  *     push, workflow trigger, ecosystem push or recipe, as before it was (secaudit 2026-10, ai-jobs/service.ts).
  *   v1.20.0 — 2026-10-18 — A `gatePublic` write that would raise the record past its label's audience
@@ -153,6 +158,9 @@ import type { PublishAsk, publishRequestedBody } from './publish-requests/ask.js
 import { memoryWriterAsk, keptMemoryLevel, fileMemoryPublishRequest, memoryCapRefusal } from './memory-publish-gate.js';
 import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
+import { shadowWarning } from './memory-write-shadow.js';
+import { memoryWriteAsks, fileMemoryWriteAsks } from './memory-write-asks.js';
+export { shadowWarning };
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
 export interface MemoryWriteFanout {
@@ -493,6 +501,11 @@ export async function writeMemoryRecord(
             input = { ...input, ...keptMemoryLevel(existing) };
         }
     }
+    // 3b. The owner's other questions (services/memory-write-asks.ts; secaudit2026oct26): the welcome
+    //     page's switch and a mail refinery's destination store all but the change asked about.
+    const asks = input.gatePublic ? await memoryWriteAsks({ storage, config }, caller, input.key, input.value) : null;
+    if (asks && 'refused' in asks) return { ok: false, status: asks.refused.status, code: 'PUBLISH_NOT_ALLOWED', message: asks.refused.message };
+    if (asks?.asks.length) input = { ...input, value: asks.value };
     if (input.key.startsWith('organism.')) {
         const guard = await isKeyArchived(storage, input.key);
         if (guard.archived) {
@@ -673,28 +686,15 @@ export async function writeMemoryRecord(
         if (filed.ok) publishRequest = filed.publishRequest;
         else warnings.push(filed.warning);
     }
+    if (asks && !('refused' in asks) && asks.asks.length) {
+        const filed = await fileMemoryWriteAsks({ storage, config }, asks.asks);
+        publishRequest ??= filed.publishRequest; warnings.push(...filed.warnings);
+    }
 
     return {
         ok: true, record, shadowedBy, warnings,
         ...(after.exchange !== undefined ? { exchange: after.exchange } : {}),
         ...(publishRequest ? { publishRequest } : {}),
-    };
-}
-
-/**
- * The SHADOWED_BY_OWNER_COPY warning, worded once for every door. `landedIn` is the namespace this
- * copy was written to; `ownerCopy` is the owner GHII holding the copy owner-scope reads resolve to.
- */
-export function shadowWarning(key: string, landedIn: string, ownerCopy: string): MemoryWriteWarning {
-    return {
-        code: 'SHADOWED_BY_OWNER_COPY',
-        message: `Saved under ${landedIn}, but "${key}" also exists under ${ownerCopy}. `
-            + 'Owner-scope reads resolve the owner\'s copy first, so an app reading with ownerScope '
-            + 'and an owner-scope listing show that copy and not this one: this write did not update it.',
-        shadowed_by: ownerCopy,
-        how_to_fix: 'Write the owner\'s record itself with owner_scope: true (aimeat_memory_write, or POST '
-            + '/v1/memory), which needs the memory:write-as-owner permission the owner grants per agent in '
-            + 'Profile -> Agents. Without that permission, tell the person what you meant to write so they can save it.',
     };
 }
 

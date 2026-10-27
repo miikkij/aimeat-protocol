@@ -683,9 +683,9 @@
     },
     "src/routes/storage-files.ts": {
       "reads": {
+        "getStorageFileMeta": 5,
         "readStorageFileRange": 1,
         "getStorageFile": 3,
-        "getStorageFileMeta": 5,
         "listStorageFiles": 1,
         "generateDownloadToken": 2
       },
@@ -927,6 +927,13 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: AI routing configuration."
+    },
+    "src/services/anonymous-principal-records.ts": {
+      "reads": {
+        "listMemory": 1,
+        "listStorageFiles": 2
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator, and clearAnonymousRecord lists the same account's files to delete the ones under datapkg/<name>/ when the operator chooses Delete on the incident. No value or file content is read or shown."
     },
     "src/services/app-agent-deploy.ts": {
       "reads": {
@@ -1222,20 +1229,6 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Checks only that the company page file exists."
     },
-    "src/services/compliance-register.ts": {
-      "reads": {
-        "getMemory": 4,
-        "listAllMemoryMeta": 1
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
-    },
-    "src/services/compliance-agreements.ts": {
-      "reads": {
-        "getMemory": 1,
-        "listAllMemory": 1
-      },
-      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance-agreements-access.ts."
-    },
     "src/services/compliance-agreements-ops.ts": {
       "reads": {
         "getStorageFile": 1
@@ -1248,6 +1241,13 @@
       },
       "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: the PDF the node rendered for a version, compared byte for byte with a returned signed copy and attached to the in-force e-mail. The second read (2026-10-27, secaudit2026oct26) is the node's own copy of a returned signed copy, kept beside the version's PDF when it was checked, hashed again before the operator's yes records it; nothing of it is shown. A copy a person uploads is read through readOwnFile (docsign/files.ts), which applies the classification reader, and a scan goes to a model only after reader.useForAi()."
     },
+    "src/services/compliance-agreements.ts": {
+      "reads": {
+        "getMemory": 1,
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance-agreements-access.ts."
+    },
     "src/services/compliance-docs.ts": {
       "reads": {
         "getMemory": 1,
@@ -1255,6 +1255,13 @@
         "listAllMemoryMeta": 1
       },
       "why": "Written 2026-10-23 (plan doc-mvlftkh9zmc9), the node's own read: the compliance documents are records of system@<node> (records of processing, processors, requests, breaches, impact assessments, framework answers), never anyone's content; who reads them is decided in services/compliance-docs-access.ts."
+    },
+    "src/services/compliance-register.ts": {
+      "reads": {
+        "getMemory": 4,
+        "listAllMemoryMeta": 1
+      },
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's system compliance records."
     },
     "src/services/component-content.ts": {
       "reads": {
@@ -1352,6 +1359,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
+    },
+    "src/services/cortex-seeder.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
     },
     "src/services/crew-def-store.ts": {
       "reads": {
@@ -1545,6 +1558,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Design Book parts, published to the node's shared Design Book by design."
     },
+    "src/services/device-return-proof.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22, lead 2150), the node's own read: the service-owned mark (agent-device-return.<user code>) that a device request proved it is an existing agent coming back, read to tell the consent card a return from a takeover. It holds an agent id and a time, no content, and is never sent to a model."
+    },
     "src/services/directory.ts": {
       "reads": {
         "getMemory": 4
@@ -1618,12 +1637,6 @@
       },
       "why": "Reviewed 2026-10-01, the node's own read: account erasure lists the system namespaces of exchange contracts and grants (metered-entitlement, metered-grant) to revoke the records the erased account is a party to. Nothing it reads is shown to anyone."
     },
-    "src/services/entitlement-merge.ts": {
-      "reads": {
-        "listAllMemory": 2
-      },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Entitlement and grant records for the merge migration."
-    },
     "src/services/exchange-market.ts": {
       "reads": {
         "listAllMemory": 7
@@ -1677,50 +1690,19 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
-    "src/services/extension-host-bounds.ts": {
-      "reads": {
-        "listMemoryMetaForOwners": 1,
-        "getMemory": 1
-      },
-      "why": "Moved from extension-ctx.ts on 2026-10-25 (secaudit2026oct22): getPublic by a bare owner name finds which of the owner's agents holds the key from metadata and reads that one record; the record goes back to getPublic in extension-ctx.ts, which lets it leave only through the caller's presentation, as before."
-    },
-    "src/services/anonymous-principal-records.ts": {
-      "reads": {
-        "listMemory": 1,
-        "listStorageFiles": 2
-      },
-      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step lists the shared anonymous account's skill manifests and data-package files to name them in one Security page incident for the operator, and clearAnonymousRecord lists the same account's files to delete the ones under datapkg/<name>/ when the operator chooses Delete on the incident. No value or file content is read or shown."
-    },
-    "src/services/verified-name.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Written 2026-10-25 (secaudit2026oct22, lead 3924), the node's own read: the record of the name an identity verification proved, under a service-owned key, read to keep its version when it is written again and read by the wallet seal to compare with the signing certificate. It is never shown to anyone and never sent to a model."
-    },
-    "src/services/device-return-proof.ts": {
-      "reads": {
-        "getMemory": 1
-      },
-      "why": "Written 2026-10-25 (secaudit2026oct22, lead 2150), the node's own read: the service-owned mark (agent-device-return.<user code>) that a device request proved it is an existing agent coming back, read to tell the consent card a return from a takeover. It holds an agent id and a time, no content, and is never sent to a model."
-    },
-    "src/services/cortex-seeder.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUNDLED_CORTEX_NAME_HELD incident twice. No content."
-    },
-    "src/services/share-search-reindex.ts": {
-      "reads": {
-        "listAllMemory": 1
-      },
-      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step reads each workspace share record and writes it back unchanged under its owner, so its search text is rebuilt without the masked fields. Nothing is shown to anyone."
-    },
     "src/services/extension-files.ts": {
       "reads": {
         "getStorageFileMeta": 1,
         "getStorageFile": 1
       },
       "why": "Reviewed 2026-10-20 (secaudit 2026-10, extension-system-run:files-read-as-owner-ghii), checked: the file passes reader.show as the READER, after authorizeRead judged against the same reader. The reader is the caller on an attended call and the principal that wrote the extension's code on an unattended one. Since 2026-10-22 (secaudit 2026-10, v68 and v69) the publish gate reads a stored file's metadata only, to learn whether a write raises it to public."
+    },
+    "src/services/extension-host-bounds.ts": {
+      "reads": {
+        "listMemoryMetaForOwners": 1,
+        "getMemory": 1
+      },
+      "why": "Moved from extension-ctx.ts on 2026-10-25 (secaudit2026oct22): getPublic by a bare owner name finds which of the owner's agents holds the key from metadata and reads that one record; the record goes back to getPublic in extension-ctx.ts, which lets it leave only through the caller's presentation, as before."
     },
     "src/services/extension-lifecycle.ts": {
       "reads": {
@@ -2032,7 +2014,7 @@
     "src/services/metered-entitlements.ts": {
       "reads": {
         "getMemory": 2,
-        "listAllMemory": 5
+        "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Entitlement, grant and history records."
     },
@@ -2053,12 +2035,6 @@
         "listAllMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The workspace registry index; content goes through collectWorkspaceSummary with the reader."
-    },
-    "src/services/secret-host-ask-setting.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-25 (secaudit2026oct22), the node's own read: the owner's own setting record profile.<username>.secret_host_ask, read to decide whether a secret's first send asks the owner, and read again before it is written to keep its version. No content."
     },
     "src/services/notification-settings.ts": {
       "reads": {
@@ -2295,6 +2271,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: portfolio.config records."
     },
+    "src/services/portfolio-memory-gate.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the owner's portfolio.config records under each of the owner's identities, read to tell whether a memory write would make the served welcome page public; only the switch and who may open the page are compared, and nothing is shown to the writer."
+    },
     "src/services/presence.ts": {
       "reads": {
         "getMemory": 2
@@ -2388,6 +2370,12 @@
       },
       "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here. 2026-10-19: updateMemoryRecord is the same read for a caller that also sets tags or visibility; the reads it replaced left calibrator.ts, design-book/reasons.ts, design-book/service.ts, knowledge-sharing.ts and app-template-proposals.ts (check:atomic-writes)."
     },
+    "src/services/refinery/definition-ask.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-27 (secaudit2026oct26), the node's own read: the owner's refinery definition as it is stored, read to compare its mailbox and workspace with what a write asks for; nothing of it is shown to the writer, whose question to the owner names only what the writer itself asked."
+    },
     "src/services/refinery/pipeline.ts": {
       "reads": {
         "getMemory": 3
@@ -2442,6 +2430,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A screenshot-file existence check."
     },
+    "src/services/secret-host-ask-setting.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-25 (secaudit2026oct22), the node's own read: the owner's own setting record profile.<username>.secret_host_ask, read to decide whether a secret's first send asks the owner, and read again before it is written to keep its version. No content."
+    },
     "src/services/security-incident.ts": {
       "reads": {
         "listAllMemory": 1
@@ -2453,6 +2447,12 @@
         "getStorageFileMeta": 2
       },
       "why": "Reviewed 2026-10-18, the node's own read: the metadata of a welcome page or a company front page (which provenance record it carries), to tell whether that record belongs to a page served to anyone now. No content is read or returned."
+    },
+    "src/services/share-search-reindex.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22), the node's own read: the once-only start step reads each workspace share record and writes it back unchanged under its owner, so its search text is rebuilt without the masked fields. Nothing is shown to anyone."
     },
     "src/services/signals/signal-service.ts": {
       "reads": {
@@ -2475,6 +2475,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The node's site template, portal keys and header navigation."
     },
+    "src/services/skill-agent-link-records.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-26, the node's own read, moved here from skills.ts unchanged: the owner's own agents.{name}.skills link record, read to list and rewrite an agent's skill refs; it holds refs and no skill content."
+    },
     "src/services/skill-records.ts": {
       "reads": {
         "listAllMemory": 1
@@ -2492,12 +2498,6 @@
         "getMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Seed fingerprint stamps."
-    },
-    "src/services/skill-agent-link-records.ts": {
-      "reads": {
-        "getMemory": 2
-      },
-      "why": "Reviewed 2026-10-26, the node's own read, moved here from skills.ts unchanged: the owner's own agents.{name}.skills link record, read to list and rewrite an agent's skill refs; it holds refs and no skill content."
     },
     "src/services/skills.ts": {
       "reads": {
@@ -2580,6 +2580,12 @@
         "listMemory": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: The watched value passes leave (external, to the peer) before it goes into a reply; the contract records are the node's own. Reviewed 2026-10-14 (QA audit K2): the third getMemory is the watched key read from the contract owner's own namespace (readWatched); it passes the same leave before it reaches a reply."
+    },
+    "src/services/verified-name.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-10-25 (secaudit2026oct22, lead 3924), the node's own read: the record of the name an identity verification proved, under a service-owned key, read to keep its version when it is written again and read by the wallet seal to compare with the signing certificate. It is never shown to anyone and never sent to a model."
     },
     "src/services/visibility/behaviour-counter.ts": {
       "reads": {

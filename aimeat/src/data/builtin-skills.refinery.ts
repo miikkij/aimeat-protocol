@@ -16,6 +16,9 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.2.3 — 2026-10-27 — "The definition": a change of the mailbox, the workspace, the spaces or
+ *     keepText by an app or an agent without the four run permissions waits for the person's one-press
+ *     answer (secaudit2026oct26). Added, nothing else changed.
  *   v1.2.2 — 2026-10-18 — "Running": a second batch on the same page of mail at the same moment stops
  *     with BATCH_BUSY (the cursor is now moved before the page is processed).
  *   v1.2.1 — 2026-10-13 — "Running": a message that has a row is skipped also after the cursor is
@@ -92,6 +95,13 @@ One private memory record, \`<prefix>.config\`, where \`<prefix>\` is lowercase 
 | \`models\` | \`{ text, vision }\`, empty for the owner's defaults |
 | \`spaces\` | \`{ items, events }\`, default \`viesti\` and \`tapahtuma\` |
 | \`keepText\` | \`true\` keeps the mail's text on each row (below). Default \`false\`. Set it only with the person's word: it puts the content of their mail into the workspace |
+
+Without the four permissions a batch spends (\`connections:read-through\`, \`ai:use\`, \`organism:rows\`,
+\`memory:write\`), an app or an agent still writes the definition, but a change of \`connectionId\`,
+\`provider\`, \`organismId\`, \`workspaceId\`, \`spaces\` or \`keepText\` waits for the person: the write
+answers 202 with \`publish_request\`, the rest is saved, and the refinery keeps the mailbox and the
+workspace it had until the person allows it with one press. Tell them what you asked and give them
+the request's address.
 
 Start from the packs: \`aimeat_refinery_classes\` says what each kind is, whether it is processed, and
 which fields it reads. A newsletter and a personal letter are filed, not processed.
