@@ -66159,7 +66159,11 @@ paths:
                   description: Publish to your own connected account. Mutually exclusive with app_id.
                 app_id:
                   type: string
-                  description: With `action`, publish through a delegation over someone's shared channel.
+                  description: >
+                    With `action`, publish through a delegation over someone's shared channel. The
+                    delegation is used by the app it names (its own grant token, any user's), by a
+                    person who uses that app (a live grant for it) in person or through their agents,
+                    and by the channel owner. Any other caller is 403 DELEGATION_NOT_FOR_CALLER.
                 action:
                   type: string
                   example: publish-video
@@ -66215,6 +66219,11 @@ paths:
             spent, or the account needs reconnecting.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: >
+            DELEGATION_NOT_FOR_CALLER - the delegation was given to an app the caller is not, and the
+            caller neither uses that app nor owns the channel. The message names the app to publish
+            through. CLASSIFIED - the stored file may not leave its organism.
         '404':
           description: >
             No such connection, or no such stored file. A connection belonging to someone else is
