@@ -10,10 +10,15 @@
 # the weights are a fixed commit of convaiinnovations/laya and the base image is pinned by digest,
 # so a build gets exactly what was measured.
 ARG TORCH=cpu
-FROM python:3.12-slim@sha256:2f17fc044b579bab302c2e8054d3a686e2cb9a83de48e70534b94cd8ebbe06a9
+FROM python:3.12-slim@sha256:12316debbfb86890f6b2d825820612741ba527ad5a44e3902759141d572bfe8f
 ARG TORCH
 ENV PYTHONUNBUFFERED=1 PIP_NO_CACHE_DIR=1 PIP_DISABLE_PIP_VERSION_CHECK=1 HF_HOME=/opt/hf
 RUN useradd -m -u 10001 app
+
+# pip before 26.2.2 trusts the compromised emSign intermediates through its own copy of certifi
+# (the PSF notice of 2026-10-20), and the base image still carries an older one.
+COPY pip.txt /tmp/req/pip.txt
+RUN pip install --require-hashes -r /tmp/req/pip.txt
 
 # The weights at one commit. laya-serve asks the cache for the default branch by name, and the hub
 # is off at run time, so that name is pointed at the pinned commit: a download by commit writes no
