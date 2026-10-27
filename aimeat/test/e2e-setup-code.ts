@@ -26,10 +26,17 @@
  *   first account and setup are refused without it; and the first registration from loopback works
  *   without one.
  *
- *   It runs its own four nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
- *   (public, setup), 40535 (public, registration), 40536 (public, no operator) and 40534 (loopback).
+ *   On a loopback node with the connector tunnel on and owners but no operator: a sign-in a remote
+ *   agent forwards through the tunnel answers but does not make its owner the operator, a registration
+ *   it forwards is asked for the code, and a sign-in on the node's own machine still does.
+ *
+ *   It runs its own five nodes, on the run's backend (test/helpers/own-node-db.ts), on ports 40533
+ *   (public, setup), 40535 (public, registration), 40536 (public, no operator), 40534 (loopback) and
+ *   40537 (loopback, tunnel on, no operator).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-setup-code
  * @version-history
+ *   2026-10-27 — A node on 40537: a sign-in or registration forwarded through the connector tunnel is
+ *     not the node's own machine for the setup code (secaudit2026oct26).
  *   2026-10-23 — The loopback node prints a code, and a request from this machine's network address is
  *     asked for it (secaudit2026oct22; Jouni, 2026-10-23).
  *   2026-10-16 — The password carries a fixed digit: a letters-only STAMP failed the password rule.
@@ -49,6 +56,8 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb, type OwnNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { tokenRoles } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
+import { TunnelClient } from './helpers/tunnel-harness.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 import { hashPassword } from '../src/services/password.js';
 
@@ -56,6 +65,7 @@ const PUBLIC_PORT = 40533;
 const LOOPBACK_PORT = 40534;
 const REGISTER_PORT = 40535;
 const NO_OPERATOR_PORT = 40536;
+const TUNNEL_PORT = 40537;
 const STAMP = Date.now().toString(36).slice(-6);
 // A fixed digit: STAMP is base36 and is sometimes letters only, and the password rule asks for a number.
 const PASSWORD = `Setup-Code-${STAMP}-Pw7!`;
@@ -121,6 +131,7 @@ let pub: OwnNode | null = null;
 let reg: OwnNode | null = null;
 let noop: OwnNode | null = null;
 let loop: OwnNode | null = null;
+let tun: OwnNode | null = null;
 
 // POST /v1/setup/init writes an .env into the package root when none is there. A placeholder is
 // written first and removed afterwards, unless the developer already had one, which is not touched
@@ -321,11 +332,82 @@ try {
         assert(r.status === 201, `expected 201, got ${r.status} ${short(r.body)}`);
         assert(r.body.data.owner.roles.includes('operator'), `roles: ${short(r.body.data.owner.roles)}`);
     });
+    await stopNode(loop);
+    loop = null;
+
+    // secaudit2026oct26, setup-code/loopback-waiver-honours-connect-tunnel-self-fetch. The connector
+    // forward tunnel replays an agent's request frame through the node's own HTTP stack on loopback,
+    // so the request arrives on a loopback socket although a remote agent sent it.
+    console.log('\nA loopback node with the connector tunnel on, owners and no operator');
+    const tunDb = await ownNodeDb(String(TUNNEL_PORT));
+    const tunEnv = { AIMEAT_LOG_LEVEL: 'warn', AIMEAT_CONNECT_TUNNEL_ENABLED: 'true', AIMEAT_REGISTRATION_RATE_LIMIT_MAX: '20' };
+    tun = await startNode(TUNNEL_PORT, `http://127.0.0.1:${TUNNEL_PORT}`, tunEnv, tunDb);
+    const tunNodeId = `aimeat-test-001-setupcode${TUNNEL_PORT}${STAMP}`;
+    await stopNode(tun);
+    const remoteName = `tunremote${STAMP}`;
+    const localName = `tunlocal${STAMP}`;
+    const tunStore = tunDb.provider === 'postgres-kysely'
+        ? await createStorage({ provider: 'postgres-kysely', dbUrl: tunDb.dbUrl })
+        : await createStorage({ provider: 'sqlite', sqlitePath: tunDb.sqlitePath });
+    try {
+        for (const name of [remoteName, localName]) {
+            const now = new Date().toISOString();
+            await tunStore.createOwner({ name, displayName: name, publicKey: '', roles: ['owner'], createdAt: now });
+            await tunStore.createGHII({
+                username: name, nodeId: tunNodeId, ghii: `${name}@${tunNodeId}`, displayName: name,
+                passwordHash: await hashPassword(PASSWORD), verificationLevel: 0, ownerName: name, totpEnabled: false,
+                createdAt: now, updatedAt: now,
+            });
+        }
+    } finally {
+        await (tunStore as unknown as { close?: () => unknown }).close?.();
+    }
+    tun = await startNode(TUNNEL_PORT, `http://127.0.0.1:${TUNNEL_PORT}`, tunEnv, tunDb);
+    const tnode = tun;
+    const tunFromLan: OwnNode = { ...tnode, base: `http://${lan}:${TUNNEL_PORT}` };
+    const signIn = (node: OwnNode, username: string) => json(node, '/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username, password: PASSWORD }) });
+
+    await test('a sign-in a remote agent forwards through the tunnel does not make its owner the operator', async () => {
+        assert(lan, 'this machine has no IPv4 address other than loopback, so the remote owner cannot sign in from another address');
+        const remote = await signIn(tunFromLan, remoteName);
+        assert(remote.status === 200 && !tokenRoles(remote.body.data.token).includes('operator'), `the remote owner's own sign-in: ${remote.status} ${short(tokenRoles(remote.body?.data?.token ?? ''))}`);
+        const agent = await makeAgent(tunFromLan.base, { name: remoteName, token: remote.body.data.token }, ['memory:read']);
+        const tunnel = await TunnelClient.connect(tunFromLan.base, agent.token);
+        try {
+            const forwarded = await tunnel.request('POST', '/v1/ghii/login', { body: { username: remoteName, password: PASSWORD }, timeoutMs: 30_000 });
+            assert(forwarded.status === 200, `the forwarded sign-in still answers: ${forwarded.status} ${short(forwarded.body)}`);
+            assert(!tokenRoles(forwarded.body.data.token).includes('operator'), `the forwarded sign-in made the remote owner the operator: ${short(tokenRoles(forwarded.body.data.token))}`);
+            const reg = await tunnel.request('POST', '/v1/ghii', { body: { username: `tunreg${STAMP}`, display_name: 'Tunnel', password: PASSWORD }, timeoutMs: 30_000 });
+            assert(reg.status === 403 && reg.body?.error?.code === 'SETUP_CODE_REQUIRED', `a registration forwarded through the tunnel: ${reg.status} ${short(reg.body)}`);
+        } finally {
+            await tunnel.close();
+        }
+    });
+
+    // The node goes back to "owners and no operator" whatever the test above did, so the next one
+    // stands on its own: on an unfixed node the forwarded sign-in has already made an operator.
+    await stopNode(tun);
+    const resetStore = tunDb.provider === 'postgres-kysely'
+        ? await createStorage({ provider: 'postgres-kysely', dbUrl: tunDb.dbUrl })
+        : await createStorage({ provider: 'sqlite', sqlitePath: tunDb.sqlitePath });
+    try {
+        for (const name of [remoteName, localName]) await resetStore.updateOwner(name, { roles: ['owner'] });
+    } finally {
+        await (resetStore as unknown as { close?: () => unknown }).close?.();
+    }
+    tun = await startNode(TUNNEL_PORT, `http://127.0.0.1:${TUNNEL_PORT}`, tunEnv, tunDb);
+    const tnodeAgain = tun;
+
+    await test('usage: on the node\'s own machine a sign-in still makes the first owner the operator, without a code', async () => {
+        const r = await signIn(tnodeAgain, localName);
+        assert(r.status === 200 && tokenRoles(r.body.data.token).includes('operator'), `the local sign-in: ${r.status} ${short(tokenRoles(r.body?.data?.token ?? ''))}`);
+    });
 } finally {
     await stopNode(pub);
     await stopNode(reg);
     await stopNode(noop);
     await stopNode(loop);
+    await stopNode(tun);
     if (!HAD_ENV && existsSync(PACKAGE_ENV)) unlinkSync(PACKAGE_ENV);
 }
 
