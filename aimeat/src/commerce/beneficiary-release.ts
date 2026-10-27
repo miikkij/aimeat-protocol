@@ -37,6 +37,10 @@
  *   const gate = await beneficiaryEligibility(storage, config, beneficiaryGhii);
  *   if (!gate.eligible) return res.status(409).json(error(nodeId, gate.reason, gate.message));
  * @version-history
+ *   2026-10-27 — An approval verified before the account that holds the name now was registered counts
+ *     as unverified (a later holder of a released name), and deleteApprovalOf lets the account erasure
+ *     remove the erased person's approval (secaudit2026oct26,
+ *     commerce/beneficiary-release:approval-survives-erasure-rebinds-on-name-reuse).
  *   v1.0.0 — 2026-07-30 — Initial: the verification gate and the two release rails.
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -44,6 +48,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { bookPayable } from './payable-book.js';
 import { settleEntryStatus, type BeneficiaryEntry } from './beneficiary-book.js';
+import { heldSince } from '../services/account-instance.js';
 
 /** System namespace — an approval is a server-trusted fact, so never in a principal-writable space. */
 export const NS_BENEFICIARY_APPROVAL = 'beneficiary-approval';
@@ -82,6 +87,14 @@ const approvalKey = (ghii: string): string =>
 export async function readApproval(storage: Storage, ghii: string): Promise<BeneficiaryApproval | null> {
   const rec = await storage.getMemory(NS_BENEFICIARY_APPROVAL, approvalKey(ghii));
   return rec ? (rec.value as BeneficiaryApproval) : null;
+}
+
+/**
+ * Remove the approval of an erased account. It attests to that person only, and the name is released
+ * for reuse (services/name-bound-grants-erasure.ts). Answers whether one was there.
+ */
+export async function deleteApprovalOf(storage: Storage, ghii: string): Promise<boolean> {
+  return storage.deleteMemory(NS_BENEFICIARY_APPROVAL, approvalKey(ghii), 'account-erasure');
 }
 
 /** Record an operator's finding about a beneficiary. The route above this enforces the operator role. */
@@ -141,7 +154,10 @@ export async function beneficiaryEligibility(
     };
   }
   const approval = await readApproval(storage, beneficiaryGhii);
-  const state = approval?.state ?? 'unverified';
+  // An approval attests to the account that held the name when it was verified. An account registered
+  // after that is a later holder of a released name, and nobody has checked them (secaudit2026oct26).
+  const state = approval?.state === 'verified' && !await heldSince(storage, beneficiaryGhii, approval.verifiedAt)
+    ? 'unverified' : (approval?.state ?? 'unverified');
   if (state === 'verified') {
     return { eligible: true, state, reason: 'OK', message: 'Verified. The share may be released' };
   }

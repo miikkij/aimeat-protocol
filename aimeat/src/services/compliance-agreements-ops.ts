@@ -17,6 +17,10 @@
  *   endOp · deletionDoneOp · breachNoticeOp · documentOp · changedParts
  * @usage const out = await createOp(deps, caller, body, { dryRun: true });
  * @version-history
+ *   2026-10-27 — createOp and patchOp record when the counterparty account was named
+ *     (counterpartyNamedAt); patchOp checks a new counterparty account as createOp does; mineOp lists
+ *     only agreements whose counterparty is the account that holds the name now (secaudit2026oct26,
+ *     compliance-agreements:counterparty-bound-by-reusable-account-name).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D1–D4).
  */
 import type { AimeatConfig } from '../config.js';
@@ -35,7 +39,7 @@ import {
 import {
   historyEntry, inForce, listAgreements, newAgreementId, newest, readAgreement, statusOf, summaryOf, updateAgreement, writeNewAgreement,
 } from './compliance-agreements.js';
-import { AgreementError, agreementAccess, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
+import { AgreementError, agreementAccess, counterpartyHolds, operatorAccess, ownerGhiiOf } from './compliance-agreements-access.js';
 import { generateAnnexes, measuresFromConfig, operatorParty, subprocessorsFor } from './compliance-agreements-generate.js';
 import { canonicalText, renderAgreementPdf, textHashOf } from './compliance-agreements-render.js';
 import { tellAgreement } from './compliance-agreements-notify.js';
@@ -112,6 +116,8 @@ export async function mineOp(deps: Deps, caller: CallerContext): Promise<Record<
   const mine = all.filter(a => a.counterparty.account && a.counterparty.account === me);
   const out = [];
   for (const a of mine) {
+    // A later holder of a released name is not the counterparty (counterpartyHolds).
+    if (!await counterpartyHolds(deps.storage, a)) continue;
     await agreementAccess(deps, caller.auth, a, 'read');
     out.push(summaryOf(await syncDocsign(deps, a)));
   }
@@ -149,6 +155,7 @@ export async function createOp(deps: Deps, caller: CallerContext, body: unknown,
   const agreement: Agreement = {
     id: newAgreementId(), type: 'dpa-art28', template: 'eu-scc-2021-915', language: input.language, ourRole: input.ourRole,
     product: input.product, subject, counterparty: input.counterparty,
+    ...(input.counterparty.account ? { counterpartyNamedAt: now } : {}),
     ...(input.registerId ? { registerId: input.registerId } : {}), ...(input.externalRef ? { externalRef: input.externalRef } : {}),
     versions: [{ n: 1, status: 'draft', annexes, sources, options, createdAt: now, createdBy: who.by, signatures: [], remindersSent: [] }],
     history: [historyEntry(who.ownerGhii, 'created', `Version 1 drafted from ${input.registerId ? `register ${input.registerId}` : `the ${input.product} defaults`}.`)],
@@ -166,6 +173,16 @@ export async function patchOp(deps: Deps, caller: CallerContext, id: string, bod
   const p = parsed.data;
   const cur = await load(deps, id);
   if (newest(cur).status !== 'draft') throw new AgreementError(409, 'NOT_A_DRAFT', `Version ${newest(cur).n} has been sent and does not change. Make a new version (POST /v1/compliance/agreements/${id}/versions).`);
+  // A new counterparty account gets the checks a new agreement's does: an account on this node that
+  // someone holds now, so the name cannot be claimed later by whoever registers it.
+  const newAccount = p.counterparty?.account;
+  if (newAccount && !newAccount.endsWith(`@${deps.config.nodeId}`)) {
+    throw new AgreementError(400, 'INVALID_INPUT', `counterparty.account is an account on this node (name@${deps.config.nodeId}). A party on another node is reached by its e-mail.`);
+  }
+  if (newAccount && !await deps.storage.getGHII(newAccount)) {
+    throw new AgreementError(404, 'NOT_FOUND', `No one is registered as ${newAccount}.`);
+  }
+  const namedAt = new Date().toISOString();
   const regenerate = (p.product && p.product !== cur.product) || (p.language && p.language !== cur.language) || (p.registerId !== undefined && p.registerId !== cur.registerId) || !!p.counterparty;
   const gen = regenerate ? await generateAnnexes(deps, {
     counterparty: p.counterparty ?? cur.counterparty, product: p.product ?? cur.product, language: p.language ?? cur.language,
@@ -180,7 +197,8 @@ export async function patchOp(deps: Deps, caller: CallerContext, id: string, bod
     const next: AgreementVersion = { ...v, annexes, sources, options };
     return {
       ...a,
-      ...(p.counterparty ? { counterparty: p.counterparty } : {}), ...(p.product ? { product: p.product } : {}),
+      ...(p.counterparty ? { counterparty: p.counterparty, counterpartyNamedAt: p.counterparty.account ? namedAt : undefined } : {}),
+      ...(p.product ? { product: p.product } : {}),
       ...(p.language ? { language: p.language } : {}), ...(p.subject ? { subject: p.subject } : {}),
       ...(p.registerId !== undefined ? { registerId: p.registerId } : {}), ...(p.externalRef !== undefined ? { externalRef: p.externalRef } : {}),
       versions: [...a.versions.slice(0, -1), next],

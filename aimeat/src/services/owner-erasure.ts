@@ -23,6 +23,9 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-10-27 — Step name_bound_grants: the operator's beneficiary approval of the person, the accountant
+ *     grants other owners gave them, and the agreements naming their account as the counterparty's
+ *     (services/name-bound-grants-erasure.ts, secaudit2026oct26).
  *   2026-10-25 — The scheduled_jobs step deletes every job whose ownerScope is the account, not only
  *     those the person made in person: a job an agent or ecosystem app made carries the maker's
  *     identity as createdBy and survived (secaudit2026oct22).
@@ -82,6 +85,7 @@ import { eraseAppMembership } from './app-member-erasure.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
 import { appendRequest, removeAppDocsOfOwner } from './compliance-docs.js';
+import { eraseNameBoundGrants } from './name-bound-grants-erasure.js';
 
 export interface OwnerErasureResult {
   agentsDeleted: number;
@@ -372,6 +376,15 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
       const c = await revokeEntitlementsOfAccount(storage, name, nodeId);
       const n = c.asConsumer + c.asProvider;
       return n ? `entitlements:${n}` : null;
+    }, deletionLog, storage);
+
+    // The operator's beneficiary approval, the accountant grants other owners gave the person, and the
+    // agreements naming the account as the counterparty's: kept by others, keyed by the released name
+    // (services/name-bound-grants-erasure.ts, secaudit2026oct26).
+    await step('name_bound_grants', async () => {
+      const c = await eraseNameBoundGrants(storage, nodeId, name);
+      const n = c.approvals + c.accountantLists + c.agreements;
+      return n ? `name_bound_grants:${n}` : null;
     }, deletionLog, storage);
 
     // Passkeys. The row is found by credential id and names the account by its bare name, which is

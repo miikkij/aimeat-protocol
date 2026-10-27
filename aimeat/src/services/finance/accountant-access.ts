@@ -16,9 +16,13 @@
  *   accountant whose grant was revoked). Mutation routes never take the param.
  *
  * @structure grantAccountant · revokeAccountant · listAccountants · listClients ·
- *   resolveFinanceOwner
+ *   resolveFinanceOwner · removeAccountantEverywhere
  * @usage const owner = await resolveFinanceOwner(config, storage, req);
  * @version-history
+ *   v1.2.0 — 2026-10-27 — The list keeps when each entry was granted (grantedAt). An account registered
+ *     after its entry was granted is a later holder of a released name and reads nothing; the account
+ *     erasure takes the erased person off every list (removeAccountantEverywhere) (secaudit2026oct26,
+ *     finance/accountant-access:grant-survives-erasure-rebinds-on-name-reuse).
  *   v1.1.0 — 2026-10-18 — Both lists are written on the version that was read (updateRecord), so a
  *     grant and a revoke at the same moment each apply to what the other wrote.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 6.
@@ -28,6 +32,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { FinanceError } from './errors.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
+import { heldSince } from '../account-instance.js';
+import { listAllMemoryPages } from '../../storage/memory-pages.js';
 
 const ACCOUNTANTS_KEY = 'finance.accountants';
 const CLIENTS_KEY = 'finance.clients';
@@ -47,12 +53,53 @@ const listOf = (v: unknown): string[] => {
  * and a revoke, at the same moment each apply to the list the other wrote. `edit` answers the new
  * list, or null to write nothing. Answers the list as stored.
  */
-async function editList(storage: Storage, ownerGhii: string, key: string, edit: (list: string[]) => string[] | null): Promise<string[]> {
-  const stored = await updateRecord(storage, ownerGhii, key, (v) => ({ list: listOf(v) }), (cur) => {
+async function editList(
+  storage: Storage, ownerGhii: string, key: string, edit: (list: string[]) => string[] | null, stamp?: { add?: string; at: string },
+): Promise<string[]> {
+  const parse = (v: unknown): { list: string[]; grantedAt?: Record<string, string> } => ({ list: listOf(v), grantedAt: grantedAtOf(v) });
+  const stored = await updateRecord(storage, ownerGhii, key, parse, (cur) => {
     const next = edit([...cur.list]);
-    return next ? { list: next } : UNCHANGED;
+    if (!next && !stamp?.add) return UNCHANGED;
+    const list = next ?? cur.list;
+    // When each entry was granted, so a later holder of a released name is told apart (grantedToCurrentHolder).
+    const grantedAt = Object.fromEntries(Object.entries(cur.grantedAt ?? {}).filter(([g]) => list.includes(g)));
+    if (stamp?.add && list.includes(stamp.add)) grantedAt[stamp.add] = stamp.at;
+    return Object.keys(grantedAt).length ? { list, grantedAt } : { list };
   }, { tag: 'finance' });
   return stored.list;
+}
+
+const grantedAtOf = (v: unknown): Record<string, string> => {
+  const g = (v as { grantedAt?: unknown } | undefined)?.grantedAt;
+  return g && typeof g === 'object' && !Array.isArray(g)
+    ? Object.fromEntries(Object.entries(g as Record<string, unknown>).filter(([, at]) => typeof at === 'string')) as Record<string, string>
+    : {};
+};
+
+/**
+ * Whether `accountantGhii` is on the client's authoritative list as the account that holds the name
+ * now. An entry granted before that account was registered names an earlier holder of a released name
+ * (secaudit2026oct26). An entry from before grant times were kept is dated by the list's last write.
+ */
+async function grantedToCurrentHolder(storage: Storage, clientGhii: string, accountantGhii: string): Promise<boolean> {
+  const rec = await storage.getMemory(clientGhii, ACCOUNTANTS_KEY);
+  if (!listOf(rec?.value).includes(accountantGhii)) return false;
+  return heldSince(storage, accountantGhii, grantedAtOf(rec?.value)[accountantGhii] ?? rec?.updatedAt);
+}
+
+/**
+ * Take an erased account off every client's accountant list. The grant was to that person, and the
+ * name is released for reuse (services/name-bound-grants-erasure.ts). Answers how many lists changed.
+ */
+export async function removeAccountantEverywhere(storage: Storage, accountantGhii: string): Promise<number> {
+  const { items } = await listAllMemoryPages(storage, { prefix: ACCOUNTANTS_KEY });
+  let n = 0;
+  for (const rec of items) {
+    if (rec.key !== ACCOUNTANTS_KEY || !listOf(rec.value).includes(accountantGhii)) continue;
+    await editList(storage, rec.ownerGaii, ACCOUNTANTS_KEY, (list) => list.filter((g) => g !== accountantGhii));
+    n++;
+  }
+  return n;
 }
 
 /** Grants the accountant role to a local owner. Both sides of the pair are written. */
@@ -64,7 +111,7 @@ export async function grantAccountant(config: AimeatConfig, storage: Storage, gr
   if (accountantGhii === granterGhii) throw new FinanceError('INVALID_ACCOUNTANT', 422, 'You already read your own books');
 
   const accountants = await editList(storage, granterGhii, ACCOUNTANTS_KEY,
-    (list) => (list.includes(accountantGhii) ? null : [...list, accountantGhii]));
+    (list) => (list.includes(accountantGhii) ? null : [...list, accountantGhii]), { add: accountantGhii, at: new Date().toISOString() });
   await editList(storage, accountantGhii, CLIENTS_KEY,
     (list) => (list.includes(granterGhii) ? null : [...list, granterGhii]));
   return accountants;
@@ -90,8 +137,7 @@ export async function listClients(storage: Storage, accountantGhii: string): Pro
   const mirror = await readList(storage, accountantGhii, CLIENTS_KEY);
   const verified: string[] = [];
   for (const clientGhii of mirror) {
-    const authority = await readList(storage, clientGhii, ACCOUNTANTS_KEY);
-    if (authority.includes(accountantGhii)) verified.push(clientGhii);
+    if (await grantedToCurrentHolder(storage, clientGhii, accountantGhii)) verified.push(clientGhii);
   }
   return verified;
 }
@@ -106,8 +152,7 @@ export async function resolveFinanceOwner(config: AimeatConfig, storage: Storage
   if (!ownerParam || `${ownerParam}@${config.nodeId}` === callerGhii) return callerGhii;
   if (!NAME_RE.test(ownerParam)) throw new FinanceError('INVALID_OWNER', 400, 'owner must be a local owner name');
   const targetGhii = `${ownerParam}@${config.nodeId}`;
-  const accountants = await readList(storage, targetGhii, ACCOUNTANTS_KEY);
-  if (!accountants.includes(callerGhii)) {
+  if (!await grantedToCurrentHolder(storage, targetGhii, callerGhii)) {
     throw new FinanceError('ACCOUNTANT_ACCESS_DENIED', 403, `No accountant grant from "${ownerParam}"`);
   }
   return targetGhii;
