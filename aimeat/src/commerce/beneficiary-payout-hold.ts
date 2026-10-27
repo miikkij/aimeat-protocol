@@ -14,7 +14,8 @@
  *   checkout and A2A doors got the same treatment on 2026-10-25 (possible-payment.ts).
  *
  *   WHAT HAPPENS NOW. The node keeps a possible-payout record under the provider's GHII
- *   (`commerce.possible.payout.<nonce>`, a service-owned prefix no memory route rewrites) with the
+ *   (`commerce.possible.payout.<nonce>`, the provider's own record: what they change in it only moves
+ *   their own entries in or out of their own quote) with the
  *   nonce, the payer, the amount and the entries the signature covered; it logs at error level and
  *   notifies the beneficiary to look for the transfer. The provider is answered 502
  *   X402_SETTLE_UNKNOWN, in plain words: do not sign again yet. While the record is open, the quote
