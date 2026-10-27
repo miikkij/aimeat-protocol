@@ -245,12 +245,12 @@
       "digest": "sha256:11c6255278aaeea621a42c17"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-10-18",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:0f8ab65ca51570d1234f367b"
+      "digest": "sha256:ebdb721e181b1828f4b66970"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-25",
@@ -260,12 +260,12 @@
       "digest": "sha256:52ebcd099c3f0297a44fc1f2"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-26",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:f61d9d1ef649ca9175496eb9"
+      "digest": "sha256:a82e6e5159e44e85d3fba3f2"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -286,12 +286,12 @@
       "digest": "sha256:d0aa9695ca5cdc314a3ae401"
     },
     "node:set-up-content-pipeline": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/lifecycle.ts"
       ],
-      "digest": "sha256:6640970ad53f83c727c27f19"
+      "digest": "sha256:e889ce5039a1ecdeff09bd30"
     },
     "node:configure-routing": {
       "reviewedOn": "2026-10-25",
@@ -325,7 +325,7 @@
       "digest": "sha256:8baa34c1b4642d1875c2b84a"
     },
     "node:aimeat-workspace-contracts": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/services/connect-tunnel-push.ts",
         "aimeat/src/cli/connect/mcp/local-server.ts",
@@ -334,7 +334,7 @@
         "aimeat/src/services/agent-profile-write.ts",
         "aimeat/src/services/agent-task-rules.ts"
       ],
-      "digest": "sha256:0997433c638d579ea7b4dc89"
+      "digest": "sha256:04ba114b33beda0dc126137e"
     },
     "node:aimeat-html-page": {
       "reviewedOn": "2026-10-20",
@@ -377,7 +377,7 @@
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
-      "reviewedOn": "2026-10-20",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/services/mcp-client/grants.ts",
@@ -385,27 +385,27 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:0dabba5ebedcca5becd154a6"
+      "digest": "sha256:945b6e6f6a658a1fc0cdf4df"
     },
     "node:aimeat-workflow-decisions": {
-      "reviewedOn": "2026-10-22",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/services/workflow/engine-human.ts",
         "aimeat/src/services/workflow/lifecycle.ts",
         "aimeat/src/mcp/workflows.ts"
       ],
-      "digest": "sha256:000892f2db2f517162f867b9"
+      "digest": "sha256:f7465674aff12a3ecb43197a"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-10-21",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:3bcec087501abde1279b0ec0",
+      "digest": "sha256:4dcd0bf4d817fb7f9dfed34e",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -434,14 +434,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:360ffe436dcce601eb08eb14"
+      "digest": "sha256:5924f5219c9545efd9d9f347"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -499,11 +499,11 @@
       "note": "It describes records on the node and ids in CLAUDE.md, not code in this tree."
     },
     "project:aimeat-pages-links": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-27",
       "watches": [
         "aimeat/src/routes/organisms/workspace-ops.ts"
       ],
-      "digest": "sha256:a3194a01834a12339ddbb06f"
+      "digest": "sha256:edfb584b4aa3baab233c7a6b"
     },
     "project:aimeat-video": {
       "reviewedOn": "2026-09-19",
@@ -622,7 +622,7 @@
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
     "node:ai-transparency": {
-      "aimeat/src/mcp/ai-provenance-input.ts": "d2c8dbd9f1ff0642",
+      "aimeat/src/mcp/ai-provenance-input.ts": "02f738b290959c61",
       "aimeat/src/services/ai-provenance.ts": "24021ea9d834c23b"
     },
     "node:aimeat-node-operations": {
@@ -630,7 +630,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "877f825eb4828018",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "0052881fc7878d95"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "a5e7ae9f4ada5a26"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
@@ -643,7 +643,7 @@
       "aimeat/src/data/basic-agents.ts": "24d901efdc265451"
     },
     "node:set-up-content-pipeline": {
-      "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
+      "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29"
     },
     "node:configure-routing": {
@@ -658,7 +658,7 @@
       "aimeat/src/cli/skill-install.ts": "43fad9e1b6aedc0d"
     },
     "node:diagnose-a-workflow": {
-      "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
+      "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "d35f0d5e66f3eeaa",
       "aimeat/src/services/scheduler.ts": "a65cd86712893598",
       "aimeat/src/services/ai/route-plan.ts": "833e3372585aa54e"
@@ -689,7 +689,7 @@
     },
     "project:aimeat-organism-records": {},
     "project:aimeat-pages-links": {
-      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15"
+      "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b"
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
@@ -740,7 +740,7 @@
     "node:aimeat-workspace-contracts": {
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/cli/connect/mcp/local-server.ts": "cebe16fc0210cc3e",
-      "aimeat/src/routes/organisms/workspace-ops.ts": "de51b7e0fa665f15",
+      "aimeat/src/routes/organisms/workspace-ops.ts": "dca722aac4be161b",
       "aimeat/src/routes/organisms/workspace-access.ts": "6bee2a50409a1cf7",
       "aimeat/src/services/agent-profile-write.ts": "27b8a03e2ea5d74c",
       "aimeat/src/services/agent-task-rules.ts": "ecc15d527ed12974"
@@ -765,21 +765,21 @@
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },
     "node:aimeat-mcp-servers": {
-      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "6e3452ba7d0e746f",
+      "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "095fdb4fbeb06409",
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
       "aimeat/src/services/mcp-client/registry.ts": "804ea44a9115d001",
       "aimeat/src/services/mcp-client/invoke.ts": "2c19276ca1c8fdd1",
       "aimeat/src/mcp/mcp-proxy.ts": "9b3ef4f1de84a597"
     },
     "node:aimeat-workflow-decisions": {
-      "aimeat/src/models/workflow-schemas.ts": "b2d4b2bdc6f01ccf",
+      "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/services/workflow/engine-human.ts": "e526ff78525b0d61",
       "aimeat/src/services/workflow/lifecycle.ts": "ef1007ab727bfb29",
       "aimeat/src/mcp/workflows.ts": "cfe244d336c1b03c"
     },
     "node:aimeat-bookkeeping": {
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
-      "aimeat/src/routes/finance-ledger.ts": "0db9f1cfe9b9c080",
+      "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
       "aimeat/src/routes/odata.ts": "fc920574f840ce8f"
     },
