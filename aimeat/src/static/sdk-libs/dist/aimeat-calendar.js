@@ -8055,6 +8055,7 @@
   var UTC_PART = { byhour: (d2) => d2.getUTCHours(), byminute: (d2) => d2.getUTCMinutes(), bysecond: (d2) => d2.getUTCSeconds() };
   var DAY_FILTERS = ["bymonth", "byweekno", "byweekday", "byeaster", "bymonthday", "byyearday"];
   var ENGINE_FACTOR = 5;
+  var MAX_TIMESET = 24 * 60 * 60;
   var PAST_END = /* @__PURE__ */ Symbol("past the range end");
   var asList = (v2) => v2 == null ? [] : [].concat(v2);
   var gcd = (a2, b2) => b2 ? gcd(b2, a2 % b2) : a2;
@@ -8141,6 +8142,8 @@
         const { never, lift: limits } = timeLimits(opts, startWall);
         if (!never) {
           for (const [k2] of limits) delete opts[k2];
+          const timeset = ["byhour", "byminute", "bysecond"].reduce((n2, k2) => n2 * Math.max(1, asList(opts[k2]).length), 1);
+          if (timeset > MAX_TIMESET) throw new RangeError("Recurrence iteration limit exceeded; shorten the series");
           const rule = new RRule2({ ...opts, dtstart: new Date(startWall), until: new Date(endWall) });
           meterPeriods(rule, lastPeriod(opts.freq, rule.options.interval, startWall, endWall), engine);
           try {
