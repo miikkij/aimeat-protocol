@@ -67,7 +67,7 @@ import * as orgService from '/js/services/organisms.js';
 import { copyToClipboard } from '/js/utils.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { swallowed } from '/js/swallowed.js';
-import { fieldErrorsOf, refusalLine } from '/js/field-errors.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
 import { OrganismRecords } from '/views/profile/organisms/compliance-records.js';
 
@@ -133,7 +133,8 @@ export function OrganismSettings({ org, isCreator, isMember, canEdit, showToast,
       const refused = fieldErrorsOf(err);
       setErrors(refused);
       if (!Object.keys(refused).length) swallowed('home-settings', err);
-      showToast(refusalLine(refused, ['name', 'description', 'type'], t) || t('organisms.updateError') || 'Failed to update');
+      showToast(refusalLine(refused, ['name', 'description', 'type'], t) || t('organisms.updateError') || 'Failed to update', true);
+      focusFirstInvalid();
     }
     finally { setSaving(false); }
   };

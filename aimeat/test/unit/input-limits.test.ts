@@ -82,6 +82,10 @@ describe('field errors', () => {
         assert.equal(env.error?.code, 'VALIDATION_ERROR');
         assert.equal(env.error?.message, 'title: Too long: at most 5 characters.');
         assert.equal((env.error?.details as unknown[]).length, 1);
+        // The caller's own input, never "this one is on us" (the _ERROR pattern of message-audience.ts).
+        const step = env.hints?.next_actions?.[0]?.description ?? '';
+        assert.ok(!/on us/i.test(step), `the next step must not blame the node: ${step}`);
+        assert.match(step, /details/);
     });
 });
 

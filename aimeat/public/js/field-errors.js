@@ -8,7 +8,7 @@
  *   the person's language. A form keeps what fieldErrorsOf gives in its state and passes it to
  *   Fields as `errors`; each field whose `name` is a path in it shows its message under itself
  *   (components/Field.js).
- * @structure fieldErrorsOf(err) · otherErrors(errors, names) · refusalLine(errors, names, t)
+ * @structure fieldErrorsOf(err) · otherErrors(errors, names) · refusalLine(errors, names, t) · focusFirstInvalid(root)
  * @usage
  *   const [errors, setErrors] = useState({});
  *   try { setErrors({}); await apiPost('/v1/x', body); } catch (err) { setErrors(fieldErrorsOf(err)); }
@@ -58,4 +58,19 @@ export function otherErrors(errors, names) {
 export function refusalLine(errors, names, t) {
   if (!Object.keys(errors).length) return null;
   return otherErrors(errors, names) || t('form.checkFields');
+}
+
+/**
+ * After the page has drawn a refusal's messages, put the focus on the first field marked invalid
+ * inside `root` (the whole page when none is given) and bring it into view, so a person whose save
+ * button sits far below the field sees what to change. Does nothing when no field is marked.
+ * @param {ParentNode} [root]
+ */
+export function focusFirstInvalid(root) {
+  requestAnimationFrame(() => {
+    const el = /** @type {HTMLElement | null} */ ((root || document).querySelector('[aria-invalid="true"]'));
+    if (!el) return;
+    el.focus({ preventScroll: true });
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+  });
 }

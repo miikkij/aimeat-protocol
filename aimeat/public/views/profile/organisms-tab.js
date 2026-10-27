@@ -120,7 +120,7 @@ import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
-import { fieldErrorsOf, refusalLine } from '/js/field-errors.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
 
 /** The fields the create form draws, by the name the server's refusal gives them. */
@@ -379,7 +379,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const refused = fieldErrorsOf(err);
       setFormErrors(refused);
       if (!Object.keys(refused).length) swallowed('organisms-tab: onOpen', err);
-      showToast(refusalLine(refused, CREATE_FIELDS, t) || t('organisms.createError') || 'Failed to create');
+      showToast(refusalLine(refused, CREATE_FIELDS, t) || t('organisms.createError') || 'Failed to create', true);
+      focusFirstInvalid();
     } finally { setCreating(false); }
   }, [formName, formDesc, formType, formTypeCustom, formPolicy, formVisibility, formInterests, formShape, shapeLang, showToast, loadData]);
 
