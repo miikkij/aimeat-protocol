@@ -5,11 +5,19 @@
  * @description Pure consent-recipient matching and summary shared by storage and services.
  * @structure matchesRecipient; countConsentRecipients
  * @version-history
+ *   1.0.2 2026-10-27 A 'node:' or 'domain:' recipient never matches the shared anonymous agent of the
+ *     reserved account 'anonymous' (secaudit2026oct26, node-domain-recipient-matches-shared-anonymous-principal).
  *   1.0.1 2026-10-24 A 'domain:' recipient matches only an accessor that names a node, so it never
  *     admits the anonymous reader (secaudit2026oct22, domain-recipient-matches-anonymous-reader).
  *   1.0.0 2026-09-27 Extract existing behavior without transport dependencies.
  */
 import { globMatchSimple } from './pattern-utils.js';
+
+/**
+ * The reserved account the node's shared anonymous identity is made under (auth/anonymous-principal.ts
+ * ANONYMOUS_ACCOUNT; utils/gaii.ts RESERVED_NAMES, so no person holds it).
+ */
+const ANONYMOUS_ACCOUNT = 'anonymous';
 
 /**
  * Check whether a consent record's recipient field matches a given accessor.
@@ -45,18 +53,24 @@ export function matchesRecipient(
     return accessorOwner === username && accessorNode === node;
   }
 
+  // 'domain:' and 'node:' mean the accounts and agents of the named nodes. The shared anonymous
+  // agent (shared#anonymous@<node>, the token POST /v1/auth/anonymous mints) names a node too, but
+  // stands for anyone, so it is the anonymous reader here as well: only '*' admits it
+  // (secaudit2026oct26, node-domain-recipient-matches-shared-anonymous-principal).
+  const anonymousReader = accessorOwner === ANONYMOUS_ACCOUNT;
+
   // Domain glob: match the accessor's home node ID. The accessor must name a node: the anonymous
   // reader parses to node '', and a glob such as '*' matches the empty string, so without this test
   // 'domain:*' admitted the unauthenticated reader. Only the recipient '*' means everyone.
   if (recipient.startsWith('domain:')) {
     const pattern = recipient.slice(7); // "*.health-network.fi"
-    return accessorNode.length > 0 && globMatchSimple(pattern, accessorNode);
+    return !anonymousReader && accessorNode.length > 0 && globMatchSimple(pattern, accessorNode);
   }
 
   // Specific node — all agents on that node
   if (recipient.startsWith('node:')) {
     const nodeId = recipient.slice(5);
-    return accessorNode === nodeId;
+    return !anonymousReader && accessorNode === nodeId;
   }
 
   // Organism membership — not handled here (requires async storage lookup)

@@ -375,6 +375,35 @@ await test('An agent of another signed-in owner still downloads the members file
     assert(!r.isError && r.data?.content_text === sharedFileText, `signed-in member: ${r.text.slice(0, 200)}`);
 });
 
+// secaudit2026oct26, consent-recipient.ts:node-domain-recipient-matches-shared-anonymous-principal.
+// A consent to 'node:<this node>' or a 'domain:' glob means accounts and agents of the named nodes;
+// only '*' admits the anonymous reader. The shared anonymous agent names this node in its GAII.
+const privateFileKey = `anon-guard-private-${Date.now()}.txt`;
+await test('fixture: the owner uploads a private file and grants it to node:<this node> and to domain:*', async () => {
+    assert(dirOwner !== null, 'owner fixture failed');
+    const data = Buffer.from(sharedFileText).toString('base64');
+    const up = await json('/v1/storage', ownerAuth({ method: 'POST', body: JSON.stringify({ key: privateFileKey, data, mime_type: 'text/plain', visibility: 'private' }) }));
+    assert(up.status === 201, `upload private: ${up.status} ${JSON.stringify(up.body).slice(0, 200)}`);
+    for (const recipient of [`node:${NODE_ID}`, 'domain:*']) {
+        const c = await json('/v1/consent', ownerAuth({ method: 'POST', body: JSON.stringify({ data_pattern: `storage:${privateFileKey}`, recipient, purpose: 'node members read', scope: 'local' }) }));
+        assert(c.status === 201, `consent ${recipient}: ${c.status} ${JSON.stringify(c.body?.error)}`);
+    }
+});
+
+await test('Anonymous token → MCP aimeat_storage_download of a private file granted to this node is refused', async () => {
+    const session = await openSession(BASE, anonToken, 'e2e-anonymous-node-consent');
+    const r = await callTool(session, 'aimeat_storage_download', { key: privateFileKey, owner: dirOwner!.ghii, inline: true });
+    assert(r.isError && !r.text.includes(sharedFileText), `the node consent admitted the anonymous reader: ${r.text.slice(0, 200)}`);
+});
+
+await test('An agent of another signed-in owner of this node still reads the file through the node consent (positive control)', async () => {
+    const other = await registerOwner(BASE, `anonnode${Date.now().toString(36)}`);
+    const agent = await makeAgent(BASE, other, ['storage:read']);
+    const session = await openSession(BASE, agent.token, 'e2e-anonymous-node-consent-member');
+    const r = await callTool(session, 'aimeat_storage_download', { key: privateFileKey, owner: dirOwner!.ghii, inline: true });
+    assert(!r.isError && r.data?.content_text === sharedFileText, `signed-in member of the node: ${r.text.slice(0, 200)}`);
+});
+
 // ─── Phase 3d: Writes outside the anonymous namespace ───
 // secaudit2026oct22. The minted token passed requireAuth() and requireScope() as an ordinary agent,
 // and the anonymous.* fence lives only in the memory and storage write paths. Document signing
