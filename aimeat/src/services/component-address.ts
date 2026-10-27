@@ -32,6 +32,9 @@
  *   AmbiguousComponentName · extensionHoldersOf
  * @usage const ext = await findExtension(storage, req.params.name, req.auth?.owner, 'manage');
  * @version-history
+ *   v1.2.1 — 2026-10-27 — /v1/ext/<a>/<b>/<action>: the account's `<a>/<b>` takes the call over a bare
+ *     extension `<a>` whose instance `<b>` was made after it (secaudit2026oct26,
+ *     extensionCallTarget:bare-extension-head-shadows-owner-namespace).
  *   v1.2.0 — 2026-10-26 — The owner is additive: an install keeps its bare name (`<owner>/<name>` only
  *     when asked for in full or when another account released the name), answers keep `name` and add
  *     `owner` and `full_name`, and a bare name the caller has nothing under reaches the one account
@@ -319,12 +322,31 @@ export async function extensionCallTarget(
   storage: Storage, a: string, b: string, callerOwner?: string | null,
 ): Promise<{ extRef: string; instanceId?: string }> {
   const aName = stripPin(a);
-  if (await isLegacyExtensionHead(storage, aName)) return { extRef: a, instanceId: b };
+  if (await isLegacyExtensionHead(storage, aName)) {
+    if (OWNER_SEGMENT.test(a) && await namespacedCameFirst(storage, a, stripPin(b))) return { extRef: `${a}/${b}` };
+    return { extRef: a, instanceId: b };
+  }
   if (callerOwner && OWNER_SEGMENT.test(callerOwner) && await storage.getExtension(namespacedName(callerOwner, aName))) {
     return { extRef: a, instanceId: b };
   }
   if (OWNER_SEGMENT.test(a)) return { extRef: `${a}/${b}` };
   return { extRef: a, instanceId: b };
+}
+
+/**
+ * Does the account `<a>`'s extension `<a>/<b>` take a three-segment call that the bare extension `<a>`
+ * could also take as its instance `<b>`? Yes when `<a>/<b>` is installed and the bare extension had no
+ * instance `<b>` when it was. A bare extension named like an account, with an instance named like that
+ * account's extension added later, took over every call the served SDK sends for it
+ * (secaudit2026oct26, extensionCallTarget:bare-extension-head-shadows-owner-namespace). An instance that
+ * was there first keeps its address: an update keeps `installedAt` (routes/extensions/crud.ts).
+ */
+async function namespacedCameFirst(storage: Storage, a: string, b: string): Promise<boolean> {
+  const ns = await storage.getExtension(namespacedName(a, b));
+  const installed = ns ? Date.parse(ns.installedAt ?? '') : NaN;
+  if (!ns || Number.isNaN(installed)) return false;
+  const instance = await storage.getExtensionInstance(a, b);
+  return !instance || !(Date.parse(instance.createdAt) <= installed);
 }
 
 function stripPin(raw: string): string {
