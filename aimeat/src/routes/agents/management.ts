@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 -- DELETE /v1/agents/:name answers `standing_work` (the schedules and saved workflows
+ *     the agent made) and tells the owner they stop until a new agent of that name runs them
+ *     (secaudit2026oct26, deleted-agent-authority-revived-by-same-name-agent).
  *   2026-10-25 -- POST /v1/agents/:gaii/rekey moved to ./rekey.ts (max-file-lines), registered at the same place.
  *   2026-10-20 -- DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey close the agent's open MCP
  *     transports too (mcp/session-registry.ts), as they already close its connect tunnel, and the
@@ -80,6 +83,7 @@ import { narrowAgent } from '../../services/scope-narrowing.js';
 import { putPortRedirect } from '../../services/agent-port-redirect.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
+import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
 import { scopeIsCovered, exceedsCeiling, uncoveredScopes } from '../../utils/scope-coverage.js';
@@ -627,6 +631,9 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // Order matters: revoke, then delete. The other way round, a failure here would leave a live
     // credential for a record nobody can look up any more.
     const endedSessions = await storage.revokeSessionsByGaii(agent.gaii);
+    // What the agent made that keeps standing: it stops with the agent, and a new agent under the
+    // same name runs it again; the owner is told both (services/agent-standing-work.ts).
+    const standing = await standingWorkOf(storage, ownerGhiiOf(agent.gaii), agent.gaii);
 
     const deleted = await storage.deleteAgent(agent.gaii);
     if (!deleted) {
@@ -665,6 +672,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     // asks), and an MCP OAuth access token carries no session row for revokeSessionsByGaii above to
     // reach at all, so this is what takes the socket itself down (mcp/session-registry.ts).
     const closedMcp = closeMcpSessionsForGaii(agent.gaii);
+    await noticeStandingWork(storage, ownerGhiiOf(agent.gaii), agent.name, standing, 'stopped');
 
     res.json(success(config.nodeId, {
       deleted: true, name: agentName, gaii: agent.gaii,
@@ -672,6 +680,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       // claims, and the owner is entitled to the second one.
       sessions_revoked: endedSessions,
       mcp_sessions_closed: closedMcp,
+      standing_work: standing,
     }));
     emitChange('agents');
   });

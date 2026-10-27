@@ -72036,6 +72036,12 @@ paths:
                           mcp_sessions_closed:
                             type: integer
                             description: How many open MCP sessions of this agent were closed. An MCP OAuth access token carries no session row, so it is not counted in sessions_revoked; it is refused from the next request on either way.
+                          standing_work:
+                            type: object
+                            description: The schedules and saved workflows this agent made. They stop with the agent and run again as a new agent approved under the same name; the owner gets a notice when there are any.
+                            properties:
+                              schedules: { type: integer }
+                              workflows: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

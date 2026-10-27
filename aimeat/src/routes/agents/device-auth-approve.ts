@@ -11,6 +11,8 @@
  * @structure scopesExceedNodeMax(config, scopes) · approveDeviceAuth(...)
  * @usage import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
  * @version-history
+ *   v1.3.0 — 2026-10-27 — A new agent under a name whose earlier agent left schedules or saved workflows
+ *     tells the owner it takes them over (secaudit2026oct26, deleted-agent-authority-revived-by-same-name-agent).
  *   v1.2.0 — 2026-10-25 — `opts`: an existing agent approved without proof that it is coming back is a
  *     takeover and records the account event agent_device_takeover; `endOtherSessions` signs the
  *     agent's other sessions out first, as a key rotation does (secaudit2026oct22,
@@ -42,6 +44,7 @@ import { agentListingTags } from '../../services/content-defaults.js';
 import { newAgentClearance, clearanceBoundByApprover } from '../../services/agent-clearance.js';
 import { closeMcpSessionsForGaii } from '../../mcp/session-registry.js';
 import { logger } from '../../utils/logger.js';
+import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 export function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -309,6 +312,11 @@ export async function approveDeviceAuth(
       link: '/v1/profile?tab=agents',
       data: { name: request.agentName },
     }, config);
+    // A new agent under a name an earlier agent had runs that agent's schedules and saved workflows
+    // again; the owner is told what it takes over (services/agent-standing-work.ts; secaudit2026oct26).
+    const ownerGhii = `${request.ownerName}@${config.nodeId}`;
+    await noticeStandingWork(storage, ownerGhii, request.agentName, await standingWorkOf(storage, ownerGhii, gaii), 'resumed')
+      .catch(err => logger.warn('device-auth approve: standing work not counted', { gaii, error: String(err) }));
   } else if (opts.takeover) {
     // A new device took the agent over (no proof that it is the agent coming back): that is news.
     void recordAccountEvent(storage, {
