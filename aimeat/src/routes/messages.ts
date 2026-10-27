@@ -21,6 +21,7 @@
  *   - GET    /v1/messages/contacts                         -- list contacts + states
  * @usage import { messagesRouter } from '../routes/messages.js'; app.use(messagesRouter(config, storage));
  * @version-history
+ *   2026-10-27 -- A named 1:1 conversation_id is bound to the sender; agent-thread merges the owner's other rows only with messages:read-as-owner (secaudit2026oct26).
  *   2026-10-26 -- /v1/messages/:id/reactions is registered here (./message-reactions.ts); a thread carries each message's reactions.
  *   2026-10-25 -- GET /v1/messages/overview takes `?compact=true`: previews and agent names only, for a list.
  *   2026-10-21 -- Group chat: /v1/messages/groups/* is registered here (./message-groups.ts).
@@ -121,7 +122,7 @@ import { sendGroupMessage } from '../services/conversation-group.js';
 import { registerSendAsOwnerRoute } from './messages-as-owner.js';
 import { registerGroupRoutes } from './message-groups.js';
 import { registerMessageReactionRoutes } from './message-reactions.js';
-import { readAgentDmInbox, readAgentDmThread } from '../services/agent-dm-reads.js';
+import { readAgentDmInbox, readAgentDmThread, withheldOwnerMessagesFields } from '../services/agent-dm-reads.js';
 import { provenanceDeclarationRefusal } from '../services/ai-provenance.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { mintMessageProvenance, withMessageProvenance } from '../services/message-provenance.js';
@@ -327,6 +328,8 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
       senderGhii, recipientGhii, body: input.body, replyToId: input.reply_to, attachments,
       conversationId: threadId, subject: threadSubject, interactive: input.interactive,
       aiProvenanceId, sendLimit: turn,
+      // An agent that may read its owner's mailbox answers in its owner's threads (message-thread-binding.ts).
+      senderReadsOwnerMailbox: mailboxReaderOf(req.auth!, config.nodeId)?.kind === 'delegate',
     });
     if (!result.ok) {
       if (result.code === 'RATE_LIMITED') {
@@ -551,8 +554,10 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const conversationId = req.params.conversationId as string;
     const page = Math.max(1, parseInt(req.query.page as string || '1', 10));
     const perPage = Math.min(200, Math.max(1, parseInt(req.query.per_page as string || '50', 10)));
-    const { messages, total } = await readAgentDmThread(storage, agentGhii, conversationId, { page, perPage });
-    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage }));
+    // The owner's rows that do not involve this agent need messages:read-as-owner (secaudit2026oct26).
+    const { messages, total, ownerMessagesWithheld } = await readAgentDmThread(storage, agentGhii, conversationId, { page, perPage }, mailboxReaderOf(req.auth!, config.nodeId)?.kind === 'delegate');
+    res.json(success(config.nodeId, { messages: await withMessageProvenance(storage, messages, config), total, page, per_page: perPage,
+      ...withheldOwnerMessagesFields(config.baseUrl, agentGhii, 'GET /v1/messages/agent-thread', ownerMessagesWithheld) }));
   });
 
   /* ── POST /v1/messages/conversations/:conversationId/read — mark thread read ── */
