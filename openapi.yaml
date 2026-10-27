@@ -47018,9 +47018,27 @@ paths:
         the rest. Creates an immutable purchase receipt with snapshotted app content and a
         cryptographic signature. A buyer who cannot cover the pacing is refused with 402
         INSUFFICIENT_MORSELS.
+
+        The app's own gates come first, before any morsel moves, as the apex read applies them: an
+        app the operator hid answers 404 as a missing one, and an app open to chosen people only
+        (`open_to`) answers 403 ACCESS_DENIED to a buyer outside them. An app with an access code is
+        bought as before, but the receipt holds its copy only when the request carries the code
+        (`X-Access-Code`, `?code=` or `code` in the body); without it `app_content` is empty and the
+        note says to open the app with the code.
       tags: [App Store]
       security:
         - BearerAuth: []
+      parameters:
+        - name: X-Access-Code
+          in: header
+          required: false
+          schema: { type: string }
+          description: The app's access code, when it has one; the receipt then holds the app's copy.
+        - name: code
+          in: query
+          required: false
+          schema: { type: string }
+          description: The app's access code, as for the apex read.
       requestBody:
         required: true
         content:
@@ -47035,6 +47053,9 @@ paths:
                 app_owner:
                   type: string
                   description: Owner of the app
+                code:
+                  type: string
+                  description: The app's access code, when it has one (also read as `access_code`).
       responses:
         '201':
           description: App purchased successfully
@@ -47083,7 +47104,7 @@ paths:
         '402':
           $ref: '#/components/responses/PaymentRequired'
         '403':
-          description: App store disabled on this node
+          description: App store disabled on this node (APP_STORE_DISABLED), or the app opens for chosen people and the buyer is not among them (ACCESS_DENIED)
         '404':
           $ref: '#/components/responses/NotFound'
         '409':

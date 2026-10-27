@@ -429,6 +429,52 @@ await test('A name registered again after the SELLER deleted their account inher
     await json(`/v1/owners/${customer}`, { ...auth(c.token), method: 'DELETE' });
 });
 
+// secaudit2026oct26 (app-store:purchase-returns-content-past-app-gates). The purchase stored and
+// returned the app's bytes past the gates the apex read applies first. An access code no longer lets a
+// receipt carry the app to a buyer without the code, and the buyer with the code buys as before; an app
+// that opens for one organism refuses a buyer outside it before any morsel moves.
+const CODED = `coded-paid-${ts}.html`;
+const AUDIENCE = `org-paid-${ts}.html`;
+let codedBuyer = { token: '', name: '' };
+let codeHolder = { token: '', name: '' };
+await test('A paid app behind an access code: a buyer without the code gets no copy in the receipt, a buyer with it does', async () => {
+    if (!marketplaceOn) return;
+    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: CODED, content: b64('<h1>coded paid body</h1>'), name: 'Coded Paid', description: 'code and pacing', category: 'utility', tags: [], toll_morsels: 5, access_code: 'cp-code-2026' }) });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    codedBuyer = { token: (await registerOwner(`apcb${ts}`)).token, name: `apcb${ts}` };
+    const buy = await json('/v1/app-store/purchase', { ...auth(codedBuyer.token), method: 'POST', body: JSON.stringify({ app_filename: CODED, app_owner: sellerName }) });
+    assert(buy.status === 200 || buy.status === 201, `the purchase itself goes through as before: ${buy.status} ${JSON.stringify(buy.body.error)}`);
+    const rec = await json(`/v1/app-store/purchases/${buy.body.data.transaction_id}`, auth(codedBuyer.token));
+    assert(rec.status === 200 && !rec.body.data.app_content, `the receipt carries the coded app's bytes: ${rec.status} ${!!rec.body.data?.app_content}`);
+    // With the code, the licence opens the app on the apex, as before.
+    const open = await json(`/v1/apps/${sellerName}/${CODED}?code=cp-code-2026`, auth(codedBuyer.token));
+    assert(open.status === 200, `the buyer with the code and the licence opens the app: ${open.status}`);
+
+    codeHolder = { token: (await registerOwner(`apch${ts}`)).token, name: `apch${ts}` };
+    const withCode = await json('/v1/app-store/purchase', { ...auth(codeHolder.token), method: 'POST', headers: { Authorization: `Bearer ${codeHolder.token}`, 'X-Access-Code': 'cp-code-2026' }, body: JSON.stringify({ app_filename: CODED, app_owner: sellerName }) });
+    assert(withCode.status === 200 || withCode.status === 201, `purchase with the code: ${withCode.status} ${JSON.stringify(withCode.body.error)}`);
+    const held = await json(`/v1/app-store/purchases/${withCode.body.data.transaction_id}`, auth(codeHolder.token));
+    assert(Buffer.from(String(held.body.data?.app_content ?? ''), 'base64').toString('utf8').includes('coded paid body'), 'a buyer with the code gets the copy as before');
+});
+
+await test('A paid app open to one organism refuses a buyer outside it, and takes no morsels', async () => {
+    if (!marketplaceOn) return;
+    const org = await json('/v1/organisms', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ name: `Paid audience ${ts}`, type: 'project', visibility: 'private' }) });
+    assert(org.status === 201, `organism: ${org.status} ${JSON.stringify(org.body.error)}`);
+    const pub = await json('/v1/apps', { ...auth(sellerTok), method: 'POST', body: JSON.stringify({ filename: AUDIENCE, content: b64('<h1>members only paid body</h1>'), name: 'Members Paid', description: 'audience and pacing', category: 'utility', tags: [], toll_morsels: 5 }) });
+    assert(pub.status === 201, `publish: ${pub.status} ${JSON.stringify(pub.body.error)}`);
+    const set = await json(`/v1/apps/${AUDIENCE}`, { ...auth(sellerTok), method: 'PATCH', body: JSON.stringify({ open_to: `organism:${org.body.data.organism.id}` }) });
+    assert(set.status === 200, `open_to: ${set.status} ${JSON.stringify(set.body.error)}`);
+    const before = await json('/v1/wallet', auth(codedBuyer.token));
+    const buy = await json('/v1/app-store/purchase', { ...auth(codedBuyer.token), method: 'POST', body: JSON.stringify({ app_filename: AUDIENCE, app_owner: sellerName }) });
+    assert(buy.status === 403 && buy.body.error?.code === 'ACCESS_DENIED', `a buyer outside the organism bought it: ${buy.status} ${JSON.stringify(buy.body.error ?? Object.keys(buy.body.data ?? {}))}`);
+    const after = await json('/v1/wallet', auth(codedBuyer.token));
+    const bal = (r: { body: any }) => r.body.data?.balance ?? r.body.data?.morsels ?? r.body.data?.morsel_balance;
+    assert(bal(after) === bal(before), `morsels moved on a refused purchase: ${bal(before)} -> ${bal(after)}`);
+    await json(`/v1/owners/${codedBuyer.name}`, { ...auth(codedBuyer.token), method: 'DELETE' });
+    await json(`/v1/owners/${codeHolder.name}`, { ...auth(codeHolder.token), method: 'DELETE' });
+});
+
 await test('Cleanup', async () => {
     await json(`/v1/owners/${sellerName}`, { ...auth(sellerTok), method: 'DELETE' });
     await json(`/v1/owners/${buyerName}`, { ...auth(buyerTok), method: 'DELETE' });
