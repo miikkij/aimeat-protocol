@@ -27,6 +27,10 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.13.0 -- 2026-10-27 -- A stream the provider answered and then broke off is settled from what came
+ *     (its usage frame, else the text seen), where it was only logged; a node-key call is priced by its
+ *     tools and response format too (estimate.inputTokens, services/ai/call-size.ts). secaudit2026oct26:
+ *     answered-call-unsettled-on-abort, node-key-estimate-omits-call-inputs.
  *   v1.12.0 -- 2026-10-25 -- The call's size goes to prepareAiCall, so a call on the node's key is priced
  *     before it runs; its estimate is held until the call is settled or failed, and its answer is at
  *     most ai.node_key_max_output_tokens long (services/ai/node-key-hold.ts; secaudit2026oct22,
@@ -89,6 +93,7 @@ import { chatCompletionRaw, listModels } from '../services/openrouter.js';
 import { openAiChat, speaksOpenAiChat, type OpenAiChatBody } from '../services/ai/gateway.js';
 import { runRoute } from '../services/ai/route-run.js';
 import { holdNodeKeyCandidates, nodeKeyOutputCap } from '../services/ai/node-key-hold.js';
+import { chatCallInputTokens } from '../services/ai/call-size.js';
 import { callCost } from '../services/ai/catalog/price.js';
 import type { CostSource } from '../services/ai/types.js';
 import { logger } from '../utils/logger.js';
@@ -207,12 +212,15 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             const role = proxyRole(req);
             // The agent's own key pays first and its daily cap applies; then the owner's key, then the server's.
             // The call's size, so a call on the node's key is priced before it runs and its estimate
-            // held while it runs (services/ai/node-key-hold.ts; secaudit2026oct22): about four
-            // characters to a token, and the answer's length when the caller named one.
+            // held while it runs (services/ai/node-key-hold.ts; secaudit2026oct22): on the node's key
+            // everything it sends as input, the tools and the response format with the messages
+            // (inputTokens, ai/call-size.ts; secaudit2026oct26), and the answer's length when the
+            // caller named one. The owner's own price ceiling reads the messages, as before.
             plan = await prepareAiCall(storage, config, gaii, {
                 appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId), ...(role ? { role } : {}),
                 estimate: {
                     promptTokens: Math.ceil(JSON.stringify(body.messages).length / 4),
+                    inputTokens: chatCallInputTokens(body),
                     ...(typeof body.max_tokens === 'number' && body.max_tokens > 0 ? { maxTokens: Math.floor(body.max_tokens) } : {}),
                 },
             });
@@ -298,9 +306,13 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
+        // What a stream carried so far: when it breaks off after the provider answered, the call is
+        // settled from it (secaudit2026oct26, answered-call-unsettled-on-abort).
+        const seen: StreamSeen = { model: answered.model, content: '', frames: 0, read: false };
         try {
             if (body.stream) {
-                const outcome = await pipeStream(provider, res, answered);
+                const outcome = await pipeStream(provider, res, answered, seen);
+                seen.read = true;
                 const settled = await settleAiCall(storage, config, gaii, answered, {
                     ...outcome, appId: 'llm-proxy', source: 'llm-proxy',
                 });
@@ -327,6 +339,14 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             // the log line. Never swallowed: an operator seeing this knows a turn was spent and not
             // recorded, which is the one bookkeeping failure that matters.
             logger.warn(`[llm-proxy] ${gaii}: ${(err as Error).message}`);
+            // A stream the provider answered and then broke off is a call the provider bills: it is
+            // settled from what came, the usage frame when it arrived, else the text seen.
+            if (body.stream && !seen.read && seen.frames > 0) {
+                await settleAiCall(storage, config, gaii, answered, {
+                    ...readUsage(seen.model, seen.content, seen.usage ?? brokenStreamUsage(body.messages, seen.content), answered),
+                    appId: 'llm-proxy', source: 'llm-proxy',
+                }).catch((e: unknown) => { logger.warn(`[llm-proxy] ${gaii}: settling a broken stream failed: ${(e as Error).message}`); });
+            }
             if (!res.headersSent) sendError(res, config.nodeId, err);
             else res.end();
         } finally {
@@ -415,7 +435,7 @@ async function readWhole(
  * anything the node invented in the middle would be a second dialect to keep in step.
  */
 async function pipeStream(
-    provider: globalThis.Response, res: Response, plan: AiCallPlan,
+    provider: globalThis.Response, res: Response, plan: AiCallPlan, seen: StreamSeen,
 ): Promise<ProviderOutcome> {
     res.writeHead(200, {
         'Content-Type': 'text/event-stream',
@@ -429,14 +449,14 @@ async function pipeStream(
 
     const decoder = new TextDecoder();
     let buffer = '';
-    let content = '';
-    let model = plan.model;
-    let usage: ProviderUsage | undefined;
+    // Read into the caller's `seen`, so a stream that breaks off can still be settled from it.
+    seen.model = plan.model;
 
     for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         const chunk = decoder.decode(value, { stream: true });
+        seen.frames++;
         res.write(chunk);
         (res as unknown as { flush?: () => void }).flush?.();
 
@@ -454,7 +474,7 @@ async function pipeStream(
                     parsed = JSON.parse(payload) as {
                         model?: string;
                         choices?: Array<{ delta?: { content?: string } }>;
-                        usage?: typeof usage;
+                        usage?: ProviderUsage;
                     };
                 } catch (err) {
                     // The frame was already forwarded verbatim above, so the client is unaffected;
@@ -463,17 +483,36 @@ async function pipeStream(
                     logger.warn(`[llm-proxy] unreadable frame: ${(err as Error).message}`);
                     continue;
                 }
-                if (parsed.model) model = parsed.model;
+                if (parsed.model) seen.model = parsed.model;
                 const delta = parsed.choices?.[0]?.delta?.content;
-                if (typeof delta === 'string') content += delta;
+                if (typeof delta === 'string') seen.content += delta;
                 // OpenRouter puts the totals in the last frame when include_usage is set, which is
                 // why it is set: without it the node would have to guess what the turn cost.
-                if (parsed.usage) usage = parsed.usage;
+                if (parsed.usage) seen.usage = parsed.usage;
             }
         }
     }
     // Not ended here: the caller names the provenance record in a comment, then ends the stream.
-    return readUsage(model, content, usage, plan);
+    return readUsage(seen.model, seen.content, seen.usage, plan);
+}
+
+/** What a stream carried so far: its chunks, the model it named, its text and its usage frame. */
+interface StreamSeen { model: string; content: string; usage?: ProviderUsage; frames: number; read: boolean }
+
+/**
+ * The usage of a stream that broke off before its usage frame: the messages' text and the answer's
+ * text seen so far, at about four characters to a token. Counted from the text alone, without the
+ * JSON around it, so the settlement stays at or under what the provider billed.
+ */
+function brokenStreamUsage(messages: ChatMessage[] | undefined, content: string): ProviderUsage {
+    let chars = 0;
+    for (const m of messages ?? []) {
+        if (typeof m?.content === 'string') chars += m.content.length;
+        else if (Array.isArray(m?.content)) {
+            for (const part of m.content as Array<{ text?: unknown }>) if (typeof part?.text === 'string') chars += part.text.length;
+        }
+    }
+    return { prompt_tokens: Math.ceil(chars / 4), completion_tokens: Math.ceil(content.length / 4) };
 }
 
 /** Tokens and cost: the provider's charge, then the model catalogue, then the table and the estimate

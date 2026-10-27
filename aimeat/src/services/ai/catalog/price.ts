@@ -14,8 +14,10 @@
  *      guess can be trusted with.
  *   Anthropic, OpenAI, xAI and Mistral report no cost in their answers, so step 3 is the only exact
  *   price a direct provider's call has.
- * @structure CallUse · CallPrice · callCost · servesCapability · textPricePerMtok
+ * @structure CallUse · CallPrice · callCost · uncataloguedTextCost · servesCapability · textPricePerMtok
  * @version-history
+ *   v1.2.0 -- 2026-10-27 -- uncataloguedTextCost: callCost's table-then-fallback steps for text, also
+ *     read by the planner for a model the catalogue does not price (secaudit2026oct26).
  *   v1.1.0 — 2026-10-04 — `cachedPromptTokens`: the catalogue prices cached prompt tokens at its
  *     cache-read rate, not the input rate.
  *   v1.0.0 — 2026-09-28 — Initial (V4 of the System 2 plan).
@@ -76,13 +78,20 @@ export function callCost(u: CallUse): CallPrice {
     if (c !== undefined) return { costUsd: c, costSource: 'catalog', priceRef: snapshot, exact: false };
   }
   const textUse = !u.images && u.seconds === undefined && u.characters === undefined;
-  if (textUse) {
-    const table = priceUsd({ model: u.model, provider: u.type, promptTokens: u.promptTokens ?? 0, completionTokens: u.completionTokens ?? 0 });
-    if (fin(table.costUsd) && table.priceRef) return { costUsd: table.costUsd, costSource: 'table', priceRef: table.priceRef, exact: false };
-    const est = (u.promptTokens ?? 0) * FALLBACK_IN_PER_TOKEN + (u.completionTokens ?? 0) * FALLBACK_OUT_PER_TOKEN;
-    return { costUsd: est, costSource: 'estimate', priceRef: 'estimate', exact: false };
-  }
+  if (textUse) return uncataloguedTextCost(u.type, u.model, u.promptTokens ?? 0, u.completionTokens ?? 0);
   return { costUsd: 0, costSource: 'none', priceRef: 'none', exact: false };
+}
+
+/**
+ * What text tokens cost on a model the catalogue has no price for: the node's old table, then the
+ * fallback rates. The last steps of callCost, and what the planner holds for such a model before the
+ * call (route-plan.ts; secaudit2026oct26).
+ */
+export function uncataloguedTextCost(type: string, model: string, promptTokens: number, completionTokens: number): CallPrice {
+  const table = priceUsd({ model, provider: type, promptTokens, completionTokens });
+  if (fin(table.costUsd) && table.priceRef) return { costUsd: table.costUsd, costSource: 'table', priceRef: table.priceRef, exact: false };
+  const est = promptTokens * FALLBACK_IN_PER_TOKEN + completionTokens * FALLBACK_OUT_PER_TOKEN;
+  return { costUsd: est, costSource: 'estimate', priceRef: 'estimate', exact: false };
 }
 
 /** Whether a catalogued model serves a capability. */
