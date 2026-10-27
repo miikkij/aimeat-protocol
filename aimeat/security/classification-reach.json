@@ -717,9 +717,9 @@
     },
     "src/services/a2a-foreign.ts": {
       "reads": {
-        "getMemory": 1
+        "getMemory": 2
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pinned-peer record."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The pinned-peer record. 2026-10-27 (secaudit2026oct26): the second read is the same record under the key it had before pins were keyed by a full hash (readPeer, legacyPeerKey), in the node's own __a2a_peer__ namespace."
     },
     "src/services/a2a-offering.ts": {
       "reads": {

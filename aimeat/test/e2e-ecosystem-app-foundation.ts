@@ -727,6 +727,41 @@ await test('A reconnect with a new key says so with both fingerprints, and appro
   assert((await memRead(after.token)).status === 200, 'the credential for the new key works');
 });
 
+// secaudit2026oct26, token-pickup-without-pinned-key-proof: a same-key hello carries no proof that
+// the requester holds the pinned key, so the owner is told whether the request proved it.
+await test('A same-key reconnect without a signature by the pinned key is marked unproven for the owner', async () => {
+  await connectApp('deskapp3', APP_PUBKEY);
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({ owner: ownerName, app: 'deskapp3', display_name: 'Desk deskapp3', public_key: APP_PUBKEY, scopes: ['memory:read'] }),
+  });
+  assert(hello.status === 200, `hello: ${hello.status}`);
+  const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const row = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
+  assert(row?.reconnect === true && row?.key_changed === false, `same-key reconnect: ${JSON.stringify(row)}`);
+  assert(row?.key_proven === false, `an unsigned same-key reconnect must read as unproven: ${JSON.stringify(row)}`);
+  await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ action: 'deny' }) });
+});
+
+await test('A same-key reconnect signed by the pinned key reads as proven and keeps the earlier credential', async () => {
+  const first = await connectApp('deskapp4', APP_PUBKEY);
+  const signedAt = new Date().toISOString();
+  const signature = await signWith(APP_KEYS.privateKey, `aimeat-eco-hello:v1\n${ownerName}\ndeskapp4\n${signedAt}`);
+  const hello = await json('/v1/ecosystem-apps/hello', {
+    method: 'POST',
+    body: JSON.stringify({ owner: ownerName, app: 'deskapp4', display_name: 'Desk deskapp4', public_key: APP_PUBKEY, scopes: ['memory:read', 'memory:write'], proof: { signed_at: signedAt, signature } }),
+  });
+  assert(hello.status === 200, `hello: ${hello.status}`);
+  const list = await json('/v1/ecosystem-apps/pending', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const row = (list.body.data.requests as any[]).find(r => r.user_code === hello.body.data.user_code);
+  assert(row?.reconnect === true && row?.key_changed === false && row?.key_proven === true, `a signed reconnect reads as proven: ${JSON.stringify(row)}`);
+  const ok = await json(`/v1/ecosystem-apps/${hello.body.data.user_code}/approve`, {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ action: 'approve', scopes: ['memory:read', 'memory:write'] }),
+  });
+  assert(ok.status === 200, `approve: ${ok.status}`);
+  assert((await memRead(first.token)).status === 200, 'the earlier credential still works after a proven reconnect');
+});
+
 // ─── Phase 9: the portal's approval sends the data areas the owner left ticked (secaudit2026oct22, lead 2378) ───
 console.log('\nPhase 9 — The Outside apps row lists the data areas, and its approval sends the ticked ones');
 

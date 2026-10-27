@@ -14,6 +14,9 @@
  *   - DELETE /v1/ecosystem/subscriptions   — owner removes a subscription (?app=&event=)
  * @usage app.use(ecosystemEventsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-27 — POST /read-through answers a reference that one ecosystem app wrote naming
+ *     another app from its cached metadata (reason `ref_names_another_app`) instead of invoking the
+ *     other app (secaudit2026oct26, ecosystem-read-through:ref-target-unbound-to-writer).
  *   v1.1.0 — 2026-09-29 — POST /read-through shows the ecosystem_ref record through presentMemory,
  *     the classification check (TARGET-082 V4); a record the caller may not see answers 404.
  *   v1.0.0 — 2026-06-14 — Created for ecosystem events & triggers (chunk 2).
@@ -134,6 +137,15 @@ export function ecosystemEventsRouter(config: AimeatConfig, storage: Storage): R
       return;
     }
     const cached = { app: ref.app, remoteId: ref.remoteId, schema: ref.schema, title: ref.title, updatedAt: ref.updatedAt };
+    // A reference an ecosystem app wrote reads through that app only. One app does not make another
+    // run an action with the owner as the caller; the owner gets the cached metadata instead
+    // (secaudit2026oct26, ref-target-unbound-to-writer). The owner's own references, and an agent's,
+    // which acts for the owner, read through the app they name as before.
+    const writerApp = stored ? parseGEAI(stored.ownerGaii)?.app : undefined;
+    if (writerApp && writerApp !== ref.app) {
+      res.json(success(config.nodeId, { read_through_unavailable: true, reason: 'ref_names_another_app', cached }));
+      return;
+    }
     const geai = buildGEAI(ref.app, req.auth!.owner, config.nodeId);
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
     const mgr = getActiveConnectTunnelManager();

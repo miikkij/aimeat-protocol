@@ -493,6 +493,33 @@ await test('24. rejecting an approval a plan put after a model work asks the mod
   assert(JSON.stringify(provider.lastRequest('chat')?.json ?? {}).includes('Käytä tutkimusta, älä omia tietojasi.'), 'the model read the reason');
 });
 
+// secaudit2026oct26, goals:person-step-answer-via-self-set-workstation-mode. Decision 2026-10-27: an
+// agent that sets its own mode keeps doing so, and answering a person's step stays allowed; the owner
+// is told about the mode change, and the goal log names the agent that answered.
+await test('25. a worker agent that sets its own mode to workstation answers the owner\'s step: the owner is told, and the log names the agent', async () => {
+  const worker = await scopedAgent(BASE, ownerAObj, ['task:read', 'task:write', 'agent:write']);
+  const self = await json(`/v1/agents/${worker.name}/mode`, { method: 'PATCH', headers: auth(worker.token), body: JSON.stringify({ mode: 'workstation' }) });
+  assert(self.status === 200, `the agent sets its own mode: ${self.status} ${JSON.stringify(self.body.error)}`);
+  const n = await json('/v1/notifications', { headers: auth(tokenA) });
+  const notice = (n.body?.data?.notifications ?? []).find((x: any) => x.i18n?.key === 'agent_mode_self_set' && x.i18n?.vars?.agent === worker.name);
+  assert(!!notice && notice.i18n.vars.mode === 'workstation', `the owner is told the agent changed its own mode: ${JSON.stringify((n.body?.data?.notifications ?? []).slice(0, 3))}`);
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ statement: 'Hyväksy suunnitelma.', works: [{ title: 'Hyväksytkö?', kind: 'human', human_kind: 'approve' }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id;
+  const step = c.body.data.goal.works[0];
+  const yes = await json(`/v1/goals/${id}/works/${step.id}/answer`, { method: 'POST', headers: auth(worker.token), body: JSON.stringify({ approve: true }) });
+  assert(yes.status === 200, `the workstation agent still answers: ${yes.status} ${JSON.stringify(yes.body.error)}`);
+  const g = await readGoal(tokenA, id);
+  const entry = [...g.log].reverse().find((e: any) => e.kind === 'answered');
+  assert(entry && entry.what.includes(worker.name) && !entry.what.includes('through their AI'), `the log names the agent: ${JSON.stringify(entry)}`);
+  // The same mode set again is no change, and the owner setting it in person is the owner's own act.
+  const again = await json(`/v1/agents/${worker.name}/mode`, { method: 'PATCH', headers: auth(worker.token), body: JSON.stringify({ mode: 'workstation' }) });
+  assert(again.status === 200, `again: ${again.status}`);
+  const n2 = await json('/v1/notifications', { headers: auth(tokenA) });
+  const count = (n2.body?.data?.notifications ?? []).filter((x: any) => x.i18n?.key === 'agent_mode_self_set' && x.i18n?.vars?.agent === worker.name).length;
+  assert(count === 1, `one notice for one change: ${count}`);
+});
+
 await provider.close();
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);

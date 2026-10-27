@@ -12,6 +12,8 @@
  *   - Routes: POST /v1/work[/request|/batch], GET inbox/sent/:tc, POST :tc/{accept,progress,reject,deliver,rate}
  *
  * @version-history
+ *   2026-10-27 — The provider node's answer is read under OUTBOUND_READ_MAX_BYTES (secaudit2026oct26,
+ *     keyIsPublished:uncapped-body siblings).
  *   2026-10-25 — Reject moves the item pending → cancelled on its status (storage.transitionWorkStatus)
  *     in the same transaction as the refund, so concurrent rejects return the escrow once; a call that
  *     lost answers 409 CONFLICT (secaudit2026oct22, work-status-transition-without-cas).
@@ -84,6 +86,7 @@ import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchem
 import { resolveGaii } from '../services/federation.js';
 import type { PeerInfo } from '../services/federation.js';
 import { safeFetch, validateOutboundUrl } from '../utils/url-validator.js';
+import { readJson, OUTBOUND_READ_MAX_BYTES } from '../utils/read-capped.js';
 import { emitChange } from '../services/event-bus.js';
 import { acceptWork, deliverWork, fireWebhook } from '../services/work-lifecycle.js';
 import { refreshTrustScore } from '../services/trust.js';
@@ -223,7 +226,7 @@ export async function createWorkItem(
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),
       });
-      remoteResult = await resp.json() as Record<string, unknown>;
+      remoteResult = await readJson(resp, OUTBOUND_READ_MAX_BYTES) as Record<string, unknown>;
     } catch (err) {
       await fee.giveBack();
       logger.warn('Failed to forward work request to remote node', { nodeUrl: resolved.nodeUrl, error: String(err) });

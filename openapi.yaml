@@ -7882,6 +7882,12 @@ paths:
                   items: { $ref: '#/components/schemas/EcoDataAreaGrant' }
                   description: Requested data-area allowlist (stored at approval; enforcement is a later chunk).
                 bound_ref: { type: string, description: Opaque ecosystem-side account reference (never interpreted by AIMEAT). }
+                proof:
+                  type: object
+                  description: "Optional, for an app the owner already connected under this public_key: a base64 Ed25519 signature by that key over `aimeat-eco-hello:v1\\n<owner>\\n<app>\\n<signed_at>`, with signed_at within five minutes. The owner's pending row then reads `key_proven: true`; without it a same-key reconnect reads `key_proven: false`."
+                  properties:
+                    signed_at: { type: string, format: date-time }
+                    signature: { type: string }
                 manifest:
                   type: object
                   additionalProperties: true
@@ -7931,7 +7937,8 @@ paths:
             the owner already connected this app) and `key_changed` (true when the request carries
             another key than the pinned one); a key change also carries `pinned_key_fingerprint` and
             `key_fingerprint`, so the owner can see that approving replaces the key of a working
-            connection.
+            connection. A reconnect with the pinned key also carries `key_proven`: true when the hello
+            signed its `proof` with that key, false when it only named the key.
         '403':
           description: Owner role required.
   /v1/ecosystem-apps/{userCode}/approve:
@@ -8635,6 +8642,8 @@ paths:
         Fetch the live content for a stored `ecosystem_ref` (a pointer + schema + cached metadata) by
         reading through to the ecosystem app over the tunnel ON DEMAND — AIMEAT never persists the live
         content. If the GEAI is offline or refuses, returns the cached metadata + `read_through_unavailable`.
+        A reference that one ecosystem app wrote and that names another app is answered the same way, with
+        `reason: ref_names_another_app`, and the other app is not invoked.
         (A capability with `source.type: 'ecosystem'` is invoked via the normal `POST /v1/capabilities/{id}/invoke`,
         routed over the tunnel.)
       tags: [Ecosystem Apps]
@@ -12649,7 +12658,8 @@ paths:
         Send `null` to clear it: a runtime that stops being the thing that runs this agent should be
         able to say so, and a stale claim is worse than none. Same-owner gated; an agent reports its
         own with no permission word, and a same-owner sibling's with `agent:write`
-        (`aimeat_agent_runtime_report`).
+        (`aimeat_agent_runtime_report`). The node's shared anonymous agent reports none: its token
+        is answered 401 AUTH_REQUIRED, as on `/tags`.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -72174,6 +72184,12 @@ paths:
                           mcp_sessions_closed:
                             type: integer
                             description: How many open MCP sessions of this agent were closed. An MCP OAuth access token carries no session row, so it is not counted in sessions_revoked; it is refused from the next request on either way.
+                          standing_work:
+                            type: object
+                            description: The schedules and saved workflows this agent made. They stop with the agent and run again as a new agent approved under the same name; the owner gets a notice when there are any.
+                            properties:
+                              schedules: { type: integer }
+                              workflows: { type: integer }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':

@@ -10,13 +10,15 @@
  * @usage
  *   const r = await deleteRecordsBatchOp(deps, caller, { organismId, ws, namespace, ids });
  * @version-history
+ *   v1.2.0 — 2026-10-27 — The fenced-space rule is asked for the workspace the keys lie in, also when
+ *     the body names no ws or a dotted one (secaudit2026oct26, mcp-workspace:delete-fence-ws-from-input).
  *   v1.1.0 — 2026-10-18 — A delete tells the workspace's live domain (services/event-bus.ts
  *     emitWorkspaceChange), so an open page of that workspace re-reads.
  *   v1.0.0 — 2026-10-16 — Moved from services/workspace-tool-ops.ts (max-file-lines), no behaviour change.
  */
 import { checkDeleteGuard } from './write-guards.js';
 import { isSameOwner } from '../utils/gaii.js';
-import { emitChange, emitWorkspaceChange } from './event-bus.js';
+import { emitChange, emitWorkspaceChange, workspaceOfKey } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -66,8 +68,17 @@ export async function deleteRecordsBatchOp(
     // through one of them (services/fenced-space.ts). The family a caller owns includes the rows
     // under its owner's name (isSameOwner below), so an agent removed the published copy of a
     // record the app's tool had written.
-    if (ws) {
-        const fenced = await fencedOpRefusal(deps, caller, organismId, ws, { keys: ids.map(x => `${root}.${namespace}.${x}`) });
+    // The workspace asked is the one the keys lie in, read from the keys: a ws that carries the first
+    // part of a dotted namespace, or no ws with a namespace that starts `w.<ws>.`, builds the same
+    // keys (secaudit2026oct26, mcp-workspace:delete-fence-ws-from-input). Each key is read, since an
+    // id may carry dots too.
+    const byWs = new Map<string, string[]>();
+    for (const key of ids.map(x => `${root}.${namespace}.${x}`)) {
+        const inWs = workspaceOfKey(key)?.ws;
+        if (inWs) byWs.set(inWs, [...(byWs.get(inWs) ?? []), key]);
+    }
+    for (const [fenceWs, keys] of byWs) {
+        const fenced = await fencedOpRefusal(deps, caller, organismId, fenceWs, { keys });
         if (fenced) return fenced;
     }
 

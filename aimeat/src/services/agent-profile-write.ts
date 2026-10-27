@@ -33,6 +33,9 @@
  *   const outcome = await setAgentMode({ storage, config }, req.auth!.owner, name, req.body?.mode);
  *   if (!outcome.ok) return renderRefusal(outcome.code, outcome.message);
  * @version-history
+ *   2026-10-27 — setAgentMode takes the caller's principal; when an agent changes an agent's mode, or
+ *     its own platform report moves it to workstation, the owner gets a notice naming the agent
+ *     (secaudit2026oct26, goals:person-step-answer-via-self-set-workstation-mode; decision 2026-10-27).
  *   2026-10-23 — setAgentRuntimeSource takes `llm: 'local'`, a model on the crew's own machine (plan
  *     doc-mvlftkh9zmc9, C3.4).
  *   2026-10-15 — setAgentCapabilities verifies an mcp-type capability only when it names a server the node
@@ -76,6 +79,7 @@ import { inferModeFromPlatform } from './platform-detector.js';
 import { VALID_MODES } from '../routes/agents/constants.js';
 import { logger } from '../utils/logger.js';
 import { exceedsCeiling } from '../utils/scope-coverage.js';
+import { notify } from './notify.js';
 
 export interface AgentWriteDeps {
     storage: Storage;
@@ -526,11 +530,16 @@ export async function setAgentRuntimeSource(
     return { ok: true, agent: updated };
 }
 
+/**
+ * `callerSub` is the principal that asked (`req.auth.sub`, or the MCP session's agent). When it is an
+ * agent and the mode changed, the owner gets a notice naming the agent that changed it.
+ */
 export async function setAgentMode(
     deps: AgentWriteDeps,
     callerOwner: string,
     identifier: string,
     rawMode: unknown,
+    callerSub?: string,
 ): Promise<AgentWriteOutcome> {
     const target = await loadSameOwnerAgent(deps, callerOwner, identifier,
         'You can only update the mode of agents owned by the same owner');
@@ -544,9 +553,30 @@ export async function setAgentMode(
     if (!updated) return { ok: false, code: 'AGENT_NOT_FOUND', message: `Agent not found: ${identifier}` };
 
     await syncOnboardingFlowToMode(deps.storage, target.gaii, mode);
+    if (callerSub?.includes('#') && (target.agent.mode ?? 'interactive') !== mode) {
+        await noticeAgentModeChange(deps.storage, ownerGhiiOf(target.gaii), target.agent.name, mode, callerSub === target.gaii ? null : callerSub.split('#')[0]);
+    }
 
     emitChange('agents');
     return { ok: true, agent: updated };
+}
+
+/**
+ * Tell the owner that an agent changed an agent's mode. The mode decides what the agent may do for
+ * the owner: an agent in the workstation mode answers the steps of the owner's goals that wait for
+ * the owner, so a change the owner did not make in person is shown to them (secaudit2026oct26,
+ * goals:person-step-answer-via-self-set-workstation-mode; developer decision 2026-10-27: allowed,
+ * and made visible). `by` is the sibling agent's name, or null when the agent changed its own mode.
+ */
+async function noticeAgentModeChange(storage: Storage, ownerGhii: string, agent: string, mode: string, by: string | null): Promise<void> {
+    const self = by === null;
+    await notify(storage, ownerGhii, {
+        type: self ? 'agent_mode_self_set' : 'agent_mode_set_by_agent',
+        title: self ? `Your agent ${agent} changed its own mode` : `Your agent ${by} changed the mode of ${agent}`,
+        body: `The mode of ${agent} is now "${mode}". In the "workstation" mode an agent may answer for you the steps of your goals that wait for you. You can change the mode on the agent's page.`,
+        link: '/v1/profile#agents',
+        i18n: { key: self ? 'agent_mode_self_set' : 'agent_mode_set_by_agent', vars: { agent, mode, ...(self ? {} : { by }) } },
+    }).catch((err: unknown) => logger.warn('agent mode: the owner could not be told about a mode change', { agent, error: String(err) }));
 }
 
 /**
@@ -673,6 +703,11 @@ export async function recordSelfReportedPlatform(
         ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
         ...(modeSetTo ? { mode: modeSetTo } : {}),
     });
+    // The agent's own report moved it to the mode that answers the owner's goal steps: the owner is
+    // told, as when the agent sets that mode itself (secaudit2026oct26).
+    if (modeSetTo === 'workstation' && current) {
+        await noticeAgentModeChange(storage, ownerGhiiOf(agentGaii), current.name, modeSetTo, null);
+    }
 
     return { modeSetTo };
 }

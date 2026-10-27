@@ -211,6 +211,27 @@ async function run() {
         assert(start.body.data.status === 'pending', 'an unauthenticated call still needs the human');
     });
 
+    // secaudit2026oct26, saverAuthority:deleted-agent-authority-revived-by-same-name-agent. A schedule
+    // whose agent is gone says "Approve it again": a new agent under the same name runs it, and that
+    // stays (the owner's approval, or an agent the owner let approve, is the approval). The owner is
+    // told at both ends: what stops at the delete, and what the new agent takes over.
+    await test('the standing work of a removed agent: the owner is told what stops, and what a new agent of the same name takes over', async () => {
+        const keeper = await ownerRegisters(o.owner, o.ownerToken, 'keeper', ['*']);
+        const s = await json('/v1/schedules', {
+            method: 'POST', headers: { Authorization: `Bearer ${keeper.token}` },
+            body: JSON.stringify({ kind: 'ai', cron: '0 8 * * *', display_name: 'Keeper digest', prompt: 'Summarise the news.' }),
+        });
+        assert(s.status === 201, `the agent's schedule: ${s.status} ${JSON.stringify(s.body?.error)}`);
+        const d = await del('keeper', o.ownerToken);
+        assert(d.status === 200 && d.body.data.standing_work?.schedules === 1, `the delete says what stops: ${JSON.stringify(d.body?.data)}`);
+        const notices = async () => ((await json('/v1/notifications', { headers: auth })).body?.data?.notifications ?? []) as any[];
+        const stopped = (await notices()).find(n => n.i18n?.key === 'agent_standing_work_stopped' && n.i18n?.vars?.agent === 'keeper');
+        assert(!!stopped && String(stopped.i18n.vars.schedules) === '1', `the owner is told what stops: ${JSON.stringify(stopped)}`);
+        await siblingRegisters(concierge.token, o.owner, 'keeper');
+        const resumed = (await notices()).find(n => n.i18n?.key === 'agent_standing_work_resumed' && n.i18n?.vars?.agent === 'keeper');
+        assert(!!resumed && String(resumed.i18n.vars.schedules) === '1', `the owner is told what the new agent takes over: ${JSON.stringify(resumed)}`);
+    });
+
     console.log('\nCleanup');
     await test('cascade-delete the owner', async () => {
         const { status } = await json(`/v1/owners/${encodeURIComponent(o.owner)}`, { method: 'DELETE', headers: auth });

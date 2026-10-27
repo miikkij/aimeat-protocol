@@ -41,3 +41,19 @@ describe('matchesRecipient, domain recipients', () => {
         expect(matches('*', 'bot#bob@aimeat-peer-1')).toBe(true);
     });
 });
+
+// secaudit2026oct26, node-domain-recipient-matches-shared-anonymous-principal.
+describe('matchesRecipient, the shared anonymous agent', () => {
+    const SHARED = 'shared#anonymous@aimeat-local-001-dev';
+    it('a node or domain recipient does not match the shared anonymous agent of the node', () => {
+        expect(matches('node:aimeat-local-001-dev', SHARED)).toBe(false);
+        expect(matches('domain:*', SHARED)).toBe(false);
+        expect(matches('domain:aimeat-*', SHARED)).toBe(false);
+    });
+
+    it('accounts and agents of the node still match, and "*" still admits the shared agent', () => {
+        expect(matches('node:aimeat-local-001-dev', 'claude#alice@aimeat-local-001-dev')).toBe(true);
+        expect(matches('node:aimeat-local-001-dev', 'alice@aimeat-local-001-dev')).toBe(true);
+        expect(matches('*', SHARED)).toBe(true);
+    });
+});

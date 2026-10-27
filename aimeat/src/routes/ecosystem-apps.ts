@@ -22,6 +22,10 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.11.0 — 2026-10-27 — A hello for an app already connected may carry `proof`, a signature by the
+ *     pinned key (services/device-return-proof.ts), and GET /pending says on a same-key reconnect
+ *     whether it was proven (`key_proven`), so the owner sees a request that only names the app's
+ *     public key (secaudit2026oct26, token-pickup-without-pinned-key-proof).
  *   v1.10.0 — 2026-10-25 — GET /pending says whether a request reconnects an app the owner already
  *     connected (`reconnect`) and whether its key differs from the pinned one (`key_changed`, with
  *     both fingerprints); approving a key change ends the sessions issued under the old key, as
@@ -67,7 +71,7 @@
  *     The portal renders it (locale-appropriate) as the app's own setup guidance in the card.
  */
 import { Router } from 'express';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, EcoDataAreaGrant, EcosystemAppRecord, EcoAutomationRecipe } from '../storage/interface.js';
 import type { Scheduler } from '../services/scheduler.js';
@@ -85,6 +89,8 @@ import { registerEcosystemAdvisoryRoutes } from './ecosystem-apps-advisories.js'
 import { registerEcoCapabilityApprovalRoutes } from './ecosystem-apps-capability-approvals.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories } from '../services/classification/present-memory.js';
+import { ecoHelloProofVerifies, markReturnProven, returnProven } from '../services/device-return-proof.js';
+import { reconnectView } from './ecosystem-apps-reconnect.js';
 
 /** Hello-integration request codes expire after 30 minutes (parallel to device-auth). */
 const ECO_AUTH_EXPIRY_MS = 1_800_000;
@@ -92,31 +98,6 @@ const ECO_AUTH_EXPIRY_MS = 1_800_000;
 /** Validate a list of requested scopes against the node's ceiling (mirror of agents.ts:318-330). */
 function scopesWithinCeiling(requested: string[], ceiling: string[]): string[] {
   return exceedsCeiling(ceiling, requested);
-}
-
-/**
- * A short, comparable name for a public key, for the owner to tell two keys apart. The input is a
- * PUBLIC key and the output is shown, so this is a display digest, not a stored secret: CodeQL
- * js/insufficient-password-hash (code scanning 1766) reads the pending record as a password source,
- * and that alert is dismissed as a false positive with this reason.
- */
-function keyFingerprint(publicKey: string): string {
-  return createHash('sha256').update(publicKey).digest('hex').slice(0, 16).match(/.{4}/g)!.join(':');
-}
-
-/**
- * What a pending request says about the app's live connection: `reconnect` when the owner already
- * connected this app, `key_changed` when the request carries another key than the pinned one, and
- * then both fingerprints.
- */
-function reconnectView(pinnedKey: string | undefined, requestKey: string | undefined) {
-  const reconnect = pinnedKey !== undefined;
-  const keyChanged = reconnect && !!requestKey && requestKey !== pinnedKey;
-  return {
-    reconnect,
-    key_changed: keyChanged,
-    ...(keyChanged ? { pinned_key_fingerprint: keyFingerprint(pinnedKey!), key_fingerprint: keyFingerprint(requestKey!) } : {}),
-  };
 }
 
 export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, scheduler: Scheduler): Router {
@@ -214,6 +195,12 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       automation,
       setup,
     });
+    // A hello for an app already connected under this key may prove it holds that key; the pending
+    // row says whether it did (secaudit2026oct26, token-pickup-without-pinned-key-proof).
+    const live = req.body?.proof ? await storage.getEcosystemAppByOwnerAndApp(owner, app) : null;
+    if (live && live.publicKey === public_key && await ecoHelloProofVerifies(public_key, owner, app, req.body.proof)) {
+      await markReturnProven(storage, `${owner}@${config.nodeId}`, userCode, live.geai);
+    }
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verificationUri = `${baseUrl}/v1/profile#ecosystem-apps`;
@@ -323,9 +310,14 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
       const live = await storage.getEcosystemAppByOwnerAndApp(req.auth!.owner, app);
       if (live) connected.set(app, live.publicKey ?? '');
     }
+    // A same-key reconnect says whether it signed with the pinned key (`key_proven`).
+    const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const proven = await Promise.all(pending.map(r => connected.get(r.app) === r.publicKey
+      ? returnProven(storage, ownerGhii, r.userCode, buildGEAI(r.app, r.ownerName, config.nodeId)) : Promise.resolve(undefined)));
     res.json(success(config.nodeId, {
-      requests: pending.map((r) => ({
+      requests: pending.map((r, i) => ({
         ...reconnectView(connected.get(r.app), r.publicKey),
+        ...(proven[i] !== undefined ? { key_proven: proven[i] } : {}),
         user_code: r.userCode,
         app: r.app,
         display_name: r.displayName,
