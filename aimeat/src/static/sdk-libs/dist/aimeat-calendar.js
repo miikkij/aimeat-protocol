@@ -8107,7 +8107,7 @@
         seen.add(start);
         if (!patch && (excluded.has(start) || overrides.has(start))) return;
         if (patch?.cancelled) return;
-        const data = patch ? normalize({ ...e2, ...patch, rrule: void 0, start: patch.start || start, end: patch.end || wallString(wallMs(patch.start || start) + duration, e2.allDay) }) : e2;
+        const data = patch ? normalize({ ...e2, ...patch, rrule: void 0, rdates: void 0, exdates: void 0, overrides: void 0, start: patch.start || start, end: patch.end || wallString(wallMs(patch.start || start) + duration, e2.allDay) }) : e2;
         const localStart = patch ? data.start : start;
         const localEnd = patch ? data.end : wallString(wallMs(start) + duration, e2.allDay);
         const startMs = zoned(localStart, data.timeZone).epochMilliseconds;
@@ -8383,7 +8383,7 @@
       const duration = wallMs(e2.end) - wallMs(e2.start);
       for (const [original, p2] of Object.entries(e2.overrides || {})) {
         const start = p2.start || original, end = p2.end || wallString(wallMs(start) + duration, e2.allDay);
-        write(normalize({ ...e2, ...p2, start, end }), e2, local(original, e2.allDay));
+        write(normalize({ ...e2, ...p2, rdates: void 0, exdates: void 0, overrides: void 0, start, end }), e2, local(original, e2.allDay));
       }
     }
     return [...lines, "END:VCALENDAR"].map(fold).join("\r\n") + "\r\n";
