@@ -36,6 +36,8 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-10-27 -- A session's MCP token is refused once a reset or a delete ends its conversation, and
+ *     once its process dies; a live conversation's token keeps working (secaudit2026oct26).
  *   2026-10-22 — A session id another owner writes into their own thread record opens a fresh session
  *     rather than the first owner's (secaudit 2026-10, r55).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
@@ -624,6 +626,66 @@ async function run(): Promise<void> {
             `exactly one more process was started, got ${peerRequests('initialize').length - starts}`);
     });
 
+    // ── A session's MCP token lives as long as the session (secaudit2026oct26, goose-chat-config.
+    //    goose-root-retains-conversations-and-live-mcp-tokens). The token is a bearer credential for the
+    //    person's whole tool surface; it was minted for 90 days and nothing revoked it. These run on
+    //    threads of their own; the one that kills a process runs after the r55 case below.
+
+    /** The bearer token the node handed goose in a session/new request. */
+    const tokenOf = (sessionNew: any): string => {
+        const auth = ((sessionNew?.params?.mcpServers ?? [])[0]?.headers ?? []).find((h: any) => h.name === 'Authorization');
+        assert(!!auth && String(auth.value).startsWith('Bearer '), `a session/new with a bearer token, got ${JSON.stringify(sessionNew?.params)}`);
+        return String(auth.value).slice('Bearer '.length);
+    };
+    /** 401 is the node saying the credential is no longer valid; anything else means it still is. */
+    const tokenStatus = async (bearer: string): Promise<number> =>
+        (await json('/v1/memory/chat.token-probe', { headers: { Authorization: `Bearer ${bearer}` } })).status;
+    const newThread = async (title: string): Promise<string> => {
+        const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title }) }));
+        assert(created.status === 201, `create ${created.status}`);
+        return created.body.data.thread.id as string;
+    };
+    const waitFor401 = async (bearer: string): Promise<number> => {
+        const deadline = Date.now() + 5_000;
+        let status = await tokenStatus(bearer);
+        while (status !== 401 && Date.now() < deadline) { await sleep(200); status = await tokenStatus(bearer); }
+        return status;
+    };
+
+    await test('a reset ends the token of the session it leaves behind; the new session\'s token works (secaudit2026oct26)', async () => {
+        const id = await newThread('token-reset');
+        const first = await turn(id, { text: 'hello for the reset token' });
+        assert(first.at(-1)!.kind === 'done', `the first turn ran, got ${JSON.stringify(first.at(-1))}`);
+        const old = tokenOf(peerRequests('session/new').at(-1));
+        assert(await tokenStatus(old) !== 401, 'the live session\'s token works');
+        const reset = await json(`/v1/chat/threads/${id}/reset`, authed({ method: 'POST' }));
+        assert(reset.status === 200, `reset ${reset.status}`);
+        const after = await turn(id, { text: 'after the reset' });
+        assert(after.at(-1)!.kind === 'done', `the turn after the reset ran, got ${JSON.stringify(after.at(-1))}`);
+        const fresh = tokenOf(peerRequests('session/new').at(-1));
+        assert(fresh !== old, 'the new session has a token of its own');
+        assert(await waitFor401(old) === 401, `the old session's token is refused, got ${await tokenStatus(old)}`);
+        assert(await tokenStatus(fresh) !== 401, 'the new session\'s token works');
+    });
+
+    await test('deleting a conversation ends its session\'s token; another conversation\'s token keeps working (secaudit2026oct26)', async () => {
+        const kept = await newThread('token-kept');
+        const keptTurn = await turn(kept, { text: 'a conversation that stays' });
+        assert(keptTurn.at(-1)!.kind === 'done', `the kept conversation's turn ran, got ${JSON.stringify(keptTurn.at(-1))}`);
+        const keptToken = tokenOf(peerRequests('session/new').at(-1));
+        const gone = await newThread('token-deleted');
+        const goneTurn = await turn(gone, { text: 'a conversation that goes' });
+        assert(goneTurn.at(-1)!.kind === 'done', `the deleted conversation's turn ran, got ${JSON.stringify(goneTurn.at(-1))}`);
+        const goneToken = tokenOf(peerRequests('session/new').at(-1));
+        assert(await tokenStatus(goneToken) !== 401, 'its token works while the conversation exists');
+        const del = await json(`/v1/chat/threads/${gone}`, authed({ method: 'DELETE' }));
+        assert(del.status === 200, `delete ${del.status}`);
+        assert(await waitFor401(goneToken) === 401, `the deleted conversation's token is refused, got ${await tokenStatus(goneToken)}`);
+        assert(await tokenStatus(keptToken) !== 401, 'the other conversation\'s token still works');
+        const again = await turn(kept, { text: 'still here' });
+        assert(again.at(-1)!.kind === 'done', `the kept conversation still runs, got ${JSON.stringify(again.at(-1))}`);
+    });
+
     await test('a thread is its owner\'s: no credential is 401, another owner cannot read it', async () => {
         const anonymous = await json(`/v1/chat/threads/${threadId}`);
         assert(anonymous.status === 401, `no credential: ${anonymous.status}`);
@@ -683,6 +745,19 @@ async function run(): Promise<void> {
         const back = await turn(threadId, { text: 'still on mine?' });
         assert(back.at(-1)!.kind === 'done', 'the first owner\'s turn runs');
         assert(peerRequests('session/prompt').at(-1)!.params.sessionId === firstSession, 'on the first owner\'s own session, resumed');
+    });
+
+    await test('a process that dies takes its sessions\' tokens with it (secaudit2026oct26)', async () => {
+        const id = await newThread('token-death');
+        const first = await turn(id, { text: 'hello before the fall' });
+        assert(first.at(-1)!.kind === 'done', `the turn ran, got ${JSON.stringify(first.at(-1))}`);
+        const before = tokenOf(peerRequests('session/new').at(-1));
+        const died = await turn(id, { text: 'DIENOW: fall over please' });
+        assert(died.at(-1)!.kind === 'error', `the agent died, got ${JSON.stringify(died.at(-1))}`);
+        const next = await turn(id, { text: 'are you back again?' });
+        assert(next.at(-1)!.kind === 'done', `a fresh process answers, got ${JSON.stringify(next.at(-1))}`);
+        assert(await waitFor401(before) === 401, `the dead process's session token is refused, got ${await tokenStatus(before)}`);
+        assert(await tokenStatus(tokenOf(peerRequests('session/new').at(-1))) !== 401, 'the fresh session\'s token works');
     });
 
     await stopNode(node);

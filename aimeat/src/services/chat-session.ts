@@ -25,10 +25,16 @@
  *   - chatEnabled() — whether this node has an agent at all
  *   - chatPayer() — who pays for this person's turns, and on which model, as the node decides it
  *   - runChatTurn() — the whole turn, yielding updates as they happen and persisting both sides
+ *   - resetChatSession() / endChatSession() — a conversation's session ends, with its MCP token
  *   - shutdownChat() — stop every agent process
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.11.0 -- 2026-10-27 -- A goose session's MCP token is revoked when its session ends: a reset, a
+ *     deleted conversation (endChatSession), a session that replaces it, and the close of the process
+ *     that holds it. A chat agent's tokens from an earlier run of the node, whose processes are gone,
+ *     are revoked before this run mints its first one (secaudit2026oct26,
+ *     goose-chat-config.goose-root-retains-conversations-and-live-mcp-tokens).
  *   v1.10.0 — 2026-10-22 — A goose session is resumed only for the person and thread the node opened
  *     it for (sessionOpeners); a session id that the thread record names but this node did not open
  *     for that thread opens a fresh session (secaudit 2026-10, r55).
@@ -133,7 +139,10 @@ async function agentFor(deps: ChatDeps, ownerName: string): Promise<AgentLease<G
     if (chatUsesSharedKey(config)) {
         // The operator changed the route while per-person processes ran: they go once idle.
         pool.retireAllExcept((key) => key === SHARED_KEY);
-        return pool.acquire(SHARED_KEY, async () => ({ client: await GooseAcpClient.start(config) }), { evictIdle: false });
+        return pool.acquire(SHARED_KEY, async () => {
+            const client = await GooseAcpClient.start(config);
+            return { client, onClose: () => endClientTokens(storage, client) };
+        }, { evictIdle: false });
     }
     pool.retireAllExcept((key) => key !== SHARED_KEY);
     return pool.acquire(ownerName, () => startPersonalAgent(storage, config, ownerName), { evictIdle: true });
@@ -149,6 +158,7 @@ async function startPersonalAgent(
     storage: Storage, config: AimeatConfig, ownerName: string,
 ): Promise<PoolStart<GooseAcpClient>> {
     const identity = await ensureChatAgent(storage, config, ownerName);
+    await revokeEarlierRunTokens(storage, identity.gaii);
     const { token, sessionId, expiresAt } = await mintChatAgentToken(storage, config, identity);
     const revoke = () => {
         storage.revokeSession(sessionId).catch((e: Error) => {
@@ -157,7 +167,8 @@ async function startPersonalAgent(
     };
     try {
         const client = await GooseAcpClient.start(config, { token });
-        return { client, expiresAt: Date.parse(expiresAt), onClose: revoke };
+        // The process takes its model-call token and its sessions' MCP tokens with it.
+        return { client, expiresAt: Date.parse(expiresAt), onClose: () => { revoke(); endClientTokens(storage, client); } };
     } catch (err) {
         revoke();
         throw err;
@@ -184,6 +195,56 @@ export function shutdownChat(): void {
 const sessionOpeners = new WeakMap<GooseAcpClient, Map<string, string>>();
 function openerOf(gaii: string, threadId: string): string {
     return `${gaii}\n${threadId}`;
+}
+
+/**
+ * The MCP token each conversation's current goose session carries, by opener (`<gaii>\n<thread>`):
+ * its session row and the process that holds it. The token is a bearer credential for the person's
+ * whole tool surface, so it ends with its session: when the conversation is reset or deleted, when a
+ * new session replaces it, and when the process closes (secaudit2026oct26).
+ */
+const sessionTokens = new Map<string, { row: string; client: GooseAcpClient }>();
+
+function revokeRow(storage: Storage, row: string): Promise<void> {
+    return storage.revokeSession(row).then(() => undefined, (e: Error) => {
+        logger.warn(`[chat] could not revoke a chat session's MCP token: ${e.message}`);
+    });
+}
+
+/** End the MCP token of this conversation's session, if one is held. */
+function endSessionToken(storage: Storage, opener: string): Promise<void> {
+    const held = sessionTokens.get(opener);
+    if (!held) return Promise.resolve();
+    sessionTokens.delete(opener);
+    return revokeRow(storage, held.row);
+}
+
+/** End the MCP tokens of every session a closing process held. */
+function endClientTokens(storage: Storage, client: GooseAcpClient): void {
+    for (const [opener, held] of [...sessionTokens]) {
+        if (held.client !== client) continue;
+        sessionTokens.delete(opener);
+        void revokeRow(storage, held.row);
+    }
+}
+
+/** The chat agents whose tokens from an earlier run of the node this run has revoked, once each. */
+const earlierRunsEnded = new Map<string, Promise<void>>();
+
+/**
+ * Revoke a chat agent's tokens minted by an earlier run of this node, before this run mints its first.
+ * The processes that held them were this node's children and ended with it, so nothing uses them; only
+ * this run's own tokens are minted after it.
+ */
+function revokeEarlierRunTokens(storage: Storage, agentGaii: string): Promise<void> {
+    let done = earlierRunsEnded.get(agentGaii);
+    if (!done) {
+        done = storage.revokeSessionsByGaii(agentGaii).then((n) => {
+            if (n > 0) logger.info(`[chat] revoked ${n} token(s) of ${agentGaii} from an earlier run of the node`);
+        }, (e: Error) => { logger.warn(`[chat] could not revoke earlier tokens of ${agentGaii}: ${e.message}`); });
+        earlierRunsEnded.set(agentGaii, done);
+    }
+    return done;
 }
 
 /** A goose session id is only meaningful for the process that issued it. */
@@ -236,16 +297,26 @@ async function sessionFor(
     if (existing) logger.warn(`[chat] thread ${threadId} of ${gaii} named a session this node did not open for it; opening a new one`);
 
     const identity = await ensureChatAgent(storage, config, ownerName);
-    const { token } = await mintChatAgentToken(storage, config, identity);
+    await revokeEarlierRunTokens(storage, identity.gaii);
+    const { token, sessionId: row } = await mintChatAgentToken(storage, config, identity);
 
-    const sessionId = await lease.client.newSession({
-        mcpServers: [aimeatMcpServer(config.baseUrl, token)],
-        // An empty directory: in the node's own, goose read the repository's AGENTS.md into every
-        // round as project hints (services/goose-chat-config.ts).
-        cwd: ensureChatGooseConfig(config).cwd,
-    });
+    let sessionId: string;
+    try {
+        sessionId = await lease.client.newSession({
+            mcpServers: [aimeatMcpServer(config.baseUrl, token)],
+            // An empty directory: in the node's own, goose read the repository's AGENTS.md into every
+            // round as project hints (services/goose-chat-config.ts).
+            cwd: ensureChatGooseConfig(config).cwd,
+        });
+    } catch (err) {
+        await revokeRow(storage, row);
+        throw err;
+    }
     if (!openers) { openers = new Map(); sessionOpeners.set(lease.client, openers); }
     openers.set(sessionId, openerOf(gaii, threadId));
+    // This session replaces the conversation's earlier one, whose token nothing uses any more.
+    await endSessionToken(storage, openerOf(gaii, threadId));
+    sessionTokens.set(openerOf(gaii, threadId), { row, client: lease.client });
     await setGooseSession(storage, gaii, threadId, stamp(lease.generation, sessionId));
     logger.info(`[chat] ${identity.gaii} -> goose session ${sessionId} for thread ${threadId}`);
     return sessionId;
@@ -485,4 +556,13 @@ export async function resetChatSession(
     deps: ChatDeps, gaii: string, threadId: string,
 ): Promise<void> {
     await setGooseSession(deps.storage, gaii, threadId, undefined);
+    await endSessionToken(deps.storage, openerOf(gaii, threadId));
+}
+
+/**
+ * The conversation is going away: its session's MCP token ends now rather than at its expiry. The
+ * conversation record itself is deleted by the caller (chat-threads.ts deleteThread).
+ */
+export async function endChatSession(deps: ChatDeps, gaii: string, threadId: string): Promise<void> {
+    await endSessionToken(deps.storage, openerOf(gaii, threadId));
 }
