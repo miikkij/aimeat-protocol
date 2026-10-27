@@ -17,10 +17,15 @@
  *   read; `services/memory-bin-sweep.ts` removes it once `memoryDeleteGraceDays` has passed. This
  *   node had no delete at all before 2026-09-03 — a value could be emptied, never removed — and the
  *   grace window is how that principle survives having one.
- * @structure MemoryBinRefusal · binRefusal() · deleteMemoryRecord() · restoreLevel() ·
- *   lowerRestored() · restoreMemoryRecord()
+ * @structure MemoryBinRefusal · appReservedKeyRefusal() · bulkDeleteKeyRefusal() · binRefusal() ·
+ *   deleteMemoryRecord() · restoreLevel() · lowerRestored() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-27 — Delete and restore refuse a reserved owner key to an app grant with 403
+ *     RESERVED_KEY, as PUT refuses to write it; bulkDeleteKeyRefusal gives POST /v1/memory/bulk-delete
+ *     the bin's per-key rules (credential record, reserved key for an app, append-only event)
+ *     (secaudit2026oct26, memory-bin:app-grant-delete-restore-skips-reserved-owner-keys,
+ *     bulk-delete-skips-bin-refusals).
  *   2026-10-25 — With owner_scope, locate walks the owner's identity and agents only for a principal
  *     of that account on this node: an ecosystem app and a visitor from another node reach their own
  *     identity only (secaudit2026oct22, memory-key-route:owner-scope-ecosystem-not-excluded).
@@ -69,9 +74,9 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { emitRecordChange } from './event-bus.js';
-import { checkDeleteGuard } from './write-guards.js';
+import { checkDeleteGuard, getNamespacePolicy, parseWorkspaceRecordKey } from './write-guards.js';
 import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
-import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal } from '../utils/reserved-keys.js';
+import { isServiceOwnedKey, isOwnerRemovableServiceKey, isReservedServerKey, serverWrittenKeyRefusal, appMayWriteKey } from '../utils/reserved-keys.js';
 import { isGEAI, isOwnerInPerson, localAccountOf, ownerGhiiOf } from '../utils/gaii.js';
 import { settleRequestsForBinnedRecord } from './publish-requests/store.js';
 import { scopeIsCovered, WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../utils/scope-coverage.js';
@@ -188,6 +193,49 @@ async function locate(
   return null;
 }
 
+/** The refusal an app grant gets for a reserved owner key, or null. Only role app is asked. */
+function appReservedKeyRefusal(roles: readonly string[], key: string): string | null {
+  if (!roles.includes('app') || appMayWriteKey([...roles], key)) return null;
+  return `The key "${key}" is managed by the account owner, and an app does not remove it or put it back. The owner does that in person.`;
+}
+
+/**
+ * The bin's per-key refusals for a delete that a batch door makes (POST /v1/memory/bulk-delete), so
+ * that door answers what DELETE /v1/memory/:key answers for the same key: a credential record is
+ * refused for every caller, a reserved owner key for an app grant, and an event of an append-only
+ * workspace space for everyone. Service-owned keys and the organism fence the door asks itself. The
+ * door refuses a key it was given by name and leaves a key a prefix matched in place, so clearing a
+ * group still clears the rest (secaudit2026oct26, bulk-delete-skips-bin-refusals).
+ */
+export async function bulkDeleteKeyRefusal(
+  deps: Pick<MemoryBinDeps, 'storage'>, req: { key: string; roles: readonly string[] },
+  /** Per request: whether a workspace space is append-only, so a manifest is read once per space, not once per record. */
+  appendOnlySpaces?: Map<string, boolean>,
+): Promise<MemoryBinRefusal | null> {
+  if (isSecretRecordKey(req.key)) {
+    return { ok: false, code: 'SECRET_RECORD', message: secretRecordBinRefusal(req.key, 'delete').message, status: 403 };
+  }
+  const appRefusal = appReservedKeyRefusal(req.roles, req.key);
+  if (appRefusal) return { ok: false, code: 'RESERVED_KEY', message: appRefusal, status: 403 };
+  const parts = parseWorkspaceRecordKey(req.key);
+  if (!parts || parts.role === 'draft') return null;
+  const space = `${parts.organismId}\u0000${parts.ws}\u0000${parts.namespace}`;
+  let appendOnly = appendOnlySpaces?.get(space);
+  if (appendOnly === undefined) {
+    appendOnly = !!(await getNamespacePolicy(deps.storage, parts.organismId, parts.ws, parts.namespace))?.createOnly;
+    appendOnlySpaces?.set(space, appendOnly);
+  }
+  if (!appendOnly) return null;
+  const guard = await checkDeleteGuard(req.key, deps.storage);
+  if (!guard.valid) {
+    return {
+      ok: false, code: 'WRITE_CONFLICT', status: 409,
+      message: guard.errors?.[0]?.message ?? 'Delete refused by the workspace write guard', violations: guard.errors,
+    };
+  }
+  return null;
+}
+
 /**
  * What the bin refuses before it looks for anything, on the way in AND on the way out: the organism
  * namespace rule and the append-only guard. Both are about the key and the caller, never about
@@ -225,6 +273,12 @@ async function binRefusal(deps: MemoryBinDeps, req: MemoryBinRequest, act: 'dele
     const refusal = secretRecordBinRefusal(req.key, act);
     return { ok: false, code: 'SECRET_RECORD', message: refusal.message, status: 403 };
   }
+  // A reserved owner key is the account holder's (utils/reserved-keys.ts): an app grant, whose
+  // identity is the owner's own, neither removes it nor puts an older copy back, as PUT refuses to
+  // write it (appMayWriteKey). The bin skipped the rule, so an app holding memory:delete removed the
+  // owner's secret host setting (secaudit2026oct26, memory-bin:app-grant-delete-restore-skips-reserved-owner-keys).
+  const appRefusal = appReservedKeyRefusal(req.roles ?? [], req.key);
+  if (appRefusal) return { ok: false, code: 'RESERVED_KEY', message: appRefusal, status: 403 };
   const operatorOverride = !!req.ownerOverride && (req.roles ?? []).includes('operator');
   if (!operatorOverride) {
     // The session's scopes ride along for the fenced-space rule (services/fenced-space.ts): a session

@@ -18804,6 +18804,11 @@ paths:
         credential. The owner stores the credential they mean to use there.
 
 
+        An app grant does not put back a reserved owner key (`profile.`,
+        `openrouter.`, `ai-usage.`, `finance.`, `commerce.` and the rest), as it
+        does not write one: 403 RESERVED_KEY. The owner puts it back in person.
+
+
         A restore answers to the write path's rule on the old morsel price: an
         app tool manifest (`apps.{app}.tools`) or an offers document
         (`agents.{agent}.offers`) that still holds the 3.x morsel price stays in
@@ -18998,6 +19003,11 @@ paths:
         the `ai.apikey.*` keys and the per-agent keys) is not removed here, by
         anyone, the owner included: 403 SECRET_RECORD, naming the record's own
         route (for example DELETE /v1/ai/providers/{id}).
+
+
+        An app grant does not remove a reserved owner key (`profile.`,
+        `openrouter.`, `ai-usage.`, `finance.`, `commerce.` and the rest), as it
+        does not write one: 403 RESERVED_KEY. The owner removes it in person.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19400,6 +19410,12 @@ paths:
         Delete many entries at once by prefix and/or an explicit key list — avoids firing thousands of
         individual DELETE requests when clearing a whole namespace. Owner sessions delete across their
         owner-scope; agent sessions delete from their own keyspace.
+
+
+        Each key gets the answer `DELETE /v1/memory/{key}` gives it: a credential record (403
+        SECRET_RECORD), a reserved owner key for an app grant (403 RESERVED_KEY) and an event of an
+        append-only workspace space (409 WRITE_CONFLICT) are refused when named in `keys`, and nothing
+        is removed; a prefix that matches one leaves it in place and removes the rest.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -19431,6 +19447,10 @@ paths:
           description: prefix or keys required
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: A named key is a credential record (SECRET_RECORD), a reserved owner key named by an app grant (RESERVED_KEY), or service-owned (RESERVED_KEY).
+        '409':
+          description: A named key is an event of an append-only workspace space (WRITE_CONFLICT, `details.violations`).
 
   /v1/memory/bundle:
     post:
