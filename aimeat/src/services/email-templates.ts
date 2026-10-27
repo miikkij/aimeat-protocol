@@ -9,6 +9,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-10-27 — operator.email_footer: the operator's own line replaces "Sent by AIMEAT Protocol" and the profile
+ *     note in every template, HTML and text (setNodeEmailFooter, wired by email.ts to the live config).
  *   2026-10-25 — textNotificationEmailHtml(): the notification template for text from anyone but the operator, escaped, with line breaks kept (secaudit2026oct22).
  *   2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-30 — Export emailTemplateLang, so the organism invitation can answer which language its
@@ -253,7 +255,19 @@ function emailLang(locale: string | undefined): string {
 /** The language a template renders for `locale`, so a caller can say which one went out. */
 export const emailTemplateLang = emailLang;
 
+// THE NODE'S OWN MAIL FOOT (2026-10-27). The operator may set it (operator.email_footer): a shop's
+// buyer has no AIMEAT profile and no idea what "AIMEAT Protocol" is, and read both lines under every
+// mail the shop sent them. Read through the live config at render time, so a change needs no restart.
+let nodeFooter: () => string = () => '';
+/** Where the operator's own mail foot comes from (email.ts wires the live config in). */
+export function setNodeEmailFooter(fn: () => string): void { nodeFooter = fn; }
+function operatorFooter(): string {
+  // One line: a control character (a newline in the env file) becomes a space.
+  return Array.from(String(nodeFooter() || ''), c => (c.charCodeAt(0) < 32 ? ' ' : c)).join('').trim().slice(0, 200);
+}
+
 function t(locale: string | undefined, key: string): string {
+  if (key === 'footer') { const own = operatorFooter(); if (own) return own; }
   return i18n[emailLang(locale)][key] ?? i18n['en'][key] ?? key;
 }
 /** The shared string table, for a template that lives in another file (the digest). */
@@ -264,7 +278,8 @@ export const emailText = t;
 export function wrapHtml(heading: string, bodyHtml: string, locale?: string, opts?: { brand?: string; footer?: string }): string {
   // brand/footer are trusted constants (never user input) — brand may carry inline HTML (e.g. a heart).
   const brand = opts?.brand ?? 'AIMEAT';
-  const footer = opts?.footer ?? t(locale, 'footer');
+  const own = operatorFooter();
+  const footer = opts?.footer ?? (own ? esc(own) : t(locale, 'footer'));
   // WHO IS WRITING DECIDES WHAT THE FOOTER MAY SAY. When this node writes in its own name — a
   // verification code, a magic link, an invitation — the reader has an account here and the profile
   // line is useful. When a CALLER supplies its own footer it is somebody's business mailing their
@@ -272,7 +287,8 @@ export function wrapHtml(heading: string, bodyHtml: string, locale?: string, opt
   // plumbing leaking into their sales mail. An empty footer drops the block entirely, which is what
   // the outbound door asks for, because its unsubscribe link belongs in the message body where a
   // recipient (and the law) expects to find it.
-  const profileNote = opts?.footer === undefined ? `\n      <p>${t(locale, 'footerUnsubscribe')}</p>` : '';
+  // The operator's own foot replaces the profile note too: it is theirs to word (operator.email_footer).
+  const profileNote = opts?.footer === undefined && !own ? `\n      <p>${t(locale, 'footerUnsubscribe')}</p>` : '';
   const footerHtml = footer
     ? `<div class="footer">\n      <p>${footer}</p>${profileNote}\n    </div>`
     : '';

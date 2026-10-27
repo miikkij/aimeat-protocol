@@ -9,6 +9,8 @@
  * @structure OPERATOR_CONFIG_FIELDS
  * @usage import { OPERATOR_CONFIG_FIELDS } from './config-schema-operator.js';
  * @version-history
+ *   v1.1.0 — 2026-10-27 — operator.email_footer: the node's own mail foot (aimeat-commercial, Jouni: a shop's buyer
+ *     reads "Sent by AIMEAT Protocol" and "Manage your notification settings in your AIMEAT profile" they do not have).
  *   v1.0.0 — 2026-10-24 — Moved from config-schema.ts, with the three agreement rows (dpo_contact, signer_name,
  *     signer_role; plan doc-mvmr4i2wdk0p D1.4).
  */
@@ -90,4 +92,9 @@ export const OPERATOR_CONFIG_FIELDS: ConfigFieldShape<OperatorFieldKey>[] = [
   { key: 'operator.signerRole', dotPath: 'operator.signer_role', envVar: 'AIMEAT_OPERATOR_SIGNER_ROLE', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 200, immutable: false,
     description: 'That signer\'s role, e.g. "CEO". Printed beside the name in Annex I' },
+  { key: 'operator.emailFooter', dotPath: 'operator.email_footer', envVar: 'AIMEAT_OPERATOR_EMAIL_FOOTER', type: 'string',
+    // One line of text, no markup: no control characters and no angle brackets.
+    validate: v => typeof v === 'string' && (v as string).length <= 200
+      && !Array.from(v as string).some(c => c.charCodeAt(0) < 32 || c === '<' || c === '>'), immutable: false,
+    description: 'The line at the foot of every mail this node sends, in place of "Sent by AIMEAT Protocol" and the profile note ("AIMEAT · aimeat.io", a shop\'s own name). Empty keeps the default' },
 ];
