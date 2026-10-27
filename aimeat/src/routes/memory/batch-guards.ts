@@ -41,7 +41,6 @@ import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
 import { memoryTarget } from '../../services/classification/label-rows.js';
 import { audienceOfVisibility } from '../../services/classification/audience-cap.js';
 import { memoryWriteAsks, fileMemoryWriteAsks, type MemoryWriteAsk } from '../../services/memory-write-asks.js';
-import { resolveIdentity, isForeignPrincipal } from '../../utils/gaii.js';
 
 export function batchKeyRefusal(roles: string[], gaii: string, key: string): string | null {
   if (isServerWrittenKey(key)) return serverWrittenKeyRefusal(key).message;
@@ -136,9 +135,10 @@ export type BatchWriteAsks = { key: string; asks: MemoryWriteAsk[] };
 export async function batchWriteAsks(
   deps: { storage: Storage; config: AimeatConfig }, req: Request, gaii: string, key: string, value: unknown,
 ): Promise<{ refusal: string } | { value: unknown; ask: BatchWriteAsks | null }> {
+  const who = callerOf(req, deps.config.nodeId, deps.storage);
   const asked = await memoryWriteAsks(deps, {
-    principal: resolveIdentity(req.auth!, deps.config.nodeId), targetGaii: gaii, roles: req.auth!.roles,
-    scopes: req.auth!.scopes ?? [], federated: isForeignPrincipal(req.auth), ...(req.auth!.app ? { app: req.auth!.app } : {}),
+    principal: who.principal, targetGaii: gaii, roles: who.roles, scopes: who.scopes, federated: who.visitor,
+    ...(req.auth!.app ? { app: req.auth!.app } : {}),
   }, key, value);
   if ('refused' in asked) return { refusal: `${asked.refused.code}: ${asked.refused.message}` };
   return asked.asks.length ? { value: asked.value, ask: { key, asks: asked.asks } } : { value, ask: null };

@@ -564,7 +564,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const appendOnlySpaces = new Map<string, boolean>();
     for (const r of records) {
       if (keys && !keys.has(r.key)) continue;
-      const refusal = await bulkDeleteKeyRefusal({ storage }, { key: r.key, roles: req.auth!.roles }, appendOnlySpaces);
+      const refusal = await bulkDeleteKeyRefusal({ storage }, { key: r.key, roles: session.roles }, appendOnlySpaces);
       if (!refusal) continue;
       if (keys) {
         res.status(refusal.status ?? 403).json(error(config.nodeId, refusal.code, refusal.message,
