@@ -13,6 +13,8 @@
  *       still found by its key, and an ordinary record by its value.
  *     - ANCHORS: personal-node anchors sent together leave an owner within personal_nodes.max_per_owner
  *       (the race shows on PostgreSQL); anchors one after another, a delete and a re-anchor work as before.
+ *     - REVIEWS: an account that writes its own record at another account's package key does not read
+ *       the operator's review of that package; the owner, the owner's agent and the operator do.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-own-reach-oct26
  * @version-history
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, group memory-b).
@@ -20,6 +22,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
+import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now() % 1_000_000;
@@ -257,6 +260,45 @@ await test('USE: anchors one after another up to the limit, then a delete frees 
     const again = await anchor(bob, `personal-seq${stamp}-4`);
     assert(again.status === 201, `after the delete: ${again.status} ${JSON.stringify(again.body?.error)}`);
     assert((await anchoredBy(bob.name)).length === 3, 'bob holds three');
+});
+
+// ─── REVIEWS (knowledge/admin.ts:GET-reviews:mine-by-global-manifest-key) ───
+console.log('\nREVIEWS: an operator\'s review of a package is read by the package\'s owner, not by whoever writes its key');
+
+let pkgId = '';
+let pkgAgent!: McpAgent;
+const MARKER = `review-note-${stamp}`;
+
+await test('Setup: alice\'s agent imports a package; the operator reviews it with a note', async () => {
+    pkgAgent = await makeAgent(BASE, alice, ['memory:read', 'memory:write']);
+    const imp = await call('POST', '/v1/knowledge/import', pkgAgent.token, { package: {
+        type: 'knowledge-package', name: `Reach Pkg ${stamp}`, version: '1.0.0', author: alice.name, content_type: 'research',
+        tags: ['reach'], language: 'en', maturity: 'published', synthesis: { level: 'assisted', description: 'x' }, references: [],
+        entries: [{ key: 'e1', title: 'E1', visibility: 'public' }], links: [],
+        sharing: { catalog_listed: true, allow_clone: false, morsel_price: 0 },
+    }, entry_data: { e1: { title: 'E1', body: 'x' } } });
+    assert(imp.status === 201, `import: ${imp.status} ${JSON.stringify(imp.body?.error)}`);
+    pkgId = imp.body.data.package_id;
+    const rev = await call('POST', `/v1/admin/knowledge/${pkgId}/review`, op.token, { reason: 'custom', custom_text: MARKER, action: 'note' });
+    assert(rev.status === 200, `review: ${rev.status} ${JSON.stringify(rev.body?.error)}`);
+});
+
+await test('ATTACK: carol writes her own record at the package\'s key and still does not read the review', async () => {
+    const w = await call('POST', '/v1/memory', carol.token, { key: `packages/${pkgId}/manifest`, value: { note: 'mine' }, visibility: 'private' });
+    assert(w.status === 201 || w.status === 200, `carol's record: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const r = await call('GET', `/v1/knowledge/${pkgId}/reviews`, carol.token);
+    assert(r.status === 404 && !JSON.stringify(r.body).includes(MARKER), `carol read the operator's review: ${r.status} ${JSON.stringify(r.body?.data)}`);
+    const rep = await call('GET', `/v1/knowledge/${pkgId}/reputation`, carol.token);
+    assert(rep.body?.data?.last_review == null, `carol read the last review: ${JSON.stringify(rep.body?.data?.last_review)}`);
+});
+
+await test('USE: alice in person, her agent and the operator read the review', async () => {
+    for (const [who, token] of [['alice', alice.token], ['her agent', pkgAgent.token], ['the operator', op.token]] as const) {
+        const r = await call('GET', `/v1/knowledge/${pkgId}/reviews`, token);
+        assert(r.status === 200 && JSON.stringify(r.body.data.reviews).includes(MARKER), `${who}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+    }
+    const rep = await call('GET', `/v1/knowledge/${pkgId}/reputation`, alice.token);
+    assert(rep.status === 200 && rep.body.data.last_review?.action === 'note', `alice's last review: ${rep.status} ${JSON.stringify(rep.body?.data?.last_review)}`);
 });
 
 await test('Cleanup: the operator turns classification off', async () => {
