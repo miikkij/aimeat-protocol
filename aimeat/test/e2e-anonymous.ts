@@ -635,6 +635,20 @@ await test('The shared agent\'s public card: the minted token is refused on tags
     assert(!mcpOwn.isError, `agent own tags over MCP: ${mcpOwn.text.slice(0, 200)}`);
 });
 
+// secaudit2026oct26, profile-metadata.ts:runtime-source:shared-anonymous-agent-self-report. The shared
+// agent's runtime report decides whether classification takes it for a model on this machine, and
+// every holder of the minted token is that one agent.
+await test('The shared agent\'s runtime report: the minted token is refused (REST and MCP); an agent without agent:write reports its own', async () => {
+    const body = JSON.stringify({ runtime_source: { kind: 'python', llm: 'local' } });
+    const rest = await json('/v1/agents/shared/runtime-source', anonAuth({ method: 'PATCH', body }));
+    assert(isAuthRequired(rest), `minted token REST runtime-source: ${shown(rest)}`);
+    const viaMcp = await callTool(anonMcp, 'aimeat_agent_runtime_report', { target_agent_name: 'shared', kind: 'python', llm: 'local' });
+    assert(viaMcp.isError && /AUTH_REQUIRED/.test(viaMcp.text), `minted token MCP runtime report: ${viaMcp.text.slice(0, 200)}`);
+    const basic = await makeAgent(BASE, dirOwner!, ['memory:read']);
+    const own = await json(`/v1/agents/${basic.name}/runtime-source`, { method: 'PATCH', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${basic.token}` }, body });
+    assert(own.status === 200 && own.body.data?.runtime_source?.llm === 'local', `an agent reports its own runtime: ${shown(own)}`);
+});
+
 const skillMd = (name: string) => `---\nname: ${name}\ndescription: A guard skill for the anonymous suite. Use when testing.\n---\n\n# Guard\n\nNothing to do.\n`;
 await test('MCP aimeat_skill_publish and aimeat_skill_update: the minted token is AUTH_REQUIRED, an agent of the owner publishes', async () => {
     assert(agentMcp !== null, 'agent fixture failed');
