@@ -27,6 +27,8 @@
  *   if (await external.refuses(label)) { … hidden, audited 'refused' … }
  *   if (modelRefuses(label, use.model)) { … the AI call is refused … }
  * @version-history
+ *   v1.0.1 — 2026-10-27 — The shared anonymous agent is an outside reader whatever runtime its record
+ *     reports (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C3.4).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -34,6 +36,9 @@ import { isValidGAII } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import type { ClassificationLabel } from './defaults.js';
 import { refusesExternalAi } from './levels.js';
+
+/** The reserved account of the node's shared anonymous agent (auth/anonymous-principal.ts ANONYMOUS_ACCOUNT). */
+const ANONYMOUS_ACCOUNT = 'anonymous';
 
 export interface ExternalAiCheck {
   /** True when content with `label` may not reach this reader, because the reader is a model elsewhere. */
@@ -59,7 +64,10 @@ export function externalAiFor(
   let local: Promise<boolean> | null = null;
   const agentIsLocal = () => (local ??= (who.kind === 'ai' && who.principal && isValidGAII(who.principal)
     ? deps.storage.getAgent(who.principal)
-      .then(a => a?.runtimeSource?.llm === 'local')
+      // The shared anonymous agent (reserved account 'anonymous') is anyone who holds the minted
+      // token, so it is an outside reader whatever its record says (secaudit2026oct26,
+      // runtime-source:shared-anonymous-agent-self-report).
+      .then(a => a?.owner !== ANONYMOUS_ACCOUNT && a?.runtimeSource?.llm === 'local')
       // A failed read must not open what the label closes.
       .catch(err => { logger.warn('classification: the agent\'s runtime could not be read; content that refuses an outside model is held back', { gaii: who.principal, error: String(err) }); return false; })
     : Promise.resolve(false)));

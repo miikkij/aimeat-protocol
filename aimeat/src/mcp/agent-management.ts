@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-27 — aimeat_agent_runtime_report refuses the shared anonymous principal with AUTH_REQUIRED,
+ *     as aimeat_agent_tags_set does (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
  *   2026-10-27 — aimeat_agent_mode_set passes the session's agent to setAgentMode, which tells the owner
  *     when an agent changed a mode (secaudit2026oct26).
  *   2026-10-24 — aimeat_agent_tags_set refuses the shared anonymous principal with AUTH_REQUIRED, as
@@ -189,6 +191,9 @@ export function registerAgentManagementTools(
         async ({ target_agent_name, ...src }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
+            // As PATCH /v1/agents/:name/runtime-source: the shared anonymous agent reports no runtime
+            // (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
+            if (isAnonymousPrincipal({ sub: agentGaii })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
             // Its own report needs no agent:write; a sibling's does (auth/self-or-scope.ts, the same rule
             // as PATCH /v1/agents/:name/runtime-source). Scope-exempt, so the sibling check is here.
             const self = agentGaiiFromIdentifier(target_agent_name, localAccountName(agentGaii), config.nodeId) === agentGaii;

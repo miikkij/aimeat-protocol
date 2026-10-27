@@ -12654,7 +12654,8 @@ paths:
         Send `null` to clear it: a runtime that stops being the thing that runs this agent should be
         able to say so, and a stale claim is worse than none. Same-owner gated; an agent reports its
         own with no permission word, and a same-owner sibling's with `agent:write`
-        (`aimeat_agent_runtime_report`).
+        (`aimeat_agent_runtime_report`). The node's shared anonymous agent reports none: its token
+        is answered 401 AUTH_REQUIRED, as on `/tags`.
       tags: [Identity]
       security:
         - BearerAuth: []
