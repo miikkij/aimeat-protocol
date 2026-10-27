@@ -25,6 +25,10 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-10-27 — SECURITY: a config held under the owner's own identity and written last by an agent
+ *     that does not read as the owner is gathered and folded with that agent's reach (pulseReader, from
+ *     the memory write tally). An agent with Full access wrote one there and the pulse read the owner's
+ *     private records for it (secaudit2026oct26, living-pulse.holderReadsAsOwner.authority-from-namespace-not-writer).
  *   2026-10-20 — SECURITY: the gather passes the config's holder to the organism read rule
  *     (holderCaller, librarianSearch's organismCaller). An agent-held config gathered records of an
  *     organism that admits only listed agents and does not list that agent (secaudit 2026-10, the
@@ -72,6 +76,7 @@ import type { EmailService } from './email.js';
 import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
 import { updateRecord } from './record-cas.js';
+import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -236,6 +241,32 @@ async function holderReadsAsOwner(storage: Storage, holder: string): Promise<boo
 }
 
 /**
+ * Whose reach the pulse reads with for this config: its holder, except that a config held under the
+ * owner's own identity and written last by an agent of that owner that does not read as the owner is
+ * read with that agent's reach. An agent holding memory:write-as-owner (Full access covers it) writes
+ * there, and memory:read-as-owner is outside every wildcard, so the holder's namespace alone handed the
+ * agent the owner's whole material (secaudit2026oct26, living-pulse.holderReadsAsOwner.authority-from-
+ * namespace-not-writer). The record carries no writer; the memory write tally does (services/data-map/
+ * write-tally-buffer.ts: every write door records its writer per key), and its pending counts are
+ * flushed first so the latest writer is current. The owner's own write after the agent's is the
+ * owner's own act and gives the reach back; an agent holding the tick, an app (its writes are the
+ * owner's identity) and a config with no tally row read as before.
+ */
+async function pulseReader(storage: Storage, config: AimeatConfig, holder: string, key: string): Promise<string> {
+  if (isGEAI(holder) || holder.includes('#')) return holder;
+  await flushWriteTallyBuffer();
+  const owner = localAccountName(holder);
+  const rows = (await storage.listMemoryWriteTally({ ownerGaii: holder, key })).filter((r) => {
+    if (r.writerPrincipal === holder) return true;
+    const agent = parseGAII(r.writerPrincipal);
+    return !!agent && agent.owner === owner && agent.node === config.nodeId;
+  });
+  const latest = rows.reduce<typeof rows[number] | null>((a, r) => (!a || r.lastAt > a.lastAt ? r : a), null);
+  if (!latest || latest.writerPrincipal === holder) return holder;
+  return (await holderReadsAsOwner(storage, latest.writerPrincipal)) ? holder : latest.writerPrincipal;
+}
+
+/**
  * The config's holder as the caller the organism read rule asks (organismReadableRecords, through
  * librarianSearch): the owner's GHII as the owner in person, an agent with its stored scopes, an
  * ecosystem app with none. An unattended pulse has no session, so the holder's grant stands in for
@@ -303,6 +334,8 @@ async function readDeliverable(
 async function handleAgentSection(
   storage: Storage, config: AimeatConfig, ownerGaii: string, loc: Loc,
   sec: Record<string, unknown>, slot: string, charter: { scope?: string }, readsAll: boolean,
+  /** Whose reach the fold reads with (pulseReader): the holder, or the agent that wrote the config. */
+  reader: string = ownerGaii,
 ): Promise<'dispatched' | 'waiting' | 'failed' | 'folded'> {
   const [agentName, offerId] = String(sec.agent).split('/');
   const stateKey = taskStateKey(loc, slot);
@@ -320,7 +353,7 @@ async function handleAgentSection(
     if (task.status === 'done') {
       if (!await clear()) return 'waiting';
       try {
-        const content = await readDeliverable(storage, task, m => ownerScopeView([m], ownerGaii, readsAll).length > 0);
+        const content = await readDeliverable(storage, task, m => ownerScopeView([m], reader, readsAll).length > 0);
         if (content) {
           const key = await addSrc(storage, ownerGaii, loc, slot, { text: content.text, origin: task.deliverableKey || `task:${task.id}`, producer: task.agentGaii });
           await inheritSourceLabels({ storage, config }, ownerGaii, [{ key, sources: [memoryTarget(task.agentGaii, content.key)] }]);
@@ -372,16 +405,18 @@ export async function pulseInstanceServer(
   const sections = Array.isArray(cfg.template) ? cfg.template as Array<Record<string, unknown>> : [];
   let costUsd = 0, derived = 0;
   const rendered: string[] = [];
-  // Read with the authority of whoever holds the config, never more (secaudit 2026-10, v51).
-  const readsAll = await holderReadsAsOwner(storage, ownerGaii);
-  // ...and with the organism rule the holder meets on GET /v1/memory/:key (secaudit 2026-10, v57 shape).
-  const organismCaller = await holderCaller(storage, config, ownerGaii);
+  // Read with the authority of whoever holds the config, never more (secaudit 2026-10, v51), and of
+  // the agent that wrote it last when that agent may read less (pulseReader; secaudit2026oct26).
+  const reader = await pulseReader(storage, config, ownerGaii, configKey(loc));
+  const readsAll = await holderReadsAsOwner(storage, reader);
+  // ...and with the organism rule the reader meets on GET /v1/memory/:key (secaudit 2026-10, v57 shape).
+  const organismCaller = await holderCaller(storage, config, reader);
 
   for (const sec of sections) {
     const slot = String(sec.slot);
     if (sec.agent) {
       // Agent-backed section: dispatch a task, then fold its deliverable on a later pulse.
-      const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter, readsAll);
+      const r = await handleAgentSection(storage, config, ownerGaii, loc, sec, slot, charter, readsAll, reader);
       if (r !== 'folded') continue;   // dispatched / waiting / failed → nothing new to derive this pulse
     } else {
       // 1. Gather from the owner's own material.
@@ -391,7 +426,7 @@ export async function pulseInstanceServer(
           // The pulse is the node's own work for the config's holder, so it reads the owner's
           // identity set as that holder may (holderReadsAsOwner; services/owner-scope-read.ts): all of
           // it for the owner, the visible part for an agent without memory:read-as-owner.
-          ownerName, fanOutOwner: true, readsAll, viewerGaii: ownerGaii,
+          ownerName, fanOutOwner: true, readsAll, viewerGaii: reader,
           query: `${sec.section} ${charter.scope || ''}`.trim(), limit: 5, scope: 'own',
           // The pulse runs with no caller; what it hands the model passes useForAi at the model.
           reader: systemReader({ storage, config }, ownerGaii),
