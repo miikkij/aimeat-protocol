@@ -84,14 +84,14 @@ pub mod test_support {
 /// On macOS and Linux, give a file or folder this mode, so only the person's own account can read
 /// it (0600 for a file, 0700 for a folder). Windows keeps the per-user profile's access list.
 #[cfg(unix)]
-fn make_private(path: &Path, mode: u32) -> Result<(), String> {
+pub(crate) fn make_private(path: &Path, mode: u32) -> Result<(), String> {
     use std::os::unix::fs::PermissionsExt;
     std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode))
         .map_err(|e| format!("Failed to restrict {}: {}", path.display(), e))
 }
 
 #[cfg(not(unix))]
-fn make_private(_path: &Path, _mode: u32) -> Result<(), String> {
+pub(crate) fn make_private(_path: &Path, _mode: u32) -> Result<(), String> {
     Ok(())
 }
 
@@ -590,7 +590,9 @@ pub fn write_config(app: AppHandle, config: NodeConfig) -> Result<(), String> {
     ensure_env_file(&rt)?;
 
     let existing = std::fs::read_to_string(&rt.env_file).unwrap_or_default();
-    let env_content = compose_env(&existing, &config)?;
+    // The node-level entries for the AI server on this computer follow the listen address
+    // (local_ai.rs): written in local-network mode, removed otherwise.
+    let env_content = crate::local_ai::sync_env(&compose_env(&existing, &config)?)?;
     std::fs::write(&rt.env_file, env_content)
         .map_err(|e| format!("Failed to write config: {}", e))?;
     make_private(&rt.env_file, 0o600)
@@ -669,6 +671,13 @@ fn compose_env(existing: &str, config: &NodeConfig) -> Result<String, String> {
     Ok(env_content)
 }
 
+/// The managed `.env`, made ready the way every settings write makes it (local_ai.rs writes it too).
+pub(crate) fn resolve_env_file(app: &AppHandle) -> Result<PathBuf, String> {
+    let rt = resolve_runtime(app)?;
+    ensure_env_file(&rt)?;
+    Ok(rt.env_file)
+}
+
 /// Read the AIMEAT `.env` configuration and return parsed values.
 #[tauri::command]
 pub fn read_config(app: AppHandle) -> Result<NodeConfig, String> {
@@ -744,7 +753,7 @@ pub fn open_external(url: String) -> Result<(), String> {
 }
 
 /// Parse a `.env` file content into a key-value map. Strips surrounding quotes.
-fn parse_env(content: &str) -> HashMap<String, String> {
+pub(crate) fn parse_env(content: &str) -> HashMap<String, String> {
     let mut map = HashMap::new();
     for line in content.lines() {
         let trimmed = line.trim();

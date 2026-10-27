@@ -3813,10 +3813,10 @@
      "slug": "g-20-listen-address",
      "cells": [
       "<strong>Listen address</strong>",
-      "Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network.",
+      "Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network; opened, the AI server the person chose on that computer keeps working as the node's own provider at its one address, and nothing else on the computer is in reach.",
       "<code>AIMEAT_BIND_HOST</code>, admin Config tab (Node)"
      ],
-     "plain": "Listen address Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network. AIMEAT_BIND_HOST, admin Config tab (Node)"
+     "plain": "Listen address Choose whether the node answers on this machine only or on the local network too. A node set to answer beyond this machine gets the public safety defaults unless the security profile says otherwise; with no address set, the node answers on every address as before. The desktop app sets this machine only for a new install and has a setting to open it to the local network; opened, the AI server the person chose on that computer keeps working as the node's own provider at its one address, and nothing else on the computer is in reach. AIMEAT_BIND_HOST, admin Config tab (Node)"
     },
     {
      "slug": "g-20-readable-refusals",
