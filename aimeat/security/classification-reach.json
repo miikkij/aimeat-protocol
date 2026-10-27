@@ -460,7 +460,7 @@
     "src/routes/knowledge/helpers.ts": {
       "reads": {
         "getMemory": 1,
-        "listMemoryForOwners": 4
+        "listMemoryForOwners": 3
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Read-to-update for the sharing routes; GET /:id checks its result with presentMemory in packages-core. Reviewed 2026-10-15 (feature-list audit 207): findReadableManifest reads a public manifest across owners and agents, or the caller's own, and returns it only through presentMemory; GET /v1/knowledge/:id and the reputation read both take it from there. Reviewed 2026-10-17 (plan doc-mvcn6c7e4e5q V3.6): findSharedManifest reads a members- or organism-audience manifest only for a node account that audience.ts admits, and findReadableManifest returns it through presentMemory like the others; the export moved here from sharing.ts and reads through the same function."
     },
@@ -1695,6 +1695,12 @@
         "getMemory": 1
       },
       "why": "Written 2026-10-25 (secaudit2026oct22, lead 2150), the node's own read: the service-owned mark (agent-device-return.<user code>) that a device request proved it is an existing agent coming back, read to tell the consent card a return from a takeover. It holds an agent id and a time, no content, and is never sent to a model."
+    },
+    "src/services/builtin-extension-seeder.ts": {
+      "reads": {
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the seeder reads the security identity's incident records to avoid opening the same BUILTIN_EXTENSION_NAME_HELD incident twice. No content."
     },
     "src/services/cortex-seeder.ts": {
       "reads": {
