@@ -37,6 +37,11 @@ bash scripts/setup.sh
 Then open **http://localhost:3000** and say *"Build an AIMEAT app that …"*. It fetches the
 spec, builds, publishes over MCP, and hands you the live URL.
 
+The UI listens on this computer only (`OPENHANDS_PORT_BIND=127.0.0.1:3000` in `.env`): it has no
+login, it can run code on the host, and it holds your agent token. From another machine, use
+`ssh -L 3000:localhost:3000 <user>@<host>`. `.env.example` says how to open it to your network
+instead, and `setup.sh` warns when it is.
+
 ## Re-deploying / another machine
 
 Everything needed is in this folder + `.env`. On a fresh host: `cp .env.example .env`,

@@ -11,6 +11,8 @@
 #         AIMEAT_SECRETS_FILE (default ./secrets/aimeat.env),
 #         AIMEAT_KEY_FILE (default <secrets dir>/<agent>@<owner>.key)
 # @version-history
+#   2026-10-27 -- The device-authorize and device-token bodies (the return proof, the device_code) go
+#     to curl on stdin, not as arguments (secaudit2026oct26, secrets-on-curl-argv).
 #   2026-10-26 — Keeps the agent's private key of each approval beside the token (0600) and signs a
 #     reconnect's device request with it (`proof`), so the owner sees the agent coming back and not a
 #     takeover (secaudit2026oct22, unbound-reapproval-of-existing-agent). The default scope "*" is no
@@ -98,10 +100,14 @@ return_proof_json() { # prints ,"proof":{...} or nothing
   rm -rf "$dir"
 }
 
+# Request bodies that carry a secret (the return proof, the device_code) go to curl on stdin:
+# printf is a bash builtin, so the body never appears in a process's arguments, which every local
+# account can read.
 echo "==> Requesting device authorization for ${AGENT_NAME}#${OWNER} @ ${BASE_URL}"
-AUTHZ="$(curl -s -X POST "$BASE_URL/v1/agents/device-authorize" \
+AUTHZ="$(printf '%s' "{\"owner\":\"$OWNER\",\"agent_name\":\"$AGENT_NAME\",\"display_name\":\"OpenHands\",\"description\":\"AIMEAT-boosted OpenHands app builder\",\"scopes\":$(scopes_json)$(return_proof_json)}" \
+  | curl -s -X POST "$BASE_URL/v1/agents/device-authorize" \
   -H "Content-Type: application/json" \
-  -d "{\"owner\":\"$OWNER\",\"agent_name\":\"$AGENT_NAME\",\"display_name\":\"OpenHands\",\"description\":\"AIMEAT-boosted OpenHands app builder\",\"scopes\":$(scopes_json)$(return_proof_json)}")"
+  --data-binary @-)"
 
 DEVICE_CODE="$(printf '%s' "$AUTHZ" | json device_code)"
 USER_CODE="$(printf '%s' "$AUTHZ" | json user_code)"
@@ -130,9 +136,10 @@ fi
 
 TOKEN=""
 for _ in $(seq 1 360); do   # up to ~30 min (device auth TTL)
-  RESP="$(curl -s -X POST "$BASE_URL/v1/agents/device-token" \
+  RESP="$(printf '%s' "{\"device_code\":\"$DEVICE_CODE\",\"grant_type\":\"urn:ietf:params:oauth:grant-type:device_code\"}" \
+    | curl -s -X POST "$BASE_URL/v1/agents/device-token" \
     -H "Content-Type: application/json" \
-    -d "{\"device_code\":\"$DEVICE_CODE\",\"grant_type\":\"urn:ietf:params:oauth:grant-type:device_code\"}")"
+    --data-binary @-)"
   TOKEN="$(printf '%s' "$RESP" | json access_token)"
   if [ -n "$TOKEN" ]; then break; fi
   ERR="$(printf '%s' "$RESP" | json error)"
