@@ -9942,6 +9942,8 @@
   "notifpage.group.otherSub": "everything else, including what you send yourself",
   "notiftext.docsign_request.title": "{from} asks you to sign: {title}",
   "notiftext.docsign_request.body": "Document {document}. Open the signing request, or ask your AI to show it to you.",
+  "notiftext.app_published_by_app.title": "The app {publisher} published your app {app}",
+  "notiftext.app_published_by_app.body": "It published version {version} with the permission you gave it to publish apps. The next time you open {app}, you are asked once whether to allow the new permissions this version asks for.",
   "notiftext.agreement_sent_cp.title": "{operator} asks you to sign a data processing agreement",
   "notiftext.agreement_sent_cp.body": "Read the summary and choose how you sign. Agreement {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Your signed copy could not be accepted",

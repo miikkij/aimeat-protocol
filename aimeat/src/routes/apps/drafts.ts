@@ -6,6 +6,7 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.11.1 -- 2026-10-27 -- POST .../publish-draft through an app's grant names that app on the version (secaudit2026oct26).
  *   v2.11.0 -- 2026-10-19 -- PUT .../draft and POST .../publish-draft take `version`, the display version
  *     the promotion publishes with (services/app-display-version.ts judges it); PUT .../draft answers with
  *     the draft's `version` (wish-the-app-draft-tools-can-set-the-display-version).
@@ -91,6 +92,7 @@ import { publishAskedFields, askedStatus } from '../../services/app-publish-gate
 import { draftNoticeFrom } from '../../services/app-news.js';
 import type { AppDraftNotice } from '../../storage/interface.js';
 import { appDisplayVersionRefusal } from '../../services/app-display-version.js';
+import { publishingAppOf } from '../../services/app-published-by-app.js';
 
 /**
  * The body's `notice` (what the draft changes) as the record the slot keeps: undefined when not sent,
@@ -554,6 +556,7 @@ export function registerDraftRoutes(
             specToken: typeof spec_token === 'string' ? spec_token : undefined,
             specAck: typeof spec_ack === 'string' ? spec_ack : undefined,
             publishGate: publishAskOf({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app),
+            publishingApp: publishingAppOf(req.auth),
         });
         if ('refusal' in out) {
             // The draft SURVIVES a refusal. A broken artifact is something to fix and publish again,

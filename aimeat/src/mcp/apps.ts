@@ -11,6 +11,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-27 — aimeat_app_publish and aimeat_app_draft_publish under a role-'app' token name that app on the version (`publishingApp`; secaudit2026oct26).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version` (the display version
@@ -163,6 +164,8 @@ export function registerAppsTools(
     emitResourceListChanged: (agentGaii: string) => void,
     /** The session's caller (register-all.ts): who asks, for the app visibility rule of aimeat_app_get and the publish gate. */
     caller: () => CallerContext,
+    /** The app whose grant the session's token carries, when it is a role-'app' token (services/app-published-by-app.ts). */
+    publishingApp: () => string | undefined = () => undefined,
 ): void {
 
     /**
@@ -254,6 +257,7 @@ export function registerAppsTools(
                         // The publish gate's answer for this session; the PUT has none to ask
                         // (services/app-publish-gate.ts). Server-side, never from the input.
                         publish_ask: publishAskOf({ storage, config }, caller()),
+                        ...(publishingApp() ? { publishing_app: publishingApp() } : {}),
                     },
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
@@ -306,6 +310,7 @@ export function registerAppsTools(
                     accessCode: { mode: 'carry' },
                     source: 'inline',
                     publishGate: publishAskOf({ storage, config }, caller()),
+                    publishingApp: publishingApp(),
                     declaredProvenanceId: ai_provenance_id,
                     declaredProvenance: toDeclaredProvenance(ai_provenance),
                     specToken: spec_token,
@@ -464,6 +469,7 @@ export function registerAppsTools(
                     roadmap,
                     version,
                     publishGate: publishAskOf({ storage, config }, caller()),
+                    publishingApp: publishingApp(),
                 });
                 if ('refusal' in out) {
                     // The draft stays: a refused promotion is work to fix, not work to lose.

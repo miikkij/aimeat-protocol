@@ -9300,7 +9300,8 @@ paths:
         the owner's name, so the consent page does not auto-approve it for its owner, and
         authorize-consent never marks it own. `published_by_other` names who published the app's
         live version when that is another account than the app's owner (a developer the owner gave
-        the publisher or full right), else null: the consent page then shows the screen to the owner
+        the publisher or full right), or the app (`<author>/<filename>`) of another author whose grant
+        published it, else null: the consent page then shows the screen to the owner
         for any scope the owner's grant lacks, as it does when the owner narrowed the grant by hand
         (`scopes_fixed_at` on GET /v1/app-grants). `prompt` is `create` when the app asked for the
         create-account form, else null. Unguessable id; no auth.
@@ -9362,8 +9363,11 @@ paths:
         account published its live version (a developer with the publisher or full right) or the
         owner narrowed the grant by hand: `consent_required` with `reason: app_updated`, `why`
         (`publisher_version` or `owner_narrowed`), `added` (the scopes asked for, space-separated)
-        and, for a version another account published, `published_by`. A version the owner or the
-        owner's agent published keeps signing in silently, new scopes included.
+        and, for a version another account published, `published_by`. A version another author's app
+        published through the owner's grant asks the same way, with `published_by` and
+        `published_by_app` naming that app; the owner is told of such a version when it is published.
+        A version the owner or the owner's agent published, and one the owner's own app published
+        through its own grant, keeps signing in silently, new scopes included.
 
         **By name (`app`).** A page of the node that holds app code in an opaque-origin frame asks
         with `app=owner/filename` instead of `origin`, because the frame has no address of its own

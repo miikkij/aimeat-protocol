@@ -10114,6 +10114,8 @@
   "notifpage.group.otherSub": "kaikki muu, myös se, minkä lähetät itsellesi",
   "notiftext.docsign_request.title": "{from} pyytää sinua allekirjoittamaan: {title}",
   "notiftext.docsign_request.body": "Dokumentti {document}. Avaa allekirjoituspyyntö, tai pyydä tekoälyäsi näyttämään se.",
+  "notiftext.app_published_by_app.title": "Sovellus {publisher} julkaisi sovelluksesi {app}",
+  "notiftext.app_published_by_app.body": "Se julkaisi version {version} oikeudella, jonka annoit sille julkaista sovelluksia. Kun seuraavaksi avaat sovelluksen {app}, kysymme yhden kerran, sallitko uudet oikeudet, joita tämä versio pyytää.",
   "notiftext.agreement_sent_cp.title": "{operator} pyytää sinua allekirjoittamaan käsittelysopimuksen",
   "notiftext.agreement_sent_cp.body": "Lue tiivistelmä ja valitse, miten allekirjoitat. Sopimus {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Allekirjoitettua kopiotasi ei voitu hyväksyä",

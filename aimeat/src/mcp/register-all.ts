@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-27 — registerAppsTools receives the app a role-'app' bearer names, so a publish through an app's grant names that app (secaudit2026oct26).
  *   2026-10-25 — registerSecretHostAskTools: aimeat_secret_host_ask (secaudit2026oct22).
  *   2026-10-25 — registerInternetOpeningTools: an app opened to the internet on a closed node (six tools).
  *   2026-10-22 — registerDecideTools takes the session's caller, so a decision run reads and shows only what the session may read (secaudit 2026-10, v83, v84).
@@ -188,6 +189,7 @@ import { registerAccessTools } from './access.js';
 import { registerSecretTools } from './secrets.js';
 import type { SurfaceRole } from '../tool-catalog/surfaces.js';
 import { agentSessionCaller, type CallerContext } from '../services/caller-context.js';
+import { publishingAppOfVerifiedToken } from '../services/app-published-by-app.js';
 
 /** What every tool group needs. The two emitters are passed in so this file has no cycle home. */
 export interface ServerToolDeps {
@@ -271,7 +273,8 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     // on every other surface everything registered is already on.
     if (deps.role === 'chat') registerToolLoader(mcp, { stateless: deps.stateless === true });
     registerCortexTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
-    registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller);
+    registerAppsTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged, caller,
+        () => publishingAppOfVerifiedToken(getToken()));
     registerAppDraftEditTools(mcp, storage, config, agentGaii);
     registerSeoTools(mcp, storage, config, agentGaii, scopes);
     registerVisibilityTools(mcp, storage, config, caller);

@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-27 — A version another author's app published through its grant (`manifest.publishedByApp`) asks like one another account published: the silent bridge adds `published_by_app`, and `published_by_other` names that app (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — The owner's own app asks the owner for the words the grant lacks when another account published the live version or the owner narrowed the grant by hand: the silent bridge answers consent_required (reason app_updated, `why`, `added`, `published_by`) and the request answers `published_by_other` so the consent page shows the screen (services/own-app-consent.ts; secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). The portfolio ceiling moved unchanged to services/app-grant-portfolio.ts (line limit).
  *   2026-10-25 — The silent bridge reads the refresh cookie by the node's config (`__Host-aimeat_rt` on https; secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   2026-10-25 — A grant given to an earlier holder's app of the author's name counts as absent on the silent bridge, the code exchange and the refresh (services/app-grant-author.ts; secaudit2026oct22).
@@ -148,6 +149,7 @@ import { readRefreshCookie, checkRefreshSession } from '../services/owner-sessio
 import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
 import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app-grant-portfolio.js';
 import { ownAppConsentNeed } from '../services/own-app-consent.js';
+import { byAnotherAuthorsApp } from '../services/app-published-by-app.js';
 import { accountOf } from '../services/app-members.js';
 import { apexOrigin, frameRedirect, bareAppHostRedirectOk } from '../services/app-frame-redirect.js';
 import { parseAppScopes } from '../services/protected-resource.js';
@@ -433,8 +435,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       packageApp, prompt: String(req.query.prompt ?? '') === 'create' ? 'create' : '',
       // Another account published the live version: the consent page asks the owner for new words (services/own-app-consent.ts).
+      // A version another author's app published through its grant names that app (services/app-published-by-app.ts).
       publishedByOther: typeof appRecord.manifest?.publishedBy === 'string' && accountOf(appRecord.manifest.publishedBy) !== accountOf(app.slice(0, slash))
-        ? appRecord.manifest.publishedBy : '',
+        ? appRecord.manifest.publishedBy
+        : byAnotherAuthorsApp(appRecord.manifest?.publishedByApp, app.slice(0, slash)) ? appRecord.manifest.publishedByApp : '',
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -648,6 +652,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return reply({
         ok: false, error: 'consent_required', reason: 'app_updated', why: ownNeed.reason, app: grantTarget, app_name: grantName,
         scope: wanted.join(' '), added: ownNeed.added.join(' '), ...(ownNeed.publisher ? { published_by: ownNeed.publisher } : {}),
+        ...(ownNeed.publisherApp ? { published_by_app: ownNeed.publisherApp } : {}),
       });
     } else if (isOwnApp) {
       scopes = wanted;

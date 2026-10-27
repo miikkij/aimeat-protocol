@@ -8831,6 +8831,8 @@
   "notifpage.group.otherSub": "todo lo demás, incluido lo que te envías a ti",
   "notiftext.docsign_request.title": "{from} te pide que firmes: {title}",
   "notiftext.docsign_request.body": "Documento {document}. Abre la solicitud de firma o pide a tu IA que te la muestre.",
+  "notiftext.app_published_by_app.title": "La app {publisher} publicó tu app {app}",
+  "notiftext.app_published_by_app.body": "Publicó la versión {version} con el permiso que le diste para publicar apps. La próxima vez que abras {app}, te preguntaremos una vez si permites los nuevos permisos que pide esta versión.",
   "notiftext.agreement_sent_cp.title": "{operator} te pide que firmes un contrato de encargo del tratamiento",
   "notiftext.agreement_sent_cp.body": "Lee el resumen y elige cómo firmas. Contrato {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "No se pudo aceptar tu copia firmada",
