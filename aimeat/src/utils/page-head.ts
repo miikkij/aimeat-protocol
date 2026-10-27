@@ -19,10 +19,17 @@
  * @structure
  *   - injectSiteHead(html, config) — the NODE's identity: same on every page, from config
  *   - injectPageHead(html, page, config) — returns the transformed document
+ *   - injectStaticPageHead(html, path, registryPage, config) — both, for a static file that keeps
+ *     its own title and description
  * @usage
  *   html = injectSiteHead(html, config, nonceAttr);
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
+ *   html = injectStaticPageHead(html, '/', findPublicPage('/'), config, nonceAttr);
  * @version-history
+ *   2026-10-27 - injectStaticPageHead: the static front pages (AIMEAT_FRONT_PAGE) are stamped like
+ *     the shell. They were sent as read from disk, so from 2026-10-21 the page aimeat.io serves at
+ *     `/` had no canonical link, no og:* and no JSON-LD, and AGENTSCAN 1.1.0 scored it 82 (S10, S12,
+ *     S13), down from 100 with the SPA shell.
  *   2026-10-05 - HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   2026-09-17 - TARGET-078: productivity category; omit a price that depends on deployment.
  *   v1.2.1 — 2026-08-26 — SECURITY (CodeQL js/reflected-xss): the per-page WebPage JSON-LD embedded
@@ -253,4 +260,38 @@ export function injectPageHead(
     out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(jsonLd)}</script>\n</head>`);
   }
   return out;
+}
+
+/** The five characters escapeHtml writes, read back, so a value taken from a file is not escaped twice. */
+function unescapeHtml(value: string): string {
+  return value.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+}
+
+/**
+ * Stamp a static page served at `path` (the front pages behind AIMEAT_FRONT_PAGE) the way serveSpa
+ * stamps the shell: the node's identity, then the canonical link, og:url and the WebPage block for
+ * that path. The title and description are the file's own, read before injectSiteHead replaces
+ * them, because the file is written for its language and the registry entry describes the classic
+ * front page; the registry entry still supplies the markdown mirror and the picture.
+ */
+export function injectStaticPageHead(
+  html: string,
+  path: string,
+  registryPage: PublicPage | undefined,
+  config: AimeatConfig,
+  nonceAttr = '',
+): string {
+  const title = unescapeHtml(html.match(/<title>([^<]{0,2048})<\/title>/i)?.[1]?.trim() ?? '');
+  const description = unescapeHtml(html.match(/<meta name="description" content="([^"]*)"/i)?.[1] ?? '');
+  const out = injectSiteHead(html, config, nonceAttr);
+  const page: PublicPage = {
+    changefreq: 'weekly',
+    priority: '1.0',
+    ...registryPage,
+    path,
+    title: title || registryPage?.title || config.seoSiteName,
+    description: description || registryPage?.description || config.seoSiteDescription,
+  };
+  return injectPageHead(out, page, config, nonceAttr);
 }
