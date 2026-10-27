@@ -18,12 +18,14 @@
  *   visitor rate limiter keys it (visitorRunShareKey). PER PROCESS, as the rate limiters are
  *   (rate-buckets.ts).
  * @structure RunSlotTurn · EXT_RUN_RETRY_AFTER_SEC · takeExtensionRunSlot(config, account) · runSlotsInUse()
- *   · visitorRunShareKey(ip)
+ *   · visitorRunShareKey(ip) · SELLER_RUNS_PER_RUN · createRunQueue(max)
  * @usage
  *   const slot = takeExtensionRunSlot(config, ownerGhiiOf(caller.gaii));
  *   if (!slot.ok) return refuse(503, slot.code, slot.message, slot.retryAfterSec);
  *   try { ... run ... } finally { slot.release(); }
  * @version-history
+ *   v1.2.0 — 2026-10-27 — createRunQueue and SELLER_RUNS_PER_RUN: the seller runs one buying run's
+ *     ctx.buy calls start go at most four at once, the rest queued (secaudit2026oct26).
  *   v1.1.0 — 2026-10-27 — visitorRunShareKey: a visitor's share is keyed by IPv6 /64, as the visitor
  *     rate limiter keys it; it was the full address, so one /64 could hold the whole pool
  *     (secaudit2026oct26).
@@ -88,6 +90,30 @@ export function takeExtensionRunSlot(config: AimeatConfig, account: string): Run
 export function visitorRunShareKey(ip: string | undefined): string {
     const mapped = ip ? /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip) : null;
     return `visitor:${ipRateKey(mapped ? mapped[1] : ip)}`;
+}
+
+/**
+ * Seller runs one buying run may have going at once. A seller action ctx.buy starts runs inside its
+ * buyer's slot ('inherited'), so a script that starts many purchases together started as many
+ * sandboxes; past this number a purchase waits its turn, and none is refused (secaudit2026oct26).
+ */
+export const SELLER_RUNS_PER_RUN = 4;
+
+/** A FIFO queue that runs at most `max` pieces of work at once. Nothing is refused. */
+export function createRunQueue(max: number): <T>(work: () => Promise<T>) => Promise<T> {
+    let running = 0;
+    const waiting: Array<() => void> = [];
+    const next = (): void => {
+        if (running >= max) return;
+        const start = waiting.shift();
+        if (start) { running++; start(); }
+    };
+    return <T>(work: () => Promise<T>) => new Promise<T>((resolve, reject) => {
+        waiting.push(() => {
+            work().then(resolve, reject).finally(() => { running--; next(); });
+        });
+        next();
+    });
 }
 
 function busy(message: string): RunSlotTurn {
