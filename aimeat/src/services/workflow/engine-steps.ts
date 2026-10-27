@@ -6,6 +6,9 @@
  *   human-input ask delivery, step-failure + finish notifications, agent-offline heads-up, and
  *   fresh-mode output clearing. Extracted from engine.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-27 — An ecosystem step's invoke frame names the agent or ecosystem app the run
+ *     acts for; the owner's, an app grant's and an older run's frame name the owner as before
+ *     (secaudit2026oct26, workflow/engine-steps:ecosystem-step-caller-is-owner-not-run-principal).
  *   v1.12.0 — 2026-10-22 — An extension step's result_to_key that names an `organism.*` key is written
  *     through the shared memory write as the run's principal, so the organism namespace rule applies
  *     (step-write.ts; secaudit 2026-10, r66). A datapackage step, and an extension step's ctx.files and
@@ -226,16 +229,22 @@ export async function dispatchStep(deps: StepDeps, ownerGhii: string, run: Workf
  * Fire an ecosystem action step (export-out / trigger-geai) over the connect-tunnel and route its
  * reply into onPushTerminal. Fire-and-forget: the run was already marked 'dispatched' + persisted
  * under the lock by tick(), so onPushTerminal (which also locks) advances it safely on the reply.
- * The workflow owner is the caller GHII (the human pays / is the AIMEAT-side principal).
+ *
+ * The caller on the frame is who the run acts for (run.principal): an agent's run names the agent and
+ * an ecosystem app's run names that app, as the capability door and an agent's eco-capability schedule
+ * do (scheduler-remote-jobs.ts). The owner's run, an app grant's run (an app's schedule names the owner
+ * too) and a run started before runs recorded a principal name the owner, as before (secaudit2026oct26,
+ * ecosystem-step-caller-is-owner-not-run-principal).
  */
 export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: WorkflowRun, step: WorkflowStep, action: Extract<NonNullable<WorkflowStep['action']>, { kind: 'export-out' } | { kind: 'trigger-geai' }>, onPushTerminal: OnPushTerminal): void {
   const { workflowId, runId } = run;
   const stepId = step.id;
+  const caller = run.principal && (run.principal.kind === 'agent' || run.principal.kind === 'ecosystem') ? run.principal.id : ownerGhii;
   const fire = async (): Promise<boolean> => {
     const mgr = getActiveConnectTunnelManager();
     if (!mgr) return false;
     if (action.kind === 'trigger-geai') {
-      const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller: ownerGhii });
+      const reply = await mgr.invokeOnPrincipal(action.geai, { capability: action.capability, input: action.input ?? {}, caller });
       return reply.ok;
     }
     // export-out: read the owner-namespace `from` key and push it to the GEAI's ingest capability.
@@ -255,7 +264,7 @@ export function dispatchEcosystemStep(deps: StepDeps, ownerGhii: string, run: Wo
     const reply = await mgr.invokeOnPrincipal(action.geai, {
       capability: action.capability ?? '__deposit__',
       input: { from: fromKey, data: rec?.value ?? null },
-      caller: ownerGhii,
+      caller,
     });
     return reply.ok;
   };
