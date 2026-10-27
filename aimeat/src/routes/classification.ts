@@ -18,6 +18,9 @@
  * @structure classificationRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.7.1 — 2026-10-27 — PUT /v1/classification/label and POST .../label/review answer a record the
+ *     agent may not read with owner_scope with 403 SCOPE_DENIED naming memory:read-as-owner, and the
+ *     address where the owner gives it (secaudit2026oct26).
  *   v1.7.0 — 2026-10-23 — GET and PUT /v1/classification/packs: the TL and NATO label packs (plan
  *     doc-mvlftkh9zmc9, C3.2).
  *   v1.6.0 — 2026-10-18 — The label routes take a container: kind organism, workspace, board
@@ -36,10 +39,12 @@
  *   v1.1.0 — 2026-09-29 — V4: GET /v1/classification/audit.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
-import { Router, type Response } from 'express';
+import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
+import { denyScope403 } from '../auth/deny.js';
+import { ReadAsOwnerRequired } from '../services/classification/owner-scope-labels.js';
 import { success, error } from '../middleware/envelope.js';
 import {
   ClassificationError, labelActorOf, readContentLabel, reviewLabel, setLabel, targetOf,
@@ -69,8 +74,11 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
   const deps = { storage, config };
 
   /** A ClassificationError becomes its own status and code; anything else goes on to Express. */
-  const fail = (res: Response, err: unknown): void => {
+  const fail = (res: Response, err: unknown, req?: Request): void => {
     if (!(err instanceof ClassificationError)) throw err;
+    // A label write on a record the caller may not read names the permission, and an agent is
+    // handed the address where its person gives it, as on every scope refusal (auth/deny.ts).
+    if (req && err instanceof ReadAsOwnerRequired) { denyScope403(req, res, err.needed, err.message); return; }
     res.status(err.status).json(error(config.nodeId, err.code, err.message));
   };
 
@@ -207,7 +215,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
         confidence: typeof body.confidence === 'number' ? body.confidence : undefined, reason: body.reason as string | undefined,
       });
       res.json(success(config.nodeId, out));
-    } catch (err) { fail(res, err); }
+    } catch (err) { fail(res, err, req); }
   });
 
   router.post('/v1/classification/label/review', requireAuth(), requireScope('memory:write'), async (req, res) => {
@@ -225,7 +233,7 @@ export function classificationRouter(config: AimeatConfig, storage: Storage): Ro
         decision, justification: body.justification as string | undefined, humanSaid: body.humanSaid as string | undefined,
       });
       res.json(success(config.nodeId, out));
-    } catch (err) { fail(res, err); }
+    } catch (err) { fail(res, err, req); }
   });
 
   // The TL and NATO label packs (plan doc-mvlftkh9zmc9, C3.2): which are on, and switching one.

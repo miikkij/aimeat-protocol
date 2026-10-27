@@ -18589,7 +18589,7 @@ paths:
       responses:
         '200': { description: Applied, or kept as a suggestion. }
         '400': { description: LABEL_UNKNOWN, JUSTIFICATION_REQUIRED or INVALID_INPUT. }
-        '403': { description: "AI_LABELLING_OFF, or NOT_ALLOWED for a container the caller may see but not classify." }
+        '403': { description: "AI_LABELLING_OFF, NOT_ALLOWED for a container the caller may see but not classify, or SCOPE_DENIED (memory:read-as-owner, with the address where the owner gives it) for a record of the owner or another of their agents that the calling agent may not read." }
         '404': { description: No such content, or not the caller's to label. }
 
   /v1/classification/label/review:
@@ -18624,7 +18624,7 @@ paths:
                 humanSaid: { type: string }
       responses:
         '200': { description: Accepted or rejected. }
-        '403': { description: PERSON_REQUIRED. }
+        '403': { description: "PERSON_REQUIRED, or SCOPE_DENIED (memory:read-as-owner) for a record the calling agent may not read." }
         '404': { description: NO_SUGGESTION, or no such content. }
 
   /v1/classification/packs:
