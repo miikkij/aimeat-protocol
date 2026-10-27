@@ -1,6 +1,6 @@
 {
   "note": "Repositories of the Storage composite that no two-provider unit file calls, and the number of storage methods those files call (scripts/check-storage-conformance.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P4-09). An entry under uncovered is DEBT, a repository whose two implementations nothing compares, or the reason no two-provider case is needed. It leaves by a case in test/unit/storage-conformance*.test.ts that writes through it and reads it back on both providers. methodsCalledFloor may only rise. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
-  "methodsCalledFloor": 194,
+  "methodsCalledFloor": 195,
   "uncovered": {
     "AccountEventRepository": "DEBT: none of its 5 methods is called by a two-provider unit file",
     "AgentActivityRepository": "DEBT: none of its 2 methods is called by a two-provider unit file",
@@ -16,7 +16,6 @@
     "CompanyRepository": "DEBT: none of its 10 methods is called by a two-provider unit file",
     "DeviceAuthRepository": "DEBT: none of its 8 methods is called by a two-provider unit file",
     "DirectMessageRepository": "DEBT: none of its 30 methods is called by a two-provider unit file",
-    "ExtensionInstanceRepository": "DEBT: none of its 6 methods is called by a two-provider unit file",
     "FinanceRepository": "DEBT: none of its 22 methods is called by a two-provider unit file",
     "InvitationRepository": "DEBT: none of its 9 methods is called by a two-provider unit file",
     "MemoryTallyRepository": "DEBT: none of its 3 methods is called by a two-provider unit file",
