@@ -36,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { putRecord } from './platform-fee.js';
 import { logger } from '../utils/logger.js';
 import { notify } from '../services/notify.js';
+import { updateRecord, UNCHANGED } from '../services/record-cas.js';
 
 /** Key prefix of the possible-payout record under the provider's GHII. */
 export const PAYOUT_HOLD_PREFIX = 'commerce.possible.payout.';
@@ -114,11 +115,14 @@ export async function closePayoutHoldNotArrived(
   storage: Storage, providerGhii: string, beneficiaryGhii: string, nonce: string,
 ): Promise<PayoutHold | null> {
   const key = `${PAYOUT_HOLD_PREFIX}${nonce}`;
-  const rec = await storage.getMemory(providerGhii, key);
-  const hold = rec?.value as unknown as PayoutHold | undefined;
-  if (!hold || hold.status !== 'unconfirmed' || hold.beneficiary !== beneficiaryGhii) return null;
-  const closed: PayoutHold = { ...hold, status: 'not-arrived', closedAt: new Date().toISOString() };
-  await putRecord(storage, providerGhii, key, closed);
+  let closed: PayoutHold | null = null;
+  // On the record's version, so two closes at once close it once.
+  await updateRecord<PayoutHold | null>(storage, providerGhii, key, v => (v ?? null) as PayoutHold | null, hold => {
+    if (!hold || hold.status !== 'unconfirmed' || hold.beneficiary !== beneficiaryGhii) return UNCHANGED;
+    closed = { ...hold, status: 'not-arrived', closedAt: new Date().toISOString() };
+    return closed;
+  }, { tag: 'commerce', visibility: 'owner', tags: ['commerce'] });
+  if (!closed) return null;
   logger.info('[beneficiary-payout] possible payout closed: the provider says it did not arrive', { provider: providerGhii, beneficiary: beneficiaryGhii, nonce });
   return closed;
 }
