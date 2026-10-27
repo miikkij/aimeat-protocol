@@ -12,6 +12,9 @@
  *   A plain local run without DATABASE_URL checks SQLite only, as storage-conformance.test.ts does.
  * @usage cd aimeat && pnpm exec vitest run test/unit/component-address.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — A bare install of a name another account keeps under its own lands in the
+ *     installer's namespace; a shipped cortex name's bare address reaches no account's copy
+ *     (secaudit2026oct26).
  *   v1.1.0 — 2026-10-26 — The owner's short file key and memory owner (ownExtensionFileKey, ownExtensionMemoryOwner).
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
  */
@@ -21,7 +24,7 @@ import { rmSync, existsSync } from 'node:fs';
 import { createStorage } from '../../src/storage/storage-factory.js';
 import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import {
-    splitComponentAddress, findExtension, installNameFor, placeExtensionInstall, extensionCallTarget,
+    splitComponentAddress, findExtension, findCortex, installNameFor, placeExtensionInstall, extensionCallTarget,
     cortexLibPath, idStemOf, settleReclaimed, ownExtensionFileKey, ownExtensionMemoryOwner, withOwnerFields,
 } from '../../src/services/component-address.js';
 import { uninstallExtension } from '../../src/services/extension-lifecycle.js';
@@ -122,6 +125,50 @@ describe('names live in the owner\'s namespace, on every provider', () => {
             await storage.createExtension(extRecord(`${bob}/${short}`, bob));
             expect((await findExtension(storage, short, bob))?.name, `${name}: the caller's own first`).toBe(`${bob}/${short}`);
             await expect(findExtension(storage, short, carol), `${name}: two holders`).rejects.toMatchObject({ code: 'AMBIGUOUS_NAME', fullNames: [`${alice}/${short}`, `${bob}/${short}`] });
+        }
+    });
+
+    // secaudit2026oct26: a bare install by another account does not take the bare address that
+    // reaches the one account keeping the name under its own; it lands in its own namespace, as a
+    // second namespaced holder does, and the bare address answers by the two-holder rule.
+    it('a bare install of a short name another account keeps under its own lands in the installer\'s namespace', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const bea = `bea${s}`, cid = `cid${s}`, short = `kept${s}`;
+            await storage.createExtension(extRecord(`${bea}/${short}`, bea));
+            const placed = extRecord(short, cid);
+            expect((await placeExtensionInstall(storage, cid, placed)).existing, `${name}: nothing in the way`).toBeNull();
+            expect(placed.name, `${name}: stored in the installer's namespace`).toBe(`${cid}/${short}`);
+            // The holder keeps its own name, and a name nobody keeps is still installed bare.
+            const own = extRecord(short, bea);
+            await placeExtensionInstall(storage, bea, own);
+            expect(own.name, `${name}: the holder's own`).toBe(`${bea}/${short}`);
+            const free = extRecord(`free${s}`, cid);
+            await placeExtensionInstall(storage, cid, free);
+            expect(free.name, `${name}: a free name stays bare`).toBe(`free${s}`);
+        }
+    });
+
+    // secaudit2026oct26: a shipped cortex name is the node's own; with the bundled record missing, the
+    // bare address reaches no account's namespaced copy of it, which its full address still reaches.
+    it('the bare address of a shipped cortex name never falls back to an account\'s namespaced copy', async () => {
+        const { bundledCortexNames } = await import('../../src/services/cortex-seeder.js');
+        const shipped = [...bundledCortexNames()][0]!;
+        expect(shipped, 'the build ships at least one cortex').toBeTruthy();
+        for (const { name, storage } of provs) {
+            if (await storage.getCortexExtension(shipped)) continue;
+            const s = stamp();
+            const alice = `alice${s}`;
+            const now = new Date().toISOString();
+            await storage.createCortexExtension({
+                name: `${alice}/${shipped}`, namespace: alice, shortName: shipped, apiVersion: 'cortex.aimeat.org/v1', version: '1.0.0',
+                description: 'namespace test', author: 'test', tags: [], labels: {}, status: 'active', visibility: 'public',
+                installedAt: now, installedBy: alice, manifest: '', components: [], activationArtifacts: {} as never,
+            } as never);
+            expect(await findCortex(storage, shipped), `${name}: the shipped bare address`).toBeNull();
+            expect((await findCortex(storage, `${alice}/${shipped}`))?.name, `${name}: the full address`).toBe(`${alice}/${shipped}`);
+            expect((await findCortex(storage, shipped, alice))?.name, `${name}: the holder's own bare call`).toBe(`${alice}/${shipped}`);
+            await storage.deleteCortexExtension(`${alice}/${shipped}`);
         }
     });
 
