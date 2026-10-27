@@ -33,7 +33,7 @@ import type { AppGrantRecord } from '../storage/interface.js';
 import { madeAfter, ownerRefuses, recordIssuedAt, tokenIssuedAt } from './credential-age.js';
 import { agentGone } from './agent-alive.js';
 import { visitorPeerRefuses } from './visitor-peer.js';
-import { isAnonymousMode, sessionStorage } from './node-auth.js';
+import { sessionConfig, sessionStorage } from './node-auth.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
 import { grantGivenToEarlierAuthor } from '../services/app-grant-author.js';
 
@@ -152,8 +152,10 @@ export async function credentialRevoked(token: string, verified: VerifiedToken):
   if (await isRevoked(token)) return true;
   // The shared anonymous principal is a credential only while anonymous mode is on: a token minted
   // before the operator switched the mode off, or before a restart with it off, stops working then
-  // (secaudit2026oct26; decision 2026-10-27). Memory only, so it runs before the storage reads.
-  if (isAnonymousPrincipal(verified) && !isAnonymousMode()) return true;
+  // (secaudit2026oct26; decision 2026-10-27). It asks the node's own setting, so a process that
+  // carries no node configuration (a unit harness) keeps the earlier answer. Memory only, so it runs
+  // before the storage reads.
+  if (isAnonymousPrincipal(verified) && sessionConfig()?.anonymousMode === false) return true;
   // The visitor question reads memory only, so it runs before the storage reads below.
   if (visitorPeerRefuses(verified)) return true;
   if (await sessionRevoked(verified)) return true;

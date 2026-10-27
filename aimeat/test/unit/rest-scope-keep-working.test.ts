@@ -21,6 +21,8 @@
  *   - The owner gets one line on the activity feed, the operator one incident on the Security page.
  * @usage cd aimeat && pnpm exec vitest run test/unit/rest-scope-keep-working.test.ts
  * @version-history
+ *   v1.1.2 — 2026-10-27 — INLINE_CONSTANTS names READ_AS_OWNER_SCOPE, and INLINE_NOT_KEPT says why the
+ *     keep step never gives memory:read-as-owner (secaudit2026oct26, routes/memory key.ts and patch.ts).
  *   v1.1.1 — 2026-10-20 — INLINE_CONSTANTS names DATAPACKAGE_READ_SCOPE (storage:read), which the data
  *     package read routes now ask a same-owner principal (secaudit 2026-10, v41).
  *   v1.1.0 — 2026-10-20 — The list test also reads the words a route refuses inline with denyScope403
@@ -101,9 +103,15 @@ const INLINE_NOT_KEPT: Record<string, string> = {
     // bids, so it is not given wholesale; the callers of the app-tool route are kept by their own step
     // (services/app-tool-invoke-keep.ts, test/unit/app-tool-invoke-keep.test.ts).
     'exchange:write': 'the app-tool route keeps its earlier callers through services/app-tool-invoke-keep.ts',
+    // routes/memory/key.ts and patch.ts (secaudit2026oct26): a relabel or an answer through owner_scope
+    // of a record the caller reads as absent. The word is outside every wildcard and only the owner's
+    // own tick gives it (decision 2026-10-15); giving it wholesale would give every agent the read.
+    'memory:read-as-owner': 'outside every wildcard: the owner gives it per agent, never a keep step',
 };
 const INLINE_CONSTANTS: Record<string, string> = {
     READ_THROUGH_SCOPE: 'connections:read-through',
+    // services/owner-scope-read.ts: reading the owner's and sibling agents' private records as the owner.
+    READ_AS_OWNER_SCOPE: 'memory:read-as-owner',
     // services/datapackage/audience.ts: the word a same-owner principal needs for a non-public package (ruling 2026-10-20).
     DATAPACKAGE_READ_SCOPE: 'storage:read',
 };

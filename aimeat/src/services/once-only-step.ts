@@ -137,8 +137,9 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
       // Only a takeover after the lease changes the claim, and that process writes its own record.
       if (!written) logger.warn(`Boot step ${key}: another process took the step over after its claim lapsed; its record stands`);
       // The step is done, so the first-seen time has nothing left to bound; a step whose done record
-      // is removed later runs as on a node that never ran it.
-      else await storage.deleteMemory(owner, ruleSinceKey(key), owner)
+      // is removed later runs as on a node that never ran it. A storage without deleteMemory keeps
+      // the record, which only bounds a step that already finished.
+      else if (typeof storage.deleteMemory === 'function') await storage.deleteMemory(owner, ruleSinceKey(key), owner)
         .catch(err => logger.warn(`Boot step ${key}: the first-seen record was not removed`, { error: String(err) }));
     },
     async release(): Promise<void> {
