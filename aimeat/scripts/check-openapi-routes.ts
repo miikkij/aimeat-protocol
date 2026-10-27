@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.6 — 2026-10-27 — POST /v1/a2a/directory is declared in routes/a2a.ts with router.use.
  *   v1.0.5 — 2026-10-16 — The page host's three routes answered: the page frame (a page), its slash redirect, the holder script.
  *   v1.0.4 — 2026-10-11 — GET /docs/specs/{} answered as a redirect to GET /v1/specs/{name}.
  *   v1.0.3 — 2026-10-05 — GET /v1/libs/aimeat-validate.js answered by the libs family route.
@@ -104,6 +105,7 @@ const NOT_API: Record<string, string> = {
 const DECLARED_ELSEWHERE: Record<string, string> = {
     'GET /v1/a2a/{}/{}/agent-card.json': 'routes/a2a.ts mounts it with router.use, because the A2A SDK handler is an Express app of its own.',
     'POST /v1/a2a/{}/{}': 'routes/a2a.ts mounts the A2A JSON-RPC handler with router.use for the same reason.',
+    'POST /v1/a2a/directory': 'routes/a2a.ts mounts the directory JSON-RPC handler with router.use, as it does for one agent.',
     'GET /v1/connect/tunnel': 'A WebSocket upgrade, registered on the HTTP server in index-start.ts, not on a router.',
     'GET /v1/schemas/ai-provenance/v1.json': 'routes/ai-provenance.ts declares it through the constant AI_PROVENANCE_SCHEMA_PATH, so the path is not a literal at the call.',
     'GET /v1/scim/v2/{}/Users': 'routes/scim.ts mounts a sub-router under /v1/scim/v2/:id with router.use; the SCIM paths are declared relative to it.',

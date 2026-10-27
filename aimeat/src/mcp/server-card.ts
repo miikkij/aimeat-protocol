@@ -1,5 +1,5 @@
 /**
- * @file src/services/mcp-server-card.ts
+ * @file src/mcp/server-card.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The node's MCP Server Card in the SEP-2127 shape (MCP Server Cards, the
@@ -27,7 +27,7 @@
  */
 import type { AimeatConfig } from '../config.js';
 import { getSoftwareVersion } from '../utils/version.js';
-import { MCP_SERVED_REVISIONS } from '../mcp/protocol-version.js';
+import { MCP_SERVED_REVISIONS } from './protocol-version.js';
 
 /** The only `$schema` value the v1 card accepts. */
 export const SERVER_CARD_SCHEMA = 'https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json';
