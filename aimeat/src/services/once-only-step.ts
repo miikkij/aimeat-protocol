@@ -21,8 +21,9 @@
  *
  *   WHEN THE RULE TOOK EFFECT. A keep step exempts what existed before its rule. A step that runs
  *   late (after a throw or a lapsed claim) ran at a time the node already served under the rule, so
- *   "now" is the wrong cutoff. The first claim writes `<key>.first-seen` once, release() leaves it,
- *   and every claim carries it as `ruleSince`; a keep step keeps only what was made before it
+ *   "now" is the wrong cutoff. The first claim writes `<key>.first-seen` once, release() and a lapsed
+ *   claim leave it, finish() removes it, and every claim carries it as `ruleSince`; so it exists only
+ *   while the step is unfinished, and a keep step keeps only what was made before it
  *   (keptBefore, madeBefore; secaudit2026oct26, late-rerun-keeps-state-made-under-new-rule).
  * @structure ONCE_ONLY_LEASE_MS · OnceOnlyClaim · ruleSinceKey · keptBefore · madeBefore ·
  *   claimOnceOnlyStep(storage, owner, key, now?)
@@ -135,6 +136,10 @@ export async function claimOnceOnlyStep(storage: Storage, owner: string, key: st
       const written = storage.setMemoryIfVersion ? !!await storage.setMemoryIfVersion(done, claim.version) : (await storage.setMemory(done), true);
       // Only a takeover after the lease changes the claim, and that process writes its own record.
       if (!written) logger.warn(`Boot step ${key}: another process took the step over after its claim lapsed; its record stands`);
+      // The step is done, so the first-seen time has nothing left to bound; a step whose done record
+      // is removed later runs as on a node that never ran it.
+      else await storage.deleteMemory(owner, ruleSinceKey(key), owner)
+        .catch(err => logger.warn(`Boot step ${key}: the first-seen record was not removed`, { error: String(err) }));
     },
     async release(): Promise<void> {
       const current = await storage.getMemory(owner, key);
