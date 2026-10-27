@@ -14,18 +14,24 @@
  *
  *   BOTH NUMBERS ARE OPERATOR SETTINGS, read on every take: extensions.run_slots (64 by default) and
  *   extensions.run_slots_per_account (16 by default); 0 is no limit on either. The account is the owner
- *   GHII, so an owner's agents and apps share one share; a visitor is counted per client address.
- *   PER PROCESS, as the rate limiters are (rate-buckets.ts).
+ *   GHII, so an owner's agents and apps share one share; a visitor is counted per client, keyed as the
+ *   visitor rate limiter keys it (visitorRunShareKey). PER PROCESS, as the rate limiters are
+ *   (rate-buckets.ts).
  * @structure RunSlotTurn · EXT_RUN_RETRY_AFTER_SEC · takeExtensionRunSlot(config, account) · runSlotsInUse()
+ *   · visitorRunShareKey(ip)
  * @usage
  *   const slot = takeExtensionRunSlot(config, ownerGhiiOf(caller.gaii));
  *   if (!slot.ok) return refuse(503, slot.code, slot.message, slot.retryAfterSec);
  *   try { ... run ... } finally { slot.release(); }
  * @version-history
+ *   v1.1.0 — 2026-10-27 — visitorRunShareKey: a visitor's share is keyed by IPv6 /64, as the visitor
+ *     rate limiter keys it; it was the full address, so one /64 could hold the whole pool
+ *     (secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, lead 817).
  */
 import type { AimeatConfig } from '../config.js';
 import { EXT_RUN_SLOTS_DEFAULT, EXT_RUN_SLOTS_PER_ACCOUNT_DEFAULT } from '../config-extension-load.js';
+import { ipRateKey } from '../middleware/rate-limit.js';
 
 /** Seconds a refused caller is told to wait: a run ends within seconds, so a short wait is enough. */
 export const EXT_RUN_RETRY_AFTER_SEC = 2;
@@ -71,6 +77,17 @@ export function takeExtensionRunSlot(config: AimeatConfig, account: string): Run
             if (left > 0) byAccount.set(account, left); else byAccount.delete(account);
         },
     };
+}
+
+/**
+ * The share a visitor (no sign-in) on a public action is counted under: the client as the visitor
+ * rate limiter keys it, an IPv6 address by its /64 network (ipRateKey), so one host does not hold
+ * many shares by rotating its 64 host bits. An IPv4-mapped address (::ffff:a.b.c.d) is its IPv4
+ * address, so every IPv4 visitor of a dual-stack socket keeps a share of its own.
+ */
+export function visitorRunShareKey(ip: string | undefined): string {
+    const mapped = ip ? /^::ffff:(\d{1,3}(?:\.\d{1,3}){3})$/i.exec(ip) : null;
+    return `visitor:${ipRateKey(mapped ? mapped[1] : ip)}`;
 }
 
 function busy(message: string): RunSlotTurn {
