@@ -23150,7 +23150,9 @@ paths:
         frameworks, { answers: { <framework>: { <question>: answer } }, answerSources }. A register
         with data domains raises each container it names to the domain's floor, only up, and a
         label a person set lower waits for them as a suggestion; the answer lists each one under
-        `floors`. `dry_run=true` validates and answers what would be stored, storing nothing. The
+        `floors`. An organism or workspace counts only when it is the register's own organism or one
+        the writer creates or administers; any other is listed with outcome `not-in-scope` and left
+        alone. `dry_run=true` validates and answers what would be stored, storing nothing. The
         node stamps updatedAt and updatedBy.
       security:
         - BearerAuth: []

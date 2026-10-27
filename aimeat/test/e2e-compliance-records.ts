@@ -20,6 +20,8 @@
  *   The operator (the suite's first account) turns classification on for every owner and off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-records
  * @version-history
+ *   2026-10-27 — An app register naming an organism its writer does not manage leaves the label alone
+ *     (not-in-scope); naming the writer's own organism raises it (secaudit2026oct26).
  *   v1.1.0 — 2026-10-24 — Every place at once (scope all) and one entry changed in place (PATCH), with
  *     their refusals (C7.7); an app's map read carries its registers (C1.7).
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9).
@@ -368,6 +370,27 @@ await test('MCP: an agent with the words reads the organism\'s registers and pre
     assert(bare.isError, `without compliance:read: ${bare.text.slice(0, 200)}`);
     const member = await callTool(bobMcp, 'aimeat_compliance_register_write', { part: 'registers', scope: 'organism', organism_id: orgId, value: { items: [] } });
     assert(member.isError && member.text.startsWith('NOT_ALLOWED'), `a member's agent: ${member.text.slice(0, 200)}`);
+});
+
+// ─── A register naming an organism its writer does not manage (secaudit2026oct26) ───
+await test('SCOPE: an app register naming someone else\'s organism leaves its label alone; one naming the writer\'s own organism raises it', async () => {
+    const orgLabel = async () => (await call('GET', `/v1/classification/label?${q({ kind: 'organism', organism_id: orgId })}`, alice.token)).body?.data?.label;
+    const before = await orgLabel();
+    const CAROL_APP = `cmpcarolapp${stamp % 1000000}.html`;
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Other</title></head><body>Other</body></html>';
+    const p = await call('POST', '/v1/apps', carol.token, { filename: CAROL_APP, content: Buffer.from(html).toString('base64'), mime_type: 'text/html', name: 'Other', description: 'E2E' });
+    assert(p.status === 201, `publish: ${p.status} ${JSON.stringify(p.body?.error)}`);
+    const reg = { id: 'theirs', title: 'Theirs', type: 'personal', purpose: 'patient', legalBasis: ['contract'], domains: ['health'], containers: [{ kind: 'organism', organism_id: orgId }], retentionMonths: 12 };
+    const w = await call('PUT', `/v1/compliance/docs/registers?${q({ scope: 'app', app: CAROL_APP })}`, carol.token, { items: [reg] });
+    assert(w.status === 200 && w.body.data.stored === true, `carol's write is stored: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const outcome = (w.body.data.floors as Body[]).find(f => f.container?.organism_id === orgId)?.outcome;
+    assert(outcome === 'not-in-scope', `the foreign organism is not hers to raise: ${JSON.stringify(w.body.data.floors)}`);
+    assert(await orgLabel() === before, `the organism's label did not move: ${before} -> ${await orgLabel()}`);
+    // Usage: the organism's creator naming it from her own app's register raises it (shown by a dry run).
+    const own = await call('PUT', `/v1/compliance/docs/registers?${q({ scope: 'app', app: APP })}&dry_run=true`, alice.token, { items: [{ ...reg, id: 'mine' }] });
+    assert(own.status === 200, `alice's dry run: ${own.status} ${JSON.stringify(own.body?.error)}`);
+    const mine = (own.body.data.floors as Body[]).find(f => f.container?.organism_id === orgId)?.outcome;
+    assert(mine === 'raised', `the creator's own organism would rise: ${JSON.stringify(own.body.data.floors)}`);
 });
 
 // ─── An organism deleted ───
