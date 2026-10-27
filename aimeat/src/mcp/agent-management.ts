@@ -17,6 +17,8 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-27 — aimeat_agent_mode_set passes the session's agent to setAgentMode, which tells the owner
+ *     when an agent changed a mode (secaudit2026oct26).
  *   2026-10-24 — aimeat_agent_tags_set refuses the shared anonymous principal with AUTH_REQUIRED, as
  *     PATCH /v1/agents/:name/tags does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -216,7 +218,7 @@ export function registerAgentManagementTools(
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
             }
 
-            const outcome = await setAgentMode({ storage, config }, localAccountName(agentGaii), target_agent_name, mode);
+            const outcome = await setAgentMode({ storage, config }, localAccountName(agentGaii), target_agent_name, mode, agentGaii);
             if (!outcome.ok) {
                 return { content: [{ type: 'text' as const, text: outcome.message }], isError: true };
             }
