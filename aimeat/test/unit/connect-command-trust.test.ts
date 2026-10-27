@@ -15,13 +15,15 @@
  *   Each case has its own record file outside the folder (AIMEAT_COMMAND_TRUST_FILE). "The update
  *   was earlier" is a record whose firstRunAt lies before the folder's files were written.
  * @version-history
+ *   v2.0.1 -- 2026-10-27 -- Case 2 dates the install's config an hour back, as an existing install's is:
+ *     written in the first-start millisecond it was not adopted, and the nightly 4.0.0 run went red.
  *   v2.0.0 -- 2026-10-25 -- No question and no `aimeat connect trust`: connecting is the approval,
  *     existing commands are adopted once, a folder nobody connected is named in one line (developer
  *     decision 2026-10-25).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, lead 4763).
  */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, readFileSync, utimesSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
@@ -101,6 +103,11 @@ describe('1. a command the connector\'s own connect flow wrote', () => {
 describe('2. an install that already had a runner at the first start after this update', () => {
   it('keeps running unattended: the daemon\'s registry holds the runner, nobody is asked, and the record keeps it', async () => {
     folderWithCommands(home);
+    // An existing install's config was written before this start. Written in the same millisecond
+    // as the first-start stamp, the file reads as newer by its sub-millisecond mtime and is not
+    // adopted, which turned this test red whenever the two calls shared a millisecond.
+    const anHourAgo = new Date(Date.now() - 3_600_000);
+    utimesSync(join(home, 'agents', 'assistant', 'config.yaml'), anHourAgo, anHourAgo);
     // No record yet: this start is the first one after the update.
     const registry = buildRegistry(await loadAllAgents());
     const entry = registry.list()[0]!;
