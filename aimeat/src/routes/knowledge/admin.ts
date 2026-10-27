@@ -6,6 +6,8 @@
  *   system knowledge, delete a package, submit an operator review, plus the per-package reviews
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-10-27 — The operator's delete and review act on the copy the package's importer wrote
+ *     (firstPackageCopy), not on whichever copy the store lists first (secaudit2026oct26).
  *   v1.7.0 — 2026-10-13 — The operator's import writes sharing.toll_morsels, the 4.0.0 name of the
  *     pacing amount (decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll).
  *   v1.6.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): memory:read on GET /v1/knowledge/:id/reviews. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
@@ -39,7 +41,7 @@ import type { Storage, KnowledgeManifest, MemoryRecord, OperatorReviewRecord, Op
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
-import type { KnowledgeHelpers } from './helpers.js';
+import { firstPackageCopy, type KnowledgeHelpers } from './helpers.js';
 import { validateManifest } from './manifest-validator.js';
 import { buildKnowledgeOverview, DEFAULT_PER_PAGE } from '../../services/knowledge-overview.js';
 import { readerFor } from '../../services/classification/reader.js';
@@ -206,8 +208,8 @@ export function registerAdminRoutes(
     // answered 404. The list route always read both; these two never did.
     const allAgents = await storage.listAgents();
     const searchOwners = [...allAgents.map(a => a.gaii), resolve(req)];
-    const hit = (await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }))
-      .find(r => r.key === manifestKey) ?? null;
+    // The copy the package's importer wrote, not whichever copy the store lists first (secaudit2026oct26).
+    const hit = firstPackageCopy(await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }), manifestKey) ?? null;
     let found = false;
 
     if (hit) {
@@ -267,8 +269,7 @@ export function registerAdminRoutes(
     // answered 404. The list route always read both; these two never did.
     const allAgents = await storage.listAgents();
     const searchOwners = [...allAgents.map(a => a.gaii), resolve(req)];
-    const manifest: MemoryRecord | null = (await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }))
-      .find(r => r.key === manifestKey) ?? null;
+    const manifest: MemoryRecord | null = firstPackageCopy(await storage.listMemoryForOwners(searchOwners, { prefix: manifestKey }), manifestKey) ?? null;
 
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
