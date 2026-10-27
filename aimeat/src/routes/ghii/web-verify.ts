@@ -6,6 +6,7 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — register-web reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-27 — POST /v1/ghii/verify-email answers 409 EMAIL_CHANGED, and marks nothing, when the account's
  *     recovery address changed after the code was sent (secaudit2026oct26,
  *     email-confirm-binds-hash-not-current-recovery-address).
@@ -77,7 +78,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
 import { generateKeyPair } from '../../auth/keypair.js';
-import { isLoopbackAddress } from '../../auth/loopback-pass.js';
+import { requestFromThisMachine } from '../../services/setup-code.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { logger } from '../../utils/logger.js';
@@ -303,7 +304,7 @@ export function registerWebVerifyRoutes(
                 loginCount: 0,
                 createdAt: now,
                 updatedAt: now,
-            }, { setupCode: req.body?.setupCode, fromLoopback: isLoopbackAddress(req.socket.remoteAddress) });
+            }, { setupCode: req.body?.setupCode, fromLoopback: requestFromThisMachine(req) });
         } catch (err) {
             if (err instanceof SetupCodeRefusedError) {
                 res.status(403).json(error(config.nodeId, err.code, err.message));

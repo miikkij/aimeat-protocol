@@ -24,6 +24,7 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-27 — finalizeExternalSignup reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-27 — Over https the pending sign-up cookie is `__Host-aimeat_pending_signup` (Secure,
  *     Path=/), and readPendingSignup reads the old name only for a token signed before this change:
  *     an app, portfolio or company page could write the old name for the apex (secaudit2026oct26,
@@ -49,7 +50,7 @@ import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { getNodeCryptoKeys } from '../auth/jwt.js';
-import { isLoopbackAddress } from '../auth/loopback-pass.js';
+import { requestFromThisMachine } from './setup-code.js';
 import { establishOwnerSession } from './owner-session.js';
 import { provisionOwner, registrationRefusal, RegistrationClosedError, type RegistrationVia } from './owner-provisioning.js';
 import { emitChange } from './event-bus.js';
@@ -505,7 +506,7 @@ export async function finalizeExternalSignup(
         emailVerified: pending.emailVerified,
         via: opts.via,
         managedBy: opts.managedBy ?? null,
-        fromLoopback: isLoopbackAddress(req.socket.remoteAddress),
+        fromLoopback: requestFromThisMachine(req),
       });
     } catch (e) {
       // An extension bound to pre_owner_registration refused the account (feature-list audit 89).
