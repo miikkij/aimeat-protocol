@@ -6,6 +6,8 @@
  *   three places that act with no token: the scheduler fire (services/scheduler.ts executeJob), the
  *   start of a workflow run by a trigger (services/workflow/trigger-authority.ts refuseTriggerStart)
  *   and an unattended extension run (services/extension-system-run.ts runExtensionActionAsSystem).
+ *   Since 2026-10-27 also before a workflow run in flight dispatches a step
+ *   (services/workflow/dispatch-authority.ts waits) and in the goal sweep (services/goals/goals-sweep.ts).
  *
  *   WHY. Deactivation (POST /v1/admin/owners/:name/disable, SCIM active:false) ends every credential
  *   in the request (services/owner-lifecycle.ts), and the per-request check is reached only from a
@@ -23,6 +25,7 @@
  * @structure deactivatedAccountSkip(storage, identity)
  * @usage const skip = await deactivatedAccountSkip(storage, job.ownerScope); if (skip) { ...skip... }
  * @version-history
+ *   v1.0.1 -- 2026-10-27 -- Two more callers: a workflow run in flight and the goal sweep (secaudit2026oct26).
  *   v1.0.0 -- 2026-10-25 -- Initial (secaudit2026oct22, owner-deactivation:background-work-keeps-acting).
  */
 import type { Storage } from '../storage/interface.js';
