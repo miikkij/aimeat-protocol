@@ -9,6 +9,7 @@
 mod node_manager;
 mod opener;
 mod ai_connector;
+mod local_ai;
 mod connectors;
 mod updater;
 mod tray;
@@ -36,6 +37,7 @@ fn main() {
             ai_connector::node_login,
             ai_connector::save_ai_endpoint,
             ai_connector::get_ai_settings,
+            local_ai::remember_local_ai,
             updater::check_update,
             updater::install_update,
         ])

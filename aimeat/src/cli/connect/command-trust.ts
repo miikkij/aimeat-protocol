@@ -36,6 +36,11 @@
  *   adoptExistingCommands · heldBackCommands · heldNotices
  * @usage adoptExistingCommands(home); const { config, held } = heldBackCommands(perAgent, home);
  * @version-history
+ *   v2.1.0 -- 2026-10-27 -- enrolmentTookHeldNotice: an enrolment the owner approved on the node that
+ *     takes held commands into use says so in one line, printed by the daemon and kept in its log
+ *     (secaudit2026oct26, node-offer-trusts-held-commands; designed use, decision 2026-10-27). Each
+ *     adopted command is logged with its file and home, and the readTrust comment says what an
+ *     unreadable record does (secaudit2026oct26, mtime-cutoff-not-bound-to-update).
  *   v2.0.0 -- 2026-10-25 -- Connecting is the approval: no question and no `aimeat connect trust`. The
  *     connect flow records what it writes, the first start after the update adopts what an install
  *     has, and a folder nobody connected gets one line (developer decision 2026-10-25).
@@ -98,7 +103,10 @@ function readTrust(file: string): TrustRecord | null {
     const v = JSON.parse(readFileSync(file, 'utf-8')) as Partial<TrustRecord>;
     return { ...(typeof v.firstRunAt === 'string' ? { firstRunAt: v.firstRunAt } : {}), hashes: v.hashes && typeof v.hashes === 'object' ? v.hashes : {} };
   } catch (err) {
-    // A record that does not parse trusts nothing; the next write replaces it with a whole file.
+    // A record that does not parse has no hashes and no firstRunAt. The next adoption run treats it
+    // as a first start and adopts the commands this home has at that moment; the write then
+    // replaces it with a whole file. The file lies outside every connector home, so a folder cannot
+    // bring this state with it.
     logger.warn('connector: the record of trusted commands could not be read', { file, error: String(err) });
     return { hashes: {} };
   }
@@ -170,6 +178,12 @@ export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = pro
       if (record.hashes[hash]) continue;
       record.hashes[hash] = { at: new Date().toISOString(), how: 'adopted' };
       changed = true;
+      // Each adoption is named in the log, so a command taken into use without a connect can be seen.
+      logger.info('connector: a command this home already had is adopted and runs', {
+        path, home: resolve(home), firstRunAt: record.firstRunAt,
+        runner: c.runner ? [c.runner.command, ...(c.runner.args ?? [])].join(' ') : null,
+        wake: c.wakeCommand ?? null,
+      });
     }
     if (changed) writeTrust(file, record);
   } catch (err) {
@@ -193,6 +207,23 @@ export function heldBackCommands<T extends AimeatPerAgentConfig>(config: T, home
   };
 }
 
+/** The commands of a hold as text: `"cmd args" for each task and "wake" on new work`. */
+function heldCommandText(held: HeldCommands): string {
+  return [
+    held.runner ? `"${[held.runner.command, ...(held.runner.args ?? [])].join(' ')}" for each task` : '',
+    held.wakeCommand ? `"${held.wakeCommand}" on new work` : '',
+  ].filter(Boolean).join(' and ');
+}
+
+/**
+ * One plain line for an enrolment that took held commands into use: the owner's approval on the
+ * node is the connect (rule 1, decision 2026-10-27), and this line makes that act visible at the
+ * machine and in the daemon's log.
+ */
+export function enrolmentTookHeldNotice(gaii: string, held: HeldCommands): string {
+  return `The enrolment of ${gaii} that the owner approved on the node took ${heldCommandText(held)} into use, as the settings in ${held.home} name them. Until now they did not run, because nobody had connected this folder through the connector.`;
+}
+
 /** One plain line per distinct command that does not run, naming the agents it was meant for. */
 export function heldNotices(agents: Array<{ agent: string; owner: string; heldCommands?: HeldCommands | null }>): string[] {
   const byHash = new Map<string, { held: HeldCommands; names: string[] }>();
@@ -203,10 +234,7 @@ export function heldNotices(agents: Array<{ agent: string; owner: string; heldCo
     byHash.set(a.heldCommands.hash, g);
   }
   return [...byHash.values()].map(({ held, names }) => {
-    const cmds = [
-      held.runner ? `"${[held.runner.command, ...(held.runner.args ?? [])].join(' ')}" for each task` : '',
-      held.wakeCommand ? `"${held.wakeCommand}" on new work` : '',
-    ].filter(Boolean).join(' and ');
+    const cmds = heldCommandText(held);
     return `The settings in ${held.home} name ${cmds} for ${names.join(', ')}, but nobody connected this folder through the connector, so the command does not run. Run \`aimeat connect\` in this folder to connect it.`;
   });
 }

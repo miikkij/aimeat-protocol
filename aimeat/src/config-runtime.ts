@@ -14,6 +14,8 @@
  * @structure RuntimeConfig · runtimeConfigFromEnv(env) · siteKvFromEnv(env)
  * @usage const runtime = runtimeConfigFromEnv(process.env);   // spread into the config in config.ts
  * @version-history
+ *   v1.1.0 -- 2026-10-27 -- bindHost (AIMEAT_BIND_HOST): the address the node listens on; empty keeps
+ *     every address (secaudit2026oct26, local-profile-from-default-baseurl-on-network-reachable-listener).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 
@@ -50,6 +52,11 @@ export interface RuntimeConfig {
   rlOpenrouter: number;
   /** Invitation emails an hour from the open registration endpoint (the `registrationInvites` tier). */
   rlRegistrationInvites: number;
+  /**
+   * The address the node listens on (AIMEAT_BIND_HOST): `127.0.0.1` for this computer only, `0.0.0.0`
+   * or `::` for every network. Empty listens on every address, as the node always has. Read at start.
+   */
+  bindHost: string;
 }
 
 const LOG_LEVELS = ['error', 'warn', 'info', 'http', 'verbose', 'debug', 'silly'];
@@ -82,6 +89,7 @@ export function runtimeConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Runt
     // value into the tier.
     rlOpenrouter: Math.max(1, count(env.AIMEAT_RL_OPENROUTER, 30)),
     rlRegistrationInvites: Math.max(1, count(env.AIMEAT_RL_REGISTRATION_INVITES, 5)),
+    bindHost: (env.AIMEAT_BIND_HOST ?? '').trim(),
   };
 }
 

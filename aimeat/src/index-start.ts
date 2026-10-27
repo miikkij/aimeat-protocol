@@ -9,6 +9,8 @@
  *     ceiling, an anonymous echat upgrade is counted by the client address Express's trust-proxy rule
  *     gives, and its room comes from EchatDoor (the visitors' room limit; a room nobody joined is
  *     closed when its handshake ends).
+ *   2026-10-27 -- The node listens on AIMEAT_BIND_HOST when it is set; without it on every address, as
+ *     before (secaudit2026oct26, local-profile-from-default-baseurl-on-network-reachable-listener).
  *   2026-10-25 — secaudit2026oct22: on a signed-in-only node the realtime upgrade refuses a verified
  *     credential that is not a node account (isNodeAccount) with 401 SIGN_IN_REQUIRED, as the REST
  *     content-access gate does; node accounts join by header and by ticket as before.
@@ -155,7 +157,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
   // (secaudit2026oct22; Jouni, 2026-10-23). Printed at warn level, so a node started with
   // AIMEAT_LOG_LEVEL=warn shows it.
   const setupCode = !hasOperator ? setupCodeGateFor(config).issue() : null;
-  const server = app.listen(config.port, (listenError?: Error) => {
+  // AIMEAT_BIND_HOST names the address; without it the node listens on every address, as before.
+  const server = app.listen({ port: config.port, ...(config.bindHost ? { host: config.bindHost } : {}) }, (listenError?: Error) => {
     // Express 5 calls this for the server's 'error' event too, not only for 'listening'. Without
     // this check a node whose port was taken printed "AIMEAT node started", ran its schedulers and
     // served nothing, and the error was lost: every "node never bound its port" failure of the
