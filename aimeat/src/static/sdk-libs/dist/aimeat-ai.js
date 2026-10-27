@@ -286,6 +286,22 @@
     }
   }
 
+  // src/static/sdk-libs/_core/safe-href.js
+  var SAFE = /^(https?:|mailto:)/i;
+  function parserText(url) {
+    const s = url.replace(/[\t\n\r]/g, "");
+    let a = 0, b = s.length;
+    while (a < b && s.charCodeAt(a) <= 32) a++;
+    while (b > a && s.charCodeAt(b - 1) <= 32) b--;
+    return s.slice(a, b).trim();
+  }
+  function sanitizeHref(url) {
+    if (typeof url !== "string") return null;
+    const t2 = parserText(url);
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(t2)) return t2 || null;
+    return SAFE.test(t2) ? t2 : null;
+  }
+
   // public/components/ai-label-icons.js
   var AI_PROVENANCE_SPEC_V1 = "aimeat.provenance/v1";
   var EU_ICONS = {
@@ -931,7 +947,7 @@
       textWrap.appendChild(el("span", "ai-label__long", long));
     }
     root.appendChild(textWrap);
-    const url = recordUrl || record.attestation && record.attestation.recordUrl;
+    const url = sanitizeHref(recordUrl || record.attestation && record.attestation.recordUrl);
     if (url) {
       const a = el("a", "ai-label__link", t("aiLabel.detailsLink"));
       a.href = url;
@@ -961,9 +977,10 @@
     textWrap.appendChild(el("span", "ai-label__short", opts.title || t("aiLabel.interactionTitle")));
     textWrap.appendChild(el("span", "ai-label__long", opts.body || t("aiLabel.interactionBody")));
     root.appendChild(textWrap);
-    if (opts.recordUrl) {
+    const recordUrl = sanitizeHref(opts.recordUrl);
+    if (recordUrl) {
       const a = el("a", "ai-label__link", t("aiLabel.detailsLink"));
-      a.href = opts.recordUrl;
+      a.href = recordUrl;
       a.target = "_blank";
       a.rel = "noopener noreferrer";
       root.appendChild(a);
