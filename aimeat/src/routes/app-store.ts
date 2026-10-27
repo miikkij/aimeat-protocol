@@ -19,6 +19,10 @@
  *   - Apps (apps.ts): app storage, versioning, manifest, search
  *
  * @version-history
+ *   2026-10-27 — POST /purchase asks the app's own gates first (services/app-purchase-gate.ts): a hidden
+ *     app answers 404, an app open to chosen people refuses a buyer outside them, and without the right
+ *     access code (X-Access-Code, ?code= or `code` in the body) the receipt holds no copy of the app
+ *     (secaudit2026oct26, app-store:purchase-returns-content-past-app-gates).
  *   2026-10-15 — GET /license-check answers for the version the app serves now (feature-list audit #110).
  *   v1.5.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend) on POST /v1/app-store/purchase; wallet:read on GET /v1/app-store/purchases/:txId. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.4.0 — 2026-10-11 — Ruling decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa: an
@@ -66,6 +70,7 @@ import { publicAppManifest } from '../services/app-public-manifest.js';
 import { appToll, presentAppManifest } from '../services/app-pacing.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
+import { appPurchaseGate } from '../services/app-purchase-gate.js';
 
 /**
  * The 3.x receipt fields, while legacyMorselFieldsLive(): `price_morsels` (and, with `withShare`,
@@ -119,6 +124,17 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         const app = await storage.getAppByOwnerName(app_owner, app_filename);
         if (!app) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${app_filename}" not found for owner "${app_owner}"`));
+            return;
+        }
+        // The app's own gates, before anything else is said about it and before any morsel moves: the
+        // operator's hiding and who the app opens for refuse as the apex read does; without the right
+        // access code the receipt carries no copy of the app (services/app-purchase-gate.ts;
+        // secaudit2026oct26). The code is read where the apex read reads it, or from the body.
+        const sentCode = [req.headers['x-access-code'], req.query.code, req.body?.code, req.body?.access_code]
+            .find((c): c is string => typeof c === 'string' && c.length > 0);
+        const gate = await appPurchaseGate({ storage, config }, req.auth ?? null, app, sentCode);
+        if (gate.kind === 'refused') {
+            res.status(gate.status).json(error(config.nodeId, gate.code, gate.message));
             return;
         }
 
@@ -176,7 +192,7 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
         // but the seller sees: the seller's own notes (the publish checks' findings, the build-spec
         // state, the reviewer log) are not part of what was sold. Read BEFORE the charge, so a failed
         // read leaves the buyer's morsels where they were.
-        const appContent = app.data.toString('base64');
+        const appContent = gate.withholdContent ? '' : app.data.toString('base64');
         const appManifest: AppManifest = publicAppManifest(app.manifest);
 
         // Get optional screenshot
@@ -256,7 +272,10 @@ export function appStoreRouter(config: AimeatConfig, storage: Storage): Router {
             ...receiptMirror(purchase),
             purchased_at: purchase.purchasedAt,
             buyer_balance: (await storage.getGHIIByOwner(buyerOwner))?.morselBalance ?? 0,
-            note: `Took "${purchase.appName}" (${licenseType} license) with ${purchase.tollMorsels} morsels of pacing. The full app content is included in this receipt.`,
+            note: `Took "${purchase.appName}" (${licenseType} license) with ${purchase.tollMorsels} morsels of pacing. `
+                + (gate.withholdContent
+                    ? 'The app has an access code that this request did not carry, so the receipt holds no copy of it. Open it with the code (?code= or the X-Access-Code header): the licence lets you in.'
+                    : 'The full app content is included in this receipt.'),
         }, [
             { description: 'View purchase details', method: 'GET', url: `/v1/app-store/purchases/${txId}` },
             { description: 'List all purchases', method: 'GET', url: '/v1/app-store/purchases' },

@@ -16,6 +16,7 @@
  *   v1.4.0 — 2026-10-27 — federationIntroductionsPerHour (secaudit2026oct26, unbounded pending peering requests).
  *   2026-10-27 — realtimeEchatMaxRooms and realtimeMaxDocsPerRoom (secaudit2026oct26,
  *     anonymous-room-cap-exhaustion and yjsSnapshots:unbounded).
+ *   v1.4.0 — 2026-10-27 — appRendersAtOnce (secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
  *   v1.3.0 — 2026-10-25 — appHeldLabelDays and appHeldLabelsPerOwner (secaudit2026oct22, app-label-recycled-after-delete).
  *   v1.2.0 — 2026-10-25 — companySmtpPrivateHosts (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
  *   v1.1.0 — 2026-10-25 — deviceAuthEmailLimit and deviceAuthEmailMax (secaudit2026oct22,
@@ -76,6 +77,12 @@ export interface NodeLimitsConfig {
    * (services/realtime-yjs.ts). AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, default 64; 0 is no limit.
    */
   realtimeMaxDocsPerRoom: number;
+  /**
+   * On-demand renders (an app screenshot asked for now, a Design Book bench) running at once on the
+   * node, each holding a headless browser (services/headless-slots.ts). AIMEAT_APP_RENDERS_AT_ONCE,
+   * default 4; 0 is no limit.
+   */
+  appRendersAtOnce: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -95,5 +102,6 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     federationIntroductionsPerHour: wholeOr(env.AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR, 30),
     realtimeEchatMaxRooms: wholeOr(env.AIMEAT_REALTIME_ECHAT_MAX_ROOMS, 50),
     realtimeMaxDocsPerRoom: wholeOr(env.AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, 64),
+    appRendersAtOnce: wholeOr(env.AIMEAT_APP_RENDERS_AT_ONCE, 4),
   };
 }

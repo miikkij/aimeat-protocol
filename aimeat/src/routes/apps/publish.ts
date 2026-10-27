@@ -8,6 +8,8 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.12.0 -- 2026-10-27 -- A publish through an app's grant names that app on the version, inline and
+ *     presigned (`publishing_app` in the signed token) (secaudit2026oct26, app-grant-publisher-reads-as-owner).
  *   v2.11.0 -- 2026-10-18 -- The publish gate (services/app-publish-gate.ts): a first publish the node's
  *     defaults make public, by a caller the owner is asked about, is stored unlisted and answers 202
  *     with `publish_request`; presigned mode carries the gate's answer in the signed token (`publish_ask`).
@@ -87,6 +89,7 @@ import { readAppTollInput, presentAppManifest } from '../../services/app-pacing.
 import { callerOf } from '../../middleware/caller.js';
 import { publishAskOf } from '../../services/publish-requests/ask.js';
 import { publishAskedFields, askedStatus } from '../../services/app-publish-gate.js';
+import { publishingAppOf } from '../../services/app-published-by-app.js';
 
 export function registerPublishRoutes(
     router: Router,
@@ -216,6 +219,8 @@ export function registerPublishRoutes(
                     }),
                     // Server-side, never from the body: buildUploadMeta picks only the declared keys.
                     publish_ask: publishGate,
+                    // The app whose grant publishes, stamped on the version (services/app-published-by-app.ts).
+                    ...(publishingAppOf(req.auth) ? { publishing_app: publishingAppOf(req.auth) } : {}),
                 },
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
@@ -311,6 +316,7 @@ export function registerPublishRoutes(
             accessCode: Object.hasOwn(req.body, 'access_code') ? { mode: 'explicit', value: accessCode } : { mode: 'carry' },
             source: 'inline',
             publishGate,
+            publishingApp: publishingAppOf(req.auth),
             roadmap,
             declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
             declaredProvenance: declared.declared,

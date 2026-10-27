@@ -2,10 +2,12 @@
  * @file app-record-keys.ts
  * @description Collision-free app record identities and verified legacy migration.
  * @version-history
+ *   2026-10-27 - readAuthorAppRecord and appRecordsOfAuthor: an author's records (the design spec, the roadmap) do not pass to the next holder of an erased name (secaudit2026oct26).
  *   2026-10-05 - tokenOfThisApp moved here from auth/app-own-gate.ts (which re-exports it), so the roster services ask it; aimeat_app_manage calls the service in place of the route over loopback HTTP (secaudit 2026-10, M6).
  *   v1.0.0 - 2026-09-08 - Keep owner boundaries and filename case.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
+import { madeAfter, recordIssuedAt } from '../auth/credential-age.js';
 
 export function canonicalAppId(appId: string): string {
   const slash = appId.indexOf('/');
@@ -40,6 +42,35 @@ export async function readAppRecord(storage: Storage, ns: string, key: string, a
     const migrated = await storage.createMemoryIfAbsent({ ...live, key, visibility: 'private' });
     await storage.deleteMemory(ns, legacyKey);
     return migrated ?? await storage.getMemory(ns, key);
+  });
+}
+
+/**
+ * readAppRecord for a record that belongs to the app's AUTHOR account (the design spec, the roadmap).
+ * The app id `<name>/<filename>` is reused when an erased account's name is registered again, so a
+ * record written before the account that now holds the name was created is an earlier holder's: it is
+ * deleted here and answered as absent, and the new holder starts their own (secaudit2026oct26,
+ * owner-erasure:app-builder-records-keyed-by-reusable-name-survive). The owner's own records are
+ * always younger than the owner's account, so they read as before.
+ */
+export async function readAuthorAppRecord(storage: Storage, ns: string, key: string, appId: string): Promise<MemoryRecord | null> {
+  const rec = await readAppRecord(storage, ns, key, appId);
+  if (!rec) return rec;
+  const slash = canonicalAppId(appId).indexOf('/');
+  const author = slash > 0 ? canonicalAppId(appId).slice(0, slash) : '';
+  const owner = author ? await storage.getOwner(author) : null;
+  if (!owner || !madeAfter(owner.createdAt, recordIssuedAt(rec.createdAt))) return rec;
+  await storage.deleteMemory(ns, rec.key);
+  return null;
+}
+
+/** The records of a namespace whose app id names `account` as the app's author. For an erasure. */
+export async function appRecordsOfAuthor(storage: Storage, ns: string, prefix: string, account: string): Promise<MemoryRecord[]> {
+  const who = account.toLowerCase();
+  const { items } = await listAppRecords(storage, ns, prefix);
+  return items.filter(r => {
+    const id = canonicalAppId(String((r.value as { appId?: unknown } | null)?.appId ?? ''));
+    return id.startsWith(`${who}/`);
   });
 }
 

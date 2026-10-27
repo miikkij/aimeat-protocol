@@ -8,6 +8,7 @@
  * @structure RequestedManifest · PublishAppInput · PublishAppRefusal
  * @usage import type { PublishAppInput } from './app-publish.js';
  * @version-history
+ *   v1.1.0 — 2026-10-27 — PublishAppInput.publishingApp, the app whose grant publishes (secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Moved unchanged from services/app-publish.ts.
  */
 import type { AppManifest, AppProtection } from '../storage/interface.js';
@@ -46,6 +47,11 @@ export interface PublishAppInput {
   ownerGhii: string;
   /** WHO pressed publish, resolved server-side: GHII, GAII or GEAI. Audit + provenance principal. */
   callerGaii: string;
+  /**
+   * The app (`<author>/<filename>`) whose grant publishes, when the caller is a role-'app' token:
+   * stamped as `manifest.publishedByApp` (services/app-published-by-app.ts). Server-resolved.
+   */
+  publishingApp?: string;
   filename: string;
   data: Buffer;
   mimeType: string;

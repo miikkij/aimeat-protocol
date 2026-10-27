@@ -19,6 +19,8 @@
  *   Self-spawns its own node (the shared runner keeps the node open), with the app origin provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-internet-opening
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Another owner's fork carries none of the source owner's forms and its
+ *     opening opens none; the owner's own fork keeps its form (secaudit2026oct26).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -335,6 +337,38 @@ async function main() {
             assert((await setConfig('visibility.app_internet_opening', 'off')).status === 200, 'set off');
             const off = await openIt(A.token, { reason: 'Off mode opening' });
             assert(off.status === 403 && off.body.error?.code === 'OPENING_OFF', `${off.status} ${JSON.stringify(off.body.error)}`);
+        });
+
+        // secaudit2026oct26 (app-lifecycle.ts:forkApp/manifest-spread-carries-intake-forms). A fork is
+        // stored without a publish, so the forker's copy carried the source owner's form list and the
+        // forker could open A's forms to the internet. A cross-owner fork keeps only the forms the
+        // forker manages; a same-owner fork keeps its list as before.
+        await test('FAILURE: another owner\'s fork of A\'s app carries none of A\'s forms, and opening it opens none', async () => {
+            const f = await call(`/v1/apps/${file}`, { token: A.token, method: 'PATCH', body: { forkable: true } });
+            assert(f.status === 200, `forkable ${f.status} ${JSON.stringify(f.body.error)}`);
+            const k = await call(`/v1/apps/${A.name}/${file}/fork`, { token: B.token, body: { new_filename: 'campaign-fork.html' } });
+            assert(k.status === 201 || k.status === 200, `fork ${k.status} ${JSON.stringify(k.body.error)}`);
+            const r = await opening(B.token, 'campaign-fork.html', B.name);
+            assert(r.status === 200, `read ${r.status} ${JSON.stringify(r.body.error)}`);
+            assert(r.body.data.declared_forms.length === 0, `the fork carries A's forms: ${JSON.stringify(r.body.data.declared_forms)}`);
+            assert((await setConfig('visibility.app_internet_opening', 'self')).status === 200, 'set self');
+            const o = await openIt(B.token, { reason: 'Fork opening' }, 'campaign-fork.html', B.name);
+            assert(o.status === 200, `open ${o.status} ${JSON.stringify(o.body.error)}`);
+            assert((o.body.data.opening.forms ?? []).length === 0, `the fork's opening opens A's forms: ${JSON.stringify(o.body.data.opening.forms)}`);
+            const s = await strangerSubmit('consent');
+            assert(s.status === 401, `a stranger reached A's form through the fork: ${s.status}`);
+            await call(`/v1/apps/${B.name}/campaign-fork.html/internet-opening`, { token: B.token, method: 'DELETE' });
+            assert((await setConfig('visibility.app_internet_opening', 'operator')).status === 200, 'set operator');
+        });
+
+        await test('A\'s own fork of the campaign keeps the forms the campaign declares', async () => {
+            const src = await opening(A.token);
+            const k = await call(`/v1/apps/${A.name}/${file}/fork`, { token: A.token, body: { new_filename: 'campaign-own-fork.html' } });
+            assert(k.status === 201 || k.status === 200, `fork ${k.status} ${JSON.stringify(k.body.error)}`);
+            const r = await opening(A.token, 'campaign-own-fork.html');
+            const forms = (x: Body) => JSON.stringify(((x.data?.declared_forms ?? []) as Array<{ form_id: string }>).map(f => f.form_id).sort());
+            assert(r.status === 200 && forms(src.body).includes('consent') && forms(r.body) === forms(src.body),
+                `the owner's own fork lost its forms: ${forms(r.body)} (the campaign declares ${forms(src.body)})`);
         });
 
         await test('FAILURE: on an open node nothing needs opening (409 NOT_NEEDED)', async () => {

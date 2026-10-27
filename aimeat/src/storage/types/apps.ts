@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.24.0 — 2026-10-27 — AppManifest gains `publishedByApp`, the app whose grant published the
+ *     version (secaudit2026oct26, own-app-consent:app-grant-publisher-reads-as-owner). Manifest JSON.
  *   v1.23.0 — 2026-10-25 — AppManifest gains `publishedBy`, the principal that published the version
  *     (secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). Inside the manifest
  *     JSON, so no column on either backend.
@@ -188,6 +190,13 @@ export interface AppManifest {
    * (services/own-app-consent.ts).
    */
   publishedBy?: string;
+  /**
+   * The app (`<author>/<filename>`) whose grant published this version, beside `publishedBy`, which is
+   * then the owner the grant acts for. Public provenance, never carried forward. When the granting
+   * app's author is another account, the owner's own app asks the owner for the words this version
+   * adds (services/own-app-consent.ts; secaudit2026oct26).
+   */
+  publishedByApp?: string;
   name: string;
   description: string;
   // Per-locale descriptions (BCP-47-ish keys, e.g. 'en', 'fi'), extensible to more languages.

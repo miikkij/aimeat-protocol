@@ -13,6 +13,9 @@
  *   2026-10-27 — credentialRevoked asks a NINTH question, first among the in-memory ones: the shared
  *     anonymous principal counts only while anonymous mode is on (secaudit2026oct26,
  *     isAnonymousMode:not-bound-to-live-config).
+ *   2026-10-27 — standingAppGrant counts a grant given to an earlier holder of the author's name as
+ *     gone, so the access tokens minted from it end with it (secaudit2026oct26,
+ *     credential-revoked:app-grant-token-ignores-earlier-author).
  *   2026-10-25 — credentialRevoked asks an EIGHTH question (patGone): a JWT minted from a personal
  *     access token counts only while that token is neither revoked nor expired. It named no PAT row,
  *     so revoking the PAT reached nothing of it (secaudit2026oct22, exchanged-pat-jwt-outlives-revoke).
@@ -32,6 +35,7 @@ import { agentGone } from './agent-alive.js';
 import { visitorPeerRefuses } from './visitor-peer.js';
 import { isAnonymousMode, sessionStorage } from './node-auth.js';
 import { isAnonymousPrincipal } from './anonymous-principal.js';
+import { grantGivenToEarlierAuthor } from '../services/app-grant-author.js';
 
 /**
  * Has this token's session been ended? True only for a token that names a session the store has and
@@ -63,7 +67,14 @@ async function standingAppGrant(verified: VerifiedToken): Promise<AppGrantRecord
   const storage = sessionStorage();
   if (!verified.app_grant || !storage) return null;
   const grant = await storage.getAppGrant(verified.app_grant);
-  return !grant || grant.revoked === true ? false : grant;
+  if (!grant || grant.revoked === true) return false;
+  // A grant given to the app of an EARLIER holder of the author's name covers nothing the current
+  // holder publishes (services/app-grant-author.ts). The silent bridge, the refresh and the grant list
+  // asked it; the access token minted from the grant before the erasure kept working until it
+  // expired, at the same origin where the new holder's code runs (secaudit2026oct26,
+  // credential-revoked:app-grant-token-ignores-earlier-author). One keyed owner read.
+  if (await grantGivenToEarlierAuthor(storage, grant)) return false;
+  return grant;
 }
 
 /**

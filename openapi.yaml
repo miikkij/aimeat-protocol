@@ -9300,7 +9300,8 @@ paths:
         the owner's name, so the consent page does not auto-approve it for its owner, and
         authorize-consent never marks it own. `published_by_other` names who published the app's
         live version when that is another account than the app's owner (a developer the owner gave
-        the publisher or full right), else null: the consent page then shows the screen to the owner
+        the publisher or full right), or the app (`<author>/<filename>`) of another author whose grant
+        published it, else null: the consent page then shows the screen to the owner
         for any scope the owner's grant lacks, as it does when the owner narrowed the grant by hand
         (`scopes_fixed_at` on GET /v1/app-grants). `prompt` is `create` when the app asked for the
         create-account form, else null. Unguessable id; no auth.
@@ -9362,8 +9363,11 @@ paths:
         account published its live version (a developer with the publisher or full right) or the
         owner narrowed the grant by hand: `consent_required` with `reason: app_updated`, `why`
         (`publisher_version` or `owner_narrowed`), `added` (the scopes asked for, space-separated)
-        and, for a version another account published, `published_by`. A version the owner or the
-        owner's agent published keeps signing in silently, new scopes included.
+        and, for a version another account published, `published_by`. A version another author's app
+        published through the owner's grant asks the same way, with `published_by` and
+        `published_by_app` naming that app; the owner is told of such a version when it is published.
+        A version the owner or the owner's agent published, and one the owner's own app published
+        through its own grant, keeps signing in silently, new scopes included.
 
         **By name (`app`).** A page of the node that holds app code in an opaque-origin frame asks
         with `app=owner/filename` instead of `origin`, because the frame has no address of its own
@@ -37767,7 +37771,7 @@ paths:
         '502':
           description: RENDER_FAILED - the page did not render; the message carries the reason
         '503':
-          description: NO_BROWSER - this node has no usable browser to render with
+          description: NO_BROWSER - this node has no usable browser to render with; HEADLESS_BUSY - the node is running as many on-demand renders as it runs at once, try again in a minute (the owner's hourly allowance is not taken)
   /v1/apps/{owner}/{filename}/draft/write:
     post:
       operationId: writeAppDraft
@@ -47070,9 +47074,27 @@ paths:
         the rest. Creates an immutable purchase receipt with snapshotted app content and a
         cryptographic signature. A buyer who cannot cover the pacing is refused with 402
         INSUFFICIENT_MORSELS.
+
+        The app's own gates come first, before any morsel moves, as the apex read applies them: an
+        app the operator hid answers 404 as a missing one, and an app open to chosen people only
+        (`open_to`) answers 403 ACCESS_DENIED to a buyer outside them. An app with an access code is
+        bought as before, but the receipt holds its copy only when the request carries the code
+        (`X-Access-Code`, `?code=` or `code` in the body); without it `app_content` is empty and the
+        note says to open the app with the code.
       tags: [App Store]
       security:
         - BearerAuth: []
+      parameters:
+        - name: X-Access-Code
+          in: header
+          required: false
+          schema: { type: string }
+          description: The app's access code, when it has one; the receipt then holds the app's copy.
+        - name: code
+          in: query
+          required: false
+          schema: { type: string }
+          description: The app's access code, as for the apex read.
       requestBody:
         required: true
         content:
@@ -47087,6 +47109,9 @@ paths:
                 app_owner:
                   type: string
                   description: Owner of the app
+                code:
+                  type: string
+                  description: The app's access code, when it has one (also read as `access_code`).
       responses:
         '201':
           description: App purchased successfully
@@ -47135,7 +47160,7 @@ paths:
         '402':
           $ref: '#/components/responses/PaymentRequired'
         '403':
-          description: App store disabled on this node
+          description: App store disabled on this node (APP_STORE_DISABLED), or the app opens for chosen people and the buyer is not among them (ACCESS_DENIED)
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
