@@ -14,6 +14,9 @@
  *   - Cleanup + metrics: idle-room reaper, message/peer counters, getStats()
  *
  * @version-history
+ *   2026-10-27 — secaudit2026oct26: a room keeps the state of at most realtime.max_docs_per_room
+ *     documents and tells the sender of one more (DOC_LIMIT_REACHED, still relayed); an anonymous
+ *     echat room keeps none. The shutdown write moved to ./realtime-yjs.ts and skips echat rooms.
  *   2026-10-16 — A failed snapshot write is logged with errorFields(err) (QA audit E1-04).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-13 — Wire + internal types extracted to ./realtime-types.ts (max-file-lines)
@@ -38,9 +41,9 @@ import type { WebSocket } from 'ws';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { errorFields } from '../utils/error-fields.js';
 import { runAsNode } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
+import { keepYjsSnapshot, saveYjsSnapshots } from './realtime-yjs.js';
 
 /** Live domain for "the room list moved": a room appeared or closed, or a player came or went. */
 const ROOMS_DOMAIN = 'realtime-rooms';
@@ -415,9 +418,16 @@ export class RealtimeManager {
           return;
         }
 
-        // Store latest update as snapshot for late-joining peers
-        if (msg.update) {
-          room.yjsSnapshots.set(msg.docId, msg.update);
+        // Store latest update as snapshot for late-joining peers, up to the room's document limit
+        // (./realtime-yjs.ts). A document past it is still relayed below.
+        if (msg.update && !keepYjsSnapshot(room, msg.docId, msg.update, this.config.realtimeMaxDocsPerRoom)) {
+          const peer = room.peers.get(peerId);
+          if (peer) {
+            this.sendToWs(peer.ws, {
+              type: 'error', code: 'DOC_LIMIT_REACHED',
+              message: `This room keeps the state of ${this.config.realtimeMaxDocsPerRoom} documents for players who join later, and this is one more. It was sent to the room; a player who joins later does not get it.`,
+            });
+          }
         }
 
         // Broadcast update to other peers
@@ -585,30 +595,6 @@ export class RealtimeManager {
     return this.joinRoom(roomId, ws, nick);
   }
 
-  // ── Yjs snapshot persistence ──
-
-  private async saveAllYjsSnapshots(): Promise<void> {
-    for (const room of this.rooms.values()) {
-      for (const [docId, snapshot] of room.yjsSnapshots) {
-        const key = `realtime.yjs.${room.id}.${docId}`;
-        const now = new Date().toISOString();
-        await this.storage.setMemory({
-          key,
-          ownerGaii: room.createdBy,
-          value: snapshot,
-          visibility: 'private',
-          tags: ['realtime', 'yjs-snapshot'],
-          ttlHours: 168, // 7 days
-          version: 1,
-          createdAt: now,
-          updatedAt: now,
-        }).catch(err => {
-          logger.warn('Failed to persist Yjs snapshot', { roomId: room.id, docId, ...errorFields(err) });
-        });
-      }
-    }
-  }
-
   // ── Metrics ──
 
   private updatePeakPeers(): void {
@@ -753,8 +739,8 @@ export class RealtimeManager {
       this.cleanupInterval = null;
     }
 
-    // Persist Yjs snapshots before shutdown
-    await this.saveAllYjsSnapshots();
+    // Persist Yjs snapshots before shutdown (./realtime-yjs.ts)
+    await saveYjsSnapshots(this.storage, this.rooms.values());
 
     // Close federation relays
     for (const ws of this.federatedRelays.values()) {

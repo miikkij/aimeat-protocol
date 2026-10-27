@@ -2845,10 +2845,10 @@
      "slug": "g-13-realtime-rooms",
      "cells": [
       "<strong>Realtime rooms</strong>",
-      "Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through <code>AIMEAT.live</code>, with no refresh, when the app holds <code>social:read</code>.",
-      "<code>/v1/realtime/rooms</code>, live domain <code>realtime-rooms</code>"
+      "Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through <code>AIMEAT.live</code>, with no refresh, when the app holds <code>social:read</code>. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat.",
+      "<code>/v1/realtime/rooms</code>, live domain <code>realtime-rooms</code>, <code>realtime.max_docs_per_room</code>, <code>realtime.echat_max_rooms</code>"
      ],
-     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through AIMEAT.live, with no refresh, when the app holds social:read. /v1/realtime/rooms, live domain realtime-rooms"
+     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through AIMEAT.live, with no refresh, when the app holds social:read. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat. /v1/realtime/rooms, live domain realtime-rooms, realtime.max_docs_per_room, realtime.echat_max_rooms"
     },
     {
      "slug": "g-13-moderation",
