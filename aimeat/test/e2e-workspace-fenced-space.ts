@@ -412,6 +412,19 @@ await test('Refused: MCP aimeat_workspace_object_delete', async () => {
     assert((await ownerOpens('decision', 'fortooldel'))?.published === true, 'the record is still there');
 });
 
+// secaudit2026oct26, mcp-workspace:delete-fence-ws-from-input. The two deletes asked the rule with the
+// ws the caller sent, so a ws that carries the first part of a dotted namespace, or no ws at all on
+// the batch, reached the same keys while the rule read a manifest that does not exist.
+await test('Refused: the same deletes with the namespace split differently between ws and namespace', async () => {
+    const [head, ...rest] = NS.split('.');
+    const tail = rest.join('.');
+    const viaMcp = await O.client.call('aimeat_workspace_object_delete', { organism_id: orgId, ws: `${WS}.${head}`, namespace: tail, id: 'fortooldel' }, rpcId++);
+    assertToolRefused({ isError: viaMcp.result?.isError === true, text: String(viaMcp.result?.content?.[0]?.text ?? JSON.stringify(viaMcp.error ?? viaMcp)) }, 'aimeat_workspace_object_delete with a dotted ws');
+    assertRefused(await post(`/v1/organisms/${orgId}/workspace/records/delete`, asAgent(), { ws: `${WS}.${head}`, namespace: tail, ids: ['forbatchdel'] }), 'records/delete with a dotted ws');
+    assertRefused(await post(`/v1/organisms/${orgId}/workspace/records/delete`, asAgent(), { namespace: `w.${WS}.${NS}`, ids: ['forbatchdel'] }), 'records/delete with no ws');
+    assert((await ownerOpens('decision', 'fortooldel'))?.published === true && (await ownerOpens('decision', 'forbatchdel'))?.published === true, 'the records are still there');
+});
+
 await test('Refused: POST /v1/memory/bulk-delete, by key and by prefix', async () => {
     const key = `${base(NS, 'forbulk')}.version.1`;
     assertRefused(await post('/v1/memory/bulk-delete', asAgent(), { keys: [key] }), 'bulk-delete (keys)');

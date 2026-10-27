@@ -301,6 +301,39 @@ async function run() {
     assert(r2.body.data?.cached?.title === 'Q3', 'cached metadata is returned when offline');
   });
 
+  // secaudit2026oct26, ecosystem-read-through:ref-target-unbound-to-writer. A reference an
+  // ecosystem app wrote reads through that app; one naming another app is answered from its cached
+  // metadata, and the other app hears nothing.
+  await test('A reference one app wrote that names another app does not invoke the other app', async () => {
+    const writer = await connectGeai('refwriter', ['memory:read', 'memory:write']);
+    const target = await connectGeai('reftarget', ['memory:read']);
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+      body: JSON.stringify({ key: 'refs.crossapp', value: { _type: 'ecosystem_ref', app: 'reftarget', remoteId: 'x', readCapability: 'purge', title: 'cross' }, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `the app writes its reference: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const frames: any[] = [];
+    const tunnel = await TunnelClient.connect(BASE, target.token);
+    tunnel.onInvoke(f => { frames.push(f); return { ok: true, result: { body: 'done' } }; });
+    try {
+      const r = await json('/v1/ecosystem/read-through', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'refs.crossapp' }) });
+      assert(r.status === 200, `read-through ${r.status}: ${JSON.stringify(r.body)}`);
+      assert(frames.length === 0, `the other app was invoked: ${JSON.stringify(frames.map(f => ({ capability: f.capability, caller: f.caller })))}`);
+      assert(r.body.data?.read_through_unavailable === true && r.body.data?.cached?.title === 'cross', `answered from the cached metadata: ${JSON.stringify(r.body.data)}`);
+    } finally { await tunnel.close(); }
+  });
+
+  await test('A reference an app wrote about itself still reads through that app', async () => {
+    const self = await connectGeai('refself', ['memory:read', 'memory:write']);
+    const w = await json('/v1/memory', { method: 'POST', headers: { Authorization: `Bearer ${self.token}` },
+      body: JSON.stringify({ key: 'refs.selfapp', value: { _type: 'ecosystem_ref', app: 'refself', remoteId: 's1', title: 'mine' }, visibility: 'private' }) });
+    assert(w.status === 200 || w.status === 201, `the app writes its reference: ${w.status}`);
+    const tunnel = await TunnelClient.connect(BASE, self.token);
+    tunnel.onInvoke(f => ({ ok: true, result: { body: `live:${(f.input as any)?.remoteId}` } }));
+    try {
+      const r = await json('/v1/ecosystem/read-through', { method: 'POST', headers: auth, body: JSON.stringify({ key: 'refs.selfapp' }) });
+      assert(r.status === 200 && r.body.data?.content?.body === 'live:s1', `live content through the writing app: ${JSON.stringify(r.body.data)}`);
+    } finally { await tunnel.close(); }
+  });
+
   // ── Phase 6: data-area READ allowlist (model A / strict) ──
   console.log('\nPhase 6 — Data-area READ allowlist on an organism key');
   await test('A GEAI WITH a read grant may read back its organism deposit', async () => {

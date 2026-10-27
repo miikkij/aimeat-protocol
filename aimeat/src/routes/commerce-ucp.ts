@@ -16,6 +16,7 @@
  *   - PATCH /ucp/v1/checkout-sessions/:id        update line_items OR { cancel: true }
  *   - POST  /ucp/v1/checkout-sessions/:id/complete  ({ payment: { handler?, instrument? } })
  * @version-history
+ *   v1.5.1 — 2026-10-27 — The UCP-Agent profile is read under a 256 KB ceiling (secaudit2026oct26, keyIsPublished:uncapped-body siblings).
  *   v1.5.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): commerce:buy (an app: contract:spend, which completeSession also asks) on POST /ucp/v1/checkout-sessions/:id/complete. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.4.0 — 2026-10-11 — Money only (ruling D4): a session opens in the request's money currency,
  *     else the first one its items are priced in, or is refused MONEY_PRICE_REQUIRED; a morsel
@@ -38,6 +39,7 @@ import { requireAuth, requireScope } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readJson } from '../utils/read-capped.js';
 import { logger } from '../utils/logger.js';
 import {
   getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
@@ -145,7 +147,8 @@ async function negotiate(req: Request): Promise<Array<{ name: string; version: s
   if (typeof profileUrl !== 'string' || !/^https?:\/\//.test(profileUrl)) return UCP_CAPABILITIES;
   try {
     const res = await safeFetch(profileUrl, { signal: AbortSignal.timeout(3000) });
-    const profile = await res.json() as { ucp?: { capabilities?: unknown } };
+    // Read under a ceiling: the address comes from the request header (secaudit2026oct26).
+    const profile = await readJson(res, 256 * 1024) as { ucp?: { capabilities?: unknown } };
     // UCP declares `capabilities` as an object keyed by capability name. Profiles in the wild also
     // carry the older array-of-{name} shape (this node served one until 2026-07-28), and a peer
     // whose shape we do not read intersects to nothing — which silently degrades to "no shared

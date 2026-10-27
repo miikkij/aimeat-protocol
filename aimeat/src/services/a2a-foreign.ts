@@ -43,6 +43,10 @@
  * @structure ForeignPeer · identifyForeignCaller() · FOREIGN_HEADERS
  * @usage const who = await identifyForeignCaller(config, storage, req.headers);
  * @version-history
+ *   v1.4.0 — 2026-10-27 — A pin belongs to the gaii and, unless the JWKS host is the node the gaii
+ *     names, to that host too, keyed by a full hash; a pin under the earlier cut key still counts for
+ *     the same gaii and host (secaudit2026oct26, jwks-origin-unbound-to-claimed-node). The JWKS is read
+ *     under a 256 KB ceiling (secaudit2026oct26, keyIsPublished:uncapped-body).
  *   v1.3.0 — 2026-10-25 — A card whose gaii names no node, or this node, is refused 401
  *     A2A_LOCAL_IDENTITY before anything is pinned or written, so a stranger cannot file work under
  *     a local principal's identity (secaudit2026oct22, self-asserted-gaii-settled-as-local-consumer).
@@ -53,13 +57,18 @@
  *     its whole life. Found in review.
  *   v1.0.0 — 2026-09-01 — Initial (Agent v2, V6a foreign path).
  */
+import { createHash } from 'node:crypto';
 import { compactVerify, importJWK, decodeProtectedHeader } from 'jose';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { readCardJws, verifyCardJws } from './agent-card.js';
 import { spendAssertion } from './assertion-spend.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { readJson } from '../utils/read-capped.js';
 import { logger } from '../utils/logger.js';
+
+/** The most of a JWKS answer this node reads. A JWKS of a few dozen keys is a few kilobytes. */
+const JWKS_MAX_BYTES = 256 * 1024;
 
 /** What a foreign caller sends. Named here so the route, the card and the docs cannot drift. */
 export const FOREIGN_HEADERS = {
@@ -78,7 +87,38 @@ export const FOREIGN_HEADERS = {
  * out of reach of an owner-scoped write.
  */
 const PEER_NS = '__a2a_peer__';
-const peerKey = (gaii: string) => `a2apeer.${Buffer.from(gaii).toString('base64url').slice(0, 100)}`;
+/** The key pins were stored under before 2026-10-27: the gaii cut to 100 base64url characters. */
+const legacyPeerKey = (gaii: string) => `a2apeer.${Buffer.from(gaii).toString('base64url').slice(0, 100)}`;
+/**
+ * Where a pin lives (secaudit2026oct26, jwks-origin-unbound-to-claimed-node). A card whose JWKS host
+ * is the node its gaii names (the gaii's node part is a DNS name and the host is it) holds the pin
+ * of the gaii alone. Any other card holds the pin of the gaii together with the host that publishes
+ * its key, so a card published elsewhere cannot take a name first and lock its agent out. A full
+ * hash, so two long names that share a start are two pins.
+ */
+const peerKey = (gaii: string, boundHost: string | null) =>
+  `a2apeer.${createHash('sha256').update(boundHost === null ? gaii : `${gaii}\n${boundHost}`).digest('base64url')}`;
+
+/** The host part of an address, lower case, or '' when it cannot be read. */
+function hostOf(uri: string | undefined): string {
+  if (!uri || !URL.canParse(uri)) return '';
+  return new URL(uri).hostname.toLowerCase();
+}
+
+/** A node name that reads as a DNS name: two or more labels of letters, digits and inner hyphens. */
+function isDnsName(name: string): boolean {
+  const labels = name.split('.');
+  return labels.length >= 2 && labels.every(l => /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(l));
+}
+
+/**
+ * Is the JWKS host the node the gaii names? True for a DNS node name served from itself or a
+ * subdomain of itself. An opaque node name (an AIMEAT node id, or a non-AIMEAT client's own word)
+ * names no host, so its pin is keyed with the JWKS host: the agent's own host keeps its own pin.
+ */
+function jwksHostIsClaimedNode(claimedNode: string, jwksHost: string): boolean {
+  return !!jwksHost && isDnsName(claimedNode) && (jwksHost === claimedNode || jwksHost.endsWith(`.${claimedNode}`));
+}
 
 /**
  * How far out an assertion may claim to live. FIVE MINUTES, the same number and the same reasoning
@@ -101,6 +141,10 @@ export interface ForeignPeer {
   displayName: string;
   firstSeenAt: string;
   lastSeenAt: string;
+  /** The host that publishes the key (absent on pins written before 2026-10-27). */
+  keyHost?: string;
+  /** True when that host is the node the gaii names, so the name is vouched for by its own node. */
+  hostIsNode?: boolean;
 }
 
 export type ForeignResult =
@@ -136,7 +180,9 @@ async function keyIsPublished(jwksUri: string, kid: string, keyX: string): Promi
   try {
     const res = await safeFetch(jwksUri, { signal: AbortSignal.timeout(8000) });
     if (!res.ok) return false;
-    const body = await res.json() as { keys?: Array<Record<string, unknown>> };
+    // Read under a ceiling: the address is the caller's, and so is the size of the answer
+    // (secaudit2026oct26, keyIsPublished:uncapped-body).
+    const body = await readJson(res, JWKS_MAX_BYTES) as { keys?: Array<Record<string, unknown>> };
     return (body.keys ?? []).some(k => k.kid === kid && k.x === keyX && k.kty === 'OKP' && k.crv === 'Ed25519');
   } catch (err) {
     logger.warn('a2a: a foreign caller\'s JWKS could not be read', { jwksUri, error: String(err) });
@@ -144,15 +190,22 @@ async function keyIsPublished(jwksUri: string, kid: string, keyX: string): Promi
   }
 }
 
-async function readPeer(storage: Storage, gaii: string): Promise<ForeignPeer | null> {
-  const rec = await storage.getMemory(PEER_NS, peerKey(gaii));
-  return rec ? (rec.value as ForeignPeer) : null;
+/**
+ * The pin for this gaii and JWKS host. A pin written before 2026-10-27 under the cut key still
+ * counts when it names the same gaii and its JWKS was at the same host, so a caller already pinned
+ * keeps working and keeps its key comparison.
+ */
+async function readPeer(storage: Storage, gaii: string, pinKey: string, jwksHost: string): Promise<ForeignPeer | null> {
+  const rec = await storage.getMemory(PEER_NS, pinKey);
+  if (rec) return rec.value as ForeignPeer;
+  const legacy = (await storage.getMemory(PEER_NS, legacyPeerKey(gaii)))?.value as ForeignPeer | undefined;
+  return legacy && legacy.gaii === gaii && hostOf(legacy.jwksUri) === jwksHost ? legacy : null;
 }
 
-async function writePeer(storage: Storage, peer: ForeignPeer): Promise<void> {
+async function writePeer(storage: Storage, peer: ForeignPeer, pinKey: string): Promise<void> {
   const now = new Date().toISOString();
   await storage.setMemory({
-    key: peerKey(peer.gaii), ownerGaii: PEER_NS, value: peer,
+    key: pinKey, ownerGaii: PEER_NS, value: peer,
     visibility: 'private', tags: ['a2a-peer'], ttlHours: null, version: 1,
     createdAt: peer.firstSeenAt, updatedAt: now,
   });
@@ -252,7 +305,10 @@ export async function identifyForeignCaller(
   }
 
   // ── Trust on first use, and compared on every use after it ──
-  const pinned = await readPeer(storage, card.gaii);
+  const jwksHost = hostOf(card.jwksUri);
+  const hostIsNode = jwksHostIsClaimedNode(claimedNode, jwksHost);
+  const pinKey = peerKey(card.gaii, hostIsNode ? null : jwksHost);
+  const pinned = await readPeer(storage, card.gaii, pinKey, jwksHost);
   const nowIso = new Date().toISOString();
 
   if (pinned) {
@@ -264,8 +320,9 @@ export async function identifyForeignCaller(
       return refuse(401, 'A2A_KEY_CHANGED',
         'This agent is known here by a different key. A new key is a new party until the node operator clears the old pin.');
     }
-    await writePeer(storage, { ...pinned, lastSeenAt: nowIso, cardUri: card.cardUri, jwksUri: card.jwksUri });
-    return { ok: true, peer: { ...pinned, lastSeenAt: nowIso }, firstSight: false };
+    const seen = { ...pinned, lastSeenAt: nowIso, cardUri: card.cardUri, jwksUri: card.jwksUri, keyHost: jwksHost, hostIsNode };
+    await writePeer(storage, seen, pinKey);
+    return { ok: true, peer: seen, firstSight: false };
   }
 
   // FIRST SIGHT is the only moment the outside world is consulted. After the pin the key is ours to
@@ -284,8 +341,10 @@ export async function identifyForeignCaller(
     displayName: card.displayName ?? card.name ?? card.gaii,
     firstSeenAt: nowIso,
     lastSeenAt: nowIso,
+    keyHost: jwksHost,
+    hostIsNode,
   };
-  await writePeer(storage, peer);
+  await writePeer(storage, peer, pinKey);
   logger.info('a2a: pinned a new foreign caller', { gaii: peer.gaii, kid: peer.kid });
   return { ok: true, peer, firstSight: true };
 }

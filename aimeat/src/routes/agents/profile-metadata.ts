@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-27 — PATCH /v1/agents/:name/runtime-source refuses the shared anonymous principal with 401
+ *     AUTH_REQUIRED, as /tags does (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
+ *   2026-10-27 — PATCH /v1/agents/:name/mode passes the caller to setAgentMode, which tells the owner
+ *     when an agent changed a mode (secaudit2026oct26).
  *   2026-10-24 — PATCH /v1/agents/:name/tags refuses the shared anonymous principal with 401
  *     AUTH_REQUIRED: its tags are on its public card and decide its catalogue listing (secaudit2026oct22).
  *   2026-10-23 — PATCH /v1/agents/:name/task-start-floor (owner in person), and
@@ -456,7 +460,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
     const identifier = (req.params.name as string);
     // Ownership, the mode vocabulary, the write and the Hello Integration step-list re-derive are
     // services/agent-profile-write.ts, shared with aimeat_agent_mode_set.
-    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode);
+    const outcome = await setAgentMode({ storage, config }, req.auth!.owner, identifier, req.body?.mode, req.auth!.sub);
     if (!outcome.ok) {
       res.status(agentWriteStatus(outcome.code)).json(error(config.nodeId, outcome.code, outcome.message));
       return;
@@ -605,7 +609,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
    * the basic agents hold no agent:write, so with the scope required on their own record a crew
    * that reports its road would have every task end as refused (aimeat-crewai 0.31.0).
    */
-  router.patch('/v1/agents/:name/runtime-source', requireAuth(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
+  // The shared anonymous agent reports no runtime: every holder of the minted token is that one
+  // agent, and the report's `llm: 'local'` decides what classification shows to it
+  // (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
+  router.patch('/v1/agents/:name/runtime-source', requireAuth(), refuseAnonymousPrincipal(), requireScopeUnlessSelf('agent:write', config.nodeId), async (req, res) => {
     const outcome = await setAgentRuntimeSource({ storage, config }, req.auth!.owner as string,
       (req.params.name as string), req.body?.runtime_source);
     if (!outcome.ok) {

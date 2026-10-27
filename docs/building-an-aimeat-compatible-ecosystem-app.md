@@ -122,9 +122,16 @@ Request body:
   "scopes": ["memory:read", "memory:write"],   // optional: defaults to the node's defaultEcoScopes
   "data_areas": [ … ],               // optional: consent-grant allowlist (stored at approval)
   "bound_ref": "<opaque acct ref>",  // optional: your account marker; kept on the record, not in the JWT
-  "manifest": { … }                  // optional: validated at once when present (section 5)
+  "manifest": { … },                 // optional: validated at once when present (section 5)
+  "proof": { "signed_at": "<ISO time>", "signature": "<base64>" }  // optional: see below
 }
 ```
+
+**Reconnecting an app the owner already connected.** Send `proof` with the hello: an Ed25519
+signature by the pinned key over `aimeat-eco-hello:v1\n<owner>\n<app>\n<signed_at>`, with
+`signed_at` the current time (it is accepted for five minutes). The owner's row then reads as your
+app coming back. A same-key hello without the proof still connects, but the owner sees that it did
+not prove it holds the key, because anyone who knows the public key can send it.
 
 The answer has the RFC 8628 shape: `{ device_code, user_code, verification_uri,
 verification_uri_complete, expires_in, interval, validation, user_instructions }`. The owner approves

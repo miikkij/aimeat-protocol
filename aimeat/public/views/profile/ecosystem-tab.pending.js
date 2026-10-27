@@ -16,6 +16,9 @@
  * @structure EcoPendingAccess({ request, ticks, onTick })
  * @usage html`<${EcoPendingAccess} request=${r} ticks=${ticks[r.user_code]} onTick=${(i, on) => ...} />`
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A same-key reconnect that did not prove it holds the pinned key
+ *     (`key_proven` false) is marked with the danger tone and a hint (secaudit2026oct26,
+ *     token-pickup-without-pinned-key-proof).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22).
  */
 import { h } from 'preact';
@@ -36,14 +39,20 @@ const html = htm.bind(h);
 export function EcoPendingAccess({ request, ticks, onTick }) {
   const areas = request?.requested_data_areas || [];
   const on = Array.isArray(ticks) ? ticks : initialTicks(request);
+  // A same-key reconnect that did not sign with the pinned key (key_proven false) is marked like a
+  // key change, since anyone who knows the public key can send it.
+  const unproven = request.reconnect && !request.key_changed && request.key_proven === false;
+  const label = request.key_changed ? 'profile.ecosystem.keyChanged'
+    : unproven ? 'profile.ecosystem.reconnectUnproven' : 'profile.ecosystem.reconnect';
   return html`
     <${Stack} gap="small">
       ${request.reconnect && html`
         <span>
-          <${Mark} kind="status" tone=${request.key_changed ? 'danger' : 'attention'}>
-            ${t(request.key_changed ? 'profile.ecosystem.keyChanged' : 'profile.ecosystem.reconnect')}
+          <${Mark} kind="status" tone=${request.key_changed || unproven ? 'danger' : 'attention'}>
+            ${t(label)}
           <//>
         </span>`}
+      ${unproven && html`<${Hint}>${t('profile.ecosystem.reconnectUnprovenHint', { app: request.display_name || request.app })}<//>`}
       ${request.key_changed && html`
         <${Hint}>
           ${t('profile.ecosystem.keyChangedHint', { app: request.display_name || request.app })}

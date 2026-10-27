@@ -432,6 +432,18 @@ await test('a save ends the keep: the agent\'s re-saved workflow is asked about 
     assert(await anon(pkgUrl(`${EXT}-old5`)) !== 200, 'the re-saved workflow published public');
 });
 
+// secaudit2026oct26, keep-matched-by-reusable-identifier: the keep names an extension by its bare
+// name and its scripts, and an install after an uninstall is a new extension.
+await test('a new install under a kept name, with the kept scripts, is asked about again', async () => {
+    const del = await json(`/v1/extensions/${OLDEXT}`, { method: 'DELETE', headers: bearer(agentTok) });
+    assert(del.status === 200 || del.status === 204, `uninstall ${del.status}: ${short(del.body?.error)}`);
+    await install(agentTok, OLDEXT, false);
+    await saveWorkflow(ownerTok, 'upg-old-ext6', [extStep(OLDEXT, `${EXT}-old6`)]);
+    const run = await runWorkflow(ownerTok, 'upg-old-ext6');
+    assert(run.steps.produce.state === 'green', `produce step ${run.steps.produce.state}`);
+    assert(await anon(pkgUrl(`${EXT}-old6`)) !== 200, 'a reinstalled extension published public unattended under the old keep');
+});
+
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 await stopServer(server);
 process.exit(failed > 0 ? 1 : 0);

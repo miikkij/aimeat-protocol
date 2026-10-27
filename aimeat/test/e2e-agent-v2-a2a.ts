@@ -125,10 +125,10 @@ const FOREIGN_CODE = {
 const jwksServers: Server[] = [];
 
 /** Serve one JWKS on loopback, the way a real node publishes a key. Torn down at the end. */
-async function serveJwks(keys: Record<string, unknown>[]): Promise<string> {
+async function serveJwks(keys: Record<string, unknown>[], padBytes = 0): Promise<string> {
     const server = createServer((_req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ keys }));
+        res.end(JSON.stringify(padBytes > 0 ? { keys, padding: 'p'.repeat(padBytes) } : { keys }));
     });
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
     jwksServers.push(server);
@@ -150,12 +150,14 @@ async function ed25519Pair() {
  * fresh assertion on demand. `publishKey: false` builds the same thing with a JWKS that does not
  * carry the key, which is the refusal the first-sight fetch exists to produce.
  */
-async function makeStranger(name: string, opts: { publishKey?: boolean; gaii?: string } = {}): Promise<Stranger> {
+async function makeStranger(name: string, opts: { publishKey?: boolean; gaii?: string; jwksHost?: string; padJwks?: number } = {}): Promise<Stranger> {
     const pair = await ed25519Pair();
     const gaii = opts.gaii ?? `${name}#remote@remote-node-999`;
-    const jwksUrl = await serveJwks(opts.publishKey === false
+    const served = await serveJwks(opts.publishKey === false
         ? []
-        : [{ kty: 'OKP', crv: 'Ed25519', x: pair.x, kid: pair.kid, use: 'sig', alg: 'EdDSA' }]);
+        : [{ kty: 'OKP', crv: 'Ed25519', x: pair.x, kid: pair.kid, use: 'sig', alg: 'EdDSA' }], opts.padJwks ?? 0);
+    // The same loopback server under another host name, for a JWKS published somewhere else.
+    const jwksUrl = opts.jwksHost ? served.replace('127.0.0.1', opts.jwksHost) : served;
     const card = {
         spec: 'aimeat.agent-card/v1',
         gaii, name, owner: 'remote', node: 'remote-node-999',
@@ -984,6 +986,50 @@ async function run(): Promise<void> {
         // The genuine stranger on its own node still gets in.
         const still = await foreignRpc(a.owner, worker.name, stranger, 'GetTask', { id: foreignTaskId });
         assert(!still.error, `the foreign caller still gets in, got ${JSON.stringify(still.error)}`);
+    });
+
+    // secaudit2026oct26, identifyForeignCaller:jwks-origin-unbound-to-claimed-node. The first card to
+    // name a foreign gaii pinned it, wherever its JWKS was published, and the agent it named was then
+    // refused as a changed key. A pin now belongs to the gaii together with the host that publishes
+    // its key, so a card published elsewhere cannot take the name first.
+    await test('a card that names a foreign agent first, from another JWKS host, does not lock the agent out', async () => {
+        const hello = { message: { messageId: 'squat-1', role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'hi' }] } };
+        const gaii = `squatted#remote@remote-node-999`;
+        const squatter = await makeStranger('squatted', { gaii, jwksHost: 'localhost' });
+        const first = await foreignRpc(a.owner, worker.name, squatter, 'SendMessage', hello);
+        assert(first.status !== 401, `the first card is accepted, got ${first.status}/${first.body?.error?.code}`);
+        const genuine = await makeStranger('squatted', { gaii });
+        const r = await foreignRpc(a.owner, worker.name, genuine, 'SendMessage', { message: { ...hello.message, messageId: 'squat-2' } });
+        assert(r.status !== 401, `the agent whose key is published on its own host gets in, got ${r.status}/${r.body?.error?.code}`);
+        // A coherent re-key on the same host is still a changed key.
+        const twin = await rekeyed(genuine);
+        const changed = await foreignRpc(a.owner, worker.name, twin, 'GetTask', { id: foreignTaskId });
+        assert(changed.status === 401 && changed.body?.error?.code === 'A2A_KEY_CHANGED', `same host, new key: ${changed.status}/${changed.body?.error?.code}`);
+    });
+
+    await test('two long foreign names that share their first 75 bytes are two pins, not one', async () => {
+        const stem = `${'l'.repeat(80)}`;
+        const one = await makeStranger('long-one', { gaii: `${stem}one#remote@remote-node-999` });
+        const two = await makeStranger('long-two', { gaii: `${stem}two#remote@remote-node-999` });
+        const hello = (id: string) => ({ message: { messageId: id, role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'hi' }] } });
+        const r1 = await foreignRpc(a.owner, worker.name, one, 'SendMessage', hello('long-1'));
+        assert(r1.status !== 401, `the first long name gets in, got ${r1.status}/${r1.body?.error?.code}`);
+        const r2 = await foreignRpc(a.owner, worker.name, two, 'SendMessage', hello('long-2'));
+        assert(r2.status !== 401, `a second long name with the same start is its own party, got ${r2.status}/${r2.body?.error?.code}`);
+    });
+
+    // secaudit2026oct26, keyIsPublished:uncapped-body. The JWKS a card names is read under a ceiling.
+    await test('a JWKS answer larger than the ceiling is not read to the end, and the key counts as unpublished', async () => {
+        const big = await makeStranger('bigjwks', { padJwks: 2 * 1024 * 1024 });
+        const r = await foreignRpc(a.owner, worker.name, big, 'SendMessage', {
+            message: { messageId: 'big-1', role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'hi' }] },
+        });
+        assert(r.status === 401 && r.body?.error?.code === 'A2A_KEY_NOT_PUBLISHED', `an oversized JWKS is refused, got ${r.status}/${r.body?.error?.code}`);
+        const small = await makeStranger('smalljwks', { padJwks: 1024 });
+        const ok = await foreignRpc(a.owner, worker.name, small, 'SendMessage', {
+            message: { messageId: 'small-1', role: 'ROLE_USER', metadata: { offeringId }, parts: [{ text: 'hi' }] },
+        });
+        assert(ok.status !== 401, `an ordinary JWKS still verifies, got ${ok.status}/${ok.body?.error?.code}`);
     });
 
     // Same finding, second half: work a stranger opened over A2A settles only through its own x402

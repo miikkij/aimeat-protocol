@@ -17,6 +17,9 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   2026-10-27 — aimeat_workspace_object_delete and _revert_to_draft ask the fenced-space rule for the
+ *     workspace the record's key lies in, not the ws argument (secaudit2026oct26,
+ *     mcp-workspace:delete-fence-ws-from-input).
  *   2026-10-24 — aimeat_workspace_revert_to_draft asks the organism rule's write test with the draft's
  *     key, so a viewer's agent does not write a draft through a reopen (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -199,7 +202,7 @@ import { canReadWorkspace } from '../services/workspace-access.js';
 import { readerForAgent } from '../services/classification/reader.js';
 import { buildOrganismOverview, buildWorkspaceOverview } from '../services/structure-overview.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
-import { emitChange } from '../services/event-bus.js';
+import { emitChange, workspaceOfKey } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { workspaceTarget } from '../services/classification/containers.js';
 import { classifyContainerAfterWrite } from '../services/classify-on-write.js';
@@ -285,8 +288,12 @@ export function registerWorkspaceTools(
     const fencedToolError = async (orgId: string, ws: string, namespace: string, id: string, whole = false): Promise<TextResult | null> => {
         const session = caller();
         const base = `${wsRoot(orgId, ws)}.${namespace}.${id}`;
+        // The workspace whose fence is asked is the one the key lies in, not the ws argument: a ws
+        // that carries the first part of a dotted namespace builds the same key under another
+        // workspace's name (secaudit2026oct26, mcp-workspace:delete-fence-ws-from-input).
+        const fenceWs = workspaceOfKey(base)?.ws ?? ws;
         const fenced = await fencedSpaceRefusal({ storage, config }, { principal: session.principal, roles: session.roles, scopes: session.scopes },
-            orgId, ws, whole ? { keys: [base, `${base}.latest`] } : { key: `${base}.latest` });
+            orgId, fenceWs, whole ? { keys: [base, `${base}.latest`] } : { key: `${base}.latest` });
         return fenced ? toolError(fenced.code, fenced.message) : null;
     };
 

@@ -36,6 +36,9 @@
  * @version-history
  *   2026-10-27 — secaudit2026oct26: only an extension installed before the rule's first try on this
  *     node is kept, also when the step runs at a later start (keptBefore, madeBefore).
+ *   v1.1.0 — 2026-10-27 — keepsPrePublishGate keeps only an extension installed before the step: a
+ *     new install under a kept name, with the same scripts, is not kept (secaudit2026oct26,
+ *     keep-matched-by-reusable-identifier).
  *   v1.0.0 — 2026-10-22 — Initial (secaudit 2026-10, v68 and v69; purpose rule 6).
  */
 import { createHash } from 'node:crypto';
@@ -64,13 +67,23 @@ export function scriptsDigest(actions: ReadonlyArray<{ id: string; scriptContent
     return h.digest('hex');
 }
 
-/** True when this extension was installed by an agent or an app before the step, with the same code now. */
+/**
+ * True when this extension was installed by an agent or an app before the step, with the same code
+ * now. A new install under the same name after an uninstall is a new extension, whoever installed
+ * it: its `installedAt` is later than the step, while a redeploy keeps `installedAt` (as
+ * services/extension-consent.ts reads it), so it is not kept (secaudit2026oct26,
+ * keep-matched-by-reusable-identifier).
+ */
 export async function keepsPrePublishGate(
-    storage: Storage, nodeId: string, ext: Pick<ExtensionRecord, 'name' | 'actions'>,
+    storage: Storage, nodeId: string, ext: Pick<ExtensionRecord, 'name' | 'actions'> & { installedAt?: string },
 ): Promise<boolean> {
-    const kept = (await readKeep(storage, nodeId))?.kept;
+    const keep = await readKeep(storage, nodeId);
+    const kept = keep?.kept;
     const digest = kept && Object.hasOwn(kept, ext.name) ? kept[ext.name] : undefined;
-    return typeof digest === 'string' && digest === scriptsDigest(ext.actions ?? []);
+    if (typeof digest !== 'string' || digest !== scriptsDigest(ext.actions ?? [])) return false;
+    const installed = ext.installedAt ? Date.parse(ext.installedAt) : NaN;
+    const at = Date.parse(keep!.at as string);
+    return Number.isNaN(installed) || Number.isNaN(at) || installed < at;
 }
 
 /** True when this workflow definition was last saved before the step ran. */
