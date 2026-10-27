@@ -31,6 +31,7 @@
  *   nextPdfToSign · deleteRequest · readRequestRecord
  * @usage const rec = await createRequest(ctx, caller, { title, document, parties });
  * @version-history
+ *   2026-10-27 — A request made before the caller's account existed is not the caller's: getRequest answers 404 and listRequests leaves it out, so the next holder of an erased account name (or an agent of the same name under it) neither reads nor signs what named the earlier holder (secaudit2026oct26, party-identity-bound-by-reusable-account-name).
  *   2026-10-25 -- A wallet signature's statement carries the certificate's subject and issuer, and the checks and the public lookup show them (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- A wallet signature's caveats (WalletEvidence.caveats) are sealed into its statement, and the checks and the public lookup carry them (secaudit2026oct22, lead 3895).
  *   2026-10-25 -- verifyRecordSignatures and SignatureCheck moved unchanged to verify-signatures.ts (max-file-lines); exported from here as before.
@@ -58,6 +59,8 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { CallerContext } from '../caller-context.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
+import { madeAfter, recordIssuedAt } from '../../auth/credential-age.js';
+import { localAccountOf } from '../../utils/gaii.js';
 import { verify as verifyEd25519 } from '../../auth/keypair.js';
 import { beginSigning, finishSigning } from '../passkeys.js';
 import { notify } from '../notify.js';
@@ -233,6 +236,22 @@ function canRead(rec: DocSignRecord, caller: CallerContext): boolean {
     || ids.includes(caller.ownerGhii) || (caller.inPerson && ids.some((p) => ownsAgent(caller.ownerGhii, p)));
 }
 
+/**
+ * When the account the caller acts for was made, or null when it is not an account of this node.
+ * A request made before that time named an earlier holder of the account name: a name is released
+ * at erasure, and the parties are stored by name (secaudit2026oct26,
+ * party-identity-bound-by-reusable-account-name; the madeAfter rule of auth/credential-age.ts).
+ */
+async function accountMadeAt(storage: Storage, caller: CallerContext): Promise<string | null> {
+  const name = localAccountOf(caller.ownerGhii);
+  return name ? (await storage.getOwner(name))?.createdAt ?? null : null;
+}
+
+/** True when the request was made before the caller's account existed, so it is not theirs. */
+function predatesAccount(rec: DocSignRecord, accountCreatedAt: string | null): boolean {
+  return madeAfter(accountCreatedAt, recordIssuedAt(rec.createdAt));
+}
+
 // The shared anonymous principal is asked by identity: the token POST /v1/auth/anonymous mints
 // carries no anonymous claim, so its kind is 'agent' and the kind check alone does not see it.
 function refuseVisitor(caller: CallerContext): void {
@@ -323,7 +342,9 @@ async function load(ctx: DocsignCtx, id: string): Promise<DocSignRecord> {
 export async function getRequest(ctx: DocsignCtx, caller: CallerContext, id: string): Promise<DocSignRecord> {
   const rec = await load(ctx, id);
   // Answered as absent, so an id is not a way to learn that a request exists.
-  if (!canRead(rec, caller)) throw new DocsignError('NOT_FOUND', 404, 'No such signing request.');
+  if (!canRead(rec, caller) || predatesAccount(rec, await accountMadeAt(ctx.storage, caller))) {
+    throw new DocsignError('NOT_FOUND', 404, 'No such signing request.');
+  }
   return rec;
 }
 
@@ -334,9 +355,10 @@ export async function listRequests(
   const ids = new Set<string>();
   for (const k of keys) for (const id of (await readJson<{ ids: string[] }>(ctx.storage, k))?.ids ?? []) ids.add(id);
   const out: DocSignRecord[] = [];
+  const accountCreatedAt = await accountMadeAt(ctx.storage, caller);
   for (const id of ids) {
     const rec = await readJson<DocSignRecord>(ctx.storage, reqKey(id));
-    if (!rec || !canRead(rec, caller)) continue;
+    if (!rec || !canRead(rec, caller) || predatesAccount(rec, accountCreatedAt)) continue;
     if (opts.state === 'waiting-for-me') {
       if (rec.state !== 'open' || rec.signatures[caller.principal] || !rec.parties.some((p) => p.identity === caller.principal)) continue;
     } else if (opts.state && rec.state !== opts.state) continue;
