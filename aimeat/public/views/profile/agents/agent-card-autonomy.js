@@ -17,6 +17,9 @@
  *   AutonomyLine({ agent, showToast }) · StoppedLine({ agent, showToast }) · WildcardLine({ agent, showToast })
  * @usage <${FactsLine} agent=${agent} /> <${PurchaseLimitLine} agent=${agent} showToast=${showToast} />
  * @version-history
+ *   v1.8.1 — 2026-10-28 — WildcardLine says the agent keeps all permissions until the owner narrows
+ *     it, what the narrowing takes away, and that only the owner narrows (the texts are in the
+ *     locales, the code is unchanged).
  *   v1.8.0 — 2026-10-23 — FloorLine under AutonomyLine: the person lets an agent start work although it
  *     can spend, send or delete in their name, and takes that back (task_start_floor_accepted).
  *   v1.7.0 — 2026-10-18 — WildcardLine says the node narrows a ready `*` agent at its next task; its
@@ -213,7 +216,7 @@ export function AutonomyLine({ agent, showToast }) {
  * that they let this agent start work with anyway (PATCH /v1/agents/:name/task-start-floor, the owner
  * in person only, which this page is). Shown while such a permission holds the agent's work, with
  * the press that lets it start, and while one is accepted, with the press that takes that back.
- * `*` is never offered: the node narrows an agent holding it first (WildcardLine).
+ * `*` is never offered: it holds no task (WildcardLine offers its narrowing).
  */
 function FloorLine({ agent, heldBy, accepted, onSaved, showToast }) {
   const [open, setOpen] = useState(false);
@@ -301,9 +304,8 @@ export function StoppedLine({ agent, showToast }) {
 
 /**
  * "All permissions" (`*`), for an agent that holds it (`task_start_wildcard` on the agent list,
- * services/scope-use.ts). While the node is still noting what it uses, the line says how many days
- * are left; once the record is ready the node narrows the agent at its next task and tells the owner
- * (services/scope-auto-narrow.ts), and the line offers the same narrowing now with one press
+ * services/scope-use.ts). The agent keeps `*` until the owner narrows it; the node never does. The
+ * line says what it used and what the narrowing takes away, and offers it with one press
  * (POST /v1/agents/:name/scope-narrowing).
  */
 export function WildcardLine({ agent, showToast }) {

@@ -20,6 +20,8 @@
  * @usage
  *   patchable.tool = wrapToolHandler(gatedTool, () => agentGaii);
  * @version-history
+ *   2026-10-28 — A refusal's `Held: [...]` list is not read as words the agent lacks: a refused
+ *     provenance declaration asked the owner for every word the agent held.
  *   2026-10-16 — A SCOPE_DENIED result is read from its code in either shape a tool answers with:
  *     `SCOPE_DENIED: …` text and a JSON object whose `error` is SCOPE_DENIED (QA audit E5-04).
  *   v1.2.1 — 2026-10-05 — Notes every word a tool needs (requiredScopesForTool; secaudit 2026-10, C3).
@@ -78,13 +80,16 @@ export function resultErrorCode(text: string): string | undefined {
  * The permission words a SCOPE_DENIED tool result names, or none. A tool refuses in the
  * `SCOPE_DENIED: …` shape of mcp/tool-error.ts or as a JSON object whose `error` is SCOPE_DENIED
  * (aimeat_memory_write), and names the word in its sentence, quoted or not; a result that names none
- * is not noted, because a refusal the owner cannot act on helps nobody.
+ * is not noted, because a refusal the owner cannot act on helps nobody. A `Held: [...]` list is what
+ * the caller has, not what it lacks, and is left out (services/ai-provenance.ts ProvenanceScopeError);
+ * services/agent-refusals.ts also drops any word the agent's record holds.
  */
-function scopeDeniedWords(value: unknown): string[] {
+export function scopeDeniedWords(value: unknown): string[] {
   const content = (value as { content?: Array<{ type?: string; text?: unknown }> }).content;
   const text = Array.isArray(content) && typeof content[0]?.text === 'string' ? content[0].text : '';
   if (resultErrorCode(text) !== 'SCOPE_DENIED') return [];
-  return [...new Set([...text.matchAll(/\b([a-z]+:[a-z*][a-z0-9*-]*)\b/g)].map((m) => m[1]))];
+  const asked = text.replace(/\bHeld:\s*\[[^\]]*\]/g, '');
+  return [...new Set([...asked.matchAll(/\b([a-z]+:[a-z*][a-z0-9*-]*)\b/g)].map((m) => m[1]))];
 }
 
 /**

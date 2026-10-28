@@ -5,6 +5,7 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-28 — aimeat_agent_scope_narrow: the node never narrows by itself; call it only on the person's word.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — aimeat_agent_scope_narrow says the node narrows a ready `*` agent by itself at its next task.
  *   2026-10-17 — aimeat_memory_write takes visibility "organism:<organism id>" (plan doc-mvcn6c7e4e5q, V3.2).
@@ -329,7 +330,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_agent_scope_narrow',
-        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal). Once two weeks of its use are on record, the node makes this same narrowing by itself at the agent's next task and tells the owner, so call this only when the person wants it done now. Refused when nothing it used is on record yet. Needs agent:permissions.",
+        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it only when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal) and told them what it takes away: everything the agent has not used so far. The node never makes this narrowing by itself; the agent keeps all permissions until the person decides. Refused when nothing it used is on record yet. Needs agent:permissions.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Narrow an Agent to What It Used', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },

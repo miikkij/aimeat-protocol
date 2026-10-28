@@ -44,6 +44,9 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.4.1 — 2026-10-28 — An agent admitted to declare is noted as having used provenance:write
+ *     (services/scope-use.ts): the record had not seen this inline check, and a narrowing built on it
+ *     took the word from an agent that used it.
  *   v1.4.0 — 2026-10-08 — The record states its medium (mediaKind, mediaType, resemblesReal):
  *     mintProvenance stores what it is given, and the three write helpers state `text` for a string
  *     when nobody said otherwise; a declaration's own medium wins. buildDisclosure's words come from
@@ -89,6 +92,7 @@ import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from '
 import { disclosureWording } from './ai-disclosure-served.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
+import { noteScopeUse } from './scope-use.js';
 import { createT, LOCALES } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 
@@ -481,7 +485,11 @@ async function mayDeclareProvenance(
   // words: a session narrower than its grant does not gain the word from the record (secaudit
   // 2026-10, C3). scopeIsCovered is the rule requireScope applies.
   const held = sessionScopes ? [...sessionScopes] : scopes;
-  if (scopeIsCovered(scopes, PROVENANCE_WRITE_SCOPE) && scopeIsCovered(held, PROVENANCE_WRITE_SCOPE)) return { ok: true };
+  if (scopeIsCovered(scopes, PROVENANCE_WRITE_SCOPE) && scopeIsCovered(held, PROVENANCE_WRITE_SCOPE)) {
+    // requireScope never sees this word, so the usage record of a `*` agent is told here.
+    if (!isGEAI(principal)) noteScopeUse(principal, [PROVENANCE_WRITE_SCOPE]);
+    return { ok: true };
+  }
   return { ok: false, scopes: held };
 }
 

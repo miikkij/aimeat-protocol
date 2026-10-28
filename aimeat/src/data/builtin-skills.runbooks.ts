@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-28 — manage-my-agents: an agent holding all permissions keeps them; the node never narrows
+ *     it by itself, and the AI narrows it only on the owner's word, saying what it takes away.
  *   2026-10-25 — aimeat-node-operations: aimeat_admin_config lists every node setting (section, q), and
  *     aimeat_admin_config_set changes them; a setting that applies at restart is said so.
  *   2026-10-23 — manage-my-agents: content whose classification refuses an outside model reaches only
@@ -204,12 +206,14 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
   agent answers \`waits_because: stopped\`: say that the agent is stopped and offer to start it. To
   end one task that is running, the owner cancels that task on the agent's Tasks tab. To remove an
   agent for good, that is a different act: the owner deletes it on the Agents page.
-- **All permissions (\`*\`)** counts as able to do anything, and it does not stay: two weeks after
-  the node starts noting what such an agent uses, the node narrows the agent to the permissions it
-  used at its next task, and tells the owner in the bell and by email. Its tasks then start as its
-  own setting says. \`aimeat_agents_list\` shows those permissions before it happens
-  (\`task_start_wildcard.proposal\`); when the owner wants it done now, narrow the agent with
-  \`aimeat_agent_scope_narrow\`. A permission it needs later is refused once and asked for.
+- **All permissions (\`*\`)** means the agent may do anything, and it keeps that: the owner gave it,
+  and the node never narrows it by itself. Its tasks start as its own setting says. The node notes
+  which permissions such an agent uses, and \`aimeat_agents_list\` shows them
+  (\`task_start_wildcard.used\`, and \`proposal\`, the list it would keep). Offer the narrowing only
+  when the owner asks about the agent's reach, and say what it takes away: everything it has not used
+  so far. Narrow it with \`aimeat_agent_scope_narrow\` only on the owner's word. The node does not see
+  every permission an agent uses, so a narrowed agent may later be refused one; the owner is then
+  asked, and allows it or says no.
 - **An agent that invites people.** \`invites_people: true\` on an agent's row means its permissions
   cover \`organism:invite\`: it can invite people into the shared spaces the owner belongs to, and an
   invitation can create a new account. That is allowed. When you describe the agent to the owner,
