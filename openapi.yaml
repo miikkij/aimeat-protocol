@@ -13323,7 +13323,7 @@ paths:
                                     task_start_held_by:
                                       type: array
                                       items: { type: string }
-                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them; an agent holding `*` is narrowed at its next task once its record is ready.
+                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them, because the owner gave it and it holds no task.
                                     task_start_floor_accepted:
                                       type: array
                                       items: { type: string }
@@ -13343,9 +13343,9 @@ paths:
                                     task_start_wildcard:
                                       type: object
                                       nullable: true
-                                      description: For an agent holding `*`, how far the record of what it uses is, and the narrowing the node makes at its next task once the record is ready, which the owner can also make now (POST .../scope-narrowing). Null for every other agent.
+                                      description: For an agent holding `*`, how far the record of what it uses is, and the narrowing the owner may make (POST .../scope-narrowing). The node never makes it by itself. Null for every other agent.
                                       properties:
-                                        ready: { type: boolean, description: '14 days of record naming a permission: the next task decision narrows the agent to `proposal`.' }
+                                        ready: { type: boolean, description: '14 days of record naming a permission: `proposal` covers two weeks of use. Only the owner applies it.' }
                                         days_left: { type: integer }
                                         since: { type: string, nullable: true }
                                         used: { type: array, items: { type: string } }
@@ -14615,10 +14615,11 @@ paths:
         replaces `*` with those words, plus every other word its list already names. The agent list
         shows the proposal first (`task_start_wildcard.proposal`).
 
-        Once 14 days of its use are on record, the node makes this same narrowing by itself at the
-        agent's next task decision and tells the owner in the bell and by email (notification
-        `agent_narrowed`, the Email page switch `agentNarrowed`); this route does it now. Until
-        2026-10-18 a ready `*` held every task of the agent for the owner instead.
+        Only the owner decides to narrow: the agent keeps `*` until this route is called, and `*`
+        holds none of its tasks. From 2026-10-18 to 2026-10-28 the node made this narrowing by
+        itself after 14 days of record (notification `agent_narrowed`); it no longer does. Some
+        permissions are checked where the record does not see them, so a narrowed agent may later
+        be refused one; its owner is then asked, with Allow and Don't allow.
 
         Only takes away, so it does not need the owner in person: the owner, or another of their
         agents holding `agent:permissions`. 409 NOT_WILDCARD when the agent does not hold `*`, and
@@ -46379,7 +46380,6 @@ paths:
                         workflowEnd: { type: boolean, description: The email when a workflow run ends (default true). }
                         nudge: { type: boolean, description: The reminder after two quiet weeks. Absent means undecided here, and the old settings.email_notifications switch answers. }
                         agentAsks: { type: boolean, description: "The email when one of the owner's agents asks to be allowed something it was refused, with the address that allows it, or with its page when the permission is not given with one press (default true)." }
-                        agentNarrowed: { type: boolean, description: "The email when the node narrows an agent that held all permissions (`*`) to the ones it used, with the list and its page (default true)." }
       responses:
         '200': { description: "{ settings }" }
         '401': { $ref: '#/components/responses/Unauthorized' }

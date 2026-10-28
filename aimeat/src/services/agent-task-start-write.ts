@@ -14,6 +14,8 @@
  *   const out = await setAgentTaskStart({ storage, config }, req.auth!.owner, resolve(req), name, req.body?.task_start);
  *   res.json(success(nodeId, { name: out.agent.name, ...taskStartView(out.agent) }));
  * @version-history
+ *   v1.3.1 — 2026-10-28 — task_start_wildcard describes the narrowing the owner may apply, never one
+ *     the node makes: the node no longer narrows an agent holding `*` by itself (Jouni 2026-10-28).
  *   v1.3.0 — 2026-10-23 — setAgentTaskStartFloor (owner in person only) and `task_start_floor_accepted`
  *     in the view: the floor permissions the owner let this agent start work with (Jouni 2026-10-23).
  *   v1.2.0 — 2026-10-18 — `'*'` leaves task_start_held_by: a ready `*` agent is narrowed at its next
@@ -37,12 +39,12 @@ import { ownerGhiiOf } from '../utils/gaii.js';
  *   task_start_effective what applies: the setting, or the one the agent's mode gives
  *   task_start_held_by  the permissions that make every task wait whatever the setting; empty when
  *                       none do. Read from the words the agent holds by name: `*` is never among
- *                       them, because a ready `*` agent is narrowed at its next start decision
- *                       (services/scope-auto-narrow.ts). The switch on the agent card reads this to
- *                       say why it has no effect.
+ *                       them, because the owner gave it and it does not hold tasks
+ *                       (agent-task-rules.ts floorScopesOf). The switch on the agent card reads this
+ *                       to say why it has no effect.
  *   task_start_wildcard for an agent holding `*`: how far its usage record is, what it used, and the
- *                       narrowing the node makes when the record is ready, which the owner can also
- *                       accept now with one press (services/scope-use.ts); null for every other agent.
+ *                       narrowing the owner may apply with one press (services/scope-use.ts); the
+ *                       node never applies it. Null for every other agent.
  *   task_start_floor_accepted the floor permissions the owner in person accepted for this agent and it
  *                       holds: they no longer hold its tasks (agent-task-rules.ts acceptedFloorOf).
  */

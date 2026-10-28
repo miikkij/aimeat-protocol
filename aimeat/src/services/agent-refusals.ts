@@ -50,6 +50,8 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-10-28 — A refusal keeps only the words the agent's record lacks, so neither the card nor the
+ *     owner's bell and email ask for a permission the agent already holds.
  *   2026-10-18 — A refusal note and a decline write the record on its version (record-cas.ts
  *     updateRecord): the per-agent chain orders writes within one process only, and two node
  *     processes on one database each wrote the copy they had read (atomic-write round).
@@ -239,7 +241,7 @@ function asRefusals(value: unknown, agentGaii: string): AgentRefusalsRecord {
 async function persistRefusal(
   storage: Storage,
   gaii: string,
-  entry: { needed: string[]; anyOf: boolean; call: string },
+  noted: { needed: string[]; anyOf: boolean; call: string },
   delta: { count: number; firstAt: string; lastAt: string },
 ): Promise<void> {
   const parsed = parseGAII(gaii);
@@ -249,6 +251,12 @@ async function persistRefusal(
   const agent = await storage.getAgent(gaii);
   if (!agent) return;
   const held = agent.defaultScopes ?? ['*'];
+  // Only the words the agent's record lacks are its refusal: a refusal text can also list what the
+  // caller holds, and the owner was then asked for 48 permissions the agent already had beside the
+  // one it lacked (2026-10-28). With none lacking there is nothing the owner can give.
+  const lacking = noted.anyOf ? noted.needed : noted.needed.filter((s) => !scopeIsCovered(held, s));
+  if (lacking.length === 0) return;
+  const entry = { ...noted, needed: lacking };
   // On the record's version (record-cas.ts updateRecord): the per-agent chain above orders writes in
   // one process only, so a note or a decline from another process at the same moment is merged with
   // rather than written over. What is decided below is the last, written attempt's.
@@ -405,7 +413,10 @@ async function settledEntries(gaii: string, stored: AgentRefusalEntry[]): Promis
   const out = stored.map((e) => ({ ...e }));
   for (const slot of slots.values()) {
     if (slot.gaii !== gaii || slot.pending === 0) continue;
-    const at = out.find((e) => sameEntry(e, slot.needed, slot.call));
+    // A written entry keeps only the words the agent lacked (persistRefusal), so the slot that wrote it
+    // may name more: the entry whose words are all in the slot's, on the same call, is that one.
+    const at = out.find((e) => sameEntry(e, slot.needed, slot.call))
+      ?? (slot.anyOf ? undefined : out.find((e) => !e.anyOf && e.call === slot.call && e.needed.every((s) => slot.needed.includes(s))));
     if (at) {
       at.count += slot.pending;
       if (slot.lastPendingAt > at.lastAt) at.lastAt = slot.lastPendingAt;

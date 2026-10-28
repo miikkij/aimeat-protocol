@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-28 -- POST /v1/agents/:name/scope-narrowing is the owner's decision alone: the node no longer narrows by itself.
  *   2026-10-25 -- POST /v1/agents/:gaii/rekey moved to ./rekey.ts (max-file-lines), registered at the same place.
  *   2026-10-20 -- DELETE /v1/agents/:name and POST /v1/agents/:gaii/rekey close the agent's open MCP
  *     transports too (mcp/session-registry.ts), as they already close its connect tunnel, and the
@@ -383,8 +384,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
   /**
    * POST /v1/agents/:name/scope-narrowing — replace the agent's `*` with the named permissions it
    * actually used, as its usage record has them (services/scope-use.ts). One press for the owner; the
-   * agent list says what the proposal is (`task_start_wildcard.proposal`). Ruling C, 2026-10-02: `*`
-   * holds an agent's tasks once its record is ready, and this is the way out the owner is offered.
+   * agent list says what the proposal is (`task_start_wildcard.proposal`). Only the owner decides to
+   * narrow: the node never does it by itself (Jouni, 2026-10-28), and `*` holds no task.
    *
    * It only ever takes away, so it does not need the owner in person: the owner, or another of their
    * agents holding `agent:permissions`, the word for changing a sibling's permissions (outside every

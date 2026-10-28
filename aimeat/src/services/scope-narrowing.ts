@@ -3,20 +3,21 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The narrowing of an agent holding `*` to the permissions it used (ruling C, Jouni
- *   2026-10-02): one implementation behind POST /v1/agents/:name/scope-narrowing,
- *   aimeat_agent_scope_narrow and the node's own narrowing at the end of the observation period
- *   (services/scope-auto-narrow.ts, Jouni 2026-10-18). The record it reads is services/scope-use.ts;
+ *   2026-10-02): one implementation behind POST /v1/agents/:name/scope-narrowing and
+ *   aimeat_agent_scope_narrow, which the owner or their AI calls. The node never calls it by itself
+ *   (Jouni 2026-10-28; from 2026-10-18 to then it did). The record it reads is services/scope-use.ts;
  *   it lives apart from the recorder because the recorder is imported by the auth middleware, and the
  *   announcements here reach the connector, which reaches the middleware back (an import cycle).
  *
- *   ONE NARROWING AT A TIME PER AGENT. Two task decisions for the same agent can arrive together (a
- *   schedule fires while the owner gives a task), and the owner can press the button while the node
- *   narrows. Each call waits for the one before it and then reads the agent as it is now, so the
+ *   ONE NARROWING AT A TIME PER AGENT. The owner's press and their AI's call can arrive together.
+ *   Each call waits for the one before it and then reads the agent as it is now, so the
  *   second finds no `*` and answers NOT_WILDCARD instead of writing the list again. The queue is per
  *   process, which is how a node runs.
  * @structure NarrowOutcome · narrowAgent()
  * @usage const out = await narrowAgent(storage, `${owner}@${nodeId}`, agent);
  * @version-history
+ *   v1.1.1 — 2026-10-28 — Only the owner's press or their AI's call narrows: the node's own narrowing
+ *     (services/scope-auto-narrow.ts) is removed.
  *   v1.1.0 — 2026-10-18 — One narrowing at a time per agent, on the agent as it is when its turn
  *     comes: the node narrows by itself now, and a second caller must see the first one's result.
  *   v1.0.0 — 2026-10-02 — Extracted from services/scope-use.ts before its first commit.
