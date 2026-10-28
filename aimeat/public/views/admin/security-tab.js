@@ -14,6 +14,8 @@
  *   security-tab.refusals.js, security-tab.sections.js and security-tab.classification.js · the
  *   actions (resolve, delete, payload)
  * @version-history
+ *   2026-10-28 -- The incidents section gets the app host, so an address of the subdomain incident names
+ *     both of its full addresses.
  *   2026-10-28 -- The confirmation of "App only" is not a warning: it removes nothing (Jouni, 2026-10-28).
  *   2026-10-26 -- decideEntry asks with the entry kind's own confirmation (entries.confirm.<kind>) when it
  *     has one, so a capability's 'clear' says it makes the capability private (secaudit2026oct22).
@@ -239,7 +241,7 @@ export default function SecurityTab(props) {
     <${Strip} ov=${ov} switchPage=${switchPage} />
     <${RefusalsSection} ov=${ov} switchPage=${switchPage} onError=${showErr} />
     ${held.length ? html`<${HeldSection} items=${held} number=${n()} onResolve=${resolve} onDelete=${remove} onDecide=${decide} switchPage=${switchPage} />` : null}
-    <${IncidentsSection} items=${refused} number=${n()} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecideCap=${decideCap} onDecideEntry=${decideEntry} />
+    <${IncidentsSection} items=${refused} number=${n()} appHost=${ov.apps?.app_origin?.enabled ? ov.apps.app_origin.host : null} onResolve=${resolve} onDelete=${remove} onPayload=${downloadQuarantine} onDecideCap=${decideCap} onDecideEntry=${decideEntry} />
     <${Columns}>
       <${AccountsSection} ov=${ov} number=${n()} switchPage=${switchPage} />
       <${SettingsSection} ov=${ov} number=${n()} switchPage=${switchPage} />

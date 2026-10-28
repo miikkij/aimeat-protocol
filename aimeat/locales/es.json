@@ -412,7 +412,14 @@
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
             "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas.",
-            "subdomain_site_origin": "Cada dirección de abajo muestra una aplicación que publicó otra persona. El servidor no sabe si tú le diste la dirección a la aplicación o si la aplicación la recibió automáticamente al publicarse. En una dirección de tu dominio, la aplicación funciona en el mismo sitio que el inicio de sesión de tu servidor. Una aplicación que publicó otra persona debe estar solo en su dirección de aplicación. Las direcciones funcionan como antes hasta que elijas."
+            "subdomain_site_origin": "Una aplicación que publicó otra persona también se abre en una dirección de tu dominio. Elige para cada dirección dónde se abre la aplicación de ahora en adelante. Hasta que elijas, todo funciona como antes."
+          },
+          "subdomain": {
+            "appOnly": "Solo la dirección propia de la aplicación (recomendado)",
+            "appOnlyWhy": "La aplicación se abre solo en {app}. Quien abra {own} llega allí, así que los enlaces a esa dirección siguen funcionando.",
+            "both": "Ambas direcciones, como ahora",
+            "bothWhy": "La aplicación se sigue abriendo en {own} y en {app}. En {own}, el código que escribió otra persona puede interferir con el inicio de sesión de tu servidor, por ejemplo, iniciar la sesión de un visitante en otra cuenta.",
+            "choose": "Elegir"
           },
           "action": {
             "subdomain": "Solo aplicación"
@@ -23726,9 +23733,9 @@
       "subdomain_site_origin": {
         "title": "Aplicaciones de otras personas en direcciones de tu dominio",
         "short": "Aplicaciones que publicaron otras personas también funcionan en direcciones de tu dominio.",
-        "what": "Cada aplicación publicada tiene su propia dirección, por ejemplo notas.apps.tu-dominio. Las versiones anteriores del servidor también mostraban algunas aplicaciones en notas.tu-dominio. Esa dirección está en el mismo sitio que el inicio de sesión de tu servidor, así que una aplicación que publicó otra persona no debe estar ahí. El servidor no sabe quién dio estas direcciones, así que funcionan como antes hasta que elijas.",
+        "what": "Cada aplicación publicada tiene su propia dirección, por ejemplo notas.apps.tu-dominio. Las versiones anteriores del servidor también abrían algunas aplicaciones en notas.tu-dominio, dentro de tu propio dominio. Ahí, el código que escribió otra persona puede interferir con el inicio de sesión de tu servidor, por ejemplo, iniciar la sesión de un visitante en otra cuenta. El servidor no sabe si tú le diste esa dirección a la aplicación, así que te lo pregunta. Hasta que elijas, todo funciona como antes.",
         "tipLabel": "Qué puedes hacer",
-        "tip": "Elige «Solo aplicación», salvo que tú le hayas dado la dirección a la aplicación. La aplicación sigue funcionando en su dirección de aplicación, y quien abra la dirección anterior irá allí. «Mi propio sitio» mantiene la dirección también en tu dominio."
+        "tip": "Elige «Solo la dirección propia de la aplicación», salvo que tú le hayas dado la dirección a la aplicación. Los enlaces a la dirección anterior siguen funcionando, porque el servidor lleva al visitante a la dirección propia de la aplicación."
       }
     },
     "ecosystem": {
