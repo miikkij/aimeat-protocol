@@ -9,6 +9,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=intake
  * @version-history
+ *   v1.2.1 — 2026-10-28 — Setup no longer matched production: the NUL case expected the route to strip
+ *     it, and the input-junk middleware (7da750c31) now refuses it with 400 nul_byte first. The NUL
+ *     case asserts that refusal; a BEL case keeps the stripping proof.
  *   v1.2.0 — 2026-09-13 — Setup no longer matched production: the no-schema-lock control defined a form
  *     into crm.unlocked, a space the workspace never declared, which UNDECLARED_SPACE now refuses. The
  *     manifest declares it, still without a schema.
@@ -203,13 +206,24 @@ async function main() {
 
     // A NUL byte cannot be stored in a Postgres value, so before stripControls() it reached the
     // write and answered an ANONYMOUS caller with 500. Found against the live public form: a
-    // public endpoint must never answer 'unexpected error' to input anyone can send.
-    await test('a control character is stripped, not a 500', async () => {
+    // public endpoint must never answer 'unexpected error' to input anyone can send. Since
+    // 7da750c31 the input-junk middleware refuses a NUL on every route with a field error, and
+    // the route still strips the other C0 controls.
+    await test('a NUL is refused with a field error, not a 500', async () => {
         const r = await json(`/v1/intake/${orgId}/${ws}/${formId}`, {
             method: 'POST',
-            body: JSON.stringify({ nimi: 'NUL\u0000byte', email: 'keeps\ttab@ex.fi' }),
+            body: JSON.stringify({ nimi: 'NUL\u0000byte', email: 'a@ex.fi' }),
         });
-        assert(r.status === 200, `expected 200, got ${r.status}`);
+        const details = (r.body.error as { details?: Array<{ path: string; code: string }> } | undefined)?.details ?? [];
+        assert(r.status === 400 && details.some(d => d.path === 'nimi' && d.code === 'nul_byte'), `expected 400 nul_byte on nimi, got ${r.status} ${JSON.stringify(r.body.error)}`);
+    });
+
+    await test('another control character is stripped, not a 500', async () => {
+        const r = await json(`/v1/intake/${orgId}/${ws}/${formId}`, {
+            method: 'POST',
+            body: JSON.stringify({ nimi: 'BEL\u0007byte', email: 'keeps\ttab@ex.fi' }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body.error)}`);
         const id = (r.body.data as { id?: string }).id;
         assert(!!id, 'the record is still written');
     });
