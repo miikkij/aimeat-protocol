@@ -23,6 +23,10 @@
  *   inspection.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-report
  * @version-history
+ *   v1.1.0 — 2026-10-28 — An app that uses AI on employment data: a report gap with its Annex III
+ *     area, a draft entry whose area is marked proposed, regulated data in its records draft, its
+ *     own owner's slice and nobody else's, and a use case naming it closes the gap. Seen red on the
+ *     code before the change: the app was in no gap and no draft entry.
  *   v1.0.0 — 2026-08-23 — BR-02, ring 1 (node-wide).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -583,6 +587,112 @@ await test('An owner who does not run the node cannot keep one (403)', async () 
 await test('Unauthenticated cannot keep one (401)', async () => {
     const r = await json('/v1/admin/compliance/snapshot', { method: 'POST' });
     assert(r.status === 401, `expected 401, got ${r.status}`);
+});
+
+// ─── An app that uses AI on employment data (innokas.aimeat.io, 2026-10-28) ───
+// TalentGrid kept colleagues' competence ratings, proposed who works on what with a model, and said
+// so in its data map. The report named three model ids and no app, and the draft did not list it.
+
+/** A one-person app whose map keeps people's skills and uses AI, as TalentGrid's does. */
+const TALENT_MAP = {
+    spec: 'aimeat.datamap/2',
+    what: 'A competence and resourcing tool: a register of people with their skills rated 1-5.',
+    usedFor: "Answering 'who could we put on this' and writing the CV for the client.",
+    form: 'one-person', arrangement: 'Private records of the person keeping it.',
+    machinery: ['ai-generation'], leaves: [], elsewhere: [],
+    held: [{
+        what: 'talent.people', holds: "each person's name, availability and allocation, their skill entries",
+        kind: 'register', usedFor: 'search-and-filter', where: 'owner-memory-private', owner: 'person',
+        readers: 'owner-only', writers: ['person-in-the-ui'], shape: 'collection-under-one-key',
+        keptFor: 'until-deleted', lossRisk: 'only-copy', personalData: 'yes',
+        why: 'assessed competence about named colleagues stays with the person keeping it',
+    }],
+};
+
+async function publishApp(o: Owner, filename: string, map: unknown): Promise<string> {
+    const html = '<!doctype html><html><head><meta charset="utf-8"><title>Talent</title></head><body>t</body></html>';
+    const p = await json('/v1/apps', {
+        method: 'POST', headers: auth(o.token),
+        body: JSON.stringify({ filename, content: Buffer.from(html).toString('base64'), mime_type: 'text/html', name: 'Talent', description: 'E2E' }),
+    });
+    assert(p.status === 201, `publish ${filename}: ${p.status} ${JSON.stringify(p.body?.error)}`);
+    const m = await json(`/v1/datamap/apps/${o.name}/${filename}`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify(map) });
+    assert(m.status === 200, `data map ${filename}: ${m.status} ${JSON.stringify(m.body?.error)}`);
+    return `${o.name}/${filename}`;
+}
+
+let talentRef = '';
+let quietRef = '';
+
+await test('An app that uses AI on employment data is a gap, named with its Annex III area', async () => {
+    talentRef = await publishApp(plain, `talent${Date.now()}.html`, TALENT_MAP);
+    const r = await json(`${REPORT}?since_days=30`, { headers: auth(op.token) });
+    assert(r.status === 200, `report ${r.status}`);
+    const gap = (r.body.data.gaps as any[]).find(g => g.kind === 'app-uses-ai-not-in-register' && g.evidence?.app === talentRef);
+    assert(!!gap, `the app is a gap: ${JSON.stringify((r.body.data.gaps as any[]).map(g => g.kind))}`);
+    assert(gap.evidence.annex3 === 'employment', `its area is employment: ${JSON.stringify(gap.evidence)}`);
+    assert(gap.evidence.annex3_basis?.rows?.includes('talent.people'), 'the basis names the key family');
+    assert(gap.evidence.uses_ai.some((s: string) => s.includes('ai-generation')), 'and what says it uses AI');
+});
+
+await test('An app whose map says its personal data is none of the regulated kinds is a gap with no area', async () => {
+    quietRef = await publishApp(plain, `quiet${Date.now()}.html`, {
+        ...TALENT_MAP, held: [{ ...TALENT_MAP.held[0], what: 'quiet.people', domains: [] }],
+    });
+    const r = await json(REPORT, { headers: auth(op.token) });
+    const gap = (r.body.data.gaps as any[]).find(g => g.evidence?.app === quietRef);
+    assert(!!gap && gap.evidence.annex3 === null, `a considered "none" proposes no area: ${JSON.stringify(gap?.evidence)}`);
+});
+
+await test('The draft gives the app an entry, its area proposed and marked so, with the reason as data', async () => {
+    const r = await json(DRAFT, { headers: auth(op.token) });
+    assert(r.status === 200, `draft ${r.status}`);
+    const uc = (r.body.data.usecases as any[]).find(u => (u.apps ?? []).includes(talentRef));
+    assert(!!uc, 'the app has an entry');
+    assert(uc.description === TALENT_MAP.what, 'described by its data map');
+    assert(uc.answers['q-annex3-area'] === 'employment' && uc.answerSources['q-annex3-area'] === 'proposed',
+        `proposed, not evidence and not an answer: ${JSON.stringify(uc.answerSources)}`);
+    const p = (r.body.data.proposals as any[]).find(x => x.usecase_id === uc.id);
+    assert(p?.basis?.domain === 'employment' && p.basis.source === 'proposed', `the proposal carries its basis: ${JSON.stringify(p)}`);
+});
+
+await test('The records-of-processing draft carries the regulated data the map points to, marked proposed', async () => {
+    const filename = talentRef.split('/')[1];
+    const q = `scope=app&app=${encodeURIComponent(filename)}&app_owner=${plain.name}`;
+    const r = await json(`/v1/compliance/draft?${q}`, { headers: auth(op.token) });
+    assert(r.status === 200, `records draft ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const item = r.body.data.items?.[0];
+    assert(JSON.stringify(item?.domains) === '["employment"]', `domains: ${JSON.stringify(item?.domains)}`);
+    assert(item.answerSources?.domains === 'proposed', `marked proposed: ${JSON.stringify(item.answerSources)}`);
+    // And the app's own gaps say the map has not stated it, with what its words point to.
+    const g = await json(`/v1/compliance/gaps?${q}`, { headers: auth(op.token) });
+    assert(g.status === 200, `app gaps ${g.status}`);
+    const unstated = (g.body.data.gaps as any[]).find(x => x.kind === 'app-personal-data-domain-unstated');
+    assert(unstated?.evidence?.proposed?.includes('employment'), `the gap names the proposal: ${JSON.stringify(g.body.data.gaps)}`);
+});
+
+await test('An owner reads only their own apps in their slice: another owner\'s app is not in it', async () => {
+    const mine = await json(MINE, { headers: auth(op.token) });
+    assert(mine.status === 200, `slice ${mine.status}`);
+    assert(!(mine.body.data.gaps as any[]).some(g => g.evidence?.app === talentRef), "another owner's app must not appear in the operator's own slice");
+    const theirs = await json(MINE, { headers: auth(plain.token) });
+    assert((theirs.body.data.gaps as any[]).some(g => g.evidence?.app === talentRef), 'the app owner sees their own app in their slice');
+});
+
+await test('A use case that names the app closes the gap', async () => {
+    const before = await json(USECASES, { headers: auth(op.token) });
+    const kept = (before.body.data.usecases as any[]) ?? [];
+    const w = await json(USECASES, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ usecases: [...kept, { id: 'uc-e2e-talent', title: 'Staffing', apps: [talentRef, quietRef] }] }),
+    });
+    assert(w.status === 200, `register write ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const r = await json(REPORT, { headers: auth(op.token) });
+    assert(!(r.body.data.gaps as any[]).some(g => g.kind === 'app-uses-ai-not-in-register' && [talentRef, quietRef].includes(g.evidence?.app)),
+        'a registered app is no longer a gap');
+    const d = await json(DRAFT, { headers: auth(op.token) });
+    assert(!(d.body.data.usecases as any[]).some(u => (u.apps ?? []).includes(talentRef)), 'and the draft does not propose it again');
+    await json(USECASES, { method: 'PUT', headers: auth(op.token), body: JSON.stringify({ usecases: kept }) });
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

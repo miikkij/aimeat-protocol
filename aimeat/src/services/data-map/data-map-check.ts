@@ -15,6 +15,10 @@
  * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.5.0 — 2026-10-28 — DATAMAP_ROW_BAD_DOMAIN (a row names a data domain the node does not know)
+ *     and DATAMAP_PERSONAL_NO_DOMAIN (a personal row says no domain at all), last in the order and
+ *     never a refusal. TalentGrid on innokas.aimeat.io kept colleagues' competence ratings and sent
+ *     them to a model, and nothing on the node could tell that this was employment data.
  *   v1.4.0 — 2026-10-18 — DATAMAP_INVITES_UNSTATED: an app whose declared scopes cover
  *     organism:invite and whose map has neither the machinery word `invites-people` nor an `invites`
  *     statement is a finding, after DATAMAP_NO_ROWS, also beside DATAMAP_MISSING. checkMap and
@@ -35,6 +39,7 @@ import {
   type DataMap, type DataMapRow, type DataMapStamp, type DataMapGap, type DataLocation,
 } from './data-map-types.js';
 import { isValidAgentName } from '../../utils/gaii.js';
+import { complianceDomainById } from '../../data/compliance-domains.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
 
 /** Findings, worst first. The order is the order a reader should care. */
@@ -49,7 +54,19 @@ export const FINDING_CODES = [
   'DATAMAP_INVITES_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
+  'DATAMAP_ROW_BAD_DOMAIN',
+  'DATAMAP_PERSONAL_NO_DOMAIN',
 ] as const;
+
+/** A row's `domains` entries this node does not know, or the whole field when it is not a list. */
+const badDomains = (r: DataMapRow): string[] => {
+  if (r.domains === undefined) return [];
+  if (!Array.isArray(r.domains)) return [String(r.domains)];
+  return r.domains.filter(d => typeof d !== 'string' || !complianceDomainById(d)).map(String);
+};
+
+/** A row that holds personal data and has not said which regulated domain it falls in. */
+const personalWithoutDomain = (r: DataMapRow): boolean => r.personalData === 'yes' && r.domains === undefined;
 
 /**
  * The shape of a classification label id. The same pattern services/classification/levels.ts holds
@@ -254,6 +271,25 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
       message: `${badName.length} of ${map.held.length} rows name an agent with something that cannot `
         + 'be an agent\'s name: use the local name of one of your own agents, such as "morning-news", '
         + `or leave the field out. Rows: ${badName.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const unknownDomain = map.held.filter(r => badDomains(r).length > 0);
+  if (unknownDomain.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_DOMAIN',
+      message: `${unknownDomain.length} of ${map.held.length} rows name a data domain this node does not know: `
+        + `${[...new Set(unknownDomain.flatMap(badDomains))].join(', ')}. Use the ids GET /v1/compliance/catalog lists, `
+        + `such as "employment" or "health", or [] for none of them. Rows: ${unknownDomain.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const noDomain = map.held.filter(personalWithoutDomain);
+  if (noDomain.length > 0) {
+    findings.push({
+      code: 'DATAMAP_PERSONAL_NO_DOMAIN',
+      message: `${noDomain.length} of ${map.held.length} rows hold personal data and do not say which regulated data `
+        + 'domain it falls in. Add `domains` to each: "employment" for CVs, competence, staffing and HR, "health" for '
+        + 'patient data, "children" for minors, or [] when none applies. The domain decides the classification floor, '
+        + `whether an impact assessment is owed and the AI Act risk area. Rows: ${noDomain.map(r => r.what).join(', ')}.`,
     });
   }
 

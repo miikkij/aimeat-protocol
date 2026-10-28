@@ -7,6 +7,8 @@
  *   stamp, the readings beside it. Drawn by components/Readings.js.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.0.1 — 2026-10-28 — A select in the mark cell is capped (18rem, 11rem on a phone), so a long
+ *     option no longer takes the name column's width (the compliance register's Annex III question).
  *   v1.0.0 — 2026-09-27 — Moved out of views/admin.css (.adm-mrow, .adm-mrow--two, .adm-why,
  *     .adm-mval, .adm-ov-grid, .adm-ov-status, .adm-ov-up, .adm-alert-line) under the component's own
  *     names, with the page sheets' variants as the component's own: no rule under the last row
@@ -30,6 +32,11 @@
 .reading-why { display: block; font-size: .78rem; font-weight: 400; line-height: 1.45; color: var(--text-dim); margin-top: 2px; }
 .reading-value { font-family: var(--font-mono); font-size: .78rem; color: var(--text-dim); text-align: right; overflow-wrap: anywhere; }
 .reading-end { display: flex; align-items: center; justify-content: flex-end; gap: 14px; }
+/* A select in the mark cell sizes to its longest option, and the name column gives up its width to
+   it: a compliance question whose answer reads "Hiring, task allocation, promotion, or ending
+   employment" left the question 65 px wide at 1036 px and 0 px on a phone. The cap keeps the name
+   readable; the select shows the chosen answer cut, and opens the whole list. */
+.reading-mark .select-field { max-width: 18rem; }
 
 /* ── The verdict ────────────────────────────────────────────────────────────────────────────── */
 .verdict { display: grid; grid-template-columns: 280px minmax(0, 1fr); gap: 0 44px; align-items: start; }
@@ -61,4 +68,5 @@
   .reading:not(.reading--two) > :nth-child(2) { grid-column: 2; grid-row: 1; justify-self: end; }
   .reading:not(.reading--two) > :nth-child(3) { grid-column: 2; grid-row: 2; max-width: 11rem; white-space: normal; }
   .reading--two > .reading-end { grid-column: 1 / -1; justify-content: flex-start; margin-top: 4px; }
+  .reading-mark .select-field { max-width: 11rem; }
 }

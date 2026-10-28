@@ -2505,6 +2505,8 @@
         "modelsEmpty": "el registro está vacío, así que los {n} modelos usados aquí cuentan como no documentados",
         "apps": "{n} aplicaciones dicen que generan contenido y la revisión de publicación no encontró ninguna declaración",
         "appsOne": "una aplicación dice que genera contenido y la revisión de publicación no encontró ninguna declaración",
+        "aiApps": "{n} aplicaciones usan IA y ninguna entrada las nombra",
+        "aiAppsOne": "una aplicación usa IA y ninguna entrada la nombra",
         "unanswered": "{n} entradas tienen preguntas todavía sin responder",
         "unansweredOne": "una entrada tiene preguntas todavía sin responder",
         "unlabelled": "{n} elementos públicos no llevan etiqueta",
@@ -2516,9 +2518,20 @@
       },
       "under": {
         "filled": "{entries} entradas · {questions} preguntas · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro",
-        "empty": "0 entradas · {questions} preguntas · todavía no hay nada anotado"
+        "empty": "0 entradas · {questions} preguntas · todavía no hay nada anotado",
+        "proposed": " · {n} propuestas te esperan"
       },
       "gapUndocumented": "Se usa aquí, no está anotado en ninguna parte",
+      "gapAiApps": "Una aplicación usa IA y ninguna entrada la nombra",
+      "answerProposed": "propuesta, revísala",
+      "proposedWhy": "Por qué se propone: {reason}",
+      "proposedStated": "según el mapa de datos, {rows} contiene datos regulados ({domain}), y la aplicación los trata con IA.",
+      "proposedRead": "las palabras del mapa de datos ({words}) apuntan a datos regulados ({domain}) en {rows}, y la aplicación los trata con IA.",
+      "acceptProposal": "Aprobar",
+      "annex3": {
+        "employment": "relación laboral",
+        "biometrics": "biometría"
+      },
       "gapAppGap": "La aplicación dice que genera contenido, y la revisión encontró una falta",
       "gapUnclassified": "Quedan preguntas sin responder",
       "gapUnlabelled": "Publicado sin etiqueta",
@@ -2529,6 +2542,11 @@
         "undocumentedClear": "Cada modelo llamado en este periodo está nombrado en una entrada.",
         "appsWhy": "dicen que generan contenido, y la revisión de publicación no encontró ninguna declaración.",
         "appsWhyOne": "dice que genera contenido, y la revisión de publicación no encontró ninguna declaración.",
+        "aiAppsWhy": "usan IA según lo que ellas mismas declaran, y ninguna entrada del registro las nombra. El borrador las añade a partir de sus mapas de datos.",
+        "aiAppsWhyOne": "usa IA según lo que ella misma declara, y ninguna entrada del registro la nombra. El borrador la añade a partir de su mapa de datos.",
+        "aiAppsClear": "Cada aplicación que usa IA está nombrada en una entrada.",
+        "aiAppHigh": "posible riesgo alto: {area}",
+        "aiAppsHighWhy": "Una aplicación marcada así trata datos laborales o biométricos con IA. El Reglamento europeo de IA considera ese uso de alto riesgo (anexo III). Revisa primero su entrada.",
         "appIn": "está en el registro",
         "appOut": "no está en el registro",
         "appsClear": "Ninguna aplicación declara que genera contenido sin una declaración.",
@@ -2627,7 +2645,8 @@
       "src": {
         "ai": "IA {n}",
         "you": "tú {n}",
-        "record": "registro {n}"
+        "record": "registro {n}",
+        "proposed": "propuesta {n}"
       },
       "showNext": "Mostrar las {n} siguientes",
       "foot": "{shown} de {total} · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro · {unanswered} sin responder",
@@ -2717,10 +2736,10 @@
         "registers": "Registros",
         "registersWhy": "{personal} contienen datos personales. Esta instalación {node}, lugares compartidos {organism}, aplicaciones {app}.",
         "gapHolds": "Guarda datos personales: {list}",
-        "gapFamilies":"No dice si esto son datos personales: {list}",
+        "gapFamilies": "No dice si esto son datos personales: {list}",
         "gapNoMap": "Sin mapa de datos, así que nada dice qué guarda la aplicación ni adónde va.",
         "gapNode": "Esta instalación",
-        "registersDrafts":"{n} borradores esperan revisión: los de esta instalación {node}, aplicaciones {apps}. Esta instalación los hizo a partir de los mapas de datos y ninguno está guardado.",
+        "registersDrafts": "{n} borradores esperan revisión: los de esta instalación {node}, aplicaciones {apps}. Esta instalación los hizo a partir de los mapas de datos y ninguno está guardado.",
         "domains": "Datos regulados",
         "domainsNone": "Ningún registro nombra datos regulados.",
         "requests": "Solicitudes de las personas",
@@ -2837,6 +2856,7 @@
           "framework-unanswered": "Una norma con preguntas sin responder",
           "app-personal-data-without-register": "Una aplicación con datos personales y sin registro",
           "app-personal-data-unstated": "Una aplicación que no dice qué son datos personales",
+          "app-personal-data-domain-unstated": "Una aplicación que no dice a qué datos regulados pertenecen sus datos personales",
           "app-register-without-privacy-notice": "Una aplicación sin aviso de privacidad",
           "retention-conflict": "Un registro y un mapa de datos que no coinciden",
           "processor-without-dpa": "Un encargado sin contrato",
@@ -13558,13 +13578,13 @@
       "daysLabel": "Mensajes de",
       "noneFresh": "Ninguna conversación de este periodo espera tu respuesta.",
       "days": {
+        "0": "cualquier fecha",
         "1": "el último día",
         "3": "los últimos 3 días",
         "7": "la última semana",
         "14": "las últimas 2 semanas",
         "30": "el último mes",
-        "90": "los últimos 3 meses",
-        "0": "cualquier fecha"
+        "90": "los últimos 3 meses"
       }
     }
   },
@@ -16298,7 +16318,11 @@
       "areaLine": "{rights}: {what} ({which})",
       "areaAll": "todos",
       "areaPattern": "los que coinciden con {pattern}",
-      "areaRights": { "read": "Leer", "write": "Escribir", "readWrite": "Leer y escribir" },
+      "areaRights": {
+        "read": "Leer",
+        "write": "Escribir",
+        "readWrite": "Leer y escribir"
+      },
       "areaName": {
         "memory": "tus registros",
         "storage": "tus archivos",

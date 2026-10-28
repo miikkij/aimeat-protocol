@@ -35,6 +35,9 @@
  *   const report = await buildComplianceReport(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, report));
  * @version-history
+ *   v1.4.0 — 2026-10-28 — Gap kind app-uses-ai-not-in-register: an app whose own statements say it
+ *     uses AI and that no use case names, with the Annex III area its data map points to. The model
+ *     gap had named only model ids on a node whose apps all call through their owners' accounts.
  *   v1.3.0 — 2026-10-23 — The node-wide report carries `processing` (records of processing, data
  *     domains, framework verdicts, processors, transfers, label packs) with its own `gaps`, and their
  *     limits in `not_covered` (compliance-processing.ts, plan doc-mvlftkh9zmc9).
@@ -58,6 +61,7 @@ import {
   type ComplianceQuestionnaire, type ComplianceRiskVerdict, type ComplianceUseCase,
 } from './compliance-register.js';
 import { buildProcessingSummary, type ProcessingSummary } from './compliance-processing.js';
+import { appAiGaps } from './compliance-app-ai-gaps.js';
 import type { ScopeGap } from './compliance-scope-gaps.js';
 
 /** How far back the rollup's hot window reaches before rows move to the archive. */
@@ -93,6 +97,7 @@ export interface ComplianceGap {
     | 'unclassified-usecase'
     | 'unlabelled-public-content'
     | 'app-declares-generation-with-gap'
+    | 'app-uses-ai-not-in-register'
     | 'font-licence-unknown';
   /** One sentence a person can act on, without needing the vocabulary of this file. */
   detail: string;
@@ -471,6 +476,11 @@ export async function buildComplianceReport(
   // The records of processing and everything beside them (plan doc-mvlftkh9zmc9): the operator's only.
   const processing = owner ? null : await buildProcessingSummary({ storage, config });
 
+  // Apps that use AI and that no use case names, by their own statements (compliance-app-ai-gaps.ts).
+  // Against the whole stored register, not the owner's slice of it: an entry the operator wrote
+  // without an owner still covers the app.
+  const appGaps: ComplianceGap[] = await appAiGaps(storage, config, rawUseCases, owner);
+
   return {
     scope: {
       node_id: config.nodeId,
@@ -486,7 +496,7 @@ export async function buildComplianceReport(
     derived: { ai_transparency: transparency, ai_usage: usage, consent },
     register: { usecases, questionnaire },
     ...(processing ? { processing: { ...processing.summary, gaps: processing.gaps } } : {}),
-    gaps: [...findGaps(usecases, usage, transparency), ...fontGaps],
+    gaps: [...findGaps(usecases, usage, transparency), ...appGaps, ...fontGaps],
   };
 }
 

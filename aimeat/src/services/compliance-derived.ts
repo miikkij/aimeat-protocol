@@ -21,6 +21,9 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.2.0 — 2026-10-28 — An app's register carries its regulated data domains: the ones its map's
+ *     personal rows state (evidence), or the ones the map's words point to (proposed), so the label
+ *     floor and the DPIA duty can follow employment and health data an app keeps.
  *   v1.1.1 — 2026-10-26 — A map whose `leaves` are sentences gives those sentences as recipients
  *     ("undefined → undefined" on innokas-outreach).
  *   v1.1.0 — 2026-10-25 — A map row with no personal-data mark is unsaid (or personal when it is
@@ -32,6 +35,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { nodeAiProviders } from './ai/providers.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
+import { appAiSignals } from './compliance-app-signals.js';
 import { classifyUseCase, type ComplianceRiskVerdict } from './compliance-register.js';
 import { COMPLIANCE_FRAMEWORKS } from '../data/compliance-frameworks.js';
 import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './compliance-docs-schemas.js';
@@ -116,6 +120,12 @@ export async function appRegisterDraft(
   const personal = map.held.filter(r => personalMark(r) === 'yes');
   const unstated = map.held.filter(r => personalMark(r) === 'unstated').map(familyOf);
   const keptForever = personal.some(r => r.keptFor === 'until-deleted' || r.keptFor === 'append-only');
+  // The regulated domains: stated on a row, or read from the map's words when no row states one.
+  // A register whose every domain a row states carries them as evidence; one that rests on a
+  // proposal says so, and a person decides before the label floor and the DPIA duty follow it.
+  const found = appAiSignals(map).domains;
+  const domains = [...new Set(found.map(d => d.domain))];
+  const domainSource = found.some(d => d.source === 'proposed') ? 'proposed' as const : EVIDENCE;
   return {
     hasMap: true, unstated,
     register: personal.length ? {
@@ -126,8 +136,12 @@ export async function appRegisterDraft(
       // A map an AI wrote to its own shape names what leaves as plain sentences, not { what, to }.
       recipients: map.leaves.map(l => (typeof l === 'string' ? l : `${l.what} → ${l.to}`).slice(0, 300)),
       retentionText: keptForever ? 'Kept until deleted (data map).' : undefined,
+      ...(domains.length ? { domains } : {}),
       containers: [{ kind: 'app', app: filename }], reviewEveryMonths: 12,
-      answerSources: src(['type', 'purposeText', 'dataCategories', 'recipients', 'retentionText', 'containers']),
+      answerSources: {
+        ...src(['type', 'purposeText', 'dataCategories', 'recipients', 'retentionText', 'containers']),
+        ...(domains.length ? { domains: domainSource } : {}),
+      },
     } : null,
   };
 }

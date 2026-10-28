@@ -3561,6 +3561,8 @@
         "modelsEmpty": "the register is empty, so all {n} models used here count as undocumented",
         "apps": "{n} apps say they generate content and the publish check found no disclosure",
         "appsOne": "one app says it generates content and the publish check found no disclosure",
+        "aiApps": "{n} apps use AI and no entry names them",
+        "aiAppsOne": "one app uses AI and no entry names it",
         "unanswered": "{n} entries have questions still unanswered",
         "unansweredOne": "one entry has questions still unanswered",
         "unlabelled": "{n} public items carry no label",
@@ -3572,9 +3574,20 @@
       },
       "under": {
         "filled": "{entries} entries · {questions} questions · answers: {ai} by AI, {human} by you, {evidence} from the record",
-        "empty": "0 entries · {questions} questions · nothing written down yet"
+        "empty": "0 entries · {questions} questions · nothing written down yet",
+        "proposed": " · {n} proposals wait for you"
       },
       "gapUndocumented": "Used here, written down nowhere",
+      "gapAiApps": "An app uses AI and no entry names it",
+      "answerProposed": "proposal, check it",
+      "proposedWhy": "Why it is proposed: {reason}",
+      "proposedStated": "the data map says {rows} holds regulated data ({domain}), and the app uses AI on it.",
+      "proposedRead": "the data map's words ({words}) point to regulated data ({domain}) in {rows}, and the app uses AI on it.",
+      "acceptProposal": "Approve",
+      "annex3": {
+        "employment": "employment",
+        "biometrics": "biometrics"
+      },
       "gapAppGap": "App says it generates, and the check found a gap",
       "gapUnclassified": "Questions still unanswered",
       "gapUnlabelled": "Published without a label",
@@ -3585,6 +3598,11 @@
         "undocumentedClear": "Every model called in this period is named by an entry.",
         "appsWhy": "say they generate content, and the publish check found no disclosure.",
         "appsWhyOne": "says it generates content, and the publish check found no disclosure.",
+        "aiAppsWhy": "use AI by their own statements, and no entry in the register names them. The draft adds them from their data maps.",
+        "aiAppsWhyOne": "uses AI by its own statements, and no entry in the register names it. The draft adds it from its data map.",
+        "aiAppsClear": "Every app that uses AI is named by an entry.",
+        "aiAppHigh": "possible high risk: {area}",
+        "aiAppsHighWhy": "An app marked so keeps employment or biometric data and uses AI on it. The EU AI Act lists such a use as high risk (Annex III). Check its entry first.",
         "appIn": "in the register",
         "appOut": "not in the register",
         "appsClear": "No app declares generation without a disclosure.",
@@ -3683,7 +3701,8 @@
       "src": {
         "ai": "AI {n}",
         "you": "you {n}",
-        "record": "record {n}"
+        "record": "record {n}",
+        "proposed": "proposed {n}"
       },
       "showNext": "Show the next {n}",
       "foot": "{shown} of {total} · answers: {ai} by AI, {human} by you, {evidence} from the record · {unanswered} unanswered",
@@ -3893,6 +3912,7 @@
           "framework-unanswered": "A law with unanswered questions",
           "app-personal-data-without-register": "An app with personal data and no register",
           "app-personal-data-unstated": "An app that does not say what is personal data",
+          "app-personal-data-domain-unstated": "An app that does not say which regulated data its personal data is",
           "app-register-without-privacy-notice": "An app with no privacy notice",
           "retention-conflict": "A register and a data map that disagree",
           "processor-without-dpa": "A processor with no agreement",

@@ -20,14 +20,18 @@
  * @usage imported by compliance-tab.js and compliance-tab.register.js; tested by
  *   test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-28 — The sixth kind, app-uses-ai-not-in-register, grouped with the Annex III
+ *     area each app's data map points to; an answer marked `proposed` (the node's rule read it from a
+ *     data map) is counted as proposed, never as the operator's.
  *   v1.1.0 — 2026-10-03 — The fifth kind, font-licence-unknown: faces added without licence data
  *     (the font manager), grouped by family.
  *   v1.0.0 — 2026-09-05 — Initial (the Compliance page in the poster face).
  */
 
-/** The five kinds the node serves, in the order the page's rows have. */
+/** The six kinds the node serves, in the order the page's rows have. */
 export const GAP_KINDS = [
   'undocumented-ai-activity',
+  'app-uses-ai-not-in-register',
   'app-declares-generation-with-gap',
   'unclassified-usecase',
   'unlabelled-public-content',
@@ -46,17 +50,21 @@ const classOf = (u) => (u && u.risk && u.risk.class) || 'unclassified';
  * The gap list grouped by kind, with the evidence each kind carries.
  *
  * @param {Array<{kind: string, detail?: string, evidence?: object}>|undefined} gaps
- * @returns {{ total: number, models: string[], apps: Array<{app: string, inRegister: boolean}>,
- *   usecases: Array<{id: string, unanswered: string[]}>, unlabelled: number, fonts: string[], other: object[] }}
+ * @returns {{ total: number, models: string[], aiApps: Array<{app: string, annex3: string|null, reason: string|null}>,
+ *   apps: Array<{app: string, inRegister: boolean}>, usecases: Array<{id: string, unanswered: string[]}>,
+ *   unlabelled: number, fonts: string[], other: object[] }}
  */
 export function groupGaps(gaps) {
-  const g = { total: 0, models: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] };
+  const g = { total: 0, models: [], aiApps: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] };
   for (const gap of gaps || []) {
     g.total++;
     const ev = gap.evidence || {};
     switch (gap.kind) {
       case 'undocumented-ai-activity':
         g.models.push(String(ev.model || gap.detail || ''));
+        break;
+      case 'app-uses-ai-not-in-register':
+        g.aiApps.push({ app: String(ev.app || gap.detail || ''), annex3: ev.annex3 ? String(ev.annex3) : null, reason: ev.annex3_reason ? String(ev.annex3_reason) : null });
         break;
       case 'app-declares-generation-with-gap':
         g.apps.push({ app: String(ev.app || gap.detail || ''), inRegister: Boolean(ev.in_register) });
@@ -77,6 +85,8 @@ export function groupGaps(gaps) {
   g.models.sort((a, b) => a.localeCompare(b));
   g.fonts.sort((a, b) => a.localeCompare(b));
   g.apps.sort((a, b) => a.app.localeCompare(b.app));
+  // The candidates for the high-risk class first, as the node orders them.
+  g.aiApps.sort((a, b) => Number(!!b.annex3) - Number(!!a.annex3) || a.app.localeCompare(b.app));
   return g;
 }
 
@@ -85,10 +95,10 @@ export function groupGaps(gaps) {
  *
  * @param {object} u — a register entry
  * @param {Array<{id: string}>} questions
- * @returns {{ total: number, answered: number, unanswered: number, ai: number, human: number, evidence: number }}
+ * @returns {{ total: number, answered: number, unanswered: number, ai: number, human: number, evidence: number, proposed: number }}
  */
 export function answersOf(u, questions) {
-  const r = { total: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0 };
+  const r = { total: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0 };
   const answers = (u && u.answers) || {};
   const sources = (u && u.answerSources) || {};
   for (const q of questions) {
@@ -98,6 +108,8 @@ export function answersOf(u, questions) {
     const src = sources[q.id];
     if (src === 'ai') r.ai++;
     else if (src === 'evidence') r.evidence++;
+    // The node's rule read it from a data map and nobody has decided: never counted as the operator's.
+    else if (src === 'proposed') r.proposed++;
     else r.human++;
   }
   return r;
@@ -105,11 +117,11 @@ export function answersOf(u, questions) {
 
 /** The same counts across the whole register, plus how many entries and questions there are. */
 export function answerStats(usecases, questions) {
-  const s = { entries: (usecases || []).length, questions: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0 };
+  const s = { entries: (usecases || []).length, questions: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0 };
   for (const u of usecases || []) {
     const a = answersOf(u, questions);
     s.answered += a.answered; s.unanswered += a.unanswered;
-    s.ai += a.ai; s.human += a.human; s.evidence += a.evidence;
+    s.ai += a.ai; s.human += a.human; s.evidence += a.evidence; s.proposed += a.proposed;
   }
   return s;
 }

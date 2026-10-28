@@ -31,6 +31,9 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.4.0 — 2026-10-28 — Section 01 has a row for apps that use AI and that no entry names, the
+ *     candidates for the high-risk class named; the draft's proposals ride to the register, where
+ *     each proposed answer shows why; the line under the verdict counts proposed answers.
  *   v3.3.0 — 2026-10-24 — A row of section 09 opens the records dialog (compliance-tab.browse.js,
  *     C7.7), and one register or one place's record prints alone from it.
  *   v3.2.0 — 2026-10-24 — Sections 08 to 10, the records of processing (compliance-tab.records.js,
@@ -125,6 +128,8 @@ export function gapsLine(g, registerEmpty) {
     parts.push(registerEmpty ? C('line.modelsEmpty', { n: num(g.models.length) })
       : g.models.length === 1 ? C('line.modelsOne') : C('line.models', { n: num(g.models.length) }));
   }
+  const aiApps = g.aiApps || [];
+  if (aiApps.length > 0) parts.push(aiApps.length === 1 ? C('line.aiAppsOne') : C('line.aiApps', { n: num(aiApps.length) }));
   if (g.apps.length > 0) parts.push(g.apps.length === 1 ? C('line.appsOne') : C('line.apps', { n: num(g.apps.length) }));
   if (g.usecases.length > 0) parts.push(g.usecases.length === 1 ? C('line.unansweredOne') : C('line.unanswered', { n: num(g.usecases.length) }));
   if (g.unlabelled > 0) parts.push(g.unlabelled === 1 ? C('line.unlabelledOne') : C('line.unlabelled', { n: num(g.unlabelled) }));
@@ -146,6 +151,11 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const undocWhy = n === 0 ? C('gap.undocumentedClear')
     : empty ? C('gap.undocumentedEmpty', { n: num(n) })
     : html`${C('gap.undocumentedWhy', { n: num(n) })} ${codes(g.models)}. ${C('gap.undocumentedDraft')}`;
+  // Apps that use AI and no entry names, the candidates for the high-risk class first and named so.
+  const aiApps = g.aiApps || [];
+  const high = aiApps.filter(a => a.annex3).length;
+  const aiAppsWhy = aiApps.length === 0 ? C('gap.aiAppsClear')
+    : html`${aiApps.map((a, i) => html`${i > 0 ? ', ' : ''}${code(a.app)}${a.annex3 ? html` (${C('gap.aiAppHigh', { area: C('annex3.' + a.annex3) })})` : ''}`)} ${aiApps.length === 1 ? C('gap.aiAppsWhyOne') : C('gap.aiAppsWhy')}${high > 0 ? html` ${C('gap.aiAppsHighWhy')}` : ''}`;
   const appsWhy = g.apps.length === 0 ? C('gap.appsClear')
     : html`${g.apps.map((a, i) => html`${i > 0 ? ', ' : ''}${code(a.app)} (${a.inRegister ? C('gap.appIn') : C('gap.appOut')})`)} ${g.apps.length === 1 ? C('gap.appsWhyOne') : C('gap.appsWhy')}`;
   const ucWhy = g.usecases.length === 0 ? C('gap.unansweredClear')
@@ -155,7 +165,8 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
     : C('gap.unlabelledWhy', { n: num(g.unlabelled) });
   const word = g.total === 0 ? C('word.clear') : g.total === 1 ? C('word.one') : C('word.many', { n: num(g.total) });
   const under = empty ? C('under.empty', { questions: num(questions.length) })
-    : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) });
+    : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) })
+      + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '');
   const toApps = () => switchPage('apps');
   // Faces added without licence data (the font manager): the Fonts tab of Themes & Styles.
   const fonts = g.fonts || [];
@@ -173,6 +184,8 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
         <${Readings} rows=${[
           { key: 'undocumented', name: C('gapUndocumented'), why: undocWhy,
             end: n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting) },
+          { key: 'aiApps', name: C('gapAiApps'), why: aiAppsWhy,
+            end: aiApps.length === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting) },
           { key: 'apps', name: C('gapAppGap'), why: appsWhy, end: g.apps.length === 0 ? clear : door(C('toApps'), toApps) },
           { key: 'unclassified', name: C('gapUnclassified'), why: ucWhy,
             end: g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id)) },
@@ -282,6 +295,7 @@ export default function ComplianceTab(props) {
   const [keeping, setKeeping] = useState(false);
   const [kept, setKept] = useState(0);
   const [draft, setDraft] = useState(null);       // the register as edited, null while untouched
+  const [proposals, setProposals] = useState({}); // usecase id → question id → the draft's proposal
   const [openId, setOpenId] = useState(null);
   const [browse, setBrowse] = useState(null);      // the records dialog's target, { kind, item?, domain? }
   const [printOnly, setPrintOnly] = useState(null); // { title, registers } while one record prints
@@ -349,6 +363,13 @@ export default function ComplianceTab(props) {
         const base = prev ?? report.register.usecases;
         const have = new Set(base.map(u => u.id));
         return [...base, ...d.usecases.filter(u => !have.has(u.id))];
+      });
+      // Why each proposed answer was proposed, kept as the node's facts and said in the reader's
+      // language when the entry draws (compliance-tab.register.js proposalText).
+      setProposals((prev) => {
+        const next = { ...prev };
+        for (const p of d.proposals || []) next[p.usecase_id] = { ...(next[p.usecase_id] || {}), [p.question]: p };
+        return next;
       });
       setOpenId(null);
       showSuccess(C('draftLoaded', { entries: num(d.counts?.entries ?? d.usecases.length), answered: num(d.counts?.answeredFromEvidence ?? 0) }));
@@ -451,7 +472,7 @@ export default function ComplianceTab(props) {
         <${Limits} items=${report.not_covered} />
         <${Happened} derived=${report.derived} switchPage=${switchPage} />
         <${RegisterSection} usecases=${usecases} questions=${questions}
-          draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId}
+          draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId} proposals=${proposals}
           saving=${saving} drafting=${drafting} onSave=${saveRegister} onDraft=${loadDraft} />
         <${QuestionnaireSection} questionnaire=${questionnaire} />
         <${Columns}>

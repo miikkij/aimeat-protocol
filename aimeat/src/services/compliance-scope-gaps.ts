@@ -19,6 +19,8 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.2.0 — 2026-10-28 — app-personal-data-domain-unstated: an app's personal key families whose
+ *     data map names no regulated domain, with the domains the map's words point to.
  *   v1.1.0 — 2026-10-25 — The node-wide list reads every app, not only the listed ones, and an app
  *     with no data map is a gap (app-personal-data-unstated): on innokas.aimeat.io the page named 3
  *     apps with personal data where the maps named 15, and said nothing of 18 apps with no map.
@@ -38,6 +40,8 @@ import {
   appRegisterDraft, derivedProcessors, frameworkVerdicts, inEea, processorsView,
 } from './compliance-derived.js';
 import { UNCLASSIFIED } from './compliance-register.js';
+import { appAiSignals } from './compliance-app-signals.js';
+import { readAppDataMap } from './data-map/data-map-store.js';
 import type { ComplianceBreach, ComplianceDpia, ComplianceRegister, ComplianceRequest } from './compliance-docs-schemas.js';
 
 export type ScopeGapKind =
@@ -47,7 +51,7 @@ export type ScopeGapKind =
   | 'request-overdue' | 'breach-risk-unassessed' | 'breach-notification-overdue' | 'breach-subjects-not-notified'
   | 'breach-hipaa-overdue' | 'framework-unanswered'
   | 'app-personal-data-without-register' | 'app-personal-data-unstated' | 'app-register-without-privacy-notice'
-  | 'retention-conflict'
+  | 'app-personal-data-domain-unstated' | 'retention-conflict'
   | 'processor-without-dpa' | 'processor-country-unknown' | 'transfer-without-basis' | 'processor-without-baa'
   | 'processor-not-itar-eligible' | 'classification-pack-not-accredited';
 
@@ -198,6 +202,21 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
     out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} has no data map, so nothing says whether it keeps personal data or where it goes.`, evidence: { ...at, families: [] } });
   } else if (draft.unstated.length) {
     out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} does not say whether ${draft.unstated.length} of its key families hold personal data.`, evidence: { ...at, families: draft.unstated.slice(0, 20) } });
+  }
+  // A personal row with no stated domain: the label floor, the DPIA duty and the AI Act area cannot
+  // follow data nobody placed. What the map's words point to rides along, so the fix is one look.
+  if (draft.hasMap && draft.register) {
+    const map = await readAppDataMap(deps.storage, ownerGhii, scope.app.replace(/\.html$/i, ''));
+    const unstated = (map?.held ?? []).filter(r => r.personalData === 'yes' && r.domains === undefined);
+    if (unstated.length) {
+      const proposed = appAiSignals(map).domains.filter(d => d.source === 'proposed').map(d => d.domain);
+      out.push({
+        kind: 'app-personal-data-domain-unstated',
+        detail: `The app ${scope.app} keeps personal data in ${unstated.length === 1 ? 'one key family' : `${unstated.length} key families`} whose data map does not say which regulated domain it falls in`
+          + (proposed.length ? `; its words point to ${proposed.join(', ')}.` : '.'),
+        evidence: { ...at, families: unstated.map(r => r.what).slice(0, 20), proposed },
+      });
+    }
   }
   if (personalRegs.length || draft.register) {
     const app = await deps.storage.getAppByOwnerName(scope.ownerName, scope.app);

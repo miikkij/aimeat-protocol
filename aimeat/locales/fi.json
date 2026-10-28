@@ -3560,6 +3560,8 @@
         "modelsEmpty": "kirjanpito on tyhjä, joten kaikki {n} täällä käytettyä mallia lasketaan dokumentoimattomiksi",
         "apps": "{n} sovellusta kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
         "appsOne": "yksi sovellus kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
+        "aiApps": "{n} sovellusta käyttää tekoälyä, eikä mikään merkintä nimeä niitä",
+        "aiAppsOne": "yksi sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
         "unanswered": "{n} merkinnässä on yhä vastaamattomia kysymyksiä",
         "unansweredOne": "yhdessä merkinnässä on yhä vastaamattomia kysymyksiä",
         "unlabelled": "{n} julkista kohdetta on ilman merkintää",
@@ -3571,9 +3573,20 @@
       },
       "under": {
         "filled": "{entries} merkintää · {questions} kysymystä · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence}",
-        "empty": "0 merkintää · {questions} kysymystä · mitään ei ole vielä kirjoitettu ylös"
+        "empty": "0 merkintää · {questions} kysymystä · mitään ei ole vielä kirjoitettu ylös",
+        "proposed": " · {n} ehdotusta odottaa sinua"
       },
       "gapUndocumented": "Käytössä, mutta ei kirjattu mihinkään",
+      "gapAiApps": "Sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
+      "answerProposed": "ehdotus, tarkista",
+      "proposedWhy": "Miksi tätä ehdotetaan: {reason}",
+      "proposedStated": "datakartan mukaan {rows} sisältää säänneltyä tietoa ({domain}), ja sovellus käsittelee sitä tekoälyllä.",
+      "proposedRead": "datakartan sanat ({words}) viittaavat säänneltyyn tietoon ({domain}) kohdassa {rows}, ja sovellus käsittelee sitä tekoälyllä.",
+      "acceptProposal": "Hyväksy",
+      "annex3": {
+        "employment": "työsuhde",
+        "biometrics": "biometriikka"
+      },
       "gapAppGap": "Sovellus kertoo tuottavansa sisältöä, ja tarkistus löysi puutteen",
       "gapUnclassified": "Kysymyksiä yhä vastaamatta",
       "gapUnlabelled": "Julkaistu ilman merkintää",
@@ -3584,6 +3597,11 @@
         "undocumentedClear": "Jokainen tällä jaksolla kutsuttu malli on nimetty jossakin merkinnässä.",
         "appsWhy": "kertovat tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää.",
         "appsWhyOne": "kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää.",
+        "aiAppsWhy": "käyttävät tekoälyä omien tietojensa mukaan, eikä mikään kirjanpidon merkintä nimeä niitä. Luonnos lisää ne datakarttojen perusteella.",
+        "aiAppsWhyOne": "käyttää tekoälyä omien tietojensa mukaan, eikä mikään kirjanpidon merkintä nimeä sitä. Luonnos lisää sen datakartan perusteella.",
+        "aiAppsClear": "Jokainen tekoälyä käyttävä sovellus on nimetty jossakin merkinnässä.",
+        "aiAppHigh": "voi olla korkea riski: {area}",
+        "aiAppsHighWhy": "Näin merkitty sovellus käsittelee työsuhde- tai biometrisiä tietoja tekoälyllä. EU:n tekoälyasetus luokittelee tällaisen käytön korkeaksi riskiksi (liite III). Tarkista sen merkintä ensin.",
         "appIn": "on kirjanpidossa",
         "appOut": "ei ole kirjanpidossa",
         "appsClear": "Yksikään sovellus ei ilmoita tuottavansa sisältöä ilman merkintää.",
@@ -3682,7 +3700,8 @@
       "src": {
         "ai": "tekoäly {n}",
         "you": "sinä {n}",
-        "record": "kirjattu {n}"
+        "record": "kirjattu {n}",
+        "proposed": "ehdotus {n}"
       },
       "showNext": "Näytä seuraavat {n}",
       "foot": "{shown}/{total} · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence} · {unanswered} vastaamatta",
@@ -3772,10 +3791,10 @@
         "registers": "Rekisterit",
         "registersWhy": "Henkilötietoja on {personal} rekisterissä. Tämä asennus {node}, yhteiset paikat {organism}, sovellukset {app}.",
         "gapHolds": "Pitää henkilötietoa: {list}",
-        "gapFamilies":"Ei kerro, ovatko nämä henkilötietoja: {list}",
+        "gapFamilies": "Ei kerro, ovatko nämä henkilötietoja: {list}",
         "gapNoMap": "Ei tietokarttaa, joten mikään ei kerro, mitä sovellus pitää tai minne tieto lähtee.",
         "gapNode": "Tämä asennus",
-        "registersDrafts":"{n} luonnosta odottaa tarkistusta: tämän asennuksen omat {node}, sovellukset {apps}. Asennus teki ne tietokartoista, eikä niitä ole tallennettu.",
+        "registersDrafts": "{n} luonnosta odottaa tarkistusta: tämän asennuksen omat {node}, sovellukset {apps}. Asennus teki ne tietokartoista, eikä niitä ole tallennettu.",
         "domains": "Säännelty tieto",
         "domainsNone": "Mikään rekisteri ei nimeä säänneltyä tietoa.",
         "requests": "Rekisteröityjen pyynnöt",
@@ -3892,6 +3911,7 @@
           "framework-unanswered": "Säädös, jonka kysymyksiin ei ole vastattu",
           "app-personal-data-without-register": "Sovelluksella on henkilötietoja mutta ei rekisteriä",
           "app-personal-data-unstated": "Sovellus ei kerro, mikä on henkilötietoa",
+          "app-personal-data-domain-unstated": "Sovellus ei kerro, mihin säänneltyyn tietoon sen henkilötiedot kuuluvat",
           "app-register-without-privacy-notice": "Sovelluksella ei ole tietosuojaselostetta",
           "retention-conflict": "Rekisteri ja datakartta ovat ristiriidassa",
           "processor-without-dpa": "Käsittelijän kanssa ei ole sopimusta",
@@ -15409,13 +15429,13 @@
       "daysLabel": "Viestit ajalta",
       "noneFresh": "Tältä ajalta mikään keskustelu ei odota vastaustasi.",
       "days": {
+        "0": "koko aika",
         "1": "viimeinen päivä",
         "3": "3 viime päivää",
         "7": "viime viikko",
         "14": "2 viime viikkoa",
         "30": "viime kuukausi",
-        "90": "3 viime kuukautta",
-        "0": "koko aika"
+        "90": "3 viime kuukautta"
       }
     }
   },
@@ -18225,7 +18245,11 @@
       "areaLine": "{rights}: {what} ({which})",
       "areaAll": "kaikki",
       "areaPattern": "ne, jotka vastaavat kuviota {pattern}",
-      "areaRights": { "read": "Lukea", "write": "Kirjoittaa", "readWrite": "Lukea ja kirjoittaa" },
+      "areaRights": {
+        "read": "Lukea",
+        "write": "Kirjoittaa",
+        "readWrite": "Lukea ja kirjoittaa"
+      },
       "areaName": {
         "memory": "tietueesi",
         "storage": "tiedostosi",
