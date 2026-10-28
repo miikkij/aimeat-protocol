@@ -24,6 +24,9 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.5.0 — 2026-10-28 — A `held` row may carry `domains`, the regulated data domains of its
+ *     personal data, read by the records of processing and the AI Act register draft. Additive, so
+ *     the spec stays /2.
  *   v2.4.0 — 2026-10-18 — The machinery word `invites-people` and the optional app-level `invites`
  *     statement: the app invites people into organisms and an invitation can create an account
  *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien). Additive, so the spec
@@ -192,6 +195,15 @@ export interface DataMapRow {
    * uses it among other things. A reader sees "made for this agent" or "uses its work".
    */
   madeFor?: boolean;
+  /**
+   * The regulated data domains this family's personal data falls in, by the ids of
+   * data/compliance-domains.ts: `employment`, `health`, `children`, and the rest.
+   *
+   * OPTIONAL, AND ASKED FOR ON EVERY PERSONAL ROW. `[]` is a considered "none of these"; absent is
+   * silence, which the check names. The domain is what the records of processing, the
+   * classification floor and the AI Act register read: written here once, it reaches all three.
+   */
+  domains?: string[];
 }
 
 /** The second table: what is unresolved, or is not ours. */

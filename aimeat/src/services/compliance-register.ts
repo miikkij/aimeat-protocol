@@ -34,6 +34,8 @@
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.3.0 — 2026-10-28 — An answer's source may be `proposed` (ComplianceAnswerSource): the node
+ *     matched an app's data map to it by rule, and a person decides.
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-08-23 — A stored report can also be a moment somebody kept, not only a month the
  *     schedule wrote. The index says which kind each one is.
@@ -88,6 +90,9 @@ export interface ComplianceQuestionnaire {
   questions: ComplianceQuestion[];
 }
 
+/** Who produced one answer; see ComplianceUseCase.answerSources. */
+export type ComplianceAnswerSource = 'human' | 'ai' | 'evidence' | 'proposed';
+
 export interface ComplianceUseCase {
   id: string;
   title: string;
@@ -113,8 +118,12 @@ export interface ComplianceUseCase {
    * the confident-sounding ones would all read as considered.
    *
    * Absent for an answer that predates this field, which reads as unknown rather than as human.
+   *
+   * `proposed` means the node matched an app's data map to it by rule (compliance-app-signals.ts):
+   * the Annex III area of an app that uses AI on employment data. It is neither a recorded fact nor
+   * a model's judgement, and a person who saves it without changing it saves it marked so.
    */
-  answerSources?: Record<string, 'human' | 'ai' | 'evidence'>;
+  answerSources?: Record<string, ComplianceAnswerSource>;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -201,7 +210,7 @@ export const UseCaseSchema = z.object({
   purpose: z.string().max(2000).optional(),
   dataSubjects: z.string().max(2000).optional(),
   answers: z.record(z.string(), z.unknown()).optional(),
-  answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence'])).optional(),
+  answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence', 'proposed'])).optional(),
   updatedAt: z.string().max(INPUT_LIMITS.id).optional(),
   updatedBy: z.string().max(300).optional(),
 });

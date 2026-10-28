@@ -22836,17 +22836,30 @@ paths:
 
         Grouped by which agent or app called each model, NOT by the model - twelve models on a real
         installation are however many things called them, and a model id is not a use of AI. Each
-        entry's title, description and systems are the ones whoever created that agent wrote.
+        agent entry's title, description and systems are the ones whoever created that agent wrote.
 
-        Two questions are answered from the record and marked `evidence` in `answerSources`: whether
-        the principal has any provenance record at all, and whether a person was ever recorded
-        reviewing its output. Every other answer is left empty rather than guessed. An answer that
-        reads as considered when nobody considered it is the failure this whole surface exists to
-        prevent, so filling those is a person's job, or a model's working for them, and the register
-        records which.
+        Every app that uses AI gets its own entry, whether or not its publish check found a gap: by
+        its declared `ai:use` permission, a declared generation, or its data map (the machinery word
+        `ai-generation`, a row of kind `ai-generated`, or something sent to an AI service). Its
+        description and purpose come from the data map, and its models from the provenance records
+        the node minted for that app's calls. An app or agent already in the stored register is not
+        proposed again.
 
-        Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, leftToAnswer }, notes }`.
-        Save it with PUT /v1/admin/compliance/usecases.
+        Answers from the record are marked `evidence` in `answerSources`: whether the principal's
+        generated content is readable by an anonymous visitor (for an app: `false` when the app is
+        not publicly served), and, for one that publishes, whether a person was recorded reviewing
+        it. When an app uses AI on data its map places in the `employment` or `biometric-genetic`
+        domain, stated on the row or read from the map's words, the Annex III area is filled and
+        marked `proposed`, with the reason in `proposals`. Every other answer is left empty rather
+        than guessed. An answer that reads as considered when nobody considered it is the failure
+        this whole surface exists to prevent, so filling those is a person's job, or a model's
+        working for them, and the register records which.
+
+        Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, proposed, leftToAnswer },
+        proposals, notes }`. `proposals` is one `{ usecase_id, question, value, reason, basis }` per
+        proposed answer: `reason` in English, `basis` the same facts as data (`{ domain, source, rows,
+        words }`: the data domain, whether a map row states it or its words point to it, the key
+        families and the matched words). Save it with PUT /v1/admin/compliance/usecases.
       security:
         - BearerAuth: []
       parameters:
@@ -22948,12 +22961,13 @@ paths:
                           unclassified and puts it in the report's gap list - never the mildest class.
                       answerSources:
                         type: object
-                        additionalProperties: { type: string, enum: [human, ai, evidence] }
+                        additionalProperties: { type: string, enum: [human, ai, evidence, proposed] }
                         description: >
                           questionId to who produced that answer. An auditor's question is which of
-                          the three, and a register that could not tell them apart would answer it
+                          them, and a register that could not tell them apart would answer it
                           wrongly by omission - the confident-sounding ones would all read as
-                          considered. Absent reads as unknown, never as human.
+                          considered. `proposed` is the node's rule reading an app's data map, which
+                          nobody has decided yet. Absent reads as unknown, never as human.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
