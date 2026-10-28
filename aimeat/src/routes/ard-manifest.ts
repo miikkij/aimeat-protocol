@@ -20,6 +20,7 @@
  *   import { aiCatalogRouter } from './ard-manifest.js';
  *   router.use(aiCatalogRouter(config, storage));  // inside wellknownRouter (routes/wellknown.ts)
  * @version-history
+ *   v1.0.1 — 2026-10-27 — The MCP entry names the SEP-2127 card at /v1/mcp/server-card.
  *   v1.0.0 — 2026-10-26 — Initial (wish-ai-catalog-well-known-ai-catalog-json-ard).
  */
 import { Router } from 'express';
@@ -85,7 +86,10 @@ export async function buildAiCatalog(config: AimeatConfig, storage: Storage): Pr
       identifier: urnFor(host, 'mcp', 'node'),
       displayName: `AIMEAT MCP server (${config.nodeId})`,
       type: TYPE.mcp,
-      url: `${base}/.well-known/mcp.json`,
+      // The SEP-2127 card, which is what this type names. /.well-known/mcp.json is the node's
+      // extended card in the registry server.json shape, and a reader validating it as a Server
+      // Card found the wrong document (AGENTSCAN 1.1.0, 2026-10-27).
+      url: `${base}/v1/mcp/server-card`,
       description: 'The node\'s MCP server: the person\'s own memory, agents, organisms and workspaces, skills, apps and tasks, under permissions the owner grants and can withdraw. OAuth sign-in.',
       tags: ['mcp', 'memory', 'agents', 'workspaces', 'skills'],
       representativeQueries: queries(

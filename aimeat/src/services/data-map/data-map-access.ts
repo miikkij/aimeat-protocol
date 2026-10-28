@@ -12,6 +12,9 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-28 — The map carries the maker's optional `aiAct` answers through a write (readAiAct), and
+ *     readProgramMap answers an app that uses AI with the node's EU AI Act questions and which of
+ *     them the map leaves unanswered, so the maker's AI reads the questions where it writes the answers.
  *   2026-10-24 — readProgramMap answers the app's records of processing (title, type, purpose, legal
  *     basis, data, regulated data, retention) and whether it has a privacy notice, to whoever may read
  *     the map (plan doc-mvlftkh9zmc9, C1.7).
@@ -36,7 +39,10 @@ import { operatorOverride, type OperatorAuth } from '../operator-override.js';
 import { appListingOf, type AppRecord } from '../../storage/types/apps.js';
 import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
-import { DATA_MAP_SPEC, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
+import { DATA_MAP_SPEC, type AiActStatement, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
+import { appAiSignals } from '../compliance-app-signals.js';
+import { effectiveQuestionnaire, type ComplianceQuestion } from '../compliance-register.js';
+import { builtInQuestionIds } from '../../data/compliance-questionnaire.js';
 import { parseAppScopes } from '../protected-resource.js';
 import type { CallerContext } from '../caller-context.js';
 import { readsAsOwner, visibleToSameOwnerReader, READ_AS_OWNER_NOTE } from '../owner-scope-read.js';
@@ -65,6 +71,12 @@ export interface ProgramMapResult {
   records?: Array<Pick<ComplianceRegister, 'title' | 'type' | 'purpose' | 'purposeText' | 'legalBasis' | 'dataCategories' | 'domains' | 'retentionMonths' | 'retentionText'>>;
   /** Whether the app publishes a privacy notice of its own (its `legal.privacy` page). Read only. */
   privacyNotice?: boolean;
+  /**
+   * For an app that uses AI: the node's EU AI Act questions, which of them are still as shipped
+   * (a page shows those in its reader's language), and which the map's `aiAct` has not answered.
+   * The maker answers them in the map. Read only; absent for an app that does not use AI.
+   */
+  aiAct?: { questions: Array<Omit<ComplianceQuestion, 'implies'>>; builtIn: string[]; unanswered: string[] };
 }
 
 /** Who is asking, in the terms every door already resolves. */
@@ -146,6 +158,7 @@ export async function readProgramMap(
   if (!isOwn) delete stamp.gap;
 
   const registers = (await readDoc(storage, config.nodeId, 'registers', { kind: 'app', ownerName: record.ownerName, app: ref.filename })).items;
+  const aiAct = await aiActQuestions(storage, config, map, record);
   return {
     app: appRef,
     dataMap: map,
@@ -156,6 +169,25 @@ export async function readProgramMap(
       dataCategories: r.dataCategories, domains: r.domains, retentionMonths: r.retentionMonths, retentionText: r.retentionText,
     })),
     privacyNotice: !!record.manifest?.legal?.privacy,
+    ...(aiAct ? { aiAct } : {}),
+  };
+}
+
+/**
+ * The questions an app that uses AI answers, by its own statements: its map, or its ai:use
+ * permission and declared generation. The question set is the node's, so the maker's AI reads it
+ * here instead of being sent to an operator-only tool.
+ */
+async function aiActQuestions(
+  storage: Storage, config: AimeatConfig, map: DataMap | null, record: AppRecord,
+): Promise<ProgramMapResult['aiAct'] | null> {
+  if (!appAiSignals(map, record.manifest?.aiPosture).usesAi) return null;
+  const set = await effectiveQuestionnaire(storage, config.nodeId);
+  const answered = map?.aiAct?.answers ?? {};
+  return {
+    questions: set.questions.map(({ implies: _implies, ...q }) => q),
+    builtIn: builtInQuestionIds(set),
+    unanswered: set.questions.filter(q => !(q.id in answered)).map(q => q.id),
   };
 }
 
@@ -193,6 +225,31 @@ function readInvites(v: unknown): InvitesStatement | null {
   return { does, into };
 }
 
+const QUESTION_ID = /^[a-z0-9][a-z0-9-]{0,79}$/;
+
+/**
+ * The maker's AI Act answers, kept to the shape the register reads: a question id, and a yes/no or
+ * an option value; a note of up to 2000 characters per question. Anything else is left out rather
+ * than refused, as `invites` is: the map is a statement, and a malformed part of it must not cost
+ * the rest. An id the node's question set does not ask is kept, because the set is data an
+ * administrator edits; the draft reads only the ids the set asks.
+ */
+export function readAiAct(v: unknown): AiActStatement | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null;
+  const raw = v as { answers?: unknown; notes?: unknown };
+  const entries = (o: unknown): Array<[string, unknown]> =>
+    (o && typeof o === 'object' && !Array.isArray(o) ? Object.entries(o) : []).filter(([k]) => QUESTION_ID.test(k)).slice(0, 50);
+  const answers: Record<string, boolean | string> = {};
+  for (const [k, a] of entries(raw.answers)) {
+    if (typeof a === 'boolean') answers[k] = a;
+    else if (typeof a === 'string' && a.trim()) answers[k] = a.trim().slice(0, 80);
+  }
+  const notes: Record<string, string> = {};
+  for (const [k, n] of entries(raw.notes)) if (typeof n === 'string' && n.trim()) notes[k] = n.trim().slice(0, 2000);
+  if (Object.keys(answers).length === 0 && Object.keys(notes).length === 0) return null;
+  return { answers, ...(Object.keys(notes).length ? { notes } : {}) };
+}
+
 /** Everything a stated map must carry before it is worth storing. */
 function readMap(body: Partial<DataMap>, at: string): DataMap | string {
   // The refusal says what to send. Three measured cold builds in a row (2026-09-19) sent a map
@@ -209,6 +266,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
   }
   const str = (v: unknown): string => (typeof v === 'string' ? v : '');
   const invites = readInvites(body.invites);
+  const aiAct = readAiAct(body.aiAct);
   return {
     spec: DATA_MAP_SPEC,
     what: str(body.what),
@@ -218,6 +276,7 @@ function readMap(body: Partial<DataMap>, at: string): DataMap | string {
     machinery: Array.isArray(body.machinery) ? body.machinery : [],
     leaves: Array.isArray(body.leaves) ? body.leaves : [],
     ...(invites ? { invites } : {}),
+    ...(aiAct ? { aiAct } : {}),
     held: Array.isArray(body.held) ? body.held : [],
     elsewhere: Array.isArray(body.elsewhere) ? body.elsewhere : [],
     // Somebody wrote this, so it is declared however it arrived. Nothing else may claim to be a map.

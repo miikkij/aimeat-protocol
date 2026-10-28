@@ -12,6 +12,7 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — aimeat_package_publish, _compose and _compose_set say what a publish request answers
  *     when the node asks the owner before making a package public (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-17 — aimeat_package_publish, _compose and _compose_set take the visibilities members and
@@ -58,9 +59,10 @@ import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
 import { REST_SCOPE_GATES_ENFORCED_IN } from '../../utils/rest-scope-release.js';
+import { INPUT_LIMITS, documentText } from '../../models/input-limits.js';
 
 /** A package's visibility on every interface: the words, or organism:<id> (services/audience.ts parseAudience). */
-const PACKAGE_VISIBILITY = z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/);
+const PACKAGE_VISIBILITY = z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/).max(INPUT_LIMITS.id);
 const PACKAGE_VISIBILITY_TEXT = 'private (you only), members (every account of this node), organism:<id> (the members of one organism you are in) or public.';
 
 /** What `config` on aimeat_package_install is, on every interface. */
@@ -136,16 +138,16 @@ export const packagesTools = [
             name: { type: 'string', required: true, description: 'Package name. With the author it forms the group id, e.g. "company-brain::alice".' },
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private.`, zod: PACKAGE_VISIBILITY },
             components: {
                 type: 'array', required: true,
                 description: 'The components, each { id, type: "app"|"extension"|"cortex"|"translation", label?, content, dependencies? }. At least one.', zod: z.array(z.object({
-      id: z.string().describe('Component id, unique within the package'),
-      type: z.string().describe('app | extension | cortex | translation'),
-      label: z.string().optional().describe('Human-readable name'),
-      content: z.string().optional().describe('The component source'),
-      dependencies: z.array(z.string()).optional().describe('Ids of components this one needs installed first'),
+      id: z.string().max(INPUT_LIMITS.id).describe('Component id, unique within the package'),
+      type: z.string().max(INPUT_LIMITS.id).describe('app | extension | cortex | translation'),
+      label: z.string().max(INPUT_LIMITS.name).optional().describe('Human-readable name'),
+      content: documentText().optional().describe('The component source'),
+      dependencies: z.array(z.string().max(INPUT_LIMITS.id)).optional().describe('Ids of components this one needs installed first'),
     })).min(1),
             },
             manifest: { type: 'object', description: 'Package manifest: object types, schedules, the workspace it provisions.' },
@@ -166,17 +168,17 @@ export const packagesTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'Package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.', zod: z.array(z.string()).min(1) },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "admin.html"]. At least one.', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
             description: { type: 'string', description: 'What the package is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private.`, zod: PACKAGE_VISIBILITY },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published, so you can install it at once.' },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true. Node-shipped cortexes are never packaged.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps, so the installer\'s AI has their operating guides. Default true. Installing publishes each in the installer\'s skills, bound to their copy of the app, and never overwrites a skill of theirs.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension the package cannot carry, recording it as a requirement instead.' },
             outcome: { type: 'string', description: 'What the package gives a person, in one sentence: the head of its "what you get" sheet. The description stands in when it is missing.' },
-            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed, in their words.', zod: z.array(z.string()) },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed, in their words.', zod: z.array(z.string().max(INPUT_LIMITS.line)) },
         },
     },
     {
@@ -189,19 +191,19 @@ export const packagesTools = [
         surfaces: ['appdev', 'agent'],
         input: {
             name: { type: 'string', required: true, description: 'The set\'s package name. With your owner name it forms the group id.' },
-            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].', zod: z.array(z.string()).min(1) },
+            apps: { type: 'array', required: true, description: 'Filenames of your own apps, e.g. ["shop.html", "backoffice.html"].', zod: z.array(z.string().max(INPUT_LIMITS.id)).min(1) },
             title: { type: 'string', description: 'The name a buyer sees. Defaults to name.' },
-            organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.', zod: z.object({ key: z.string().optional(), name: z.string().optional() }) },
+            organism: { type: 'object', description: '{ key, name }: the organism the declared workspaces go into, its key in the set and its default name.', zod: z.object({ key: z.string().max(INPUT_LIMITS.id).optional(), name: z.string().max(INPUT_LIMITS.name).optional() }) },
             defaults: { type: 'object', description: 'The set\'s default config, { <app filename>: { <field>: value } }. A field given here is not asked of the buyer.', zod: z.record(z.string(), z.record(z.string(), z.unknown())) },
             description: { type: 'string', description: 'What the set is for.' },
             category: { type: 'string', description: 'Category for the package gallery.' },
-            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags for search.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             visibility: { type: 'string', description: `Who may install it: ${PACKAGE_VISIBILITY_TEXT} Defaults to private: a set is made to be sold.`, zod: PACKAGE_VISIBILITY },
             include_cortex: { type: 'boolean', description: 'Package the cortexes you installed yourself. Default true.' },
             include_skills: { type: 'boolean', description: 'Package your own skills bound to these apps. Default true.' },
             allow_expectations: { type: 'boolean', description: 'Compose even when an app calls an extension a package cannot carry.' },
             outcome: { type: 'string', description: 'What the set gives a person, in one sentence.' },
-            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.', zod: z.array(z.string()) },
+            prompts: { type: 'array', description: 'Up to three things a person can ask their AI once it is installed.', zod: z.array(z.string().max(INPUT_LIMITS.line)) },
             dry_run: { type: 'boolean', description: 'Write nothing; answer what the set would be and every problem.' },
         },
     },
@@ -302,7 +304,7 @@ export const packagesTools = [
             dry_run: { type: 'boolean', description: 'Report what would be registered and register nothing.' },
             mode: { type: 'string', enum: ['managed', 'editable'], description: '"managed": the package owns the code and layout. "editable" (default): you may edit everything.' },
             config: { type: 'object', description: PACKAGE_CONFIG_PARAM, zod: z.record(z.string(), z.record(z.string(), z.unknown())) },
-            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.', zod: z.record(z.string(), z.string()) },
+            organism_names: { type: 'object', description: 'For a set: your own names for its organisms, { <organism key>: name }.', zod: z.record(z.string(), z.string().max(INPUT_LIMITS.name)) },
             grant_apps: { type: 'boolean', description: GRANT_APPS_PARAM },
         },
     },
@@ -375,9 +377,9 @@ export const packagesTools = [
             group_id: { type: 'string', required: true, description: 'Your package group identifier.' },
             action: { type: 'string', required: true, enum: ['list', 'grant', 'revoke'], description: 'list the nodes, grant (or change) one, or revoke one.' },
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
-            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.', zod: z.string().nullable() },
+            updates_until: { type: 'string', description: 'For grant: versions published after this ISO date-time are not served to the node. Omit for updates that run on.', zod: z.string().max(INPUT_LIMITS.id).nullable() },
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant: stable serves published versions (the default); beta serves versions set to beta too, whichever is newest.' },
-            node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.', zod: z.object({ url: z.string(), public_key: z.string() }) },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a node this repository does not know yet. It is registered with the grant as a packages-only peer (active, contact tier, messages off), which can pull only what it is entitled to. A peer of that id under another key, or switched off, is refused.', zod: z.object({ url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             note: { type: 'string', description: 'For grant: why, e.g. the order it came from.' },
         },
     },
@@ -393,7 +395,7 @@ export const packagesTools = [
         input: {
             action: { type: 'string', required: true, enum: ['list', 'add', 'remove'], description: 'list your sellers, add (or change) one, or remove one.' },
             node_id: { type: 'string', description: 'For add and remove: the seller node, e.g. "aimeat-finland-003-store".' },
-            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.', zod: z.object({ url: z.string(), public_key: z.string() }) },
+            node: { type: 'object', description: 'For add: { url, public_key } of a node this repository does not know yet.', zod: z.object({ url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             note: { type: 'string', description: 'For add: why, e.g. "the shop".' },
         },
     },
@@ -477,7 +479,7 @@ export const packagesTools = [
             action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.' },
             repository: { type: 'string', description: 'The package repository\'s node id.' },
             group_id: { type: 'string', description: 'The package group id on the repository.' },
-            node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.', zod: z.object({ node_id: z.string(), url: z.string(), public_key: z.string() }) },
+            node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.', zod: z.object({ node_id: z.string().max(INPUT_LIMITS.id), url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             node_id: { type: 'string', description: 'For renew and auto_renew: the node the package was bought for.' },
             auto_renew: { type: 'boolean', description: 'For checkout: keep the card for automatic renewals. For auto_renew: on or off.' },
         },

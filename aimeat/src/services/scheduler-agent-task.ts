@@ -11,6 +11,8 @@
  * @structure TaskWake · runAgentTaskJob(storage, wake, job, trigger) · materialiseAgentTask(storage, wake, args)
  * @usage import { runAgentTaskJob, materialiseAgentTask } from './scheduler-agent-task.js';
  * @version-history
+ *   v1.3.1 — 2026-10-28 — Both paths decide on the agent record as it is: the node no longer narrows
+ *     an agent holding `*` by itself (Jouni, 2026-10-28).
  *   v1.3.0 — 2026-10-25 — materialiseAgentTask takes `workTrackingCode` and `startedBy`: an agent goal's
  *     taken work becomes a task through the same wake path (services/goals/, session cc-jouni-goals).
  *   v1.2.1 — 2026-10-21 — The check is services/schedule-fire-refusal.ts: an app's schedule from before
@@ -31,7 +33,6 @@ import type { createWebhookDispatcher } from './webhook-dispatcher.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { decideTaskStart, taskWakeId, AUTO_START_MARK } from './agent-task-rules.js';
 import { isStopped } from './agent-stop-rules.js';
-import { startFactsOf } from './scope-auto-narrow.js';
 import { scheduleFireRefusal } from './schedule-fire-refusal.js';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
@@ -46,7 +47,7 @@ type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 export interface TaskWake {
   webhookDispatcher?: WebhookDispatcher;
   emitResourceUpdated: (agentGaii: string, uri: string) => void;
-  /** The node's config, for the narrowing a start decision may make (services/scope-auto-narrow.ts). */
+  /** The node's config, for the maker check at the fire (scheduleFireRefusal). */
   config: AimeatConfig;
 }
 
@@ -116,7 +117,7 @@ export async function runAgentTaskJob(
   // The same start decision every created task gets (services/agent-task-rules.ts): the agent's
   // own answer, never past the permission floor. It read `mode === 'task-runner'` inline until
   // 2026-10-02, a copy of the old rule that would have kept a concierge's schedules waiting.
-  const autoActivated = decideTaskStart(await startFactsOf({ storage, config: wake.config }, agent)).startsNow;
+  const autoActivated = decideTaskStart(agent).startsNow;
   const now = new Date().toISOString();
   const scheduleScope: AgentTaskScope = {
     name: 'schedule', value: job.cron, type: 'cron', description: job.displayName || job.name,
@@ -210,7 +211,7 @@ export async function materialiseAgentTask(storage: Storage, wake: TaskWake, arg
   startedBy?: string;
 }): Promise<string> {
   const agent = await storage.getAgent(args.agentGaii);
-  const autoActivated = decideTaskStart(await startFactsOf({ storage, config: wake.config }, agent)).startsNow;
+  const autoActivated = decideTaskStart(agent).startsNow;
   const now = new Date().toISOString();
   const record: AgentTaskRecord = {
     id: randomUUID(),

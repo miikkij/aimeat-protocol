@@ -132,9 +132,9 @@ async function publishVersion(v: string, status = 'published'): Promise<string> 
 console.log('Setup');
 
 await test('Boot R (repository) and C (customer), an owner each, each the other\'s active peer', async () => {
-    // 40731-40732: clear of the 4025x-4029x band thirty-odd suites hardcode, and of 40701/40702.
-    R = await bootNode(40731, `aimeat-test-001-repo${ts}`, true);
-    C = await bootNode(40732, `aimeat-test-001-cust${ts}`, false);
+    // 28731-28732: clear of the 4025x-4029x band thirty-odd suites hardcode, and of 28701/28702.
+    R = await bootNode(28731, `aimeat-test-001-repo${ts}`, true);
+    C = await bootNode(28732, `aimeat-test-001-cust${ts}`, false);
     await setupOwner(R, `repo${ts}`);
     await setupOwner(C, `cust${ts}`);
     await peer(C, R);

@@ -5,6 +5,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_capabilities_get says who is shown a private or not yet published capability (secaudit2026oct22).
  *   2026-10-25 — aimeat_share_list declares memory:read, the word its REST twins ask (secaudit2026oct22, aimeat_share_list:missing-memory-read).
  *   2026-10-20 — aimeat_knowledge_list, aimeat_knowledge_get and aimeat_knowledge_links declare memory:read, as aimeat_memory_read does (secaudit 2026-10, v56).
@@ -44,6 +45,7 @@
 
 import { FLAG_REASONS, FLAG_TARGET_TYPES, OVERVIEW_SECTIONS } from '../../models/tool-input-vocabulary.js';
 import { CONSENT_REACH_INPUTS } from '../../utils/consent-reach.js';
+import { INPUT_LIMITS, documentText } from '../../models/input-limits.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
@@ -61,7 +63,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['agent', 'service'],
         input: {
             search: { type: 'string', description: 'Full-text search on name and summary.' },
-            tags: { type: 'array', description: 'Filter by tags.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Filter by tags.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             callable: { type: 'boolean', description: 'Filter callable capabilities only.' },
             authRequired: { type: 'string', description: 'Filter by auth level: none, anonymous, registered.' },
             source_type: { type: 'string', description: 'Filter by source type: extension (a server extension action, callable), app-tool (a sellable tool from an app manifest, called under a contract), offering (an agent\'s public offer, commissioned as work), cortex (a browser library the app loads, never callable here), manual (an owner-added webhook), action.' },
@@ -109,7 +111,7 @@ export const capabilitiesGroupsSkillsTools = [
             // POST /v1/capabilities reads it and the node's MCP took it; the catalog had left it out (secaudit 2026-10 follow-up, Part B).
             status: { type: 'string', enum: ['draft', 'active'], description: 'draft = created but listed to nobody; active = listed. Default draft, the same as POST /v1/capabilities, so nothing reaches the catalogue that the owner did not mean to put there. Publish it later with aimeat_capabilities_update({ id, status: "active" }). On a moderated node a PUBLIC capability goes to pending_review whichever you ask for; that gate is not this field.' },
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Visibility: private (default) or public.' },
-            tags: { type: 'array', description: 'Tags for discovery and filtering.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags for discovery and filtering.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             inputSchema: { type: 'object', description: 'JSON Schema for input validation.' },
             outputSchema: { type: 'object', description: 'JSON Schema for output format.' },
             usage: { type: 'string', description: 'Usage instructions for consumers.' },
@@ -128,7 +130,7 @@ export const capabilitiesGroupsSkillsTools = [
             id: { type: 'string', required: true, description: 'Capability identifier.' },
             name: { type: 'string', description: 'Updated name.' },
             summary: { type: 'string', description: 'Updated summary.' },
-            tags: { type: 'array', description: 'Updated tags.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Updated tags.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             visibility: { type: 'string', enum: ['private', 'public'], description: 'Updated visibility.' },
             status: { type: 'string', enum: ['draft', 'active', 'deprecated', 'disabled'], description: 'Publish a draft with "active", take it out of the catalogue with "draft", or retire it with "deprecated" or "disabled". Without it an agent could create a capability and never publish it.' },
             usage: { type: 'string', description: 'Updated usage instructions.' },
@@ -342,7 +344,7 @@ export const capabilitiesGroupsSkillsTools = [
             name: { type: 'string', required: true, description: 'Group name.' },
             description: { type: 'string', description: 'Group description.' },
             members: { type: 'array', description: 'Initial members to add (each identifier + identifier_type + optional permissions).', zod: z.array(z.object({
-                identifier: z.string().describe('GAII or GHII of the member'),
+                identifier: z.string().max(INPUT_LIMITS.id).describe('GAII or GHII of the member'),
                 identifier_type: z.enum(['gaii', 'ghii']).describe('Type of identifier'),
                 permissions: z.object({
                     read: z.boolean(),
@@ -596,7 +598,7 @@ export const capabilitiesGroupsSkillsTools = [
             id: { type: 'string', required: true, description: 'Stable kebab-case template id (same id = update).', zod: z.string().min(1).max(64) },
             title: { type: 'string', required: true, description: 'Template title.', zod: z.string().min(3).max(160) },
             description: { type: 'string', required: true, description: 'What the template is for.', zod: z.string().min(5).max(10_000) },
-            derived_from: { type: 'object', required: true, description: '{owner, filename} of YOUR published source app.', zod: z.object({ owner: z.string().min(1).describe('Your own owner name'), filename: z.string().min(1).describe('The published app this template distills') }) },
+            derived_from: { type: 'object', required: true, description: '{owner, filename} of YOUR published source app.', zod: z.object({ owner: z.string().min(1).max(INPUT_LIMITS.id).describe('Your own owner name'), filename: z.string().min(1).max(INPUT_LIMITS.id).describe('The published app this template distills') }) },
             tier: { type: 'string', required: true, enum: ['T1', 'T2', 'T3'], description: 'T1 pure client · T2 +cortex · T3 +extension.' },
             reuse_notes: { type: 'string', required: true, description: 'What generalizes — the parts a next build should copy/keep.', zod: z.string().min(10).max(40_000) },
             model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that built the source app. Self-identify, never ask the user (indicative).', zod: z.string().min(1).max(64) },
@@ -671,7 +673,7 @@ export const capabilitiesGroupsSkillsTools = [
         surfaces: ['appdev', 'agent', 'service'],
         input: {
             skill_md: { type: 'string', description: 'SKILL.md content (frontmatter + body). Omit for presigned ZIP upload mode.' },
-            files: { type: 'object', description: 'The skill\'s other files as relative path -> content: the text of a text file, or { "content": "<base64>", "encoding": "base64" } for an image or other binary file. Any path inside the skill folder (scripts/, references/, assets/, LICENSE.txt …).', zod: z.record(z.string(), z.union([z.string(), z.object({ content: z.string(), encoding: z.literal('base64') })])) },
+            files: { type: 'object', description: 'The skill\'s other files as relative path -> content: the text of a text file, or { "content": "<base64>", "encoding": "base64" } for an image or other binary file. Any path inside the skill folder (scripts/, references/, assets/, LICENSE.txt …).', zod: z.record(z.string(), z.union([documentText(), z.object({ content: documentText(), encoding: z.literal('base64') })])) },
             keep_files: { type: 'boolean', description: 'Keep every file the skill already holds that `files` does not name (default false: a republish holds exactly SKILL.md plus `files`). Use it to change SKILL.md alone.' },
             scope: { type: 'string', enum: ['user', 'node', 'workspace'], description: 'Registry scope (default user).' },
             visibility: { type: 'string', description: 'Registry visibility (node/user): owner, members, public, or organism:<organism id> (user scope only: the active members of one organisation your owner is a member of). Defaults: user->owner, node->members. public = federated.', zod: z.union([z.enum(['owner', 'members', 'public']), organismAudienceInput]) },
@@ -772,8 +774,8 @@ export const capabilitiesGroupsSkillsTools = [
             display_name: { type: 'string', description: 'New display name.' },
             description: { type: 'string', description: 'New description.' },
             mode: { type: 'string', enum: ['interactive', 'autonomous', 'task-runner', 'coordinator', 'workstation'], description: 'New agent mode.' },
-            tags: { type: 'array', description: 'Replacement tag list.', zod: z.array(z.string()) },
-            scopes: { type: 'array', description: 'Replacement scope list (narrowing only).', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Replacement tag list.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
+            scopes: { type: 'array', description: 'Replacement scope list (narrowing only).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             clearance: { type: 'string', description: 'The highest classification the agent may read, as the classification\'s id (for example sisainen); content classified higher is hidden from it while classification is on. Lowering only: you can set a lower one, or one where there was none. Raising it or null (no limit) is the owner\'s decision on the agent\'s page, and you cannot change your own.', zod: z.string().max(40).nullable() },
             confirm_token: { type: 'string', description: 'On the node\'s own MCP: the token from the propose step; omit it to propose and see the change first. The shell and the connector apply directly, because the REST routes take no token.' },
         },

@@ -16,11 +16,13 @@
  *   const check = validateCortexAgents(req.body.cortex?.agents);
  *   if (!check.ok) return res.status(400).json(error(..., check.errors.join('; ')));
  * @version-history
+ *   v1.1.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-09-20 — A tool id may carry ONE ':' so a decision rule can be named
  *     (`decide:<rule>`). The charset refused it, and that form is what the Crew tab offers.
  *   v1.0.0 — 2026-07-16 — Initial creation (Agent-Bundled Apps Slice 1, node side)
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /**
  * One crew member. `tools`/`skills` are NAMES resolved fleet-side against the vetted
@@ -39,7 +41,7 @@ const CrewAgentSchema = z.object({
   role: z.string().min(1).max(256),
   goal: z.string().min(1).max(4000),
   backstory: z.string().max(8000).optional().default(''),
-  tools: z.array(z.string().regex(/^[a-z0-9_-]{1,64}(:[a-z0-9_-]{1,64})?$/,
+  tools: z.array(z.string().max(INPUT_LIMITS.id).regex(/^[a-z0-9_-]{1,64}(:[a-z0-9_-]{1,64})?$/,
     "tool names are lowercase alphanumeric with _ or -, optionally with one ':' and a selector (for example decide:sort-a-message)")).max(16).optional(),
   skills: z.array(z.string().min(1).max(128)).max(20).optional(),
   allow_delegation: z.boolean().optional(),
@@ -62,7 +64,7 @@ const CrewTaskSchema = z.object({
  * deployed name (`<agent_name>-<slug(app_id)>`, ≤64) still fits the node's agent-name limit.
  */
 export const CrewDefSchema = z.object({
-  agent_name: z.string().regex(/^[a-z0-9][a-z0-9-]{2,31}$/,
+  agent_name: z.string().max(INPUT_LIMITS.id).regex(/^[a-z0-9][a-z0-9-]{2,31}$/,
     'agent_name must be 3-32 lowercase alphanumeric characters with hyphens'),
   readme_md: z.string().max(20000).optional(),
   temperature: z.number().min(0).max(2).optional(),

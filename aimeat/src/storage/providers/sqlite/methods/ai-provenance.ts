@@ -17,6 +17,7 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.7.0 — 2026-10-28 — listAiProvenance({ publicOnly }): public records, reviewed or not.
  *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
  *     owner or the node since a day that PUBLICLY_LINKED does not count, up to 5000. Mirrors the
  *     Postgres provider.
@@ -217,6 +218,8 @@ export const aiProvenanceMethods = {
     if (query?.unreviewedPublicOnly) {
       where.push(PUBLICLY_LINKED);
       where.push(`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`);
+    } else if (query?.publicOnly) {
+      where.push(PUBLICLY_LINKED);
     }
     const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)

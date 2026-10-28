@@ -17,6 +17,7 @@
  * @structure dataMapRouter(config, storage)
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-28 — GET carries ai_act for an app that uses AI: the EU AI Act questions its maker answers in the map's `aiAct`.
  *   2026-10-24 — GET carries records_of_processing and privacy_notice (plan doc-mvlftkh9zmc9, C1.7).
  *   2026-10-21 — The caller asks isAnonymousPrincipal, so the minted anonymous token is nobody here too (secaudit 2026-10, anonymous-claim-not-signed).
  *   2026-10-16 — GET answers the map of an app that is not public only to whoever may see that app (services/data-map/data-map-access.ts), and the caller comes from callerOf (middleware/caller.ts) with whether it is a member of this node and its session for the operator question (QA audit list review).
@@ -71,6 +72,7 @@ export function dataMapRouter(config: AimeatConfig, storage: Storage): Router {
       app: out.app, data_map: out.dataMap, stamp: out.stamp,
       ...(out.findings ? { findings: out.findings } : {}),
       records_of_processing: out.records, privacy_notice: out.privacyNotice,
+      ...(out.aiAct ? { ai_act: { questions: out.aiAct.questions, built_in: out.aiAct.builtIn, unanswered: out.aiAct.unanswered } } : {}),
     }));
   });
 

@@ -33,6 +33,8 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-living-hooks and e2e-connections use to put a real counterparty on the machine.
  * @version-history
+ *   v1.3.2 — 2026-10-27 — The receiver listens on a port the OS chooses; its fixed default was inside
+ *     the range the claims board hands out, and a session holding it refused the suite.
  *   v1.3.1 — 2026-10-24 — The operator's own agent (no secrets:manage) makes the first use of a shared
  *     value toward a new host and it goes through, by Jouni's ruling of 2026-10-24 (secaudit2026oct22).
  *   v1.3.0 — 2026-10-24 — A second owner's first use of a value from the operator's shared map is
@@ -51,13 +53,17 @@
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=secrets
 
 import { createServer, type Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_PORT ?? '40672', 10);
+// The receiver's port is the OS's choice (0), read back once it listens; E2E_SECRETS_PORT still fixes
+// one. The fixed default this had sat inside the range the claims board hands out, so a session
+// holding that port refused the suite with EADDRINUSE before its first test (2026-10-27).
 const RECEIVER_HOST = '127.0.0.1';
-const RECEIVER = `http://${RECEIVER_HOST}:${RECEIVER_PORT}`;
+let RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_PORT ?? '0', 10);
+let RECEIVER = '';
 
 const SECRET_NAME = 'VAULT_TOKEN';
 const SECRET_VALUE = 'zz-vault-value-zz';
@@ -141,7 +147,11 @@ function startReceiver(): Promise<void> {
             });
         });
         receiver.on('error', reject);
-        receiver.listen(RECEIVER_PORT, RECEIVER_HOST, () => resolve());
+        receiver.listen(RECEIVER_PORT, RECEIVER_HOST, () => {
+            RECEIVER_PORT = (receiver!.address() as AddressInfo).port;
+            RECEIVER = `http://${RECEIVER_HOST}:${RECEIVER_PORT}`;
+            resolve();
+        });
     });
 }
 const stopReceiver = (): Promise<void> =>

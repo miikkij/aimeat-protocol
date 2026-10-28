@@ -23,7 +23,7 @@
  *   which interleaves at every await on both backends: the UCP completion and the MCP delivery. The
  *   renewal has no route, only the daily job, so its test runs the job and the cancel together.
  *
- *   The node is in this process (port 40296) on a database of its own on the run's backend
+ *   The node is in this process (port 28296) on a database of its own on the run's backend
  *   (helpers/own-node-db.ts), so the payment handlers it charges through are stand-ins this file
  *   registers: Stripe's id for the UCP card, and a kept-card handler for the renewal.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-path-races
@@ -44,7 +44,7 @@ import { registerExchangeRunTools } from '../src/mcp/exchange-run.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner, ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = parseInt(process.env.E2E_RACES_PORT ?? '40296', 10);
+const PORT = parseInt(process.env.E2E_RACES_PORT ?? '28296', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let passed = 0, failed = 0;

@@ -19,7 +19,7 @@
  *   second time under a query string gives a second, independent copy of that chain, which is what a
  *   second node process has.
  *
- *   The node is in this process (port 40419) on a database of its own on the run's backend
+ *   The node is in this process (port 28419) on a database of its own on the run's backend
  *   (helpers/own-node-db.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=atomic-access
  * @version-history
@@ -51,7 +51,7 @@ import { agentRefusalsKey, AGENT_REFUSALS_SPEC, type AgentRefusalEntry } from '.
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
 
-const PORT = parseInt(process.env.E2E_ATOMIC_ACCESS_PORT ?? '40419', 10);
+const PORT = parseInt(process.env.E2E_ATOMIC_ACCESS_PORT ?? '28419', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let passed = 0, failed = 0;

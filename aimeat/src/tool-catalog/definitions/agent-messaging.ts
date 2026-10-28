@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_contact_list's description names origin 'colleague', every other person of a company node (members see each other).
  *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
  *   2026-10-18 — aimeat_agents_list's description names `invites_people` (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
@@ -71,6 +72,7 @@ import { InteractiveQuestionSchema, MessageAttachmentInputSchema } from '../../m
 import { MessagePromptSchema } from '../../models/agent-message-schemas.js';
 import { CONVERSATION_ID, InboxRuleInputSchema } from '../../models/inbox-organize-schemas.js';
 import { LinkSchema } from '../input-schemas.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { z } from 'zod';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere, connectorOnly } from './types.js';
@@ -144,8 +146,8 @@ export const agentMessagingTools = [
         annotations: { title: 'Declare Agent Services', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         surfaces: ['agent', 'service'],
         input: { services: { type: 'array', description: 'Optional array of service objects with name and description.', zod: z.array(z.object({
-            name: z.string().describe('Service name'),
-            description: z.string().optional().describe('Short service description'),
+            name: z.string().max(INPUT_LIMITS.name).describe('Service name'),
+            description: z.string().max(INPUT_LIMITS.description).optional().describe('Short service description'),
         })) } },
     },
     {
@@ -157,11 +159,11 @@ export const agentMessagingTools = [
         surfaces: ['agent', 'service'],
         input: {
             technical: { type: 'array', description: 'Array of technical capabilities: { name, type }.', zod: z.array(z.object({
-                name: z.string().describe('Capability name (e.g. "playwright", "git", "python")'),
+                name: z.string().max(INPUT_LIMITS.name).describe('Capability name (e.g. "playwright", "git", "python")'),
                 type: z.enum(['mcp', 'skill', 'tool']).describe('Capability type'),
             })) },
-            domain: { type: 'array', description: 'Array of domain expertise strings.', zod: z.array(z.string()) },
-            languages: { type: 'array', description: 'Array of language codes.', zod: z.array(z.string()) },
+            domain: { type: 'array', description: 'Array of domain expertise strings.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
+            languages: { type: 'array', description: 'Array of language codes.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
         },
     },
     {
@@ -233,7 +235,7 @@ export const agentMessagingTools = [
         surfaces: ['agent', 'service', 'admin'],
         input: {
             target_agent_name: { type: 'string', required: true, description: 'Agent whose tags to update (must be owned by the same owner as the caller). Pass the calling agent\'s own name to self-tag.' },
-            tags: { type: 'array', required: true, description: 'Replacement tag list. Empty array clears all tags.', zod: z.array(z.string()) },
+            tags: { type: 'array', required: true, description: 'Replacement tag list. Empty array clears all tags.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
         },
     },
     {
@@ -352,7 +354,7 @@ export const agentMessagingTools = [
             name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
             purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from. This is what they read.' },
             display_name: { type: 'string', description: 'The name shown to the person. Defaults to the agent name.' },
-            scopes: { type: 'array', description: 'Exactly what it may do, e.g. ["memory:read","memory:write"]. Never more than you hold yourself.', zod: z.array(z.string()) },
+            scopes: { type: 'array', description: 'Exactly what it may do, e.g. ["memory:read","memory:write"]. Never more than you hold yourself.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             mode: { type: 'string', description: "How the node treats its tasks: 'task-runner' activates a queued task without asking the owner each time; also autonomous, interactive, coordinator, workstation." },
             run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for an agent that answers people as they write, at a few seconds of cold start saved)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
@@ -573,7 +575,7 @@ export const agentMessagingTools = [
         scope: 'messages:organize-as-owner',
         surfaces: ['agent'],
         input: {
-            conversation_ids: { type: 'array', required: true, description: 'Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.', zod: z.array(z.string().regex(CONVERSATION_ID)).min(1).max(500) },
+            conversation_ids: { type: 'array', required: true, description: 'Conversation ids to archive or restore (1-500), from aimeat_dm_inbox_as_owner.', zod: z.array(z.string().regex(CONVERSATION_ID).max(INPUT_LIMITS.id)).min(1).max(500) },
             restore: { type: 'boolean', description: 'true brings the conversations back to the list instead of archiving them.' },
         },
     },
@@ -590,7 +592,7 @@ export const agentMessagingTools = [
             auto_archive_days: { type: 'number', description: 'Days without a message before that happens (1-365).', zod: z.number().int().min(1).max(365) },
             fold_same_subject: { type: 'boolean', description: 'One row for conversations one sender opened with the same subject within an hour.' },
             add_rule: { type: 'object', description: 'A rule { id?, name, enabled?, action: "fold" | "group" | "archive", match: { with?, subject?, body?, scope?: "agents" | "all", older_than_days? } }.', zod: InboxRuleInputSchema },
-            remove_rule: { type: 'string', description: 'Id of a rule to remove.', zod: z.string().regex(/^[a-z0-9-]{1,40}$/) },
+            remove_rule: { type: 'string', description: 'Id of a rule to remove.', zod: z.string().regex(/^[a-z0-9-]{1,40}$/).max(INPUT_LIMITS.id) },
             rules: { type: 'array', description: 'Replace every rule with this list (same shape as add_rule).', zod: z.array(InboxRuleInputSchema).max(50) },
         },
     },

@@ -17,11 +17,15 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.3.0 — 2026-10-28 — An answer's source may be `proposed`: the node read it from the data map's
+ *     words and nobody has decided (a register's domain drafted from an app's map).
+ *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-24 — A processor's `agreement` (the DPA plan doc-mvmr4i2wdk0p fills it).
  *   v1.0.1 — 2026-10-24 — retentionMonths takes up to 2 400 months: a patient record's 120 years was refused.
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.1, C4.1, C4.3, C5.1, C5.2, C6).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 
 /** The documents, in the order the surfaces list them. */
 export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks'] as const;
@@ -35,8 +39,9 @@ const id = z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._-]*$/, 'let
 const text = (max = 2000) => z.string().max(max);
 const list = (max = 50) => z.array(z.string().max(300)).max(max);
 const iso = z.string().max(40).refine(s => !Number.isNaN(Date.parse(s)), 'an ISO date or time');
-const sources = z.record(z.string(), z.enum(['human', 'ai', 'evidence'])).optional();
-const stamp = { updatedAt: z.string().optional(), updatedBy: z.string().max(300).optional() };
+/** `proposed`: the node matched the data map's words to it (compliance-app-signals.ts); a person decides. */
+const sources = z.record(z.string(), z.enum(['human', 'ai', 'evidence', 'proposed'])).optional();
+const stamp = { updatedAt: z.string().max(INPUT_LIMITS.id).optional(), updatedBy: z.string().max(300).optional() };
 
 /** A container a register covers. An app is its filename (the owner is the register's scope). */
 const ContainerSchema = z.object({

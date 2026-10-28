@@ -31,7 +31,7 @@
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40463';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28463';
 const stamp = Date.now();
 
 let passed = 0, failed = 0;

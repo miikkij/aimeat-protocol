@@ -22,6 +22,8 @@
  *   const r = await deployAppAgent(storage, config, { callerOwner, appOwner, filename, agentName, undeploy: false });
  *   if (!r.ok) return res.status(r.status).json(error(config.nodeId, r.code, r.message));
  * @version-history
+ *   2026-10-28 — The start decision reads the runner's record as it is: the node no longer narrows an
+ *     agent holding `*` by itself (Jouni, 2026-10-28).
  *   2026-10-20 — createAppAgentTask asks the shared start decision (decideTaskStart over startFactsOf)
  *     in place of the runner's mode alone: a runner holding a permission-floor scope or set to
  *     taskStart 'confirm' gets a queued deploy task, the auto-start event carries the marker, a
@@ -57,7 +59,6 @@ import { logger } from '../utils/logger.js';
 import { proposeBundledAgent } from './app-agent-propose.js';
 import { proposerIsOwnerSession, type ProposerPrincipal } from './agent-proposals.js';
 import { decideTaskStart, resolveAutoActivation, autoStartEvent, taskWakeId, type TaskStartDecision } from './agent-task-rules.js';
-import { startFactsOf } from './scope-auto-narrow.js';
 import { notifyTaskWaiting, waitReason } from './task-start-notice.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
@@ -131,7 +132,7 @@ export async function createAppAgentTask(
   // task names no start policy of its own, so the caller cannot loosen the runner's setting here.
   // This replaced a mode-only test that started a deploy past the floor and the owner's setting
   // (secaudit 2026-10, app-agent-deploy.ts:createAppAgentTask:mode-only-auto-activation).
-  const decision = decideTaskStart(await startFactsOf({ storage, config }, runner));
+  const decision = decideTaskStart(runner);
   const { autoActivated, effectiveStatus } = resolveAutoActivation(decision, 'queued');
 
   const task: AgentTaskRecord = {

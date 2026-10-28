@@ -23,7 +23,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40483';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28483';
 const stamp = Date.now();
 const tag = stamp.toString(36);
 

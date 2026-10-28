@@ -10,9 +10,11 @@
  * @usage import { InboxOrganizePatchSchema } from '../models/inbox-organize-schemas.js';
  * @version-history
  *   v1.0.0 -- 2026-09-13 -- Initial, with the Messages list's sections, rules and archive.
+ *   v1.0.1 -- 2026-10-27 -- Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  */
 
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /** A conversation id as the list hands it out: a 32-hex pair id, a minted uuid, a group id. */
 export const CONVERSATION_ID = /^[A-Za-z0-9_.:-]{8,128}$/;
@@ -29,7 +31,7 @@ export const InboxRuleMatchSchema = z.object({
 }).strict();
 
 export const InboxRuleInputSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]{1,40}$/).optional().describe('Keep the id of an existing rule to edit it in place.'),
+  id: z.string().max(INPUT_LIMITS.id).regex(/^[a-z0-9-]{1,40}$/).optional().describe('Keep the id of an existing rule to edit it in place.'),
   name: z.string().trim().min(1).max(80).describe('What the rule is called; a "group" rule shows its rows under this name.'),
   enabled: z.boolean().optional(),
   action: z.enum(['fold', 'group', 'archive'])
@@ -45,11 +47,11 @@ export const InboxOrganizePatchSchema = z.object({
   fold_same_subject: z.boolean().optional(),
   rules: z.array(InboxRuleInputSchema).max(50).optional(),
   add_rule: InboxRuleInputSchema.optional(),
-  remove_rule: z.string().regex(/^[a-z0-9-]{1,40}$/).optional(),
+  remove_rule: z.string().max(INPUT_LIMITS.id).regex(/^[a-z0-9-]{1,40}$/).optional(),
 }).strict();
 
 export const InboxArchiveSchema = z.object({
-  conversation_ids: z.array(z.string().regex(CONVERSATION_ID)).min(1).max(500),
+  conversation_ids: z.array(z.string().max(INPUT_LIMITS.id).regex(CONVERSATION_ID)).min(1).max(500),
   restore: z.boolean().optional(),
 }).strict();
 

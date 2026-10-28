@@ -29,6 +29,8 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.5.0 — 2026-10-28 — The list filter `publicOnly`: public content, reviewed or not (the
+ *     register draft's "does this publish").
  *   v1.4.0 — 2026-10-08 — `storage_files` joins the list: a public stored file is served to anyone
  *     at /v1/pub, and its record answered 404 to the same visitor.
  *   v1.4.0 — 2026-10-08 — A facet carries the minted `reason` and the record's `mediaKind`, so the
@@ -151,6 +153,12 @@ export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
    * (services/ai-transparency-report.ts), not read from the block stored at mint.
    */
   unreviewedPublicOnly?: boolean;
+  /**
+   * Only records whose content an anonymous visitor can read right now, reviewed or not. The
+   * register draft reads it to answer "does this publish": a record existing says only that
+   * something was generated, and on a node whose apps are all parked that answer was "yes".
+   */
+  publicOnly?: boolean;
   limit?: number;
   offset?: number;
 }

@@ -10,6 +10,7 @@
  * @structure WorkspaceList
  * @usage import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
  * @version-history
+ *   v1.20.0 -- 2026-10-27 -- The new workspace's name stops at the node's name limit (js/input-limits.js).
  *   v1.19.0 -- 2026-10-25 -- An access request answered no or taken back shows that answer, not Approve
  *     and Deny again, and an open request inbox reads again on the live `organisms` event (the developer's review).
  *   v1.18.0 -- 2026-10-16 -- A failed read of the list shows the could-not-load note with Retry instead
@@ -80,6 +81,7 @@ import { Note } from '/components/Note.js';
 import { Tab } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 import { FileDrop } from '/components/FileDrop.js';
 import { Row as Line } from '/components/Layout.js';
 import { List, Row, Name, Cell, Lead, Stats, Stat, Doors } from '/components/List.js';
@@ -417,7 +419,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
 
       <${Line} wrap below="medium">
         ${creating ? html`
-          <${TextField} size="medium" autoFocus placeholder=${t('organisms.workspaceName') || 'Workspace name'} ariaLabel=${t('organisms.workspaceName') || 'Workspace name'}
+          <${TextField} size="medium" autoFocus maxLength=${INPUT_LIMITS.name} placeholder=${t('organisms.workspaceName') || 'Workspace name'} ariaLabel=${t('organisms.workspaceName') || 'Workspace name'}
             value=${newName} onInput=${setNewName} onEnter=${create} />
           <${Loud} control onClick=${create} disabled=${busy || !newName.trim()}>${t('organisms.create') || 'Create'}<//>
           <${Action} small onClick=${() => { setCreating(false); setNewName(''); }}>${t('organisms.cancel') || 'Cancel'}<//>

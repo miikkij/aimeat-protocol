@@ -16,7 +16,7 @@
  *     bell entry, no retry; autoDisable() clears nextRunAt, so a schedule that is off shows no next
  *     run (wish a-failed-one-shot-schedule-does-not-wait-a-year).
  *   2026-10-18 — taskWake() passes the node's config, for the narrowing of a `*` agent a scheduled
- *     task's start decision may make (services/scope-auto-narrow.ts).
+ *     task's start decision made until 2026-10-28; it now serves the maker check at the fire.
  *   2026-10-16 — A failed core job sends the operator the deduplicated fault message; a failed user
  *     schedule tells its owner in the bell and is paused after five failures in a row
  *     (scheduler-failures.ts); a core job whose handler is not registered is skipped with one log

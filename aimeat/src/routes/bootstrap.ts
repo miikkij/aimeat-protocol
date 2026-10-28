@@ -3,14 +3,16 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Bootstrap and discovery routes: GET / (node discovery JSON for AI agents and
- *   assistants), /llms.txt, /favicon, /v1/help/prompt, and /v1/health. The two sitemaps moved to
- *   ./sitemaps.ts when this file passed the line ceiling.
+ *   assistants), /llms.txt, /favicon and /v1/help/prompt. The two sitemaps moved to ./sitemaps.ts
+ *   and /v1/health to ./health.ts when this file passed the line ceiling.
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-10-28 — GET /v1/health moved unchanged to ./health.ts (line ceiling, after a merge of main).
  *   2026-10-27 — secaudit2026oct26: GET /v1/health probes storage with one keyed read instead of
  *     listing every account, lists the personal nodes once, and reads one mailbox item per node.
- *   2026-10-21 —The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
+ *   2026-10-27 — A static front page is stamped with the node's head metadata (utils/page-head.ts).
+ *   2026-10-21 — The switch grows a fourth value: AIMEAT_FRONT_PAGE=start serves the
  *     "accelerate your AI" page (public/front-start.html, .fi sibling), same rules as demo.
  *   2026-10-17 — A node set to signed-in content access answers GET / without the operator's
  *     template, the front page passages and the live page body, and the JSON bootstrap says
@@ -89,24 +91,23 @@ import type { TunnelManager } from '../services/personal-tunnel.js';
 import type { SiteService } from '../services/site.js';
 import { injectCspNonce } from '../utils/csp-nonce.js';
 import { success } from '../middleware/envelope.js';
-import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
-import { buildLlmsHumanPages, buildLlmsOptionalPages } from '../data/public-pages.js';
+import { buildLlmsHumanPages, buildLlmsOptionalPages, findPublicPage } from '../data/public-pages.js';
+import { injectStaticPageHead } from '../utils/page-head.js';
 import { buildGettingStarted } from '../data/getting-started.js';
 import { getActiveEmailService } from '../services/email.js';
 import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
 import { buildFirstSteps } from '../services/first-steps.js';
 import { apexOnly } from './agent-docs.js';
 import { mountSitemapRoutes } from './sitemaps.js';
+import { mountHealthRoute } from './health.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
 import { SurfaceLayoutService } from '../services/surface-layout/service.js';
 import { renderLayoutMarkdown } from '../services/surface-layout/markdown.js';
 import { logger } from '../utils/logger.js';
-import { runningBuild } from '../utils/build-stamp.js';
-import { getSoftwareVersion } from '../utils/version.js';
 import { coreDiscoveryFields } from '../services/core-discovery.js';
 import { signedInOnly } from '../config-visibility.js';
 
@@ -139,8 +140,6 @@ const FAVICON_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 10
  */
 const LLMS_INDEX_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-index-template.txt'), 'utf-8');
 const LLMS_FULL_TEMPLATE = readFileSync(resolve(__dirname, '../../public/llms-full-template.txt'), 'utf-8');
-/** How long GET /v1/health waits for the storage probe before it answers degraded (QA audit E6-07). */
-const HEALTH_STORAGE_PROBE_MS = 5_000;
 
 export function bootstrapRouter(
   config: AimeatConfig,
@@ -290,7 +289,8 @@ export function bootstrapRouter(
         const staticPath = resolvePublicFile(wantsFi ? `${base}.fi.html` : `${base}.html`);
         if (staticPath) {
           res.set('Cache-Control', 'no-cache');
-          res.type('html').send(readFileSync(staticPath, 'utf-8'));
+          const nonce = res.locals.cspNonce as string | undefined;
+          res.type('html').send(injectStaticPageHead(readFileSync(staticPath, 'utf-8'), '/', findPublicPage('/'), config, nonce ? ` nonce="${nonce}"` : ''));
           return;
         }
       }
@@ -675,126 +675,8 @@ export function bootstrapRouter(
     }));
   });
 
-  // GET /v1/health — simple liveness/readiness check (Tier 0, no auth)
-  router.get('/v1/health', async (_req, res) => {
-    const healthData: Record<string, unknown> = {
-      status: 'healthy',
-      uptime_seconds: Math.floor(process.uptime()),
-      memory_mb: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-    };
-
-    let degraded = false;
-    const subsystems: Record<string, unknown> = {};
-
-    // Site LB (existing — keep as-is)
-    if (config.siteLbEnabled) {
-      const syncState = getSiteSyncState();
-      const lastSyncAge = syncState.lastSync
-        ? (Date.now() - new Date(syncState.lastSync).getTime()) / 1000
-        : Infinity;
-      const syncHealthy = syncState.lastError === null && lastSyncAge < config.siteLbSyncIntervalMin * 60 * 2;
-      if (!syncHealthy) degraded = true;
-      healthData.site_lb = {
-        enabled: true,
-        origin_url: config.siteLbOriginUrl,
-        last_sync: syncState.lastSync,
-        sync_healthy: syncHealthy,
-      };
-    }
-
-    // The personal nodes, listed once for the tunnel and the mailbox subsystems (secaudit2026oct26).
-    // Both readers await it inside their own try, the mailbox one always.
-    const personalNodes = config.personalNodesEnabled ? storage.listPersonalNodes() : null;
-
-    // Tunnel subsystem
-    if (personalNodes && tunnelManager) {
-      const tunnelSub: Record<string, unknown> = {
-        healthy: true,
-        connections_active: tunnelManager.getOnlineCount(),
-      };
-      // Find most recent connection timestamp from online nodes
-      try {
-        const nodes = await personalNodes;
-        let newest: string | null = null;
-        for (const n of nodes) {
-          if (n.lastSeen && (!newest || n.lastSeen > newest)) newest = n.lastSeen;
-        }
-        if (newest) tunnelSub.last_connection_at = newest;
-      } catch (err) { logger.warn('GET /v1/health: ignore — non-critical', { error: String(err) }); }
-      subsystems.tunnel = tunnelSub;
-    }
-
-    // Mailbox subsystem
-    if (personalNodes) {
-      try {
-        const nodes = await personalNodes;
-        let totalItems = 0;
-        let totalBytes = 0;
-        let oldestAge = 0;
-
-        for (const node of nodes) {
-          const mbStats = await storage.getMailboxStats(node.nodeId);
-          totalItems += mbStats.count;
-          totalBytes += mbStats.totalBytes;
-          // Ordered oldest first, so the first item is the oldest; one is all this reads.
-          const items = await storage.listMailboxItems(node.nodeId, { limit: 1 });
-          if (items.length > 0) {
-            const age = Math.floor((Date.now() - new Date(items[0].createdAt).getTime()) / 1000);
-            if (age > oldestAge) oldestAge = age;
-          }
-        }
-
-        subsystems.mailbox = {
-          healthy: true,
-          items_total: totalItems,
-          bytes_total: totalBytes,
-          oldest_item_age_seconds: oldestAge,
-        };
-      } catch (err) {
-        logger.warn('bootstrap: suppressed failure, continuing', { error: String(err) });
-        subsystems.mailbox = { healthy: false };
-        degraded = true;
-      }
-    }
-
-    // Storage health probe, with its own time limit: a database that stops answering made this
-    // request wait without end, so the health check did not answer at all (QA audit E6-07). The
-    // pool's own limits end the query later; the probe answers degraded first. The probe is one keyed
-    // read of a name no account can hold: listing every account made each unsigned call cost as much as
-    // the node has accounts (secaudit2026oct26).
-    let probeTimer: ReturnType<typeof setTimeout> | undefined;
-    try {
-      await Promise.race([
-        storage.getOwner('__health_probe__'),
-        new Promise((_, reject) => { probeTimer = setTimeout(() => reject(new Error(`storage did not answer within ${HEALTH_STORAGE_PROBE_MS} ms`)), HEALTH_STORAGE_PROBE_MS); }),
-      ]);
-      subsystems.storage = { healthy: true };
-    } catch (err) {
-      logger.warn('health: the storage probe failed; answering degraded', { error: String(err) });
-      subsystems.storage = { healthy: false };
-      degraded = true;
-    } finally {
-      clearTimeout(probeTimer);
-    }
-
-    if (Object.keys(subsystems).length > 0) {
-      healthData.subsystems = subsystems;
-    }
-
-    if (degraded) {
-      healthData.status = 'degraded';
-    }
-
-    // Which code answers, so "is the fix deployed" is read here and not inferred from the uptime
-    // (utils/build-stamp.ts runningBuild; GET /v1/build carries the same with the build id).
-    const running = runningBuild();
-    healthData.build = {
-      version: getSoftwareVersion(), commit: running.commit, commit_source: running.commit_source,
-      dirty: running.dirty, built_at: running.built_at, state: running.state,
-    };
-
-    res.json(success(config.nodeId, healthData));
-  });
+  // GET /v1/health lives in ./health.ts, a pure extraction when this file passed the line ceiling.
+  mountHealthRoute(router, config, storage, tunnelManager);
 
   return router;
 }

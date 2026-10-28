@@ -20,7 +20,7 @@
  *   2026-10-16 —The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.0.2 — 2026-10-08 — The allowlist node listens on 31100 + lane % 100 (suitePort).
  *   v1.0.1 — 2026-10-02 —The allowlist node listens on a port the operating system picks
- *     (helpers/free-port.ts); 41104 was held by a database connection on two Postgres sweeps.
+ *     (helpers/free-port.ts); 29104 was held by a database connection on two Postgres sweeps.
  *   v1.0.0 — 2026-08-14 —Written with the August 2026 audit fix to routes/capabilities.ts.
  */
 
@@ -164,7 +164,7 @@ await test('The two-step way in is closed: a parked webhook cannot be turned man
 
 // ─── Phase 2: a node with an ALLOWLIST ───
 // A boot-time setting, so it needs a node of its own, on this suite's block below 32768
-// (helpers/free-port.ts says why: 41104 met a database connection's port on two Postgres sweeps,
+// (helpers/free-port.ts says why: 29104 met a database connection's port on two Postgres sweeps,
 // and a port asked of the system lost a race to another suite's stub server).
 console.log('\nPhase 2 — capabilityWebhooks=allowlist_only');
 

@@ -48,6 +48,9 @@
  *   const held = await acquirePortLocks(suiteOwnPorts(src, lanePort), { suite, session });
  *   try { await run(); } finally { releasePortLocks(held); }
  * @version-history
+ *   v1.1.0 — 2026-10-27 — suiteOwnPorts reads 28000-29999: the suites' fixed ports moved there from
+ *     40000-41999, the range the claims board hands out, because a claim is not a runner and these
+ *     locks never covered it (a claim on 40672 refused e2e-secrets).
  *   v1.0.0 — 2026-10-11 — Initial (wish-kaksi-istuntoa-ei-saa-en-samaa-testiporttia).
  */
 import { mkdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs';
@@ -89,19 +92,19 @@ export function sessionLanePorts(basePort: number): number[] {
 }
 
 /**
- * The ports a suite binds for itself, read from its source: every port number it writes down
- * (40000-41999; 40251 is the runner's default base and 40050 the dev server, which a suite only
- * mentions), and every `suitePort(<block>, …)` call resolved for the lane it will run in
- * (test/helpers/free-port.ts adds the lane port's last two digits to the block).
+ * The ports a suite binds for itself, read from its source: every port number it writes down in
+ * the suites' band, 28000-29999 (scripts/check-suite-ports.ts refuses one anywhere else), and every
+ * `suitePort(<block>, …)` call resolved for the lane it will run in (test/helpers/free-port.ts adds
+ * the lane port's last two digits to the block).
  *
  * It over-counts on purpose: a number in a comment is locked as well. A lock nobody needed costs
  * nothing; a port nobody locked is the failure this file exists for.
  */
 export function suiteOwnPorts(source: string, lanePort: number): number[] {
     const ports = new Set<number>();
-    for (const m of source.matchAll(/\b(4[01][0-9]{3})\b/g)) {
+    for (const m of source.matchAll(/\b(2[89][0-9]{3})\b/g)) {
         const p = Number(m[1]);
-        if (p !== 40251 && p !== 40050 && p !== lanePort) ports.add(p);
+        if (p !== lanePort) ports.add(p);
     }
     for (const m of source.matchAll(/\bsuitePort\(\s*(\d{5})\s*,/g)) {
         ports.add(Number(m[1]) + (lanePort % 100));

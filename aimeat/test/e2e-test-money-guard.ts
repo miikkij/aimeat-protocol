@@ -27,9 +27,9 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { setupOperator } from './helpers/owner-login.js';
 
-const PORT_PUBLIC = process.env.E2E_TMG_PUBLIC_PORT ?? '40486';
-const PORT_LOCAL = process.env.E2E_TMG_LOCAL_PORT ?? '40487';
-const PORT_OFF = process.env.E2E_TMG_OFF_PORT ?? '40489';
+const PORT_PUBLIC = process.env.E2E_TMG_PUBLIC_PORT ?? '28486';
+const PORT_LOCAL = process.env.E2E_TMG_LOCAL_PORT ?? '28487';
+const PORT_OFF = process.env.E2E_TMG_OFF_PORT ?? '28489';
 const ADMIN_PW = 'tmg-admin-password-2026';
 const PACK_PRICE = 2_000_000;   // 2.00 EUR in micro-units
 

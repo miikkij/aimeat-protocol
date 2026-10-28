@@ -11,6 +11,7 @@
  *   CLASSIFICATION_ACTIONS · checkClassificationInput()
  * @usage imported by catalog/definitions.ts and src/tool-dispatch/classification-call.ts
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-23 — pack_list and pack_set (the TL and NATO label packs), and a label's externalAi in the
  *     policy shape (plan doc-mvlftkh9zmc9, C3.2, C3.4).
  *   2026-10-18 — The audience cap (plan doc-mvdipuyqraas, L3): a label's maxAudience in the policy
@@ -44,6 +45,7 @@
  *   v1.0.0 — 2026-09-29 — TARGET-082 V2. Initial.
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
 /**
@@ -123,7 +125,7 @@ export const classificationTools = [
         surfaces: ['agent', 'admin'],
         input: {
             action: { type: 'string', required: true, enum: [...CLASSIFICATION_ACTIONS], description: 'What to do.' },
-            keys: { type: 'array', description: 'scan: memory keys to classify.', zod: z.array(z.string()).max(500) },
+            keys: { type: 'array', description: 'scan: memory keys to classify.', zod: z.array(z.string().max(INPUT_LIMITS.key)).max(500) },
             prefix: { type: 'string', description: 'scan: classify every memory key under this prefix (queued).' },
             since: { type: 'string', description: 'audit, exception_list: only rows from this ISO time on.' },
             audit_action: { type: 'string', enum: [...AUDIT_ACTIONS], description: 'audit: only this kind of row. exception: an exception made, used or withdrawn.' },

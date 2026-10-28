@@ -31,6 +31,15 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.6.0 — 2026-10-28 — "Fill these in for me" also brings the app makers' answers into entries
+ *     already saved, for the questions they leave open; the CSV carries each answer's reason; the
+ *     line under the verdict counts the makers' answers.
+ *   v3.5.0 — 2026-10-28 — The page reads the node's draft with the report, so the printout carries
+ *     every AI use the node finds, saved or not; the screen's question set speaks the reader's
+ *     language like the printout.
+ *   v3.4.0 — 2026-10-28 — Section 01 has a row for apps that use AI and that no entry names, the
+ *     candidates for the high-risk class named; the draft's proposals ride to the register, where
+ *     each proposed answer shows why; the line under the verdict counts proposed answers.
  *   v3.3.0 — 2026-10-24 — A row of section 09 opens the records dialog (compliance-tab.browse.js,
  *     C7.7), and one register or one place's record prints alone from it.
  *   v3.2.0 — 2026-10-24 — Sections 08 to 10, the records of processing (compliance-tab.records.js,
@@ -125,6 +134,8 @@ export function gapsLine(g, registerEmpty) {
     parts.push(registerEmpty ? C('line.modelsEmpty', { n: num(g.models.length) })
       : g.models.length === 1 ? C('line.modelsOne') : C('line.models', { n: num(g.models.length) }));
   }
+  const aiApps = g.aiApps || [];
+  if (aiApps.length > 0) parts.push(aiApps.length === 1 ? C('line.aiAppsOne') : C('line.aiApps', { n: num(aiApps.length) }));
   if (g.apps.length > 0) parts.push(g.apps.length === 1 ? C('line.appsOne') : C('line.apps', { n: num(g.apps.length) }));
   if (g.usecases.length > 0) parts.push(g.usecases.length === 1 ? C('line.unansweredOne') : C('line.unanswered', { n: num(g.usecases.length) }));
   if (g.unlabelled > 0) parts.push(g.unlabelled === 1 ? C('line.unlabelledOne') : C('line.unlabelled', { n: num(g.unlabelled) }));
@@ -146,6 +157,11 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const undocWhy = n === 0 ? C('gap.undocumentedClear')
     : empty ? C('gap.undocumentedEmpty', { n: num(n) })
     : html`${C('gap.undocumentedWhy', { n: num(n) })} ${codes(g.models)}. ${C('gap.undocumentedDraft')}`;
+  // Apps that use AI and no entry names, the candidates for the high-risk class first and named so.
+  const aiApps = g.aiApps || [];
+  const high = aiApps.filter(a => a.annex3).length;
+  const aiAppsWhy = aiApps.length === 0 ? C('gap.aiAppsClear')
+    : html`${aiApps.map((a, i) => html`${i > 0 ? ', ' : ''}${code(a.app)}${a.annex3 ? html` (${C('gap.aiAppHigh', { area: C('annex3.' + a.annex3) })})` : ''}`)} ${aiApps.length === 1 ? C('gap.aiAppsWhyOne') : C('gap.aiAppsWhy')}${high > 0 ? html` ${C('gap.aiAppsHighWhy')}` : ''}`;
   const appsWhy = g.apps.length === 0 ? C('gap.appsClear')
     : html`${g.apps.map((a, i) => html`${i > 0 ? ', ' : ''}${code(a.app)} (${a.inRegister ? C('gap.appIn') : C('gap.appOut')})`)} ${g.apps.length === 1 ? C('gap.appsWhyOne') : C('gap.appsWhy')}`;
   const ucWhy = g.usecases.length === 0 ? C('gap.unansweredClear')
@@ -155,7 +171,9 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
     : C('gap.unlabelledWhy', { n: num(g.unlabelled) });
   const word = g.total === 0 ? C('word.clear') : g.total === 1 ? C('word.one') : C('word.many', { n: num(g.total) });
   const under = empty ? C('under.empty', { questions: num(questions.length) })
-    : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) });
+    : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) })
+      + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '')
+      + (stats.maker > 0 ? C('under.maker', { n: num(stats.maker) }) : '');
   const toApps = () => switchPage('apps');
   // Faces added without licence data (the font manager): the Fonts tab of Themes & Styles.
   const fonts = g.fonts || [];
@@ -173,6 +191,8 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
         <${Readings} rows=${[
           { key: 'undocumented', name: C('gapUndocumented'), why: undocWhy,
             end: n === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting) },
+          { key: 'aiApps', name: C('gapAiApps'), why: aiAppsWhy,
+            end: aiApps.length === 0 ? clear : door(drafting ? C('drafting') : C('draftAction'), onDraft, drafting) },
           { key: 'apps', name: C('gapAppGap'), why: appsWhy, end: g.apps.length === 0 ? clear : door(C('toApps'), toApps) },
           { key: 'unclassified', name: C('gapUnclassified'), why: ucWhy,
             end: g.usecases.length === 0 ? clear : door(C('answer'), () => onAnswer(g.usecases[0].id)) },
@@ -276,12 +296,14 @@ export default function ComplianceTab(props) {
   const [report, setReport] = useState(null);
   const [questionnaire, setQuestionnaire] = useState(null);
   const [registers, setRegisters] = useState([]);   // the node's own records of processing, for print and CSV
+  const [found, setFound] = useState(null);         // the node's draft, which the printout carries unsaved
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [drafting, setDrafting] = useState(false);
   const [keeping, setKeeping] = useState(false);
   const [kept, setKept] = useState(0);
   const [draft, setDraft] = useState(null);       // the register as edited, null while untouched
+  const [proposals, setProposals] = useState({}); // usecase id → question id → the draft's proposal
   const [openId, setOpenId] = useState(null);
   const [browse, setBrowse] = useState(null);      // the records dialog's target, { kind, item?, domain? }
   const [printOnly, setPrintOnly] = useState(null); // { title, registers } while one record prints
@@ -290,14 +312,24 @@ export default function ComplianceTab(props) {
 
   const load = useCallback(async (d) => {
     try {
-      const [rep, qs, regs] = await Promise.all([
+      // The draft rides along for the printout: on paper the AI uses the node finds print whether or
+      // not anybody saved them, each marked as the system's finding (compliance-tab.print.js).
+      const [rep, qs, regs, dr] = await Promise.all([
         apiGet(`/v1/admin/compliance/report?since_days=${d}`),
         apiGet('/v1/admin/compliance/questionnaire'),
         apiGet('/v1/compliance/docs/registers').catch((e) => { swallowed('compliance-tab: registers', e); return null; }),
+        apiGet(`/v1/admin/compliance/draft?since_days=${d}`).catch((e) => { swallowed('compliance-tab: draft for print', e); return null; }),
       ]);
       if (rep?.data) setReport(rep.data);
-      if (qs?.data) setQuestionnaire(qs.data.questionnaire);
+      // A question still as shipped carries `builtIn`, and only those are shown translated
+      // (compliance-tab.print.js questionText); the stored set itself is never changed here.
+      if (qs?.data) {
+        const shipped = new Set(qs.data.built_in || []);
+        const set = qs.data.questionnaire;
+        setQuestionnaire({ ...set, questions: (set.questions || []).map(q => ({ ...q, builtIn: shipped.has(q.id) })) });
+      }
       setRegisters(regs?.data?.items || []);
+      setFound(dr?.data || null);
       setFailed(false);
     } catch (e) {
       setFailed(true);
@@ -346,12 +378,31 @@ export default function ComplianceTab(props) {
       const d = r?.data;
       if (!d?.usecases) { showError(C('draftFailed')); return; }
       setDraft((prev) => {
-        const base = prev ?? report.register.usecases;
+        // A stored entry takes the maker's answers to the questions it has not answered, and the
+        // maker's notes where it has none; what somebody already saved stays as it is.
+        const updates = new Map((d.makerUpdates || []).map(m => [m.usecase_id, m]));
+        const base = (prev ?? report.register.usecases).map((u) => {
+          const m = updates.get(u.id);
+          if (!m) return u;
+          return {
+            ...u,
+            answers: { ...m.answers, ...(u.answers || {}) },
+            answerSources: { ...m.answerSources, ...(u.answerSources || {}) },
+            answerNotes: { ...m.answerNotes, ...(u.answerNotes || {}) },
+          };
+        });
         const have = new Set(base.map(u => u.id));
         return [...base, ...d.usecases.filter(u => !have.has(u.id))];
       });
+      // Why each proposed answer was proposed, kept as the node's facts and said in the reader's
+      // language when the entry draws (compliance-tab.register.js proposalText).
+      setProposals((prev) => {
+        const next = { ...prev };
+        for (const p of d.proposals || []) next[p.usecase_id] = { ...(next[p.usecase_id] || {}), [p.question]: p };
+        return next;
+      });
       setOpenId(null);
-      showSuccess(C('draftLoaded', { entries: num(d.counts?.entries ?? d.usecases.length), answered: num(d.counts?.answeredFromEvidence ?? 0) }));
+      showSuccess(C('draftLoaded', { entries: num(d.counts?.entries ?? d.usecases.length), answered: num((d.counts?.answeredFromEvidence ?? 0) + (d.counts?.fromMaker ?? 0)) }));
       go('adm-cmp-04');
     } catch (e) {
       showError(e?.message || C('draftFailed'));
@@ -381,7 +432,7 @@ export default function ComplianceTab(props) {
 
   const exportCsv = () => {
     if (!report) return;
-    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose', 'answer', 'answered_by'];
+    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose', 'answer', 'answered_by', 'reason'];
     const pad = (r) => [...r, ...Array(headers.length - r.length).fill('')];
     const rows = [];
     const questions = questionnaire?.questions || [];
@@ -393,7 +444,7 @@ export default function ComplianceTab(props) {
       // auditor reads next.
       for (const q of questions) {
         rows.push(pad(['answer', u.id, q.text, '', '', '', '',
-          answerText(q, u.answers?.[q.id]) || '', u.answerSources?.[q.id] || '']));
+          answerText(q, u.answers?.[q.id]) || '', u.answerSources?.[q.id] || '', u.answerNotes?.[q.id] || '']));
       }
     }
     for (const g of report.gaps) rows.push(pad(['gap', g.kind, g.detail]));
@@ -451,7 +502,7 @@ export default function ComplianceTab(props) {
         <${Limits} items=${report.not_covered} />
         <${Happened} derived=${report.derived} switchPage=${switchPage} />
         <${RegisterSection} usecases=${usecases} questions=${questions}
-          draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId}
+          draft=${draft} setDraft=${setDraft} openId=${openId} setOpenId=${setOpenId} proposals=${proposals}
           saving=${saving} drafting=${drafting} onSave=${saveRegister} onDraft=${loadDraft} />
         <${QuestionnaireSection} questionnaire=${questionnaire} />
         <${Columns}>
@@ -466,7 +517,7 @@ export default function ComplianceTab(props) {
           onChanged=${() => load(days)} />` : null}
         <${AgreementsSection} num="11" onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
       <//>
-      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} only=${printOnly} />
+      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} found=${found} only=${printOnly} />
     <//>
   `;
 }

@@ -12,6 +12,7 @@
  *   problem. Flattening a chosen server into the list with its real schemas is a later phase, opted
  *   into per server.
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-16 — aimeat_mcp_grant_set: a grant on a node-wide server narrows the caller's own agents and apps; GRANT_NOT_APPLICABLE is for another person's server; an expires value that is not a date is refused (QA audit F01b-02).
  *   2026-10-15 — aimeat_mcp_grant_set says a node-wide server answers GRANT_NOT_APPLICABLE (feature-list audit #12).
  *   2026-10-09 — aimeat_mcp_authorize says the address is the node's confirmation page (secrets audit 2026-10-09).
@@ -21,6 +22,7 @@
  */
 
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
@@ -152,10 +154,10 @@ export const mcpProxyTools = [
         input: {
             server: { type: 'string', required: true, description: "Which server on this node's registry, by its short name." },
             availability: { type: 'string', description: "'all-owners' or 'allowlist'.", zod: z.enum(['all-owners', 'allowlist']) },
-            allowlist: { type: 'array', description: 'The owners who may use it. An empty list means nobody.', zod: z.array(z.string()) },
+            allowlist: { type: 'array', description: 'The owners who may use it. An empty list means nobody.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             price: { type: 'object', description: "What one call costs, in money only: {perCall, currency}. perCall is whole micro-units (1000000 is one unit of the currency) and currency is ISO 4217, such as EUR. perCall 0 makes it free again.", zod: z.object({
         perCall: z.number(),
-        currency: z.string().optional(),
+        currency: z.string().max(INPUT_LIMITS.id).optional(),
       }) },
             exposure: { type: 'string', description: "How its tools are reached: 'gateway' through aimeat_mcp_call, or 'flatten' listed one by one.", zod: z.enum(['gateway', 'flatten']) },
             enabled: { type: 'boolean', description: 'false takes it away from everybody at once.' },
@@ -188,7 +190,7 @@ export const mcpProxyTools = [
         input: {
             server: { type: 'string', required: true, description: 'Which server, by its short name.' },
             grantee: { type: 'string', required: true, description: "An agent's full name, an app as app:owner/file, or * for everything acting for this person." },
-            tools: { type: 'array', required: true, description: "Which tools it may use: a list of names, or the string '*' for all of them.", zod: z.union([z.literal('*'), z.array(z.string())]) },
+            tools: { type: 'array', required: true, description: "Which tools it may use: a list of names, or the string '*' for all of them.", zod: z.union([z.literal('*'), z.array(z.string().max(INPUT_LIMITS.id))]) },
             locked_input: { type: 'object', description: 'Arguments it may not choose. These win over whatever it sends.' },
             call_cap: { type: 'object', description: 'At most {count} calls in {windowHours} hours.', zod: z.object({ count: z.number(), windowHours: z.number() }) },
             expires: { type: 'string', description: 'An ISO date after which this stops applying, such as 2026-12-31. A value that is not a date is refused.' },

@@ -13,8 +13,8 @@
  *   routes answer 403 before doing anything. routing.ts (166), memory-replication.ts (156),
  *   catalogue-sync.ts (219) and sync-scheduler.ts (136) all need a second node that really answers.
  *
- *   SO THIS SUITE OWNS ITS WORLD. Two AIMEAT nodes boot IN-PROCESS — A on 40322 (the node under
- *   test) and B on 40323 (a real peer that serves template listings and a memory inventory) — both
+ *   SO THIS SUITE OWNS ITS WORLD. Two AIMEAT nodes boot IN-PROCESS — A on 28322 (the node under
+ *   test) and B on 28323 (a real peer that serves template listings and a memory inventory) — both
  *   with `packageFederationEnabled = true`, which no other suite turns on. Beside them a node:http
  *   fake peer on an ephemeral loopback port holds an Ed25519 keypair the suite controls, so a
  *   settlement can be SIGNED as that peer and the 200 is proof the verification ran rather than
@@ -129,8 +129,8 @@ function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
 // ─── State ───
 const stamp = Date.now().toString(36);
-const A_PORT = 40322;
-const B_PORT = 40323;
+const A_PORT = 28322;
+const B_PORT = 28323;
 const A_ID = 'aimeat-test-001-seta';
 const B_ID = 'aimeat-test-001-setb';
 const FAKE_ID = `aimeat-fake-set-${stamp}`;
@@ -177,7 +177,7 @@ async function run(): Promise<void> {
     // ─── Phase 1: Boot ───
     console.log('Phase 1 — Boot two nodes and a peer that holds a key we control');
 
-    await test('A on 40322 and B on 40323 boot with package federation on', async () => {
+    await test('A on 28322 and B on 28323 boot with package federation on', async () => {
         // packageFederationEnabled is the one switch that made templates.ts dark everywhere else:
         // both routes it guards answer 403 before reading anything when it is off, and off is the
         // shipped default.

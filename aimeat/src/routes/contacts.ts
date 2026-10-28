@@ -15,6 +15,8 @@
  *   gate); POST /v1/contacts/resolve (email → GHII exact match, or invite fallback signal).
  * @usage app.use(contactsRouter(config, storage))
  * @version-history
+ *   2026-10-27 — POST /v1/contacts and PATCH /v1/contacts/:contactId check their bodies with
+ *     validateBody (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
  *   2026-10-15 — POST /v1/contacts and DELETE /v1/contacts/:contactId admit the owner's agent holding
  *     messages:send, the word aimeat_contact_add and aimeat_contact_remove declare, and act on the owner's
  *     address book (feature-list audit #127).
@@ -59,6 +61,8 @@
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { validateBody } from '../models/schemas.js';
+import { ContactAddBody, ContactUpdateBody } from '../models/write-body-schemas.js';
 import type { Storage } from '../storage/interface.js';
 import type { OutboundContactLink } from '../models/outbound-schemas.js';
 import { success, error } from '../middleware/envelope.js';
@@ -206,7 +210,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
    * declares, as on POST /v1/contacts/invite: the node's tool, the connector's (which calls this route)
    * and REST give one answer, and the contact lands in the OWNER's address book whoever saves it
    * (feature-list audit #127). requireRole('agent') keeps an app grant and an ecosystem app out. ── */
-  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), async (req, res) => {
+  router.post('/v1/contacts', requireAuth(), requireLocalSession(), requireRole('agent'), requireScope('messages:send'), validateBody(ContactAddBody, config.nodeId), async (req, res) => {
     const input = parseAddInput((req.body ?? {}) as Record<string, unknown>);
     if (!input) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -226,7 +230,7 @@ export function contactsRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── PATCH /v1/contacts/:contactId — what the OWNER knows about a saved person (name, note,
    * tags, links, relation). Never touches opt-out, bounce or suppression: that is the recipient's
    * state, not the owner's note about them. ── */
-  router.patch('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), async (req, res) => {
+  router.patch('/v1/contacts/:contactId', requireAuth(), requireLocalSession(), requireRole('owner'), validateBody(ContactUpdateBody, config.nodeId), async (req, res) => {
     const contactId = decodeURIComponent(req.params.contactId as string);
     const b = (req.body ?? {}) as Record<string, unknown>;
     try {

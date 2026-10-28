@@ -13,6 +13,7 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — Who may open the front page (plan doc-mvcn6c7e4e5q, V3.10): PUT /v1/companies/:id/front-page
  *     takes `access` (anyone, signed-in, organism:<id>; `kind` may be left out to change only that), a
  *     company answers `front_page_access`, and new POST /v1/companies/:id/open answers the address with a
@@ -34,6 +35,7 @@
  */
 import { Router, type Request, type Response } from 'express';
 import { z } from 'zod';
+import { documentText } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config-types.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
@@ -111,7 +113,7 @@ const SmtpSchema = z.object({
 
 const PortfolioSchema = z.object({
   /** The whole document. A page is small enough to send inline; the cap is portfolioMaxSizeKb. */
-  html: z.string().min(1),
+  html: documentText().min(1),
 }).strict();
 
 const FrontPageSchema = z.object({

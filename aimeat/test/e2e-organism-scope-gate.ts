@@ -14,7 +14,7 @@
  *   costs no existing agent a capability. The last is the expensive one — changelog 1.33.1 records
  *   the fleet-wide outage from naming a scope on a door agents already used — so the migration that
  *   hands the word out at boot is exercised here against the real backend, not stubbed.
- * @usage cd aimeat && rm -f test/.orgscope.db* && AIMEAT_PORT=40431 AIMEAT_DB_PATH=test/.orgscope.db \
+ * @usage cd aimeat && rm -f test/.orgscope.db* && AIMEAT_PORT=28431 AIMEAT_DB_PATH=test/.orgscope.db \
  *   pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-organism-scope-gate
  * @version-history
  *   v1.1.0 — 2026-09-30 — Phase 5: an agent approved after 2026-08-10 is left alone; the old reach is

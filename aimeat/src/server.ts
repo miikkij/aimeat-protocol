@@ -13,6 +13,8 @@
  *   - buildServer: builds and wires the Express app and its background managers
  *
  * @version-history
+ *   2026-10-27 — inputJunkGuard() before idempotency(): a NUL or a lone surrogate in the body, the query
+ *     or the path is refused with a 400 that names the field (middleware/input-junk.ts).
  *   2026-10-25 — secaudit2026oct22: POST /v1/mcp/register is parsed at 64 kB, not at the large /v1/mcp limit.
  *   2026-10-25 — secaudit2026oct22: optionalAuth counts refused credentials per address at the global
  *     rate (refusedLimiter), so a stream of forged or dead tokens is answered 429 past that rate.
@@ -63,6 +65,7 @@ import { corsMiddleware } from './middleware/cors.js';
 import { optionalAuth } from './auth/middleware.js';
 import { rateLimit } from './middleware/rate-limit.js';
 import { idempotency } from './middleware/idempotency.js';
+import { inputJunkGuard } from './middleware/input-junk.js';
 import { cookieConsentMiddleware } from './middleware/cookie-consent.js';
 import { requestIdMiddleware } from './middleware/request-id.js';
 import { refusalRecorder } from './middleware/refusal-recorder.js';
@@ -315,6 +318,11 @@ async function buildServer(config: AimeatConfig, configSources?: ConfigSources):
   app.use('/v1/admin/setup', rateLimit(config.rateLimits.adminSetup, config.rateLimits.roleMultipliers));
   app.use('/v1/federation/peer/introduce', rateLimit(config.rateLimits.federation, config.rateLimits.roleMultipliers));
   app.use('/v1/catalogue', rateLimit(config.rateLimits.catalogue, config.rateLimits.roleMultipliers));
+
+  // A NUL or a lone surrogate anywhere in the body, the query or the path is refused before any route
+  // runs: no storage keeps either as sent (middleware/input-junk.ts). After the rate limits, so a
+  // flood of junk still counts against them.
+  app.use(inputJunkGuard(config.nodeId));
 
   // Idempotency-Key support for POST/PUT
   app.use(idempotency(config.nodeId));

@@ -25,7 +25,7 @@ import { nodeEntryArgs } from './helpers/node-entry.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = process.env.E2E_PACING_PORT ?? '40488';
+const PORT = process.env.E2E_PACING_PORT ?? '28488';
 const BASE = `http://localhost:${PORT}`;
 const TOLL = 2;
 

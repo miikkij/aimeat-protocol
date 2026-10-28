@@ -39,6 +39,8 @@
  * @usage
  *   const out = await setAgentStopped({ storage, config }, req.auth!.owner, principal, name, true);
  * @version-history
+ *   v1.2.1 — 2026-10-28 — releaseWaitingTasks decides on the agent record as it is: the node no longer
+ *     narrows an agent holding `*` by itself (Jouni, 2026-10-28).
  *   v1.2.0 — 2026-10-18 — releaseWaitingTasks reads the agent through startFactsOf
  *     (services/scope-auto-narrow.ts): a `*` agent whose record is ready is narrowed first.
  *   v1.1.0 — 2026-10-11 — Two defects a live fleet measured the day this shipped. A direct message
@@ -53,7 +55,6 @@ import { resolveAgentTarget, type AgentWriteDeps, type AgentWriteRefusal } from 
 import { decideTaskStart, autoStartEvent } from './agent-task-rules.js';
 import { readAgentDmInbox } from './agent-dm-reads.js';
 import { messagePreview } from '../utils/messaging.js';
-import { startFactsOf } from './scope-auto-narrow.js';
 import { recordTaskStarted } from './activity-recorder.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { emitChange, emitDelivery } from './event-bus.js';
@@ -82,11 +83,10 @@ export type AgentStopOutcome =
  */
 export async function releaseWaitingTasks(deps: AgentWriteDeps, agent: AgentRecord): Promise<AgentTaskRecord[]> {
   const { storage } = deps;
-  const startAgent = await startFactsOf(deps, agent);
   const { tasks } = await storage.listAgentTasks(agent.gaii, { status: 'queued' });
   const started: AgentTaskRecord[] = [];
   for (const task of tasks) {
-    const decision = decideTaskStart(startAgent, { policy: task.startPolicy, todos: task.todos });
+    const decision = decideTaskStart(agent, { policy: task.startPolicy, todos: task.todos });
     if (!decision.startsNow) continue;
     const now = new Date().toISOString();
     try {

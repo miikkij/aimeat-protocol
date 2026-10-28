@@ -18,6 +18,7 @@
  * @structure AiProvenanceBlockSchema · AiProvenanceBodyFields
  * @usage import { AiProvenanceBlockSchema } from '../ai-provenance-schema.js';
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-08 — AiProvenanceBodyFields: ai_provenance and ai_provenance_id for a REST body
  *     schema to spread (aiprov D5).
  *   v1.1.0 — 2026-10-08 — Optional `media_kind`, `media_type` and `resembles_real`: a declaration can
@@ -25,6 +26,7 @@
  *   v1.0.0 — 2026-10-05 — Moved from src/mcp/ai-provenance-input.ts v1.2.1 (secaudit 2026-10, M3).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AiSourceUrlSchema,
   AI_MEDIA_KINDS, AI_RESEMBLES_REAL, MEDIA_TYPE_PATTERN,
@@ -36,9 +38,9 @@ const sourceInput = z.object({
   // the service, and an author publishing an app got an opaque failure for an input the tool had
   // just accepted. One rule, stated once, refused where the caller can see it.
   url: AiSourceUrlSchema.describe('Where the material came from. Must be an http or https address.'),
-  title: z.string().optional(),
-  retrieved_at: z.string().optional().describe('ISO 8601 timestamp of when you fetched it.'),
-  role: z.string().optional().describe("How it was used, e.g. 'primary' or 'background'."),
+  title: z.string().max(INPUT_LIMITS.title).optional(),
+  retrieved_at: z.string().max(INPUT_LIMITS.id).optional().describe('ISO 8601 timestamp of when you fetched it.'),
+  role: z.string().max(INPUT_LIMITS.title).optional().describe("How it was used, e.g. 'primary' or 'background'."),
 });
 
 /** The declaration block. */
@@ -54,11 +56,11 @@ export const AiProvenanceBlockSchema = z.object({
     'Whether a person examined what the model produced. Only a step where someone reads the '
     + 'SUBSTANCE and can reject it counts: a skim, a spell-check or clicking publish is '
     + "'light-review' at most. Omitted means 'none'."),
-  model: z.string().optional().describe(
+  model: z.string().max(INPUT_LIMITS.title).optional().describe(
     "The model that produced it, as the provider names it, e.g. 'anthropic/claude-opus-5'. "
     + 'When you made it, this is YOUR OWN model id: self-identify from your own configuration, never '
     + 'ask the person. Without it the record says only who served the model, never which one.'),
-  provider: z.string().optional().describe(
+  provider: z.string().max(INPUT_LIMITS.title).optional().describe(
     "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
     + "someone else's model. Say it when you route through an intermediary, because 'which model' "
     + 'and "who ran it" are different questions and a reader chasing an output needs both.'),
@@ -68,7 +70,7 @@ export const AiProvenanceBlockSchema = z.object({
     + 'image, audio and video only. Omitted: the node states text for text it stores, and nothing '
     + 'for bytes.'),
   media_type: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'media_type must be an IANA media type such as audio/mpeg')
-    .optional().describe("The IANA media type of the bytes, e.g. 'audio/mpeg' or 'image/png'."),
+    .max(INPUT_LIMITS.id).optional().describe("The IANA media type of the bytes, e.g. 'audio/mpeg' or 'image/png'."),
   resembles_real: z.enum(AI_RESEMBLES_REAL).optional().describe(
     'For image, audio or video: does it resemble a real person, place, object or event (a cloned '
     + "voice, a likeness)? 'yes' | 'no' | 'unknown'. Public synthetic media is labelled either way; "

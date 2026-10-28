@@ -42,7 +42,7 @@ import type { RecordedCall } from './helpers/fake-mail-upstreams.js';
 import { BROWSER_START, roundCookie } from './helpers/oauth-round.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 
-const PORT = parseInt(process.env.E2E_PUBLISH_PORT ?? '40317', 10);
+const PORT = parseInt(process.env.E2E_PUBLISH_PORT ?? '28317', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 const TMP = mkdtempSync(join(tmpdir(), 'aimeat-publish-e2e-'));
 

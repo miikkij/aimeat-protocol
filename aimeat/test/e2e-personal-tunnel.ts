@@ -18,7 +18,7 @@
  *   NOT a registered local agent, because resolveGaii checks local agents before personal nodes and
  *   a local agent would be served locally and enqueue nothing.
  *
- *   THE LAST PHASE SELF-SPAWNS A NODE, on 40299 (E2E_TUNNEL_HB_PORT), because the heartbeat monitor's
+ *   THE LAST PHASE SELF-SPAWNS A NODE, on 28299 (E2E_TUNNEL_HB_PORT), because the heartbeat monitor's
  *   degraded and timeout branches are reachable only with a short offline threshold, and that is
  *   process-wide configuration: AIMEAT_PERSONAL_HEARTBEAT_MS=10000 with AIMEAT_PERSONAL_OFFLINE_MS
  *   =12000 turns a five-minute wait into twenty seconds. The shared-node phases run first so a
@@ -63,7 +63,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
-const HB_PORT = Number(process.env.E2E_TUNNEL_HB_PORT ?? 40299);
+const HB_PORT = Number(process.env.E2E_TUNNEL_HB_PORT ?? 28299);
 const HB_BASE = `http://127.0.0.1:${HB_PORT}`;
 const HB_NODE_ID = 'aimeat-tunnel-heartbeat-test';
 

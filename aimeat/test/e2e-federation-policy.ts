@@ -5,7 +5,7 @@
  *   (incl. forced override), and advisory-driven demotion. Mixes a unit check of the availability
  *   helper with two in-process nodes (A = authoring genesis, P = puller/peer).
  *
- *   Nodes: A 40275 aimeat-test-001-pola; P 40276 aimeat-test-001-polp.
+ *   Nodes: A 28275 aimeat-test-001-pola; P 28276 aimeat-test-001-polp.
  * @version-history
  *   v1.2.1 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
@@ -122,8 +122,8 @@ await test('0. recordHeartbeatOutcome label transitions', async () => {
 
 console.log('\nSetup nodes');
 await test('Boot A (genesis author, open-join) + P (puller)', async () => {
-  A = await bootNode(40410, 'aimeat-test-001-pola', true);
-  P = await bootNode(40276, 'aimeat-test-001-polp', true);
+  A = await bootNode(28410, 'aimeat-test-001-pola', true);
+  P = await bootNode(28276, 'aimeat-test-001-polp', true);
   await setupOwner(A, `pola${ts}`);
   await setupOwner(P, `polp${ts}`);
 });
@@ -219,8 +219,8 @@ await test('8. a policy that is unsigned or tampered is refused, and the local c
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ ok: true, node_id: 'stub', data: { policy: served } }));
   });
-  await new Promise<void>(r => stub.listen(40284, r));
-  const STUB = 'http://localhost:40284';
+  await new Promise<void>(r => stub.listen(28284, r));
+  const STUB = 'http://localhost:28284';
   const pullFromStub = () => P.json('/v1/federation/network-policy/pull', {
     method: 'POST', headers: auth(P.ownerToken), body: JSON.stringify({ source_url: STUB }),
   });

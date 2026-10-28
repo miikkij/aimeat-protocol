@@ -17,6 +17,8 @@
  *   res.json(success(nodeId, { task, start: startAnswer(decision, task.status) }));
  *   void notifyTaskWaiting(storage, task, decision);
  * @version-history
+ *   v1.3.1 — 2026-10-28 — The `*` sentence is gone: `*` no longer holds a task, and the node no
+ *     longer narrows an agent by itself (Jouni 2026-10-28).
  *   v1.3.0 — 2026-10-18 — The `*` sentence is for a narrowing that failed: a ready `*` agent is
  *     narrowed at its start decision now, and only a failed narrowing holds its task.
  *   v1.2.0 — 2026-10-11 — The sentence for a task that waits because its agent is stopped.
@@ -50,11 +52,7 @@ function joinWords(words: string[]): string {
 /** One sentence saying why this task waits, or that it does not. */
 export function waitReason(agentName: string, decision: Pick<TaskStartDecision, 'waitsBecause' | 'floorScopes' | 'effects'>): string {
     switch (decision.waitsBecause) {
-        // `*` alone: the agent may do anything, and the narrowing the node makes at this point failed
-        // (services/scope-auto-narrow.ts). The next decision tries again; the owner can narrow it now.
-        case 'floor': return decision.floorScopes.includes('*') && kindsOf(decision).length === 0
-            ? `${agentName} may do anything, including spend money and send or delete things as you, and AIMEAT could not narrow it to the permissions it used this time, so this task waits for your OK. You can narrow it on its card.`
-            : `${agentName} can ${joinWords(kindsOf(decision))}, so its tasks always wait for your OK.`;
+        case 'floor': return `${agentName} can ${joinWords(kindsOf(decision))}, so its tasks always wait for your OK.`;
         case 'effects': return `The plan says it will ${joinWords(kindsOf(decision))}, so it waits for your OK.`;
         case 'stopped': return `${agentName} is stopped, so this waits. It starts when you start the agent.`;
         case 'setting': return 'It waits for your OK before it starts.';

@@ -32,7 +32,7 @@ import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpAgent, type McpSession } from './helpers/mcp-session.js';
 import { generateKeyPair } from '../src/auth/keypair.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40252';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28252';
 const stamp = Date.now();
 
 let passed = 0, failed = 0;

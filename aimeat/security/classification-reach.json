@@ -1249,6 +1249,12 @@
       },
       "why": "Written 2026-10-24 (plan doc-mvmr4i2wdk0p), the node's own read: a data processing agreement is a record of system@<node>, never anyone's content; who reads it is decided in services/compliance-agreements-access.ts."
     },
+    "src/services/compliance-ask-makers.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-28, the node's own read: compliance.makerAsks under the node's system identity, the dates each app's maker was last asked for the AI Act answers. No person's content is read or returned."
+    },
     "src/services/compliance-docs.ts": {
       "reads": {
         "getMemory": 1,

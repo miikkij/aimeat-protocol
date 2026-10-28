@@ -49,6 +49,10 @@
  *   const d = decideTaskStart(agent, { policy: task.startPolicy, todos });
  *   if (!canProposeTodos(task)) return refuse(TODO_PROPOSE_REFUSAL(task.status));
  * @version-history
+ *   v2.5.0 — 2026-10-28 — `*` never reaches the floor and `wildcardReady` is gone: the node no longer
+ *     narrows an agent holding `*` by itself, so there is no failed narrowing to fall back on. An
+ *     agent keeps the permissions its owner gave it, and its tasks are decided on them (Jouni
+ *     2026-10-28, after the node narrowed his own interactive agent and it was refused at once).
  *   v2.4.0 — 2026-10-23 — The owner's accepted floor (`taskStartFloor`): the floor permissions the
  *     owner in person named for an agent stop holding its tasks, and so do the plan's effects of
  *     those kinds. floorScopesOf() answers the permissions that still hold; acceptedFloorOf() the
@@ -103,14 +107,10 @@ export const TASK_START_FLOOR: ReadonlyArray<{ scope: string; kind: TaskEffect }
     { scope: 'memory:purge', kind: 'delete' },
 ];
 
-/**
- * The agent as the start rules read it. `wildcardReady` is set by services/scope-auto-narrow.ts
- * startFactsOf() only when the agent holds `*`, its usage record is ready, and the narrowing it then
- * makes failed: the one case `*` still holds a task (fail closed).
- */
-type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt' | 'taskStartFloor'>> & { wildcardReady?: boolean };
+/** The agent as the start rules read it: its record as the owner left it. */
+type StartAgent = Pick<AgentRecord, 'mode'> & Partial<Pick<AgentRecord, 'taskStart' | 'defaultScopes' | 'stoppedAt' | 'taskStartFloor'>>;
 
-type FloorAgent = Partial<Pick<AgentRecord, 'defaultScopes' | 'taskStartFloor'>> & { wildcardReady?: boolean };
+type FloorAgent = Partial<Pick<AgentRecord, 'defaultScopes' | 'taskStartFloor'>>;
 
 /**
  * The floor permissions this agent holds AND its owner in person accepted for it (`taskStartFloor`):
@@ -128,14 +128,13 @@ export function acceptedFloorOf(agent: FloorAgent | null | undefined): string[] 
  * The floor permissions this agent's record grants BY NAME: the word itself or its domain wildcard
  * (`commerce:*`). The record is the ceiling a token is narrowed to (auth/effective-scopes.ts).
  *
- * THE GLOBAL `*` (ruling C, Jouni 2026-10-02, and its follow-up of 2026-10-18): "all permissions"
- * must never read as "nothing dangerous", and it does not stay. Once the agent's usage record is
- * ready, the start decision narrows the agent to the named permissions it used before it decides
- * (services/scope-auto-narrow.ts), so the floor then reads those words like any agent's. `*` reaches
- * the floor only through `wildcardReady`, which is set when that narrowing failed: the task waits for
- * the owner rather than starting on `*`. Until the record is ready a `*` agent starts as it did. On
- * aimeat.io on 2026-10-02, 52 of the 53 task-runners of the busiest account held `*`; when the
- * floor held them all on 2026-10-16..18, the owner got one notice per task. `*` is reported as `'*'`.
+ * THE GLOBAL `*` is not on the floor. The owner gave it, and the agent keeps it (Jouni, 2026-10-28).
+ * Ruling C (2026-10-02) put `*` on the floor once two weeks of its use were on record; when that
+ * held every task of 14 scheduled agents on aimeat.io on 2026-10-16..18, the follow-up of 2026-10-18
+ * had the node narrow such an agent by itself instead. That narrowed the owner's own interactive
+ * agent past a permission it used, and it was refused three minutes later, so both halves are gone:
+ * the node notes what a `*` agent uses and offers the narrowing on its card (services/scope-use.ts),
+ * and only the owner applies it. The words a `*` agent's record names are read like any agent's.
  *
  * A floor permission the owner in person accepted for this agent (acceptedFloorOf) is not in the
  * answer: it no longer holds the agent. Everything that reads "what holds this agent" reads this.
@@ -144,8 +143,7 @@ export function floorScopesOf(agent: FloorAgent | null | undefined): string[] {
     const held = agent?.defaultScopes ?? [];
     const named = held.filter(s => s !== '*');
     const accepted = new Set(acceptedFloorOf(agent));
-    const floor = TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope) && !accepted.has(f.scope)).map(f => f.scope);
-    return held.includes('*') && agent?.wildcardReady ? ['*', ...floor] : floor;
+    return TASK_START_FLOOR.filter(f => scopeIsCovered(named, f.scope) && !accepted.has(f.scope)).map(f => f.scope);
 }
 
 /** The agent's own answer, or, when nobody has said, the one its mode always gave. */

@@ -46,7 +46,7 @@ import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-logi
 import { audienceProof, signedGetHeaders, SERVICE_SUMMARY_PURPOSE } from '../src/services/signed-node-request.js';
 
 // ─── Boot embedded server ───
-const TEST_PORT = parseInt(process.env.E2E_PORT ?? '40253', 10);
+const TEST_PORT = parseInt(process.env.E2E_PORT ?? '28253', 10);
 const BASE = process.env.E2E_BASE ?? `http://localhost:${TEST_PORT}`;
 
 let server: Server | null = null;

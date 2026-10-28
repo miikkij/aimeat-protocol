@@ -29,6 +29,7 @@
  *   - Phase 4: the decision model
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-ai-tools
  * @version-history
+ *   2026-10-27 — Its own node is on suitePort block 30100, out of the range the claims board hands out.
  *   v1.0.0 — 2026-10-16 — Initial (QA audit F09a-03 and W27: the AI tools called and refused).
  */
 import { createServer, type IncomingMessage, type Server } from 'node:http';
@@ -43,9 +44,12 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool, type McpSession } from './helpers/mcp-session.js';
 import { startFakeAiProvider, chatJson, imageJson, transcriptionJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
+import { suitePort } from './helpers/free-port.js';
 
 // Its own port, below the lane's E2E port so it meets neither another lane nor the sandbox range.
-const PORT = process.env.E2E_MCP_AI_TOOLS_PORT ?? String(Number(process.env.AIMEAT_TEST_PORT ?? '40251') - 200);
+// A suitePort block, not the base port minus 200: that landed in the range the claims board hands out.
+const PORT = process.env.E2E_MCP_AI_TOOLS_PORT
+    ?? String(suitePort(30100, process.env.E2E_BASE ?? `http://localhost:${process.env.AIMEAT_TEST_PORT ?? '40251'}`));
 const BASE = `http://localhost:${PORT}`;
 const NODE_KEY = 'ts-node-key-mcp-ai-0001';
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 9, 8, 7, 6]);

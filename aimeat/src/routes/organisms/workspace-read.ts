@@ -54,9 +54,13 @@
  *   v1.14.0 — 2026-10-16 — A published page or record an open share serves to anyone carries the
  *     label it owes there (`_aiProvenance` decided as public, sharedPublishedProvenanceIds). Each
  *     item carries `_writtenBy`, the account that holds it, for a member to read who made a page.
+ *   v1.15.0 — 2026-10-27 — POST /v1/organisms/:id/comments checks its body with validateBody
+ *     (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
+import { validateBody } from '../../models/schemas.js';
+import { CommentCreateBody } from '../../models/write-body-schemas.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireScope } from '../../auth/middleware.js';
@@ -536,7 +540,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * surface of an agent without organism:write while this door said 201. Full reasoning on POST
    * /v1/organisms in routes/organisms/crud.ts. Owner and operator sessions bypass scopes, and the
    * membership gate below is unchanged and still decides who may comment where. */
-  router.post('/v1/organisms/:id/comments', requireAuth(), requireScope('organism:write'), async (req, res) => {
+  router.post('/v1/organisms/:id/comments', requireAuth(), requireScope('organism:write'), validateBody(CommentCreateBody, config.nodeId), async (req, res) => {
     const id = req.params.id as string;
     const { ws, space, instance_id, body, anchor, parent_id } = req.body ?? {};
     if (!ws || !space || !instance_id || typeof body !== 'string' || !body.trim()) {

@@ -543,7 +543,7 @@ await test('Another owner cannot read, change or run this calibration → 404, a
 // e2e-ai-provenance.ts); nothing inside the node is mocked, and the charge is read back from
 // /v1/ai/usage rather than inferred from the code.
 
-const STUB_PORT = parseInt(process.env.E2E_AI_STUB_PORT_CAL ?? '40319', 10);
+const STUB_PORT = parseInt(process.env.E2E_AI_STUB_PORT_CAL ?? '28319', 10);
 const STUB_MODEL = 'stub/calibrator-test-model';
 const { createServer } = await import('node:http');
 const stub = createServer((req, res) => {

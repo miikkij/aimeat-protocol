@@ -19,6 +19,7 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.36.0 -- 2026-10-27 -- A refused create shows each field's message under that field (Fields `errors`, js/field-errors.js); the name and description stop at the server's limits (js/input-limits.js) (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.35.0 -- 2026-10-16 -- A failed load shows the could-not-load note with Retry instead of an empty
  *     list, and leaves the lists as they were, so the open organism is no longer closed as if it had
  *     gone; the list-order prefs are saved only after they loaded (QA audit F6-04, F6-05).
@@ -119,6 +120,11 @@ import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
+
+/** The fields the create form draws, by the name the server's refusal gives them. */
+const CREATE_FIELDS = ['shape', 'name', 'description', 'interests', 'type', 'join_policy', 'visibility'];
 import { useLoadState, LoadFailed } from '/js/load-state.js';
 import { authHeaders } from '/js/services/auth.js';
 
@@ -167,6 +173,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [formPolicy, setFormPolicy] = useState('open');
   const [formVisibility, setFormVisibility] = useState('public');
   const [formInterests, setFormInterests] = useState('');
+  // A refused create's message per field, shown under each field (js/field-errors.js).
+  const [formErrors, setFormErrors] = useState({});
   // A starting shape (GET /v1/organisms/shapes): '' is none, the organism starts empty.
   const [formShape, setFormShape] = useState('');
   const [shapes, setShapes] = useState([]);
@@ -346,6 +354,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       return;
     }
     setCreating(true);
+    setFormErrors({});
     try {
       const interests = formInterests.split(',').map(s => s.trim()).filter(Boolean);
       const result = await orgService.createOrganism({
@@ -366,8 +375,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         showToast(result?.error?.message || (t('organisms.createError') || 'Failed to create'));
       }
     } catch (err) {
-      swallowed('organisms-tab: onOpen', err);
-      showToast(t('organisms.createError') || 'Failed to create');
+      // A refusal that names fields shows each message under its field (js/field-errors.js).
+      const refused = fieldErrorsOf(err);
+      setFormErrors(refused);
+      if (!Object.keys(refused).length) swallowed('organisms-tab: onOpen', err);
+      showToast(refusalLine(refused, CREATE_FIELDS, t) || t('organisms.createError') || 'Failed to create', true);
+      focusFirstInvalid();
     } finally { setCreating(false); }
   }, [formName, formDesc, formType, formTypeCustom, formPolicy, formVisibility, formInterests, formShape, shapeLang, showToast, loadData]);
 
@@ -614,8 +627,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     ${/* Create form (opened from the topbar button) */ ''}
     ${!showCreate ? null : html`
       <${Card} tone="section" title=${t('organisms.createTitle') || 'Create New Organism'}>
-        <${Fields}>
-          <${Select} fit value=${formShape} onChange=${pickFormShape} ariaLabel=${t('organisms.shapeLabel')} options=${[
+        <${Fields} errors=${formErrors}>
+          <${Select} fit name="shape" value=${formShape} onChange=${pickFormShape} ariaLabel=${t('organisms.shapeLabel')} options=${[
             ['', t('organisms.shapeNone')],
             ...shapes.map(s => [s.id, s.label]),
           ]} />
@@ -624,11 +637,11 @@ export default function OrganismsTab({ session, showToast, onStats }) {
               ? `${chosenShape.hint} ${t('organisms.shapeMakes', { list: chosenShape.workspaces.map(w => w.name).join(', ') })}`
               : t('organisms.shapeNoneHint')}
           <//>
-          <${TextField} placeholder=${t('organisms.namePlaceholder') || 'Name'} ariaLabel=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${setFormName} />
-          <${TextArea} placeholder=${t('organisms.descPlaceholder') || 'Description'} ariaLabel=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${setFormDesc} rows=${2} />
-          <${TextField} placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} ariaLabel=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${setFormInterests} />
+          <${TextField} name="name" maxLength=${INPUT_LIMITS.name} placeholder=${t('organisms.namePlaceholder') || 'Name'} ariaLabel=${t('organisms.namePlaceholder') || 'Name'} value=${formName} onInput=${setFormName} />
+          <${TextArea} name="description" maxLength=${INPUT_LIMITS.description} placeholder=${t('organisms.descPlaceholder') || 'Description'} ariaLabel=${t('organisms.descPlaceholder') || 'Description'} value=${formDesc} onInput=${setFormDesc} rows=${2} />
+          <${TextField} name="interests" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} ariaLabel=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${setFormInterests} />
           <${Row} wrap>
-            <${Select} fit value=${formType} onChange=${pickFormType} ariaLabel=${t('organisms.fieldType') || 'Type'} options=${[
+            <${Select} fit name="type" value=${formType} onChange=${pickFormType} ariaLabel=${t('organisms.fieldType') || 'Type'} options=${[
               ['community', t('organisms.types.community') || 'Community'],
               ['team', t('organisms.types.team') || 'Team'],
               ['club', t('organisms.types.club') || 'Club'],
@@ -643,12 +656,12 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 placeholder=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
                 ariaLabel=${t('organisms.typeCustomPlaceholder') || 'Type, in your own words'}
                 onInput=${setFormTypeCustom} />` : null}
-            <${Select} fit value=${formPolicy} onChange=${setFormPolicy} ariaLabel=${t('organisms.policyLabel') || 'Join policy'} options=${[
+            <${Select} fit name="join_policy" value=${formPolicy} onChange=${setFormPolicy} ariaLabel=${t('organisms.policyLabel') || 'Join policy'} options=${[
               ['open', t('organisms.policyOpen') || 'Open (anyone can join)'],
               ['approval_required', t('organisms.policyApproval') || 'Approval required'],
               ['invite_only', t('organisms.policyInvite') || 'Invite only'],
             ]} />
-            <${Select} fit value=${formVisibility} onChange=${setFormVisibility} ariaLabel=${t('organisms.setVisibility') || 'Who sees'} options=${[
+            <${Select} fit name="visibility" value=${formVisibility} onChange=${setFormVisibility} ariaLabel=${t('organisms.setVisibility') || 'Who sees'} options=${[
               ['public', t('organisms.visPublic') || 'Public'],
               ['listed', t('organisms.visListed') || 'Listed'],
               ['private', t('organisms.visPrivate') || 'Private'],

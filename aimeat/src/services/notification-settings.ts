@@ -17,6 +17,9 @@
  * @usage const s = await readNotificationSettings(storage, ghii); const p = prefsFor(s, source, type);
  *   await updateNotificationSettings(storage, ghii, cur => ({ ...cur, lastDigestAt }));
  * @version-history
+ *   v1.4.0 — 2026-10-28 — EmailPrefs.agentNarrowed is gone: the node no longer narrows an agent by
+ *     itself, so there is no such email. The mail log kind `agent_narrowed` stays for the entries
+ *     already written; a stored `agentNarrowed` is ignored.
  *   v1.3.1 — 2026-10-18 — appendMailLog and updateNotificationSettings write with updateRecord, on the
  *     version they read; serialByKey stays for this process's own order.
  *   v1.3.0 — 2026-10-18 — EmailPrefs.agentNarrowed (on unless switched off) and the mail log kind
@@ -59,8 +62,6 @@ export interface EmailPrefs {
   nudge?: boolean;
   /** One of the person's agents asks to be allowed something it was refused (services/permission-ask-notice.ts). On unless switched off. */
   agentAsks: boolean;
-  /** The node narrowed an agent holding all permissions to the ones it used (services/scope-auto-narrow.ts). On unless switched off. */
-  agentNarrowed: boolean;
 }
 export interface NotificationSettings {
   /** The node's own notifications, by group. */
@@ -76,11 +77,12 @@ export interface NotificationSettings {
 }
 
 export function defaultSettings(): NotificationSettings {
-  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, email: { workflowEnd: true, agentAsks: true, agentNarrowed: true }, lastDigestAt: null };
+  return { groups: {}, senders: {}, quiet: null, throttleMinutes: 10, emailDigest: { enabled: false, afterHours: 8 }, email: { workflowEnd: true, agentAsks: true }, lastDigestAt: null };
 }
 
 /** The last emails the node sent to the owner's own address: what and when, never the content. */
 export const MAIL_LOG_KEY = 'notifications.mail-log';
+/** `agent_narrowed` names entries written from 2026-10-18 to 2026-10-28, when the node narrowed agents by itself. */
 export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation' | 'agent_ask' | 'agent_narrowed';
 export interface MailLogEntry { kind: MailLogKind; subject: string; at: string }
 const MAIL_LOG_MAX = 50;
@@ -138,7 +140,7 @@ export function normalizeSettings(raw: unknown): NotificationSettings {
   };
   const em = (o.email && typeof o.email === 'object' ? o.email : {}) as Record<string, unknown>;
   const email: EmailPrefs = {
-    workflowEnd: em.workflowEnd !== false, agentAsks: em.agentAsks !== false, agentNarrowed: em.agentNarrowed !== false,
+    workflowEnd: em.workflowEnd !== false, agentAsks: em.agentAsks !== false,
     ...(typeof em.nudge === 'boolean' ? { nudge: em.nudge } : {}),
   };
   const lastDigestAt = typeof o.lastDigestAt === 'string' ? o.lastDigestAt : null;

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile edit / change-password / presence modals + presence pill. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-10-27 — A refused profile save shows each field's message under that field (WithFieldErrors, js/field-errors.js); a message for a field the dialog does not draw goes to the toast (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.9.0 — 2026-09-26 — Every part is a kit component (the dialogs' fields TextField, TextArea, Select, Check, Choice and Field in a Stack; the picture's preview MastheadPreview; the password's eye TextField secret with its Show and Hide words, kept as main had it; the requirements the List's small cut with Tick; the presence button PresenceButton; Note, Action, Loud): this file writes no class (page group G8).
  *   v1.8.0 — 2026-09-26 — The overview's head is the home's head, the Masthead (components/Masthead.js); the head's own rules go, the address line and the marks keep theirs. The account dialog's preview of your picture is framed as the head frames it (.poster-frame); its size stays (a unification: Jouni's decision "Person head").
  *   v1.7.0 — 2026-09-26 — The account dialog's e-mail, which is changed in the Email tab, is the Text field, disabled; .pf-edit-readonly goes (a unification: the look most tabs use).
@@ -43,7 +44,8 @@ import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { Choice } from '/components/Choice.js';
-import { Field } from '/components/Field.js';
+import { Field, WithFieldErrors } from '/components/Field.js';
+import { fieldErrorsOf, refusalLine, focusFirstInvalid } from '/js/field-errors.js';
 import { List, Row, Tick, Cell } from '/components/List.js';
 import { HeadDesc } from '/components/SubHeading.js';
 import { Note } from '/components/Note.js';
@@ -58,6 +60,8 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', region: '', timezone: '', directory_listed: false });
   const [currentEmail, setCurrentEmail] = useState('');
+  // A refused save's message per field, shown under each field (js/field-errors.js).
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -89,9 +93,15 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
 
   const save = async () => {
     setSaving(true);
+    setErrors({});
     try {
       const resp = await updateProfile(fields);
-      if (resp && resp.data) {
+      const refused = fieldErrorsOf(resp);
+      if (Object.keys(refused).length) {
+        setErrors(refused);
+        showToast(refusalLine(refused, ['display_name', 'bio', 'avatar', 'locale'], t), true);
+        focusFirstInvalid();
+      } else if (resp && resp.data) {
         // Every date already on the screen repaints in the new format and clock, without a reload.
         setDisplayPrefs({ region: resp.data.region, timezone: resp.data.timezone });
         if (session && typeof fields.display_name === 'string') {
@@ -125,18 +135,18 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
     <${Modal} open=${true} onClose=${requestClose} title=${t('profile.landing.editModalTitle')}
       footer=${footer} footerStart=${footerStart}>
         ${loading ? html`<${Space} above="section" below="section"><${LoadingLine} /><//>` : html`
-          <${Stack} gap="medium">
-            <${TextField} label=${t('profile.landing.editDisplayName')} value=${fields.display_name}
+          <${WithFieldErrors} errors=${errors}><${Stack} gap="medium">
+            <${TextField} name="display_name" label=${t('profile.landing.editDisplayName')} value=${fields.display_name}
               placeholder=${t('profile.landing.editDisplayNamePlaceholder')} maxLength=${100}
               onInput=${(v) => set('display_name', v)} />
-            <${TextArea} label=${t('profile.landing.editBio')} value=${fields.bio}
+            <${TextArea} name="bio" label=${t('profile.landing.editBio')} value=${fields.bio}
               placeholder=${t('profile.landing.editBioPlaceholder')} maxLength=${500} rows=${3}
               onInput=${(v) => set('bio', v)} />
-            <${TextField} label=${t('profile.landing.editAvatar')} value=${fields.avatar}
+            <${TextField} name="avatar" label=${t('profile.landing.editAvatar')} value=${fields.avatar}
               placeholder=${t('profile.landing.editAvatarPlaceholder')} maxLength=${50}
               onInput=${(v) => set('avatar', v)}
               actions=${html`<${MastheadPreview}>${fields.avatar || '🙂'}<//>`} />
-            <${Select} label=${t('profile.landing.editLocale')} value=${fields.locale} onChange=${(v) => set('locale', v)}
+            <${Select} name="locale" label=${t('profile.landing.editLocale')} value=${fields.locale} onChange=${(v) => set('locale', v)}
               options=${[['en', 'English'], ['fi', 'Suomi'], ['es', 'Español']]}
               hint=${t('profile.landing.editLocaleHint') || 'Your preferred language — used for the portal UI; agents can read it from your profile to answer in it.'} />
             ${/* Beside the language, because they are the two settings it is NOT. */''}
@@ -150,7 +160,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
               hint=${t('profile.landing.editDirectoryHint') || 'Off by default. When on, other signed-in members can find you (name, bio, avatar) in the directory. Anonymous visitors never see it.'}>
               ${t('profile.landing.editDirectoryListed') || 'List me in the member directory'}
             <//>
-          <//>
+          <//><//>
         `}
         <${ToastContainer} />
     <//>

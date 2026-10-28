@@ -9,7 +9,7 @@
  *   /v1/ai/available on the provider records, the provider test of speech and embeddings, an app's
  *   prefer.* in its meta, and the publish hints.
  *
- *   Its own node on 40441, whose fixed provider types point at the fake provider
+ *   Its own node on 28441, whose fixed provider types point at the fake provider
  *   (test/helpers/fake-ai-provider.ts), and whose catalogue sources point at a stub serving the V4
  *   samples, so a retirement can be made to happen.
  *
@@ -17,6 +17,9 @@
  *   calls aimeat_ai_capabilities and gets a fix for a capability that is off.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-capabilities.ts
  * @version-history
+ *   v1.3.0 — 2026-10-27 — 7b: an agent of the same owner without ai:use is refused with a 403 naming
+ *     the word, on GET /v1/ai/capabilities and on the provider test. Its own node moved to 28441 with
+ *     every suite's fixed ports.
  *   v1.2.0 — 2026-10-08 — 10b (aiprov plan, A1, A4, A5, A6): an OpenRouter TTS model's PCM layout on
  *     the start, done and json=1 answers; a voice the catalogue says it lacks refused before the call;
  *     an mp3 refusal as 422 PROVIDER_REJECTED with a pcm hint; the speech fallback when allowed.
@@ -41,7 +44,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, chatJson, imageJson, anthropicJson, providerStatus, speechPcm, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_CAPABILITIES_PORT ?? '40441';
+const PORT = process.env.E2E_AI_CAPABILITIES_PORT ?? '28441';
 const BASE = `http://localhost:${PORT}`;
 const REDIRECT = 'http://localhost:9912/callback';
 /** One transparent pixel, which is all an image answer needs to be stored. */
@@ -322,6 +325,15 @@ const toolJson = (r: any) => JSON.parse(String(r?.result?.content?.[0]?.text ?? 
         const r = (await caps(a.token, '?app_id=cap-app')).body.data.capabilities;
         assert(r.text.on === false && r.text.reason === 'APP_NOT_ALLOWED', `text for cap-app: ${JSON.stringify(r.text)}`);
       } finally { await settings(a, { app_allowlist: null }); }
+    });
+
+    await test('7b. an agent of the same owner without ai:use is refused (403) on capabilities and on the provider test', async () => {
+      const agent = await connectAgent(a, 'capnoai', ['memory:read']);
+      const r = await caps(agent);
+      assert(r.status === 403, `capabilities without ai:use: expected 403, got ${r.status}`);
+      assert(JSON.stringify(r.body).includes('ai:use'), `the refusal does not name ai:use: ${JSON.stringify(r.body).slice(0, 200)}`);
+      const t = await json('/v1/ai/providers/my-openai/test', { method: 'POST', headers: auth(agent), body: JSON.stringify({ capability: 'text' }) });
+      assert(t.status === 403, `provider test without ai:use: expected 403, got ${t.status}`);
     });
 
     await test('8. an agent reads its own answer, and an app\'s prefer.text orders the owner\'s providers', async () => {

@@ -33,8 +33,8 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_PROACTIVE_PORT ?? '40404';
-const OFF_PORT = process.env.E2E_PROACTIVE_OFF_PORT ?? '40409';
+const PORT = process.env.E2E_PROACTIVE_PORT ?? '28404';
+const OFF_PORT = process.env.E2E_PROACTIVE_OFF_PORT ?? '28409';
 const BASE = `http://localhost:${PORT}`;
 const OFF_BASE = `http://localhost:${OFF_PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';

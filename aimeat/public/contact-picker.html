@@ -15,6 +15,7 @@
       frame the app controls is a frame the app can position, resize and overlay — the choice has to
       happen somewhere the app cannot dress up.
     @version-history
+      v1.0.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
       v1.0.0 — 2026-08-17 — TARGET-063 phase 3.
   -->
   <style>
@@ -48,7 +49,7 @@
   <div class="wrap">
     <h1 id="title">Choose a contact</h1>
     <p class="subtitle" id="subtitle"></p>
-    <input id="filter" type="search" placeholder="Filter…" autocomplete="off">
+    <input id="filter" type="search" placeholder="Filter…" autocomplete="off" maxlength="2048"><!-- js/input-limits.js line -->
     <div id="body"></div>
     <p class="foot" id="foot"></p>
   </div>

@@ -331,7 +331,7 @@ export function pinnedEnv(target: RunnerTarget, suite?: string): Record<string, 
         // the server reads this at boot, before the test process has started the provider — they
         // can only meet on a port agreed in advance.
         AIMEAT_CONNECTIONS_ENABLED: process.env.AIMEAT_CONNECTIONS_ENABLED ?? 'true',
-        AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388',
+        AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:28388',
         // The fake provider lives on loopback, which safeFetch refuses by default and must.
         AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
         // A TURN server and its shared secret, so e2e-realtime-rooms can prove that

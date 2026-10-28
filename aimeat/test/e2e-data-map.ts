@@ -11,6 +11,7 @@
  *   that guessing cannot come back without turning this suite red.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-map
  * @version-history
+ *   2026-10-28 — A personal row says its regulated data in `domains`: without it the map has DATAMAP_PERSONAL_NO_DOMAIN, a stated domain clears it and is stored on the row, and an id the node does not know is DATAMAP_ROW_BAD_DOMAIN and still writes.
  *   2026-10-18 — An app that asks for organism:invite and does not say in its map that it invites people gets DATAMAP_INVITES_UNSTATED; the machinery word or the `invites` statement clears it, and a tie keeps the statement. An agent holding organism:invite is listed with `invites_people: true` on GET /v1/agents and aimeat_agents_list (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
  *   2026-10-16 —The map of an app that is not public (unlisted, behind an access code, listed to the community, hidden by an operator) goes only to whoever may see the app; another owner, another owner's agent over MCP and a caller with no token get a 404 (QA audit list review).
  *   v2.2.0 — 2026-09-26 — A6-10 on the MCP door: aimeat_app_get gives another owner's agent the
@@ -205,6 +206,37 @@ async function publish(o: Owner, filename: string, htmlText: string = APP_HTML):
         assert(r.body.data.stamp.missing === false, 'the stamp no longer says missing');
         assert((r.body.data.findings ?? []).length === 0,
             `a complete map has nothing missing: ${JSON.stringify(r.body.data.findings)}`);
+    });
+
+    await test('a personal row says which regulated data it is, and saying it clears the finding', async () => {
+        // TalentGrid on innokas.aimeat.io kept colleagues' competence ratings and nothing on the node
+        // could tell that this was employment data: the row had no place to say it.
+        await publish(o, 'probe-domain.html');
+        const personal = { ...GOOD_MAP.held[0], what: 'team.people', holds: 'names and skills', personalData: 'yes' };
+        const unsaid = await json(`/v1/datamap/apps/${o.name}/probe-domain.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify({ ...GOOD_MAP, held: [personal] }),
+        });
+        assert(unsaid.status === 200, `write ${unsaid.status}: ${JSON.stringify(unsaid.body?.error)}`);
+        const codes = (unsaid.body.data.findings ?? []).map((f: { code: string }) => f.code);
+        assert(codes.includes('DATAMAP_PERSONAL_NO_DOMAIN'), `a personal row with no domain is a finding: ${JSON.stringify(codes)}`);
+
+        const said = await json(`/v1/datamap/apps/${o.name}/probe-domain.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify({ ...GOOD_MAP, held: [{ ...personal, domains: ['employment'] }] }),
+        });
+        assert(said.status === 200, `write ${said.status}`);
+        assert((said.body.data.findings ?? []).length === 0, `a stated domain clears it: ${JSON.stringify(said.body.data.findings)}`);
+        const back = await json(`/v1/datamap/apps/${o.name}/probe-domain.html`, { headers: auth(o.token) });
+        assert(JSON.stringify(back.body.data.data_map?.held?.[0]?.domains) === '["employment"]', 'the domain is stored on the row');
+    });
+
+    await test('a domain the node does not know is a finding, never a refusal', async () => {
+        const personal = { ...GOOD_MAP.held[0], what: 'team.people', holds: 'names', personalData: 'yes', domains: ['hr'] };
+        const w = await json(`/v1/datamap/apps/${o.name}/probe-domain.html`, {
+            method: 'PUT', headers: auth(o.token), body: JSON.stringify({ ...GOOD_MAP, held: [personal] }),
+        });
+        assert(w.status === 200, `an unknown domain still writes: ${w.status}`);
+        const found = (w.body.data.findings ?? []).find((f: { code: string }) => f.code === 'DATAMAP_ROW_BAD_DOMAIN');
+        assert(!!found && found.message.includes('hr'), `the finding names the unknown id: ${JSON.stringify(w.body.data.findings)}`);
     });
 
     await test('the example object the tool itself shows is one the node accepts, with the spec the service takes', async () => {

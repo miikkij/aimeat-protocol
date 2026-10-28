@@ -24,6 +24,7 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-permission-ask
  * @version-history
+ *   v1.3.0 — 2026-10-28 — Phase 5: the page notice carries Don't allow for the word it asks for.
  *   v1.2.0 — 2026-10-25 — Phase 3: the notice carries Don't allow, and the agent is told the Allow on
  *     its inbox (secaudit2026oct22, the approval standard).
  *   v1.1.0 — 2026-10-18 — Phase 5: a refusal one press cannot answer reaches the bell too.
@@ -262,7 +263,7 @@ await test('A refused powerful permission (AI use) answers with the agent\'s pag
     assert(d.one_press === false && String(d.allow_url).includes(`/v1/profile?tab=agents&agent=${AGENT}`), `details ${JSON.stringify(d)}`);
 });
 
-await test('The owner\'s bell gets one notice with the agent\'s page and no Allow button', async () => {
+await test('The owner\'s bell gets one notice with the agent\'s page and Don\'t allow, and no Allow button', async () => {
     let found: any[] = [];
     for (let i = 0; i < 40 && found.length === 0; i++) {
         found = await pageNotices(ownerToken);
@@ -271,8 +272,11 @@ await test('The owner\'s bell gets one notice with the agent\'s page and no Allo
     assert(found.length === 1, `expected one notice, got ${found.length}`);
     const n = found[0];
     assert(n.link === `/v1/profile?tab=agents&agent=${AGENT}`, `link ${n.link}`);
-    assert(!(n.actions ?? []).some((a: any) => a.kind === 'api'), `an Allow button: ${JSON.stringify(n.actions)}`);
+    assert(!(n.actions ?? []).some((a: any) => a.kind === 'api' && a.endpoint.endsWith('/allow')), `an Allow button: ${JSON.stringify(n.actions)}`);
     assert((n.actions ?? []).some((a: any) => a.kind === 'navigate' && a.link === n.link), `no way to the agent's page: ${JSON.stringify(n.actions)}`);
+    // "No" is one press on this notice too (Jouni, 2026-10-28); the words are only the one it lacks.
+    assert((n.actions ?? []).some((a: any) => a.id === 'deny' && a.kind === 'api' && a.endpoint === `/v1/agents/${AGENT}/refusals/decline`
+        && JSON.stringify(a.body?.needed) === '["ai:use"]'), `no Don't allow: ${JSON.stringify(n.actions)}`);
 });
 
 await test('A second refusal of the same permission asks nothing new; the other owner hears none of it', async () => {

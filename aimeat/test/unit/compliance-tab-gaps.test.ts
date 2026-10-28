@@ -9,6 +9,10 @@
  *   compliance-gaps.test.ts; this is the page's fold over what that computation serves.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-tab-gaps.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-28 — The counts carry `maker` (setup, by design), and an answer the app's maker
+ *     gave is counted as the maker's.
+ *   v1.2.0 — 2026-10-28 — The sixth kind, app-uses-ai-not-in-register; a proposed answer is counted
+ *     as proposed, never as the operator's.
  *   v1.1.0 — 2026-10-03 — The fifth kind, font-licence-unknown (the font manager).
  *   v1.0.0 — 2026-09-05 — Initial (the Compliance page in the poster face).
  */
@@ -54,7 +58,18 @@ describe('groupGaps', () => {
     expect(g.other).toHaveLength(1);
   });
   it('is empty and total 0 without gaps', () => {
-    expect(groupGaps(undefined)).toEqual({ total: 0, models: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] });
+    expect(groupGaps(undefined)).toEqual({ total: 0, models: [], aiApps: [], apps: [], usecases: [], unlabelled: 0, fonts: [], other: [] });
+  });
+  it('groups the apps that use AI and no entry names, the high-risk candidates first', () => {
+    const g = groupGaps([
+      { kind: 'app-uses-ai-not-in-register', evidence: { app: 'antti/doffin-tenders.html', annex3: null } },
+      { kind: 'app-uses-ai-not-in-register', evidence: { app: 'teemu/talentgrid.html', annex3: 'employment', annex3_reason: 'the map reads as employment data' } },
+    ]);
+    expect(g.aiApps).toEqual([
+      { app: 'teemu/talentgrid.html', annex3: 'employment', reason: 'the map reads as employment data' },
+      { app: 'antti/doffin-tenders.html', annex3: null, reason: null },
+    ]);
+    expect(g.other).toHaveLength(0);
   });
   it('groups the faces added without licence data by family', () => {
     const g = groupGaps([
@@ -69,13 +84,22 @@ describe('groupGaps', () => {
 
 describe('answersOf and answerStats', () => {
   it('counts an answer with no recorded source as the operator\'s', () => {
-    expect(answersOf(UC[2], QS)).toEqual({ total: 3, answered: 3, unanswered: 0, ai: 0, human: 3, evidence: 0 });
+    expect(answersOf(UC[2], QS)).toEqual({ total: 3, answered: 3, unanswered: 0, ai: 0, human: 3, evidence: 0, proposed: 0, maker: 0 });
   });
   it('treats an empty string as unanswered', () => {
-    expect(answersOf(UC[3], QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 2, evidence: 0 });
+    expect(answersOf(UC[3], QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 2, evidence: 0, proposed: 0, maker: 0 });
   });
   it('sums across the register', () => {
-    expect(answerStats(UC, QS)).toEqual({ entries: 4, questions: 3, answered: 9, unanswered: 3, ai: 2, human: 6, evidence: 1 });
+    expect(answerStats(UC, QS)).toEqual({ entries: 4, questions: 3, answered: 9, unanswered: 3, ai: 2, human: 6, evidence: 1, proposed: 0, maker: 0 });
+  });
+  it('never counts a proposed answer as the operator\'s', () => {
+    // A proposal the node's rule read from a data map, saved unchanged, is still nobody's decision.
+    const u = { id: 'e', answers: { q1: 'employment', q2: true }, answerSources: { q1: 'proposed', q2: 'human' } };
+    expect(answersOf(u, QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 1, evidence: 0, proposed: 1, maker: 0 });
+  });
+  it('counts an answer the app\'s maker gave as the maker\'s, never as the operator\'s', () => {
+    const u = { id: 'm', answers: { q1: 'none', q2: false }, answerSources: { q1: 'maker', q2: 'human' } };
+    expect(answersOf(u, QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 1, evidence: 0, proposed: 0, maker: 1 });
   });
 });
 

@@ -154,7 +154,7 @@ const vendor = `vendor${ts}`;
 const ops = `ops${ts}`;
 const buyer = `buyer${ts}`;
 // Nodes the repository has never seen and that do not answer: a grant to one stands with peer_pending.
-const fakeNode = async (tag: string) => ({ node_id: `aimeat-test-001-${tag}${ts}`, url: 'http://127.0.0.1:40498', public_key: (await generateKeyPair()).publicKey });
+const fakeNode = async (tag: string) => ({ node_id: `aimeat-test-001-${tag}${ts}`, url: 'http://127.0.0.1:28498', public_key: (await generateKeyPair()).publicKey });
 let n1: { node_id: string; url: string; public_key: string };
 let n2: { node_id: string; url: string; public_key: string };
 
@@ -183,10 +183,10 @@ const notifsOf = async (type: string) =>
 console.log('Setup');
 
 await test('Boot R, B and S; R and S are each other\'s peers; R publishes two private packages', async () => {
-    // 40741-40743: no other suite names them.
-    R = await bootNode(40741, `aimeat-test-001-salerepo${ts}`, true);
-    B = await bootNode(40743, `aimeat-test-001-salebuy${ts}`, false, { packageFederationEnabled: false });
-    S = await bootNode(40742, `aimeat-test-001-saleshop${ts}`, false);
+    // 28741-28743: no other suite names them.
+    R = await bootNode(28741, `aimeat-test-001-salerepo${ts}`, true);
+    B = await bootNode(28743, `aimeat-test-001-salebuy${ts}`, false, { packageFederationEnabled: false });
+    S = await bootNode(28742, `aimeat-test-001-saleshop${ts}`, false);
     vendorToken = await setupOwner(R, vendor);
     strangerToken = await signUp(R, `stranger${ts}`);
     opsToken = await setupOwner(S, ops);

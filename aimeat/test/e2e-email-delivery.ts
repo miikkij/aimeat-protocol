@@ -23,7 +23,7 @@
  *   IT RUNS ITS OWN NODE. SMTP is process-wide configuration and the shared E2E server has email
  *   off, so this spawns a node of its own on its own port with AIMEAT_SMTP_* pointed at the sink in
  *   this process. That node's database follows the run's backend (test/helpers/own-node-db.ts), and
- *   the suite seeds passwords into that same database. `E2E_EMAIL_PORT` moves it (default 40294,
+ *   the suite seeds passwords into that same database. `E2E_EMAIL_PORT` moves it (default 28294,
  *   with the SMTP sink one port above).
  *
  *   THE TRANSPORT AUTHENTICATES. AIMEAT_SMTP_USER is set, so `createEmailService()` builds its
@@ -70,7 +70,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { ownerSignIn, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { seedPassword } from './helpers/seed-password.js';
 
-const PORT = Number(process.env.E2E_EMAIL_PORT ?? 40294);
+const PORT = Number(process.env.E2E_EMAIL_PORT ?? 28294);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
 const STAMP = Date.now().toString(36).slice(-6);

@@ -8,7 +8,7 @@
  *   the owner confirms, an app never binding, the reserved keys, and the provider's default fine-tuning
  *   under the call's own.
  *
- *   Its own node on 40444, whose fixed provider types point at the fake provider
+ *   Its own node on 28444, whose fixed provider types point at the fake provider
  *   (test/helpers/fake-ai-provider.ts). The catalogue sources are a closed port: nothing is fetched.
  *   The models are gpt-4.1: the AI SDK's OpenAI adapter drops temperature for a reasoning model
  *   (gpt-5 and the o-series), so fine-tuning is only seen on the wire for a model that is not one.
@@ -31,7 +31,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, chatJson, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_ROLES_PORT ?? '40444';
+const PORT = process.env.E2E_AI_ROLES_PORT ?? '28444';
 const BASE = `http://localhost:${PORT}`;
 const REDIRECT = 'http://localhost:9912/callback';
 

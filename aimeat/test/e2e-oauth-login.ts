@@ -5,7 +5,7 @@
  *   authorize + callback must report the feature as disabled (503) rather than 404 — proving the
  *   routes are mounted and correctly gated. GET /v1/auth/providers must return 200 (an array, empty
  *   here). The full mapping/session happy-path is covered by test/unit/oauth-login.test.ts (fake IdP).
- * @usage cd aimeat && E2E_BASE=http://localhost:40250 npx tsx test/e2e-oauth-login.ts
+ * @usage cd aimeat && E2E_BASE=http://localhost:28250 npx tsx test/e2e-oauth-login.ts
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial guard suite.
  *   v1.1.0 — 2026-06-25 — Guard the first-time-username-choice endpoints: /login/pending 404s
@@ -15,7 +15,7 @@
  *     GET /v1/auth/providers discovery endpoint (200, array).
  */
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40250';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28250';
 
 let passed = 0;
 let failed = 0;

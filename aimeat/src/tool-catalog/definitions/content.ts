@@ -22,11 +22,13 @@
  * @structure checkContentInput() · contentTools
  * @usage imported by tool-catalog/definitions.ts; checkContentInput by mcp/content.ts and tool-dispatch/tool-call-defs-content.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-21 — aimeat_content_correct: correct an item's classes and extracted values.
  *   v1.0.0 — 2026-10-20 — Initial: aimeat_content_facts, _inspect, _scan, _classes and _settings.
  */
 
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
@@ -155,7 +157,7 @@ export const contentTools = [
             key: { type: 'string', required: true, description: 'The stored file\'s key, or the memory record\'s key.', zod: z.string().min(1).max(1024) },
             owner: SOURCE_OWNER,
             classes: { type: 'array', description: 'The item\'s whole list of content class ids as it should be; [] says it is in none.', zod: z.array(z.string().min(1).max(64)).max(50) },
-            fields: { type: 'object', description: 'Per content class id, the property values to set; null removes one.', zod: z.record(z.string(), z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))) },
+            fields: { type: 'object', description: 'Per content class id, the property values to set; null removes one.', zod: z.record(z.string(), z.record(z.string(), z.union([z.string().max(INPUT_LIMITS.text), z.number(), z.boolean(), z.null()]))) },
             extract: { type: 'boolean', description: 'Extract the classes again afterwards (an AI step).' },
         },
     },

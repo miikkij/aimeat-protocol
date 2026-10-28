@@ -15,20 +15,31 @@
  *   failure the whole feature exists to prevent.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-draft.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-28 — Every app that uses AI is an entry (TalentGrid on innokas.aimeat.io had
+ *     none), its Annex III area proposed from its data map, its models from its own calls; "publishes
+ *     publicly" needs content a visitor can read, not a record existing.
  *   v1.0.0 — 2026-08-23 — BR-02.
  */
 import { describe, it, expect } from 'vitest';
 import { draftRegisterFromActivity } from '../../src/services/compliance-draft.js';
 import type { AimeatConfig } from '../../src/config.js';
 import type { Storage } from '../../src/storage/interface.js';
+import type { DataMap } from '../../src/services/data-map/data-map-types.js';
 
 const CONFIG = { nodeId: 'test-node', consentAuditRetentionDays: 90, aiProvenance: true } as unknown as AimeatConfig;
 
 function storageWith(opts: {
   usage?: Array<{ agentGaii: string; model: string; owner?: string }>;
   agents?: Array<{ gaii: string; name: string; displayName?: string; description?: string; capabilities?: string[] }>;
-  provenance?: Array<{ principal: string; humanInvolvement: string }>;
+  /** `public: false` is a record no visitor can read; absent counts as public, as before. */
+  provenance?: Array<{ principal: string; humanInvolvement: string; public?: boolean; pipeline?: string; model?: string }>;
   appsWithGap?: Array<{ ownerName: string; filename: string }>;
+  /** Apps as the listing gives them, with whatever posture and visibility the test needs. */
+  apps?: Array<{ ownerName: string; filename: string; name?: string; parked?: boolean; aiPosture?: Record<string, unknown> }>;
+  /** Data maps, by `owner/appId`. */
+  maps?: Record<string, DataMap>;
+  /** The stored register. */
+  stored?: Array<{ id: string; title: string; apps?: string[] }>;
 }): Storage {
   return {
     queryUsageDailyAllOwners: async () => (opts.usage ?? []).map(u => ({
@@ -40,23 +51,53 @@ function storageWith(opts: {
       ...a, owner: 'alice', publicKey: '', trustScore: 0, morselBalance: 0,
       createdAt: '', lastSeen: '', capabilities: a.capabilities ?? [],
     })),
-    listAiProvenance: async () => ({
-      items: (opts.provenance ?? []).map((p, i) => ({
-        id: `p${i}`, ownerGhii: 'alice@test-node', principal: p.principal, contentHash: null,
-        generatedAt: '2026-08-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z',
-        record: { humanInvolvement: p.humanInvolvement },
-      })),
-      total: (opts.provenance ?? []).length,
-    }),
+    listAiProvenance: async (q?: { publicOnly?: boolean; offset?: number }) => {
+      // One page: the draft pages by offset, and a second page must come back empty.
+      const rows = (q?.offset ?? 0) > 0 ? [] : (opts.provenance ?? []).filter(p => !q?.publicOnly || p.public !== false);
+      return {
+        items: rows.map((p, i) => ({
+          id: `p${i}`, ownerGhii: 'alice@test-node', principal: p.principal, contentHash: null,
+          generatedAt: '2026-08-01T00:00:00Z', createdAt: '2026-08-01T00:00:00Z',
+          record: { humanInvolvement: p.humanInvolvement, generator: { pipeline: p.pipeline, model: p.model } },
+        })),
+        total: rows.length,
+      };
+    },
     listApps: async () => ({
-      apps: (opts.appsWithGap ?? []).map(a => ({
-        ownerName: a.ownerName, filename: a.filename,
-        manifest: { aiPosture: { gap: { code: 'AI_DISCLOSURE_MISSING' }, usesAi: true, generates: ['text'] } },
-      })),
+      apps: [
+        ...(opts.appsWithGap ?? []).map(a => ({
+          ownerName: a.ownerName, filename: a.filename,
+          manifest: { aiPosture: { gap: { code: 'AI_DISCLOSURE_MISSING' }, usesAi: true, generates: ['text'] } },
+        })),
+        ...(opts.apps ?? []).map(a => ({
+          ownerName: a.ownerName, filename: a.filename, parked: a.parked,
+          manifest: { name: a.name ?? a.filename, description: '', ...(a.aiPosture ? { aiPosture: a.aiPosture } : {}) },
+        })),
+      ],
     }),
-    getMemory: async () => null,   // no stored question set: the shipped default is used
+    getMemory: async (owner: string, key: string) => {
+      if (key === 'compliance.usecases' && opts.stored) return { value: { usecases: opts.stored } };
+      const m = /^apps\.(.+)\.datamap$/.exec(key);
+      const map = m ? opts.maps?.[`${owner.split('@')[0]}/${m[1]}`] : undefined;
+      // No stored question set: the shipped default is used.
+      return map ? { value: map } : null;
+    },
   } as unknown as Storage;
 }
+
+/** TalentGrid's data map on innokas.aimeat.io (2026-10-28), abridged to the words that matter. */
+const TALENTGRID_MAP: DataMap = {
+  spec: 'aimeat.datamap/2', form: 'one-person', arrangement: 'four private records',
+  what: 'TalentGrid is a competence and resourcing tool for a software organisation.',
+  usedFor: "Answering 'who could we put on this' with evidence instead of memory.",
+  machinery: ['ai-generation', 'login'], leaves: [], elsewhere: [], source: 'declared', at: '2026-08-31T08:23:10.633Z',
+  held: [{
+    what: 'talentgrid.people', holds: "each person's name, availability and allocation, their skill entries (level 1-5)",
+    kind: 'register', usedFor: 'search-and-filter', where: 'owner-memory-private', owner: 'person', readers: 'owner-only',
+    writers: ['person-in-the-ui'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy',
+    personalData: 'yes', why: 'assessed competence about named colleagues',
+  }],
+};
 
 describe('the draft groups by what called the model, not by the model', () => {
   it('turns four models used by one agent into ONE entry', async () => {
@@ -176,9 +217,94 @@ describe('the draft answers only what it can point at', () => {
     expect(draft.counts.answeredFromEvidence).toBe(0);
   });
 
+  it('answers "does not publish" when everything it generated is private', async () => {
+    // innokas.aimeat.io, 2026-10-28: every app parked, and the draft answered "publishes publicly:
+    // yes" because a provenance record existed. A record says something was generated, not that
+    // anyone outside can read it.
+    const draft = await draftRegisterFromActivity(storageWith({
+      usage: [{ agentGaii: 'teemu@test-node', model: 'm/one' }],
+      provenance: [{ principal: 'teemu@test-node', humanInvolvement: 'none', public: false }],
+    }), CONFIG);
+    const uc = draft.usecases[0];
+    expect(uc.answers?.['q-publishes-publicly']).toBe(false);
+    expect(uc.answerSources?.['q-publishes-publicly']).toBe('evidence');
+    // Review only matters for what is published; nothing is, so nothing is said about it.
+    expect(uc.answers?.['q-human-reviews-before-publish']).toBeUndefined();
+  });
+
   it('says what it could not work out', async () => {
     const draft = await draftRegisterFromActivity(storageWith({}), CONFIG);
     expect(draft.notes.length).toBeGreaterThanOrEqual(3);
     expect(draft.notes.join(' ')).toMatch(/nothing is stored/i);
+  });
+});
+
+describe('every app that uses AI is in the draft, not only the ones with a gap', () => {
+  const talentgrid = {
+    apps: [{ ownerName: 'teemu', filename: 'talentgrid.html', name: 'TalentGrid', parked: true, aiPosture: { usesAi: true, generates: [] } }],
+    maps: { 'teemu/talentgrid': TALENTGRID_MAP },
+  };
+
+  it('TalentGrid: an entry described by its data map, though its publish check found no gap', async () => {
+    // innokas.aimeat.io, 2026-10-28: TalentGrid proposes who works on what from colleagues'
+    // competence ratings with a model, and the draft did not list it at all.
+    const draft = await draftRegisterFromActivity(storageWith(talentgrid), CONFIG);
+    expect(draft.usecases).toHaveLength(1);
+    const uc = draft.usecases[0];
+    expect(uc.title).toBe('TalentGrid');
+    expect(uc.apps).toEqual(['teemu/talentgrid.html']);
+    expect(uc.description).toBe(TALENTGRID_MAP.what);
+    expect(uc.purpose).toBe(TALENTGRID_MAP.usedFor);
+    expect(uc.systems).toContain('the data map lists ai-generation in its machinery');
+  });
+
+  it('TalentGrid: the Annex III area is proposed as employment, marked proposed, with the reason', async () => {
+    const draft = await draftRegisterFromActivity(storageWith(talentgrid), CONFIG);
+    const uc = draft.usecases[0];
+    expect(uc.answers?.['q-annex3-area']).toBe('employment');
+    expect(uc.answerSources?.['q-annex3-area']).toBe('proposed');
+    expect(draft.proposals).toEqual([expect.objectContaining({ usecase_id: uc.id, question: 'q-annex3-area', value: 'employment' })]);
+    expect(draft.proposals[0].reason).toContain('talentgrid.people');
+    expect(draft.counts.proposed).toBe(1);
+  });
+
+  it('a parked app publishes nothing to the public through itself: evidence', async () => {
+    const draft = await draftRegisterFromActivity(storageWith(talentgrid), CONFIG);
+    expect(draft.usecases[0].answers?.['q-publishes-publicly']).toBe(false);
+    expect(draft.usecases[0].answerSources?.['q-publishes-publicly']).toBe('evidence');
+  });
+
+  it('a publicly served app leaves "does it publish" open: being served is not publishing AI output', async () => {
+    const draft = await draftRegisterFromActivity(storageWith({
+      ...talentgrid, apps: [{ ...talentgrid.apps[0], parked: false }],
+    }), CONFIG);
+    expect(draft.usecases[0].answers?.['q-publishes-publicly']).toBeUndefined();
+  });
+
+  it("an app's models are the ones its own calls ran on, whoever made the call", async () => {
+    const draft = await draftRegisterFromActivity(storageWith({
+      ...talentgrid,
+      provenance: [
+        { principal: 'teemu@test-node', humanInvolvement: 'none', public: false, pipeline: 'teemu/talentgrid.html', model: 'deepseek/v4' },
+        { principal: 'mostafa@test-node', humanInvolvement: 'none', public: false, pipeline: 'teemu/talentgrid', model: 'liquid/lfm' },
+        { principal: 'teemu@test-node', humanInvolvement: 'none', public: false, pipeline: 'teemu/other.html', model: 'other/model' },
+      ],
+    }), CONFIG);
+    expect(draft.usecases[0].models).toEqual(['deepseek/v4', 'liquid/lfm']);
+  });
+
+  it('an app with no AI in its statements stays out, however much personal data it keeps', async () => {
+    const draft = await draftRegisterFromActivity(storageWith({
+      apps: [{ ownerName: 'teemu', filename: 'roster.html' }],
+      maps: { 'teemu/roster': { ...TALENTGRID_MAP, machinery: [] } },
+    }), CONFIG);
+    expect(draft.usecases).toEqual([]);
+  });
+
+  it('an app the stored register already names is not proposed again', async () => {
+    const draft = await draftRegisterFromActivity(storageWith({
+      ...talentgrid, stored: [{ id: 'uc-talentgrid', title: 'Staffing', apps: ['teemu/talentgrid.html'] }],
+    }), CONFIG);
+    expect(draft.usecases).toEqual([]);
   });
 });

@@ -34,6 +34,13 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.3.0 — 2026-10-28 — An answer from the app's maker says so; an opened entry has a reason field
+ *     per answered question (`answerNotes`), and a reason stands beside its answer.
+ *   v3.2.0 — 2026-10-28 — The questions, their help and their options in the reader's language while
+ *     the stored set still holds the built-in English (compliance-tab.print.js questionText).
+ *   v3.1.0 — 2026-10-28 — A proposed answer (the node's rule read it from an app's data map) says
+ *     "proposed, check it" and shows its reason where the help stands; the counts name proposed
+ *     answers apart from the operator's.
  *   v3.0.0 — 2026-09-27 — Library components only: the class is a status Mark by its tone, the
  *     filters Tabs and the SearchLine, the table a List with its own cut and More at its foot, the
  *     opened entry a Box with TextFields in Fields and its questions Readings with a Choice (yes/no,
@@ -48,6 +55,7 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
+import { questionText, questionHelp, optionLabel } from './compliance-tab.print.js';
 import { num } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import {
@@ -102,6 +110,8 @@ function answeredText(u, questions) {
   if (a.ai) parts.push(C('src.ai', { n: num(a.ai) }));
   if (a.human) parts.push(C('src.you', { n: num(a.human) }));
   if (a.evidence) parts.push(C('src.record', { n: num(a.evidence) }));
+  if (a.proposed) parts.push(C('src.proposed', { n: num(a.proposed) }));
+  if (a.maker) parts.push(C('src.maker', { n: num(a.maker) }));
   return [head, ...parts].join(' · ');
 }
 
@@ -109,29 +119,60 @@ function answeredText(u, questions) {
  *  clears it, so an answer given by mistake can be taken back. */
 function AnswerPick({ q, value, onChange }) {
   if (q.type === 'boolean') {
-    return html`<${Choice} clearable ariaLabel=${q.text} value=${value} options=${[[true, C('yes')], [false, C('no')]]}
+    return html`<${Choice} clearable ariaLabel=${questionText(q)} value=${value} options=${[[true, C('yes')], [false, C('no')]]}
       onChange=${(v) => onChange(v === '' ? undefined : v)} />`;
   }
-  return html`<${Select} fit ariaLabel=${q.text} value=${isBlank(value) ? '' : String(value)} placeholder=${C('pickAnswer')}
-    options=${(q.options || []).map(o => ({ value: o.value, label: o.label }))}
+  return html`<${Select} fit ariaLabel=${questionText(q)} value=${isBlank(value) ? '' : String(value)} placeholder=${C('pickAnswer')}
+    options=${(q.options || []).map(o => ({ value: o.value, label: optionLabel(q, o) }))}
     onChange=${(raw) => onChange(raw === '' ? undefined : raw)} />`;
 }
 
-/** One question as a reading: the question and its help, the answer, and who gave it. */
-function questionRow(q, value, source, onChange, last) {
+/**
+ * One question as a reading: the question and its help, the answer, and who gave it. A proposed
+ * answer (the node's rule read it from an app's data map) waits for a person like a blank one, and
+ * its reason stands where the help would, because the reason is what the person checks.
+ */
+function questionRow(q, value, source, onChange, last, reason, note) {
   const blank = isBlank(value);
+  const proposed = !blank && source === 'proposed';
   const src = blank ? C('waitsForYou')
     : source === 'evidence' ? C('answerFromEvidence')
     : source === 'ai' ? C('answerFromAi')
+    : source === 'maker' ? C('answerFromMaker')
+    : proposed ? C('answerProposed')
     : C('answerFromHuman');
+  // The reason given for the answer stands where the help would: it is what the reader checks.
+  const why = note ? C('noteWhy', { note }) : proposed && reason ? C('proposedWhy', { reason }) : (questionHelp(q) || undefined);
   return {
     key: q.id,
-    name: q.text,
-    why: q.help || undefined,
+    name: questionText(q),
+    why,
     mark: html`<${AnswerPick} q=${q} value=${value} onChange=${onChange} />`,
     value: blank ? html`<${Tinted} tone="notice">${src}<//>` : src,
+    // Picking the answer already shown changes nothing in a select, so accepting a proposal as it
+    // stands needs its own press; it makes the answer the operator's. A reading draws `end` in place
+    // of `value`, so the source words ride in the same cell as the press.
+    ...(proposed ? {
+      end: html`<${Tinted} tone="notice">${src}<//><${Action} small soft onClick=${() => onChange(value)}>${C('acceptProposal')}<//>`,
+    } : {}),
     last,
   };
+}
+
+/**
+ * Why the node proposed an answer, in the reader's language at the moment of reading, from the
+ * facts the draft carries: the regulated data, whether a data map row states it or the map's words
+ * point to it, the key families and the words. Rendered on every draw, so a language switch after
+ * the draft reaches it too. The node's English sentence when a draft from an older node has no facts.
+ */
+export function proposalText(p) {
+  const b = p && p.basis;
+  if (!b) return (p && p.reason) || '';
+  const domain = tOr(`admin.compliance.records.domain.${b.domain}`, b.domain);
+  const rows = (b.rows || []).join(', ');
+  return b.source === 'evidence'
+    ? C('proposedStated', { rows, domain })
+    : C('proposedRead', { rows, domain, words: (b.words || []).slice(0, 6).join(', ') });
 }
 
 /**
@@ -141,11 +182,12 @@ function questionRow(q, value, source, onChange, last) {
  * lists, and re-rendering a list joined with ", " on every keystroke eats the comma the person
  * has just typed.
  */
-function EntrySheet({ u, questions, onPatch, onAnswer, onRemove, onClose }) {
+function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer, onRemove, onClose }) {
   const [modelsText, setModelsText] = useState((u.models || []).join(', '));
   const [appsText, setAppsText] = useState((u.apps || []).join(', '));
   const reasons = (u.risk && u.risk.reasons) || [];
   const open = answersOf(u, questions).unanswered;
+  const answered = questions.filter(q => !isBlank((u.answers || {})[q.id]));
   return html`
     <${Box} id="adm-cmp-sheet" name=${u.title || u.id} marks=${html` <${ClassChip} cls=${u.risk && u.risk.class} />`}
       end=${html`<${Actions}>
@@ -166,11 +208,20 @@ function EntrySheet({ u, questions, onPatch, onAnswer, onRemove, onClose }) {
       <${Label} block>${C('answersTitle')}<//>
       ${open > 0 ? html`<${Note} kind="hint"><${Tinted} tone="notice" strong>${open === 1 ? C('unansweredOne') : C('unansweredMany', { n: num(open) })}<//><//>` : null}
       <${Readings} rows=${questions.map((q, i) => questionRow(q, (u.answers || {})[q.id], (u.answerSources || {})[q.id],
-        (v) => onAnswer(q.id, v), i === questions.length - 1))} />
+        (v) => onAnswer(q.id, v), i === questions.length - 1, proposedWhy[q.id] ? proposalText(proposedWhy[q.id]) : undefined,
+        (u.answerNotes || {})[q.id]))} />
+      ${answered.length > 0 ? html`
+        <${Label} block>${C('notesTitle')}<//>
+        <${Note} kind="quiet">${C('notesHint')}<//>
+        <${Fields}>
+          ${answered.map(q => html`<${TextArea} key=${q.id} wide label=${questionText(q)} rows=${2}
+            value=${(u.answerNotes || {})[q.id] || ''}
+            onInput=${(v) => onPatch({ answerNotes: { ...(u.answerNotes || {}), [q.id]: v } })} />`)}
+        <//>` : null}
     <//>`;
 }
 
-export function RegisterSection({ usecases, questions, draft, setDraft, openId, setOpenId, saving, drafting, onSave, onDraft }) {
+export function RegisterSection({ usecases, questions, draft, setDraft, openId, setOpenId, proposals = {}, saving, drafting, onSave, onDraft }) {
   const [cls, setCls] = useState('all');
   const [query, setQuery] = useState('');
   const [shown, setShown] = useState(PAGE);
@@ -251,9 +302,10 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
       note=${C('foot', {
         shown: num(Math.min(shown, filtered.length)), total: num(list.length),
         ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence), unanswered: num(stats.unanswered),
-      })} />
+      }) + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '')
+        + (stats.maker > 0 ? C('under.maker', { n: num(stats.maker) }) : '')} />
     ${open ? html`
-      <${EntrySheet} key=${openIndex} u=${open} questions=${questions}
+      <${EntrySheet} key=${openIndex} u=${open} questions=${questions} reasons=${proposals[open.id]}
         onPatch=${(p) => patch(open.id, p)} onAnswer=${(qid, v) => answer(open.id, qid, v)}
         onRemove=${() => remove(open.id)} onClose=${() => setOpenId(null)} />` : null}`;
 
@@ -291,7 +343,7 @@ export function QuestionnaireSection({ questionnaire }) {
     <${List} cols="tag-name" rows=${items} render=${(q) => html`
       <${Row} key=${q.id}>
         <${Cell} sign>${q.id}<//>
-        <${Cell} line>${q.text} ${impliesChips(q)}<//>
+        <${Cell} line>${questionText(q)} ${impliesChips(q)}<//>
       <//>`} />`;
   return html`
     <${Section} id="adm-cmp-05" num="05" title=${C('qsTitle')}

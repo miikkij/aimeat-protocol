@@ -30,12 +30,22 @@
  *     answer says `emptyAnswer` in italics, a source stands in brackets after the answer) and the
  *     reasons under `reasonsLabel` as a bulleted list; it is kept on one sheet.
  *   - PrintList({ items }): a numbered list [{ key, text, help }], the help on its own line in grey.
- * @structure PrintPage · ScreenOnly · PrintOnly · PrintHead · PrintHeading · PrintEntry · PrintList
+ *   - PrintToc({ title, items }): the contents, one linked line per part [{ id, num, label, note }];
+ *     a PDF keeps the links. PrintHeading takes the same `id` and `num`.
+ *   - PrintTable({ head, rows, lead }): a table with ruled rows; `lead` makes the first column the
+ *     row's name.
+ *   PrintEntry's fields are a two-column table, and its answers take a head row (`answersHead`);
+ *   with three columns the source has a column of its own, and with four an answer's `note` (why
+ *   that answer) stands between the answer and its source.
+ * @structure PrintPage · ScreenOnly · PrintOnly · PrintHead · PrintHeading · PrintToc · PrintTable · PrintEntry · PrintList
  * @usage html`<${PrintPage}>
  *          <${ScreenOnly}>…the page…<//>
  *          <${PrintOnly}><${PrintHead} title=${t('x.printTitle')} line=${stamp} />…<//>
  *        <//>`
  * @version-history
+ *   v1.1.0 — 2026-10-28 — PrintToc and PrintTable; PrintHeading takes an id and a number; PrintEntry
+ *     prints its fields as a table and its answers with a head row. The Compliance report's 15
+ *     pages read as one run of lines on innokas.aimeat.io.
  *   v1.0.0 — 2026-09-27 — Initial: the Compliance page's printout (views/admin/compliance-tab.print.js
  *     markup and admin.css .adm-cmp-print-only, .adm-cmp-pr-*, the body.adm-compliance-active print
  *     block) as a component that any page can print with (admin group G1).
@@ -69,34 +79,65 @@ export function PrintHead({ title, line }) {
   return html`<div class="print-head"><h2>${title}</h2>${has(line) ? html`<p>${line}</p>` : null}</div>`;
 }
 
-export function PrintHeading({ children }) {
-  return html`<h3 class="print-heading">${children}</h3>`;
+/** A part's heading; `id` makes it a target for PrintToc, `num` stands before it, `newSheet` starts a sheet. */
+export function PrintHeading({ children, id, num, newSheet = false }) {
+  return html`<h3 class=${newSheet ? 'print-heading print-page-break' : 'print-heading'} id=${id}>${has(num) ? html`<span class="print-heading-num">${num}</span>` : null}${children}</h3>`;
+}
+
+/** The contents: one line per part, each a link to its PrintHeading `id`, which a PDF keeps. */
+export function PrintToc({ title, items = [] }) {
+  return html`<nav class="print-toc">
+    ${has(title) ? html`<h3 class="print-heading">${title}</h3>` : null}
+    <ol>${(items || []).map((it, i) => html`<li key=${it.id ?? i}><a href=${'#' + it.id}><span class="print-heading-num">${it.num}</span>${it.label}</a>${has(it.note) ? html`<span class="print-toc-note">${it.note}</span>` : null}</li>`)}</ol>
+  </nav>`;
 }
 
 /**
- * @param {{ title: any, tag?: any, desc?: any, fields?: Array<{ key?: any, label: any, value: any }>,
- *   answers?: Array<{ key?: any, question: any, answer?: any, source?: any }>, reasons?: Array<any>,
- *   reasonsLabel?: any, emptyAnswer?: any }} props
+ * A table on paper: `head` the column names, `rows` arrays of cells (a list cell joined with
+ * commas). `lead` sets the first column as the row's name, in bold and a third of the width.
  */
-export function PrintEntry({ title, tag, desc, fields = [], answers = [], reasons = [], reasonsLabel, emptyAnswer }) {
+export function PrintTable({ head = [], rows = [], lead = false }) {
+  const cell = (c) => (Array.isArray(c) ? c.join(', ') : c);
+  return html`<table class=${lead ? 'print-table print-table-lead' : 'print-table'}>
+    ${head && head.length ? html`<thead><tr>${head.map((h, i) => html`<th key=${i}>${h}</th>`)}</tr></thead>` : null}
+    <tbody>${(rows || []).map((r, i) => html`<tr key=${i}>${r.map((c, j) => html`<td key=${j}>${cell(c)}</td>`)}</tr>`)}</tbody>
+  </table>`;
+}
+
+/**
+ * @param {{ id?: string, title: any, tag?: any, desc?: any, fields?: Array<{ key?: any, label: any, value: any }>,
+ *   answers?: Array<{ key?: any, question: any, answer?: any, note?: any, source?: any }>, answersHead?: Array<any>,
+ *   reasons?: Array<any>, reasonsLabel?: any, emptyAnswer?: any }} props
+ */
+export function PrintEntry({ id, title, tag, desc, fields = [], answers = [], answersHead, reasons = [], reasonsLabel, emptyAnswer }) {
   const shownFields = (fields || []).map((f) => ({ ...f, text: Array.isArray(f.value) ? f.value.join(', ') : f.value })).filter((f) => has(f.text));
   return html`
-    <article class="print-entry">
+    <article class="print-entry" id=${id}>
       <h4>${title}${has(tag) ? html`<span class="print-entry-tag">${tag}</span>` : null}</h4>
       ${has(desc) ? html`<p class="print-entry-desc">${desc}</p>` : null}
-      ${shownFields.map((f, i) => html`<div class="print-entry-field" key=${f.key ?? i}><span>${f.label}</span> ${f.text}</div>`)}
-      <table class="print-entry-answers">
+      ${shownFields.length ? html`<table class="print-entry-fields"><tbody>
+        ${shownFields.map((f, i) => html`<tr key=${f.key ?? i}><th>${f.label}</th><td>${f.text}</td></tr>`)}
+      </tbody></table>` : null}
+      ${(answers || []).length ? html`<table class="print-entry-answers">
+        ${answersHead && answersHead.length ? html`<thead><tr>${answersHead.map((h, i) => html`<th key=${i}>${h}</th>`)}</tr></thead>` : null}
         <tbody>
           ${(answers || []).map((a, i) => html`
             <tr key=${a.key ?? i}>
               <td class="print-entry-q">${a.question}</td>
-              <td class="print-entry-a">
-                ${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}
-                ${has(a.answer) && has(a.source) ? html`<span class="print-entry-src">(${a.source})</span>` : null}
-              </td>
+              ${answersHead && answersHead.length > 3
+                ? html`<td class="print-entry-a">${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}</td>
+                       <td class="print-entry-note">${has(a.note) ? a.note : null}</td>
+                       <td class="print-entry-who">${has(a.answer) ? a.source : null}</td>`
+                : answersHead && answersHead.length > 2
+                ? html`<td class="print-entry-a">${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}</td>
+                       <td class="print-entry-who">${has(a.answer) ? a.source : null}</td>`
+                : html`<td class="print-entry-a">
+                    ${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}
+                    ${has(a.answer) && has(a.source) ? html`<span class="print-entry-src">(${a.source})</span>` : null}
+                  </td>`}
             </tr>`)}
         </tbody>
-      </table>
+      </table>` : null}
       ${reasons && reasons.length > 0 ? html`
         <div class="print-entry-why">
           <span>${reasonsLabel}</span>

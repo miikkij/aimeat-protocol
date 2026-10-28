@@ -10,6 +10,11 @@
  *   component's own names.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-10-28 — The frames that hold the page grow to their content on paper: with the
+ *     app shell (page-base.css) they cut the printout to one sheet (innokas.aimeat.io). An answer
+ *     wraps in its own column instead of squeezing the question. The contents (print-toc), tables
+ *     (print-table, an entry's fields and answers ruled, with a head row), numbered part headings,
+ *     and a part that starts a new sheet (print-page-break).
  *   v1.1.0 — 2026-09-27 — A part marked data-print-keep prints too (the admin frame's bar with the
  *     page's title and the time of the last read, which main's printout carried).
  *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
@@ -25,13 +30,27 @@
 .print-entry h4 { margin: 0 0 .25rem; font-size: .95rem; }
 .print-entry-tag { margin-left: .5rem; font-weight: 500; color: var(--muted); }
 .print-entry-desc { margin: 0 0 .35rem; }
-.print-entry-field { font-size: .82rem; }
-.print-entry-field > span { color: var(--muted); }
-.print-entry-answers { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
-.print-entry-answers td { vertical-align: top; padding: .15rem .4rem .15rem 0; }
-.print-entry-q { width: 70%; }
-.print-entry-a { white-space: nowrap; }
+.print-entry-desc { font-size: .85rem; }
+/* Fields and answers are tables: on 2026-10-28 they were runs of "Label value" lines, and a reader
+   could not see where a label ended and its value began. */
+.print-entry-fields, .print-entry-answers, .print-table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
+.print-entry-fields th, .print-entry-fields td, .print-entry-answers th, .print-entry-answers td,
+.print-table th, .print-table td { vertical-align: top; text-align: left; padding: .25rem .5rem .25rem 0; border-bottom: 1px solid var(--border); }
+.print-entry-fields th { width: 28%; font-weight: 600; color: var(--muted); }
+.print-entry-answers thead th, .print-table thead th { font-weight: 600; color: var(--muted); border-bottom: 1.5px solid var(--text); }
+.print-table-lead td:first-child { width: 32%; font-weight: 600; }
+/* The answer wraps: an option label with its source ("Hiring, task allocation … (a rule's
+   proposal, not yet approved)") held on one line squeezed the question to a word per line. */
+.print-entry-q { width: 40%; }
+.print-entry-a { width: 20%; }
+.print-entry-note { width: 25%; }
+.print-entry-who { width: 15%; color: var(--muted); }
 .print-entry-src { margin-left: .4rem; color: var(--muted); }
+.print-heading-num { display: inline-block; min-width: 1.8rem; color: var(--muted); }
+.print-toc ol { list-style: none; padding: 0; margin: .3rem 0 1rem; font-size: .9rem; }
+.print-toc li { padding: .2rem 0; border-bottom: 1px dotted var(--border); }
+.print-toc a { color: inherit; text-decoration: none; }
+.print-toc-note { margin-left: .6rem; color: var(--muted); font-size: .8rem; }
 .print-entry-why { margin-top: .4rem; font-size: .82rem; }
 .print-entry-why > span { color: var(--muted); }
 .print-entry-why ul { margin: .1rem 0 0; padding-left: 1.1rem; }
@@ -41,10 +60,20 @@
 @media print {
   /* Nothing of the site around the page: what neither holds the page nor stands inside it. */
   body.print-page-active *:not(:has(.print-page)):not(:has([data-print-keep])):not(.print-page):not(.print-page *):not([data-print-keep]):not([data-print-keep] *) { display: none !important; }
+  /* page-base.css lets the app shell go on paper; the frames between it and the page (the
+     operator frame, a settings frame) cap their height and scroll too, and on innokas.aimeat.io
+     the Compliance report printed "1/1", cut at question 11. Every box that holds the page grows
+     to its content and lets the browser break it into sheets. */
+  body.print-page-active :has(.print-page) {
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    overflow: visible !important; display: block !important; position: static !important;
+  }
   body.print-page-active .print-screen-only { display: none !important; }
   body.print-page-active .print-only { display: block; }
   body.print-page-active .print-page { width: 100%; margin: 0; padding: 0; }
   body.print-page-active .print-entry { break-inside: avoid; }
+  body.print-page-active .print-table tr, body.print-page-active .print-entry-answers tr { break-inside: avoid; }
+  body.print-page-active .print-page-break { break-before: page; }
   body.print-page-active .print-page h3, body.print-page-active .print-page h4 { break-after: avoid; }
   @page { margin: 1.8cm; }
 }

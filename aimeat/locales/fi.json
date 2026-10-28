@@ -3583,6 +3583,8 @@
         "modelsEmpty": "kirjanpito on tyhjä, joten kaikki {n} täällä käytettyä mallia lasketaan dokumentoimattomiksi",
         "apps": "{n} sovellusta kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
         "appsOne": "yksi sovellus kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
+        "aiApps": "{n} sovellusta käyttää tekoälyä, eikä mikään merkintä nimeä niitä",
+        "aiAppsOne": "yksi sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
         "unanswered": "{n} merkinnässä on yhä vastaamattomia kysymyksiä",
         "unansweredOne": "yhdessä merkinnässä on yhä vastaamattomia kysymyksiä",
         "unlabelled": "{n} julkista kohdetta on ilman merkintää",
@@ -3594,9 +3596,31 @@
       },
       "under": {
         "filled": "{entries} merkintää · {questions} kysymystä · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence}",
-        "empty": "0 merkintää · {questions} kysymystä · mitään ei ole vielä kirjoitettu ylös"
+        "empty": "0 merkintää · {questions} kysymystä · mitään ei ole vielä kirjoitettu ylös",
+        "proposed": " · {n} ehdotusta odottaa sinua",
+        "maker": " · {n} vastausta sovellusten tekijöiltä"
       },
       "gapUndocumented": "Käytössä, mutta ei kirjattu mihinkään",
+      "gapAiApps": "Sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
+      "answerProposed": "ehdotus, tarkista",
+      "proposedWhy": "Miksi tätä ehdotetaan: {reason}",
+      "noteWhy": "Miksi: {note}",
+      "notesTitle": "Perustelu jokaiselle vastaukselle",
+      "notesHint": "Yksi tai kaksi lausetta vastausta kohden. Tulosteessa perustelu näkyy vastauksen vieressä, ja auditoija tarkistaa juuri sen.",
+      "ask": {
+        "subject": "Tekoälyasetuksen kysymykset {{n}} sovelluksellesi",
+        "intro": "Tekoälyä käyttäviä sovelluksiasi on {{n}}, ja EU:n tekoälyasetus kysyy jokaisesta muutaman kysymyksen. Sinä tunnet sovelluksesi parhaiten, joten pääkäyttäjä pyytää sinua vastaamaan:",
+        "appLine": "- {{title}}: avoimia kysymyksiä {{open}}. Vastaa sovelluksen sivulla: {{url}}",
+        "how": "Nopein tapa on oma tekoälysi. Liitä tämä tekoälykeskusteluusi:",
+        "after": "Vastauksesi tallentuvat sovelluksen datakarttaan, ja pääkäyttäjä hyväksyy ne vaatimustenmukaisuuden kirjanpitoon. Muistutus tulee uudelleen kahden viikon päästä, jos kysymyksiä on yhä avoinna."
+      },
+      "proposedStated": "datakartan mukaan {rows} sisältää säänneltyä tietoa ({domain}), ja sovellus käsittelee sitä tekoälyllä.",
+      "proposedRead": "datakartan sanat ({words}) viittaavat säänneltyyn tietoon ({domain}) kohdassa {rows}, ja sovellus käsittelee sitä tekoälyllä.",
+      "acceptProposal": "Hyväksy",
+      "annex3": {
+        "employment": "työsuhde",
+        "biometrics": "biometriikka"
+      },
       "gapAppGap": "Sovellus kertoo tuottavansa sisältöä, ja tarkistus löysi puutteen",
       "gapUnclassified": "Kysymyksiä yhä vastaamatta",
       "gapUnlabelled": "Julkaistu ilman merkintää",
@@ -3607,6 +3631,11 @@
         "undocumentedClear": "Jokainen tällä jaksolla kutsuttu malli on nimetty jossakin merkinnässä.",
         "appsWhy": "kertovat tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää.",
         "appsWhyOne": "kertoo tuottavansa sisältöä, eikä julkaisutarkistus löytänyt merkintää.",
+        "aiAppsWhy": "käyttävät tekoälyä omien tietojensa mukaan, eikä mikään kirjanpidon merkintä nimeä niitä. Luonnos lisää ne datakarttojen perusteella.",
+        "aiAppsWhyOne": "käyttää tekoälyä omien tietojensa mukaan, eikä mikään kirjanpidon merkintä nimeä sitä. Luonnos lisää sen datakartan perusteella.",
+        "aiAppsClear": "Jokainen tekoälyä käyttävä sovellus on nimetty jossakin merkinnässä.",
+        "aiAppHigh": "voi olla korkea riski: {area}",
+        "aiAppsHighWhy": "Näin merkitty sovellus käsittelee työsuhde- tai biometrisiä tietoja tekoälyllä. EU:n tekoälyasetus luokittelee tällaisen käytön korkeaksi riskiksi (liite III). Tarkista sen merkintä ensin.",
         "appIn": "on kirjanpidossa",
         "appOut": "ei ole kirjanpidossa",
         "appsClear": "Yksikään sovellus ei ilmoita tuottavansa sisältöä ilman merkintää.",
@@ -3705,7 +3734,9 @@
       "src": {
         "ai": "tekoäly {n}",
         "you": "sinä {n}",
-        "record": "kirjattu {n}"
+        "record": "kirjattu {n}",
+        "proposed": "ehdotus {n}",
+        "maker": "tekijä {n}"
       },
       "showNext": "Näytä seuraavat {n}",
       "foot": "{shown}/{total} · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence} · {unanswered} vastaamatta",
@@ -3731,6 +3762,210 @@
       "answerFromEvidence": "kirjatusta",
       "answerFromAi": "tekoälyn luonnos",
       "answerFromHuman": "sinun vastauksesi",
+      "answerFromProposed": "säännön ehdotus, ei vielä hyväksytty",
+      "answerFromMaker": "sovelluksen tekijä",
+      "paper": {
+        "summaryTitle": "Kokonaistila",
+        "sumUses": "Löydetyt tekoälyn käytöt",
+        "sumUsesValue": "sovelluksia {apps} · henkilöitä tai agentteja {others}",
+        "sumApproved": "Tallennettu kirjanpitoon",
+        "sumApprovedValue": "{saved}/{total}",
+        "sumHigh": "Korkean riskin ehdokkaat",
+        "none": "ei yhtään",
+        "sumCalls": "Mallikutsut jaksolla",
+        "sumCallsValue": "{calls} kutsua · {cost} · {models} mallia",
+        "sumGaps": "Avoimet puutteet",
+        "sumGapsValue": "{ai} tekoälyn kirjanpidossa · {records} käsittelyselosteissa",
+        "sumPublic": "Julkinen sisältö",
+        "sumPublicValue": "{total} julkaistua · {unlabelled} ilman merkintää",
+        "usesLead": "Jokainen sovellus ja henkilö, joka käyttää tekoälyä tämän asennuksen omien tietojen mukaan. Tallennettu merkintä on kirjanpidossa. Järjestelmän löytämän merkinnän asennus luki käyttökirjanpidosta ja datakartoista, eikä kukaan ole vielä tarkistanut tai tallentanut sitä.",
+        "usesNone": "Asennus ei löydä tekoälyn käyttöä tältä jaksolta.",
+        "statusSaved": "tallennettu · luokka: {cls}",
+        "statusFound": "järjestelmän löytämä, ei tallennettu",
+        "statusProposed": " · ehdotettu luokka: {cls}",
+        "fOwner": "Tili",
+        "modelsNone": "jaksolla ei ole kirjattuja mallikutsuja",
+        "fWhyAi": "Miksi tämä on tekoälyn käyttöä",
+        "fProposal": "Ehdotettu vastaus, ei hyväksytty",
+        "fOpen": "Vastaamatta",
+        "openCount": "{n}/{total} kysymystä",
+        "ev": {
+          "aiUse": "sovellus pyytää luvan käyttää tekoälyä",
+          "machinery": "datakartan mukaan sovellus tuottaa sisältöä tekoälyllä",
+          "generates": "sovellus kertoo tuottavansa: {what}",
+          "sendsOne": "datakartan mukaan sovellus lähettää yhden asian tekoälypalveluun",
+          "sends": "datakartan mukaan sovellus lähettää {n} asiaa tekoälypalveluun",
+          "keeps": "datakartan mukaan sovellus säilyttää tekoälyn tekemää sisältöä ({rows})"
+        },
+        "media": {
+          "text": "tekstiä",
+          "image": "kuvia",
+          "audio": "ääntä",
+          "video": "videota"
+        },
+        "personal": "henkilötietoja sovelluksen datakartan mukaan",
+        "personalDomains": "henkilötietoja sovelluksen datakartan mukaan; säänneltyä tietoa: {list}",
+        "domainStated": "{domain}, ilmoitettu kohdassa {rows}",
+        "domainProposed": "{domain}, päätelty sanoista kohdassa {rows}",
+        "gapsTitle": "Mitä puuttuu",
+        "gapAiAnnex": "korkean riskin ehdokas ({area})",
+        "gapCount": "{n} kohdetta",
+        "gapKind": {
+          "undocumented-ai-activity": "Mallia on käytetty, eikä mikään merkintä nimeä sitä",
+          "app-uses-ai-not-in-register": "Sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
+          "app-declares-generation-with-gap": "Sovellus tuottaa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
+          "unclassified-usecase": "Merkinnältä puuttuu vastauksia, joten sillä ei ole luokkaa",
+          "unlabelled-public-content": "Julkaistu ilman tekoälymerkintää",
+          "font-licence-unknown": "Fontti ilman lisenssitietoa"
+        },
+        "measuresWhat": "Tekoälyn käyttö jaksolla",
+        "recordsNone": "Yhtään käsittelyselostetta ei ole vielä tallennettu. Asennuksella on {drafts} luonnosta valmiina tarkistettavaksi.",
+        "appendixTitle": "Liite: kysymyssarja",
+        "appendixNum": "A",
+        "appendixLead": "Tekoälyn käytön riskiluokka tulee näistä kysymyksistä. Jokainen vastaus johtaa luokkaan viimeisen sarakkeen säännön mukaan, ja vakavin luokka ratkaisee. Jos kysymykseen ei ole vastattu, käyttö jää luokittelematta.",
+        "readFirst": "Tämä raportti kertoo, mihin tekoälyä tässä asennuksessa käytetään, mitä siitä on kirjattu ja mitä puuttuu. Raportti on tietosuojavastaavalle, johdolle ja auditoijalle. Kohdassa 2 on seuraavat toimet ja niiden tekijät. Jokaisesta vastauksesta näkyy, kuka sen antoi:",
+        "colMark": "Merkintä",
+        "colMeans": "Mitä se tarkoittaa",
+        "means": {
+          "human": "Ihminen vastasi.",
+          "ai": "Malli luonnosteli vastauksen, ja ihminen tallensi sen.",
+          "evidence": "Asennus luki vastauksen omista tiedoistaan. Kukaan ei päättänyt mitään.",
+          "proposed": "Sääntö päätteli vastauksen sovelluksen datakartasta. Kukaan ei ole vielä hyväksynyt sitä.",
+          "maker": "Sovelluksen tekijä vastasi sovelluksen datakartassa, ja pääkäyttäjä tallensi vastauksen."
+        },
+        "tocTitle": "Sisällys",
+        "sumOpen": "Vastaamattomat kysymykset",
+        "sumOpenValue": "{n}/{total}",
+        "nextTitle": "Seuraavat toimet",
+        "nextLead": "Compliance-sivun osoite on {page}.",
+        "colAction": "Mitä tehdään",
+        "colWhoDoes": "Kuka",
+        "colWhere": "Missä",
+        "act": {
+          "save": "Tarkista järjestelmän löytämät {n} tekoälyn käyttöä ja tallenna ne kirjanpitoon",
+          "high": "Päätä korkean riskin ehdokkaiden luokka: {list}",
+          "answer": "Vastaa {entries} tekoälyn käytön {n} avoimeen kysymykseen"
+        },
+        "who": {
+          "operator": "Pääkäyttäjä",
+          "operatorDpo": "Pääkäyttäjä ja tietosuojavastaava",
+          "appOwner": "Sovelluksen tekijä",
+          "publisher": "Sisällön julkaisija"
+        },
+        "where": {
+          "register": "Compliance-sivu, kohdat 01 ja 04",
+          "registerOrAi": "Compliance-sivun kohta 04 tai oma tekoäly kohdan 07 kehotteella",
+          "records": "Compliance-sivu, kohdat 08 ja 09",
+          "app": "Sovelluksen datakartta ja käsittelyseloste, tekijän oman tekoälyn kautta",
+          "publish": "Sovelluksen tekoälymerkintä, joka tarkistetaan julkaisun yhteydessä",
+          "fonts": "Teemat ja tyylit, välilehti Fontit"
+        },
+        "usesTitle": "Tekoälyn käyttö yhdellä silmäyksellä",
+        "eachTitle": "Tekoälyn käytöt yksitellen",
+        "colUse": "Tekoälyn käyttö",
+        "colPersonal": "Henkilötiedot",
+        "colClass": "Luokka",
+        "colState": "Tila",
+        "colAnswered": "Vastattu",
+        "classProposed": "{cls} (ehdotus)",
+        "stSaved": "tallennettu",
+        "stFound": "löydetty, ei tallennettu",
+        "gapsLead": "Jokainen puutetyyppi, montako puutteita on, kuka ne korjaa ja mitä kukin koskee.",
+        "gapTag": "{n} · korjaa: {who}",
+        "colConcerns": "Koskee",
+        "colDetail": "Tarkenne",
+        "howTitle": "Miten raportti täydennetään",
+        "howLead": "Asennus löytää tekoälyn käytöt itse. Ihminen vastaa kysymyksiin ja hyväksyy vastaukset. Vaiheet:",
+        "how": {
+          "1": "Pääkäyttäjä avaa Compliance-sivun: {page}",
+          "2": "Hän painaa kohdassa 01 painiketta ”Täytä nämä puolestani”. Asennus lisää löytämänsä tekoälyn käytöt kirjanpitoon luonnoksena. Mitään ei vielä tallenneta.",
+          "3": "Hän avaa kohdassa 04 jokaisen merkinnän ja vastaa sen kysymyksiin. Hän hyväksyy tai muuttaa jokaisen ehdotetun vastauksen. Jokaisesta vastauksesta näkyy, kuka sen antoi.",
+          "4": "Hän voi myös antaa työn omalle tekoälylleen: kohdassa 07 on valmis kehote. Tekoäly näyttää ehdotuksensa ja odottaa hyväksyntää, ja sen vastaukset merkitään tekoälyn vastauksiksi.",
+          "5": "Sovelluksen tekijä vastaa oman sovelluksensa kysymyksiin perusteluineen, oman tekoälynsä kautta tai sovelluksen sivun osiossa ”Tekoälyasetuksen kysymykset”. Asennus muistuttaa tekijää, kun kysymyksiä on avoinna, samasta sovelluksesta kahden viikon välein. Tekijän vastaukset tulevat luonnokseen merkittyinä tekijän vastauksiksi.",
+          "6": "Pääkäyttäjä tallentaa. Asennus laskee jokaisen merkinnän luokan uudelleen.",
+          "7": "Hän ottaa raportin talteen kohdan 06 painikkeella ”Ota tämä talteen”. Asennus tallentaa lisäksi kuukausiraportin itse joka kuun 1. päivä.",
+          "8": "Hän tulostaa tämän raportin painikkeella ”Tulosta tai tallenna PDF:ksi”."
+        },
+        "colRole": "Rooli",
+        "colRoleDoes": "Tehtävä",
+        "role": {
+          "operator": "Pääkäyttäjä",
+          "dpo": "Tietosuojavastaava tai juristi",
+          "appOwner": "Sovelluksen tekijä",
+          "ai": "Pääkäyttäjän tekoäly"
+        },
+        "roleDoes": {
+          "operator": "Pitää kirjanpitoa, vastaa kysymyksiin ja tallentaa vastaukset.",
+          "dpo": "Päättää korkean riskin ehdokkaan luokan ja lukee raportin.",
+          "appOwner": "Vastaa sovelluksen tekoälyasetuksen kysymyksiin perusteluineen ja pitää sen datakartan ja käsittelyselosteen ajan tasalla.",
+          "ai": "Luonnostelee vastaukset asennuksen tiedoista. Ihminen hyväksyy ne."
+        },
+        "colQuestion": "Kysymys",
+        "colAnswer": "Vastaus",
+        "colWho": "Kuka vastasi",
+        "colReason": "Miksi",
+        "colHelp": "Miten vastataan",
+        "colRule": "Vastaus johtaa luokkaan"
+      },
+      "question": {
+        "q-manipulative-technique": {
+          "text": "Käyttääkö se keinoja, joita ihminen ei huomaa, tai käyttääkö se hyväksi ikää, vammaa tai taloudellista ahdinkoa niin, että joku voi tehdä itselleen haitallisen päätöksen?",
+          "help": "Ratkaisevaa on se, mitä järjestelmä tekee, ei se, mitä sillä tarkoitettiin. Ohjaava järjestelmä lasketaan mukaan, vaikka kukaan ei tarkoittanut sitä manipuloivaksi."
+        },
+        "q-social-scoring": {
+          "text": "Pisteyttääkö se ihmisiä heidän sosiaalisen käytöksensä tai henkilökohtaisten ominaisuuksiensa perusteella, ja käytetäänkö pisteitä heitä vastaan tilanteessa, joka ei liity siihen, missä tiedot kerättiin?",
+          "help": "Asiaan liittymätön tilanne tekee siitä sosiaalista pisteytystä eikä tavallista arviointia."
+        },
+        "q-emotion-workplace-education": {
+          "text": "Päätteleekö se ihmisten tunteita työssä tai opetuksessa?",
+          "help": "Lääketieteelliset ja turvallisuuteen liittyvät käyttötarkoitukset on rajattu pois. Agenttien luottamuspisteet eivät ole tätä: ne arvioivat tunnuksia, eivät ihmisiä."
+        },
+        "q-biometric-categorisation-sensitive": {
+          "text": "Luokitteleeko se ihmisiä biometristen tietojen perusteella päätelläkseen rodun, poliittisen mielipiteen, ammattiliiton jäsenyyden, uskonnon, seksuaalisen käyttäytymisen tai seksuaalisen suuntautumisen?"
+        },
+        "q-untargeted-face-scraping": {
+          "text": "Rakentaako tai laajentaako se kasvojentunnistustietokantaa keräämällä kuvia internetistä tai valvontakameroista kohdentamatta?"
+        },
+        "q-annex3-area": {
+          "text": "Käytetäänkö sitä jollakin näistä alueista?",
+          "help": "Valitse lähin. Nämä ovat liitteen III alueet arkikielellä, ei asetuksen sanoin. ”Ei mikään näistä” on tavallinen vastaus."
+        },
+        "q-decides-about-a-person": {
+          "text": "Ratkaiseeko sen tuotos jotakin tunnistettavasta ihmisestä, tai vaikuttaako se olennaisesti päätökseen, jonka joku tekee hänestä?",
+          "help": "Järjestelmä, joka vain luonnostelee, tiivistää tai ehdottaa omalle käyttäjälleen, ei ole tätä. Järjestelmä, jonka pisteet kopioidaan päätökseen, on tätä, kopioi ne kuka tahansa."
+        },
+        "q-interacts-with-people": {
+          "text": "Keskusteleeko ihminen sen kanssa suoraan, tai lukeeko ihminen jotain, minkä se kirjoitti?",
+          "help": "Agentin ja asennuksen välinen liikenne, työkalukutsut, federaation synkronointi ja ajastin eivät ole tätä. Ne ovat koneiden välistä liikennettä, ja 50 artiklan 1 kohta sanoo sen suoraan."
+        },
+        "q-publishes-publicly": {
+          "text": "Julkaiseeko se tuotettua tekstiä, kuvaa, ääntä tai videota paikkaan, jossa kuka tahansa voi lukea sen?",
+          "help": "Tämä on 50 artiklan 4 kohdan kysymys, ja asennus voi mitata sen puolestasi: raportti laskee, mitä on julkaistu ilman merkintää."
+        },
+        "q-publishes-public-interest": {
+          "text": "Koskeeko jokin siitä politiikkaa, julkishallintoa, terveyttä, tiedettä tai muuta yleisen edun asiaa?",
+          "help": "Aihe ratkaisee, koskeeko 50 artiklan 4 kohta oikeasti, koska toimituksellinen poikkeus pätee vain, kun ihminen on oikeasti tarkistanut sisällön."
+        },
+        "q-resembles-real-people": {
+          "text": "Tuottaako se kuvaa, ääntä tai videota, jota voi luulla todellisiksi ihmisiksi, paikoiksi tai tapahtumiksi?",
+          "help": "Kuvitukset ja kuvakkeet eivät ole tätä. Kuva, jota voi luulla valokuvaksi tunnistettavasta ihmisestä, on tätä."
+        },
+        "q-human-reviews-before-publish": {
+          "text": "Lukeeko ihminen sisällön ennen kuin se julkaistaan, ja voiko hän muuttaa tai pysäyttää sen?",
+          "help": "Vastaa ei kaikkeen, minkä ajastus julkaisee itse. Vastaus ei yksin laske luokkaa. Se kirjataan, koska toimituksellinen poikkeus riippuu siitä, ja koska ”ei” yleisen edun julkaisun rinnalla on yhdistelmä, joka kannattaa katsoa."
+        }
+      },
+      "option": {
+        "none": "Ei mikään näistä",
+        "biometrics": "Ihmisten tunnistaminen biometrisesti",
+        "critical-infrastructure": "Kriittisen infrastruktuurin käyttö tai suojaaminen",
+        "education": "Koulutukseen pääsy, arviointi tai eteneminen",
+        "employment": "Rekrytointi, työtehtävien jako, ylennys tai työsuhteen päättäminen",
+        "essential-services": "Välttämättömien palvelujen saatavuus, luotonanto tai vakuutusten hinnoittelu",
+        "law-enforcement": "Lainvalvonta",
+        "migration": "Muuttoliike, turvapaikka-asiat tai rajavalvonta",
+        "justice-democracy": "Oikeudenkäyttö tai vaaleihin vaikuttaminen"
+      },
       "save": "Tallenna",
       "saving": "Tallennetaan…",
       "saved": "Tallennettu. Kaikki luokiteltiin uudelleen.",
@@ -3915,6 +4150,7 @@
           "framework-unanswered": "Säädös, jonka kysymyksiin ei ole vastattu",
           "app-personal-data-without-register": "Sovelluksella on henkilötietoja mutta ei rekisteriä",
           "app-personal-data-unstated": "Sovellus ei kerro, mikä on henkilötietoa",
+          "app-personal-data-domain-unstated": "Sovellus ei kerro, mihin säänneltyyn tietoon sen henkilötiedot kuuluvat",
           "app-register-without-privacy-notice": "Sovelluksella ei ole tietosuojaselostetta",
           "retention-conflict": "Rekisteri ja datakartta ovat ristiriidassa",
           "processor-without-dpa": "Käsittelijän kanssa ei ole sopimusta",
@@ -9947,9 +10183,6 @@
   "emailpage.letter.agentAsksT": "Kun agenttisi pyytää sinulta oikeutta",
   "emailpage.letter.agentAsksS": "kerran jokaisesta pyynnöstä",
   "emailpage.letter.agentAsksD": "Tekoälysi yritti tehdä puolestasi jotain, mitä et ole vielä sallinut. Viestissä on painike sivulle, jolla päätät asiasta.",
-  "emailpage.letter.agentNarrowedT": "Kun AIMEAT rajaa agentin oikeudet",
-  "emailpage.letter.agentNarrowedS": "kerran kustakin agentista",
-  "emailpage.letter.agentNarrowedD": "Agentilla oli kaikki oikeudet, ja nyt sillä on vain ne, joita se käytti kahden viikon aikana. Viestissä ne luetellaan.",
   "emailpage.letter.languageT": "Kirjeiden kieli",
   "emailpage.letter.languageS": "kaikille tämän listan kirjeille",
   "emailpage.letter.languageD": "Kooste, muistutukset ja pyynnöt tulevat tällä kielellä. Sama kieli näkyy profiilissasi.",
@@ -10358,6 +10591,7 @@
   "notiftext.agent_permission_ask_page.title": "{agent} tarvitsee oikeuden, jonka annat sen sivulla",
   "notiftext.agent_permission_ask_page.body": "{agent} yritti tehdä puolestasi jotain, mitä et ole sallinut. Tämän oikeuden annat agentin sivulla, jos haluat. Avaa sivu, niin näet, mistä on kyse.",
   "notiftext.agent_permission_ask_page.open": "Avaa agentin sivu",
+  "notiftext.agent_permission_ask_page.deny": "Älä salli",
   "notiftext.secret_use_ask.title": "Laajennus {extension} pyytää lupaa käyttää salaisuuttasi {secret}",
   "notiftext.secret_use_ask.body": "{extension} (asentaja: {installer}) tarvitsee salaisuuttasi {secret} palvelussa {host}. Salaisuutesi ei ole mennyt tähän osoitteeseen ennen, joten sinulta kysytään ensin. Mitään ei lähetetty. Avaa ilmoitus, niin näet miksi, tai vastaa tästä.",
   "notiftext.secret_use_ask.allow": "Salli",
@@ -10453,10 +10687,6 @@
   "agentAllowPage.email.lead": "{{agent}} yritti tehdä tämän puolestasi, mutta ei onnistunut, koska et ole sallinut sitä:",
   "agentAllowPage.email.button": "Avaa agentin sivu",
   "agentAllowPage.email.after": "Tätä oikeutta ei anneta yhdellä painalluksella. Agentin sivulla näet, mitä se sallii, ja voit antaa sen siellä, jos haluat.",
-  "agentNarrowed.email.subject": "AIMEAT rajasi agentin {{agent}} oikeudet",
-  "agentNarrowed.email.lead": "AIMEAT rajasi agentin {{agent}} oikeudet niihin, joita se käytti kahden viikon aikana:",
-  "agentNarrowed.email.button": "Avaa agentin sivu",
-  "agentNarrowed.email.after": "Jos se myöhemmin tarvitsee jotain muuta, saat pyynnön ja voit sallia sen yhdellä painalluksella.",
   "notiftext.task_waiting.title": "{agent} odottaa lupaasi: {title}",
   "notiftext.task_waiting.body": "Suunnitelmassa on {steps} vaihetta. Kun painat Käynnistä, työ alkaa.",
   "notiftext.task_waiting.start": "Käynnistä",
@@ -18558,7 +18788,6 @@
         "open": "Avaa",
         "close": "Sulje",
         "waitingCount": "{n} odottaa sinua",
-        "wildcardWaiting": "Nämä agentit saavat tehdä mitä tahansa: {names}. Kun agentti seuraavan kerran saa tehtävän, AIMEAT rajaa sen käyttämiinsä oikeuksiin ja kertoo siitä sinulle. Jos haluat tehdä sen heti, avaa agentti ja paina \"Rajaa näihin\".",
         "basicHaveLine": "{names} ovat sinun ja käynnissä.",
         "basicMissingLine": "{n} vielä luomatta.",
         "shapeHint": "Määritys, jolla se pyörii ensimmäisestä päivästä. Muuta sitä myöhemmin Crew-välilehdellä.",
@@ -20035,8 +20264,8 @@
         "takesWorkOnSaved": "Agentti ottaa taas uutta työtä.",
         "takesWorkOnSavedWork": "Agentti ottaa taas uutta työtä. Odottaneet tehtävät ovat nyt käynnissä ({n}).",
         "wildcardLabel": "Kaikki oikeudet",
-        "wildcardCollecting": "Se saa tehdä mitä tahansa. AIMEAT kirjaa, mitä oikeuksia se käyttää. {days} päivän päästä AIMEAT rajaa sen niihin ja kertoo siitä sinulle.",
-        "wildcardReady": "Se saa tehdä mitä tahansa. Se käytti {n} oikeutta: {areas}. Kun se seuraavan kerran saa tehtävän, AIMEAT rajaa sen niihin ja kertoo siitä sinulle. Voit rajata sen myös heti.",
+        "wildcardCollecting": "Se saa tehdä mitä tahansa, koska annoit sille kaikki oikeudet. AIMEAT kirjaa, mitä oikeuksia se käyttää, jotta voit halutessasi rajata sen niihin. {days} päivän päästä kirjaus kattaa kaksi viikkoa. Vain sinä rajaat sen.",
+        "wildcardReady": "Se saa tehdä mitä tahansa, koska annoit sille kaikki oikeudet. Kahden viikon aikana se käytti {n} oikeutta: {areas}. Jos rajaat sen niihin, se ei voi tehdä mitään, mitä se ei ole tähän asti tehnyt. AIMEAT ei näe kaikkia oikeuksia, joita agentti käyttää. Siksi agentti voi myöhemmin pyytää sinulta lupaa, ja sinä sallit sen tai kiellät. Vain sinä rajaat sen.",
         "wildcardNarrow": "Rajaa näihin {n}",
         "wildcardNarrowed": "Sillä on nyt ne {n} oikeutta, joita se käytti.",
         "wildcardFailed": "Tallennus ei onnistunut. Yritä uudelleen.",
@@ -24688,6 +24917,20 @@
     }
   },
   "appcat": {
+    "aiAct.title": "Tekoälyasetuksen kysymykset",
+    "aiAct.lead": "Tämä sovellus käyttää tekoälyä, joten EU:n tekoälyasetus kysyy siitä muutaman kysymyksen. Sinä tunnet sovelluksen parhaiten: vastaa jokaiseen kysymykseen ja kerro yhdellä lauseella miksi. Asennuksen pääkäyttäjä hyväksyy vastaukset vaatimustenmukaisuuden kirjanpitoon.",
+    "aiAct.notAi": "Sovellus ei omien tietojensa mukaan käytä tekoälyä, joten tekoälyasetuksen kysymyksiä ei ole.",
+    "aiAct.aiTitle": "Anna tekoälysi vastata",
+    "aiAct.aiNote": "Kopioi kehote omaan tekoälykeskusteluusi. Tekoäly lukee sovelluksen ja kysymykset, näyttää vastauksensa perusteluineen ja tallentaa ne, kun hyväksyt.",
+    "aiAct.copyPrompt": "Kopioi kehote",
+    "aiAct.noMap": "Sovelluksella ei ole vielä datakarttaa, joten vastauksille ei ole paikkaa. Pyydä tekoälyäsi kirjoittamaan datakartta ensin; yllä oleva kehote tekee molemmat.",
+    "aiAct.formTitle": "Vastaa tässä · {open}/{total} avoinna",
+    "aiAct.noteLabel": "Miksi tämä vastaus",
+    "aiAct.notePlaceholder": "Miksi, yhdellä tai kahdella lauseella",
+    "aiAct.save": "Tallenna vastaukset",
+    "aiAct.saving": "Tallennetaan…",
+    "aiAct.saved": "Tallennettu. Pääkäyttäjä näkee vastauksesi vaatimustenmukaisuuden kirjanpidossa.",
+    "aiAct.saveFailed": "Vastauksia ei tallennettu.",
     "dataMap.agentsTitle": "Agentit, joiden työtä tämä sovellus näyttää",
     "dataMap.agentMadeFor": "Sovellus tehtiin tätä agenttia varten.",
     "dataMap.agentUses": "Sovellus käyttää tämän agentin työtä.",
@@ -28345,5 +28588,23 @@
   "home.agentPage.takes": "Avoin työ, jota se ottaa",
   "home.agentPage.takesNone": "Ei mitään: sille ei ole asetettu taitoja",
   "home.agentPage.takesSub": "Tavoitteen avoin työ, joka pyytää jotain näistä taidoista.",
-  "home.agentPage.takesChange": "Muuta"
+  "home.agentPage.takesChange": "Muuta",
+  "form.checkFields": "Ei tallennettu. Tarkista merkityt kentät.",
+  "validation": {
+    "failed": "Korjaa {{n}} kenttää. Jokainen kertoo, mitä muuttaa.",
+    "oneField": "{{field}}: {{problem}}",
+    "tooLong": "Liian pitkä: enintään {{n}} merkkiä.",
+    "tooShort": "Liian lyhyt: vähintään {{n}} merkkiä.",
+    "tooMany": "Liian monta: enintään {{n}}.",
+    "tooFew": "Liian vähän: vähintään {{n}}.",
+    "required": "Täytä tämä.",
+    "blank": "Kirjoita muutakin kuin välilyöntejä.",
+    "controlChar": "Tekstissä on näkymätön ohjausmerkki. Poista se ja yritä uudelleen.",
+    "nulByte": "Tekstissä on nollamerkki, jota ei voi tallentaa. Poista se ja yritä uudelleen.",
+    "invalidUnicode": "Tekstissä on rikkinäinen merkki. Kirjoita tai liitä teksti uudelleen.",
+    "unknownField": "Tätä kenttää ei oteta vastaan tässä.",
+    "invalidType": "Väärä arvon laji: odotettiin {{expected}}.",
+    "invalidFormat": "Muoto ei ole oikea.",
+    "invalidValue": "Arvo ei ole mikään sallituista."
+  }
 }

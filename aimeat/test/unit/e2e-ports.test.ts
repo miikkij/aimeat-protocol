@@ -9,6 +9,8 @@
  *   group here is that case as arithmetic, and the last group is the wait that replaces a collision.
  * @usage pnpm exec vitest run test/unit/e2e-ports.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — A suite's own ports are read from 28000-29999, where they moved out of the
+ *     range the claims board hands out.
  *   v1.0.0 — 2026-10-11 — Initial.
  */
 import { describe, expect, it, afterAll } from 'vitest';
@@ -69,9 +71,17 @@ describe('lane ports are a session\'s own', () => {
 });
 
 describe('the ports a suite binds for itself, read from its source', () => {
-    it('finds each written port once, sorted, and leaves out the runner\'s default and the dev server', () => {
-        const src = `const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';\nconst STUB = 40313; // dev is 40050\nlisten(40313); listen(40297);`;
-        expect(suiteOwnPorts(src, 40356)).toEqual([40297, 40313]);
+    it('finds each port written in the suites\' band once, sorted, and nothing in the board\'s range', () => {
+        const src = `const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';\nconst STUB = 28313; // dev is 40050\nlisten(28313); listen(28297);`;
+        expect(suiteOwnPorts(src, 40356)).toEqual([28297, 28313]);
+    });
+
+    it('the suites\' band, 28000-29999, meets neither the lane ports nor the suitePort blocks', () => {
+        for (const base of [40251, 40356, 40499, 40750]) {
+            for (const p of sessionLanePorts(base)) expect(p < 28000 || p > 29999, `lane port ${p}`).toBe(true);
+        }
+        const blocks = suiteOwnPorts('suitePort(30000, BASE); suitePort(32600, BASE);', 40399);
+        for (const p of blocks) expect(p).toBeGreaterThanOrEqual(30000);
     });
 
     it('resolves suitePort(block, …) for the lane the suite runs in', () => {

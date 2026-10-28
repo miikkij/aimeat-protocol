@@ -13,7 +13,7 @@
  *   default is operator) and AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS=five (the default is 5); then with the
  *   metrics access corrected; and one start with `--db sqllite`, which exits without serving.
  *
- *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40484.
+ *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 28484.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-config-setting-fallback
  * @version-history
  *   2026-10-16 — Initial (Jouni, decision 2026-10-16).
@@ -25,7 +25,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner } from './helpers/owner-login.js';
 
-const PORT = 40484;
+const PORT = 28484;
 const BASE = `http://127.0.0.1:${PORT}`;
 const STAMP = Date.now().toString(36).slice(-6);
 

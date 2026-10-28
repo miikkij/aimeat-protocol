@@ -4,23 +4,24 @@
  * SPDX-License-Identifier: MIT
  * @description Which permissions an agent holding `*` actually uses, and the narrowing built from it.
  *
- *   WHY (ruling C, Jouni 2026-10-02, and its follow-up of 2026-10-18). "All permissions" must never
- *   read as "nothing dangerous", so an agent holding `*` does not keep it: once its record is
- *   OBSERVE_DAYS old and names at least one permission, the next start decision narrows it to the
- *   named permissions it actually used and tells the owner (services/scope-auto-narrow.ts). Until
- *   2026-10-18 the record being ready put `*` on the task-start floor instead, and every task waited
- *   for the owner in person; on aimeat.io that held 14 scheduled agents at once. The owner may still
- *   narrow earlier with one press. The node recorded no such history before this file: the usage
+ *   WHY. An agent holding `*` keeps it: the owner gave it (Jouni, 2026-10-28). The record is what
+ *   lets the owner narrow it knowing what it would lose: the agent's card shows what it used and
+ *   offers that narrowing with one press, and only the owner, in person or through their AI, applies
+ *   it (services/scope-narrowing.ts). Twice before it was more: ruling C (2026-10-02) put a ready `*`
+ *   on the task-start floor, which held 14 scheduled agents on aimeat.io at once, and from 2026-10-18
+ *   the node narrowed a ready `*` agent by itself. On 2026-10-28 that narrowed the owner's own
+ *   interactive agent past provenance:write, which it used and this record had not seen, and it was
+ *   refused three minutes later. The node recorded no such history before this file: the usage
  *   stream keeps MCP tool calls by name and no REST call at all, and the fleet crews reach the node
- *   through REST. So the record starts the day this ships. Until it is ready nothing changes for the
- *   agent.
+ *   through REST. So the record starts the day this shipped.
  *
- *   HOW IT IS FED. requireScope (auth/middleware.ts) notes the words it admitted a `*` agent for, and
- *   the MCP tool wrapper (mcp/tool-usage-wrap.ts) notes the word each tool needs. Both are synchronous
- *   and buffered, as the usage stream is: a call never waits on this, and a write never fails a call.
- *   A route that checks a word inline rather than through requireScope is not seen; an agent narrowed
- *   past such a route is refused once, and its card offers the word with one press
- *   (services/agent-refusals.ts), which is the net under "without loss".
+ *   HOW IT IS FED. requireScope (auth/middleware.ts) notes the words it admitted a `*` agent for, the
+ *   MCP tool wrapper (mcp/tool-usage-wrap.ts) notes the word each tool needs, and the provenance
+ *   check notes provenance:write when it admits a declaration (services/ai-provenance.ts). All are
+ *   synchronous and buffered, as the usage stream is: a call never waits on this, and a write never
+ *   fails a call. Another word checked inline rather than through requireScope is not seen, which
+ *   is why the card says that a narrowed agent may later ask for a word, and why that request
+ *   carries both Allow and Don't allow (services/permission-ask-notice.ts).
  *
  *   ONE RECORD PER OWNER, `scope-use.agents`: the agents and, per word, when it was last used. A
  *   collection read as a unit, a few dozen words per agent at most. Service-owned
@@ -28,13 +29,14 @@
  *   its own history.
  * @structure SCOPE_USE_KEY · OBSERVE_DAYS · noteScopeUse() · flushScopeUse() · initScopeUse() ·
  *   shutdownScopeUse() · readScopeUse() · writeScopeUse() · wildcardStatus()
- *   (the narrowing itself is services/scope-narrowing.ts, and the node's own narrowing at a start
- *   decision services/scope-auto-narrow.ts: this file is imported by the auth middleware and must
- *   not reach the connector, which reaches the middleware back)
+ *   (the narrowing itself is services/scope-narrowing.ts: this file is imported by the auth
+ *   middleware and must not reach the connector, which reaches the middleware back)
  * @usage
  *   noteScopeUse(req.auth.sub, ['memory:read']);
  *   const status = wildcardStatus(agent, (await readScopeUse(storage, ownerGhii)).agents[agent.name]);
  * @version-history
+ *   v1.2.0 — 2026-10-28 — A ready record only offers the narrowing; the node never applies it (Jouni
+ *     2026-10-28). provenance:write is noted when the provenance check admits a declaration.
  *   v1.1.0 — 2026-10-18 — A ready record no longer holds the agent's tasks: the next start decision
  *     narrows the agent (services/scope-auto-narrow.ts startFactsOf, which replaces withWildcardFacts).
  *   v1.0.0 — 2026-10-02 — Initial.
@@ -45,7 +47,7 @@ import { isOutsideWildcard } from '../utils/scope-coverage.js';
 import { logger } from '../utils/logger.js';
 
 export const SCOPE_USE_KEY = 'scope-use.agents';
-/** How long the record must run before the node narrows the agent: two weeks catches a weekly job twice. */
+/** How long the record must run before its narrowing is worth offering: two weeks catches a weekly job twice. */
 export const OBSERVE_DAYS = 14;
 const FLUSH_INTERVAL_MS = 60_000;
 /** A word already on record is rewritten only when its last use is older than this. */
@@ -144,11 +146,11 @@ export interface WildcardStatus {
     /** When the record of this agent started; null when nothing is on record. */
     since: string | null;
     daysObserved: number;
-    /** Days until the node narrows it; 0 once ready. */
+    /** Days until the record covers OBSERVE_DAYS; 0 once ready. */
     daysLeft: number;
     /**
-     * The record is OBSERVE_DAYS old and names a permission: the next start decision narrows the agent
-     * to `proposal` (services/scope-auto-narrow.ts), and the owner may narrow it now.
+     * The record is OBSERVE_DAYS old and names a permission: the card offers the narrowing to
+     * `proposal` as one that covers two weeks of use. The owner may narrow earlier, and only the owner.
      */
     ready: boolean;
     /** The permissions it used, newest knowledge first. */

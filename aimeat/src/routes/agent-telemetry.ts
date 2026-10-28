@@ -8,6 +8,7 @@
  *   - POST /v1/agents/:name/telemetry  -- Append a telemetry event
  *   - GET  /v1/agents/:name/telemetry  -- List telemetry events (with filtering)
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-14 — The agent access check is mayActOnAgent (utils/gaii.ts): the agent itself or its own owner in person. An owner in person reached another account's agent named by its whole GAII (QA audit 2026-10-14, K1).
  *   v1.3.1 -- 2026-10-05 -- The account holder in person is asked with isOwnerInPerson (utils/gaii.ts; secaudit 2026-10, C4).
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Dashboard telemetry
@@ -25,6 +26,7 @@ import { Router } from 'express';
 import { recordTelemetryUsage } from '../services/usage-metering.js';
 import { randomUUID } from 'node:crypto';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, TelemetryEvent } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
@@ -37,8 +39,8 @@ import { pushTelemetry, recordTelemetryActivity, listTelemetryBuffered } from '.
 const TelemetryAppendSchema = z.object({
   type: z.enum(['llm_call', 'tool_call', 'agent_report']),
   data: z.record(z.string(), z.unknown()).default({}),
-  session_id: z.string().optional(),
-  task_id: z.string().optional(),
+  session_id: z.string().max(INPUT_LIMITS.id).optional(),
+  task_id: z.string().max(INPUT_LIMITS.id).optional(),
 });
 
 export function agentTelemetryRouter(config: AimeatConfig, storage: Storage): Router {

@@ -34,7 +34,7 @@ import {
 } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-const PORT = process.env.E2E_AI_CATALOG_PORT ?? '40440';
+const PORT = process.env.E2E_AI_CATALOG_PORT ?? '28440';
 const BASE = `http://localhost:${PORT}`;
 
 let passed = 0, failed = 0;

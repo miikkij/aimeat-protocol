@@ -7,6 +7,8 @@
  *     GET  /v1/a2a/:owner/:agent/agent-card.json   what the agent is, in A2A's words
  *     POST /v1/a2a/:owner/:agent                   the JSON-RPC surface
  *     GET  /v1/oasf/:owner/:agent                  the same agent, as an OASF record (V6c)
+ *     GET  /.well-known/agent-card.json            the node's directory, as an A2A card
+ *     POST /v1/a2a/directory                       the directory's JSON-RPC interface (public)
  *
  *   THE CARD IS PUBLIC AND THE DOOR IS NOT. Discovery has to be public or it is not discovery, and
  *   the card says nothing the AIMEAT card at /v1/agents/:gaii/card does not already say to anyone
@@ -43,6 +45,8 @@
  * @structure a2aRouter(config, storage)
  * @usage app.use(a2aRouter(config, storage));
  * @version-history
+ *   2026-10-27 — The directory card and its new JSON-RPC interface live in services/a2a-directory.ts;
+ *     the card names the interface instead of an empty list and drops the 0.3 top-level `url`.
  *   2026-10-19 — Every A2A card this router builds carries `iconUrl`, the absolute address of the
  *     agent's avatar, when it has one (services/agent-avatar.ts). The directory rows have no picture
  *     field and stay as they are.
@@ -64,27 +68,24 @@
  */
 import { Router, type Request, type Response, type NextFunction } from 'express';
 import { jsonRpcHandler, agentCardHandler } from '@a2a-js/sdk/server/express';
+import { UnauthenticatedUser } from '@a2a-js/sdk/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { error } from '../middleware/envelope.js';
 import { callerOf } from '../middleware/caller.js';
 import { buildGAII } from '../utils/gaii.js';
-import { a2aCardFor, directoryDescriptionFor } from '../services/a2a-card.js';
+import { a2aCardFor } from '../services/a2a-card.js';
+import { agentInterfaceUrl, directoryAgents, directoryCard, DirectoryA2AHandler } from '../services/a2a-directory.js';
 import { oasfRecordFor } from '../services/oasf-projection.js';
 import { AimeatA2ARequestHandler } from '../services/a2a-handler.js';
 import type { A2ACaller } from '../services/a2a-handler.js';
 import { ForeignA2AHandler } from '../services/a2a-foreign-handler.js';
 import { identifyForeignCaller, FOREIGN_HEADERS } from '../services/a2a-foreign.js';
-import { offeringsForAgent, publishedAgentOfferings } from '../services/a2a-offering.js';
+import { offeringsForAgent } from '../services/a2a-offering.js';
 import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 import { logger } from '../utils/logger.js';
 
-/** The address this node publishes for one agent's A2A interface. */
-function interfaceUrl(config: AimeatConfig, owner: string, agentName: string): string {
-  const base = config.baseUrl.replace(/\/+$/, '');
-  return `${base}/v1/a2a/${encodeURIComponent(owner)}/${encodeURIComponent(agentName)}`;
-}
 
 export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -129,54 +130,25 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
    *
    * PUBLIC, like the cards it points at, and it says nothing they do not.
    */
-  router.get('/.well-known/agent-card.json', async (_req, res) => {
-    const published = await publishedAgentOfferings(storage, config);
-    const base = config.baseUrl.replace(/\/+$/, '');
+  router.get(['/.well-known/agent-card.json', '/v1/a2a/directory/agent-card.json'], async (_req, res) => {
+    // A DIRECTORY THAT IS A CARD, because this path is A2A's and A2A says a card lives here. Every
+    // required field is true of a directory, and since 2026-10-27 it names an interface that
+    // answers: /v1/a2a/directory, where any message gets the same `agents` list back
+    // (services/a2a-directory.ts says why the empty interface list went).
     res.setHeader('Cache-Control', 'public, max-age=60');
-    res.json({
-      // A DIRECTORY THAT VALIDATES AS A CARD, because this path is A2A's and A2A says a card lives
-      // here. It was a bare registry until 2026-09-04, on the reasoning that a card describes ONE
-      // agent and a directory pretending to be one would have a very odd skill list. That reasoning
-      // still holds and the shape below obeys it — what it missed is that a client which validates
-      // the document before reading it gets nothing at all, and a validator reported exactly that:
-      // missing version, capabilities, supportedInterfaces, defaultInputModes, defaultOutputModes,
-      // skills. So the required fields are present and every one of them is TRUE of a directory:
-      // it streams nothing, it answers as JSON, it offers no interface of its own, and its one
-      // skill is telling you where the real cards are. `agents` is unchanged and is still the point.
-      name: config.nodeId,
-      description: `Agents on ${config.nodeId} that are offered to other agents.`,
-      protocol: 'a2a',
-      node: config.nodeId,
-      url: base,
-      version: '1.0.0',
-      // NOT AN ENDPOINT, and the empty list is the honest way to say so. Work goes to an agent's
-      // own interface, named per row below; there is no node-level A2A JSON-RPC and inventing one
-      // in this document would send a stranger's task to an address that answers nothing.
-      supportedInterfaces: [],
-      capabilities: { streaming: false, pushNotifications: false, stateTransitionHistory: false, extensions: [] },
-      defaultInputModes: ['application/json'],
-      defaultOutputModes: ['application/json'],
-      skills: [{
-        id: 'directory',
-        name: 'Agent directory',
-        description: `Lists the agents on ${config.nodeId} whose owners have published an offering, with the address of each one's own agent card. Publishing the offering is the consent, so an agent absent from this list is not hidden — it is not for sale.`,
-        tags: ['directory', 'discovery', 'a2a'],
-      }],
-      agents: published.map(({ agent, offerings }) => ({
-        name: agent.name,
-        owner: agent.owner,
-        // Public: the agent card's address names the owner and the agent on this node, which is the
-        // whole GAII. Listing it gives away nothing a stranger cannot derive (feature-list audit #83).
-        gaii: agent.gaii,
-        display_name: agent.displayName ?? agent.name,
-        description: directoryDescriptionFor(agent.description, offerings),
-        agent_card: `${interfaceUrl(config, agent.owner, agent.name)}/agent-card.json`,
-        interface: interfaceUrl(config, agent.owner, agent.name),
-        // The count, not the offerings: what each one costs is on the card, and saying it twice is
-        // how the two come to disagree.
-        offerings: offerings.length,
-      })),
-    });
+    res.json(directoryCard(config, await directoryAgents(config, storage)));
+  });
+
+  // The directory's JSON-RPC interface. Public, like the card: it answers what the card already
+  // says and keeps nothing. Registered before the per-agent routes, which it cannot be mistaken for
+  // (one path segment after /v1/a2a, where an agent's address has two).
+  router.use('/v1/a2a/directory', async (req, res, next) => {
+    const card = directoryCard(config, await directoryAgents(config, storage));
+    return jsonRpcHandler({
+      requestHandler: new DirectoryA2AHandler(config, storage, card),
+      legacyCompat: { enabled: true },
+      userBuilder: async () => new UnauthenticatedUser(),
+    })(req, res, next);
   });
 
   router.use('/v1/a2a/:owner/:agent/agent-card.json', async (req, res, next) => {
@@ -186,7 +158,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const offerings = await offeringsForAgent(storage, agent);
-    const card = a2aCardFor(config, agent, interfaceUrl(config, agent.owner, agent.name), { offerings, iconUrl: await iconUrlFor(agent) });
+    const card = a2aCardFor(config, agent, agentInterfaceUrl(config, agent.owner, agent.name), { offerings, iconUrl: await iconUrlFor(agent) });
     // The SDK's handler owns the ETag, Cache-Control and 304, which is the part of serving a card
     // that is easy to get subtly wrong.
     return agentCardHandler({ agentCardProvider: async () => card })(req, res, next);
@@ -204,7 +176,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const base = config.baseUrl.replace(/\/+$/, '');
-    const a2a = interfaceUrl(config, agent.owner, agent.name);
+    const a2a = agentInterfaceUrl(config, agent.owner, agent.name);
     res.json(oasfRecordFor(config, agent, {
       a2a,
       a2aCard: `${a2a}/agent-card.json`,
@@ -242,7 +214,7 @@ export function a2aRouter(config: AimeatConfig, storage: Storage): Router {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No agent of that name on this node.'));
       return;
     }
-    const url = interfaceUrl(config, agent.owner, agent.name);
+    const url = agentInterfaceUrl(config, agent.owner, agent.name);
 
     if (req.headers.authorization) {
       return auth(req, res, async () => {

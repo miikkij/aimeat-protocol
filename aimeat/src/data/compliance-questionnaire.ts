@@ -33,6 +33,8 @@
  *   import { COMPLIANCE_QUESTIONNAIRE_SEED } from '../data/compliance-questionnaire.js';
  *   await seedComplianceQuestionnaire(storage, config.nodeId);   // writes only when absent
  * @version-history
+ *   v1.1.0 — 2026-10-28 — builtInQuestionIds(): which stored questions are still the seed's, so a
+ *     page can show those in the reader's language.
  *   v1.0.0 — 2026-08-23 — BR-02. Structured on the Act's own lists because no first customer has
  *     been named; the set is data precisely so the first real one can reshape it without a release.
  */
@@ -52,6 +54,21 @@ export const NOT_LEGAL_ADVICE =
   'This class is your own answers run through your own question set. It is an engineering aid for '
   + 'finding what needs a closer look, not a legal determination and not advice. The question set '
   + 'is editable data on this node: if a reading is wrong for you, change the question.';
+
+/**
+ * The ids of the questions a stored set still holds as this seed wrote them: the same text, help and
+ * option labels. A page translates only these; a question an operator reworded is theirs, and it
+ * reads in the words they wrote (admin Compliance printed the stored English to a Finnish reader
+ * on innokas.aimeat.io, 2026-10-28).
+ */
+export function builtInQuestionIds(set: Pick<ComplianceQuestionnaire, 'questions'>): string[] {
+  const seed = new Map(COMPLIANCE_QUESTIONNAIRE_SEED.questions.map(q => [q.id, q]));
+  const labels = (q: { options?: Array<{ value: string; label: string }> }) => JSON.stringify((q.options || []).map(o => [o.value, o.label]));
+  return (set.questions || []).filter((q) => {
+    const s = seed.get(q.id);
+    return !!s && s.text === q.text && (s.help ?? '') === (q.help ?? '') && labels(s) === labels(q);
+  }).map(q => q.id);
+}
 
 export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
   version: QUESTIONNAIRE_SEED_VERSION,
