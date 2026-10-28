@@ -2717,7 +2717,7 @@
         "domainStated": "{domain}, declarado en {rows}",
         "domainProposed": "{domain}, deducido de las palabras de {rows}",
         "gapsTitle": "Qué falta",
-        "gapAiAnnex": "{app}: candidato a la clase de alto riesgo ({area})",
+        "gapAiAnnex": "candidato a la clase de alto riesgo ({area})",
         "gapCount": "{n} elementos",
         "gapKind": {
           "undocumented-ai-activity": "Se usó un modelo y ninguna entrada lo nombra",
@@ -2729,7 +2729,90 @@
         },
         "measuresWhat": "Uso de IA en el periodo",
         "recordsNone": "Todavía no hay ningún registro de actividades de tratamiento guardado. La instalación tiene {drafts} borradores listos para revisar.",
-        "appendixTitle": "Anexo: el conjunto de preguntas"
+        "appendixTitle": "Anexo: el conjunto de preguntas",
+        "appendixNum": "A",
+        "appendixLead": "La clase de riesgo de un uso de IA sale de estas preguntas. Cada respuesta lleva a una clase según la regla de la última columna, y gana la clase más grave. Una pregunta sin respuesta deja el uso sin clasificar.",
+        "readFirst": "Este informe dice para qué se usa la IA en esta instalación, qué está registrado y qué falta. Es para el delegado de protección de datos, la dirección y un auditor. El apartado 2 enumera lo que hay que hacer y quién lo hace. Cada respuesta dice quién la dio:",
+        "colMark": "Marca",
+        "colMeans": "Qué significa",
+        "means": {
+          "human": "Respondió una persona.",
+          "ai": "Un modelo redactó la respuesta y una persona la guardó.",
+          "evidence": "La instalación leyó la respuesta de sus propios registros. Nadie decidió nada.",
+          "proposed": "Una regla dedujo la respuesta del mapa de datos de la aplicación. Nadie la ha aprobado todavía."
+        },
+        "tocTitle": "Contenido",
+        "sumOpen": "Preguntas sin responder",
+        "sumOpenValue": "{n} de {total}",
+        "nextTitle": "Qué hacer ahora",
+        "nextLead": "La página de cumplimiento está en {page}.",
+        "colAction": "Qué hacer",
+        "colWhoDoes": "Quién",
+        "colWhere": "Dónde",
+        "act": {
+          "save": "Revisar los {n} usos de IA que encontró el sistema y guardarlos en el registro",
+          "high": "Decidir la clase de los candidatos a alto riesgo: {list}",
+          "answer": "Responder las {n} preguntas abiertas de los {entries} usos de IA"
+        },
+        "who": {
+          "operator": "Administrador",
+          "operatorDpo": "Administrador con el delegado de protección de datos",
+          "appOwner": "Quien hizo la aplicación",
+          "publisher": "Quien publica el contenido"
+        },
+        "where": {
+          "register": "Página de cumplimiento, apartados 01 y 04",
+          "registerOrAi": "Página de cumplimiento, apartado 04, o tu propia IA con la instrucción del apartado 07",
+          "records": "Página de cumplimiento, apartados 08 y 09",
+          "app": "El mapa de datos y el registro de actividades de la aplicación, con la IA de quien la hizo",
+          "publish": "La etiqueta de IA de la aplicación, que se comprueba al publicarla",
+          "fonts": "Temas y estilos, pestaña Fuentes"
+        },
+        "usesTitle": "El uso de IA de un vistazo",
+        "eachTitle": "Cada uso de IA",
+        "colUse": "Uso de IA",
+        "colPersonal": "Datos personales",
+        "colClass": "Clase",
+        "colState": "Estado",
+        "colAnswered": "Respondidas",
+        "classProposed": "{cls} (propuesta)",
+        "stSaved": "guardado",
+        "stFound": "encontrado, sin guardar",
+        "gapsLead": "Cada tipo de carencia, cuántas hay, quién las corrige y a qué afecta cada una.",
+        "gapTag": "{n} · corrige: {who}",
+        "colConcerns": "Afecta a",
+        "colDetail": "Detalle",
+        "howTitle": "Cómo se completa este informe",
+        "howLead": "La instalación encuentra los usos de IA por sí misma. Una persona responde las preguntas y aprueba las respuestas. Los pasos:",
+        "how": {
+          "1": "El administrador abre la página de cumplimiento: {page}",
+          "2": "En el apartado 01 pulsa «Complétalas por mí». La instalación añade al registro, como borrador, los usos de IA que encontró. Todavía no se guarda nada.",
+          "3": "En el apartado 04 abre cada entrada y responde sus preguntas. Aprueba o cambia cada respuesta propuesta. Cada respuesta muestra quién la dio.",
+          "4": "También puede dar el trabajo a su propia IA: el apartado 07 tiene una instrucción lista. La IA muestra su propuesta y espera la aprobación, y sus respuestas quedan marcadas como de la IA.",
+          "5": "Cuando una respuesta necesita a quien hizo la aplicación, el administrador se lo pregunta. Quien la hizo mantiene al día el mapa de datos y el registro de actividades de su aplicación.",
+          "6": "El administrador guarda. La instalación vuelve a calcular la clase de cada entrada.",
+          "7": "Guarda el informe con «Guardar este» en el apartado 06. La instalación guarda además un informe mensual por sí misma el día 1 de cada mes.",
+          "8": "Imprime este informe con «Imprimir o guardar como PDF»."
+        },
+        "colRole": "Papel",
+        "colRoleDoes": "Qué hace",
+        "role": {
+          "operator": "Administrador",
+          "dpo": "Delegado de protección de datos o abogado",
+          "appOwner": "Quien hizo la aplicación",
+          "ai": "La IA del administrador"
+        },
+        "roleDoes": {
+          "operator": "Lleva el registro, responde las preguntas y las guarda.",
+          "dpo": "Decide la clase de un candidato a alto riesgo y lee el informe.",
+          "appOwner": "Explica qué hace la aplicación y mantiene al día su mapa de datos y su registro de actividades.",
+          "ai": "Redacta respuestas a partir de los registros de la instalación. Una persona las aprueba."
+        },
+        "colQuestion": "Pregunta",
+        "colAnswer": "Respuesta",
+        "colWho": "Quién respondió",
+        "colHelp": "Cómo responder",
+        "colRule": "La respuesta lleva a la clase"
       },
       "question": {
         "q-manipulative-technique": {

@@ -3768,7 +3768,7 @@
         "domainStated": "{domain}, stated in {rows}",
         "domainProposed": "{domain}, read from the words in {rows}",
         "gapsTitle": "What is missing",
-        "gapAiAnnex": "{app}: candidate for the high-risk class ({area})",
+        "gapAiAnnex": "candidate for the high-risk class ({area})",
         "gapCount": "{n} items",
         "gapKind": {
           "undocumented-ai-activity": "A model was used and no entry names it",
@@ -3780,7 +3780,90 @@
         },
         "measuresWhat": "AI use in the period",
         "recordsNone": "No record of processing is saved yet. The installation has {drafts} drafts ready to check.",
-        "appendixTitle": "Appendix: the question set"
+        "appendixTitle": "Appendix: the question set",
+        "appendixNum": "A",
+        "appendixLead": "The risk class of an AI use comes from these questions. Each answer leads to a class by the rule in the last column, and the most serious class wins. A question with no answer leaves the use unclassified.",
+        "readFirst": "This report says what AI is used for on this installation, what is written down about it and what is missing. It is for the data protection officer, the management and an auditor. Section 2 lists what to do next and who does it. Every answer says who gave it:",
+        "colMark": "Mark",
+        "colMeans": "What it means",
+        "means": {
+          "human": "A person answered.",
+          "ai": "A model drafted the answer and a person saved it.",
+          "evidence": "The installation read the answer from its own records. Nobody decided anything.",
+          "proposed": "A rule read the answer from the app's data map. Nobody has approved it yet."
+        },
+        "tocTitle": "Contents",
+        "sumOpen": "Unanswered questions",
+        "sumOpenValue": "{n} of {total}",
+        "nextTitle": "What to do next",
+        "nextLead": "The Compliance page is at {page}.",
+        "colAction": "What to do",
+        "colWhoDoes": "Who",
+        "colWhere": "Where",
+        "act": {
+          "save": "Check the {n} AI uses the system found and save them in the register",
+          "high": "Decide the class of the high-risk candidates: {list}",
+          "answer": "Answer the {n} open questions of the {entries} AI uses"
+        },
+        "who": {
+          "operator": "Administrator",
+          "operatorDpo": "Administrator with the data protection officer",
+          "appOwner": "The app's maker",
+          "publisher": "Whoever publishes the content"
+        },
+        "where": {
+          "register": "Compliance page, sections 01 and 04",
+          "registerOrAi": "Compliance page, section 04, or your own AI with the prompt in section 07",
+          "records": "Compliance page, sections 08 and 09",
+          "app": "The app's data map and its record of processing, through the maker's own AI",
+          "publish": "The app's AI label, checked when the app is published",
+          "fonts": "Themes & Styles, the Fonts tab"
+        },
+        "usesTitle": "AI use at a glance",
+        "eachTitle": "Each AI use",
+        "colUse": "AI use",
+        "colPersonal": "Personal data",
+        "colClass": "Class",
+        "colState": "State",
+        "colAnswered": "Answered",
+        "classProposed": "{cls} (proposed)",
+        "stSaved": "saved",
+        "stFound": "found, not saved",
+        "gapsLead": "Each kind of gap, how many there are, who fixes them and what each one concerns.",
+        "gapTag": "{n} · fixes: {who}",
+        "colConcerns": "Concerns",
+        "colDetail": "Detail",
+        "howTitle": "How this report is completed",
+        "howLead": "The installation finds the AI uses by itself. A person answers the questions and approves the answers. The steps:",
+        "how": {
+          "1": "The administrator opens the Compliance page: {page}",
+          "2": "In section 01 they press \"Fill these in for me\". The installation adds the AI uses it found to the register as a draft. Nothing is saved yet.",
+          "3": "In section 04 they open each entry and answer its questions. They approve or change each proposed answer. Every answer shows who gave it.",
+          "4": "They can also give the work to their own AI: section 07 has a ready prompt. The AI shows its proposal and waits for approval, and its answers are marked as the AI's.",
+          "5": "When an answer needs the app's maker, the administrator asks the maker. The maker keeps their own app's data map and record of processing up to date.",
+          "6": "The administrator saves. The installation calculates each entry's class again.",
+          "7": "They keep the report with \"Keep this one\" in section 06. The installation also keeps a monthly report by itself on the first day of each month.",
+          "8": "They print this report with \"Print or save as PDF\"."
+        },
+        "colRole": "Role",
+        "colRoleDoes": "Does",
+        "role": {
+          "operator": "Administrator",
+          "dpo": "Data protection officer or lawyer",
+          "appOwner": "The app's maker",
+          "ai": "The administrator's AI"
+        },
+        "roleDoes": {
+          "operator": "Keeps the register, answers the questions and saves them.",
+          "dpo": "Decides the class of a high-risk candidate and reads the report.",
+          "appOwner": "Tells what the app does and keeps its data map and record of processing up to date.",
+          "ai": "Drafts answers from the installation's records. A person approves them."
+        },
+        "colQuestion": "Question",
+        "colAnswer": "Answer",
+        "colWho": "Who answered",
+        "colHelp": "How to answer",
+        "colRule": "Answer leads to class"
       },
       "question": {
         "q-manipulative-technique": {
