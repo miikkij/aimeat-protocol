@@ -34,6 +34,8 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.3.0 — 2026-10-28 — An answer from the app's maker says so; an opened entry has a reason field
+ *     per answered question (`answerNotes`), and a reason stands beside its answer.
  *   v3.2.0 — 2026-10-28 — The questions, their help and their options in the reader's language while
  *     the stored set still holds the built-in English (compliance-tab.print.js questionText).
  *   v3.1.0 — 2026-10-28 — A proposed answer (the node's rule read it from an app's data map) says
@@ -109,6 +111,7 @@ function answeredText(u, questions) {
   if (a.human) parts.push(C('src.you', { n: num(a.human) }));
   if (a.evidence) parts.push(C('src.record', { n: num(a.evidence) }));
   if (a.proposed) parts.push(C('src.proposed', { n: num(a.proposed) }));
+  if (a.maker) parts.push(C('src.maker', { n: num(a.maker) }));
   return [head, ...parts].join(' · ');
 }
 
@@ -129,18 +132,21 @@ function AnswerPick({ q, value, onChange }) {
  * answer (the node's rule read it from an app's data map) waits for a person like a blank one, and
  * its reason stands where the help would, because the reason is what the person checks.
  */
-function questionRow(q, value, source, onChange, last, reason) {
+function questionRow(q, value, source, onChange, last, reason, note) {
   const blank = isBlank(value);
   const proposed = !blank && source === 'proposed';
   const src = blank ? C('waitsForYou')
     : source === 'evidence' ? C('answerFromEvidence')
     : source === 'ai' ? C('answerFromAi')
+    : source === 'maker' ? C('answerFromMaker')
     : proposed ? C('answerProposed')
     : C('answerFromHuman');
+  // The reason given for the answer stands where the help would: it is what the reader checks.
+  const why = note ? C('noteWhy', { note }) : proposed && reason ? C('proposedWhy', { reason }) : (questionHelp(q) || undefined);
   return {
     key: q.id,
     name: questionText(q),
-    why: proposed && reason ? C('proposedWhy', { reason }) : (questionHelp(q) || undefined),
+    why,
     mark: html`<${AnswerPick} q=${q} value=${value} onChange=${onChange} />`,
     value: blank ? html`<${Tinted} tone="notice">${src}<//>` : src,
     // Picking the answer already shown changes nothing in a select, so accepting a proposal as it
@@ -181,6 +187,7 @@ function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer
   const [appsText, setAppsText] = useState((u.apps || []).join(', '));
   const reasons = (u.risk && u.risk.reasons) || [];
   const open = answersOf(u, questions).unanswered;
+  const answered = questions.filter(q => !isBlank((u.answers || {})[q.id]));
   return html`
     <${Box} id="adm-cmp-sheet" name=${u.title || u.id} marks=${html` <${ClassChip} cls=${u.risk && u.risk.class} />`}
       end=${html`<${Actions}>
@@ -201,7 +208,16 @@ function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer
       <${Label} block>${C('answersTitle')}<//>
       ${open > 0 ? html`<${Note} kind="hint"><${Tinted} tone="notice" strong>${open === 1 ? C('unansweredOne') : C('unansweredMany', { n: num(open) })}<//><//>` : null}
       <${Readings} rows=${questions.map((q, i) => questionRow(q, (u.answers || {})[q.id], (u.answerSources || {})[q.id],
-        (v) => onAnswer(q.id, v), i === questions.length - 1, proposedWhy[q.id] ? proposalText(proposedWhy[q.id]) : undefined))} />
+        (v) => onAnswer(q.id, v), i === questions.length - 1, proposedWhy[q.id] ? proposalText(proposedWhy[q.id]) : undefined,
+        (u.answerNotes || {})[q.id]))} />
+      ${answered.length > 0 ? html`
+        <${Label} block>${C('notesTitle')}<//>
+        <${Note} kind="quiet">${C('notesHint')}<//>
+        <${Fields}>
+          ${answered.map(q => html`<${TextArea} key=${q.id} wide label=${questionText(q)} rows=${2}
+            value=${(u.answerNotes || {})[q.id] || ''}
+            onInput=${(v) => onPatch({ answerNotes: { ...(u.answerNotes || {}), [q.id]: v } })} />`)}
+        <//>` : null}
     <//>`;
 }
 
@@ -286,7 +302,8 @@ export function RegisterSection({ usecases, questions, draft, setDraft, openId, 
       note=${C('foot', {
         shown: num(Math.min(shown, filtered.length)), total: num(list.length),
         ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence), unanswered: num(stats.unanswered),
-      }) + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '')} />
+      }) + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '')
+        + (stats.maker > 0 ? C('under.maker', { n: num(stats.maker) }) : '')} />
     ${open ? html`
       <${EntrySheet} key=${openIndex} u=${open} questions=${questions} reasons=${proposals[open.id]}
         onPatch=${(p) => patch(open.id, p)} onAnswer=${(qid, v) => answer(open.id, qid, v)}

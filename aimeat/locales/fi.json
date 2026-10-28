@@ -3574,12 +3574,23 @@
       "under": {
         "filled": "{entries} merkintää · {questions} kysymystä · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence}",
         "empty": "0 merkintää · {questions} kysymystä · mitään ei ole vielä kirjoitettu ylös",
-        "proposed": " · {n} ehdotusta odottaa sinua"
+        "proposed": " · {n} ehdotusta odottaa sinua",
+        "maker": " · {n} vastausta sovellusten tekijöiltä"
       },
       "gapUndocumented": "Käytössä, mutta ei kirjattu mihinkään",
       "gapAiApps": "Sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
       "answerProposed": "ehdotus, tarkista",
       "proposedWhy": "Miksi tätä ehdotetaan: {reason}",
+      "noteWhy": "Miksi: {note}",
+      "notesTitle": "Perustelu jokaiselle vastaukselle",
+      "notesHint": "Yksi tai kaksi lausetta vastausta kohden. Tulosteessa perustelu näkyy vastauksen vieressä, ja auditoija tarkistaa juuri sen.",
+      "ask": {
+        "subject": "Tekoälyasetuksen kysymykset {{n}} sovelluksellesi",
+        "intro": "Tekoälyä käyttäviä sovelluksiasi on {{n}}, ja EU:n tekoälyasetus kysyy jokaisesta muutaman kysymyksen. Sinä tunnet sovelluksesi parhaiten, joten pääkäyttäjä pyytää sinua vastaamaan:",
+        "appLine": "- {{title}}: avoimia kysymyksiä {{open}}. Vastaa sovelluksen sivulla: {{url}}",
+        "how": "Nopein tapa on oma tekoälysi. Liitä tämä tekoälykeskusteluusi:",
+        "after": "Vastauksesi tallentuvat sovelluksen datakarttaan, ja pääkäyttäjä hyväksyy ne vaatimustenmukaisuuden kirjanpitoon. Muistutus tulee uudelleen kahden viikon päästä, jos kysymyksiä on yhä avoinna."
+      },
       "proposedStated": "datakartan mukaan {rows} sisältää säänneltyä tietoa ({domain}), ja sovellus käsittelee sitä tekoälyllä.",
       "proposedRead": "datakartan sanat ({words}) viittaavat säänneltyyn tietoon ({domain}) kohdassa {rows}, ja sovellus käsittelee sitä tekoälyllä.",
       "acceptProposal": "Hyväksy",
@@ -3701,7 +3712,8 @@
         "ai": "tekoäly {n}",
         "you": "sinä {n}",
         "record": "kirjattu {n}",
-        "proposed": "ehdotus {n}"
+        "proposed": "ehdotus {n}",
+        "maker": "tekijä {n}"
       },
       "showNext": "Näytä seuraavat {n}",
       "foot": "{shown}/{total} · vastauksia: tekoälyltä {ai}, sinulta {human}, kirjatusta {evidence} · {unanswered} vastaamatta",
@@ -3728,6 +3740,7 @@
       "answerFromAi": "tekoälyn luonnos",
       "answerFromHuman": "sinun vastauksesi",
       "answerFromProposed": "säännön ehdotus, ei vielä hyväksytty",
+      "answerFromMaker": "sovelluksen tekijä",
       "paper": {
         "summaryTitle": "Kokonaistila",
         "sumUses": "Löydetyt tekoälyn käytöt",
@@ -3794,7 +3807,8 @@
           "human": "Ihminen vastasi.",
           "ai": "Malli luonnosteli vastauksen, ja ihminen tallensi sen.",
           "evidence": "Asennus luki vastauksen omista tiedoistaan. Kukaan ei päättänyt mitään.",
-          "proposed": "Sääntö päätteli vastauksen sovelluksen datakartasta. Kukaan ei ole vielä hyväksynyt sitä."
+          "proposed": "Sääntö päätteli vastauksen sovelluksen datakartasta. Kukaan ei ole vielä hyväksynyt sitä.",
+          "maker": "Sovelluksen tekijä vastasi sovelluksen datakartassa, ja pääkäyttäjä tallensi vastauksen."
         },
         "tocTitle": "Sisällys",
         "sumOpen": "Vastaamattomat kysymykset",
@@ -3844,7 +3858,7 @@
           "2": "Hän painaa kohdassa 01 painiketta ”Täytä nämä puolestani”. Asennus lisää löytämänsä tekoälyn käytöt kirjanpitoon luonnoksena. Mitään ei vielä tallenneta.",
           "3": "Hän avaa kohdassa 04 jokaisen merkinnän ja vastaa sen kysymyksiin. Hän hyväksyy tai muuttaa jokaisen ehdotetun vastauksen. Jokaisesta vastauksesta näkyy, kuka sen antoi.",
           "4": "Hän voi myös antaa työn omalle tekoälylleen: kohdassa 07 on valmis kehote. Tekoäly näyttää ehdotuksensa ja odottaa hyväksyntää, ja sen vastaukset merkitään tekoälyn vastauksiksi.",
-          "5": "Kun vastaus tarvitaan sovelluksen tekijältä, pääkäyttäjä kysyy häneltä. Tekijä pitää oman sovelluksensa datakartan ja käsittelyselosteen ajan tasalla.",
+          "5": "Sovelluksen tekijä vastaa oman sovelluksensa kysymyksiin perusteluineen, oman tekoälynsä kautta tai sovelluksen sivun osiossa ”Tekoälyasetuksen kysymykset”. Asennus muistuttaa tekijää, kun kysymyksiä on avoinna, samasta sovelluksesta kahden viikon välein. Tekijän vastaukset tulevat luonnokseen merkittyinä tekijän vastauksiksi.",
           "6": "Pääkäyttäjä tallentaa. Asennus laskee jokaisen merkinnän luokan uudelleen.",
           "7": "Hän ottaa raportin talteen kohdan 06 painikkeella ”Ota tämä talteen”. Asennus tallentaa lisäksi kuukausiraportin itse joka kuun 1. päivä.",
           "8": "Hän tulostaa tämän raportin painikkeella ”Tulosta tai tallenna PDF:ksi”."
@@ -3860,12 +3874,13 @@
         "roleDoes": {
           "operator": "Pitää kirjanpitoa, vastaa kysymyksiin ja tallentaa vastaukset.",
           "dpo": "Päättää korkean riskin ehdokkaan luokan ja lukee raportin.",
-          "appOwner": "Kertoo, mitä sovellus tekee, ja pitää sen datakartan ja käsittelyselosteen ajan tasalla.",
+          "appOwner": "Vastaa sovelluksen tekoälyasetuksen kysymyksiin perusteluineen ja pitää sen datakartan ja käsittelyselosteen ajan tasalla.",
           "ai": "Luonnostelee vastaukset asennuksen tiedoista. Ihminen hyväksyy ne."
         },
         "colQuestion": "Kysymys",
         "colAnswer": "Vastaus",
         "colWho": "Kuka vastasi",
+        "colReason": "Miksi",
         "colHelp": "Miten vastataan",
         "colRule": "Vastaus johtaa luokkaan"
       },
@@ -24824,6 +24839,20 @@
     }
   },
   "appcat": {
+    "aiAct.title": "Tekoälyasetuksen kysymykset",
+    "aiAct.lead": "Tämä sovellus käyttää tekoälyä, joten EU:n tekoälyasetus kysyy siitä muutaman kysymyksen. Sinä tunnet sovelluksen parhaiten: vastaa jokaiseen kysymykseen ja kerro yhdellä lauseella miksi. Asennuksen pääkäyttäjä hyväksyy vastaukset vaatimustenmukaisuuden kirjanpitoon.",
+    "aiAct.notAi": "Sovellus ei omien tietojensa mukaan käytä tekoälyä, joten tekoälyasetuksen kysymyksiä ei ole.",
+    "aiAct.aiTitle": "Anna tekoälysi vastata",
+    "aiAct.aiNote": "Kopioi kehote omaan tekoälykeskusteluusi. Tekoäly lukee sovelluksen ja kysymykset, näyttää vastauksensa perusteluineen ja tallentaa ne, kun hyväksyt.",
+    "aiAct.copyPrompt": "Kopioi kehote",
+    "aiAct.noMap": "Sovelluksella ei ole vielä datakarttaa, joten vastauksille ei ole paikkaa. Pyydä tekoälyäsi kirjoittamaan datakartta ensin; yllä oleva kehote tekee molemmat.",
+    "aiAct.formTitle": "Vastaa tässä · {open}/{total} avoinna",
+    "aiAct.noteLabel": "Miksi tämä vastaus",
+    "aiAct.notePlaceholder": "Miksi, yhdellä tai kahdella lauseella",
+    "aiAct.save": "Tallenna vastaukset",
+    "aiAct.saving": "Tallennetaan…",
+    "aiAct.saved": "Tallennettu. Pääkäyttäjä näkee vastauksesi vaatimustenmukaisuuden kirjanpidossa.",
+    "aiAct.saveFailed": "Vastauksia ei tallennettu.",
     "dataMap.agentsTitle": "Agentit, joiden työtä tämä sovellus näyttää",
     "dataMap.agentMadeFor": "Sovellus tehtiin tätä agenttia varten.",
     "dataMap.agentUses": "Sovellus käyttää tämän agentin työtä.",

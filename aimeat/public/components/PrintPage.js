@@ -35,7 +35,8 @@
  *   - PrintTable({ head, rows, lead }): a table with ruled rows; `lead` makes the first column the
  *     row's name.
  *   PrintEntry's fields are a two-column table, and its answers take a head row (`answersHead`);
- *   with three columns the source has a column of its own.
+ *   with three columns the source has a column of its own, and with four an answer's `note` (why
+ *   that answer) stands between the answer and its source.
  * @structure PrintPage · ScreenOnly · PrintOnly · PrintHead · PrintHeading · PrintToc · PrintTable · PrintEntry · PrintList
  * @usage html`<${PrintPage}>
  *          <${ScreenOnly}>…the page…<//>
@@ -105,7 +106,7 @@ export function PrintTable({ head = [], rows = [], lead = false }) {
 
 /**
  * @param {{ id?: string, title: any, tag?: any, desc?: any, fields?: Array<{ key?: any, label: any, value: any }>,
- *   answers?: Array<{ key?: any, question: any, answer?: any, source?: any }>, answersHead?: Array<any>,
+ *   answers?: Array<{ key?: any, question: any, answer?: any, note?: any, source?: any }>, answersHead?: Array<any>,
  *   reasons?: Array<any>, reasonsLabel?: any, emptyAnswer?: any }} props
  */
 export function PrintEntry({ id, title, tag, desc, fields = [], answers = [], answersHead, reasons = [], reasonsLabel, emptyAnswer }) {
@@ -123,7 +124,11 @@ export function PrintEntry({ id, title, tag, desc, fields = [], answers = [], an
           ${(answers || []).map((a, i) => html`
             <tr key=${a.key ?? i}>
               <td class="print-entry-q">${a.question}</td>
-              ${answersHead && answersHead.length > 2
+              ${answersHead && answersHead.length > 3
+                ? html`<td class="print-entry-a">${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}</td>
+                       <td class="print-entry-note">${has(a.note) ? a.note : null}</td>
+                       <td class="print-entry-who">${has(a.answer) ? a.source : null}</td>`
+                : answersHead && answersHead.length > 2
                 ? html`<td class="print-entry-a">${has(a.answer) ? a.answer : html`<em>${emptyAnswer}</em>`}</td>
                        <td class="print-entry-who">${has(a.answer) ? a.source : null}</td>`
                 : html`<td class="print-entry-a">

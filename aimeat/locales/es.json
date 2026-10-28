@@ -2519,12 +2519,23 @@
       "under": {
         "filled": "{entries} entradas · {questions} preguntas · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro",
         "empty": "0 entradas · {questions} preguntas · todavía no hay nada anotado",
-        "proposed": " · {n} propuestas te esperan"
+        "proposed": " · {n} propuestas te esperan",
+        "maker": " · {n} respuestas de quienes hicieron las aplicaciones"
       },
       "gapUndocumented": "Se usa aquí, no está anotado en ninguna parte",
       "gapAiApps": "Una aplicación usa IA y ninguna entrada la nombra",
       "answerProposed": "propuesta, revísala",
       "proposedWhy": "Por qué se propone: {reason}",
+      "noteWhy": "Por qué: {note}",
+      "notesTitle": "Por qué cada respuesta",
+      "notesHint": "Una o dos frases por respuesta. La versión impresa muestra el motivo junto a la respuesta, y es lo que comprueba un auditor.",
+      "ask": {
+        "subject": "Las preguntas del Reglamento de IA para {{n}} de tus aplicaciones",
+        "intro": "{{n}} de tus aplicaciones usan IA, y el Reglamento europeo de IA hace algunas preguntas sobre cada una. Tú conoces tus aplicaciones mejor que nadie, así que el administrador te pide que las respondas:",
+        "appLine": "- {{title}}: {{open}} preguntas abiertas. Respóndelas en la página de la aplicación: {{url}}",
+        "how": "Lo más rápido es tu propia IA. Pega esto en el chat de tu IA:",
+        "after": "Tus respuestas se guardan en el mapa de datos de la aplicación, y el administrador las aprueba en el registro de cumplimiento. Este recordatorio vuelve dentro de dos semanas mientras queden preguntas abiertas."
+      },
       "proposedStated": "según el mapa de datos, {rows} contiene datos regulados ({domain}), y la aplicación los trata con IA.",
       "proposedRead": "las palabras del mapa de datos ({words}) apuntan a datos regulados ({domain}) en {rows}, y la aplicación los trata con IA.",
       "acceptProposal": "Aprobar",
@@ -2646,7 +2657,8 @@
         "ai": "IA {n}",
         "you": "tú {n}",
         "record": "registro {n}",
-        "proposed": "propuesta {n}"
+        "proposed": "propuesta {n}",
+        "maker": "autor {n}"
       },
       "showNext": "Mostrar las {n} siguientes",
       "foot": "{shown} de {total} · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro · {unanswered} sin responder",
@@ -2673,6 +2685,7 @@
       "answerFromAi": "borrador de la IA",
       "answerFromHuman": "tu respuesta",
       "answerFromProposed": "propuesta de una regla, aún sin aprobar",
+      "answerFromMaker": "quien hizo la aplicación",
       "paper": {
         "summaryTitle": "Situación general",
         "sumUses": "Usos de IA encontrados",
@@ -2739,7 +2752,8 @@
           "human": "Respondió una persona.",
           "ai": "Un modelo redactó la respuesta y una persona la guardó.",
           "evidence": "La instalación leyó la respuesta de sus propios registros. Nadie decidió nada.",
-          "proposed": "Una regla dedujo la respuesta del mapa de datos de la aplicación. Nadie la ha aprobado todavía."
+          "proposed": "Una regla dedujo la respuesta del mapa de datos de la aplicación. Nadie la ha aprobado todavía.",
+          "maker": "Quien hizo la aplicación respondió en su mapa de datos, y el administrador lo guardó."
         },
         "tocTitle": "Contenido",
         "sumOpen": "Preguntas sin responder",
@@ -2789,7 +2803,7 @@
           "2": "En el apartado 01 pulsa «Complétalas por mí». La instalación añade al registro, como borrador, los usos de IA que encontró. Todavía no se guarda nada.",
           "3": "En el apartado 04 abre cada entrada y responde sus preguntas. Aprueba o cambia cada respuesta propuesta. Cada respuesta muestra quién la dio.",
           "4": "También puede dar el trabajo a su propia IA: el apartado 07 tiene una instrucción lista. La IA muestra su propuesta y espera la aprobación, y sus respuestas quedan marcadas como de la IA.",
-          "5": "Cuando una respuesta necesita a quien hizo la aplicación, el administrador se lo pregunta. Quien la hizo mantiene al día el mapa de datos y el registro de actividades de su aplicación.",
+          "5": "Quien hizo la aplicación responde las preguntas de su aplicación con un motivo cada una, con su propia IA o en el apartado «Preguntas del Reglamento de IA» de la página de la aplicación. La instalación se lo recuerda mientras queden preguntas abiertas, para la misma aplicación cada dos semanas. Sus respuestas llegan al borrador marcadas como suyas.",
           "6": "El administrador guarda. La instalación vuelve a calcular la clase de cada entrada.",
           "7": "Guarda el informe con «Guardar este» en el apartado 06. La instalación guarda además un informe mensual por sí misma el día 1 de cada mes.",
           "8": "Imprime este informe con «Imprimir o guardar como PDF»."
@@ -2805,12 +2819,13 @@
         "roleDoes": {
           "operator": "Lleva el registro, responde las preguntas y las guarda.",
           "dpo": "Decide la clase de un candidato a alto riesgo y lee el informe.",
-          "appOwner": "Explica qué hace la aplicación y mantiene al día su mapa de datos y su registro de actividades.",
+          "appOwner": "Responde las preguntas del Reglamento de IA de la aplicación con un motivo cada una, y mantiene al día su mapa de datos y su registro de actividades.",
           "ai": "Redacta respuestas a partir de los registros de la instalación. Una persona las aprueba."
         },
         "colQuestion": "Pregunta",
         "colAnswer": "Respuesta",
         "colWho": "Quién respondió",
+        "colReason": "Por qué",
         "colHelp": "Cómo responder",
         "colRule": "La respuesta lleva a la clase"
       },
@@ -22467,6 +22482,20 @@
     }
   },
   "appcat": {
+    "aiAct.title": "Preguntas del Reglamento de IA",
+    "aiAct.lead": "Esta aplicación usa IA, así que el Reglamento europeo de IA hace algunas preguntas sobre ella. Tú la conoces mejor que nadie: responde cada pregunta y di por qué en una frase. El administrador de esta instalación aprueba las respuestas en el registro de cumplimiento.",
+    "aiAct.notAi": "Según sus propios datos, esta aplicación no usa IA, así que no tiene preguntas del Reglamento de IA.",
+    "aiAct.aiTitle": "Deja que tu IA responda",
+    "aiAct.aiNote": "Copia la instrucción en el chat de tu propia IA. Lee la aplicación y las preguntas, te muestra sus respuestas con un motivo cada una y las guarda cuando dices que sí.",
+    "aiAct.copyPrompt": "Copiar la instrucción",
+    "aiAct.noMap": "Esta aplicación aún no tiene mapa de datos, así que las respuestas no tienen dónde guardarse. Pide a tu IA que escriba el mapa primero; la instrucción de arriba hace las dos cosas.",
+    "aiAct.formTitle": "Responde aquí · {open} de {total} abiertas",
+    "aiAct.noteLabel": "Por qué esta respuesta",
+    "aiAct.notePlaceholder": "Por qué, en una o dos frases",
+    "aiAct.save": "Guardar las respuestas",
+    "aiAct.saving": "Guardando…",
+    "aiAct.saved": "Guardado. El administrador ve tus respuestas en el registro de cumplimiento.",
+    "aiAct.saveFailed": "Las respuestas no se guardaron.",
     "dataMap.agentsTitle": "Agentes cuyo trabajo muestra esta aplicación",
     "dataMap.agentMadeFor": "La aplicación se hizo para este agente.",
     "dataMap.agentUses": "La aplicación usa el trabajo de este agente.",

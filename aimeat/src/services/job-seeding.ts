@@ -11,6 +11,7 @@
  *   - seedCoreScheduledJobs(config, storage): builds the job list and createScheduledJob() for missing ones
  *
  * @version-history
+ *   2026-10-28 — Seed core:compliance-ask-makers (daily 08:15): the makers of AI apps with EU AI Act questions open are asked.
  *   2026-10-25 — Seed core:held-label-release (daily 05:41; secaudit2026oct22, app-label-recycled-after-delete).
  *   2026-10-25 — Seed core:mcp-client-cleanup (daily 04:53; secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-25 — Seed core:internet-opening-sweep (hourly at :12).
@@ -92,6 +93,9 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     // The compliance report for the month that just ended. 04:00 on the first, after the nightly
     // usage rollup and archive at 03:xx, so the month it reports on is fully folded before it reads.
     { id: 'core:compliance-report-monthly', name: 'Monthly Compliance Report', coreHandler: 'compliance-report-monthly', cron: '0 4 1 * *' },
+    // The makers of apps that use AI with EU AI Act questions open get one message with a ready prompt.
+    // Daily at 08:15, in working hours; the same app is asked again only after a fortnight.
+    { id: 'core:compliance-ask-makers', name: 'Ask App Makers for AI Act Answers', coreHandler: 'compliance-ask-makers', cron: '15 8 * * *' },
   ];
 
   if (config.consentEnabled) {

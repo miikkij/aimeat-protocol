@@ -15,6 +15,8 @@
  * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.6.0 — 2026-10-28 — DATAMAP_AI_ACT_UNANSWERED: the map says the app uses AI and its `aiAct`
+ *     answers none of the EU AI Act questions. Last in the order and never a refusal.
  *   v1.5.0 — 2026-10-28 — DATAMAP_ROW_BAD_DOMAIN (a row names a data domain the node does not know)
  *     and DATAMAP_PERSONAL_NO_DOMAIN (a personal row says no domain at all), last in the order and
  *     never a refusal. TalentGrid on innokas.aimeat.io kept colleagues' competence ratings and sent
@@ -41,6 +43,7 @@ import {
 import { isValidAgentName } from '../../utils/gaii.js';
 import { complianceDomainById } from '../../data/compliance-domains.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
+import { appAiSignals } from '../compliance-app-signals.js';
 
 /** Findings, worst first. The order is the order a reader should care. */
 export const FINDING_CODES = [
@@ -56,7 +59,15 @@ export const FINDING_CODES = [
   'DATAMAP_ROW_BAD_CLASSIFICATION',
   'DATAMAP_ROW_BAD_DOMAIN',
   'DATAMAP_PERSONAL_NO_DOMAIN',
+  'DATAMAP_AI_ACT_UNANSWERED',
 ] as const;
+
+/**
+ * The map says the app uses AI: a model in its machinery, or something sent to an AI service. The
+ * map's own words only; the register draft also reads the app's ai:use permission, which this pure
+ * check does not see (compliance-app-signals.ts reads both).
+ */
+const mapUsesAi = (map: DataMap): boolean => appAiSignals(map, null).usesAi;
 
 /** A row's `domains` entries this node does not know, or the whole field when it is not a list. */
 const badDomains = (r: DataMapRow): string[] => {
@@ -290,6 +301,19 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
         + 'domain it falls in. Add `domains` to each: "employment" for CVs, competence, staffing and HR, "health" for '
         + 'patient data, "children" for minors, or [] when none applies. The domain decides the classification floor, '
         + `whether an impact assessment is owed and the AI Act risk area. Rows: ${noDomain.map(r => r.what).join(', ')}.`,
+    });
+  }
+
+  // The maker is the one who knows what an AI app does to people, so the maker answers the AI Act
+  // questions, at build time, in the map they are already writing. Without it the node's
+  // administrator has to ask, app by app (Jouni, 2026-10-28).
+  if (mapUsesAi(map) && Object.keys(map.aiAct?.answers ?? {}).length === 0) {
+    findings.push({
+      code: 'DATAMAP_AI_ACT_UNANSWERED',
+      message: 'This app uses AI, and the map does not answer the EU AI Act questions. You know what the app does, '
+        + 'so answer them: aimeat_datamap_get lists them under `ai_act`. Add to the map `aiAct`: { "answers": '
+        + '{ "<question id>": true | false | "<option value>" }, "notes": { "<question id>": "why, in one or two sentences" } }. '
+        + 'The node\'s administrator approves the answers; a note is what an auditor reads beside the answer.',
     });
   }
 

@@ -40,6 +40,10 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.2.0 — 2026-10-28 — The maker's answers and notes from the app's data map (`aiAct`) enter the
+ *     draft marked `maker`, below evidence and over a rule's proposal; an entry already stored gets
+ *     them in `makerUpdates` for the questions it has not answered (Jouni: the maker answers for
+ *     their own app, the administrator approves).
  *   v1.1.0 — 2026-10-28 — Every app that uses AI gets an entry, described from its data map, with its
  *     models from the provenance records its calls minted, and the Annex III area proposed when its
  *     map holds employment or biometric data. "Publishes publicly" is evidenced by content a visitor
@@ -59,6 +63,7 @@ import type { ComplianceAnswerSource, ComplianceUseCase } from './compliance-reg
 import { effectiveQuestionnaire, readUseCases } from './compliance-register.js';
 import { appAiSignals } from './compliance-app-signals.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
+import type { AiActStatement } from './data-map/data-map-types.js';
 import { localAccountName } from '../utils/gaii.js';
 
 /** Provenance rows read per draft. Bounded: this is a page of recent activity, not a scan. */
@@ -86,13 +91,27 @@ export interface DraftProposal {
   basis: { domain: string; source: 'evidence' | 'proposed'; rows: string[]; words: string[] };
 }
 
+/**
+ * The maker's answers for an entry the stored register already holds: the questions that entry has
+ * not answered, and the notes it has none for. The caller merges them into the stored entry, never
+ * over an answer somebody already saved.
+ */
+export interface MakerUpdate {
+  usecase_id: string;
+  answers: Record<string, unknown>;
+  answerSources: Record<string, ComplianceAnswerSource>;
+  answerNotes: Record<string, string>;
+}
+
 export interface RegisterDraft {
   /** The proposed entries. Not stored: the caller shows these and somebody approves them. */
   usecases: ComplianceUseCase[];
   /** Every `proposed` answer in `usecases`, with why. */
   proposals: DraftProposal[];
-  /** How many answers came from the record, how many were proposed, and how many are left. */
-  counts: { entries: number; answeredFromEvidence: number; proposed: number; leftToAnswer: number };
+  /** The maker's answers that stored entries do not carry yet. */
+  makerUpdates: MakerUpdate[];
+  /** How many answers came from the record, from apps' makers and by rule, and how many are left. */
+  counts: { entries: number; answeredFromEvidence: number; fromMaker: number; proposed: number; leftToAnswer: number };
   /** What this draft could NOT work out, in the same spirit as the report's own limits. */
   notes: string[];
 }
@@ -220,10 +239,33 @@ export async function draftRegisterFromActivity(
   const agentByGaii = new Map(agents.map(a => [a.gaii, a]));
   const storedIds = new Set(stored.map(u => u.id));
   const storedTitles = new Set(stored.map(u => u.title));
-  const storedApps = new Set(stored.flatMap(u => u.apps ?? []).map(ref => {
-    const [owner, ...rest] = ref.split('/');
-    return appKey(owner, rest.join('/'));
-  }));
+  const storedByApp = new Map<string, ComplianceUseCase>();
+  for (const u of stored) {
+    for (const ref of u.apps ?? []) {
+      const [owner, ...rest] = ref.split('/');
+      storedByApp.set(appKey(owner, rest.join('/')), u);
+    }
+  }
+
+  /**
+   * The maker's answers the CURRENT question set can take: a yes/no for a yes/no question, one of the
+   * options for a choice. An answer of the wrong shape is left out rather than coerced, because a
+   * coerced answer reads as the maker's and is not.
+   */
+  const makerAnswers = (stmt: AiActStatement | undefined): { answers: Record<string, unknown>; notes: Record<string, string> } => {
+    const answers: Record<string, unknown> = {};
+    const notes: Record<string, string> = {};
+    for (const q of questionnaire.questions) {
+      const a = stmt?.answers?.[q.id];
+      const fits = q.type === 'boolean' ? typeof a === 'boolean' : (q.options || []).some(o => o.value === a);
+      if (fits) answers[q.id] = a;
+      const n = stmt?.notes?.[q.id];
+      if (typeof n === 'string' && n.trim()) notes[q.id] = n.trim().slice(0, 2000);
+    }
+    return { answers, notes };
+  };
+  let fromMaker = 0;
+  const makerUpdates: MakerUpdate[] = [];
 
   let answeredFromEvidence = 0;
   const usecases: ComplianceUseCase[] = [];
@@ -288,8 +330,22 @@ export async function draftRegisterFromActivity(
     const owner = localAccountName(app.ownerName ?? app.ownerGaii ?? '');
     if (!owner) continue;
     const key = appKey(owner, app.filename);
-    if (storedApps.has(key)) continue;
+    const storedEntry = storedByApp.get(key);
     const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, app.filename.replace(/\.html$/i, ''));
+    const maker = makerAnswers(map?.aiAct);
+    if (storedEntry) {
+      // Already in the register: only what the maker answered and nobody saved yet, never over a
+      // saved answer. A note the entry has none for comes with it.
+      const u: MakerUpdate = { usecase_id: storedEntry.id, answers: {}, answerSources: {}, answerNotes: {} };
+      for (const [q, a] of Object.entries(maker.answers)) {
+        if (storedEntry.answers?.[q] !== undefined) continue;
+        u.answers[q] = a;
+        u.answerSources[q] = 'maker';
+      }
+      for (const [q, n] of Object.entries(maker.notes)) if (!storedEntry.answerNotes?.[q]) u.answerNotes[q] = n;
+      if (Object.keys(u.answers).length || Object.keys(u.answerNotes).length) makerUpdates.push(u);
+      continue;
+    }
     const signals = appAiSignals(map, app.manifest?.aiPosture);
     if (!signals.usesAi) continue;
 
@@ -301,9 +357,16 @@ export async function draftRegisterFromActivity(
     // An app nobody outside can open publishes nothing to the public through itself: evidence. A
     // publicly served app may or may not show generated content to a visitor, so that stays open.
     if (!publiclyServed(app)) answer(answers, answerSources, Q.publishesPublicly, false, 'evidence');
-    if (signals.annex3 && answer(answers, answerSources, Q.annex3, signals.annex3.area, 'proposed')) {
-      proposed++;
+    // The rule's proposal stays in `proposals` even when the maker answered the same question: a
+    // maker's "none of these" beside a rule's "employment" is the pair the administrator decides on.
+    if (signals.annex3) {
       proposals.push({ usecase_id: id, question: Q.annex3, value: signals.annex3.area, reason: signals.annex3.reason, basis: signals.annex3.basis });
+      if (!(Q.annex3 in maker.answers) && answer(answers, answerSources, Q.annex3, signals.annex3.area, 'proposed')) proposed++;
+    }
+    // The maker's answers, below what the record evidences and over what a rule proposes.
+    for (const [q, a] of Object.entries(maker.answers)) {
+      if (answerSources[q] === 'evidence') continue;
+      if (answer(answers, answerSources, q, a, 'maker')) fromMaker++;
     }
     const domains = signals.domains.map(d => `${d.domain} (${d.source === 'evidence' ? 'stated' : 'proposed'}: ${d.rows.join(', ')})`);
     usecases.push({
@@ -320,6 +383,7 @@ export async function draftRegisterFromActivity(
       } : {}),
       answers,
       answerSources,
+      ...(Object.keys(maker.notes).length ? { answerNotes: maker.notes } : {}),
     });
   }
 
@@ -327,11 +391,13 @@ export async function draftRegisterFromActivity(
   return {
     usecases,
     proposals,
+    makerUpdates,
     counts: {
       entries: usecases.length,
       answeredFromEvidence,
+      fromMaker,
       proposed,
-      leftToAnswer: Math.max(0, usecases.length * perEntry - answeredFromEvidence - proposed),
+      leftToAnswer: Math.max(0, usecases.length * perEntry - answeredFromEvidence - fromMaker - proposed),
     },
     notes: [
       'Grouped by what called the model, not by the model: an agent is a named thing with a purpose, '
@@ -341,6 +407,9 @@ export async function draftRegisterFromActivity(
       'Answers read from the record are marked evidence. An app\'s Annex III area is marked proposed when its '
         + 'data map holds employment or biometric data and the app uses AI; the reason is in proposals, and a '
         + 'person decides. Every other answer is left empty rather than guessed.',
+      'An app\'s maker answers the questions in the app\'s data map (aiAct), with a note each; those answers are marked '
+        + 'maker, below what the record evidences and over what a rule proposes. A stored entry gets the maker\'s answers '
+        + 'to the questions it has not answered, in makerUpdates, never over a saved answer.',
       'Entries the stored register already holds are not proposed again.',
       'Nothing is stored until somebody saves it.',
     ],

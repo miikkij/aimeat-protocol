@@ -31,6 +31,9 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.6.0 — 2026-10-28 — "Fill these in for me" also brings the app makers' answers into entries
+ *     already saved, for the questions they leave open; the CSV carries each answer's reason; the
+ *     line under the verdict counts the makers' answers.
  *   v3.5.0 — 2026-10-28 — The page reads the node's draft with the report, so the printout carries
  *     every AI use the node finds, saved or not; the screen's question set speaks the reader's
  *     language like the printout.
@@ -169,7 +172,8 @@ function NeedsALook({ report, g, stats, questions, drafting, onDraft, onAnswer, 
   const word = g.total === 0 ? C('word.clear') : g.total === 1 ? C('word.one') : C('word.many', { n: num(g.total) });
   const under = empty ? C('under.empty', { questions: num(questions.length) })
     : C('under.filled', { entries: num(stats.entries), questions: num(questions.length), ai: num(stats.ai), human: num(stats.human), evidence: num(stats.evidence) })
-      + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '');
+      + (stats.proposed > 0 ? C('under.proposed', { n: num(stats.proposed) }) : '')
+      + (stats.maker > 0 ? C('under.maker', { n: num(stats.maker) }) : '');
   const toApps = () => switchPage('apps');
   // Faces added without licence data (the font manager): the Fonts tab of Themes & Styles.
   const fonts = g.fonts || [];
@@ -374,7 +378,19 @@ export default function ComplianceTab(props) {
       const d = r?.data;
       if (!d?.usecases) { showError(C('draftFailed')); return; }
       setDraft((prev) => {
-        const base = prev ?? report.register.usecases;
+        // A stored entry takes the maker's answers to the questions it has not answered, and the
+        // maker's notes where it has none; what somebody already saved stays as it is.
+        const updates = new Map((d.makerUpdates || []).map(m => [m.usecase_id, m]));
+        const base = (prev ?? report.register.usecases).map((u) => {
+          const m = updates.get(u.id);
+          if (!m) return u;
+          return {
+            ...u,
+            answers: { ...m.answers, ...(u.answers || {}) },
+            answerSources: { ...m.answerSources, ...(u.answerSources || {}) },
+            answerNotes: { ...m.answerNotes, ...(u.answerNotes || {}) },
+          };
+        });
         const have = new Set(base.map(u => u.id));
         return [...base, ...d.usecases.filter(u => !have.has(u.id))];
       });
@@ -386,7 +402,7 @@ export default function ComplianceTab(props) {
         return next;
       });
       setOpenId(null);
-      showSuccess(C('draftLoaded', { entries: num(d.counts?.entries ?? d.usecases.length), answered: num(d.counts?.answeredFromEvidence ?? 0) }));
+      showSuccess(C('draftLoaded', { entries: num(d.counts?.entries ?? d.usecases.length), answered: num((d.counts?.answeredFromEvidence ?? 0) + (d.counts?.fromMaker ?? 0)) }));
       go('adm-cmp-04');
     } catch (e) {
       showError(e?.message || C('draftFailed'));
@@ -416,7 +432,7 @@ export default function ComplianceTab(props) {
 
   const exportCsv = () => {
     if (!report) return;
-    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose', 'answer', 'answered_by'];
+    const headers = ['row', 'id_or_kind', 'title_or_detail', 'risk', 'models', 'apps', 'purpose', 'answer', 'answered_by', 'reason'];
     const pad = (r) => [...r, ...Array(headers.length - r.length).fill('')];
     const rows = [];
     const questions = questionnaire?.questions || [];
@@ -428,7 +444,7 @@ export default function ComplianceTab(props) {
       // auditor reads next.
       for (const q of questions) {
         rows.push(pad(['answer', u.id, q.text, '', '', '', '',
-          answerText(q, u.answers?.[q.id]) || '', u.answerSources?.[q.id] || '']));
+          answerText(q, u.answers?.[q.id]) || '', u.answerSources?.[q.id] || '', u.answerNotes?.[q.id] || '']));
       }
     }
     for (const g of report.gaps) rows.push(pad(['gap', g.kind, g.detail]));

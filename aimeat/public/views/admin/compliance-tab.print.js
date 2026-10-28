@@ -39,6 +39,8 @@
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v3.2.0 — 2026-10-28 — Each answer prints with its reason (`answerNotes`) in a column of its own,
+ *     and an answer the app's maker gave is marked as the maker's.
  *   v3.1.0 — 2026-10-28 — Laid out for its readers (the data protection officer, the management, an
  *     auditor): what the answer marks mean, linked contents, the state as a table, what to do next
  *     with who and where, the AI uses as one overview table linked to each use, each use's facts
@@ -71,6 +73,7 @@ const SOURCE_LABEL = {
   ai: 'admin.compliance.answerFromAi',
   evidence: 'admin.compliance.answerFromEvidence',
   proposed: 'admin.compliance.answerFromProposed',
+  maker: 'admin.compliance.answerFromMaker',
 };
 
 /**
@@ -179,7 +182,7 @@ function printableUseCase(u, questionnaire, { saved, why = {} }) {
     title: u.title || u.id,
     tag,
     desc: u.description,
-    answersHead: [P('colQuestion'), P('colAnswer'), P('colWho')],
+    answersHead: [P('colQuestion'), P('colAnswer'), P('colReason'), P('colWho')],
     fields: [
       { key: 'account', label: P('fOwner'), value: u.ownerGhii },
       { key: 'purpose', label: C('ucPurpose'), value: u.purpose },
@@ -194,7 +197,10 @@ function printableUseCase(u, questionnaire, { saved, why = {} }) {
     // exist. How many are open is the field above, and the questions are the appendix.
     answers: answered.map((q) => {
       const src = sources[q.id];
-      return { key: q.id, question: questionText(q), answer: answerText(q, answers[q.id]), source: src ? t(SOURCE_LABEL[src]) : null };
+      return {
+        key: q.id, question: questionText(q), answer: answerText(q, answers[q.id]),
+        note: (u.answerNotes || {})[q.id] || '—', source: src ? t(SOURCE_LABEL[src]) : null,
+      };
     }),
     reasons: (risk?.reasons || []).map((r) => {
       const q = questions.find(x => x.id === r.questionId);

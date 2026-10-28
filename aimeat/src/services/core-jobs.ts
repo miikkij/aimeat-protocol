@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-10-28 — compliance-ask-makers: the makers of apps that use AI and leave the EU AI Act
+ *     questions open get a message (services/compliance-ask-makers.ts).
  *   2026-10-25 — held-label-release: the own addresses of removed apps are held, then released after
  *     apps.held_label_days and past apps.held_labels_per_owner (services/held-app-labels.ts;
  *     secaudit2026oct22, app-label-recycled-after-delete).
@@ -175,6 +177,13 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('compliance-report-monthly', async () => {
     const { runComplianceMonthlyReport } = await import('./compliance-monthly-job.js');
     await runComplianceMonthlyReport(config, storage);
+  });
+
+  // The makers of apps that use AI and have left the EU AI Act questions open get a message with a
+  // ready prompt, at most once per app per fortnight (compliance-ask-makers.ts).
+  scheduler.registerCoreHandler('compliance-ask-makers', async () => {
+    const { askMakersForAiAct } = await import('./compliance-ask-makers.js');
+    await askMakersForAiAct(storage, config);
   });
 
   // The AI-job day logs. A finished job folds into ai.jobs.log.<day> and its live key is deleted;

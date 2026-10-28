@@ -41,9 +41,10 @@
 .print-table-lead td:first-child { width: 32%; font-weight: 600; }
 /* The answer wraps: an option label with its source ("Hiring, task allocation … (a rule's
    proposal, not yet approved)") held on one line squeezed the question to a word per line. */
-.print-entry-q { width: 55%; }
-.print-entry-a { width: 25%; }
-.print-entry-who { width: 20%; color: var(--muted); }
+.print-entry-q { width: 40%; }
+.print-entry-a { width: 20%; }
+.print-entry-note { width: 25%; }
+.print-entry-who { width: 15%; color: var(--muted); }
 .print-entry-src { margin-left: .4rem; color: var(--muted); }
 .print-heading-num { display: inline-block; min-width: 1.8rem; color: var(--muted); }
 .print-toc ol { list-style: none; padding: 0; margin: .3rem 0 1rem; font-size: .9rem; }
