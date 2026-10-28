@@ -13,6 +13,9 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=intake-thread
  * @version-history
+ *   v1.0.1 — 2026-10-28 — Setup no longer matched production: 2a sent a NUL, which the input-junk
+ *     middleware (7da750c31) now refuses with 400 before the route runs. It sends a BEL, which the
+ *     turn still strips.
  *   v1.0.0 — 2026-10-13 — Initial (the October agents plan, P4).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -142,7 +145,7 @@ async function main() {
     // ── 2. One conversation ──
     let token = '', id = '';
     await test('2a. the first message starts a conversation: a token once, one thread record, one signal', async () => {
-        const r = await say('chat', '  Do you deliver to Tampere?\u0000 ');
+        const r = await say('chat', '  Do you deliver to Tampere?\u0007 ');
         assert(r.status === 200 && r.body.data.ok === true, `start: ${r.status} ${JSON.stringify(r.body.error)}`);
         token = r.body.data.thread_token;
         assert(typeof token === 'string' && token.length === 43, `a token: ${token}`);
