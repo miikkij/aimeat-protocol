@@ -7,9 +7,12 @@
  *   kept (one row per incident, the one loud action on the open one), who holds the keys (rows in
  *   words with a button to the page that acts), the security settings (read as sentences, each with a
  *   button to Settings), and the paste for the operator's own AI.
- * @structure HeldSection · IncidentsSection (CapOffers, EntryActions) · AccountsSection · SettingsSection · AskAiSection ·
+ * @structure HeldSection · IncidentsSection (CapOffers, EntryActions, SubdomainChoices) · AccountsSection · SettingsSection · AskAiSection ·
  *   isHeldIncident · entryLine
  * @version-history
+ *   2026-10-28 -- An open address of the subdomain incident shows its two choices as rows, each saying
+ *     with both full addresses what happens when it is chosen, its button at the end (SubdomainChoices);
+ *     Jouni could not tell what the two bare buttons decided.
  *   2026-10-28 -- What Jouni could not read on the subdomain incident (2026-10-28): an incident the server's
  *     start recorded shows only where it came from, not "On behalf of node" and "not kept, too large",
  *     which belong to a refused upload; while an entry is open Resolve reads "Keep all as they are" and
@@ -228,16 +231,40 @@ const targetParts = (target) => {
 export const entryLine = (e) => tOr('admin.security.incidents.entries.kind.' + e.kind, e.what, { ...targetParts(e.params?.target), ...(e.params || {}) });
 
 /**
+ * The two full addresses of a subdomain label: under the node's own domain, and under the app host,
+ * with this page's scheme and port (the same parts routes/subdomains.ts redirects with).
+ */
+function labelUrls(label, appHost) {
+  const base = new URL(getNodeUrl());
+  const port = base.port ? ':' + base.port : '';
+  return { own: `${base.protocol}//${label}.${base.hostname}${port}`, app: `${base.protocol}//${label}.${appHost}${port}` };
+}
+
+/**
+ * An open subdomain address: each choice as a row that says, with both full addresses, what happens
+ * when it is chosen, and its button at the end (Jouni, 2026-10-28: "jos sinä valitset näin tapahtuu näin").
+ */
+function SubdomainChoices({ i, e, appHost, onDecideEntry }) {
+  const urls = labelUrls(e.params?.label || e.id, appHost);
+  const choose = S('incidents.entries.subdomain.choose');
+  return html`<${Readings} rows=${[
+    doorRow('app_only', { title: S('incidents.entries.subdomain.appOnly'), why: S('incidents.entries.subdomain.appOnlyWhy', urls), door: choose, onClick: () => onDecideEntry(i.id, e, 'app_only') }),
+    doorRow('keep', { title: S('incidents.entries.subdomain.both'), why: S('incidents.entries.subdomain.bothWhy', urls), door: choose, onClick: () => onDecideEntry(i.id, e, 'keep'), last: true }),
+  ]} />`;
+}
+
+/**
  * Under an incident that names records to act on: each record in words, and while it is open its
  * offered action (Clear or Delete) and Keep as it is under it. The incident resolves with the last.
+ * An address of the subdomain incident shows its choices as rows instead, when the node has an app host.
  */
-function EntryActions({ i, onDecideEntry }) {
+function EntryActions({ i, appHost, onDecideEntry }) {
   return html`
     <${List} under dense keepCols cols="state-name-who-doors" rows=${entriesOf(i)} render=${(e) => {
       const open = e.status === 'open';
       const line = entryLine(e);
       return html`
-      <${Row} key=${e.id} below=${open ? html`
+      <${Row} key=${e.id} below=${open && e.kind === 'subdomain' && appHost ? html`<${SubdomainChoices} i=${i} e=${e} appHost=${appHost} onDecideEntry=${onDecideEntry} />` : open ? html`
         <${Actions} tight>
           <${Action} small tone=${e.action === 'clear' || e.action === 'delete' ? 'danger' : undefined} onClick=${() => onDecideEntry(i.id, e, e.action)}>${tOr('admin.security.incidents.entries.action.' + e.kind, S('incidents.entries.' + (e.action === 'clear' ? 'clear' : 'delete')))}<//>
           <${Action} small soft onClick=${() => onDecideEntry(i.id, e, 'keep')}>${tOr('admin.security.incidents.entries.keepAction.' + e.kind, S('incidents.entries.keep'))}<//>
@@ -291,7 +318,7 @@ export function HeldSection({ items, number, onResolve, onDelete, onDecide, swit
  * Section "Refused and kept": what the server refused (an upload's bytes kept when small enough) and
  * what it could not decide on its own and left to the operator.
  */
-export function IncidentsSection({ items, number, onResolve, onDelete, onPayload, onDecideCap, onDecideEntry }) {
+export function IncidentsSection({ items, number, appHost, onResolve, onDelete, onPayload, onDecideCap, onDecideEntry }) {
   const open = items.filter(i => i.status === 'open').length;
   const lastResolved = items.map(i => i.resolvedAt).filter(Boolean).sort().pop();
   return html`
@@ -320,7 +347,7 @@ export function IncidentsSection({ items, number, onResolve, onDelete, onPayload
           // the stored detail (English, with the API steps an AI uses) is the fallback.
           const plain = i.params ? tOr('admin.security.incidents.detail.' + i.type, '', i.params) : '';
           const below = caps.length ? html`<${CapOffers} i=${i} onDecideCap=${onDecideCap} />`
-            : entries.length ? html`<${EntryActions} i=${i} onDecideEntry=${onDecideEntry} />` : undefined;
+            : entries.length ? html`<${EntryActions} i=${i} appHost=${appHost} onDecideEntry=${onDecideEntry} />` : undefined;
           return html`
           <${Row} key=${i.id} below=${below}>
             <${Cell} line><${Mark} kind="status" tone=${i.status === 'open' ? 'danger' : 'fine'}>${S('incidents.status.' + (i.status === 'open' ? 'open' : 'resolved'))}<//><//>

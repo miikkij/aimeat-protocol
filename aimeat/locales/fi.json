@@ -1312,7 +1312,14 @@
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
-            "subdomain_site_origin": "Jokainen alla oleva osoite näyttää sovellusta, jonka toinen henkilö julkaisi. Palvelin ei tiedä, annoitko osoitteen sovellukselle itse vai saiko sovellus sen automaattisesti, kun se julkaistiin. Oman verkkotunnuksesi osoitteessa sovellus toimii samalla sivustolla kuin palvelimesi kirjautuminen. Toisen henkilön julkaisema sovellus kuuluu vain omaan sovellusosoitteeseensa. Osoitteet toimivat kuten ennenkin, kunnes valitset."
+            "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen."
+          },
+          "subdomain": {
+            "appOnly": "Vain sovelluksen oma osoite (suositus)",
+            "appOnlyWhy": "Sovellus avautuu vain osoitteesta {app}. Kun joku avaa osoitteen {own}, hänet ohjataan sinne, joten linkit siihen toimivat edelleen.",
+            "both": "Molemmat osoitteet, kuten nyt",
+            "bothWhy": "Sovellus avautuu edelleen sekä osoitteesta {own} että osoitteesta {app}. Osoitteessa {own} toisen ihmisen kirjoittama koodi voi sotkea palvelimesi kirjautumisen, esimerkiksi kirjata kävijän sisään toiselle tilille.",
+            "choose": "Valitse"
           },
           "action": {
             "subdomain": "Vain sovellus"
@@ -26083,9 +26090,9 @@
       "subdomain_site_origin": {
         "title": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
         "short": "Muiden julkaisemat sovellukset toimivat myös oman verkkotunnuksesi osoitteissa.",
-        "what": "Jokaisella julkaistulla sovelluksella on oma osoite, esimerkiksi muistiot.apps.oma-verkkotunnus. Palvelimen vanhat versiot näyttivät osan sovelluksista myös osoitteessa muistiot.oma-verkkotunnus. Se osoite on samalla sivustolla kuin palvelimesi kirjautuminen, joten toisen henkilön julkaisema sovellus ei saa olla siellä. Palvelin ei tiedä, kuka nämä osoitteet antoi, joten ne toimivat kuten ennenkin, kunnes valitset.",
+        "what": "Jokaisella julkaistulla sovelluksella on oma osoite, esimerkiksi muistiot.apps.oma-verkkotunnus. Palvelimen vanhat versiot avasivat osan sovelluksista myös osoitteesta muistiot.oma-verkkotunnus, eli oman verkkotunnuksesi alta. Siellä toisen ihmisen kirjoittama koodi voi sotkea palvelimesi kirjautumisen, esimerkiksi kirjata kävijän sisään toiselle tilille. Palvelin ei tiedä, annoitko sellaisen osoitteen sovellukselle itse, joten se kysyy sinulta. Siihen asti kaikki toimii kuten ennen.",
         "tipLabel": "Mitä voit tehdä",
-        "tip": "Valitse ”Vain sovellus”, ellet itse antanut osoitetta sovellukselle. Sovellus toimii edelleen omassa sovellusosoitteessaan, ja vanhan osoitteen avaaja ohjataan sinne. ”Oma sivusto” pitää osoitteen myös omassa verkkotunnuksessasi."
+        "tip": "Valitse ”Vain sovelluksen oma osoite”, ellet itse antanut osoitetta sovellukselle. Linkit vanhaan osoitteeseen toimivat edelleen, koska palvelin ohjaa kävijän sovelluksen omaan osoitteeseen."
       }
     },
     "ecosystem": {
