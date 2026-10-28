@@ -39,6 +39,11 @@
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v3.1.0 — 2026-10-28 — Laid out for its readers (the data protection officer, the management, an
+ *     auditor): what the answer marks mean, linked contents, the state as a table, what to do next
+ *     with who and where, the AI uses as one overview table linked to each use, each use's facts
+ *     and answers as tables, the gaps as tables with who fixes them, how the report is completed
+ *     and by whom, and the question set with the rule each answer follows.
  *   v3.0.0 — 2026-10-28 — The overall state first, every AI use the node finds (saved or not, each
  *     marked), the gaps by kind with what each concerns, the measurements and the limits; the
  *     question set in the reader's language as an appendix. The printout was the empty stored
@@ -54,7 +59,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, tOr, getLocale } from '/js/i18n.js';
-import { PrintOnly, PrintHead, PrintHeading, PrintEntry, PrintList } from '/components/PrintPage.js';
+import { PrintOnly, PrintHead, PrintHeading, PrintToc, PrintTable, PrintEntry, PrintList } from '/components/PrintPage.js';
 import { Note } from '/components/Note.js';
 
 const C = (key, params) => t('admin.compliance.' + key, params);
@@ -170,9 +175,11 @@ function printableUseCase(u, questionnaire, { saved, why = {} }) {
   const answered = questions.filter(q => answerText(q, answers[q.id]) !== null);
   const proposals = Object.values(why);
   return {
+    id: anchorOf(u),
     title: u.title || u.id,
     tag,
     desc: u.description,
+    answersHead: [P('colQuestion'), P('colAnswer'), P('colWho')],
     fields: [
       { key: 'account', label: P('fOwner'), value: u.ownerGhii },
       { key: 'purpose', label: C('ucPurpose'), value: u.purpose },
@@ -229,29 +236,44 @@ export function printableRegister(r) {
   };
 }
 
-/** What one gap concerns, from its evidence: the app, the model, the law, the processor. */
-function gapItem(g, frameworks) {
+/**
+ * What one gap concerns, from its evidence, as a table row: the thing (the app, the model, the law,
+ * the processor) and what about it, when there is more to say than the kind already says.
+ */
+function gapRow(g, frameworks) {
   const ev = g.evidence || {};
   const lang = (getLocale() || 'en').slice(0, 2);
   const place = ev.owner && ev.app ? `${ev.owner}/${ev.app}` : (ev.app || null);
   if (g.kind === 'app-uses-ai-not-in-register') {
-    return ev.annex3 ? P('gapAiAnnex', { app: place, area: tOr(`admin.compliance.annex3.${ev.annex3}`, ev.annex3) }) : place;
+    return [place, ev.annex3 ? P('gapAiAnnex', { area: tOr(`admin.compliance.annex3.${ev.annex3}`, ev.annex3) }) : ''];
   }
-  if (ev.model) return ev.model;
+  if (ev.model) return [ev.model, ''];
   if (ev.framework) {
     const f = (frameworks || []).find(x => x.id === ev.framework);
     const name = (f?.name && (f.name[lang] || f.name.en)) || ev.framework;
-    return Array.isArray(ev.unanswered) ? `${name}: ${t('admin.compliance.records.unanswered', { n: String(ev.unanswered.length) })}` : name;
+    return [name, Array.isArray(ev.unanswered) ? t('admin.compliance.records.unanswered', { n: String(ev.unanswered.length) }) : ''];
   }
-  if (ev.name) return ev.name;
+  if (ev.name) return [ev.name, ''];
   if (place) {
     const families = Array.isArray(ev.holds) && ev.holds.length ? ev.holds.map(h => String(h).split(':')[0])
       : (Array.isArray(ev.families) ? ev.families : []);
-    return families.length ? `${place} (${families.join(', ')})` : place;
+    return [place, families.join(', ')];
   }
-  if (ev.family) return ev.family;
-  if (typeof ev.count === 'number') return P('gapCount', { n: String(ev.count) });
-  return g.detail;
+  if (ev.family) return [ev.family, ''];
+  if (typeof ev.count === 'number') return [P('gapCount', { n: String(ev.count) }), ''];
+  return [g.detail, ''];
+}
+
+/**
+ * Who fixes one kind of gap, and where. An app's own data map and record are its owner's; the AI
+ * register, the node's records and the processors are the operator's; a label is the publisher's.
+ */
+function gapOwner(kind) {
+  if (kind.startsWith('app-') && kind !== 'app-uses-ai-not-in-register' && kind !== 'app-declares-generation-with-gap') return ['who.appOwner', 'where.app'];
+  if (kind === 'unlabelled-public-content' || kind === 'app-declares-generation-with-gap') return ['who.publisher', 'where.publish'];
+  if (kind === 'font-licence-unknown') return ['who.operator', 'where.fonts'];
+  if (['undocumented-ai-activity', 'app-uses-ai-not-in-register', 'unclassified-usecase'].includes(kind)) return ['who.operator', 'where.register'];
+  return ['who.operator', 'where.records'];
 }
 
 /** The gaps by kind, the AI register's first and the records of processing after. */
@@ -259,12 +281,33 @@ function gapGroups(report) {
   const groups = new Map();
   const add = (g, name) => {
     const k = g.kind;
-    if (!groups.has(k)) groups.set(k, { kind: k, name, items: [] });
-    groups.get(k).items.push(gapItem(g, report.processing?.frameworks));
+    if (!groups.has(k)) groups.set(k, { kind: k, name, rows: [] });
+    groups.get(k).rows.push(gapRow(g, report.processing?.frameworks));
   };
   for (const g of report.gaps || []) add(g, tOr(`admin.compliance.paper.gapKind.${g.kind}`, g.kind));
   for (const g of report.processing?.gaps || []) add(g, tOr(`admin.compliance.records.kind.${g.kind}`, g.kind));
   return [...groups.values()];
+}
+
+/** The anchor of one AI use in the document, for the overview table's links. */
+const anchorOf = (u) => 'cmp-uc-' + String(u.id).replace(/[^a-z0-9-]/gi, '-');
+
+/** The regulated data an entry's "whose data" sentence names, short, for the overview table. */
+function personalShort(u) {
+  const s = u.dataSubjects;
+  if (typeof s !== 'string' || !s) return '—';
+  const domains = [...s.matchAll(/([\w-]+) \((?:stated|proposed): /g)].map(m => domainWord(m[1]));
+  return domains.length ? `${C('yes')}: ${domains.join(', ')}` : C('yes');
+}
+
+/** The question set's own rule for one question, as the appendix prints it. */
+function impliesText(questionnaire, q) {
+  const entries = Object.entries(q.implies || {});
+  if (entries.length === 0) return C('qs.impliesNone');
+  if (q.type === 'boolean') return entries.map(([a, cls]) => C('qs.implies', { answer: a === 'true' ? C('yes') : C('no'), cls: classWord(questionnaire, cls) })).join(' · ');
+  const byClass = new Map();
+  for (const [v, cls] of entries) byClass.set(cls, [...(byClass.get(cls) || []), v]);
+  return [...byClass.keys()].map(cls => C('qs.impliesChoice', { cls: classWord(questionnaire, cls) })).join(' · ');
 }
 
 /**
@@ -298,6 +341,39 @@ export default function PrintableReport({ report, questionnaire, registers = [],
   const groups = report ? gapGroups(report) : [];
   const aiGaps = (report?.gaps || []).length;
   const recordGaps = (report?.processing?.gaps || []).length;
+  const answeredOf = (u) => questions.filter(q => answerText(q, (u.answers || {})[q.id]) !== null).length;
+  const openAnswers = all.reduce((n, u) => n + (questions.length - answeredOf(u)), 0);
+  const page = `${window.location.origin}/v1/admin?tab=compliance`;
+  const money = `$${(Number(usage.cost_usd) || 0).toFixed(2)}`;
+  const classOf = (u) => {
+    if (savedIds.has(u.id)) return classWord(questionnaire, u.risk?.class || 'unclassified');
+    const p = proposedClass(questionnaire, u);
+    return p ? P('classProposed', { cls: classWord(questionnaire, p) }) : '—';
+  };
+
+  // What to do next, each with who does it and where: the report's first use is a to-do list.
+  const actions = [
+    ...(unsaved.length ? [[P('act.save', { n: String(unsaved.length) }), P('who.operator'), P('where.register', { page })]] : []),
+    ...(high.length ? [[P('act.high', { list: high.map(u => u.title || u.id).join(', ') }), P('who.operatorDpo'), P('where.register', { page })]] : []),
+    ...(openAnswers ? [[P('act.answer', { n: String(openAnswers), entries: String(all.length) }), P('who.operator'), P('where.registerOrAi', { page })]] : []),
+    ...groups.filter(g => g.kind !== 'app-uses-ai-not-in-register' && g.kind !== 'unclassified-usecase')
+      .map(g => { const [who, where] = gapOwner(g.kind); return [`${g.name} (${g.rows.length})`, P(who), P(where, { page })]; }),
+  ];
+
+  const parts = [
+    { id: 'cmp-p-state', label: P('summaryTitle') },
+    { id: 'cmp-p-next', label: P('nextTitle') },
+    { id: 'cmp-p-uses', label: P('usesTitle') },
+    { id: 'cmp-p-each', label: P('eachTitle') },
+    { id: 'cmp-p-gaps', label: P('gapsTitle') },
+    { id: 'cmp-p-how', label: P('howTitle') },
+    { id: 'cmp-p-measures', label: C('derivedTitle') },
+    { id: 'cmp-p-limits', label: C('limitsTitle') },
+    { id: 'cmp-p-records', label: t('admin.compliance.records.printTitle') },
+    { id: 'cmp-p-questions', label: P('appendixTitle') },
+  ].map((p, i, list) => ({ ...p, num: i === list.length - 1 ? P('appendixNum') : String(i + 1) }));
+  const part = (id) => parts.find(p => p.id === id);
+  const heading = (id, extra = {}) => html`<${PrintHeading} id=${id} num=${part(id).num} ...${extra}>${part(id).label}<//>`;
 
   const line = [
     scope.node_id || '',
@@ -309,51 +385,87 @@ export default function PrintableReport({ report, questionnaire, registers = [],
   return html`
     <${PrintOnly}>
       <${PrintHead} title=${t('admin.compliance.printTitle')} line=${line} />
+      <${Note} kind="quiet">${P('readFirst')}<//>
+      <${PrintTable} lead head=${[P('colMark'), P('colMeans')]} rows=${Object.keys(SOURCE_LABEL).map(k => [t(SOURCE_LABEL[k]), P('means.' + k)])} />
 
-      <${PrintHeading}>${P('summaryTitle')}<//>
-      <${PrintEntry} title=${scope.node_id || ''} fields=${[
-        { key: 'uses', label: P('sumUses'), value: P('sumUsesValue', { apps: String(all.filter(isApp).length), others: String(all.filter(u => !isApp(u)).length) }) },
-        { key: 'approved', label: P('sumApproved'), value: P('sumApprovedValue', { saved: String(saved.length), total: String(all.length) }) },
-        { key: 'high', label: P('sumHigh'), value: high.length ? high.map(u => u.title || u.id) : P('none') },
-        { key: 'calls', label: P('sumCalls'), value: P('sumCallsValue', { calls: String(usage.calls ?? 0), cost: `$${(Number(usage.cost_usd) || 0).toFixed(2)}`, models: String((usage.models || []).length) }) },
-        { key: 'gaps', label: P('sumGaps'), value: P('sumGapsValue', { ai: String(aiGaps), records: String(recordGaps) }) },
-        { key: 'public', label: P('sumPublic'), value: P('sumPublicValue', { total: String(tr.public_total ?? 0), unlabelled: String(tr.unlabelled ?? 0) }) },
+      <${PrintToc} title=${P('tocTitle')} items=${parts} />
+
+      ${heading('cmp-p-state', { newSheet: true })}
+      <${PrintTable} lead rows=${[
+        [P('sumUses'), P('sumUsesValue', { apps: String(all.filter(isApp).length), others: String(all.filter(u => !isApp(u)).length) })],
+        [P('sumApproved'), P('sumApprovedValue', { saved: String(saved.length), total: String(all.length) })],
+        [P('sumHigh'), high.length ? high.map(u => u.title || u.id) : P('none')],
+        [P('sumOpen'), P('sumOpenValue', { n: String(openAnswers), total: String(all.length * questions.length) })],
+        [P('sumCalls'), P('sumCallsValue', { calls: String(usage.calls ?? 0), cost: money, models: String((usage.models || []).length) })],
+        [P('sumGaps'), P('sumGapsValue', { ai: String(aiGaps), records: String(recordGaps) })],
+        [P('sumPublic'), P('sumPublicValue', { total: String(tr.public_total ?? 0), unlabelled: String(tr.unlabelled ?? 0) })],
       ]} />
 
-      <${PrintHeading}>${C('registerTitle')}<//>
+      ${heading('cmp-p-next')}
+      <${Note} kind="quiet">${P('nextLead', { page })}<//>
+      ${actions.length === 0
+        ? html`<${Note} kind="quiet">${C('gapsNone')}<//>`
+        : html`<${PrintTable} lead head=${[P('colAction'), P('colWhoDoes'), P('colWhere')]} rows=${actions} />`}
+
+      ${heading('cmp-p-uses')}
       <${Note} kind="quiet">${P('usesLead')}<//>
       ${all.length === 0
         ? html`<${Note} kind="quiet">${P('usesNone')}<//>`
-        : all.map(u => html`<${PrintEntry} key=${u.id}
-            ...${printableUseCase(u, questionnaire, { saved: savedIds.has(u.id), why: why[u.id] || {} })}
-            reasonsLabel=${t('admin.compliance.printWhy')} emptyAnswer=${t('admin.compliance.unanswered')} />`)}
+        : html`<${PrintTable} head=${[P('colUse'), P('fOwner'), C('ucModels'), P('colPersonal'), P('colClass'), P('colState'), P('colAnswered')]}
+            rows=${all.map(u => [
+              html`<a href=${'#' + anchorOf(u)}>${u.title || u.id}</a>`,
+              String(u.ownerGhii || '').split('@')[0] || '—',
+              (u.models || []).length ? String(u.models.length) : '0',
+              personalShort(u),
+              classOf(u),
+              savedIds.has(u.id) ? P('stSaved') : P('stFound'),
+              `${answeredOf(u)}/${questions.length}`,
+            ])} />`}
 
-      <${PrintHeading}>${P('gapsTitle')}<//>
+      ${heading('cmp-p-each', { newSheet: true })}
+      ${all.map(u => html`<${PrintEntry} key=${u.id}
+          ...${printableUseCase(u, questionnaire, { saved: savedIds.has(u.id), why: why[u.id] || {} })}
+          reasonsLabel=${t('admin.compliance.printWhy')} emptyAnswer=${t('admin.compliance.unanswered')} />`)}
+
+      ${heading('cmp-p-gaps', { newSheet: true })}
+      <${Note} kind="quiet">${P('gapsLead')}<//>
       ${groups.length === 0
         ? html`<${Note} kind="quiet">${C('gapsNone')}<//>`
-        : groups.map(g => html`<${PrintEntry} key=${g.kind} title=${g.name} tag=${String(g.items.length)} reasons=${g.items} reasonsLabel="" />`)}
+        : groups.map(g => {
+          const [who] = gapOwner(g.kind);
+          const detailed = g.rows.some(r => r[1]);
+          return html`<${PrintEntry} key=${g.kind} title=${g.name} tag=${P('gapTag', { n: String(g.rows.length), who: P(who) })} />
+            <${PrintTable} lead head=${detailed ? [P('colConcerns'), P('colDetail')] : [P('colConcerns')]}
+              rows=${g.rows.map(r => (detailed ? [r[0], r[1] || '—'] : [r[0]]))} />`;
+        })}
 
-      <${PrintHeading}>${C('derivedTitle')}<//>
-      <${PrintEntry} title=${P('measuresWhat')} fields=${[
-        { key: 'calls', label: C('row.calls'), value: C('row.callsWhy', { prompt: String(usage.prompt_tokens ?? 0), completion: String(usage.completion_tokens ?? 0), cost: `$${(Number(usage.cost_usd) || 0).toFixed(2)}`, unpriced: String(usage.unpriced_calls ?? 0) }) },
-        { key: 'models', label: C('row.models'), value: (usage.models || []).length ? usage.models : C('row.modelsNone') },
-        { key: 'public', label: C('row.public'), value: C('row.publicWhy', { labelled: String(tr.labelled ?? 0), unlabelled: String(tr.unlabelled ?? 0) }) },
+      ${heading('cmp-p-how')}
+      <${Note} kind="quiet">${P('howLead')}<//>
+      <${PrintList} items=${['1', '2', '3', '4', '5', '6', '7', '8'].map(n => ({ key: n, text: P('how.' + n, { page }) }))} />
+      <${PrintTable} lead head=${[P('colRole'), P('colRoleDoes')]} rows=${['operator', 'dpo', 'appOwner', 'ai'].map(r => [P('role.' + r), P('roleDoes.' + r)])} />
+
+      ${heading('cmp-p-measures')}
+      <${PrintTable} lead rows=${[
+        [C('row.calls'), C('row.callsWhy', { prompt: String(usage.prompt_tokens ?? 0), completion: String(usage.completion_tokens ?? 0), cost: money, unpriced: String(usage.unpriced_calls ?? 0) })],
+        [C('row.models'), (usage.models || []).length ? usage.models : C('row.modelsNone')],
+        [C('row.public'), C('row.publicWhy', { labelled: String(tr.labelled ?? 0), unlabelled: String(tr.unlabelled ?? 0) })],
       ]} />
 
-      <${PrintHeading}>${C('limitsTitle')}<//>
+      ${heading('cmp-p-limits')}
       <${PrintList} items=${(report?.not_covered || []).map((s, i) => ({ key: s.code || i, text: typeof s === 'string' ? s : tOr(`admin.compliance.limit.${s.code}`, s.text, { days: s.days }) }))} />
 
-      <${PrintHeading}>${t('admin.compliance.records.printTitle')}<//>
+      ${heading('cmp-p-records')}
       ${registers.length === 0
         ? html`<${Note} kind="quiet">${P('recordsNone', { drafts: String(report?.processing?.registers?.drafts?.total ?? 0) })}<//>`
         : registers.map(r => html`<${PrintEntry} key=${r.id} ...${printableRegister(r)} />`)}
 
-      <${PrintHeading}>${P('appendixTitle')}<//>
-      <${PrintList} items=${questions.map(q => ({
-        key: q.id,
-        text: q.type === 'choice' ? `${questionText(q)} (${(q.options || []).map(o => optionLabel(q, o)).join(' · ')})` : questionText(q),
-        help: questionHelp(q),
-      }))} />
+      ${heading('cmp-p-questions', { newSheet: true })}
+      <${Note} kind="quiet">${P('appendixLead')}<//>
+      <${PrintTable} head=${[P('colQuestion'), P('colHelp'), P('colRule')]} rows=${questions.map(q => [
+        q.type === 'choice' ? `${questionText(q)} (${(q.options || []).map(o => optionLabel(q, o)).join(' · ')})` : questionText(q),
+        questionHelp(q) || '—',
+        impliesText(questionnaire, q),
+      ])} />
     <//>
   `;
 }

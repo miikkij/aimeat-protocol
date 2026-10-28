@@ -3772,7 +3772,7 @@
         "domainStated": "{domain}, ilmoitettu kohdassa {rows}",
         "domainProposed": "{domain}, päätelty sanoista kohdassa {rows}",
         "gapsTitle": "Mitä puuttuu",
-        "gapAiAnnex": "{app}: korkean riskin ehdokas ({area})",
+        "gapAiAnnex": "korkean riskin ehdokas ({area})",
         "gapCount": "{n} kohdetta",
         "gapKind": {
           "undocumented-ai-activity": "Mallia on käytetty, eikä mikään merkintä nimeä sitä",
@@ -3784,7 +3784,90 @@
         },
         "measuresWhat": "Tekoälyn käyttö jaksolla",
         "recordsNone": "Yhtään käsittelyselostetta ei ole vielä tallennettu. Asennuksella on {drafts} luonnosta valmiina tarkistettavaksi.",
-        "appendixTitle": "Liite: kysymyssarja"
+        "appendixTitle": "Liite: kysymyssarja",
+        "appendixNum": "A",
+        "appendixLead": "Tekoälyn käytön riskiluokka tulee näistä kysymyksistä. Jokainen vastaus johtaa luokkaan viimeisen sarakkeen säännön mukaan, ja vakavin luokka ratkaisee. Jos kysymykseen ei ole vastattu, käyttö jää luokittelematta.",
+        "readFirst": "Tämä raportti kertoo, mihin tekoälyä tässä asennuksessa käytetään, mitä siitä on kirjattu ja mitä puuttuu. Raportti on tietosuojavastaavalle, johdolle ja auditoijalle. Kohdassa 2 on seuraavat toimet ja niiden tekijät. Jokaisesta vastauksesta näkyy, kuka sen antoi:",
+        "colMark": "Merkintä",
+        "colMeans": "Mitä se tarkoittaa",
+        "means": {
+          "human": "Ihminen vastasi.",
+          "ai": "Malli luonnosteli vastauksen, ja ihminen tallensi sen.",
+          "evidence": "Asennus luki vastauksen omista tiedoistaan. Kukaan ei päättänyt mitään.",
+          "proposed": "Sääntö päätteli vastauksen sovelluksen datakartasta. Kukaan ei ole vielä hyväksynyt sitä."
+        },
+        "tocTitle": "Sisällys",
+        "sumOpen": "Vastaamattomat kysymykset",
+        "sumOpenValue": "{n}/{total}",
+        "nextTitle": "Seuraavat toimet",
+        "nextLead": "Compliance-sivun osoite on {page}.",
+        "colAction": "Mitä tehdään",
+        "colWhoDoes": "Kuka",
+        "colWhere": "Missä",
+        "act": {
+          "save": "Tarkista järjestelmän löytämät {n} tekoälyn käyttöä ja tallenna ne kirjanpitoon",
+          "high": "Päätä korkean riskin ehdokkaiden luokka: {list}",
+          "answer": "Vastaa {entries} tekoälyn käytön {n} avoimeen kysymykseen"
+        },
+        "who": {
+          "operator": "Pääkäyttäjä",
+          "operatorDpo": "Pääkäyttäjä ja tietosuojavastaava",
+          "appOwner": "Sovelluksen tekijä",
+          "publisher": "Sisällön julkaisija"
+        },
+        "where": {
+          "register": "Compliance-sivu, kohdat 01 ja 04",
+          "registerOrAi": "Compliance-sivun kohta 04 tai oma tekoäly kohdan 07 kehotteella",
+          "records": "Compliance-sivu, kohdat 08 ja 09",
+          "app": "Sovelluksen datakartta ja käsittelyseloste, tekijän oman tekoälyn kautta",
+          "publish": "Sovelluksen tekoälymerkintä, joka tarkistetaan julkaisun yhteydessä",
+          "fonts": "Teemat ja tyylit, välilehti Fontit"
+        },
+        "usesTitle": "Tekoälyn käyttö yhdellä silmäyksellä",
+        "eachTitle": "Tekoälyn käytöt yksitellen",
+        "colUse": "Tekoälyn käyttö",
+        "colPersonal": "Henkilötiedot",
+        "colClass": "Luokka",
+        "colState": "Tila",
+        "colAnswered": "Vastattu",
+        "classProposed": "{cls} (ehdotus)",
+        "stSaved": "tallennettu",
+        "stFound": "löydetty, ei tallennettu",
+        "gapsLead": "Jokainen puutetyyppi, montako puutteita on, kuka ne korjaa ja mitä kukin koskee.",
+        "gapTag": "{n} · korjaa: {who}",
+        "colConcerns": "Koskee",
+        "colDetail": "Tarkenne",
+        "howTitle": "Miten raportti täydennetään",
+        "howLead": "Asennus löytää tekoälyn käytöt itse. Ihminen vastaa kysymyksiin ja hyväksyy vastaukset. Vaiheet:",
+        "how": {
+          "1": "Pääkäyttäjä avaa Compliance-sivun: {page}",
+          "2": "Hän painaa kohdassa 01 painiketta ”Täytä nämä puolestani”. Asennus lisää löytämänsä tekoälyn käytöt kirjanpitoon luonnoksena. Mitään ei vielä tallenneta.",
+          "3": "Hän avaa kohdassa 04 jokaisen merkinnän ja vastaa sen kysymyksiin. Hän hyväksyy tai muuttaa jokaisen ehdotetun vastauksen. Jokaisesta vastauksesta näkyy, kuka sen antoi.",
+          "4": "Hän voi myös antaa työn omalle tekoälylleen: kohdassa 07 on valmis kehote. Tekoäly näyttää ehdotuksensa ja odottaa hyväksyntää, ja sen vastaukset merkitään tekoälyn vastauksiksi.",
+          "5": "Kun vastaus tarvitaan sovelluksen tekijältä, pääkäyttäjä kysyy häneltä. Tekijä pitää oman sovelluksensa datakartan ja käsittelyselosteen ajan tasalla.",
+          "6": "Pääkäyttäjä tallentaa. Asennus laskee jokaisen merkinnän luokan uudelleen.",
+          "7": "Hän ottaa raportin talteen kohdan 06 painikkeella ”Ota tämä talteen”. Asennus tallentaa lisäksi kuukausiraportin itse joka kuun 1. päivä.",
+          "8": "Hän tulostaa tämän raportin painikkeella ”Tulosta tai tallenna PDF:ksi”."
+        },
+        "colRole": "Rooli",
+        "colRoleDoes": "Tehtävä",
+        "role": {
+          "operator": "Pääkäyttäjä",
+          "dpo": "Tietosuojavastaava tai juristi",
+          "appOwner": "Sovelluksen tekijä",
+          "ai": "Pääkäyttäjän tekoäly"
+        },
+        "roleDoes": {
+          "operator": "Pitää kirjanpitoa, vastaa kysymyksiin ja tallentaa vastaukset.",
+          "dpo": "Päättää korkean riskin ehdokkaan luokan ja lukee raportin.",
+          "appOwner": "Kertoo, mitä sovellus tekee, ja pitää sen datakartan ja käsittelyselosteen ajan tasalla.",
+          "ai": "Luonnostelee vastaukset asennuksen tiedoista. Ihminen hyväksyy ne."
+        },
+        "colQuestion": "Kysymys",
+        "colAnswer": "Vastaus",
+        "colWho": "Kuka vastasi",
+        "colHelp": "Miten vastataan",
+        "colRule": "Vastaus johtaa luokkaan"
       },
       "question": {
         "q-manipulative-technique": {
