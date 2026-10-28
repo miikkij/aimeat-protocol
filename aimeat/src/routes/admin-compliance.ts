@@ -37,6 +37,8 @@
  *   import { adminComplianceRouter } from './routes/admin-compliance.js';
  *   app.use(adminComplianceRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-28 — GET questionnaire also answers `built_in`, the questions still as shipped,
+ *     which a page shows in the reader's language.
  *   v1.1.2 — 2026-10-16 — The unlabelled detail counts what an open workspace share serves to anyone as public.
  *   v1.1.1 — 2026-10-08 — The unlabelled detail is decided under the node's label posture.
  *   v1.1.0 — 2026-08-23 — A report can be kept on demand, and the index says which of the kept ones
@@ -64,6 +66,7 @@ import {
   type ComplianceQuestionnaire,
 } from '../services/compliance-register.js';
 import { saveComplianceSnapshot } from '../services/compliance-monthly-job.js';
+import { builtInQuestionIds } from '../data/compliance-questionnaire.js';
 
 export function adminComplianceRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -204,7 +207,8 @@ export function adminComplianceRouter(config: AimeatConfig, storage: Storage): R
   // ── The question set ──────────────────────────────────────────────────────────────────────
   router.get('/v1/admin/compliance/questionnaire', ...canRead, async (_req: Request, res: Response) => {
     const questionnaire = await effectiveQuestionnaire(storage, config.nodeId);
-    res.json(success(config.nodeId, { questionnaire }));
+    // Beside the set, not inside it: the stored record stays what the operator wrote.
+    res.json(success(config.nodeId, { questionnaire, built_in: builtInQuestionIds(questionnaire) }));
   });
 
   router.put('/v1/admin/compliance/questionnaire', ...canWrite,

@@ -3728,6 +3728,123 @@
       "answerFromAi": "tekoälyn luonnos",
       "answerFromHuman": "sinun vastauksesi",
       "answerFromProposed": "säännön ehdotus, ei vielä hyväksytty",
+      "paper": {
+        "summaryTitle": "Kokonaistila",
+        "sumUses": "Löydetyt tekoälyn käytöt",
+        "sumUsesValue": "sovelluksia {apps} · henkilöitä tai agentteja {others}",
+        "sumApproved": "Tallennettu kirjanpitoon",
+        "sumApprovedValue": "{saved}/{total}",
+        "sumHigh": "Korkean riskin ehdokkaat",
+        "none": "ei yhtään",
+        "sumCalls": "Mallikutsut jaksolla",
+        "sumCallsValue": "{calls} kutsua · {cost} · {models} mallia",
+        "sumGaps": "Avoimet puutteet",
+        "sumGapsValue": "{ai} tekoälyn kirjanpidossa · {records} käsittelyselosteissa",
+        "sumPublic": "Julkinen sisältö",
+        "sumPublicValue": "{total} julkaistua · {unlabelled} ilman merkintää",
+        "usesLead": "Jokainen sovellus ja henkilö, joka käyttää tekoälyä tämän asennuksen omien tietojen mukaan. Tallennettu merkintä on kirjanpidossa. Järjestelmän löytämän merkinnän asennus luki käyttökirjanpidosta ja datakartoista, eikä kukaan ole vielä tarkistanut tai tallentanut sitä.",
+        "usesNone": "Asennus ei löydä tekoälyn käyttöä tältä jaksolta.",
+        "statusSaved": "tallennettu · luokka: {cls}",
+        "statusFound": "järjestelmän löytämä, ei tallennettu",
+        "statusProposed": " · ehdotettu luokka: {cls}",
+        "fOwner": "Tili",
+        "modelsNone": "jaksolla ei ole kirjattuja mallikutsuja",
+        "fWhyAi": "Miksi tämä on tekoälyn käyttöä",
+        "fProposal": "Ehdotettu vastaus, ei hyväksytty",
+        "fOpen": "Vastaamatta",
+        "openCount": "{n}/{total} kysymystä",
+        "ev": {
+          "aiUse": "sovellus pyytää luvan käyttää tekoälyä",
+          "machinery": "datakartan mukaan sovellus tuottaa sisältöä tekoälyllä",
+          "generates": "sovellus kertoo tuottavansa: {what}",
+          "sendsOne": "datakartan mukaan sovellus lähettää yhden asian tekoälypalveluun",
+          "sends": "datakartan mukaan sovellus lähettää {n} asiaa tekoälypalveluun",
+          "keeps": "datakartan mukaan sovellus säilyttää tekoälyn tekemää sisältöä ({rows})"
+        },
+        "media": {
+          "text": "tekstiä",
+          "image": "kuvia",
+          "audio": "ääntä",
+          "video": "videota"
+        },
+        "personal": "henkilötietoja sovelluksen datakartan mukaan",
+        "personalDomains": "henkilötietoja sovelluksen datakartan mukaan; säänneltyä tietoa: {list}",
+        "domainStated": "{domain}, ilmoitettu kohdassa {rows}",
+        "domainProposed": "{domain}, päätelty sanoista kohdassa {rows}",
+        "gapsTitle": "Mitä puuttuu",
+        "gapAiAnnex": "{app}: korkean riskin ehdokas ({area})",
+        "gapCount": "{n} kohdetta",
+        "gapKind": {
+          "undocumented-ai-activity": "Mallia on käytetty, eikä mikään merkintä nimeä sitä",
+          "app-uses-ai-not-in-register": "Sovellus käyttää tekoälyä, eikä mikään merkintä nimeä sitä",
+          "app-declares-generation-with-gap": "Sovellus tuottaa sisältöä, eikä julkaisutarkistus löytänyt merkintää",
+          "unclassified-usecase": "Merkinnältä puuttuu vastauksia, joten sillä ei ole luokkaa",
+          "unlabelled-public-content": "Julkaistu ilman tekoälymerkintää",
+          "font-licence-unknown": "Fontti ilman lisenssitietoa"
+        },
+        "measuresWhat": "Tekoälyn käyttö jaksolla",
+        "recordsNone": "Yhtään käsittelyselostetta ei ole vielä tallennettu. Asennuksella on {drafts} luonnosta valmiina tarkistettavaksi.",
+        "appendixTitle": "Liite: kysymyssarja"
+      },
+      "question": {
+        "q-manipulative-technique": {
+          "text": "Käyttääkö se keinoja, joita ihminen ei huomaa, tai käyttääkö se hyväksi ikää, vammaa tai taloudellista ahdinkoa niin, että joku voi tehdä itselleen haitallisen päätöksen?",
+          "help": "Ratkaisevaa on se, mitä järjestelmä tekee, ei se, mitä sillä tarkoitettiin. Ohjaava järjestelmä lasketaan mukaan, vaikka kukaan ei tarkoittanut sitä manipuloivaksi."
+        },
+        "q-social-scoring": {
+          "text": "Pisteyttääkö se ihmisiä heidän sosiaalisen käytöksensä tai henkilökohtaisten ominaisuuksiensa perusteella, ja käytetäänkö pisteitä heitä vastaan tilanteessa, joka ei liity siihen, missä tiedot kerättiin?",
+          "help": "Asiaan liittymätön tilanne tekee siitä sosiaalista pisteytystä eikä tavallista arviointia."
+        },
+        "q-emotion-workplace-education": {
+          "text": "Päätteleekö se ihmisten tunteita työssä tai opetuksessa?",
+          "help": "Lääketieteelliset ja turvallisuuteen liittyvät käyttötarkoitukset on rajattu pois. Agenttien luottamuspisteet eivät ole tätä: ne arvioivat tunnuksia, eivät ihmisiä."
+        },
+        "q-biometric-categorisation-sensitive": {
+          "text": "Luokitteleeko se ihmisiä biometristen tietojen perusteella päätelläkseen rodun, poliittisen mielipiteen, ammattiliiton jäsenyyden, uskonnon, seksuaalisen käyttäytymisen tai seksuaalisen suuntautumisen?"
+        },
+        "q-untargeted-face-scraping": {
+          "text": "Rakentaako tai laajentaako se kasvojentunnistustietokantaa keräämällä kuvia internetistä tai valvontakameroista kohdentamatta?"
+        },
+        "q-annex3-area": {
+          "text": "Käytetäänkö sitä jollakin näistä alueista?",
+          "help": "Valitse lähin. Nämä ovat liitteen III alueet arkikielellä, ei asetuksen sanoin. ”Ei mikään näistä” on tavallinen vastaus."
+        },
+        "q-decides-about-a-person": {
+          "text": "Ratkaiseeko sen tuotos jotakin tunnistettavasta ihmisestä, tai vaikuttaako se olennaisesti päätökseen, jonka joku tekee hänestä?",
+          "help": "Järjestelmä, joka vain luonnostelee, tiivistää tai ehdottaa omalle käyttäjälleen, ei ole tätä. Järjestelmä, jonka pisteet kopioidaan päätökseen, on tätä, kopioi ne kuka tahansa."
+        },
+        "q-interacts-with-people": {
+          "text": "Keskusteleeko ihminen sen kanssa suoraan, tai lukeeko ihminen jotain, minkä se kirjoitti?",
+          "help": "Agentin ja asennuksen välinen liikenne, työkalukutsut, federaation synkronointi ja ajastin eivät ole tätä. Ne ovat koneiden välistä liikennettä, ja 50 artiklan 1 kohta sanoo sen suoraan."
+        },
+        "q-publishes-publicly": {
+          "text": "Julkaiseeko se tuotettua tekstiä, kuvaa, ääntä tai videota paikkaan, jossa kuka tahansa voi lukea sen?",
+          "help": "Tämä on 50 artiklan 4 kohdan kysymys, ja asennus voi mitata sen puolestasi: raportti laskee, mitä on julkaistu ilman merkintää."
+        },
+        "q-publishes-public-interest": {
+          "text": "Koskeeko jokin siitä politiikkaa, julkishallintoa, terveyttä, tiedettä tai muuta yleisen edun asiaa?",
+          "help": "Aihe ratkaisee, koskeeko 50 artiklan 4 kohta oikeasti, koska toimituksellinen poikkeus pätee vain, kun ihminen on oikeasti tarkistanut sisällön."
+        },
+        "q-resembles-real-people": {
+          "text": "Tuottaako se kuvaa, ääntä tai videota, jota voi luulla todellisiksi ihmisiksi, paikoiksi tai tapahtumiksi?",
+          "help": "Kuvitukset ja kuvakkeet eivät ole tätä. Kuva, jota voi luulla valokuvaksi tunnistettavasta ihmisestä, on tätä."
+        },
+        "q-human-reviews-before-publish": {
+          "text": "Lukeeko ihminen sisällön ennen kuin se julkaistaan, ja voiko hän muuttaa tai pysäyttää sen?",
+          "help": "Vastaa ei kaikkeen, minkä ajastus julkaisee itse. Vastaus ei yksin laske luokkaa. Se kirjataan, koska toimituksellinen poikkeus riippuu siitä, ja koska ”ei” yleisen edun julkaisun rinnalla on yhdistelmä, joka kannattaa katsoa."
+        }
+      },
+      "option": {
+        "none": "Ei mikään näistä",
+        "biometrics": "Ihmisten tunnistaminen biometrisesti",
+        "critical-infrastructure": "Kriittisen infrastruktuurin käyttö tai suojaaminen",
+        "education": "Koulutukseen pääsy, arviointi tai eteneminen",
+        "employment": "Rekrytointi, työtehtävien jako, ylennys tai työsuhteen päättäminen",
+        "essential-services": "Välttämättömien palvelujen saatavuus, luotonanto tai vakuutusten hinnoittelu",
+        "law-enforcement": "Lainvalvonta",
+        "migration": "Muuttoliike, turvapaikka-asiat tai rajavalvonta",
+        "justice-democracy": "Oikeudenkäyttö tai vaaleihin vaikuttaminen"
+      },
       "save": "Tallenna",
       "saving": "Tallennetaan…",
       "saved": "Tallennettu. Kaikki luokiteltiin uudelleen.",

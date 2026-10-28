@@ -34,6 +34,8 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.2.0 — 2026-10-28 — The questions, their help and their options in the reader's language while
+ *     the stored set still holds the built-in English (compliance-tab.print.js questionText).
  *   v3.1.0 — 2026-10-28 — A proposed answer (the node's rule read it from an app's data map) says
  *     "proposed, check it" and shows its reason where the help stands; the counts name proposed
  *     answers apart from the operator's.
@@ -51,6 +53,7 @@ import { h } from 'preact';
 import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
+import { questionText, questionHelp, optionLabel } from './compliance-tab.print.js';
 import { num } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import {
@@ -113,11 +116,11 @@ function answeredText(u, questions) {
  *  clears it, so an answer given by mistake can be taken back. */
 function AnswerPick({ q, value, onChange }) {
   if (q.type === 'boolean') {
-    return html`<${Choice} clearable ariaLabel=${q.text} value=${value} options=${[[true, C('yes')], [false, C('no')]]}
+    return html`<${Choice} clearable ariaLabel=${questionText(q)} value=${value} options=${[[true, C('yes')], [false, C('no')]]}
       onChange=${(v) => onChange(v === '' ? undefined : v)} />`;
   }
-  return html`<${Select} fit ariaLabel=${q.text} value=${isBlank(value) ? '' : String(value)} placeholder=${C('pickAnswer')}
-    options=${(q.options || []).map(o => ({ value: o.value, label: o.label }))}
+  return html`<${Select} fit ariaLabel=${questionText(q)} value=${isBlank(value) ? '' : String(value)} placeholder=${C('pickAnswer')}
+    options=${(q.options || []).map(o => ({ value: o.value, label: optionLabel(q, o) }))}
     onChange=${(raw) => onChange(raw === '' ? undefined : raw)} />`;
 }
 
@@ -136,8 +139,8 @@ function questionRow(q, value, source, onChange, last, reason) {
     : C('answerFromHuman');
   return {
     key: q.id,
-    name: q.text,
-    why: proposed && reason ? C('proposedWhy', { reason }) : (q.help || undefined),
+    name: questionText(q),
+    why: proposed && reason ? C('proposedWhy', { reason }) : (questionHelp(q) || undefined),
     mark: html`<${AnswerPick} q=${q} value=${value} onChange=${onChange} />`,
     value: blank ? html`<${Tinted} tone="notice">${src}<//>` : src,
     // Picking the answer already shown changes nothing in a select, so accepting a proposal as it
@@ -323,7 +326,7 @@ export function QuestionnaireSection({ questionnaire }) {
     <${List} cols="tag-name" rows=${items} render=${(q) => html`
       <${Row} key=${q.id}>
         <${Cell} sign>${q.id}<//>
-        <${Cell} line>${q.text} ${impliesChips(q)}<//>
+        <${Cell} line>${questionText(q)} ${impliesChips(q)}<//>
       <//>`} />`;
   return html`
     <${Section} id="adm-cmp-05" num="05" title=${C('qsTitle')}

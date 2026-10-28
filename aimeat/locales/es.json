@@ -2673,6 +2673,123 @@
       "answerFromAi": "borrador de la IA",
       "answerFromHuman": "tu respuesta",
       "answerFromProposed": "propuesta de una regla, aún sin aprobar",
+      "paper": {
+        "summaryTitle": "Situación general",
+        "sumUses": "Usos de IA encontrados",
+        "sumUsesValue": "aplicaciones: {apps} · personas o agentes: {others}",
+        "sumApproved": "Guardados en el registro",
+        "sumApprovedValue": "{saved} de {total}",
+        "sumHigh": "Candidatos a la clase de alto riesgo",
+        "none": "ninguno",
+        "sumCalls": "Llamadas a modelos en el periodo",
+        "sumCallsValue": "{calls} llamadas · {cost} · {models} modelos",
+        "sumGaps": "Carencias abiertas",
+        "sumGapsValue": "{ai} en el registro de IA · {records} en los registros de actividades de tratamiento",
+        "sumPublic": "Contenido público",
+        "sumPublicValue": "{total} publicados · {unlabelled} sin etiqueta",
+        "usesLead": "Cada aplicación y persona de esta instalación que usa IA, según sus propios registros. Una entrada guardada está en el registro. Una entrada encontrada por el sistema es lo que la instalación leyó de sus registros de uso y de los mapas de datos; nadie la ha revisado ni guardado todavía.",
+        "usesNone": "La instalación no encuentra ningún uso de IA en este periodo.",
+        "statusSaved": "guardado · clase: {cls}",
+        "statusFound": "encontrado por el sistema, sin guardar",
+        "statusProposed": " · clase propuesta: {cls}",
+        "fOwner": "Cuenta",
+        "modelsNone": "sin llamadas a modelos registradas en este periodo",
+        "fWhyAi": "Por qué cuenta como uso de IA",
+        "fProposal": "Respuesta propuesta, sin aprobar",
+        "fOpen": "Sin responder",
+        "openCount": "{n} de {total} preguntas",
+        "ev": {
+          "aiUse": "la aplicación pide permiso para usar IA",
+          "machinery": "según el mapa de datos, la aplicación genera contenido con IA",
+          "generates": "la aplicación declara que genera: {what}",
+          "sendsOne": "según el mapa de datos, la aplicación envía una cosa a un servicio de IA",
+          "sends": "según el mapa de datos, la aplicación envía {n} cosas a un servicio de IA",
+          "keeps": "según el mapa de datos, la aplicación guarda contenido hecho con IA ({rows})"
+        },
+        "media": {
+          "text": "texto",
+          "image": "imágenes",
+          "audio": "audio",
+          "video": "vídeo"
+        },
+        "personal": "datos personales, según el mapa de datos de la aplicación",
+        "personalDomains": "datos personales, según el mapa de datos de la aplicación; datos regulados: {list}",
+        "domainStated": "{domain}, declarado en {rows}",
+        "domainProposed": "{domain}, deducido de las palabras de {rows}",
+        "gapsTitle": "Qué falta",
+        "gapAiAnnex": "{app}: candidato a la clase de alto riesgo ({area})",
+        "gapCount": "{n} elementos",
+        "gapKind": {
+          "undocumented-ai-activity": "Se usó un modelo y ninguna entrada lo nombra",
+          "app-uses-ai-not-in-register": "Una aplicación usa IA y ninguna entrada la nombra",
+          "app-declares-generation-with-gap": "Una aplicación genera contenido y la comprobación de publicación no encontró etiqueta",
+          "unclassified-usecase": "Una entrada tiene preguntas sin responder y por eso no tiene clase",
+          "unlabelled-public-content": "Publicado sin etiqueta de IA",
+          "font-licence-unknown": "Una fuente sin datos de licencia"
+        },
+        "measuresWhat": "Uso de IA en el periodo",
+        "recordsNone": "Todavía no hay ningún registro de actividades de tratamiento guardado. La instalación tiene {drafts} borradores listos para revisar.",
+        "appendixTitle": "Anexo: el conjunto de preguntas"
+      },
+      "question": {
+        "q-manipulative-technique": {
+          "text": "¿Usa técnicas que una persona no puede percibir, o se aprovecha de la edad, una discapacidad o una situación económica vulnerable, de forma que alguien pueda tomar una decisión que le perjudique?",
+          "help": "Cuenta lo que hace el sistema, no la intención: un sistema que empuja a decidir cuenta aunque nadie lo pensara como manipulador."
+        },
+        "q-social-scoring": {
+          "text": "¿Puntúa a las personas por su comportamiento social o sus rasgos personales, y se usa esa puntuación en su contra en una situación ajena a aquella en la que se recogió?",
+          "help": "Lo que la convierte en puntuación social y no en una evaluación corriente es que el contexto sea ajeno."
+        },
+        "q-emotion-workplace-education": {
+          "text": "¿Infiere las emociones de las personas en el trabajo o en la educación?",
+          "help": "Los fines médicos y de seguridad quedan fuera. Las puntuaciones de confianza de los agentes no son esto: puntúan credenciales, no personas."
+        },
+        "q-biometric-categorisation-sensitive": {
+          "text": "¿Clasifica a las personas por datos biométricos para deducir su raza, opiniones políticas, afiliación sindical, religión, vida sexual u orientación sexual?"
+        },
+        "q-untargeted-face-scraping": {
+          "text": "¿Crea o amplía una base de datos de reconocimiento facial extrayendo imágenes de internet o de cámaras de vigilancia de forma no selectiva?"
+        },
+        "q-annex3-area": {
+          "text": "¿Se usa en alguno de estos ámbitos?",
+          "help": "Elige el más cercano. Son los ámbitos del anexo III, con las palabras que usaría quien lo opera y no las del Reglamento. «Ninguno de estos» es una respuesta normal."
+        },
+        "q-decides-about-a-person": {
+          "text": "¿Su resultado decide algo sobre una persona identificada, o influye de forma importante en una decisión que alguien toma sobre ella?",
+          "help": "Un sistema que solo redacta, resume o sugiere a su propio usuario no es esto. Un sistema cuya puntuación se copia en una decisión sí lo es, la copie quien la copie."
+        },
+        "q-interacts-with-people": {
+          "text": "¿Una persona habla con él directamente o lee algo que ha escrito?",
+          "help": "El tráfico entre agentes y la instalación, las llamadas a herramientas, la sincronización de la federación y el programador no son esto. Es tráfico entre máquinas, y el artículo 50, apartado 1, lo dice expresamente."
+        },
+        "q-publishes-publicly": {
+          "text": "¿Publica texto, imagen, audio o vídeo generados donde cualquiera puede leerlos?",
+          "help": "Es la cuestión del artículo 50, apartado 4, y la que esta instalación puede medir por ti: el informe cuenta lo publicado sin etiqueta."
+        },
+        "q-publishes-public-interest": {
+          "text": "¿Trata algo de ello de política, administración pública, salud, ciencia u otro asunto de interés público?",
+          "help": "El tema es lo que hace que el artículo 50, apartado 4, se aplique de verdad, porque la excepción editorial solo vale cuando una persona revisó de verdad el contenido."
+        },
+        "q-resembles-real-people": {
+          "text": "¿Genera imágenes, audio o vídeo que se puedan tomar por personas, lugares o hechos reales?",
+          "help": "Las ilustraciones y los iconos no son esto. Una imagen que alguien podría tomar por una fotografía de una persona identificable sí lo es."
+        },
+        "q-human-reviews-before-publish": {
+          "text": "¿Una persona lee el contenido antes de que se publique, y puede cambiarlo o detenerlo?",
+          "help": "Responde no a todo lo que una programación publica por sí sola. Esta respuesta no baja la clase por sí misma. Se registra porque la excepción editorial depende de ella, y porque un «no» junto a una publicación de interés público es la combinación que conviene mirar."
+        }
+      },
+      "option": {
+        "none": "Ninguno de estos",
+        "biometrics": "Identificar a personas por datos biométricos",
+        "critical-infrastructure": "Gestionar o proteger infraestructuras críticas",
+        "education": "Decidir el acceso, la evaluación o el progreso en la educación",
+        "employment": "Contratación, reparto de tareas, ascensos o fin de la relación laboral",
+        "essential-services": "Acceso a servicios esenciales, crédito o precio de seguros",
+        "law-enforcement": "Aplicación de la ley",
+        "migration": "Migración, asilo o control de fronteras",
+        "justice-democracy": "Administración de justicia o influencia en unas elecciones"
+      },
       "save": "Guardar",
       "saving": "Guardando…",
       "saved": "Guardado. Todo se volvió a clasificar.",

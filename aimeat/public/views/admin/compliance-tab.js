@@ -31,6 +31,9 @@
  *     door and the empty state's slab reach it), save, draft, keep, the CSV
  * @usage Registered in views/admin.js NAV_GROUPS; rendered with the shared admin tab props.
  * @version-history
+ *   v3.5.0 — 2026-10-28 — The page reads the node's draft with the report, so the printout carries
+ *     every AI use the node finds, saved or not; the screen's question set speaks the reader's
+ *     language like the printout.
  *   v3.4.0 — 2026-10-28 — Section 01 has a row for apps that use AI and that no entry names, the
  *     candidates for the high-risk class named; the draft's proposals ride to the register, where
  *     each proposed answer shows why; the line under the verdict counts proposed answers.
@@ -289,6 +292,7 @@ export default function ComplianceTab(props) {
   const [report, setReport] = useState(null);
   const [questionnaire, setQuestionnaire] = useState(null);
   const [registers, setRegisters] = useState([]);   // the node's own records of processing, for print and CSV
+  const [found, setFound] = useState(null);         // the node's draft, which the printout carries unsaved
   const [failed, setFailed] = useState(false);
   const [saving, setSaving] = useState(false);
   const [drafting, setDrafting] = useState(false);
@@ -304,14 +308,24 @@ export default function ComplianceTab(props) {
 
   const load = useCallback(async (d) => {
     try {
-      const [rep, qs, regs] = await Promise.all([
+      // The draft rides along for the printout: on paper the AI uses the node finds print whether or
+      // not anybody saved them, each marked as the system's finding (compliance-tab.print.js).
+      const [rep, qs, regs, dr] = await Promise.all([
         apiGet(`/v1/admin/compliance/report?since_days=${d}`),
         apiGet('/v1/admin/compliance/questionnaire'),
         apiGet('/v1/compliance/docs/registers').catch((e) => { swallowed('compliance-tab: registers', e); return null; }),
+        apiGet(`/v1/admin/compliance/draft?since_days=${d}`).catch((e) => { swallowed('compliance-tab: draft for print', e); return null; }),
       ]);
       if (rep?.data) setReport(rep.data);
-      if (qs?.data) setQuestionnaire(qs.data.questionnaire);
+      // A question still as shipped carries `builtIn`, and only those are shown translated
+      // (compliance-tab.print.js questionText); the stored set itself is never changed here.
+      if (qs?.data) {
+        const shipped = new Set(qs.data.built_in || []);
+        const set = qs.data.questionnaire;
+        setQuestionnaire({ ...set, questions: (set.questions || []).map(q => ({ ...q, builtIn: shipped.has(q.id) })) });
+      }
       setRegisters(regs?.data?.items || []);
+      setFound(dr?.data || null);
       setFailed(false);
     } catch (e) {
       setFailed(true);
@@ -487,7 +501,7 @@ export default function ComplianceTab(props) {
           onChanged=${() => load(days)} />` : null}
         <${AgreementsSection} num="11" onMessage=${(kind, text) => (kind === 'error' ? showError(text) : showSuccess(text))} />
       <//>
-      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} only=${printOnly} />
+      <${PrintableReport} report=${report} questionnaire=${questionnaire} registers=${registers} found=${found} only=${printOnly} />
     <//>
   `;
 }

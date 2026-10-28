@@ -22987,7 +22987,9 @@ paths:
       description: >
         Node operator only (`compliance:read`). The set this node classifies against: the stored one,
         or the shipped default when nothing has been stored yet. Never empty, and nothing is written
-        until an operator saves.
+        until an operator saves. `data.built_in` lists the ids of the questions still exactly as
+        shipped (text, help and option labels); a page shows those in the reader's language and every
+        other question in the words its editor wrote.
       security:
         - BearerAuth: []
       responses:
