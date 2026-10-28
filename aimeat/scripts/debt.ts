@@ -44,6 +44,7 @@
  *   - main(): the table
  * @usage cd aimeat && pnpm debt
  * @version-history
+ *   2026-10-27 — The writing routes that read a body without a schema join the report (check:write-validation).
  *   2026-10-20 — The unbounded storage lists, the whole-table reads and the repositories no
  *     two-provider case calls join the report (QA audit P7-10, P4-09).
  *   2026-10-18 — The reads followed by an unconditional write of the same key join the report
@@ -190,6 +191,14 @@ const RATCHETS: Ratchet[] = [
         check: 'check:unbounded-lists',
         count: raw => Object.values((parse(raw).wholeTableCalls ?? {}) as Record<string, Record<string, number>>)
             .reduce((total, counts) => total + Object.values(counts).reduce((sum, n) => sum + n, 0), 0),
+    },
+    // Wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli (2026-10-27).
+    {
+        file: 'aimeat/security/write-validation-baseline.json',
+        label: 'Writing routes without a body schema',
+        check: 'check:write-validation',
+        count: raw => Object.keys((parse(raw).unvalidated ?? {}) as Json).length,
+        open: raw => Object.values((parse(raw).unvalidated ?? {}) as Json).filter(isOpen).length,
     },
     {
         file: 'aimeat/security/storage-conformance-baseline.json',

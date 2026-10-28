@@ -5,7 +5,7 @@
  * @description The person hears it from the node, not only from their AI: when one of their agents
  *   is refused a permission, a notice lands in the bell and the same question goes to their own email
  *   address. A permission one press may give carries an Allow button and the allow page; any other
- *   carries the agent's page, where the person decides on it with its own tick.
+ *   carries the agent's page, where the person gives it with its own tick. Both carry Don't allow.
  *
  *   WHY. The agent is told what to say (services/permission-ask.ts), and an agent does not always
  *   say it: a person's ChatGPT passed her the name of a permission and no address (2026-10-17). The
@@ -31,6 +31,8 @@
  *   sendPermissionAsk(deps, ownerGhii, agent, words)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   v1.4.0 — 2026-10-28 — The page notice carries Don't allow and its question's ref too, so the
+ *     person answers "no" from the bell and the answer closes the notice (Jouni 2026-10-28).
  *   2026-10-27 — The email's heading escapes its subject, which carries the agent's display name
  *     (secaudit2026oct26, wrapHtml unescaped-heading-agent-display-name).
  *   v1.3.0 — 2026-10-25 — The one-press notice carries its question's ref, and closePermissionAsk() shows
@@ -106,7 +108,10 @@ export function permissionAskNotice(agent: AgentRecord, words: readonly string[]
   };
 }
 
-/** The bell notice for a permission one press does not give: no Allow button, the agent's page instead. */
+/**
+ * The bell notice for a permission one press does not give: Don't allow on the notice itself, and the
+ * agent's page, where the person gives it with its own tick, instead of an Allow button.
+ */
 export function permissionPageNotice(agent: AgentRecord, words: readonly string[], baseUrl: string): NotifyInput {
   const path = pathOf(agentPageUrl(baseUrl, agent.name));
   const name = agentLabel(agent);
@@ -118,7 +123,18 @@ export function permissionPageNotice(agent: AgentRecord, words: readonly string[
       + "You give this permission on the agent's page, if you want to.",
     link: path,
     i18n: { key: PAGE_KEY, vars: { agent: name, what } },
-    actions: [{ id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, i18n: { key: `${PAGE_KEY}.open` } }],
+    ref: permissionQuestionRef(agent.name, words),
+    // "No" is one press here too (Jouni, 2026-10-28); only "yes" needs the page.
+    actions: [{
+      id: 'deny',
+      label: 'Don\'t allow',
+      kind: 'api',
+      method: 'POST',
+      endpoint: `/v1/agents/${encodeURIComponent(agent.name)}/refusals/decline`,
+      body: { needed: [...words] },
+      style: 'default',
+      i18n: { key: `${PAGE_KEY}.deny` },
+    }, { id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, style: 'primary', i18n: { key: `${PAGE_KEY}.open` } }],
   };
 }
 

@@ -20,6 +20,9 @@
  *   deterministically — otherwise every timing assertion here would be a race.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-jobs.ts
  * @version-history
+ *   v1.12.1 — 2026-10-28 — Case 15 kills the node only after the completion reached the stub: it read
+ *     'running' from the live map before the record was written, and a kill between the two left a
+ *     queued record the restart ran to done (nightly 40758148360, postgres-kysely).
  *   v1.12.0 — 2026-10-21 — 19e-19i: an image job's PICTURE meets the publish gate its record meets
  *     (secaudit 2026-10, ai-image public picture past the publish gate). 19e on the default node: an
  *     agent's public picture is public at once, as before. On the gated node: 19f an agent without
@@ -101,9 +104,9 @@ import { startFakeAiProvider, imageJson, transcriptionJson, providerStatus, type
 import { ownerSignIn } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const PORT = process.env.E2E_AI_JOBS_PORT ?? '40297';
+const PORT = process.env.E2E_AI_JOBS_PORT ?? '28297';
 const BASE = `http://localhost:${PORT}`;
-const STUB_PORT = parseInt(process.env.E2E_AI_JOBS_STUB_PORT ?? '40298', 10);
+const STUB_PORT = parseInt(process.env.E2E_AI_JOBS_STUB_PORT ?? '28298', 10);
 const STUB_BASE = `http://127.0.0.1:${STUB_PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 
@@ -852,6 +855,15 @@ const SCRIPT_THROW = `export default async function(ctx, input) {
         assert(r.status === 202, `start ${r.status}`);
         const id = r.body.data.job_id;
         await waitForState(a, id, ['running'], 10_000);
+        // 'running' is read from the live map, which the service sets one await before it writes the
+        // record. Killed in between, the stored record still says queued and the restarted node
+        // rightly runs it again to done. The provider call comes after the write, so its arrival at
+        // the stub is the proof that the stored record says running.
+        const began = Date.now();
+        while (held.length === 0) {
+            assert(Date.now() - began < 15_000, 'the completion never reached the stub');
+            await sleep(50);
+        }
 
         await stopServer(server, true);          // SIGKILL: no graceful anything, like a real crash
         releaseHeld();

@@ -2,20 +2,21 @@
  * @file test/unit/agent-name-email-heading.test.ts
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description An agent's display name reaches the heading of the node's own permission-ask and
- *   agent-narrowed emails as text, not as HTML (secaudit2026oct26,
+ * @description An agent's display name reaches the heading of the node's own permission-ask email
+ *   as text, not as HTML (secaudit2026oct26,
  *   email-templates.ts:wrapHtml:unescaped-heading-agent-display-name). The display name comes from
  *   whoever composed the device request. The use that stays: an ordinary name, non-ASCII letters
  *   included, reads in the subject, the heading and the plain-text part exactly as written.
  * @usage pnpm exec vitest run test/unit/agent-name-email-heading.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-28 — The agent-narrowed email's cases go with the email: main removed the node's
+ *     own narrowing (7b2aae278, the owner narrows an agent, never the node).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, AgentRecord } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { mailOwnerNarrowed } from '../../src/services/scope-auto-narrow.js';
 import { sendPermissionAsk } from '../../src/services/permission-ask-notice.js';
 import { setActiveEmailService } from '../../src/services/email.js';
 
@@ -69,22 +70,6 @@ describe('the permission-ask email', () => {
 
     it('usage: an ordinary name with non-ASCII letters reads as written in subject, heading and text', async () => {
         const m = await mailOf(() => sendPermissionAsk({ storage, config }, OWNER, agent('Pääkirjuri Öhman'), ['memory:write']));
-        expect(m.subject).toContain('Pääkirjuri Öhman');
-        expect(heading(m.html)).toContain('Pääkirjuri Öhman');
-        expect(m.text).toContain('Pääkirjuri Öhman');
-    });
-});
-
-describe('the agent-narrowed email', () => {
-    it('shows markup in an agent display name as text in the heading and title', async () => {
-        const m = await mailOf(() => mailOwnerNarrowed({ storage, config }, OWNER, agent(MARKUP)));
-        expect(m.html).not.toContain(MARKUP);
-        expect(heading(m.html)).toContain('&lt;a href=');
-        expect(title(m.html)).toContain('&lt;a href=');
-    });
-
-    it('usage: an ordinary name with non-ASCII letters reads as written in subject, heading and text', async () => {
-        const m = await mailOf(() => mailOwnerNarrowed({ storage, config }, OWNER, agent('Pääkirjuri Öhman')));
         expect(m.subject).toContain('Pääkirjuri Öhman');
         expect(heading(m.html)).toContain('Pääkirjuri Öhman');
         expect(m.text).toContain('Pääkirjuri Öhman');

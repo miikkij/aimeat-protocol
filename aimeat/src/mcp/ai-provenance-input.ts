@@ -41,6 +41,7 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.5.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.0 — 2026-10-08 — toDeclaredProvenance maps `media_kind`, `media_type` and `resembles_real`.
  *   v1.3.0 — 2026-10-05 — AiProvenanceBlockSchema moved unchanged to src/tool-catalog/ai-provenance-schema.ts,
  *     the catalog's exact schema of the field, and is re-exported here (secaudit 2026-10, M3).
@@ -56,6 +57,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import { AiProvenanceBlockSchema } from '../tool-catalog/ai-provenance-schema.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 
@@ -78,7 +80,7 @@ export const aiProvenanceInput = {
 
 /** The optional `ai_provenance_id` parameter: attach a record the node already minted. */
 export const aiProvenanceIdInput = {
-  ai_provenance_id: z.string().optional().describe(
+  ai_provenance_id: z.string().max(INPUT_LIMITS.id).optional().describe(
     'Attach an EXISTING provenance record instead of declaring a new one — the id the node returned '
     + 'when it generated this content for you. Only your own records can be attached.'),
 };

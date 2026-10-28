@@ -17,6 +17,7 @@
  *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.7.0 — 2026-10-28 — listAiProvenance({ publicOnly }): public records, reviewed or not.
  *   v1.6.0 — 2026-10-16 — workspaceProvenanceLinks({ scan }): every workspace share candidate of one
  *     owner or the node since a day that publiclyLinked does not count, up to 5000, for the
  *     compliance counts (services/share-provenance.ts sharePublicInScope).
@@ -225,7 +226,7 @@ export const aiProvenanceMethods = {
       ...(query?.unreviewedPublicOnly ? [
         publiclyLinked('p."id"'),
         sql`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`,
-      ] : []),
+      ] : query?.publicOnly ? [publiclyLinked('p."id"')] : []),
     ], sql` AND `)}`;
 
     const counted = await this.db.selectFrom('AiProvenance as p')

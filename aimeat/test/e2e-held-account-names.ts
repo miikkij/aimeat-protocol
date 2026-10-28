@@ -56,7 +56,7 @@ import { registerOwner, ownerSignIn, OWNER_PASSWORD } from './helpers/owner-logi
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_HELD_ACCOUNT_NAMES_PORT ?? '40452';
+const PORT = process.env.E2E_HELD_ACCOUNT_NAMES_PORT ?? '28452';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';

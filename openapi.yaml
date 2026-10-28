@@ -1730,7 +1730,7 @@ components:
             - TOTP_REPLAY: TOTP code already used
             - TOTP_ALREADY_ENABLED: TOTP already set up
             - CSM_NOT_FOUND: CSM service not found
-            - VALIDATION_ERROR: Request body validation failed
+            - VALIDATION_ERROR: A field of the request is not valid. `details` lists each field (FieldError): its path, a code, the limit and a sentence in the caller's language. A NUL character or a broken (lone surrogate) character anywhere in the body, the query or the path gets this answer on every route.
             - ALREADY_FLAGGED: User has already flagged this target
             - EMAIL_UNAVAILABLE: Email service not configured
             - FEATURE_DISABLED: Feature disabled on this node
@@ -1741,10 +1741,39 @@ components:
           type: string
           example: You need 110 morsels but have 50
         details:
-          type: object
+          description: More about the error. On VALIDATION_ERROR, one FieldError per field that is not valid.
+          oneOf:
+            - type: object
+            - type: array
+              items:
+                $ref: '#/components/schemas/FieldError'
         retry_after:
           type: integer
           description: Seconds to wait before retry (present on RATE_LIMITED)
+
+    FieldError:
+      type: object
+      description: One field a request was refused for (VALIDATION_ERROR). `path` is the name a form gives the field, so a page shows `message` under it.
+      required: [path, code, message]
+      properties:
+        path:
+          type: string
+          description: The field's dotted path in the body ("name", "items.2.title"); "query.<name>" for the query string; "" for the request itself.
+          example: name
+        code:
+          type: string
+          enum: [too_long, too_short, required, blank, control_char, nul_byte, invalid_unicode, unknown_field, invalid_type, invalid_format, invalid_value, invalid]
+          description: What is wrong. It does not change with the language.
+        message:
+          type: string
+          description: What is wrong, in the caller's language (?lang=, the aimeat-lang cookie, Accept-Language).
+          example: "Too long: at most 200 characters."
+        max:
+          type: integer
+          description: The limit, on too_long.
+        min:
+          type: integer
+          description: The minimum, on too_short and required.
 
     Hints:
       type: object
@@ -11732,6 +11761,39 @@ paths:
         '404':
           description: No agent of that name on this node
 
+  /v1/a2a/directory:
+    post:
+      operationId: a2aDirectoryJsonRpc
+      summary: The A2A JSON-RPC interface of the node's agent directory
+      description: |
+        The interface `/.well-known/agent-card.json` names (A2A 1.0, and 0.3 through the
+        `A2A-Version` header). Public, and it answers what the card already says: any `SendMessage`
+        gets one message back whose data part is `{ node, agents }`, the same list the card carries.
+        It keeps no tasks: `GetTask` and `CancelTask` answer TaskNotFound, `ListTasks` an empty list,
+        and streaming and push notifications are refused. The caller's message is not read beyond
+        being well formed. Body and answer are JSON-RPC 2.0, not the AIMEAT envelope.
+      tags: [A2A]
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [jsonrpc, method]
+              properties:
+                jsonrpc: { type: string, enum: ['2.0'] }
+                id: {}
+                method: { type: string }
+                params: { type: object }
+      responses:
+        '200':
+          description: A JSON-RPC 2.0 response.
+          content:
+            application/json:
+              schema:
+                type: object
+
   /v1/a2a/{owner}/{agent}/agent-card.json:
     get:
       operationId: getA2AAgentCard
@@ -13288,7 +13350,7 @@ paths:
                                     task_start_held_by:
                                       type: array
                                       items: { type: string }
-                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them; an agent holding `*` is narrowed at its next task once its record is ready.
+                                      description: The permissions that make every task of this agent wait for the owner, whatever the setting, read from the words it holds by name. `*` is never among them, because the owner gave it and it holds no task.
                                     task_start_floor_accepted:
                                       type: array
                                       items: { type: string }
@@ -13308,9 +13370,9 @@ paths:
                                     task_start_wildcard:
                                       type: object
                                       nullable: true
-                                      description: For an agent holding `*`, how far the record of what it uses is, and the narrowing the node makes at its next task once the record is ready, which the owner can also make now (POST .../scope-narrowing). Null for every other agent.
+                                      description: For an agent holding `*`, how far the record of what it uses is, and the narrowing the owner may make (POST .../scope-narrowing). The node never makes it by itself. Null for every other agent.
                                       properties:
-                                        ready: { type: boolean, description: '14 days of record naming a permission: the next task decision narrows the agent to `proposal`.' }
+                                        ready: { type: boolean, description: '14 days of record naming a permission: `proposal` covers two weeks of use. Only the owner applies it.' }
                                         days_left: { type: integer }
                                         since: { type: string, nullable: true }
                                         used: { type: array, items: { type: string } }
@@ -14580,10 +14642,11 @@ paths:
         replaces `*` with those words, plus every other word its list already names. The agent list
         shows the proposal first (`task_start_wildcard.proposal`).
 
-        Once 14 days of its use are on record, the node makes this same narrowing by itself at the
-        agent's next task decision and tells the owner in the bell and by email (notification
-        `agent_narrowed`, the Email page switch `agentNarrowed`); this route does it now. Until
-        2026-10-18 a ready `*` held every task of the agent for the owner instead.
+        Only the owner decides to narrow: the agent keeps `*` until this route is called, and `*`
+        holds none of its tasks. From 2026-10-18 to 2026-10-28 the node made this narrowing by
+        itself after 14 days of record (notification `agent_narrowed`); it no longer does. Some
+        permissions are checked where the record does not see them, so a narrowed agent may later
+        be refused one; its owner is then asked, with Allow and Don't allow.
 
         Only takes away, so it does not need the owner in person: the owner, or another of their
         agents holding `agent:permissions`. 409 NOT_WILDCARD when the agent does not hold `*`, and
@@ -18140,6 +18203,17 @@ paths:
         legal basis, data, regulated data and retention, for the same readers as the map. The
         register's other fields stay with its owner and the operator. `privacy_notice` says whether
         the app publishes a privacy notice of its own among its legal pages.
+
+        `ai_act`, for an app that uses AI (its map, its `ai:use` permission or a declared
+        generation): the node's EU AI Act questions without their class rules (`questions`: id, text,
+        help, type, options), the ids still exactly as shipped (`built_in`, which a page shows in its
+        reader's language), and the ids the map's `aiAct` leaves `unanswered`. The maker answers them
+        in the map: `aiAct: { answers: { <question id>: true | false | <option value> }, notes:
+        { <question id>: <why> } }`, written with PUT on this address like the rest of the map. The
+        node's administrator approves them in the register draft (GET /v1/admin/compliance/draft),
+        where they are marked `maker`. An AI app whose map answers none gets the finding
+        DATAMAP_AI_ACT_UNANSWERED, and the daily job core:compliance-ask-makers sends its owner a
+        message with a ready prompt, the same app at most once a fortnight.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -22835,17 +22909,39 @@ paths:
 
         Grouped by which agent or app called each model, NOT by the model - twelve models on a real
         installation are however many things called them, and a model id is not a use of AI. Each
-        entry's title, description and systems are the ones whoever created that agent wrote.
+        agent entry's title, description and systems are the ones whoever created that agent wrote.
 
-        Two questions are answered from the record and marked `evidence` in `answerSources`: whether
-        the principal has any provenance record at all, and whether a person was ever recorded
-        reviewing its output. Every other answer is left empty rather than guessed. An answer that
-        reads as considered when nobody considered it is the failure this whole surface exists to
-        prevent, so filling those is a person's job, or a model's working for them, and the register
-        records which.
+        Every app that uses AI gets its own entry, whether or not its publish check found a gap: by
+        its declared `ai:use` permission, a declared generation, or its data map (the machinery word
+        `ai-generation`, or something sent to an AI service). A row of kind `ai-generated` alone
+        does not count: content an AI made once is a labelling question, not a model the app calls. Its
+        description and purpose come from the data map, and its models from the provenance records
+        the node minted for that app's calls. An app or agent already in the stored register is not
+        proposed again.
 
-        Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, leftToAnswer }, notes }`.
-        Save it with PUT /v1/admin/compliance/usecases.
+        Answers from the record are marked `evidence` in `answerSources`: whether the principal's
+        generated content is readable by an anonymous visitor (for an app: `false` when the app is
+        not publicly served), and, for one that publishes, whether a person was recorded reviewing
+        it. When an app uses AI on data its map places in the `employment` or `biometric-genetic`
+        domain, stated on the row or read from the map's words, the Annex III area is filled and
+        marked `proposed`, with the reason in `proposals`. Every other answer is left empty rather
+        than guessed. An answer that reads as considered when nobody considered it is the failure
+        this whole surface exists to prevent, so filling those is a person's job, or a model's
+        working for them, and the register records which.
+
+        The app's maker answers in the app's data map (`aiAct`, see GET /v1/datamap/apps/{owner}/{filename}):
+        those answers are marked `maker`, below what the record evidences and over what a rule
+        proposes, and the maker's reasons come as `answerNotes`. A rule's proposal stays in
+        `proposals` beside a maker's different answer, for the administrator to decide. For an entry
+        already in the stored register, `makerUpdates` carries the maker's answers to the questions it
+        has not answered and the notes it has none for; the page merges them, never over a saved
+        answer. `counts.fromMaker` counts the maker's answers.
+
+        Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, proposed, leftToAnswer },
+        proposals, notes }`. `proposals` is one `{ usecase_id, question, value, reason, basis }` per
+        proposed answer: `reason` in English, `basis` the same facts as data (`{ domain, source, rows,
+        words }`: the data domain, whether a map row states it or its words point to it, the key
+        families and the matched words). Save it with PUT /v1/admin/compliance/usecases.
       security:
         - BearerAuth: []
       parameters:
@@ -22947,12 +23043,20 @@ paths:
                           unclassified and puts it in the report's gap list - never the mildest class.
                       answerSources:
                         type: object
-                        additionalProperties: { type: string, enum: [human, ai, evidence] }
+                        additionalProperties: { type: string, enum: [human, ai, evidence, proposed, maker] }
                         description: >
                           questionId to who produced that answer. An auditor's question is which of
-                          the three, and a register that could not tell them apart would answer it
+                          them, and a register that could not tell them apart would answer it
                           wrongly by omission - the confident-sounding ones would all read as
-                          considered. Absent reads as unknown, never as human.
+                          considered. `proposed` is the node's rule reading an app's data map, which
+                          nobody has decided yet. `maker` is the app's maker, answering in the app's
+                          data map. Absent reads as unknown, never as human.
+                      answerNotes:
+                        type: object
+                        additionalProperties: { type: string, maxLength: 2000 }
+                        description: >
+                          questionId to why that answer, in one or two sentences: the maker's note
+                          from the data map or the operator's own. The printout shows it beside the answer.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -22971,7 +23075,9 @@ paths:
       description: >
         Node operator only (`compliance:read`). The set this node classifies against: the stored one,
         or the shipped default when nothing has been stored yet. Never empty, and nothing is written
-        until an operator saves.
+        until an operator saves. `data.built_in` lists the ids of the questions still exactly as
+        shipped (text, help and option labels); a page shows those in the reader's language and every
+        other question in the words its editor wrote.
       security:
         - BearerAuth: []
       responses:
@@ -29487,6 +29593,10 @@ paths:
         listing obeys the same sentence. An agent with no offering is not hidden; it is not for sale.
 
         Public, like the cards it points at, and it says nothing they do not.
+
+        **It names an interface that answers** (2026-10-27): `POST /v1/a2a/directory`, at A2A 1.0
+        and 0.3, where any message gets the same list back. The list was empty until then, which A2A
+        1.0 does not allow, and the A2A 0.3 top-level `url` it carried is gone.
       tags: [A2A]
       responses:
         '200':
@@ -39191,6 +39301,43 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/mcp/server-card:
+    get:
+      operationId: mcpServerCardSep2127
+      summary: MCP Server Card (SEP-2127)
+      description: |
+        The node's MCP Server Card in the SEP-2127 shape (schema family v1,
+        `https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json`), at the location
+        the SEP reserves, `<streamable-http-url>/server-card`. The AI Catalog entry typed
+        `application/mcp-server-card+json` (`/.well-known/ard.json`, `/.well-known/ai-catalog.json`)
+        names this address, and `/.well-known/mcp/server-card.json` serves the same card.
+
+        Identity, the one streamable-http remote and the MCP revisions it serves, nothing else: a
+        Server Card does not list tools. `/.well-known/mcp.json` stays the node's extended card (the
+        WebMCP bridge and the priced tool catalog), named in `_meta["io.aimeat/extended-card"]`.
+        Public, with `Access-Control-Allow-Origin: *`.
+      tags: [Catalogue]
+      security: []
+      responses:
+        '200':
+          description: The Server Card.
+          content:
+            application/mcp-server-card+json:
+              schema:
+                type: object
+                required: [$schema, name, version, description]
+                properties:
+                  $schema: { type: string }
+                  name: { type: string, description: 'Reverse DNS with one slash: io.aimeat/<node id>.' }
+                  version: { type: string }
+                  description: { type: string, maxLength: 100 }
+                  title: { type: string }
+                  websiteUrl: { type: string }
+                  repository: { type: object }
+                  icons: { type: array, items: { type: object } }
+                  remotes: { type: array, items: { type: object } }
+                  _meta: { type: object }
+
   /v1/mcp/register:
     post:
       operationId: mcpRegisterClient
@@ -42947,15 +43094,17 @@ paths:
               properties:
                 name:
                   type: string
-                  maxLength: 100
-                  description: Organism display name
+                  minLength: 2
+                  maxLength: 200
+                  description: Organism display name. No control character, and not only white space (400 VALIDATION_ERROR naming the field).
                   example: Helsinki Photography Club
                 description:
                   type: string
-                  maxLength: 2000
+                  maxLength: 10000
+                  description: No control character other than tab and line breaks.
                 type:
                   type: string
-                  maxLength: 40
+                  maxLength: 256
                   description: Free text; the presets are community, team, club, cooperative, project.
                 location:
                   type: object
@@ -42970,6 +43119,7 @@ paths:
                   type: array
                   items:
                     type: string
+                    maxLength: 200
                   example: [photography, urban-exploration]
                 joinPolicy:
                   type: string
@@ -43216,10 +43366,11 @@ paths:
               properties:
                 name:
                   type: string
-                  maxLength: 100
+                  maxLength: 200
+                  description: No control character, and not only white space.
                 description:
                   type: string
-                  maxLength: 2000
+                  maxLength: 10000
                 readme:
                   type: string
                   description: |
@@ -44865,7 +45016,7 @@ paths:
               type: object
               required: [name]
               properties:
-                name: { type: string }
+                name: { type: string, maxLength: 200, description: "No control character, and not only white space." }
                 manifest: { type: object }
                 schemas: { type: object }
                 readme: { type: string }
@@ -46420,7 +46571,6 @@ paths:
                         workflowEnd: { type: boolean, description: The email when a workflow run ends (default true). }
                         nudge: { type: boolean, description: The reminder after two quiet weeks. Absent means undecided here, and the old settings.email_notifications switch answers. }
                         agentAsks: { type: boolean, description: "The email when one of the owner's agents asks to be allowed something it was refused, with the address that allows it, or with its page when the permission is not given with one press (default true)." }
-                        agentNarrowed: { type: boolean, description: "The email when the node narrows an agent that held all permissions (`*`) to the ones it used, with the list and its page (default true)." }
       responses:
         '200': { description: "{ settings }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -53417,10 +53567,10 @@ paths:
               type: object
               required: [ws, space, instance_id, body]
               properties:
-                ws: { type: string }
-                space: { type: string, description: The objectType (space) name }
-                instance_id: { type: string, description: The record/document id }
-                body: { type: string }
+                ws: { type: string, maxLength: 256 }
+                space: { type: string, maxLength: 256, description: The objectType (space) name }
+                instance_id: { type: string, maxLength: 1024, description: The record/document id }
+                body: { type: string, maxLength: 100000, description: "Not empty or only white space, no control character other than tab and line breaks; the first 10 000 characters are kept." }
                 anchor:
                   type: object
                   description: Optional anchor to part of a document
@@ -62371,17 +62521,17 @@ paths:
             schema:
               type: object
               properties:
-                name: { type: string, maxLength: 140 }
+                name: { type: string, maxLength: 140, description: "No control character (400 VALIDATION_ERROR naming the field)." }
                 note: { type: string, nullable: true, maxLength: 1000 }
-                tags: { type: array, items: { type: string } }
+                tags: { type: array, items: { type: string, maxLength: 200 } }
                 links:
                   type: array
                   items:
                     type: object
                     required: [url]
                     properties:
-                      label: { type: string }
-                      url: { type: string }
+                      label: { type: string, maxLength: 200 }
+                      url: { type: string, maxLength: 2048 }
                 relation: { type: string, nullable: true, maxLength: 40 }
       responses:
         '200':
@@ -73830,9 +73980,9 @@ paths:
             schema:
               type: object
               properties:
-                display_name: { type: string }
-                bio: { type: string }
-                avatar: { type: string }
+                display_name: { type: string, maxLength: 200, description: "No control character (400 VALIDATION_ERROR naming the field)." }
+                bio: { type: string, maxLength: 10000 }
+                avatar: { type: string, maxLength: 2048 }
                 locale:
                   type: string
                   description: The LANGUAGE. Also the language this person's email is sent in.

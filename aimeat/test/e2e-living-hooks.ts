@@ -31,6 +31,10 @@
  *   because the runner pins AIMEAT_ALLOW_PRIVATE_EGRESS=true (run-e2e-server.ts) — the same flag
  *   e2e-connections and e2e-ai-jobs use to put a real counterparty on the machine.
  * @version-history
+ *   v1.3.0 — 2026-10-27 — An agent of the same owner without ext:invoke is refused at the action
+ *     route with a 403 naming the word, and nothing reaches the receiver: the suite's first refusal
+ *     of a second signed-in principal at HTTP (the extension's own refusals answer inside the body).
+ *     Its ports moved to 28000-29999 with every suite's.
  *   v1.2.0 — 2026-10-12 — The two agents hold ext:invoke, the word node 4.0.0 asks on POST
  *     /v1/ext/:name/:action (REST scope gates). There the route refused both agents with a
  *     SCOPE_DENIED for ext:invoke in the HTTP error, so the extension's own memory:write refusal, the
@@ -51,7 +55,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const RECEIVER_PORT = parseInt(process.env.E2E_LIVING_HOOKS_PORT ?? '40665', 10);
+const RECEIVER_PORT = parseInt(process.env.E2E_LIVING_HOOKS_PORT ?? '28665', 10);
 const RECEIVER_HOST = '127.0.0.1';
 const RECEIVER = `http://${RECEIVER_HOST}:${RECEIVER_PORT}`;
 const SECRET_NAME = 'HOOK_TOKEN';
@@ -296,6 +300,15 @@ await test('a guest is refused at the door, before any script runs', async () =>
 // the extension's own memory:write check and never a refusal at the action route.
 const readOnlyAgent = await mintAgentToken(owner, 'lh-reader', ['memory:read', 'ext:invoke']);
 const writeAgent = await mintAgentToken(owner, 'lh-writer', ['memory:read', 'memory:write', 'ext:invoke']);
+const noInvokeAgent = await mintAgentToken(owner, 'lh-noinvoke', ['memory:read', 'memory:write']);
+
+await test('an agent of the same owner without ext:invoke is refused at the action route (403), and nothing is sent', async () => {
+    deliveries.length = 0;
+    const r = await call('send', noInvokeAgent, { url: `${RECEIVER}/hook`, body: { a: 0 } });
+    assert(r.status === 403, `expected 403 at the route, got ${r.status}: ${JSON.stringify(r.envelope).slice(0, 200)}`);
+    assert(JSON.stringify(r.envelope).includes('ext:invoke'), 'the refusal does not name ext:invoke');
+    assert(deliveries.length === 0, 'a route-refused send reached the receiver');
+});
 
 await test('an agent without memory:write may not send, and the refusal says which word is missing', async () => {
     deliveries.length = 0;

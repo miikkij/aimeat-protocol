@@ -44,7 +44,7 @@ import {
 import { ownerSignIn } from './helpers/owner-login.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
-const PORT = process.env.E2E_AI_MODEL_POLICY_PORT ?? '40438';
+const PORT = process.env.E2E_AI_MODEL_POLICY_PORT ?? '28438';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const REDIRECT = 'http://localhost:9912/callback';

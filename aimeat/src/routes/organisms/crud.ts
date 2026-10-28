@@ -6,6 +6,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   2026-10-27 — POST /v1/organisms and PUT /v1/organisms/:id check their bodies with validateBody
+ *     (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
  *   2026-10-25 — GET /v1/organisms/waiting leaves out an organism that does not admit the calling
  *     agent (agentAccess 'listed'), as aimeat_organism_list does (secaudit2026oct22).
  *   2026-10-23 — Deleting an organism deletes its compliance documents (plan doc-mvlftkh9zmc9).
@@ -63,6 +65,8 @@
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
+import { validateBody } from '../../models/schemas.js';
+import { OrganismCreateBody, OrganismUpdateBody } from '../../models/write-body-schemas.js';
 import type { Storage, OrganismRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../../auth/anonymous-principal.js';
@@ -112,7 +116,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
    * NOBODY LOSES A CAPABILITY. organism:write has been in GRANDFATHERED_SCOPES since 2026-08-10
    * (services/scope-vocabulary-migration.ts), so every agent with a recorded scope list is handed
    * the word at boot, and a '*' agent is covered by the wildcard at this door. ── */
-  router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), async (req, res) => {
+  router.post('/v1/organisms', requireAuth(), requireScope('organism:write'), validateBody(OrganismCreateBody, config.nodeId), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const { name, description, type, location, interests, join_policy, max_members, visibility, member_visibility, shape, lang } = req.body ?? {};
 
@@ -337,7 +341,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   // the create door and on aimeat_organism_update, and absent here, so an agent granted only
   // memory:read could rename its owner's organism, rewrite the README and flip visibility to
   // public. Same word as the MCP tool that calls the same service.
-  router.put('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write'), async (req, res) => {
+  router.put('/v1/organisms/:id', requireAuth(), requireRole('agent'), requireScope('organism:write'), validateBody(OrganismUpdateBody, config.nodeId), async (req, res) => {
     const ghii = req.auth!.owner as string;
     const id = req.params.id as string;
 

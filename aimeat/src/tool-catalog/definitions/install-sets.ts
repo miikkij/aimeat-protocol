@@ -8,6 +8,7 @@
  *   (src/tool-dispatch/tool-call-defs-admin.ts) all read this description.
  * @structure installSetTools
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
  *   v1.4.0 — 2026-10-04 — aimeat_admin_install_set names `grant_apps` and `landing`.
@@ -18,6 +19,7 @@
  *   v1.0.0 — 2026-09-28 — Initial (install packages, phase 4).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 
 export const installSetTools = [
@@ -52,16 +54,16 @@ export const installSetTools = [
         input: {
             action: { type: 'string', required: true, enum: ['needs', 'grant', 'revoke', 'offer', 'claim', 'catalogue', 'price', 'review', 'requests', 'decide'], description: 'needs: the questions to ask; grant: serve (or change, or end the updates of) a customer node; revoke: stop serving it; offer: the author\'s terms and what the version on sale can do; claim: a one-time code for a node not known yet; catalogue: what this node sells; price: put a package on sale here at this node\'s own price, or change it; review: approve what the version on sale can do, which opens new sales; requests: sales waiting for approval; decide: approve or refuse one.' },
             repository: { type: 'string', description: 'The package repository\'s node id, e.g. "aimeat-finland-002-repository". Not for catalogue, requests or decide.' },
-            repository_link: { type: 'object', description: 'The first time only: { url, public_key } of the repository, to link it as a peer of this node.', zod: z.object({ url: z.string(), public_key: z.string() }) },
+            repository_link: { type: 'object', description: 'The first time only: { url, public_key } of the repository, to link it as a peer of this node.', zod: z.object({ url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             group_id: { type: 'string', description: 'The package or install bundle group id on the repository.' },
             node_id: { type: 'string', description: 'For grant and revoke: the customer node.' },
-            node: { type: 'object', description: 'For grant: { url, public_key } of a customer node the repository does not know yet.', zod: z.object({ url: z.string(), public_key: z.string() }) },
+            node: { type: 'object', description: 'For grant: { url, public_key } of a customer node the repository does not know yet.', zod: z.object({ url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             updates_until: { type: 'string', description: 'For grant and claim: versions published after this ISO date-time are not served (the monthly updates ended). Omit to keep the grant\'s date.' },
             channel: { type: 'string', enum: ['stable', 'beta'], description: 'For grant and claim: stable (the default) or beta.' },
             note: { type: 'string', description: 'For grant and claim: the order it came from.' },
             terms_id: { type: 'string', description: 'For grant and claim: the author\'s terms the sale was made on (from action offer).' },
-            price: { type: 'object', description: 'For price: { amount, currency } in micro-units (1 EUR = 1000000), this node\'s one-time price; null for an offer that grants without money.', zod: z.object({ amount: z.number(), currency: z.string() }).nullable() },
-            renewal: { type: 'object', description: 'For price: { amount, currency, period_days }, this node\'s renewal price; null for none.', zod: z.object({ amount: z.number(), currency: z.string(), period_days: z.number() }).nullable() },
+            price: { type: 'object', description: 'For price: { amount, currency } in micro-units (1 EUR = 1000000), this node\'s one-time price; null for an offer that grants without money.', zod: z.object({ amount: z.number(), currency: z.string().max(INPUT_LIMITS.id) }).nullable() },
+            renewal: { type: 'object', description: 'For price: { amount, currency, period_days }, this node\'s renewal price; null for none.', zod: z.object({ amount: z.number(), currency: z.string().max(INPUT_LIMITS.id), period_days: z.number() }).nullable() },
             title: { type: 'string', description: 'For price: the name buyers see.' },
             state: { type: 'string', enum: ['on_sale', 'paused', 'ended'], description: 'For price: on_sale, paused (renewals only) or ended.' },
             request_id: { type: 'string', description: 'For decide: the request.' },
@@ -78,7 +80,7 @@ export const installSetTools = [
         surfaces: ['admin'],
         input: {
             repository: { type: 'string', required: true, description: 'The package repository\'s node id.' },
-            repository_link: { type: 'object', description: 'The first time only: { url, public_key } of the repository, to link it as a peer of this node.', zod: z.object({ url: z.string(), public_key: z.string() }) },
+            repository_link: { type: 'object', description: 'The first time only: { url, public_key } of the repository, to link it as a peer of this node.', zod: z.object({ url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             group_id: { type: 'string', required: true, description: 'The package or install bundle group id on the repository.' },
             code: { type: 'string', required: true, description: 'The claim code the seller gave (pkgc_…).' },
         },

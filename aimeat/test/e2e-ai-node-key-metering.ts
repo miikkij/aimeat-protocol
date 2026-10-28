@@ -35,6 +35,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-node-key-metering
  * @version-history
+ *   v1.0.1 -- 2026-10-28 -- Port 40465 -> 28465, main's move of fixed suite ports out of the claims range.
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26).
  */
 import { createHash, randomBytes } from 'node:crypto';
@@ -49,8 +50,9 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { startFakeAiProvider, chatJson, sseChat, type FakeAiProvider, type RecordedRequest } from './helpers/fake-ai-provider.js';
 import { ownerSignIn } from './helpers/owner-login.js';
 
-// Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
-const PORT = process.env.E2E_AI_NODE_KEY_METERING_PORT ?? '40465';
+// Its own port, in the suites' fixed band (28000-29999) outside what the claims board hands out; the
+// stub takes an ephemeral one.
+const PORT = process.env.E2E_AI_NODE_KEY_METERING_PORT ?? '28465';
 const BASE = `http://localhost:${PORT}`;
 const NODE_KEY = 'sk-node-e2e-metering-never-billed';
 const NODE_MODEL = 'openai/gpt-4o';

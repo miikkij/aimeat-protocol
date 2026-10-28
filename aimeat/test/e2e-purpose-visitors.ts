@@ -18,7 +18,7 @@
  *   FAIL FIRST, 2026-10-21, both backends: with GET /v1/cortex/:name refusing the anonymous principal
  *   (routes/cortex.ts, the shape that removed the popup), test 6 is red; restored byte for byte.
  *
- *   THE NODE runs on the run's backend (test/helpers/own-node-db.ts) on E2E_PURPOSE_ANON_PORT, 40820
+ *   THE NODE runs on the run's backend (test/helpers/own-node-db.ts) on E2E_PURPOSE_ANON_PORT, 28820
  *   by default, with production settings apart from anonymous mode.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-visitors
  * @version-history
@@ -34,7 +34,7 @@ import { BASE, NODE_ID, assert, auth, harness, installExtension, json } from './
 
 const h = harness('Purpose: visitors without registration and anonymous mode');
 const STAMP = Date.now().toString(36);
-const ANON_PORT = parseInt(process.env.E2E_PURPOSE_ANON_PORT ?? '40820', 10);
+const ANON_PORT = parseInt(process.env.E2E_PURPOSE_ANON_PORT ?? '28820', 10);
 const ANON = `http://127.0.0.1:${ANON_PORT}`;
 const ANON_NODE_ID = `aimeat-test-001-anon${STAMP.slice(-6)}`;
 

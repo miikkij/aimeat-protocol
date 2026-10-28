@@ -5,6 +5,7 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_workspace_members declares organism:invite, the word its REST twin asks (secaudit2026oct22).
  *   2026-10-18 — aimeat_workspace_publish and aimeat_workspace_revert_to_draft: `namespace` takes the space's name as well as its namespace.
  *   2026-10-18 — aimeat_workspace_share, aimeat_organism_create and aimeat_organism_update say they answer publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
@@ -83,6 +84,7 @@
 
 import { wsGrantShape } from '../input-schemas.js';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -304,7 +306,7 @@ export const organismsWorkspacesAppsTools = [
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             email: { type: 'string', required: true, description: 'Email address of the person to invite.' },
             org_role: { type: 'string', enum: ['member', 'admin'], description: 'Organism role granted on accept (default "member").' },
-            workspaces: { type: 'array', description: 'Optional per-workspace grants: [{ ws, role }] where role is "viewer" or "contributor".', zod: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })) },
+            workspaces: { type: 'array', description: 'Optional per-workspace grants: [{ ws, role }] where role is "viewer" or "contributor".', zod: z.array(z.object({ ws: z.string().max(INPUT_LIMITS.id), role: z.enum(['viewer', 'contributor']) })) },
             message: { type: 'string', description: 'Optional personal note included in the invitation email.' },
             expires_in_days: { type: 'number', description: 'Days until the invitation expires (1–30, default 7).' },
             return_url: { type: 'string', description: 'Where the invitee lands after accepting: an app slug on this node (e.g. "my-app") or a full URL on this node or its app subdomains. Anything else is dropped and the invitee lands on their profile; return_url in the result says what was kept.' },
@@ -370,7 +372,7 @@ export const organismsWorkspacesAppsTools = [
             space: { type: 'string', required: true, description: 'The objectType (space) name the target lives in.' },
             instance_id: { type: 'string', required: true, description: 'The id of the record/document being commented on.' },
             body: { type: 'string', required: true, description: 'The comment text.' },
-            anchor: { type: 'object', description: 'Optional anchor to part of a document: { section } or { quote }.', zod: z.object({ section: z.string().optional(), quote: z.string().optional() }) },
+            anchor: { type: 'object', description: 'Optional anchor to part of a document: { section } or { quote }.', zod: z.object({ section: z.string().max(INPUT_LIMITS.title).optional(), quote: z.string().max(INPUT_LIMITS.text).optional() }) },
             parent_id: { type: 'string', description: 'Optional id of the comment this replies to (threading).' },
         },
     },
@@ -431,7 +433,7 @@ export const organismsWorkspacesAppsTools = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id (from aimeat_workspace_list).' },
-            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.', zod: z.array(z.string()) },
+            ids: { type: 'array', description: 'Batch-open: return the FULL value of ONLY these instance ids (from the index). A full memory key, which is the id aimeat_discover gives a workspace record, is taken as well. Omit for the lightweight index.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
             space: { type: 'string', description: 'With `ids`: optionally restrict the lookup to this space (objectType name or namespace).' },
             include_archived: { type: 'boolean', description: 'Include archived (hidden) content. Default false.' },
         },
@@ -608,7 +610,7 @@ export const organismsWorkspacesAppsTools = [
             name: { type: 'string', required: false, description: 'New organism name.' },
             description: { type: 'string', required: false, description: 'Short tagline shown under the name.' },
             readme: { type: 'string', required: false, description: 'Free-form markdown README (mermaid + aimeat-memory live-data blocks allowed) describing the organism; shown at the top of the organism home. Replaces the current one.' },
-            interests: { type: 'array', required: false, description: 'Interest tags.', zod: z.array(z.string()) },
+            interests: { type: 'array', required: false, description: 'Interest tags.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             join_policy: { type: 'string', required: false, description: 'open | approval_required | invite_only.' },
             visibility: { type: 'string', required: false, description: 'public | listed | private.' },
             agent_access: { type: 'string', required: false, enum: ['all', 'listed'], description: 'Which members\' agents may act here: "all" (every member\'s agents, the default) or "listed" (only the agents in the Agents section of the organism\'s page; any other agent is refused as a non-member). An agent can set "listed"; only the owner signed in can set "all" again.' },
@@ -662,7 +664,7 @@ export const organismsWorkspacesAppsTools = [
             action: { type: 'string', required: true, enum: ['request', 'list', 'decide'], description: "'request' | 'list' | 'decide'." },
             message: { type: 'string', description: "action='request': optional note to the creator." },
             requester: { type: 'string', description: "action='decide': the requester's owner name (from action='list')." },
-            decision: { type: 'string', enum: ['approve', 'deny'], description: "action='decide': 'approve' (default) or 'deny'.", zod: z.string() },
+            decision: { type: 'string', enum: ['approve', 'deny'], description: "action='decide': 'approve' (default) or 'deny'.", zod: z.string().max(INPUT_LIMITS.id) },
             role: { type: 'string', enum: ['viewer', 'contributor'], description: "action='decide' approve: 'viewer' (read) or 'contributor' (read+write). Omit for the default (contributor)." },
         },
     },
@@ -677,7 +679,7 @@ export const organismsWorkspacesAppsTools = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', description: 'A single workspace id (use this and/or `workspaces`).' },
-            workspaces: { type: 'array', description: 'Many workspace ids to grant in one call.', zod: z.array(z.string()) },
+            workspaces: { type: 'array', description: 'Many workspace ids to grant in one call.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             grantee: { type: 'string', required: true, description: 'Owner name, GHII, or GAII to grant. Applies to the owner (agents inherit).' },
             role: { type: 'string', required: true, enum: ['viewer', 'contributor'], description: "'viewer' (read) or 'contributor' (read+write)." },
         },
@@ -693,7 +695,7 @@ export const organismsWorkspacesAppsTools = [
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', description: 'A single workspace id (use this and/or `workspaces`).' },
-            workspaces: { type: 'array', description: 'Many workspace ids to revoke in one call.', zod: z.array(z.string()) },
+            workspaces: { type: 'array', description: 'Many workspace ids to revoke in one call.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             grantee: { type: 'string', required: true, description: 'Owner name, GHII, or GAII to revoke.' },
         },
     },

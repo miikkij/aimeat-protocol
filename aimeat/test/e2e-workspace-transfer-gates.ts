@@ -44,7 +44,7 @@ import { unzipBuffer } from '../src/services/workspace-import.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_WS_TRANSFER_GATES_PORT ?? '40496';
+const PORT = process.env.E2E_WS_TRANSFER_GATES_PORT ?? '28496';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-workspace-transfer-gates.db');

@@ -47,7 +47,7 @@ export interface HostResponse {
 /**
  * GET (or any method) `path` on the server behind `base`, addressed as `host`.
  *
- * `base` gives the address to connect to (`http://localhost:40262`); `host` is what goes in the
+ * `base` gives the address to connect to (`http://localhost:28262`); `host` is what goes in the
  * request line's Host header, port included when the server is not on 80 — the two differ on
  * purpose, which is the whole point of this helper. Redirects are never followed, so a 301/302 is
  * returned as itself.

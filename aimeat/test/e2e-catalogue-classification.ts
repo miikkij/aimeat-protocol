@@ -39,7 +39,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
 
-const PORT = Number(process.env.E2E_CATALOGUE_CLASSIFICATION_PORT ?? 40495);
+const PORT = Number(process.env.E2E_CATALOGUE_CLASSIFICATION_PORT ?? 28495);
 const BASE = `http://127.0.0.1:${PORT}`;
 const STAMP = Date.now().toString(36).slice(-6);
 const NODE_ID = `aimeat-test-001-catcl${STAMP}`;

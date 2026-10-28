@@ -17,6 +17,7 @@
  *   const parsed = OdpsExtrasSchema.safeParse(req.body.odps);
  *   if (!parsed.success) return res.status(400).json(error(nodeId, 'INVALID_ODPS', parsed.error.message));
  * @version-history
+ *   v1.1.1 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   Comment only — 2026-09-13 — The developer decided the ODPS caps are enforced at the write: a source
  *     flagged for EXCHANGE whose changed text would break one is refused with ODPS_FIELD_TOO_LONG
  *     (services/exchange-odps-write.ts). These authoring limits stay raised and unchanged.
@@ -32,6 +33,7 @@
  *     addendum Q2/Q3): closes the drift where `odpsVersion` was declared but never written.
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from './input-limits.js';
 
 /** ODPS v4.1 `product.details.type` — what KIND of data product this is. */
 export const ODPS_PRODUCT_TYPES = [
@@ -94,7 +96,7 @@ export const ProvenanceSchema = z.object({
   /** What was done to the raw material to make this product (cleaning, joining, enrichment, model inference). */
   transformations: longText.optional(),
   /** SHA-256 content identity of the snapshot this promise is about (hex or `sha256:` prefixed). */
-  snapshotHash: z.string().trim().regex(/^(sha256:)?[a-fA-F0-9]{64}$/, 'snapshotHash must be a SHA-256 hex digest').optional(),
+  snapshotHash: z.string().max(INPUT_LIMITS.id).trim().regex(/^(sha256:)?[a-fA-F0-9]{64}$/, 'snapshotHash must be a SHA-256 hex digest').optional(),
   /** Upstream chain for derived data (OpenLineage-style, kept deliberately small + human-readable). */
   lineage: z.array(ProvenanceLineageHopSchema).max(20).optional(),
   /** Which ODPS version this listing's descriptor follows. Defaulted by the node on write. */
@@ -166,7 +168,7 @@ export const OdpsExtrasSchema = z.object({
    * which key it belongs under. Defaults to `en`. The same string is never duplicated under a second
    * language — a claimed translation that does not exist is worse than none.
    */
-  language: z.string().trim().regex(/^[a-z]{2}$/, 'language must be an ISO 639-1 two-letter code').optional(),
+  language: z.string().max(INPUT_LIMITS.id).trim().regex(/^[a-z]{2}$/, 'language must be an ISO 639-1 two-letter code').optional(),
   /** Overrides the node's default product type (derived from the offering kind). */
   productType: z.enum(ODPS_PRODUCT_TYPES).optional(),
   /** v4.1: governance maturity applied to this product. */

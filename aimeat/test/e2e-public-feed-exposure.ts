@@ -49,7 +49,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_PUBLIC_FEED_PORT ?? '40497';
+const PORT = process.env.E2E_PUBLIC_FEED_PORT ?? '28497';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = resolve(process.cwd(), 'test/.test-public-feed-exposure.db');

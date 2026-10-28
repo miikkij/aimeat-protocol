@@ -227,7 +227,7 @@ async function siblingSession(base: Awaited<ReturnType<typeof setup>>, name: str
 // completed means a node started with the threshold at zero, and that is a second server.
 //
 // It follows the run's backend (test/helpers/own-node-db.ts), like the shared node.
-const STALL_PORT = process.env.E2E_MCP_TASK_STALL_PORT ?? '40413';
+const STALL_PORT = process.env.E2E_MCP_TASK_STALL_PORT ?? '28413';
 const STALL_BASE = `http://localhost:${STALL_PORT}`;
 const STALL_DB = resolve(process.cwd(), 'test/.test-mcp-task-stall.db');
 

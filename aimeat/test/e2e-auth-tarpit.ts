@@ -26,7 +26,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { waitForServer } from './helpers/wait-for-server.js';
 
-const PORT = process.env.E2E_TARPIT_PORT ?? '40275';
+const PORT = process.env.E2E_TARPIT_PORT ?? '28275';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = 'aimeat-local-001-dev';
 const DB_PATH = './test/.test-auth-tarpit.db';

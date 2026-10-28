@@ -76,7 +76,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = Number(process.env.E2E_CORE_JOBS_PORT ?? 40310);
+const PORT = Number(process.env.E2E_CORE_JOBS_PORT ?? 28310);
 const SMTP_PORT = PORT + 1;
 const BASE = `http://127.0.0.1:${PORT}`;
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -228,7 +228,7 @@ async function startNode(): Promise<void> {
             // Outbound connections, for the one door that mints a verification nonce without a live
             // identity provider behind it. No server is needed: only the authorize URL is built.
             AIMEAT_CONNECTIONS_ENABLED: 'true',
-            AIMEAT_CONNECT_FAKE_BASE_URL: 'http://127.0.0.1:40388',
+            AIMEAT_CONNECT_FAKE_BASE_URL: 'http://127.0.0.1:28388',
 
             // The usage sweep's windows, read at module load in services/usage/archive-job.ts. Zero
             // means "keep nothing hot": until 2026-09-08 the file read `Number(x) || 90`, so this 0

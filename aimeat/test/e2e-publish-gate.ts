@@ -26,7 +26,7 @@ import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40269';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28269';
 const stamp = Date.now();
 
 let passed = 0, failed = 0;

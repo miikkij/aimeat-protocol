@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.23.1 -- 2026-10-28 -- The list no longer names the agents holding all permissions: the node no longer narrows them, so the owner is not asked to; each agent's card offers the narrowing.
  *   v4.23.0 -- 2026-10-25 -- An approval of a new device taking over an existing agent sends the owner's
  *     choice to sign its other sessions out (end_other_sessions; secaudit2026oct22).
  *   v4.22.0 -- 2026-10-25 -- A connection request's Approve and Deny wait while an answer is on its way
@@ -716,8 +717,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
             ${agents.length === 0
               ? html`<${NoAgentsYet} onPick=${pickExample} />`
               : html`
-                ${/* The agents whose `*` now holds their tasks, waiting for the owner's narrowing. */''}
-                ${agents.some(a => a.task_start_wildcard?.ready) && html`<${Note} kind="hint">${p('wildcardWaiting', { names: agents.filter(a => a.task_start_wildcard?.ready).map(a => a.display_name || a.name).join(', ') })}<//>`}
                 <${AgentSearch}
                   query=${query}
                   setQuery=${setQuery}

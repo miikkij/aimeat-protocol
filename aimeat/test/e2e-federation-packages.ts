@@ -123,7 +123,7 @@ console.log('Setup');
 
 await test('Boot A (publisher) and B (puller) with an owner each', async () => {
     // This suite's two blocks plus the lane's last two digits (helpers/free-port.ts), so it runs
-    // beside any other lane and any other session's run. It held 40701/40702, which kept two
+    // beside any other lane and any other session's run. It held 28701/28702, which kept two
     // sessions from running it at once, and a collision does not fail loudly: every assertion then
     // runs against somebody else's node (incident 2026-09-05-port-40262-app-origin). A port asked of
     // the system lost a race to another suite's stub server on 2026-10-08 (e2e-capabilities).

@@ -17,7 +17,7 @@
  *   account, the shape of the first wave's fix), tests 5, 6 and 7 are red; restored byte for byte.
  *
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_PURPOSE_SHARED_PORT,
- *   40821 by default.
+ *   28821 by default.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-purpose-shared-extensions
  * @version-history
  *   v1.0.0 -- 2026-10-21 -- Initial (wish wish-tarkoitustestit-e2e-sarjat-jotka-varmistavat-aimeatin-suunni).
@@ -28,7 +28,7 @@ import { BASE, assert, auth, harness, installExtension, json, sleep, startReceiv
 
 const h = harness('Purpose: an extension is a service other accounts call, with their own keys');
 const STAMP = Date.now().toString(36);
-const receiver = await startReceiver(parseInt(process.env.E2E_PURPOSE_SHARED_PORT ?? '40821', 10));
+const receiver = await startReceiver(parseInt(process.env.E2E_PURPOSE_SHARED_PORT ?? '28821', 10));
 const EXT = `purposesvc${STAMP}`;
 const WHY = "to read the caller's shop orders";
 

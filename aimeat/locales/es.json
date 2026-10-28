@@ -2528,6 +2528,8 @@
         "modelsEmpty": "el registro está vacío, así que los {n} modelos usados aquí cuentan como no documentados",
         "apps": "{n} aplicaciones dicen que generan contenido y la revisión de publicación no encontró ninguna declaración",
         "appsOne": "una aplicación dice que genera contenido y la revisión de publicación no encontró ninguna declaración",
+        "aiApps": "{n} aplicaciones usan IA y ninguna entrada las nombra",
+        "aiAppsOne": "una aplicación usa IA y ninguna entrada la nombra",
         "unanswered": "{n} entradas tienen preguntas todavía sin responder",
         "unansweredOne": "una entrada tiene preguntas todavía sin responder",
         "unlabelled": "{n} elementos públicos no llevan etiqueta",
@@ -2539,9 +2541,31 @@
       },
       "under": {
         "filled": "{entries} entradas · {questions} preguntas · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro",
-        "empty": "0 entradas · {questions} preguntas · todavía no hay nada anotado"
+        "empty": "0 entradas · {questions} preguntas · todavía no hay nada anotado",
+        "proposed": " · {n} propuestas te esperan",
+        "maker": " · {n} respuestas de quienes hicieron las aplicaciones"
       },
       "gapUndocumented": "Se usa aquí, no está anotado en ninguna parte",
+      "gapAiApps": "Una aplicación usa IA y ninguna entrada la nombra",
+      "answerProposed": "propuesta, revísala",
+      "proposedWhy": "Por qué se propone: {reason}",
+      "noteWhy": "Por qué: {note}",
+      "notesTitle": "Por qué cada respuesta",
+      "notesHint": "Una o dos frases por respuesta. La versión impresa muestra el motivo junto a la respuesta, y es lo que comprueba un auditor.",
+      "ask": {
+        "subject": "Las preguntas del Reglamento de IA para {{n}} de tus aplicaciones",
+        "intro": "{{n}} de tus aplicaciones usan IA, y el Reglamento europeo de IA hace algunas preguntas sobre cada una. Tú conoces tus aplicaciones mejor que nadie, así que el administrador te pide que las respondas:",
+        "appLine": "- {{title}}: {{open}} preguntas abiertas. Respóndelas en la página de la aplicación: {{url}}",
+        "how": "Lo más rápido es tu propia IA. Pega esto en el chat de tu IA:",
+        "after": "Tus respuestas se guardan en el mapa de datos de la aplicación, y el administrador las aprueba en el registro de cumplimiento. Este recordatorio vuelve dentro de dos semanas mientras queden preguntas abiertas."
+      },
+      "proposedStated": "según el mapa de datos, {rows} contiene datos regulados ({domain}), y la aplicación los trata con IA.",
+      "proposedRead": "las palabras del mapa de datos ({words}) apuntan a datos regulados ({domain}) en {rows}, y la aplicación los trata con IA.",
+      "acceptProposal": "Aprobar",
+      "annex3": {
+        "employment": "relación laboral",
+        "biometrics": "biometría"
+      },
       "gapAppGap": "La aplicación dice que genera contenido, y la revisión encontró una falta",
       "gapUnclassified": "Quedan preguntas sin responder",
       "gapUnlabelled": "Publicado sin etiqueta",
@@ -2552,6 +2576,11 @@
         "undocumentedClear": "Cada modelo llamado en este periodo está nombrado en una entrada.",
         "appsWhy": "dicen que generan contenido, y la revisión de publicación no encontró ninguna declaración.",
         "appsWhyOne": "dice que genera contenido, y la revisión de publicación no encontró ninguna declaración.",
+        "aiAppsWhy": "usan IA según lo que ellas mismas declaran, y ninguna entrada del registro las nombra. El borrador las añade a partir de sus mapas de datos.",
+        "aiAppsWhyOne": "usa IA según lo que ella misma declara, y ninguna entrada del registro la nombra. El borrador la añade a partir de su mapa de datos.",
+        "aiAppsClear": "Cada aplicación que usa IA está nombrada en una entrada.",
+        "aiAppHigh": "posible riesgo alto: {area}",
+        "aiAppsHighWhy": "Una aplicación marcada así trata datos laborales o biométricos con IA. El Reglamento europeo de IA considera ese uso de alto riesgo (anexo III). Revisa primero su entrada.",
         "appIn": "está en el registro",
         "appOut": "no está en el registro",
         "appsClear": "Ninguna aplicación declara que genera contenido sin una declaración.",
@@ -2650,7 +2679,9 @@
       "src": {
         "ai": "IA {n}",
         "you": "tú {n}",
-        "record": "registro {n}"
+        "record": "registro {n}",
+        "proposed": "propuesta {n}",
+        "maker": "autor {n}"
       },
       "showNext": "Mostrar las {n} siguientes",
       "foot": "{shown} de {total} · respuestas: {ai} de la IA, {human} tuyas, {evidence} del registro · {unanswered} sin responder",
@@ -2676,6 +2707,210 @@
       "answerFromEvidence": "de lo registrado",
       "answerFromAi": "borrador de la IA",
       "answerFromHuman": "tu respuesta",
+      "answerFromProposed": "propuesta de una regla, aún sin aprobar",
+      "answerFromMaker": "quien hizo la aplicación",
+      "paper": {
+        "summaryTitle": "Situación general",
+        "sumUses": "Usos de IA encontrados",
+        "sumUsesValue": "aplicaciones: {apps} · personas o agentes: {others}",
+        "sumApproved": "Guardados en el registro",
+        "sumApprovedValue": "{saved} de {total}",
+        "sumHigh": "Candidatos a la clase de alto riesgo",
+        "none": "ninguno",
+        "sumCalls": "Llamadas a modelos en el periodo",
+        "sumCallsValue": "{calls} llamadas · {cost} · {models} modelos",
+        "sumGaps": "Carencias abiertas",
+        "sumGapsValue": "{ai} en el registro de IA · {records} en los registros de actividades de tratamiento",
+        "sumPublic": "Contenido público",
+        "sumPublicValue": "{total} publicados · {unlabelled} sin etiqueta",
+        "usesLead": "Cada aplicación y persona de esta instalación que usa IA, según sus propios registros. Una entrada guardada está en el registro. Una entrada encontrada por el sistema es lo que la instalación leyó de sus registros de uso y de los mapas de datos; nadie la ha revisado ni guardado todavía.",
+        "usesNone": "La instalación no encuentra ningún uso de IA en este periodo.",
+        "statusSaved": "guardado · clase: {cls}",
+        "statusFound": "encontrado por el sistema, sin guardar",
+        "statusProposed": " · clase propuesta: {cls}",
+        "fOwner": "Cuenta",
+        "modelsNone": "sin llamadas a modelos registradas en este periodo",
+        "fWhyAi": "Por qué cuenta como uso de IA",
+        "fProposal": "Respuesta propuesta, sin aprobar",
+        "fOpen": "Sin responder",
+        "openCount": "{n} de {total} preguntas",
+        "ev": {
+          "aiUse": "la aplicación pide permiso para usar IA",
+          "machinery": "según el mapa de datos, la aplicación genera contenido con IA",
+          "generates": "la aplicación declara que genera: {what}",
+          "sendsOne": "según el mapa de datos, la aplicación envía una cosa a un servicio de IA",
+          "sends": "según el mapa de datos, la aplicación envía {n} cosas a un servicio de IA",
+          "keeps": "según el mapa de datos, la aplicación guarda contenido hecho con IA ({rows})"
+        },
+        "media": {
+          "text": "texto",
+          "image": "imágenes",
+          "audio": "audio",
+          "video": "vídeo"
+        },
+        "personal": "datos personales, según el mapa de datos de la aplicación",
+        "personalDomains": "datos personales, según el mapa de datos de la aplicación; datos regulados: {list}",
+        "domainStated": "{domain}, declarado en {rows}",
+        "domainProposed": "{domain}, deducido de las palabras de {rows}",
+        "gapsTitle": "Qué falta",
+        "gapAiAnnex": "candidato a la clase de alto riesgo ({area})",
+        "gapCount": "{n} elementos",
+        "gapKind": {
+          "undocumented-ai-activity": "Se usó un modelo y ninguna entrada lo nombra",
+          "app-uses-ai-not-in-register": "Una aplicación usa IA y ninguna entrada la nombra",
+          "app-declares-generation-with-gap": "Una aplicación genera contenido y la comprobación de publicación no encontró etiqueta",
+          "unclassified-usecase": "Una entrada tiene preguntas sin responder y por eso no tiene clase",
+          "unlabelled-public-content": "Publicado sin etiqueta de IA",
+          "font-licence-unknown": "Una fuente sin datos de licencia"
+        },
+        "measuresWhat": "Uso de IA en el periodo",
+        "recordsNone": "Todavía no hay ningún registro de actividades de tratamiento guardado. La instalación tiene {drafts} borradores listos para revisar.",
+        "appendixTitle": "Anexo: el conjunto de preguntas",
+        "appendixNum": "A",
+        "appendixLead": "La clase de riesgo de un uso de IA sale de estas preguntas. Cada respuesta lleva a una clase según la regla de la última columna, y gana la clase más grave. Una pregunta sin respuesta deja el uso sin clasificar.",
+        "readFirst": "Este informe dice para qué se usa la IA en esta instalación, qué está registrado y qué falta. Es para el delegado de protección de datos, la dirección y un auditor. El apartado 2 enumera lo que hay que hacer y quién lo hace. Cada respuesta dice quién la dio:",
+        "colMark": "Marca",
+        "colMeans": "Qué significa",
+        "means": {
+          "human": "Respondió una persona.",
+          "ai": "Un modelo redactó la respuesta y una persona la guardó.",
+          "evidence": "La instalación leyó la respuesta de sus propios registros. Nadie decidió nada.",
+          "proposed": "Una regla dedujo la respuesta del mapa de datos de la aplicación. Nadie la ha aprobado todavía.",
+          "maker": "Quien hizo la aplicación respondió en su mapa de datos, y el administrador lo guardó."
+        },
+        "tocTitle": "Contenido",
+        "sumOpen": "Preguntas sin responder",
+        "sumOpenValue": "{n} de {total}",
+        "nextTitle": "Qué hacer ahora",
+        "nextLead": "La página de cumplimiento está en {page}.",
+        "colAction": "Qué hacer",
+        "colWhoDoes": "Quién",
+        "colWhere": "Dónde",
+        "act": {
+          "save": "Revisar los {n} usos de IA que encontró el sistema y guardarlos en el registro",
+          "high": "Decidir la clase de los candidatos a alto riesgo: {list}",
+          "answer": "Responder las {n} preguntas abiertas de los {entries} usos de IA"
+        },
+        "who": {
+          "operator": "Administrador",
+          "operatorDpo": "Administrador con el delegado de protección de datos",
+          "appOwner": "Quien hizo la aplicación",
+          "publisher": "Quien publica el contenido"
+        },
+        "where": {
+          "register": "Página de cumplimiento, apartados 01 y 04",
+          "registerOrAi": "Página de cumplimiento, apartado 04, o tu propia IA con la instrucción del apartado 07",
+          "records": "Página de cumplimiento, apartados 08 y 09",
+          "app": "El mapa de datos y el registro de actividades de la aplicación, con la IA de quien la hizo",
+          "publish": "La etiqueta de IA de la aplicación, que se comprueba al publicarla",
+          "fonts": "Temas y estilos, pestaña Fuentes"
+        },
+        "usesTitle": "El uso de IA de un vistazo",
+        "eachTitle": "Cada uso de IA",
+        "colUse": "Uso de IA",
+        "colPersonal": "Datos personales",
+        "colClass": "Clase",
+        "colState": "Estado",
+        "colAnswered": "Respondidas",
+        "classProposed": "{cls} (propuesta)",
+        "stSaved": "guardado",
+        "stFound": "encontrado, sin guardar",
+        "gapsLead": "Cada tipo de carencia, cuántas hay, quién las corrige y a qué afecta cada una.",
+        "gapTag": "{n} · corrige: {who}",
+        "colConcerns": "Afecta a",
+        "colDetail": "Detalle",
+        "howTitle": "Cómo se completa este informe",
+        "howLead": "La instalación encuentra los usos de IA por sí misma. Una persona responde las preguntas y aprueba las respuestas. Los pasos:",
+        "how": {
+          "1": "El administrador abre la página de cumplimiento: {page}",
+          "2": "En el apartado 01 pulsa «Complétalas por mí». La instalación añade al registro, como borrador, los usos de IA que encontró. Todavía no se guarda nada.",
+          "3": "En el apartado 04 abre cada entrada y responde sus preguntas. Aprueba o cambia cada respuesta propuesta. Cada respuesta muestra quién la dio.",
+          "4": "También puede dar el trabajo a su propia IA: el apartado 07 tiene una instrucción lista. La IA muestra su propuesta y espera la aprobación, y sus respuestas quedan marcadas como de la IA.",
+          "5": "Quien hizo la aplicación responde las preguntas de su aplicación con un motivo cada una, con su propia IA o en el apartado «Preguntas del Reglamento de IA» de la página de la aplicación. La instalación se lo recuerda mientras queden preguntas abiertas, para la misma aplicación cada dos semanas. Sus respuestas llegan al borrador marcadas como suyas.",
+          "6": "El administrador guarda. La instalación vuelve a calcular la clase de cada entrada.",
+          "7": "Guarda el informe con «Guardar este» en el apartado 06. La instalación guarda además un informe mensual por sí misma el día 1 de cada mes.",
+          "8": "Imprime este informe con «Imprimir o guardar como PDF»."
+        },
+        "colRole": "Papel",
+        "colRoleDoes": "Qué hace",
+        "role": {
+          "operator": "Administrador",
+          "dpo": "Delegado de protección de datos o abogado",
+          "appOwner": "Quien hizo la aplicación",
+          "ai": "La IA del administrador"
+        },
+        "roleDoes": {
+          "operator": "Lleva el registro, responde las preguntas y las guarda.",
+          "dpo": "Decide la clase de un candidato a alto riesgo y lee el informe.",
+          "appOwner": "Responde las preguntas del Reglamento de IA de la aplicación con un motivo cada una, y mantiene al día su mapa de datos y su registro de actividades.",
+          "ai": "Redacta respuestas a partir de los registros de la instalación. Una persona las aprueba."
+        },
+        "colQuestion": "Pregunta",
+        "colAnswer": "Respuesta",
+        "colWho": "Quién respondió",
+        "colReason": "Por qué",
+        "colHelp": "Cómo responder",
+        "colRule": "La respuesta lleva a la clase"
+      },
+      "question": {
+        "q-manipulative-technique": {
+          "text": "¿Usa técnicas que una persona no puede percibir, o se aprovecha de la edad, una discapacidad o una situación económica vulnerable, de forma que alguien pueda tomar una decisión que le perjudique?",
+          "help": "Cuenta lo que hace el sistema, no la intención: un sistema que empuja a decidir cuenta aunque nadie lo pensara como manipulador."
+        },
+        "q-social-scoring": {
+          "text": "¿Puntúa a las personas por su comportamiento social o sus rasgos personales, y se usa esa puntuación en su contra en una situación ajena a aquella en la que se recogió?",
+          "help": "Lo que la convierte en puntuación social y no en una evaluación corriente es que el contexto sea ajeno."
+        },
+        "q-emotion-workplace-education": {
+          "text": "¿Infiere las emociones de las personas en el trabajo o en la educación?",
+          "help": "Los fines médicos y de seguridad quedan fuera. Las puntuaciones de confianza de los agentes no son esto: puntúan credenciales, no personas."
+        },
+        "q-biometric-categorisation-sensitive": {
+          "text": "¿Clasifica a las personas por datos biométricos para deducir su raza, opiniones políticas, afiliación sindical, religión, vida sexual u orientación sexual?"
+        },
+        "q-untargeted-face-scraping": {
+          "text": "¿Crea o amplía una base de datos de reconocimiento facial extrayendo imágenes de internet o de cámaras de vigilancia de forma no selectiva?"
+        },
+        "q-annex3-area": {
+          "text": "¿Se usa en alguno de estos ámbitos?",
+          "help": "Elige el más cercano. Son los ámbitos del anexo III, con las palabras que usaría quien lo opera y no las del Reglamento. «Ninguno de estos» es una respuesta normal."
+        },
+        "q-decides-about-a-person": {
+          "text": "¿Su resultado decide algo sobre una persona identificada, o influye de forma importante en una decisión que alguien toma sobre ella?",
+          "help": "Un sistema que solo redacta, resume o sugiere a su propio usuario no es esto. Un sistema cuya puntuación se copia en una decisión sí lo es, la copie quien la copie."
+        },
+        "q-interacts-with-people": {
+          "text": "¿Una persona habla con él directamente o lee algo que ha escrito?",
+          "help": "El tráfico entre agentes y la instalación, las llamadas a herramientas, la sincronización de la federación y el programador no son esto. Es tráfico entre máquinas, y el artículo 50, apartado 1, lo dice expresamente."
+        },
+        "q-publishes-publicly": {
+          "text": "¿Publica texto, imagen, audio o vídeo generados donde cualquiera puede leerlos?",
+          "help": "Es la cuestión del artículo 50, apartado 4, y la que esta instalación puede medir por ti: el informe cuenta lo publicado sin etiqueta."
+        },
+        "q-publishes-public-interest": {
+          "text": "¿Trata algo de ello de política, administración pública, salud, ciencia u otro asunto de interés público?",
+          "help": "El tema es lo que hace que el artículo 50, apartado 4, se aplique de verdad, porque la excepción editorial solo vale cuando una persona revisó de verdad el contenido."
+        },
+        "q-resembles-real-people": {
+          "text": "¿Genera imágenes, audio o vídeo que se puedan tomar por personas, lugares o hechos reales?",
+          "help": "Las ilustraciones y los iconos no son esto. Una imagen que alguien podría tomar por una fotografía de una persona identificable sí lo es."
+        },
+        "q-human-reviews-before-publish": {
+          "text": "¿Una persona lee el contenido antes de que se publique, y puede cambiarlo o detenerlo?",
+          "help": "Responde no a todo lo que una programación publica por sí sola. Esta respuesta no baja la clase por sí misma. Se registra porque la excepción editorial depende de ella, y porque un «no» junto a una publicación de interés público es la combinación que conviene mirar."
+        }
+      },
+      "option": {
+        "none": "Ninguno de estos",
+        "biometrics": "Identificar a personas por datos biométricos",
+        "critical-infrastructure": "Gestionar o proteger infraestructuras críticas",
+        "education": "Decidir el acceso, la evaluación o el progreso en la educación",
+        "employment": "Contratación, reparto de tareas, ascensos o fin de la relación laboral",
+        "essential-services": "Acceso a servicios esenciales, crédito o precio de seguros",
+        "law-enforcement": "Aplicación de la ley",
+        "migration": "Migración, asilo o control de fronteras",
+        "justice-democracy": "Administración de justicia o influencia en unas elecciones"
+      },
       "save": "Guardar",
       "saving": "Guardando…",
       "saved": "Guardado. Todo se volvió a clasificar.",
@@ -2860,6 +3095,7 @@
           "framework-unanswered": "Una norma con preguntas sin responder",
           "app-personal-data-without-register": "Una aplicación con datos personales y sin registro",
           "app-personal-data-unstated": "Una aplicación que no dice qué son datos personales",
+          "app-personal-data-domain-unstated": "Una aplicación que no dice a qué datos regulados pertenecen sus datos personales",
           "app-register-without-privacy-notice": "Una aplicación sin aviso de privacidad",
           "retention-conflict": "Un registro y un mapa de datos que no coinciden",
           "processor-without-dpa": "Un encargado sin contrato",
@@ -8664,9 +8900,6 @@
   "emailpage.letter.agentAsksT": "Cuando tu agente te pide un permiso",
   "emailpage.letter.agentAsksS": "una vez por cada solicitud",
   "emailpage.letter.agentAsksD": "Tu IA intentó hacer por ti algo que aún no has permitido. El correo trae un botón a la página donde decides.",
-  "emailpage.letter.agentNarrowedT": "Cuando AIMEAT limita los permisos de un agente",
-  "emailpage.letter.agentNarrowedS": "una vez por agente",
-  "emailpage.letter.agentNarrowedD": "Un agente que tenía todos los permisos ahora solo tiene los que usó en dos semanas. El correo los enumera.",
   "emailpage.letter.languageT": "El idioma de tus correos",
   "emailpage.letter.languageS": "para todos los correos de esta lista",
   "emailpage.letter.languageD": "El resumen, los recordatorios y las solicitudes llegan en este idioma. Tu perfil muestra el mismo idioma.",
@@ -9075,6 +9308,7 @@
   "notiftext.agent_permission_ask_page.title": "{agent} necesita un permiso que das en su página",
   "notiftext.agent_permission_ask_page.body": "{agent} intentó hacer por ti algo que no has permitido. Este permiso lo das en la página del agente, si quieres. Ábrela para ver de qué se trata.",
   "notiftext.agent_permission_ask_page.open": "Abrir la página del agente",
+  "notiftext.agent_permission_ask_page.deny": "No permitir",
   "notiftext.secret_use_ask.title": "La extensión {extension} pide permiso para usar tu secreto {secret}",
   "notiftext.secret_use_ask.body": "{extension}, instalada por {installer}, necesita tu secreto {secret} para {host}. Tu secreto no ha ido antes a esta dirección, así que se te pregunta primero, y no se ha enviado nada. Ábrelo para ver por qué, o responde aquí.",
   "notiftext.secret_use_ask.allow": "Permitir",
@@ -9170,10 +9404,6 @@
   "agentAllowPage.email.lead": "{{agent}} intentó hacer esto por ti y no pudo, porque no lo has permitido:",
   "agentAllowPage.email.button": "Abrir la página del agente",
   "agentAllowPage.email.after": "Este permiso no se da con un solo clic. En la página del agente ves qué permite, y allí lo das si quieres.",
-  "agentNarrowed.email.subject": "AIMEAT limitó los permisos de {{agent}}",
-  "agentNarrowed.email.lead": "AIMEAT limitó los permisos de {{agent}} a los que usó en dos semanas:",
-  "agentNarrowed.email.button": "Abrir la página del agente",
-  "agentNarrowed.email.after": "Si más adelante necesita otra cosa, recibirás una solicitud y podrás permitirla con un solo clic.",
   "notiftext.task_waiting.title": "{agent} espera tu permiso: {title}",
   "notiftext.task_waiting.body": "El plan tiene {steps} pasos. Pulsa Empezar y el trabajo comienza.",
   "notiftext.task_waiting.start": "Empezar",
@@ -16631,7 +16861,6 @@
         "open": "Abrir",
         "close": "Cerrar",
         "waitingCount": "{n} esperan tu decisión",
-        "wildcardWaiting": "Estos agentes pueden hacer cualquier cosa: {names}. Cuando cada uno reciba su próxima tarea, AIMEAT lo limita a los permisos que usó y te avisa. Para hacerlo ahora, abre un agente y presiona \"Limitar a estos\".",
         "basicHaveLine": "{names} son tuyos y están en marcha.",
         "basicMissingLine": "{n} por crear todavía.",
         "shapeHint": "Una definición con la que puede trabajar desde el primer día. Cámbiala después en la pestaña Crew.",
@@ -17932,8 +18161,8 @@
         "takesWorkOnSaved": "Vuelve a recibir trabajo nuevo.",
         "takesWorkOnSavedWork": "Vuelve a recibir trabajo nuevo. Las tareas que esperaban ya están en marcha ({n}).",
         "wildcardLabel": "Todos los permisos",
-        "wildcardCollecting": "Puede hacer cualquier cosa. Tu AIMEAT anota qué permisos usa. Dentro de {days} días AIMEAT lo limita a esos y te avisa.",
-        "wildcardReady": "Puede hacer cualquier cosa. Usó {n} permisos, para {areas}. Cuando reciba su próxima tarea, AIMEAT lo limita a esos y te avisa. Puedes hacerlo ahora.",
+        "wildcardCollecting": "Puede hacer cualquier cosa, porque se lo permitiste. AIMEAT anota qué permisos usa, para que puedas limitarlo a esos si quieres. Dentro de {days} días la lista cubre dos semanas. Solo tú lo limitas.",
+        "wildcardReady": "Puede hacer cualquier cosa, porque se lo permitiste. En dos semanas usó {n} permisos, para {areas}. Si lo limitas a esos, no podrá hacer nada que no haya hecho hasta ahora. AIMEAT no ve todos los permisos que usa un agente, así que más adelante puede pedirte uno, y tú lo permites o no. Solo tú lo limitas.",
         "wildcardNarrow": "Limitar a estos {n}",
         "wildcardNarrowed": "Ahora tiene los {n} permisos que usó.",
         "wildcardFailed": "No se ha podido guardar. Inténtalo otra vez.",
@@ -22331,6 +22560,20 @@
     }
   },
   "appcat": {
+    "aiAct.title": "Preguntas del Reglamento de IA",
+    "aiAct.lead": "Esta aplicación usa IA, así que el Reglamento europeo de IA hace algunas preguntas sobre ella. Tú la conoces mejor que nadie: responde cada pregunta y di por qué en una frase. El administrador de esta instalación aprueba las respuestas en el registro de cumplimiento.",
+    "aiAct.notAi": "Según sus propios datos, esta aplicación no usa IA, así que no tiene preguntas del Reglamento de IA.",
+    "aiAct.aiTitle": "Deja que tu IA responda",
+    "aiAct.aiNote": "Copia la instrucción en el chat de tu propia IA. Lee la aplicación y las preguntas, te muestra sus respuestas con un motivo cada una y las guarda cuando dices que sí.",
+    "aiAct.copyPrompt": "Copiar la instrucción",
+    "aiAct.noMap": "Esta aplicación aún no tiene mapa de datos, así que las respuestas no tienen dónde guardarse. Pide a tu IA que escriba el mapa primero; la instrucción de arriba hace las dos cosas.",
+    "aiAct.formTitle": "Responde aquí · {open} de {total} abiertas",
+    "aiAct.noteLabel": "Por qué esta respuesta",
+    "aiAct.notePlaceholder": "Por qué, en una o dos frases",
+    "aiAct.save": "Guardar las respuestas",
+    "aiAct.saving": "Guardando…",
+    "aiAct.saved": "Guardado. El administrador ve tus respuestas en el registro de cumplimiento.",
+    "aiAct.saveFailed": "Las respuestas no se guardaron.",
     "dataMap.agentsTitle": "Agentes cuyo trabajo muestra esta aplicación",
     "dataMap.agentMadeFor": "La aplicación se hizo para este agente.",
     "dataMap.agentUses": "La aplicación usa el trabajo de este agente.",
@@ -25988,5 +26231,23 @@
   "home.agentPage.takes": "Trabajo abierto que toma",
   "home.agentPage.takesNone": "Ninguno: no tiene habilidades definidas",
   "home.agentPage.takesSub": "El trabajo abierto de un objetivo que pide una de estas habilidades.",
-  "home.agentPage.takesChange": "Cambiar"
+  "home.agentPage.takesChange": "Cambiar",
+  "form.checkFields": "No se guardó. Revisa los campos marcados.",
+  "validation": {
+    "failed": "Hay que corregir {{n}} campos. Cada uno dice qué cambiar.",
+    "oneField": "{{field}}: {{problem}}",
+    "tooLong": "Demasiado largo: como máximo {{n}} caracteres.",
+    "tooShort": "Demasiado corto: al menos {{n}} caracteres.",
+    "tooMany": "Demasiados: como máximo {{n}}.",
+    "tooFew": "Muy pocos: al menos {{n}}.",
+    "required": "Rellena este campo.",
+    "blank": "Escribe algo más que espacios.",
+    "controlChar": "Contiene un carácter de control oculto. Quítalo e inténtalo de nuevo.",
+    "nulByte": "Contiene un carácter nulo, que no se puede guardar. Quítalo e inténtalo de nuevo.",
+    "invalidUnicode": "Contiene un carácter dañado. Escribe o pega el texto de nuevo.",
+    "unknownField": "Este campo no se acepta aquí.",
+    "invalidType": "Tipo de valor incorrecto: se esperaba {{expected}}.",
+    "invalidFormat": "No tiene el formato esperado.",
+    "invalidValue": "No es uno de los valores permitidos."
+  }
 }

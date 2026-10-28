@@ -7,6 +7,8 @@
  *   export/import, workspace wipe, and archive/unarchive. Extracted from src/routes/organisms.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.25.0 -- 2026-10-27 -- POST /v1/organisms/:id/workspaces checks its body with validateBody
+ *     (models/write-body-schemas.ts): a too-long or junk name is a 400 naming the field.
  *   v1.24.1 -- 2026-10-24 -- GET …/workspace/records asks canReadWorkspaceRecords instead of the
  *     manifest alone: a workspace creator removed from the organism is answered 404, an organism
  *     manager reads, and a non-member holding the creator's grant still reads (secaudit2026oct22,
@@ -79,6 +81,8 @@
  */
 import type { Router, Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../../config.js';
+import { validateBody } from '../../models/schemas.js';
+import { WorkspaceCreateBody } from '../../models/write-body-schemas.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
 import { requireAuth, requireRole, requireScope, requireExternalPrincipal } from '../../auth/middleware.js';
@@ -421,7 +425,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
      ('agent', …) admitted every agent before it read the word, so the permission that hides
      aimeat_workspace_create from an agent's MCP surface did nothing here. Reasoning and measurement on
      POST /v1/organisms in crud.ts. Owner/operator sessions bypass scopes; membership is unchanged. ── */
-  router.post('/v1/organisms/:id/workspaces', requireAuth(), requireScope('organism:write'), async (req, res) => {
+  router.post('/v1/organisms/:id/workspaces', requireAuth(), requireScope('organism:write'), validateBody(WorkspaceCreateBody, config.nodeId), async (req, res) => {
     const id = req.params.id as string;
     const organism = await storage.getOrganism(id);
     if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }

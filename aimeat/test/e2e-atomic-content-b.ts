@@ -18,7 +18,7 @@
  *   The hook replaces `getMemory` on the storage instance the node uses, so it reaches a route as
  *   well as a service function. The technique is test/e2e-atomic-money.ts's (group G1).
  *
- *   The node is in this process (port 40563) on a database of its own on the run's backend
+ *   The node is in this process (port 28563) on a database of its own on the run's backend
  *   (helpers/own-node-db.ts).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=atomic-content-b
  * @version-history
@@ -54,7 +54,7 @@ import { ownNodeDb } from './helpers/own-node-db.js';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent } from './helpers/mcp-session.js';
 
-const PORT = parseInt(process.env.E2E_ATOMIC_CONTENT_B_PORT ?? '40563', 10);
+const PORT = parseInt(process.env.E2E_ATOMIC_CONTENT_B_PORT ?? '28563', 10);
 const BASE = `http://127.0.0.1:${PORT}`;
 
 let passed = 0, failed = 0;

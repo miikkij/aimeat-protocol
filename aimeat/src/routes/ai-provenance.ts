@@ -36,6 +36,7 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — POST /v1/provenance/embed answers 503 BUSY with Retry-After when every archive slot is in use (secaudit2026oct22, provenance-embed archive bound).
  *   2026-10-21 — callerOwner asks isAnonymousPrincipal: the token POST /v1/auth/anonymous mints carries
  *     no anonymous claim and was given the anonymous account's owner scope (secaudit 2026-10,
@@ -68,6 +69,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -103,13 +105,13 @@ const DeclareProvenanceSchema = z.object({
   method: z.enum(AI_PROVENANCE_METHODS).optional(),
   /** What kind of thing it is. Decides the label's words, and whether the deep-fake rule applies. */
   mediaKind: z.enum(AI_MEDIA_KINDS).optional(),
-  mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').optional(),
+  mediaType: z.string().trim().toLowerCase().regex(MEDIA_TYPE_PATTERN, 'mediaType must be an IANA media type such as audio/mpeg').max(INPUT_LIMITS.id).optional(),
   /** Does it resemble a real person, place or event? Only the declarer can say. */
   resemblesReal: z.enum(AI_RESEMBLES_REAL).optional(),
   /** The exact bytes, hashed server-side. Prefer this over `contentHash` when you hold them. */
   content: z.string().max(2_000_000).optional(),
   /** A pre-computed `sha256:<64 lower-case hex>`, when the declarer holds bytes we should not see. */
-  contentHash: z.string().trim().regex(CONTENT_HASH_PATTERN, 'contentHash must be `sha256:<64 lower-case hex>`').optional(),
+  contentHash: z.string().trim().regex(CONTENT_HASH_PATTERN, 'contentHash must be `sha256:<64 lower-case hex>`').max(INPUT_LIMITS.id).optional(),
   generatedAt: z.string().trim().max(40).optional(),
   generator: z.object({
     model: z.string().trim().min(1).max(400).optional(),

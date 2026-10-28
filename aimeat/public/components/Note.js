@@ -38,6 +38,8 @@
  * @structure Note({ kind, slab, inline, error, size, tone, title, mono, keep, children })
  * @usage html`<${Note} kind="quiet">${t('x.none')}<//>` · html`<${Note} kind="loading" />`
  * @version-history
+ *   v1.13.0 — 2026-10-27 — The message takes an `id`, which a field's control names in its
+ *     aria-describedby (components/Field.js); additive.
  *   v1.12.0 — 2026-09-27 — appcat parity (sections-c), additive: the hint's `size` 'text' (a paragraph
  *     to be read, the old .mk-legal; hint.css .poster-hint--text) and the lead's `size` 'record' (a
  *     statement on the record, the old .mk-author-is; page-section.css .og-lead--record).
@@ -89,7 +91,7 @@ const REPORT_TONES = new Set(['busy', 'ok', 'err', 'refused']);
 // 'text' (added by appcat sections-c): a paragraph to be read, the law said in words (the old .mk-legal).
 const HINT_SIZES = new Set(['small', 'intro', 'note', 'text']);
 
-export function Note({ kind = 'hint', slab, inline, error, size, tone, title, role, mono, pre, keep, chapter, children }) {
+export function Note({ kind = 'hint', id, slab, inline, error, size, tone, title, role, mono, pre, keep, chapter, children }) {
     switch (kind) {
         // chapter (added by appcat sections-a, parity): the lead of a chapter of a long page of one
         // thing, the old app catalogue's detail sections (.dtl-desc).
@@ -119,7 +121,8 @@ export function Note({ kind = 'hint', slab, inline, error, size, tone, title, ro
         case 'loading': return inline
             ? html`<span class="poster-quiet loading-mark" role="status">${children || t('profile.loading')}</span>`
             : html`<p class="poster-quiet loading-mark" role="status">${children || t('profile.loading')}</p>`;
-        case 'message': return html`<span class=${cx('form-message', error && 'form-message--error', pre && 'form-message--pre')} role=${role || (error ? 'alert' : 'status')}>${children}</span>`;
+        // message `id` (2026-10-27): a field's control names its message in aria-describedby.
+        case 'message': return html`<span id=${id} class=${cx('form-message', error && 'form-message--error', pre && 'form-message--pre')} role=${role || (error ? 'alert' : 'status')}>${children}</span>`;
         case 'meta': return inline
             ? html`<span class=${cx('text-meta-sm', mono && 'text-meta-sm--mono')} title=${title}>${children}</span>`
             : html`<div class=${cx('text-meta-sm', mono && 'text-meta-sm--mono')} title=${title}>${children}</div>`;

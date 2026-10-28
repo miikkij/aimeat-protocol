@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.5.1 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.5.0 -- 2026-10-16 -- Each entry shows the AI label its own record says it owes (the export's
  *     entry_provenance), beside the package's.
  *   v2.4.0 -- 2026-09-26 -- The figure's "of how many" is the Figure strip's own cut (.og-strip-of), moved unchanged from .kp-of (a move).
@@ -32,6 +33,7 @@ import { AiLabel } from '/components/ai-label.js';
 import { getSession } from '/js/services/auth.js';
 import { apiPost } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { INPUT_LIMITS } from '/js/input-limits.js';
 
 const CONTENT_TYPES = ['idea', 'research', 'plan', 'dataset', 'document', 'tutorial', 'collection', 'article', 'story', 'fiction', 'guide'];
 const c = (key, vars) => t('knowledge.cover.' + key, vars);
@@ -201,7 +203,7 @@ function BrowseView({ onSelect }) {
       </div></div>
     </div>
     <div class="kp-desk poster-row--thing">
-      <input type="search" class="kp-field" value=${search} placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
+      <input type="search" class="kp-field" maxLength=${INPUT_LIMITS.line} value=${search} placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
       <div class="og-choice">
         <button type="button" class=${`og-choice-btn ${contentType === '' ? 'on' : ''}`} onClick=${() => setContentType('')}>${c('pubAll')}</button>
         ${typesPresent.map(ct => html`<button type="button" key=${ct} class=${`og-choice-btn ${contentType === ct ? 'on' : ''}`} onClick=${() => setContentType(contentType === ct ? '' : ct)}>${ctWord(ct)}</button>`)}

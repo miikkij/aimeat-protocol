@@ -5,10 +5,12 @@
  * @description The refinery: the class packs, running one batch of a mail refinery definition, and
  *   following it. One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.0.0 — 2026-09-29 — Initial (wish aimeat-refinery).
  */
 
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 
@@ -36,7 +38,7 @@ export const refineryTools = [
         surfaces: ['agent'],
         input: {
             prefix: { type: 'string', required: true, description: 'Names the definition, `<prefix>.config`: lowercase letters, digits, - or _ (e.g. postinjalostamo).' },
-            message_ids: { type: 'array', description: 'Run exactly these messages again (at most 50), whether or not they already have rows.', zod: z.array(z.string()) },
+            message_ids: { type: 'array', description: 'Run exactly these messages again (at most 50), whether or not they already have rows.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
         },
     },
     {

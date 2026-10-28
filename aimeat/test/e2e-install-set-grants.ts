@@ -59,8 +59,8 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
-// 40752: no other suite names it.
-const PORT = 40752;
+// 28752: no other suite names it.
+const PORT = 28752;
 const BASE = `http://127.0.0.1:${PORT}`;
 const APP_HOST = 'apps.aimeat.test';
 const ts = Date.now() % 1000000;
@@ -427,9 +427,9 @@ await test('grant_apps that is not true or false is refused', async () => {
 
 console.log('\nPhase 7 — A repository the set names (secaudit 2026-10-10, I17 and I18)');
 
-// 40753: the repository node; no other suite names it. Booting it in this process takes over the
+// 28753: the repository node; no other suite names it. Booting it in this process takes over the
 // token signing, so the accounts of this node get their tokens minted again (e2e-install-sets.ts).
-const R_PORT = 40753;
+const R_PORT = 28753;
 const R_BASE = `http://127.0.0.1:${R_PORT}`;
 const R_ID = `aimeat-test-001-isgrantrepo${ts}`;
 let rServer: Server | undefined;

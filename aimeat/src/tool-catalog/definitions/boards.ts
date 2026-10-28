@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./discovery-work-boards.ts
  * @version-history
+ *   v1.4.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.3.0 — 2026-10-18 — aimeat_board_create: visibility is optional, the node's starting level when omitted (plan doc-mvcn6c7e4e5q, V5.3).
  *   v1.2.0 — 2026-10-18 — aimeat_board_create says it answers publish_request when the node asks the owner (plan doc-mvcn6c7e4e5q, V4).
  *   v1.1.0 — 2026-10-17 — aimeat_board_create takes `organism:<id>` (plan doc-mvcn6c7e4e5q, V3.5).
@@ -15,6 +16,7 @@
  */
 import { boardRulesInput, organismAudienceInput } from '../input-schemas.js';
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -44,7 +46,7 @@ export const boardTools = [
             name: { type: 'string', required: true, description: 'Board name.' },
             description: { type: 'string', description: 'Board description.' },
             visibility: { type: 'string', description: 'Board visibility level: private, shared, public, or organism:<organism id> for the active members of one organisation you are a member of (never federated). Omit it and the board gets the level this node gives a new board (public unless the operator chose otherwise).', zod: z.union([z.enum(['private', 'shared', 'public']), organismAudienceInput]) },
-            allowed_gaiis: { type: 'array', description: 'GAIIs allowed to access a shared/private board.', zod: z.array(z.string()) },
+            allowed_gaiis: { type: 'array', description: 'GAIIs allowed to access a shared/private board.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             rules: { type: 'object', description: 'The board\'s own rules, all optional: posting ("owner", "members" or "anyone"), categories (at most 20 names of 64 characters; a post under any other category is refused), default_ttl_hours (more than 0, at most 8760; how long a post lives when it names no lifetime of its own, 168 when unset), post_cost (0 to 100000 morsels per post on a public board; 0 makes posting free and removes the only spam brake a board has).', zod: boardRulesInput },
         },
     },
@@ -76,8 +78,8 @@ export const boardTools = [
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
             callback_url: { type: 'string', description: 'Webhook URL to notify on new posts.' },
             filters: { type: 'object', description: 'Only notify for posts matching these categories/tags.', zod: z.object({
-                categories: z.array(z.string()).optional(),
-                tags: z.array(z.string()).optional(),
+                categories: z.array(z.string().max(INPUT_LIMITS.name)).optional(),
+                tags: z.array(z.string().max(INPUT_LIMITS.name)).optional(),
             }) },
         },
     },
@@ -124,8 +126,8 @@ export const boardTools = [
         surfaces: ['service'],
         input: {
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
-            add: { type: 'array', description: 'GAIIs to grant access.', zod: z.array(z.string()) },
-            remove: { type: 'array', description: 'GAIIs to revoke access.', zod: z.array(z.string()) },
+            add: { type: 'array', description: 'GAIIs to grant access.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+            remove: { type: 'array', description: 'GAIIs to revoke access.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
         },
     },
     {

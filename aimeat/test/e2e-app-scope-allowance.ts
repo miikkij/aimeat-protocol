@@ -33,7 +33,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { registerOwner, ownerToken } from './helpers/owner-login.js';
 import { createStorage } from '../src/storage/storage-factory.js';
 
-const PORT = process.env.E2E_APP_SCOPE_ALLOWANCE_PORT ?? '40478';
+const PORT = process.env.E2E_APP_SCOPE_ALLOWANCE_PORT ?? '28478';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const SYSTEM = `system@${NODE_ID}`;

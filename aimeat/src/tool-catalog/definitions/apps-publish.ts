@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version`, the display version the
  *     draft publishes with (wish-the-app-draft-tools-can-set-the-display-version).
  *   2026-10-18 — aimeat_image_generate takes reference_images and mask (Comicland v3 A-1, A-2).
@@ -25,6 +26,7 @@
  *   v1.0.0 — 2026-10-05 — Extracted from organisms-workspaces-apps.ts (pure extraction; no behavior change).
  */
 import { z } from 'zod';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -86,7 +88,7 @@ export const appPublishTools = [
             content_base64: { type: 'string', description: 'Already base64-encoded HTML, if you did the encoding yourself. Give this or content, not both.' },
             description: { type: 'string', description: 'Short description.' },
             category: { type: 'string', description: 'Category (default "tool").' },
-            tags: { type: 'array', description: 'Tags for search and filtering.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags for search and filtering.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             icon: { type: 'string', description: 'Emoji icon.' },
             version: { type: 'string', description: 'Semver display version. Generated if omitted.' },
             cortex_agents: { type: 'array', description: 'Declarative crew-defs this app ships (manifest.cortex.agents), validated at publish in both modes. Omit on update to carry them forward; [] clears.', zod: z.array(z.record(z.string(), z.unknown())) },
@@ -170,7 +172,7 @@ export const appPublishTools = [
             name: { type: 'string', description: 'Display name (defaults to the live app\'s).' },
             description: { type: 'string', description: 'Description (defaults to the live app\'s).' },
             category: { type: 'string', description: 'Category (defaults to the live app\'s).' },
-            tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Tags (default: the live app\'s).', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             icon: { type: 'string', description: 'Emoji icon (defaults to the live app\'s).' },
             version: { type: 'string', description: 'Display version the draft publishes with, e.g. "1.4.0" (defaults to the live app\'s). Letters, digits, dots, hyphens, plus signs and underscores, at most 40.' },
             ...DRAFT_NOTICE_INPUT,

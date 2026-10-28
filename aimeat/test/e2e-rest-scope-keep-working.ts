@@ -42,7 +42,7 @@ import { createStorage } from '../src/storage/storage-factory.js';
 
 ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
 
-const PORT = process.env.E2E_REST_SCOPE_KEEP_WORKING_PORT ?? '40477';
+const PORT = process.env.E2E_REST_SCOPE_KEEP_WORKING_PORT ?? '28477';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const SYSTEM = `system@${NODE_ID}`;

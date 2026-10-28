@@ -461,10 +461,6 @@
         "count": 1,
         "why": "UNREVIEWED"
       },
-      "src/services/agent-task-rules.ts": {
-        "count": 1,
-        "why": "UNREVIEWED"
-      },
       "src/services/agent-task-start-write.ts": {
         "count": 1,
         "why": "UNREVIEWED"
@@ -507,10 +503,6 @@
       },
       "src/services/scope-vocabulary-migration.ts": {
         "count": 2,
-        "why": "UNREVIEWED"
-      },
-      "src/services/task-start-notice.ts": {
-        "count": 1,
         "why": "UNREVIEWED"
       },
       "src/services/workflow/engine-steps.ts": {

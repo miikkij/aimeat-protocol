@@ -8,6 +8,7 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.9.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
     v1.9.0 — 2026-10-25 — The page reads what the server checked about the app (GET
         /v1/mcp/consent-info) and shows it before the sign-in and the approval: the host the code goes
         to, the client_id host of a metadata-document client, and a name the app gave itself at
@@ -563,7 +564,7 @@
         <p class="login-prompt">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">
           <label>${escHtml(t('usernameLabel'))}</label>
-          <input type="text" id="username" required autocomplete="username" />
+          <input type="text" id="username" required autocomplete="username" maxlength="256" /><!-- js/input-limits.js id -->
           <label>${escHtml(t('passwordLabel'))}</label>
           <input type="password" id="password" required autocomplete="current-password" />
           <label>${escHtml(t('totpLabel'))}</label>
@@ -614,7 +615,7 @@
           ${prefill ? `<p class="name-identity-hint name-from-home">${escHtml(t('homeNamed'))}</p>` : ''}
           <p class="name-identity-hint">${escHtml(t('newAgentNameHint'))}</p>
           <label>${escHtml(t('newAgentDisplayName'))}</label>
-          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint', { client: aiInline }))}" />
+          <input type="text" id="newAgentDisplayName" placeholder="${escHtml(t('newAgentDisplayNameHint', { client: aiInline }))}" maxlength="200" /><!-- js/input-limits.js name -->
           <div id="createError" class="error-msg"></div>
           <div class="btn-row">
             <button type="button" class="btn-sm btn-sm-muted" id="cancelCreate">${escHtml(t('cancelBtn'))}</button>

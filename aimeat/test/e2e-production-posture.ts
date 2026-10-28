@@ -21,7 +21,7 @@
  *   shipped default (QA audit P7-03); a plain-http peer address is refused (FED-13); the node
  *   statistics are not public.
  *
- *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 40479.
+ *   It runs its own node, on the run's backend (test/helpers/own-node-db.ts), on port 28479.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-production-posture
  * @version-history
  *   2026-10-25 — With install role operator, an agent of another account installs nothing (REST,
@@ -45,7 +45,7 @@ import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 import { SHIPPED_DEFAULT_AGENT_SCOPES } from '../src/config.js';
 
-const PORT = 40479;
+const PORT = 28479;
 const BASE = `http://127.0.0.1:${PORT}`;
 const PUBLIC_URL = 'https://posture.example';
 const STAMP = Date.now().toString(36).slice(-6);

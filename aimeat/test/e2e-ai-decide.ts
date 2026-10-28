@@ -66,7 +66,7 @@ import { ownerSignIn } from './helpers/owner-login.js';
 import { takeOffAudienceCaps } from './helpers/classification-caps.js';
 
 // Its own port, outside the 40251-up range sessions claim; the stub takes an ephemeral one.
-const PORT = process.env.E2E_AI_DECIDE_PORT ?? '40436';
+const PORT = process.env.E2E_AI_DECIDE_PORT ?? '28436';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const NODE_KEY = 'ts-node-key-e2e-0001';

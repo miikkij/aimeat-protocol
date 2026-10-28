@@ -38,7 +38,7 @@ import { createStorage } from '../src/storage/storage-factory.js';
 import { ownerSignIn, registerOwner, OWNER_PASSWORD } from './helpers/owner-login.js';
 import { ANONYMOUS_PRINCIPAL_RECORDS_KEY } from '../src/services/anonymous-principal-records.js';
 
-const PORT = process.env.E2E_ANON_RECORDS_PORT ?? '40458';
+const PORT = process.env.E2E_ANON_RECORDS_PORT ?? '28458';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 const ADMIN_PW = process.env.AIMEAT_ADMIN_PASSWORD ?? 'test-admin-pw';

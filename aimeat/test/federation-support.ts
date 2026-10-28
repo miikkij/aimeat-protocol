@@ -11,7 +11,7 @@
  *   vendor's own operators. Nobody joins anybody's operator list, no group thread gains a foreign
  *   participant, and createGroupConversation's node-local invariant is never touched.
  *
- *   Nodes: V (vendor) 40288, two operators. C (customer) 40289, one owner who IS its operator, plus
+ *   Nodes: V (vendor) 28288, two operators. C (customer) 28289, one owner who IS its operator, plus
  *   an agent — the principal that actually writes to support when something breaks.
  * @version-history
  *   2026-10-23 — setupOperator registers through helpers/owner-login.ts setupOperator (a password and
@@ -170,8 +170,8 @@ let ticketId = '';
 
 console.log('Setup');
 await test('Boot V (two operators) and C (owner + agent), linked at tier contact', async () => {
-    V = await bootNode(40288, 'aimeat-test-001-supv');
-    C = await bootNode(40414, 'aimeat-test-001-supc');
+    V = await bootNode(28288, 'aimeat-test-001-supv');
+    C = await bootNode(28414, 'aimeat-test-001-supc');
     await setupOperator(V, `supv${ts}`);
     await setupOperator(C, `supc${ts}`);
     opB = await addOperator(V, `supvb${ts}`);

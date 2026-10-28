@@ -6,6 +6,7 @@
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
  *   2026-10-27 — aimeat_admin_incident_resolve decides an address of the subdomain incident ("app_only" or "keep"), and no longer names the capability incident, which is gone (Jouni, 2026-10-27).
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_admin_incident_resolve names the incident of capabilities with an unknown visibility word (secaudit2026oct22).
  *   2026-10-25 — aimeat_discover says the shared scope needs organism:read (secaudit2026oct22).
  *   2026-10-25 — aimeat_admin_config answers the whole Config list (section, q); aimeat_admin_config_set changes settings.
@@ -76,6 +77,7 @@
 
 import { z } from 'zod';
 import { storedVisibilitySchema } from '../../utils/visibility-words.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
 import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
@@ -270,20 +272,20 @@ export const discoveryWorkBoardsTools = [
             name: { type: 'string', required: true, description: 'Lowercase letters, digits and dashes. Becomes part of the permanent URL.' },
             changes: { type: 'string', required: true, description: 'What changed against the previous version and why.' },
             resources: { type: 'array', required: true, description: 'One or more { name, rows, schema?, title?, description? }. rows is an array of objects.', zod: z.array(z.object({
-                name: z.string().describe('Becomes data/{name}.csv inside the package.'),
+                name: z.string().max(INPUT_LIMITS.name).describe('Becomes data/{name}.csv inside the package.'),
                 rows: z.array(z.record(z.string(), z.unknown())).describe('The table, as an array of objects.'),
                 schema: z.unknown().optional().describe('A Frictionless Table Schema to DECLARE the types. Omit to have them inferred — the descriptor then records schemaSource "inferred", so a consumer can see nobody confirmed them.'),
-                title: z.string().optional(),
-                description: z.string().optional(),
+                title: z.string().max(INPUT_LIMITS.title).optional(),
+                description: z.string().max(INPUT_LIMITS.description).optional(),
             })).min(1) },
             title: { type: 'string', description: 'Human title for the package.' },
             description: { type: 'string', description: 'What the package contains, for a person deciding whether to use it.' },
             license: { type: 'string', description: 'e.g. CC-BY-4.0. You publish under your owner name; say the terms.' },
             sources: { type: 'array', description: 'Where the data came from: { url, title, retrievedAt }.', zod: z.array(z.object({
-                url: z.string().optional(), title: z.string().optional(), retrievedAt: z.string().optional(),
+                url: z.string().max(INPUT_LIMITS.url).optional(), title: z.string().max(INPUT_LIMITS.title).optional(), retrievedAt: z.string().max(INPUT_LIMITS.id).optional(),
             })) },
             legal_basis: { type: 'string', description: 'Why you may publish this — e.g. a public register, consent, a contract.' },
-            visibility: { type: 'string', description: 'Who reads it: public (the default: anyone, at the permanent address), members (every account of this node), organism:<id> (the members of one organism you are in) or private (your owner only).', zod: z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/) },
+            visibility: { type: 'string', description: 'Who reads it: public (the default: anyone, at the permanent address), members (every account of this node), organism:<id> (the members of one organism you are in) or private (your owner only).', zod: z.string().regex(/^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$/).max(INPUT_LIMITS.id) },
         },
     },
     {
@@ -300,7 +302,7 @@ export const discoveryWorkBoardsTools = [
             format: { type: 'string', required: true, enum: ['url', 'csv', 'json'], description: 'url (default) = the permanent address. csv/json = inline rows.', zod: z.enum(['url', 'csv', 'json']).default('url') },
             limit: { type: 'number', description: 'Rows for csv/json (default 500, max 5000).', zod: z.number().int().positive().max(5000) },
             offset: { type: 'number', description: 'Row to start from, for csv/json.', zod: z.number().int().nonnegative() },
-            select: { type: 'array', description: 'Only these columns.', zod: z.array(z.string()) },
+            select: { type: 'array', description: 'Only these columns.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
         },
     },
     {
@@ -318,7 +320,7 @@ export const discoveryWorkBoardsTools = [
             mime_type: { type: 'string', description: 'Optional MIME type (default application/octet-stream).' },
             visibility: { type: 'string', description: "Access control (default: private): private, owner, group, workspace, members, public, or 'organism:<organism id>'. Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces, and 'organism:<organism id>' to share it with every active member of one organism you belong to.", zod: storedVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
-            workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string()) },
+            workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             ...aiProvenanceCatalogInput,
         },
     },
@@ -400,7 +402,7 @@ export const discoveryWorkBoardsTools = [
         surfaces: ['admin'],
         input: {
             changes: { type: 'array', required: true, description: 'The settings to change: [{ path, value }], path as aimeat_admin_config names it (a secret by its set_path), value of the setting\'s type.', zod: z.array(z.object({
-                path: z.string().min(1).describe('The setting\'s path, such as packages.max_size_mb.'),
+                path: z.string().min(1).max(INPUT_LIMITS.id).describe('The setting\'s path, such as packages.max_size_mb.'),
                 value: z.unknown().describe('The new value, of the setting\'s type: number, true or false, text, or a list.'),
             })).min(1) },
         },
@@ -439,7 +441,7 @@ export const discoveryWorkBoardsTools = [
         input: {
             id: { type: 'string', required: true, description: 'Permanent slug id (lowercase letters, digits, dashes; 2-31 chars).' },
             name: { type: 'string', required: true, description: 'The organisation\'s name — the sign-in button label when listed.' },
-            domains: { type: 'array', description: 'Email domains this organisation vouches for, e.g. ["contoso.com"].', zod: z.array(z.string()) },
+            domains: { type: 'array', description: 'Email domains this organisation vouches for, e.g. ["contoso.com"].', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             organism_id: { type: 'string', description: 'Organism its people are added to on first sign-in or provisioning.' },
             login_visibility: { type: 'string', description: '"listed" shows a sign-in button; "hidden" keeps the organisation off the public modal (default listed).', zod: z.enum(['listed', 'hidden']) },
             allow_idp_initiated: { type: 'boolean', description: 'Accept sign-ins started from the IdP\'s own portal tile (default false).' },
@@ -456,7 +458,7 @@ export const discoveryWorkBoardsTools = [
         input: {
             id: { type: 'string', required: true, description: 'The connection id.' },
             name: { type: 'string', description: 'New organisation name.' },
-            domains: { type: 'array', description: 'New email-domain list (replaces the old one).', zod: z.array(z.string()) },
+            domains: { type: 'array', description: 'New email-domain list (replaces the old one).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             organism_id: { type: 'string', description: 'New organism binding; an empty string clears it.' },
             login_visibility: { type: 'string', description: '"listed" or "hidden".', zod: z.enum(['listed', 'hidden']) },
             allow_idp_initiated: { type: 'boolean', description: 'Accept IdP-initiated sign-ins.' },
@@ -699,7 +701,7 @@ export const discoveryWorkBoardsTools = [
         surfaces: ['admin'],
         input: {
             hook: { type: 'string', required: true, description: 'The moment, e.g. "pre_owner_registration".' },
-            actions: { type: 'array', required: true, description: 'Action references to call, in order, each naming an action already published here. An empty list clears the moment.', zod: z.array(z.string()) },
+            actions: { type: 'array', required: true, description: 'Action references to call, in order, each naming an action already published here. An empty list clears the moment.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
         },
     },
     {
@@ -714,7 +716,7 @@ export const discoveryWorkBoardsTools = [
         surfaces: ['admin'],
         input: {
             who: { type: 'string', required: true, description: 'A person\'s address (owner@node), a bare owner name, or an agent\'s address (name#owner@node).' },
-            origins: { type: 'array', required: true, description: 'The origins to allow, each an http(s) URL or "*"; null clears the list.', zod: z.array(z.string()).nullable() },
+            origins: { type: 'array', required: true, description: 'The origins to allow, each an http(s) URL or "*"; null clears the list.', zod: z.array(z.string().max(INPUT_LIMITS.url)).nullable() },
         },
     },
     {

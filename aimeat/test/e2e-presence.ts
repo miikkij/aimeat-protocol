@@ -7,7 +7,7 @@
  *   an `unknown` update evicts it, and bad-signature / non-peer pushes are rejected. Also checks the
  *   push-side snapshot the flush loop would send (via the in-process tracker singleton).
  *
- *   Node: port 40272, aimeat-test-001-presence (a database of its own on the run's backend,
+ *   Node: port 28272, aimeat-test-001-presence (a database of its own on the run's backend,
  *   test/helpers/own-node-db.ts; in-process — same pattern as the federation-* suites, so the test
  *   shares the server's PresenceTracker instance).
  * @version-history
@@ -52,7 +52,7 @@ async function test(name: string, fn: () => Promise<void>) {
 }
 function assert(cond: boolean, msg: string) { if (!cond) throw new Error(msg); }
 
-const PORT = 40272;
+const PORT = 28272;
 const NODE_ID = 'aimeat-test-001-presence';
 const BASE = `http://127.0.0.1:${PORT}`;
 const adminPw = randomBytes(16).toString('base64url');

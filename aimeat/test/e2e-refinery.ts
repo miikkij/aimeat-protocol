@@ -58,7 +58,7 @@ import { startFakeMailServer, type FakeMailServer } from '../scripts/lib/fake-ma
 import { ownerSignIn } from './helpers/owner-login.js';
 
 // Its own port, outside the 40251-up range sessions claim; the mailbox takes an ephemeral one.
-const PORT = process.env.E2E_REFINERY_PORT ?? '40449';
+const PORT = process.env.E2E_REFINERY_PORT ?? '28449';
 const BASE = `http://localhost:${PORT}`;
 const NODE_ID = process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev';
 

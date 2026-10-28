@@ -29,7 +29,7 @@
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, openSession, callTool } from './helpers/mcp-session.js';
 
-const BASE = process.env.E2E_BASE ?? 'http://localhost:40467';
+const BASE = process.env.E2E_BASE ?? 'http://localhost:28467';
 const stamp = Date.now();
 const short = stamp.toString(36).slice(-6);
 

@@ -12,12 +12,13 @@
  *        over MCP, and never its own;
  *     4. the floor holds: an agent that can spend, send or delete as the owner, or a plan that says
  *        it will, waits for the owner in person whatever the setting.
- *   And since 2026-10-18 (section 8): an agent holding `*` whose record is two weeks old is narrowed
- *   by the node at its next task, which is then decided on the narrowed agent, and the owner is told
- *   once.
+ *   And since 2026-10-28 (section 8): an agent holding `*` keeps it when its record is two weeks old,
+ *   its tasks start as its setting says, and only the owner narrows it (7b).
  *   The wake on Start is held by e2e-connect-tunnel-delivery (test 8).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=task-start
  * @version-history
+ *   v1.3.0 — 2026-10-28 — Section 8: the node never narrows a ready `*` agent by itself; it keeps `*`,
+ *     its tasks start, and no `agent_narrowed` notice is sent (Jouni, 2026-10-28).
  *   v1.2.0 — 2026-10-23 — Section 9: the owner in person accepts floor permissions per agent
  *     (PATCH .../task-start-floor), and only those stop holding its tasks (Jouni 2026-10-23).
  *   v1.1.0 — 2026-10-18 — Section 8: the node narrows a ready `*` agent itself instead of holding its
@@ -448,9 +449,10 @@ await test('7c. A permission it never used is refused after the narrowing, on a 
   assert(refused.status === 403, `contacts after narrowing ${refused.status}`);
 });
 
-console.log('\n8. The node narrows a `*` agent itself when its record is ready (Jouni, 2026-10-18)');
-// Until 2026-10-18 a ready record put `*` on the floor and every task of the agent waited for the
-// owner in person, one bell notice per task; on aimeat.io that held 14 scheduled agents at once.
+console.log('\n8. The node never narrows a `*` agent by itself, and `*` holds no task (Jouni, 2026-10-28)');
+// From 2026-10-02 a ready record put `*` on the floor, and from 2026-10-18 the node narrowed the agent
+// by itself instead; on 2026-10-28 that narrowed the owner's own agent past a permission it used. The
+// agent keeps what the owner gave, and only the owner narrows it (7b).
 // The record is service-owned (no route writes it), so its start date is moved back in the database.
 const DAY_MS = 86_400_000;
 let db: Storage | null = null;
@@ -496,7 +498,7 @@ await test('8b. A `*` task-runner uses memory, and its record is moved past two 
   assert(!a.task_start_held_by.includes('*'), `held_by shows no '*' any more: ${JSON.stringify(a.task_start_held_by)}`);
 });
 
-await test('8c. Another owner\'s agent cannot give it a task, so it cannot set off the narrowing (403)', async () => {
+await test('8c. FAILURE: another owner\'s agent cannot give it a task (403), and nothing about it changes', async () => {
   const x = await json(`/v1/agents/${encodeURIComponent(autostar.gaii)}/tasks`, {
     method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ title: 'Not yours', description: 'Not yours' }),
   });
@@ -506,37 +508,35 @@ await test('8c. Another owner\'s agent cannot give it a task, so it cannot set o
   assert((await narrowedNotices(owner.token, 'autostar')).length === 0, 'nobody was told');
 });
 
-await test('8d. Its next task starts on its own, the agent holds what it used, and the owner is told once', async () => {
+await test('8d. Its next task starts on its own, and the agent keeps all permissions', async () => {
   const r = await createTask(owner.token, 'autostar', 'Nightly paper, after two weeks');
   assert(r.status === 201 && r.body.data.task.status === 'active', `status ${r.status} ${r.body?.data?.task?.status}: ${JSON.stringify(r.body?.data?.start)}`);
   assert(r.body.data.start.starts === 'now', `start ${JSON.stringify(r.body.data.start)}`);
   const a = await listAgent(owner.token, 'autostar');
-  const scopes: string[] = a.default_scopes ?? [];
-  assert(!scopes.includes('*') && scopes.includes('memory:write'), `scopes ${JSON.stringify(scopes)}`);
-  assert(a.task_start_wildcard === null, `no longer all permissions ${JSON.stringify(a.task_start_wildcard)}`);
-  const told = await narrowedNotices(owner.token, 'autostar');
-  assert(told.length === 1, `one notice, got ${told.length}`);
-  assert(told[0].link === '/v1/profile?tab=agents&agent=autostar', `link ${told[0].link}`);
-  assert(!(told[0].actions ?? []).some((x: any) => x.kind === 'api'), 'a notice with nothing to press but Open');
+  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['*']), `scopes ${JSON.stringify(a.default_scopes)}`);
+  // The narrowing is still offered on its card, for the owner to apply.
+  assert(a.task_start_wildcard?.ready === true && a.task_start_wildcard.proposal.includes('memory:write'), `wildcard ${JSON.stringify(a.task_start_wildcard)}`);
+  assert((await narrowedNotices(owner.token, 'autostar')).length === 0, 'the node narrowed nothing, so nobody is told');
 });
 
-await test('8e. A second task starts too, and the owner is not told again', async () => {
+await test('8e. A second task starts too, and still nothing is narrowed', async () => {
   const r = await createTask(owner.token, 'autostar', 'Nightly paper, the day after');
   assert(r.body.data.task.status === 'active', `status ${r.body.data.task.status}`);
-  assert((await narrowedNotices(owner.token, 'autostar')).length === 1, 'still one notice');
+  const a = await listAgent(owner.token, 'autostar');
+  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['*']), `scopes ${JSON.stringify(a.default_scopes)}`);
+  assert((await narrowedNotices(owner.token, 'autostar')).length === 0, 'no notice');
   assert((await narrowedNotices(other.token)).length === 0, 'another owner sees none of it');
 });
 
-await test('8f. An agent that used a word on the floor is narrowed, and its task still waits for the owner', async () => {
+await test('8f. An agent that used a word on the floor keeps `*` too, and `*` does not hold its task', async () => {
   await newAgent(owner, 'startrader', ['*'], 'task-runner');
   await ageRecord('startrader', 15, ['exchange:write', 'memory:read']);
   const r = await createTask(owner.token, 'startrader', 'Bid on the paper');
-  assert(r.status === 201 && r.body.data.task.status === 'queued', `status ${r.body?.data?.task?.status}`);
-  assert(r.body.data.start.waits_because === 'floor' && r.body.data.start.who_can_start === 'owner_in_person', `start ${JSON.stringify(r.body.data.start)}`);
+  assert(r.status === 201 && r.body.data.task.status === 'active', `status ${r.body?.data?.task?.status}: ${JSON.stringify(r.body?.data?.start)}`);
   const a = await listAgent(owner.token, 'startrader');
-  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['exchange:write', 'memory:read']), `scopes ${JSON.stringify(a.default_scopes)}`);
-  assert(a.task_start_held_by.includes('exchange:write'), `held_by ${JSON.stringify(a.task_start_held_by)}`);
-  assert((await narrowedNotices(owner.token, 'startrader')).length === 1, 'told once');
+  assert(JSON.stringify(a.default_scopes) === JSON.stringify(['*']), `scopes ${JSON.stringify(a.default_scopes)}`);
+  assert(a.task_start_held_by.length === 0, `held_by ${JSON.stringify(a.task_start_held_by)}`);
+  assert((await narrowedNotices(owner.token, 'startrader')).length === 0, 'nobody told');
 });
 
 await test('8g. A `*` agent whose record is younger than two weeks is left as it is', async () => {

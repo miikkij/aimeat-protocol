@@ -24,7 +24,7 @@
  *   services/owner-secrets.ts removed, 10 fails (the approved call is refused).
  *
  *   THE RECEIVER runs on 127.0.0.1 (the runner admits private egress) on E2E_SECRETS_APPROVALS_PORT,
- *   40675 by default.
+ *   28675 by default.
  * @version-history
  *   v1.2.0 — 2026-10-25 — 12b: the agent whose call asked hears Allow and Don't allow on its inbox
  *     (secaudit2026oct22, the approval standard).
@@ -44,7 +44,7 @@ import { keepExtensionFirstUseOnce, FIRST_USE_KEEP_KEY, FIRST_USE_KEEP_STEP_KEY 
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
-const RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_APPROVALS_PORT ?? '40675', 10);
+const RECEIVER_PORT = parseInt(process.env.E2E_SECRETS_APPROVALS_PORT ?? '28675', 10);
 const RECEIVER = `http://127.0.0.1:${RECEIVER_PORT}`;
 const RECEIVER_HOST = `127.0.0.1:${RECEIVER_PORT}`;
 const OTHER = `http://localhost:${RECEIVER_PORT}`;

@@ -8,6 +8,8 @@
  *   scope and states neither gets the finding DATAMAP_INVITES_UNSTATED. A finding, never a refusal,
  *   and nothing about who may invite changes (Jouni, 2026-10-18).
  * @version-history
+ *   v1.0.1 — 2026-10-28 — The roster row states `domains: []`, so the personal-row domain finding
+ *     stays out of a test about invitations.
  *   v1.0.0 — 2026-10-18 — wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien.
  */
 import { describe, it, expect } from 'vitest';
@@ -23,7 +25,7 @@ const map = (over: Partial<DataMap> = {}): DataMap => ({
     what: 'roster.*', holds: 'the people', kind: 'register', usedFor: 'to-share-with-others',
     where: 'organism-workspace', owner: 'organism', readers: 'organism-members',
     writers: ['person-in-the-ui'], shape: 'one-record', keptFor: 'until-deleted',
-    lossRisk: 'only-copy', personalData: 'yes', why: 'The roster belongs to the team.',
+    lossRisk: 'only-copy', personalData: 'yes', domains: [], why: 'The roster belongs to the team.',
   }],
   elsewhere: [], source: 'declared', at: AT, ...over,
 });

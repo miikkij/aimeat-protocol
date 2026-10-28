@@ -14,6 +14,9 @@
  *   2025-11-25.
  * @usage cd aimeat && pnpm exec vitest run test/unit/mcp-protocol-version.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-27 — The SEP-2127 Server Card at /v1/mcp/server-card and
+ *     /.well-known/mcp/server-card.json: its members, limits, media type and CORS header; the
+ *     revisions are read from its remote, and the extended card's from /.well-known/mcp.json alone.
  *   v1.1.0 — 2026-10-20 — Bound to server/discover (2026-07-28) and initialize (2025-era) both, and
  *     the cards' supportedProtocolVersions (MCP SDK v2 migration step 8).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -140,11 +143,47 @@ describe('the MCP revision on the server card', () => {
         expect(await negotiated('2025-03-26')).toBe('2025-03-26');
         expect(MCP_SERVED_REVISIONS[0]).toBe(MCP_PROTOCOL_VERSION);
         expect(MCP_SERVED_REVISIONS).toEqual(expect.arrayContaining([...(await discovered()), ...SUPPORTED_PROTOCOL_VERSIONS]));
-        for (const path of ['/.well-known/mcp.json', '/.well-known/mcp/server-card.json']) {
-            const card = await (await fetch(`${base}${path}`)).json() as { protocolVersion?: string; supportedProtocolVersions?: string[] };
-            expect(card.protocolVersion, path).toBe(MCP_PROTOCOL_VERSION);
-            expect(card.supportedProtocolVersions, path).toEqual([...MCP_SERVED_REVISIONS]);
-            expect(card.supportedProtocolVersions, path).toContain(highestSession);
+        const extended = await (await fetch(`${base}/.well-known/mcp.json`)).json() as { protocolVersion?: string; supportedProtocolVersions?: string[] };
+        expect(extended.protocolVersion).toBe(MCP_PROTOCOL_VERSION);
+        expect(extended.supportedProtocolVersions).toEqual([...MCP_SERVED_REVISIONS]);
+        expect(extended.supportedProtocolVersions).toContain(highestSession);
+        for (const path of ['/v1/mcp/server-card', '/.well-known/mcp/server-card.json']) {
+            const card = await (await fetch(`${base}${path}`)).json() as { remotes?: Array<{ supportedProtocolVersions?: string[] }> };
+            expect(card.remotes?.[0]?.supportedProtocolVersions, path).toEqual([...MCP_SERVED_REVISIONS]);
         }
+    });
+});
+
+/** The root members the v1 Server Card schema defines (experimental-ext-server-card schema.ts). */
+const SERVER_CARD_MEMBERS = ['$schema', '_meta', 'description', 'icons', 'name', 'remotes', 'repository', 'title', 'version', 'websiteUrl'];
+
+describe('the SEP-2127 Server Card', () => {
+    it('is served at the reserved location and the .well-known path, public, as the card media type', async () => {
+        for (const path of ['/v1/mcp/server-card', '/.well-known/mcp/server-card.json']) {
+            const res = await fetch(`${base}${path}`);
+            expect(res.status, path).toBe(200);
+            expect(res.headers.get('content-type') ?? '', path).toMatch(/^application\/mcp-server-card\+json/);
+            expect(res.headers.get('access-control-allow-origin'), path).toBe('*');
+        }
+    });
+
+    it('holds only the members the schema defines, within its limits, and names the MCP endpoint', async () => {
+        const card = await (await fetch(`${base}/v1/mcp/server-card`)).json() as Record<string, any>;
+        expect(card.$schema).toBe('https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json');
+        for (const key of Object.keys(card)) expect(SERVER_CARD_MEMBERS, key).toContain(key);
+        expect(card.name).toMatch(/^[a-zA-Z0-9.-]+\/[a-zA-Z0-9._-]+$/);
+        expect(card.name).toBe(`io.aimeat/${NODE_ID}`);
+        expect(card.description.length).toBeGreaterThan(0);
+        expect(card.description.length).toBeLessThanOrEqual(100);
+        expect(card.version).not.toMatch(/[\^~*<>=]|\.x\b/);
+        expect(card.repository).toMatchObject({ url: expect.stringMatching(/^https:\/\//), source: 'github' });
+        expect(card.remotes).toEqual([{ type: 'streamable-http', url: 'https://node.test/v1/mcp', supportedProtocolVersions: [...MCP_SERVED_REVISIONS] }]);
+        for (const key of Object.keys(card._meta)) expect(key).toMatch(/^[a-z0-9.-]+\/[a-z0-9-]+$/);
+    });
+
+    it('FAILURE: the extended card is not the Server Card (no v1 $schema, so a validator does not take it for one)', async () => {
+        const extended = await (await fetch(`${base}/.well-known/mcp.json`)).json() as Record<string, unknown>;
+        expect(extended.$schema).not.toBe('https://static.modelcontextprotocol.io/schemas/v1/server-card.schema.json');
+        expect(extended).toHaveProperty('webmcp');
     });
 });

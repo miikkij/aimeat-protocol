@@ -5,6 +5,8 @@
  * @description Schedule, workflow, task lifecycle, and agent memory (read/write/list/search) tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-28 — aimeat_agent_scope_narrow: the node never narrows by itself; call it only on the person's word.
+ *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — aimeat_agent_scope_narrow says the node narrows a ready `*` agent by itself at its next task.
  *   2026-10-17 — aimeat_memory_write takes visibility "organism:<organism id>" (plan doc-mvcn6c7e4e5q, V3.2).
  *   2026-10-15 — aimeat_task_request_changes leaves the catalog: no surface offers it any more (feature-list audit #79).
@@ -67,6 +69,7 @@
 
 import { flexibleBoolean } from '../input-schemas.js';
 import { MEMORY_LIST_MAX_LIMIT } from '../../models/tool-input-vocabulary.js';
+import { INPUT_LIMITS, documentText } from '../../models/input-limits.js';
 import { z } from 'zod';
 import { memoryWriteVisibilitySchema } from '../../utils/visibility-words.js';
 import type { AimeatToolDefinition } from './types.js';
@@ -90,7 +93,7 @@ export const schedulesTasksMemoryTools = [
             timezone: { type: 'string', description: 'IANA timezone, e.g. "Europe/Helsinki".' },
             purpose: { type: 'string', description: 'Why this runs (shown to the owner).' },
             prompt: { type: 'string', description: 'ai: instruction applied to the input memory values.' },
-            input_keys: { type: 'array', description: 'ai: owner memory keys fed in as context. Each one goes to the model provider, so a key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with RESERVED_KEY.', zod: z.array(z.string()) },
+            input_keys: { type: 'array', description: 'ai: owner memory keys fed in as context. Each one goes to the model provider, so a key naming a record this node keeps for itself (an AI key, a payout setting, a spend limit) is refused with RESERVED_KEY.', zod: z.array(z.string().max(INPUT_LIMITS.key)) },
             output_key: { type: 'string', description: 'ai: memory key for the result (auto-generated if omitted). A record this node keeps for itself is refused with RESERVED_KEY.' },
             task_title: { type: 'string', description: 'agent_task: title of the task created each fire.' },
             extension_name: { type: 'string', description: 'extension: installed extension name.' },
@@ -166,15 +169,15 @@ export const schedulesTasksMemoryTools = [
         surfaces: ['agent'],
         input: {
             entries: { type: 'array', required: true, description: 'Array of {name, description?, purpose?, cron?, timezone?, schedule?, status?, kind?}.', zod: z.array(z.object({
-        id: z.string().optional(),
-        name: z.string(),
-        description: z.string().optional(),
-        purpose: z.string().optional(),
-        cron: z.string().optional(),
-        timezone: z.string().optional(),
-        schedule: z.string().optional().describe('Human-readable schedule if no cron, e.g. "Every day 07:00".'),
+        id: z.string().max(INPUT_LIMITS.id).optional(),
+        name: z.string().max(INPUT_LIMITS.name),
+        description: z.string().max(INPUT_LIMITS.description).optional(),
+        purpose: z.string().max(INPUT_LIMITS.description).optional(),
+        cron: z.string().max(INPUT_LIMITS.line).optional(),
+        timezone: z.string().max(INPUT_LIMITS.id).optional(),
+        schedule: z.string().max(INPUT_LIMITS.line).optional().describe('Human-readable schedule if no cron, e.g. "Every day 07:00".'),
         status: z.enum(['active', 'paused']).optional(),
-        kind: z.string().optional(),
+        kind: z.string().max(INPUT_LIMITS.id).optional(),
       })) },
         },
     },
@@ -215,7 +218,7 @@ export const schedulesTasksMemoryTools = [
         input: {
             id: { type: 'string', required: true, description: 'The workflow id.' },
             mode: { type: 'string', required: true, description: 'signals-only | full', enum: ['signals-only', 'full'] },
-            vars: { type: 'object', description: 'The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.', zod: z.record(z.string(), z.string()) },
+            vars: { type: 'object', description: 'The run\'s input, as { varName: value } over the vars the workflow declares. A workflow that takes input is a constant without this. Anything it does not declare is ignored, and a declared var left out falls back to its default.', zod: z.record(z.string(), z.string().max(INPUT_LIMITS.text)) },
             target: { type: 'string', description: 'With mode="full": "sandbox" writes every key behind a per-run prefix so a trial cannot touch what a live run produced. Default "live".', enum: ['live', 'sandbox'] },
         },
     },
@@ -242,7 +245,7 @@ export const schedulesTasksMemoryTools = [
             workflow_id: { type: 'string', required: true, description: 'The workflow id.' },
             run_id: { type: 'string', required: true, description: 'The run id (from aimeat_workflow_pending_inputs).' },
             step_id: { type: 'string', required: true, description: 'The waiting step id.' },
-            picks: { type: 'array', required: true, description: 'Option ids from the pinned question (may be empty when answering with `other` alone).', zod: z.array(z.string()) },
+            picks: { type: 'array', required: true, description: 'Option ids from the pinned question (may be empty when answering with `other` alone).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
             other: { type: 'string', description: 'Free-text answer; only when the question allows it.' },
         },
     },
@@ -273,13 +276,13 @@ export const schedulesTasksMemoryTools = [
             title: { type: 'string', required: true, description: 'Short human-readable title for the task.' },
             description: { type: 'string', required: true, description: 'The actual prompt / instruction for the target agent.' },
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued" (visible to target immediately). Use "draft" for owner-review-first.' },
-            files: { type: 'array', description: 'Up to 20 file REFERENCES the target agent needs: "<owner@node>/<storage key>" each (a bare key means one of your own files). You must be able to read each file yourself.', zod: z.array(z.string()).max(20) },
+            files: { type: 'array', description: 'Up to 20 file REFERENCES the target agent needs: "<owner@node>/<storage key>" each (a bare key means one of your own files). You must be able to read each file yourself.', zod: z.array(z.string().max(INPUT_LIMITS.key)).max(20) },
             scope: { type: 'array', description: 'Named parameters the receiving runner DISPATCHES on, each { name, value, type?, description? }. A fleet runner recognises work by a `kind` entry here and takes its pointers (a memory key, an app id) from the others; the description is prose for a model, and a pointer put in the title is the standard way to build a task nothing picks up.', zod: z.array(z.object({
-                name: z.string().describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
-                value: z.string(),
+                name: z.string().max(INPUT_LIMITS.name).describe('Field name the receiving runner reads, e.g. "kind", "memory_key", "app_id".'),
+                value: z.string().max(INPUT_LIMITS.text),
                 type: z.enum(['text', 'url', 'memory_key', 'number', 'cron']).optional()
                     .describe('How to read the value. Defaults to "text".'),
-                description: z.string().optional().describe('What this field is for, for whoever reads the task.'),
+                description: z.string().max(INPUT_LIMITS.description).optional().describe('What this field is for, for whoever reads the task.'),
             })).max(20) },
             start: { type: 'string', enum: ['automatic', 'confirm'], description: "How THIS task starts. 'confirm' = it waits for the owner's OK; 'automatic' = the agent proposes its plan and goes on (needs agent:write, never for your own task). Leave it out to use the agent's own setting. The answer's `start` says whether it runs now or waits, and why: tell the person." },
         },
@@ -303,9 +306,9 @@ export const schedulesTasksMemoryTools = [
         input: {
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             todos: { type: 'array', required: true, description: "Array of TODOs with title, optional description, verification, estimate_minutes, and effects (any of 'spend', 'send_as_owner', 'delete').", zod: z.array(z.object({
-                title: z.string().describe('TODO title'),
-                description: z.string().optional().describe('TODO details'),
-                verification: z.string().optional().describe('How completion can be verified'),
+                title: z.string().max(INPUT_LIMITS.title).describe('TODO title'),
+                description: z.string().max(INPUT_LIMITS.description).optional().describe('TODO details'),
+                verification: z.string().max(INPUT_LIMITS.description).optional().describe('How completion can be verified'),
                 estimate_minutes: z.number().optional().describe('Estimated work time in minutes'),
                 effects: z.array(z.enum(['spend', 'send_as_owner', 'delete'])).optional()
                     .describe("Declare what this step does that the owner must see first: 'spend' (money), 'send_as_owner' (mail or a message in the owner's name), 'delete' (removes the owner's data). A plan with any of these waits for the owner's OK."),
@@ -327,7 +330,7 @@ export const schedulesTasksMemoryTools = [
     },
     {
         name: 'aimeat_agent_scope_narrow',
-        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal). Once two weeks of its use are on record, the node makes this same narrowing by itself at the agent's next task and tells the owner, so call this only when the person wants it done now. Refused when nothing it used is on record yet. Needs agent:permissions.",
+        description: "Replace one of the owner's agents' \"all permissions\" (*) with the named permissions it actually used, as the node recorded them. Use it only when the person agrees after you showed them the list (aimeat_agents_list: task_start_wildcard.proposal) and told them what it takes away: everything the agent has not used so far. The node never makes this narrowing by itself; the agent keeps all permissions until the person decides. Refused when nothing it used is on record yet. Needs agent:permissions.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Narrow an Agent to What It Used', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -485,10 +488,10 @@ export const schedulesTasksMemoryTools = [
         input: {
             ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
-            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([z.string(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
+            value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.', zod: z.union([documentText(), z.number(), z.boolean(), z.record(z.string(), z.unknown()), z.array(z.unknown())]) },
             visibility: { type: 'string', description: 'Who can read it: private, owner, group, members (any signed-in account of this node), public, or "organism:<organism id>" (the active members of that one organism and their agents; you must be a member of it yourself). Default: private.', zod: memoryWriteVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
-            tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string()) },
+            tags: { type: 'array', description: 'Optional tags for later filtering or shared memory areas.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             ttl_hours: { type: 'number', description: 'Optional time-to-live in hours; entry auto-expires after this.' },
             owner_scope: { type: 'boolean', description: 'Write under the OWNER instead of yourself. Requires the memory:write-as-owner scope.', zod: flexibleBoolean },
             expected_version: { type: 'number', description: 'Optimistic lock: the version you read. Refused with VERSION_CONFLICT if the record changed since. Pass 0 to assert the key does not exist yet. Omit for last-write-wins.', zod: z.number().int().nonnegative() },
@@ -540,8 +543,8 @@ export const schedulesTasksMemoryTools = [
         concisePath: 'items',
         input: {
             prefix: { type: 'string', description: 'Key prefix filter, e.g. "project/".' },
-            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.', zod: z.string() },
-            tags: { type: 'array', description: 'Optional tag filters.', zod: z.array(z.string()) },
+            visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Optional visibility filter.', zod: z.string().max(INPUT_LIMITS.id) },
+            tags: { type: 'array', description: 'Optional tag filters.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
             owner_scope: { type: 'boolean', description: 'When true, list same-owner GHII and all same-owner agent memory. Their private records are listed only with the memory:read-as-owner scope.', zod: flexibleBoolean },
             limit: { type: 'number', description: 'Maximum entries to return (recommended on large stores).', zod: z.number().int().positive().max(MEMORY_LIST_MAX_LIMIT) },
         },

@@ -8,9 +8,13 @@
  *   - with frontPage 'start', GET / for a browser answers public/front-start.fi.html for a
  *     Finnish Accept-Language and public/front-start.html for ?lang=en, with Vary on the language;
  *   - with frontPage 'classic', GET / answers the SPA shell and not the start page;
- *   - JSON negotiation is untouched by the switch.
+ *   - JSON negotiation is untouched by the switch;
+ *   - the served page carries the node's head metadata (canonical, og:*, JSON-LD) and keeps its
+ *     own title and description.
  * @usage cd aimeat && pnpm exec vitest run test/unit/front-page-start.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-27 — The head metadata the shell gets: the page was sent as read from disk, so
+ *     aimeat.io's front page had no canonical, og:* or JSON-LD from 2026-10-21 (AGENTSCAN S10, S12, S13).
  *   v1.0.0 — 2026-10-21 — Initial (the "accelerate your AI" front page, staged before the flip).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -76,6 +80,26 @@ describe('AIMEAT_FRONT_PAGE=start', () => {
         const enText = await en.text();
         expect(enText).toContain('<html lang="en">');
         expect(enText).toContain('Accelerate your AI.');
+    });
+
+    it('carries the node head metadata and keeps its own title and description', async () => {
+        const url = await serve({ ...base, frontPage: 'start' });
+        for (const [lang, title] of [['en', 'AIMEAT · Accelerate your AI'], ['fi', 'AIMEAT · Kiihdytä tekoälysi']] as const) {
+            const res = await fetch(`${url}/?lang=${lang}`, { headers: { Accept: 'text/html' } });
+            const html = await res.text();
+            const head = html.slice(0, html.indexOf('</head>'));
+            expect(head).toContain('<link rel="canonical" href="https://node.test/">');
+            expect(head).toContain(`<title>${title}</title>`);
+            expect(head).toContain(`<meta property="og:title" content="${title}">`);
+            expect(head).toMatch(/<meta property="og:description" content="[^"]{50,}">/);
+            expect(head).toContain('<meta property="og:url" content="https://node.test/">');
+            expect(head.match(/<title>/g)?.length).toBe(1);
+            expect(head.match(/<meta name="description"/g)?.length).toBe(1);
+            const blocks = [...head.matchAll(/<script type="application\/ld\+json"[^>]*>([^<]*)<\/script>/g)]
+                .map(m => JSON.parse(m[1]!) as { '@type': string; name?: string });
+            expect(blocks.map(b => b['@type']).sort()).toEqual(['Organization', 'SoftwareApplication', 'WebPage']);
+            expect(blocks.find(b => b['@type'] === 'WebPage')?.name).toBe(title);
+        }
     });
 
     it('leaves the classic front page alone when the switch is classic', async () => {

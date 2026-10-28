@@ -24,6 +24,12 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.6.0 — 2026-10-28 — The optional app-level `aiAct`: the maker's answers to the EU AI Act
+ *     questions, with a reason each, which the register draft takes as the maker's for the
+ *     administrator to approve (wish: the maker answers for their own app).
+ *   v2.5.0 — 2026-10-28 — A `held` row may carry `domains`, the regulated data domains of its
+ *     personal data, read by the records of processing and the AI Act register draft. Additive, so
+ *     the spec stays /2.
  *   v2.4.0 — 2026-10-18 — The machinery word `invites-people` and the optional app-level `invites`
  *     statement: the app invites people into organisms and an invitation can create an account
  *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien). Additive, so the spec
@@ -132,6 +138,19 @@ export interface InvitesStatement {
   into: string;
 }
 
+/**
+ * The app maker's answers to the node's EU AI Act questions, for an app that uses AI: question id →
+ * the answer (`true`/`false` for a yes/no question, the option value for a choice), and question id
+ * → one or two sentences saying why. The maker knows the app; the node's administrator approves the
+ * answers when they save the register, where they are marked as the maker's (compliance-draft.ts).
+ * The ids and the questions are the node's question set: aimeat_datamap_get lists them under
+ * `ai_act` for an app that uses AI. Public like the rest of the map.
+ */
+export interface AiActStatement {
+  answers: Record<string, boolean | string>;
+  notes?: Record<string, string>;
+}
+
 /* ── The two tables ──────────────────────────────────────────────────────────────────────────── */
 
 /** One key family. Eleven things, and `why` is the one the whole feature exists for. */
@@ -192,6 +211,15 @@ export interface DataMapRow {
    * uses it among other things. A reader sees "made for this agent" or "uses its work".
    */
   madeFor?: boolean;
+  /**
+   * The regulated data domains this family's personal data falls in, by the ids of
+   * data/compliance-domains.ts: `employment`, `health`, `children`, and the rest.
+   *
+   * OPTIONAL, AND ASKED FOR ON EVERY PERSONAL ROW. `[]` is a considered "none of these"; absent is
+   * silence, which the check names. The domain is what the records of processing, the
+   * classification floor and the AI Act register read: written here once, it reaches all three.
+   */
+  domains?: string[];
 }
 
 /** The second table: what is unresolved, or is not ours. */
@@ -230,6 +258,8 @@ export interface DataMap {
   leaves: LeavesRow[];
   /** Optional: the app invites people into organisms, and how. See InvitesStatement. */
   invites?: InvitesStatement;
+  /** Optional: the maker's answers to the EU AI Act questions, for an app that uses AI. */
+  aiAct?: AiActStatement;
 
   /* ── The rows ── */
 
