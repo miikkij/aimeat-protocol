@@ -3728,6 +3728,7 @@
       "answerFromEvidence": "from the record",
       "answerFromAi": "AI draft",
       "answerFromHuman": "your answer",
+      "answerFromProposed": "a rule's proposal, not yet approved",
       "save": "Save",
       "saving": "Saving…",
       "saved": "Saved. Everything was re-classified.",

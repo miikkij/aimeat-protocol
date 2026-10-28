@@ -27,6 +27,8 @@
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v2.2.1 — 2026-10-28 — A saved answer whose source is `proposed` (an app's Annex III area read
+ *     from its data map) prints as a rule's proposal not yet approved; it printed with no label.
  *   v2.2.0 — 2026-10-24 — `only`: one register or one place's record printed alone, from the records
  *     dialog (C7.7).
  *   v2.1.0 — 2026-10-24 — The node's records of processing print after the question set, one entry
@@ -48,6 +50,7 @@ const SOURCE_LABEL = {
   human: 'admin.compliance.answerFromHuman',
   ai: 'admin.compliance.answerFromAi',
   evidence: 'admin.compliance.answerFromEvidence',
+  proposed: 'admin.compliance.answerFromProposed',
 };
 
 /**
