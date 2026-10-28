@@ -3729,6 +3729,118 @@
       "answerFromAi": "AI draft",
       "answerFromHuman": "your answer",
       "answerFromProposed": "a rule's proposal, not yet approved",
+      "paper": {
+        "summaryTitle": "Overall state",
+        "sumUses": "AI uses found",
+        "sumUsesValue": "apps {apps} · people or agents {others}",
+        "sumApproved": "Saved in the register",
+        "sumApprovedValue": "{saved} of {total}",
+        "sumHigh": "Candidates for the high-risk class",
+        "none": "none",
+        "sumCalls": "Model calls in the period",
+        "sumCallsValue": "{calls} calls · {cost} · {models} models",
+        "sumGaps": "Open gaps",
+        "sumGapsValue": "{ai} in the AI register · {records} in the records of processing",
+        "sumPublic": "Public content",
+        "sumPublicValue": "{total} published · {unlabelled} without a label",
+        "usesLead": "Every app and person on this installation that uses AI, by its own records. A saved entry is in the register. An entry found by the system is what the installation read from its usage records and data maps; nobody has checked or saved it yet.",
+        "usesNone": "The installation finds no AI use in this period.",
+        "statusSaved": "saved · class: {cls}",
+        "statusFound": "found by the system, not saved",
+        "statusProposed": " · proposed class: {cls}",
+        "fOwner": "Account",
+        "modelsNone": "no model calls recorded in this period",
+        "fWhyAi": "Why it counts as AI use",
+        "fProposal": "Proposed answer, not approved",
+        "fOpen": "Unanswered",
+        "openCount": "{n} of {total} questions",
+        "ev": {
+          "aiUse": "the app asks for permission to use AI",
+          "machinery": "the data map says the app generates content with AI",
+          "generates": "the app says it generates {what}",
+          "sendsOne": "the data map sends one thing to an AI service",
+          "sends": "the data map sends {n} things to an AI service",
+          "keeps": "the data map keeps content AI made ({rows})"
+        },
+        "media": { "text": "text", "image": "images", "audio": "audio", "video": "video" },
+        "personal": "personal data, by the app's data map",
+        "personalDomains": "personal data, by the app's data map; regulated data: {list}",
+        "domainStated": "{domain}, stated in {rows}",
+        "domainProposed": "{domain}, read from the words in {rows}",
+        "gapsTitle": "What is missing",
+        "gapAiAnnex": "{app}: candidate for the high-risk class ({area})",
+        "gapCount": "{n} items",
+        "gapKind": {
+          "undocumented-ai-activity": "A model was used and no entry names it",
+          "app-uses-ai-not-in-register": "An app uses AI and no entry names it",
+          "app-declares-generation-with-gap": "An app generates content and the publish check found no label",
+          "unclassified-usecase": "An entry has unanswered questions, so it has no class",
+          "unlabelled-public-content": "Published without an AI label",
+          "font-licence-unknown": "A font without licence data"
+        },
+        "measuresWhat": "AI use in the period",
+        "recordsNone": "No record of processing is saved yet. The installation has {drafts} drafts ready to check.",
+        "appendixTitle": "Appendix: the question set"
+      },
+      "question": {
+        "q-manipulative-technique": {
+          "text": "Does it use techniques a person cannot perceive, or exploit an age, disability or financial vulnerability, in a way that could lead someone to a decision harmful to them?",
+          "help": "Aimed at the substance rather than the intent: a nudging system nobody meant as manipulative still counts if that is what it does."
+        },
+        "q-social-scoring": {
+          "text": "Does it score people by their social behaviour or personal traits, and is that score then used against them in a situation unrelated to where it was collected?",
+          "help": "The unrelated-context part is what makes it social scoring rather than ordinary assessment."
+        },
+        "q-emotion-workplace-education": {
+          "text": "Does it infer emotions of people at work or in education?",
+          "help": "Medical and safety purposes are carved out. Agent trust scores are not this: they score credentials, not natural persons."
+        },
+        "q-biometric-categorisation-sensitive": {
+          "text": "Does it sort people by biometric data to infer race, political opinion, trade union membership, religion, sex life or sexual orientation?"
+        },
+        "q-untargeted-face-scraping": {
+          "text": "Does it build or expand a face-recognition database by scraping images from the internet or CCTV without a target?"
+        },
+        "q-annex3-area": {
+          "text": "Is it used in one of these areas?",
+          "help": "Pick the closest. These are the Annex III areas, in the words an operator would use rather than the Act's. \"None of these\" is a normal answer."
+        },
+        "q-decides-about-a-person": {
+          "text": "Does its output decide something about an identified person, or materially shape a decision somebody makes about them?",
+          "help": "A system that only drafts, summarises or suggests to its own user is not this. A system whose score is copied into a decision is, whoever pastes it."
+        },
+        "q-interacts-with-people": {
+          "text": "Does a person talk to it directly, or read something it wrote?",
+          "help": "Traffic between agents and this installation, tool calls, federation sync and the scheduler are not this. That is machine to machine, and Article 50(1) says so explicitly."
+        },
+        "q-publishes-publicly": {
+          "text": "Does it publish generated text, image, audio or video where anyone can read it?",
+          "help": "This is the Article 50(4) question, and the one this installation can measure for you: the report counts what was published without a label."
+        },
+        "q-publishes-public-interest": {
+          "text": "Is any of that about politics, public administration, health, science or another matter of public interest?",
+          "help": "Subject matter is what moves 50(4) from theoretical to real, because the editorial carve-out only helps where a person actually reviewed the substance."
+        },
+        "q-resembles-real-people": {
+          "text": "Does it generate media that could be taken for real people, places or events?",
+          "help": "Illustrations and icons are not this. A depiction someone could mistake for a photograph of an identifiable person is."
+        },
+        "q-human-reviews-before-publish": {
+          "text": "Does a person read the substance before it goes out, and can they change or stop it?",
+          "help": "Answer no for anything a schedule publishes on its own. This does not lower the class by itself — it is recorded because it is the fact the editorial carve-out turns on, and because a \"no\" beside public-interest publishing is the pair worth looking at."
+        }
+      },
+      "option": {
+        "none": "None of these",
+        "biometrics": "Identifying people by biometrics",
+        "critical-infrastructure": "Running or protecting critical infrastructure",
+        "education": "Deciding admission, assessment or progress in education",
+        "employment": "Hiring, task allocation, promotion, or ending employment",
+        "essential-services": "Access to essential services, credit, or insurance pricing",
+        "law-enforcement": "Law enforcement",
+        "migration": "Migration, asylum or border control",
+        "justice-democracy": "Administration of justice, or influencing an election"
+      },
       "save": "Save",
       "saving": "Saving…",
       "saved": "Saved. Everything was re-classified.",

@@ -11,7 +11,8 @@
  *   NOTE: this file must be linked in spa.html.
  * @version-history
  *   v1.2.0 — 2026-10-28 — The frames that hold the page grow to their content on paper: with the
- *     app shell (page-base.css) they cut the printout to one sheet (innokas.aimeat.io).
+ *     app shell (page-base.css) they cut the printout to one sheet (innokas.aimeat.io). An answer
+ *     wraps in its own column instead of squeezing the question.
  *   v1.1.0 — 2026-09-27 — A part marked data-print-keep prints too (the admin frame's bar with the
  *     page's title and the time of the last read, which main's printout carried).
  *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
@@ -31,8 +32,10 @@
 .print-entry-field > span { color: var(--muted); }
 .print-entry-answers { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
 .print-entry-answers td { vertical-align: top; padding: .15rem .4rem .15rem 0; }
-.print-entry-q { width: 70%; }
-.print-entry-a { white-space: nowrap; }
+/* The answer wraps: an option label with its source ("Hiring, task allocation … (a rule's
+   proposal, not yet approved)") held on one line squeezed the question to a word per line. */
+.print-entry-q { width: 60%; }
+.print-entry-a { width: 40%; }
 .print-entry-src { margin-left: .4rem; color: var(--muted); }
 .print-entry-why { margin-top: .4rem; font-size: .82rem; }
 .print-entry-why > span { color: var(--muted); }
