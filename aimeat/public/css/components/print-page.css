@@ -10,6 +10,8 @@
  *   component's own names.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-10-28 — The frames that hold the page grow to their content on paper: with the
+ *     app shell (page-base.css) they cut the printout to one sheet (innokas.aimeat.io).
  *   v1.1.0 — 2026-09-27 — A part marked data-print-keep prints too (the admin frame's bar with the
  *     page's title and the time of the last read, which main's printout carried).
  *   v1.0.0 — 2026-09-27 — Initial (admin group G1).
@@ -41,6 +43,14 @@
 @media print {
   /* Nothing of the site around the page: what neither holds the page nor stands inside it. */
   body.print-page-active *:not(:has(.print-page)):not(:has([data-print-keep])):not(.print-page):not(.print-page *):not([data-print-keep]):not([data-print-keep] *) { display: none !important; }
+  /* page-base.css lets the app shell go on paper; the frames between it and the page (the
+     operator frame, a settings frame) cap their height and scroll too, and on innokas.aimeat.io
+     the Compliance report printed "1/1", cut at question 11. Every box that holds the page grows
+     to its content and lets the browser break it into sheets. */
+  body.print-page-active :has(.print-page) {
+    height: auto !important; min-height: 0 !important; max-height: none !important;
+    overflow: visible !important; display: block !important; position: static !important;
+  }
   body.print-page-active .print-screen-only { display: none !important; }
   body.print-page-active .print-only { display: block; }
   body.print-page-active .print-page { width: 100%; margin: 0; padding: 0; }

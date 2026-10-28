@@ -14,6 +14,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.1.0 — 2026-10-28 — On paper html, body, #app and .page-content grow to their content: the
+ *     one-viewport shell cut every printout to one sheet.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 515-635, 1627-1631, 1652-1656, 1782-1796), so theme.css
  *     holds tokens only (UI consolidation, a move).
  */
@@ -151,6 +153,17 @@ a { color: inherit; text-decoration: none; }
    scroll. min-height:0 lets the flex child shrink so overflow-y actually scrolls;
    overflow-x:hidden replaces the clip that used to live on body. */
 .page-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; animation: pageIn 0.8s ease; }
+
+/* On paper the app shell lets go. The frame above is one viewport tall and clips (html and body
+   overflow: clip, #app 100dvh, .page-content its own scroll region), so every printout stopped at the
+   first sheet: the Compliance report cut at question 11 of 12 and printed "1/1" on innokas.aimeat.io,
+   and the start page's playbook (2243 px) lost its second half mid-sentence (2026-10-28). Paper has
+   no viewport to fill: each box grows to its content and the browser breaks it into sheets. Unscoped
+   on purpose, because it hides nothing and Ctrl+P on any page needs it as much as a Print button. */
+@media print {
+  html, body, #app, .page-content { height: auto !important; min-height: 0; max-height: none; overflow: visible !important; }
+  #app { display: block; }
+}
 
 /* ── Accessibility ── */
 .visually-hidden { position:absolute; width:1px; height:1px; padding:0; margin:-1px; overflow:hidden; clip:rect(0,0,0,0); white-space:nowrap; border:0; }
