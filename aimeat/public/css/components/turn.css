@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.4.1 — 2026-10-28 — .poster-turn-body keeps to the turn's width (max-width: 100%): your own message
+ *     no longer grows past the left edge of a phone screen.
  *   v1.4.0 — 2026-09-27 — Your turn's Markdown parts, quote, table lines and tags take the turn's own
  *     words' colour (inherit) instead of --on-sun: the same ink on the sun in AIMEAT, and readable in
  *     Pebble's dark mode, which draws your turn on a dark ground with light words.
@@ -38,6 +40,9 @@
   font-size: var(--text-md);
   font-weight: var(--weight-semibold);
   overflow-wrap: anywhere;
+  /* The turn is a flex column, so a part with a wide minimum (a long unbreakable mark) made the body
+     wider than the turn; on your own turn, aligned right, that width went past the screen's left edge. */
+  max-width: 100%;
 }
 /* What the person said: a sun block, bold, its own words. */
 .poster-turn--user .poster-turn-body {
