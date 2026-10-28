@@ -36,6 +36,8 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.7.0 — 2026-10-28 — The section "EU AI Act questions" after the AI labels (sections/aiact.js),
+ *     where the owner of an app that uses AI answers the node's questions with a reason each.
  *   v1.6.0 — 2026-10-25 — The section "Open to the internet" after Manage (sections/internet.js), on a
  *     node that shows its content to its own accounts only.
  *   v1.5.0 — 2026-10-18 — The pencil into the About editor is the owner's only, and the back link names
@@ -106,6 +108,7 @@ const SECTION_LOADERS = {
   skills: () => import('/views/appcat/sections/skills.js'),
   search: () => import('/views/appcat/sections/search.js'),
   marks: () => import('/views/appcat/sections/marks.js'),
+  aiact: () => import('/views/appcat/sections/aiact.js'),
   legal: () => import('/views/appcat/sections/legal.js'),
   audit: () => import('/views/appcat/sections/audit.js'),
   promote: () => import('/views/appcat/sections/promote.js'),

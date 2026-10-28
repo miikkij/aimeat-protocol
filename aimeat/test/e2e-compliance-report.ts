@@ -23,6 +23,9 @@
  *   inspection.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-report
  * @version-history
+ *   v1.2.0 — 2026-10-28 — The maker answers for their own app: the questions on the map read, the
+ *     finding, another account refused, the draft marking the answers `maker` with their reasons,
+ *     a saved entry receiving only its open answers, and the daily job asking once.
  *   v1.1.0 — 2026-10-28 — An app that uses AI on employment data: a report gap with its Annex III
  *     area, a draft entry whose area is marked proposed, regulated data in its records draft, its
  *     own owner's slice and nobody else's, and a use case naming it closes the gap. Seen red on the
@@ -693,6 +696,113 @@ await test('A use case that names the app closes the gap', async () => {
     const d = await json(DRAFT, { headers: auth(op.token) });
     assert(!(d.body.data.usecases as any[]).some(u => (u.apps ?? []).includes(talentRef)), 'and the draft does not propose it again');
     await json(USECASES, { method: 'PUT', headers: auth(op.token), body: JSON.stringify({ usecases: kept }) });
+});
+
+// ─── The maker answers for their own app (Jouni, 2026-10-28) ───
+// The node finds the AI apps by itself, but only the maker knows what one does to people. The maker
+// answers the questions in the app's data map, with a reason each; the administrator approves them;
+// and a maker who has not answered gets a message with a ready prompt.
+
+const MAP_OF = (ref: string) => `/v1/datamap/apps/${ref}`;
+
+await test('The maker reads the questions on the map read, and an unanswered AI map is a finding', async () => {
+    const r = await json(MAP_OF(talentRef), { headers: auth(plain.token) });
+    assert(r.status === 200, `map read ${r.status}`);
+    const act = r.body.data.ai_act;
+    assert(Array.isArray(act?.questions) && act.questions.length > 0, `the questions are served: ${JSON.stringify(act)}`);
+    assert(act.questions.every((q: any) => q.implies === undefined), 'without their class rules');
+    assert(act.unanswered.length === act.questions.length, 'every question is open');
+    assert(act.built_in.includes('q-annex3-area'), 'the shipped questions are named, so a page can translate them');
+    assert((r.body.data.findings as any[]).some(f => f.code === 'DATAMAP_AI_ACT_UNANSWERED'), `the finding: ${JSON.stringify(r.body.data.findings)}`);
+});
+
+await test('An app that does not use AI gets no questions', async () => {
+    const ref = await publishApp(plain, `noai${Date.now()}.html`, { ...TALENT_MAP, machinery: [], held: [{ ...TALENT_MAP.held[0], what: 'noai.list', personalData: 'no' }] });
+    const r = await json(MAP_OF(ref), { headers: auth(plain.token) });
+    assert(r.status === 200 && r.body.data.ai_act === undefined, `no ai_act: ${JSON.stringify(r.body.data.ai_act)}`);
+    assert(!(r.body.data.findings as any[]).some(f => f.code === 'DATAMAP_AI_ACT_UNANSWERED'), 'and no finding');
+});
+
+await test('Another account cannot write the maker\'s answers (403)', async () => {
+    const r = await json(MAP_OF(talentRef), {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ ...TALENT_MAP, aiAct: { answers: { 'q-annex3-area': 'none' } } }),
+    });
+    assert(r.status === 403, `another account's write: ${r.status}`);
+});
+
+await test('The maker answers in the map, and the draft takes the answers as the maker\'s with their reasons', async () => {
+    const w = await json(MAP_OF(talentRef), {
+        method: 'PUT', headers: auth(plain.token),
+        body: JSON.stringify({
+            ...TALENT_MAP,
+            aiAct: {
+                answers: { 'q-annex3-area': 'none', 'q-decides-about-a-person': 'no', 'q-interacts-with-people': true },
+                notes: { 'q-annex3-area': 'It lists skills the person typed; nobody is hired or allocated by it.' },
+            },
+        }),
+    });
+    assert(w.status === 200, `the maker's write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    assert(!(w.body.data.findings as any[]).some(f => f.code === 'DATAMAP_AI_ACT_UNANSWERED'), 'the finding is gone');
+    const r = await json(MAP_OF(talentRef), { headers: auth(plain.token) });
+    assert(!r.body.data.ai_act.unanswered.includes('q-annex3-area'), 'an answered question is not open');
+
+    const d = await json(DRAFT, { headers: auth(op.token) });
+    const uc = (d.body.data.usecases as any[]).find(u => (u.apps ?? []).includes(talentRef));
+    assert(!!uc, 'the app has an entry');
+    assert(uc.answers['q-annex3-area'] === 'none' && uc.answerSources['q-annex3-area'] === 'maker',
+        `the maker's answer wins over the rule's proposal: ${JSON.stringify(uc.answerSources)}`);
+    assert(uc.answerNotes?.['q-annex3-area']?.startsWith('It lists skills'), `with its reason: ${JSON.stringify(uc.answerNotes)}`);
+    assert(uc.answers['q-interacts-with-people'] === true && uc.answerSources['q-interacts-with-people'] === 'maker', 'a yes/no answer comes too');
+    assert(uc.answers['q-decides-about-a-person'] === undefined, 'an answer of the wrong shape is left out, not coerced');
+    assert((d.body.data.proposals as any[]).some(p => p.usecase_id === uc.id && p.value === 'employment'),
+        'the rule\'s proposal stays beside the maker\'s different answer, for the administrator to decide');
+    assert(d.body.data.counts.fromMaker >= 2, `counted: ${JSON.stringify(d.body.data.counts)}`);
+});
+
+await test('A saved entry receives the maker\'s answers to its open questions, never over a saved answer', async () => {
+    const before = await json(USECASES, { headers: auth(op.token) });
+    const kept = (before.body.data.usecases as any[]) ?? [];
+    const w = await json(USECASES, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ usecases: [...kept, {
+            id: 'uc-e2e-maker', title: 'Talent', apps: [talentRef],
+            answers: { 'q-annex3-area': 'employment' }, answerSources: { 'q-annex3-area': 'human' },
+            answerNotes: { 'q-annex3-area': 'The administrator reads it as staffing.' },
+        }] }),
+    });
+    assert(w.status === 200, `register write with a note: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    const saved = await json(USECASES, { headers: auth(op.token) });
+    const entry = (saved.body.data.usecases as any[]).find(u => u.id === 'uc-e2e-maker');
+    assert(entry?.answerNotes?.['q-annex3-area'] === 'The administrator reads it as staffing.', 'the note is stored');
+
+    const d = await json(DRAFT, { headers: auth(op.token) });
+    const upd = (d.body.data.makerUpdates as any[]).find(m => m.usecase_id === 'uc-e2e-maker');
+    assert(!!upd, `an update for the saved entry: ${JSON.stringify(d.body.data.makerUpdates)}`);
+    assert(upd.answers['q-interacts-with-people'] === true && upd.answerSources['q-interacts-with-people'] === 'maker', 'its open question gets the maker\'s answer');
+    assert(upd.answers['q-annex3-area'] === undefined && upd.answerNotes['q-annex3-area'] === undefined,
+        'the saved answer and its note stay as they are');
+    await json(USECASES, { method: 'PUT', headers: auth(op.token), body: JSON.stringify({ usecases: kept }) });
+});
+
+await test('The daily job asks the maker once, in one message naming the apps, and not again within the fortnight', async () => {
+    const fromOp = async (): Promise<string[]> => {
+        const convs = await json('/v1/messages/conversations', { headers: auth(plain.token) });
+        const c = (convs.body.data?.conversations ?? []).find((x: any) => String(x.peerGhii || '').startsWith(`${op.name}@`));
+        if (!c) return [];
+        const thread = await json(`/v1/messages/conversations/${encodeURIComponent(c.conversationId)}`, { headers: auth(plain.token) });
+        return (thread.body.data?.messages ?? []).map((m: any) => String(m.body || '')).filter((b: string) => b.includes('aimeat_datamap_get'));
+    };
+    const trigger = () => json('/v1/admin/scheduler/jobs/core:compliance-ask-makers/trigger', { method: 'POST', headers: auth(op.token) });
+    const t1 = await trigger();
+    assert(t1.status === 200, `trigger: ${t1.status} ${JSON.stringify(t1.body?.error)}`);
+    let msgs: string[] = [];
+    for (let i = 0; i < 20 && msgs.length === 0; i++) { await new Promise(r => setTimeout(r, 250)); msgs = await fromOp(); }
+    assert(msgs.length === 1, `one message: ${msgs.length}`);
+    assert(msgs[0].includes(talentRef) && msgs[0].includes(quietRef), 'it names both open apps');
+    await trigger();
+    await new Promise(r => setTimeout(r, 1500));
+    assert((await fromOp()).length === 1, 'the same apps are not asked again within the fortnight');
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

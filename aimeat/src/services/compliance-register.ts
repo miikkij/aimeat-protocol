@@ -34,6 +34,8 @@
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.4.0 — 2026-10-28 — An answer's source may be `maker` (the app's maker answered it in the data
+ *     map), and an entry carries `answerNotes`, a reason per answer.
  *   v1.3.0 — 2026-10-28 — An answer's source may be `proposed` (ComplianceAnswerSource): the node
  *     matched an app's data map to it by rule, and a person decides.
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -91,7 +93,7 @@ export interface ComplianceQuestionnaire {
 }
 
 /** Who produced one answer; see ComplianceUseCase.answerSources. */
-export type ComplianceAnswerSource = 'human' | 'ai' | 'evidence' | 'proposed';
+export type ComplianceAnswerSource = 'human' | 'ai' | 'evidence' | 'proposed' | 'maker';
 
 export interface ComplianceUseCase {
   id: string;
@@ -122,8 +124,16 @@ export interface ComplianceUseCase {
    * `proposed` means the node matched an app's data map to it by rule (compliance-app-signals.ts):
    * the Annex III area of an app that uses AI on employment data. It is neither a recorded fact nor
    * a model's judgement, and a person who saves it without changing it saves it marked so.
+   *
+   * `maker` means the app's maker answered it in the app's data map (`aiAct`), and the administrator
+   * saved it: the person who knows the app gave the answer, the person who keeps the register approved it.
    */
   answerSources?: Record<string, ComplianceAnswerSource>;
+  /**
+   * questionId → why that answer, in one or two sentences: the maker's note from the data map, or
+   * the administrator's own. An answer is the conclusion; this is what an auditor checks it against.
+   */
+  answerNotes?: Record<string, string>;
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -210,7 +220,8 @@ export const UseCaseSchema = z.object({
   purpose: z.string().max(2000).optional(),
   dataSubjects: z.string().max(2000).optional(),
   answers: z.record(z.string(), z.unknown()).optional(),
-  answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence', 'proposed'])).optional(),
+  answerSources: z.record(z.string(), z.enum(['human', 'ai', 'evidence', 'proposed', 'maker'])).optional(),
+  answerNotes: z.record(z.string().max(80), z.string().max(2000)).optional(),
   updatedAt: z.string().max(INPUT_LIMITS.id).optional(),
   updatedBy: z.string().max(300).optional(),
 });

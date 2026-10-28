@@ -18176,6 +18176,17 @@ paths:
         legal basis, data, regulated data and retention, for the same readers as the map. The
         register's other fields stay with its owner and the operator. `privacy_notice` says whether
         the app publishes a privacy notice of its own among its legal pages.
+
+        `ai_act`, for an app that uses AI (its map, its `ai:use` permission or a declared
+        generation): the node's EU AI Act questions without their class rules (`questions`: id, text,
+        help, type, options), the ids still exactly as shipped (`built_in`, which a page shows in its
+        reader's language), and the ids the map's `aiAct` leaves `unanswered`. The maker answers them
+        in the map: `aiAct: { answers: { <question id>: true | false | <option value> }, notes:
+        { <question id>: <why> } }`, written with PUT on this address like the rest of the map. The
+        node's administrator approves them in the register draft (GET /v1/admin/compliance/draft),
+        where they are marked `maker`. An AI app whose map answers none gets the finding
+        DATAMAP_AI_ACT_UNANSWERED, and the daily job core:compliance-ask-makers sends its owner a
+        message with a ready prompt, the same app at most once a fortnight.
       tags: [Apps]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -22856,6 +22867,14 @@ paths:
         this whole surface exists to prevent, so filling those is a person's job, or a model's
         working for them, and the register records which.
 
+        The app's maker answers in the app's data map (`aiAct`, see GET /v1/datamap/apps/{owner}/{filename}):
+        those answers are marked `maker`, below what the record evidences and over what a rule
+        proposes, and the maker's reasons come as `answerNotes`. A rule's proposal stays in
+        `proposals` beside a maker's different answer, for the administrator to decide. For an entry
+        already in the stored register, `makerUpdates` carries the maker's answers to the questions it
+        has not answered and the notes it has none for; the page merges them, never over a saved
+        answer. `counts.fromMaker` counts the maker's answers.
+
         Response `data`: `{ usecases, counts: { entries, answeredFromEvidence, proposed, leftToAnswer },
         proposals, notes }`. `proposals` is one `{ usecase_id, question, value, reason, basis }` per
         proposed answer: `reason` in English, `basis` the same facts as data (`{ domain, source, rows,
@@ -22962,13 +22981,20 @@ paths:
                           unclassified and puts it in the report's gap list - never the mildest class.
                       answerSources:
                         type: object
-                        additionalProperties: { type: string, enum: [human, ai, evidence, proposed] }
+                        additionalProperties: { type: string, enum: [human, ai, evidence, proposed, maker] }
                         description: >
                           questionId to who produced that answer. An auditor's question is which of
                           them, and a register that could not tell them apart would answer it
                           wrongly by omission - the confident-sounding ones would all read as
                           considered. `proposed` is the node's rule reading an app's data map, which
-                          nobody has decided yet. Absent reads as unknown, never as human.
+                          nobody has decided yet. `maker` is the app's maker, answering in the app's
+                          data map. Absent reads as unknown, never as human.
+                      answerNotes:
+                        type: object
+                        additionalProperties: { type: string, maxLength: 2000 }
+                        description: >
+                          questionId to why that answer, in one or two sentences: the maker's note
+                          from the data map or the operator's own. The printout shows it beside the answer.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'

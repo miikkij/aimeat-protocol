@@ -18,6 +18,7 @@
  *   import { registerDataMapTools } from './data-map.js';
  *   registerDataMapTools(mcp, storage, config, () => agentGaii, () => scopes, caller);
  * @version-history
+ *   2026-10-28 — aimeat_datamap_get carries ai_act, as the REST read.
  *   2026-10-24 — aimeat_datamap_get carries records_of_processing and privacy_notice, as the REST read.
  *   2026-10-22 — aimeat_memory_hands passes the session caller to handsOnKey, which answers by the owner-scope read rule, and carries its `note` (secaudit 2026-10, v88).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -86,6 +87,7 @@ export function registerDataMapTools(
       return text({
         app: out.app, data_map: out.dataMap, stamp: out.stamp, findings: out.findings,
         records_of_processing: out.records, privacy_notice: out.privacyNotice,
+        ...(out.aiAct ? { ai_act: { questions: out.aiAct.questions, built_in: out.aiAct.builtIn, unanswered: out.aiAct.unanswered } } : {}),
       });
     },
   );

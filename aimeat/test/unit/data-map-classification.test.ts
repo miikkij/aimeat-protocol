@@ -6,6 +6,7 @@
  *   family by default. It is checked for shape and reported as a finding; it never refuses a map and
  *   it never changes the spec version.
  * @version-history
+ *   v1.0.2 — 2026-10-28 — DATAMAP_AI_ACT_UNANSWERED ranks last; the order test names it (setup, by design).
  *   v1.0.1 — 2026-10-28 — The two data-domain findings rank after the classification one; the order
  *     test names the last three. Its setup no longer matched the code, the code was right.
  *   v1.0.0 — 2026-09-29 — TARGET-082 V5.
@@ -75,10 +76,10 @@ describe('a held row may say which classification the app expects', () => {
     expect(found!.message).not.toContain('a.*');
   });
 
-  it('ranks below every finding but the two data-domain ones, so a missing why stays the gap a list shows', () => {
-    // The domain findings (2026-10-28) come after it: a personal row with no domain is a question
-    // for the compliance pages, and must not push a missing why or a bad label off an app's stamp.
-    expect(FINDING_CODES.slice(-3)).toEqual(['DATAMAP_ROW_BAD_CLASSIFICATION', 'DATAMAP_ROW_BAD_DOMAIN', 'DATAMAP_PERSONAL_NO_DOMAIN']);
+  it('ranks below every finding but the data-domain and AI Act ones, so a missing why stays the gap a list shows', () => {
+    // The domain findings and the AI Act one (2026-10-28) come after it: they are questions for the
+    // compliance pages, and must not push a missing why or a bad label off an app's stamp.
+    expect(FINDING_CODES.slice(-4)).toEqual(['DATAMAP_ROW_BAD_CLASSIFICATION', 'DATAMAP_ROW_BAD_DOMAIN', 'DATAMAP_PERSONAL_NO_DOMAIN', 'DATAMAP_AI_ACT_UNANSWERED']);
     const check = checkMap(map([row({ why: '', classification: 'NOPE' })]), AT);
     expect(check.findings.map(f => f.code)).toEqual(['DATAMAP_ROW_NO_WHY', 'DATAMAP_ROW_BAD_CLASSIFICATION']);
     expect(check.gap?.code).toBe('DATAMAP_ROW_NO_WHY');

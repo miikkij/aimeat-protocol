@@ -9,6 +9,8 @@
  *   compliance-gaps.test.ts; this is the page's fold over what that computation serves.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-tab-gaps.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-28 — The counts carry `maker` (setup, by design), and an answer the app's maker
+ *     gave is counted as the maker's.
  *   v1.2.0 — 2026-10-28 — The sixth kind, app-uses-ai-not-in-register; a proposed answer is counted
  *     as proposed, never as the operator's.
  *   v1.1.0 — 2026-10-03 — The fifth kind, font-licence-unknown (the font manager).
@@ -82,18 +84,22 @@ describe('groupGaps', () => {
 
 describe('answersOf and answerStats', () => {
   it('counts an answer with no recorded source as the operator\'s', () => {
-    expect(answersOf(UC[2], QS)).toEqual({ total: 3, answered: 3, unanswered: 0, ai: 0, human: 3, evidence: 0, proposed: 0 });
+    expect(answersOf(UC[2], QS)).toEqual({ total: 3, answered: 3, unanswered: 0, ai: 0, human: 3, evidence: 0, proposed: 0, maker: 0 });
   });
   it('treats an empty string as unanswered', () => {
-    expect(answersOf(UC[3], QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 2, evidence: 0, proposed: 0 });
+    expect(answersOf(UC[3], QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 2, evidence: 0, proposed: 0, maker: 0 });
   });
   it('sums across the register', () => {
-    expect(answerStats(UC, QS)).toEqual({ entries: 4, questions: 3, answered: 9, unanswered: 3, ai: 2, human: 6, evidence: 1, proposed: 0 });
+    expect(answerStats(UC, QS)).toEqual({ entries: 4, questions: 3, answered: 9, unanswered: 3, ai: 2, human: 6, evidence: 1, proposed: 0, maker: 0 });
   });
   it('never counts a proposed answer as the operator\'s', () => {
     // A proposal the node's rule read from a data map, saved unchanged, is still nobody's decision.
     const u = { id: 'e', answers: { q1: 'employment', q2: true }, answerSources: { q1: 'proposed', q2: 'human' } };
-    expect(answersOf(u, QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 1, evidence: 0, proposed: 1 });
+    expect(answersOf(u, QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 1, evidence: 0, proposed: 1, maker: 0 });
+  });
+  it('counts an answer the app\'s maker gave as the maker\'s, never as the operator\'s', () => {
+    const u = { id: 'm', answers: { q1: 'none', q2: false }, answerSources: { q1: 'maker', q2: 'human' } };
+    expect(answersOf(u, QS)).toEqual({ total: 3, answered: 2, unanswered: 1, ai: 0, human: 1, evidence: 0, proposed: 0, maker: 1 });
   });
 });
 

@@ -3575,12 +3575,23 @@
       "under": {
         "filled": "{entries} entries · {questions} questions · answers: {ai} by AI, {human} by you, {evidence} from the record",
         "empty": "0 entries · {questions} questions · nothing written down yet",
-        "proposed": " · {n} proposals wait for you"
+        "proposed": " · {n} proposals wait for you",
+        "maker": " · {n} answers from apps' makers"
       },
       "gapUndocumented": "Used here, written down nowhere",
       "gapAiApps": "An app uses AI and no entry names it",
       "answerProposed": "proposal, check it",
       "proposedWhy": "Why it is proposed: {reason}",
+      "noteWhy": "Why: {note}",
+      "notesTitle": "Why each answer",
+      "notesHint": "One or two sentences per answer. The printout shows the reason beside the answer, and it is what an auditor checks.",
+      "ask": {
+        "subject": "The EU AI Act questions for {{n}} of your apps",
+        "intro": "{{n}} of your apps use AI, and the EU AI Act asks a few questions about each. You know your apps best, so the administrator asks you to answer them:",
+        "appLine": "- {{title}}: {{open}} questions open. Answer them on the app's page: {{url}}",
+        "how": "The quickest way is your own AI. Paste this into your AI chat:",
+        "after": "Your answers go into the app's data map, and the administrator approves them in the compliance register. This reminder comes again in two weeks while questions are open."
+      },
       "proposedStated": "the data map says {rows} holds regulated data ({domain}), and the app uses AI on it.",
       "proposedRead": "the data map's words ({words}) point to regulated data ({domain}) in {rows}, and the app uses AI on it.",
       "acceptProposal": "Approve",
@@ -3702,7 +3713,8 @@
         "ai": "AI {n}",
         "you": "you {n}",
         "record": "record {n}",
-        "proposed": "proposed {n}"
+        "proposed": "proposed {n}",
+        "maker": "maker {n}"
       },
       "showNext": "Show the next {n}",
       "foot": "{shown} of {total} · answers: {ai} by AI, {human} by you, {evidence} from the record · {unanswered} unanswered",
@@ -3729,6 +3741,7 @@
       "answerFromAi": "AI draft",
       "answerFromHuman": "your answer",
       "answerFromProposed": "a rule's proposal, not yet approved",
+      "answerFromMaker": "the app's maker",
       "paper": {
         "summaryTitle": "Overall state",
         "sumUses": "AI uses found",
@@ -3790,7 +3803,8 @@
           "human": "A person answered.",
           "ai": "A model drafted the answer and a person saved it.",
           "evidence": "The installation read the answer from its own records. Nobody decided anything.",
-          "proposed": "A rule read the answer from the app's data map. Nobody has approved it yet."
+          "proposed": "A rule read the answer from the app's data map. Nobody has approved it yet.",
+          "maker": "The app's maker answered in the app's data map, and the administrator saved it."
         },
         "tocTitle": "Contents",
         "sumOpen": "Unanswered questions",
@@ -3840,7 +3854,7 @@
           "2": "In section 01 they press \"Fill these in for me\". The installation adds the AI uses it found to the register as a draft. Nothing is saved yet.",
           "3": "In section 04 they open each entry and answer its questions. They approve or change each proposed answer. Every answer shows who gave it.",
           "4": "They can also give the work to their own AI: section 07 has a ready prompt. The AI shows its proposal and waits for approval, and its answers are marked as the AI's.",
-          "5": "When an answer needs the app's maker, the administrator asks the maker. The maker keeps their own app's data map and record of processing up to date.",
+          "5": "The app's maker answers their own app's questions with a reason each, through their own AI or in the section \"EU AI Act questions\" on the app's page. The installation reminds the maker while questions are open, for the same app every two weeks. The maker's answers come into the draft marked as the maker's.",
           "6": "The administrator saves. The installation calculates each entry's class again.",
           "7": "They keep the report with \"Keep this one\" in section 06. The installation also keeps a monthly report by itself on the first day of each month.",
           "8": "They print this report with \"Print or save as PDF\"."
@@ -3856,12 +3870,13 @@
         "roleDoes": {
           "operator": "Keeps the register, answers the questions and saves them.",
           "dpo": "Decides the class of a high-risk candidate and reads the report.",
-          "appOwner": "Tells what the app does and keeps its data map and record of processing up to date.",
+          "appOwner": "Answers the app's EU AI Act questions with a reason each, and keeps its data map and record of processing up to date.",
           "ai": "Drafts answers from the installation's records. A person approves them."
         },
         "colQuestion": "Question",
         "colAnswer": "Answer",
         "colWho": "Who answered",
+        "colReason": "Why",
         "colHelp": "How to answer",
         "colRule": "Answer leads to class"
       },
@@ -24662,6 +24677,20 @@
     }
   },
   "appcat": {
+    "aiAct.title": "EU AI Act questions",
+    "aiAct.lead": "This app uses AI, so the EU AI Act asks a few questions about it. You know the app best: answer each question and say why in a sentence. The administrator of this installation approves the answers in the compliance register.",
+    "aiAct.notAi": "This app does not use AI by its own statements, so it has no AI Act questions.",
+    "aiAct.aiTitle": "Let your AI answer",
+    "aiAct.aiNote": "Copy the prompt into your own AI chat. It reads the app and the questions, shows you its answers with a reason each, and saves them when you say yes.",
+    "aiAct.copyPrompt": "Copy the prompt",
+    "aiAct.noMap": "This app has no data map yet, so the answers have nowhere to be kept. Ask your AI to write the map first; the prompt above does both.",
+    "aiAct.formTitle": "Answer here · {open} of {total} open",
+    "aiAct.noteLabel": "Why this answer",
+    "aiAct.notePlaceholder": "Why, in one or two sentences",
+    "aiAct.save": "Save the answers",
+    "aiAct.saving": "Saving…",
+    "aiAct.saved": "Saved. The administrator sees your answers in the compliance register.",
+    "aiAct.saveFailed": "The answers were not saved.",
     "dataMap.agentsTitle": "Agents whose work this app shows",
     "dataMap.agentMadeFor": "The app was made for this agent.",
     "dataMap.agentUses": "The app uses this agent's work.",

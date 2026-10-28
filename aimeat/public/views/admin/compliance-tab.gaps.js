@@ -20,6 +20,8 @@
  * @usage imported by compliance-tab.js and compliance-tab.register.js; tested by
  *   test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-28 — An answer marked `maker` (the app's maker answered it in the data map) is
+ *     counted on its own, never as the operator's.
  *   v1.2.0 — 2026-10-28 — The sixth kind, app-uses-ai-not-in-register, grouped with the Annex III
  *     area each app's data map points to; an answer marked `proposed` (the node's rule read it from a
  *     data map) is counted as proposed, never as the operator's.
@@ -95,10 +97,10 @@ export function groupGaps(gaps) {
  *
  * @param {object} u — a register entry
  * @param {Array<{id: string}>} questions
- * @returns {{ total: number, answered: number, unanswered: number, ai: number, human: number, evidence: number, proposed: number }}
+ * @returns {{ total: number, answered: number, unanswered: number, ai: number, human: number, evidence: number, proposed: number, maker: number }}
  */
 export function answersOf(u, questions) {
-  const r = { total: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0 };
+  const r = { total: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0, maker: 0 };
   const answers = (u && u.answers) || {};
   const sources = (u && u.answerSources) || {};
   for (const q of questions) {
@@ -110,6 +112,8 @@ export function answersOf(u, questions) {
     else if (src === 'evidence') r.evidence++;
     // The node's rule read it from a data map and nobody has decided: never counted as the operator's.
     else if (src === 'proposed') r.proposed++;
+    // The app's maker answered it in the app's data map.
+    else if (src === 'maker') r.maker++;
     else r.human++;
   }
   return r;
@@ -117,11 +121,11 @@ export function answersOf(u, questions) {
 
 /** The same counts across the whole register, plus how many entries and questions there are. */
 export function answerStats(usecases, questions) {
-  const s = { entries: (usecases || []).length, questions: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0 };
+  const s = { entries: (usecases || []).length, questions: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0, maker: 0 };
   for (const u of usecases || []) {
     const a = answersOf(u, questions);
     s.answered += a.answered; s.unanswered += a.unanswered;
-    s.ai += a.ai; s.human += a.human; s.evidence += a.evidence; s.proposed += a.proposed;
+    s.ai += a.ai; s.human += a.human; s.evidence += a.evidence; s.proposed += a.proposed; s.maker += a.maker;
   }
   return s;
 }
