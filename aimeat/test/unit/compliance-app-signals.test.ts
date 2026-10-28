@@ -14,6 +14,8 @@
  *   much personal data it keeps.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-app-signals.test.ts
  * @version-history
+ *   v1.0.1 — 2026-10-28 — Kept AI-made content alone is not an AI use (the source was broken: live
+ *     on innokas.aimeat.io it listed suuntai and Rautavasara).
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -131,6 +133,21 @@ describe('what does not fire', () => {
   it('a row without personal data is never placed in a domain, whatever it says', () => {
     const m = mapOf({ machinery: ['ai-generation'], held: [row({ what: 'catalogue', personalData: 'no', holds: 'skill matrix template, CV layout' })] });
     expect(appAiSignals(m, null).domains).toEqual([]);
+  });
+
+  // innokas.aimeat.io, 2026-10-28, live: suuntai (AI-drawn background pictures baked into the page)
+  // and Rautavasara (reviews a person's own Claude writes in from outside) each became an AI Act
+  // register entry with eleven questions to answer, though neither app calls a model. Content an AI
+  // made is a labelling question (Article 50), not an AI system in use.
+  it('a map that only keeps AI-made content, with no model call, is not an AI use', () => {
+    const m = mapOf({ held: [row({ what: 'suuntai/bg-path.jpg', kind: 'ai-generated', holds: 'a background picture an AI drew' })] });
+    const s = appAiSignals(m, null);
+    expect(s.usesAi).toBe(false);
+    expect(s.aiEvidence).toEqual([]);
+  });
+
+  it('kept AI-made content still counts as evidence beside a model call', () => {
+    expect(appAiSignals(TALENTGRID, null).aiEvidence).toContain('the data map keeps AI-generated data (talentgrid.cvs)');
   });
 
   it('no map: the posture alone says AI, and nothing about people', () => {

@@ -2672,6 +2672,7 @@
       "answerFromEvidence": "de lo registrado",
       "answerFromAi": "borrador de la IA",
       "answerFromHuman": "tu respuesta",
+      "answerFromProposed": "propuesta de una regla, aún sin aprobar",
       "save": "Guardar",
       "saving": "Guardando…",
       "saved": "Guardado. Todo se volvió a clasificar.",

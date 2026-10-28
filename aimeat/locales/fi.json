@@ -3727,6 +3727,7 @@
       "answerFromEvidence": "kirjatusta",
       "answerFromAi": "tekoälyn luonnos",
       "answerFromHuman": "sinun vastauksesi",
+      "answerFromProposed": "säännön ehdotus, ei vielä hyväksytty",
       "save": "Tallenna",
       "saving": "Tallennetaan…",
       "saved": "Tallennettu. Kaikki luokiteltiin uudelleen.",

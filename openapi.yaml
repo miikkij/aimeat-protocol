@@ -22840,7 +22840,8 @@ paths:
 
         Every app that uses AI gets its own entry, whether or not its publish check found a gap: by
         its declared `ai:use` permission, a declared generation, or its data map (the machinery word
-        `ai-generation`, a row of kind `ai-generated`, or something sent to an AI service). Its
+        `ai-generation`, or something sent to an AI service). A row of kind `ai-generated` alone
+        does not count: content an AI made once is a labelling question, not a model the app calls. Its
         description and purpose come from the data map, and its models from the provenance records
         the node minted for that app's calls. An app or agent already in the stored register is not
         proposed again.

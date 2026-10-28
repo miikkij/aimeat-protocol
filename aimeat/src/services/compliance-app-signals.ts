@@ -24,6 +24,8 @@
  * @structure DOMAIN_WORDS · ANNEX3_BY_DOMAIN · AppAiSignals · appAiSignals()
  * @usage const s = appAiSignals(map, app.manifest?.aiPosture);
  * @version-history
+ *   v1.0.1 — 2026-10-28 — A map that only keeps AI-made content is not an AI use: live on
+ *     innokas.aimeat.io it listed two apps that call no model.
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import type { DataMap, DataMapRow } from './data-map/data-map-types.js';
@@ -122,11 +124,14 @@ export function appAiSignals(map: DataMap | null, posture?: Partial<AppAiPosture
   if (posture?.generates?.length) aiEvidence.push(`the app declares it generates ${posture.generates.join(', ')}`);
   const held = Array.isArray(map?.held) ? map!.held : [];
   if (map && Array.isArray(map.machinery) && map.machinery.includes('ai-generation')) aiEvidence.push('the data map lists ai-generation in its machinery');
-  const aiRows = held.filter(r => r.kind === 'ai-generated').map(rowName);
-  if (aiRows.length) aiEvidence.push(`the data map keeps AI-generated data (${aiRows.join(', ')})`);
   const leaves = Array.isArray(map?.leaves) ? map!.leaves : [];
   const toAi = leaves.filter(leavesToAi);
   if (toAi.length) aiEvidence.push(`the data map sends ${toAi.length === 1 ? 'one thing' : `${toAi.length} things`} to an AI service`);
+  // Kept AI-made content is evidence only beside a model call. Alone it is a picture an AI drew once
+  // or text a person's own agent wrote in from outside: content to label (Article 50), not an AI
+  // system this app runs. Counted alone, it put suuntai and Rautavasara in the register.
+  const aiRows = held.filter(r => r.kind === 'ai-generated').map(rowName);
+  if (aiRows.length && aiEvidence.length) aiEvidence.push(`the data map keeps AI-generated data (${aiRows.join(', ')})`);
 
   const personalRows = held.filter(isPersonal);
   const appText = `${map?.what ?? ''} ${map?.usedFor ?? ''}`;
