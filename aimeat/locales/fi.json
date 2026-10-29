@@ -22965,6 +22965,7 @@
   "chat.youLabel": "Sinä",
   "chat.agentLabel": "Agentti",
   "chat.jumpLatest": "Hyppää uusimpaan",
+  "chat.deletedCopyKept": "Keskustelu on poistettu täältä. Keskustelutyökalu, joka vastasi siinä, säilyttää tekstistä oman kopionsa tällä palvelimella, eikä AIMEAT voi poistaa sitä. Palvelun ylläpitäjä voi poistaa kopion.",
   "chat.starterPage": "Tee minulle kotisivu",
   "chat.starterPageAsk": "Laita kotisivuni pystyyn. Pidä se yksinkertaisena ja kerro osoite, kun se on julkaistu.",
   "chat.starterCompany": "Ota yritykseni käyttöön",

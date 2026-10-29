@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
+ *     keeps its own copy of the text (secaudit2026oct26 round 8c).
  *   2026-10-19: On a phone the chat is pinned to the visible area (js/visual-viewport.js), so the
  *     composer stays on the keyboard on iOS too.
  *   2026-10-06: The cap box's "Get your own place" way says it opens soon and leads nowhere while the
@@ -95,6 +97,7 @@ import {
     ConversationCopy,
 } from '/components/ConversationFrame.js';
 import { InstallCta } from '/components/InstallCta.js';
+import { Alert } from '/components/Alert.js';
 import { storeHref, storeOpensSoon } from '/js/site.js';
 import { useJourney } from './home/journey-steps.js';
 import { trackVisualViewport } from '/js/visual-viewport.js';
@@ -207,6 +210,7 @@ export default function ChatView() {
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState({ text: '', thought: '', progress: '', tools: [], cards: [] });
     const [failure, setFailure] = useState('');
+    const [deleteNote, setDeleteNote] = useState('');
     const [loading, setLoading] = useState(true);
     // On a phone the conversation takes the whole screen, so the list is a separate place rather
     // than a column that would leave neither readable.
@@ -575,7 +579,12 @@ export default function ChatView() {
     }, []);
 
     const removeThread = useCallback(async (id) => {
-        await chat.deleteThread(id);
+        const gone = await chat.deleteThread(id);
+        // The chat tool keeps its own copy of a conversation it has seen, and the node cannot delete
+        // that copy, so the person is told (secaudit2026oct26 round 8c).
+        setDeleteNote(gone?.data?.chat_tool_copy === 'kept'
+            ? tr('chat.deletedCopyKept', 'The conversation is deleted here. The chat tool that answered in it keeps its own copy of the text on this server, and AIMEAT cannot delete that copy. The operator of this service can remove it.')
+            : '');
         if (thread?.id === id) setThread(null);
         await loadThreads();
     }, [thread, loadThreads]);
@@ -614,6 +623,7 @@ export default function ChatView() {
                 onNew=${startThread}
                 onDelete=${removeThread}
                 onClose=${() => setListOpen(false)}>
+                <${Alert} type="info" message=${deleteNote} onDismiss=${() => setDeleteNote('')} />
                 ${/* Everything about THIS conversation that is not the conversation: its name, who
                       answers and on whose money, and the two actions. In the rail on a desktop, in
                       the drawer on a phone, so the column keeps its height for the words. */''}

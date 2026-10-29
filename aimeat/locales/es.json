@@ -20861,6 +20861,7 @@
   "chat.youLabel": "Tú",
   "chat.agentLabel": "Agente",
   "chat.jumpLatest": "Ir a lo último",
+  "chat.deletedCopyKept": "La conversación se eliminó aquí. La herramienta de chat que respondió en ella guarda su propia copia del texto en este servidor, y AIMEAT no puede eliminar esa copia. El operador de este servicio puede quitarla.",
   "chat.starterPage": "Crea mi página de bienvenida",
   "chat.starterPageAsk": "Publica mi página de bienvenida. Que sea sencilla, y dime la dirección cuando esté en línea.",
   "chat.starterCompany": "Poner en marcha mi empresa",
