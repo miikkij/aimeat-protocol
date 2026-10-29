@@ -15,6 +15,8 @@
  * @version-history
  *   2026-10-29 — An app by another author publishing through a delegation that names its app by file
  *     name alone, allowed by the channel owner (apply-delegation-binding.ts; secaudit2026oct26 round 8c).
+ *   v1.13.0 — 2026-10-29 — AIMEAT's model doing a goal's work on the AI allowance for an agent without
+ *     ai:use, allowed by the owner (apply-goal-model-spend.ts; secaudit2026oct26 round 8c).
  *   v1.12.0 — 2026-10-27 — AIMEAT's model reading private records an agent named in a goal, allowed by
  *     the owner (apply-goal-model-read.ts; secaudit2026oct26).
  *   v1.11.0 — 2026-10-27 — A sibling agent's instruction to another agent's ai schedule, allowed by the
@@ -61,6 +63,7 @@ import { applyAccountSetting } from './apply-account-setting.js';
 import { applySubscriptionPrice } from './apply-subscription-price.js';
 import { applyScheduleInstruction } from './apply-schedule-instruction.js';
 import { applyGoalModelRead } from './apply-goal-model-read.js';
+import { applyGoalModelSpend } from './apply-goal-model-spend.js';
 import { applyRefineryDefinition } from './apply-refinery-definition.js';
 import { applyDelegationBinding } from './apply-delegation-binding.js';
 
@@ -89,4 +92,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'goal-model-read': applyGoalModelRead,
   'refinery-definition': applyRefineryDefinition,
   'delegation-binding': applyDelegationBinding,
+  'goal-model-spend': applyGoalModelSpend,
 };

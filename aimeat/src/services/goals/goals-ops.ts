@@ -20,6 +20,8 @@
  * @structure listOp · getOp · waitingOp · createOp · patchOp · goalActionOp · attachOp · workOp · answerOp
  * @usage res.json(success(nodeId, await createOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.2.1 — 2026-10-29 — Approving a proposed goal records approvedAt (secaudit2026oct26 round 8c,
+ *     goals-model-spend.ts).
  *   v1.2.0 — 2026-10-27 — An agent's answer to a person's step is logged with the agent's name, not as
  *     "the owner, through their AI" (secaudit2026oct26, goals:person-step-answer-via-self-set-workstation-mode).
  *   v1.1.0 — 2026-10-25 — approve and decline for a proposed goal; a proposal refuses the other actions,
@@ -155,7 +157,8 @@ export async function goalActionOp(deps: GoalDeps, caller: CallerContext, id: st
       if (!access.person) throw new GoalError(403, 'FORBIDDEN', 'The owner approves a proposed goal, signed in themselves.');
       if (goal.status !== 'proposed') throw new GoalError(409, 'CONFLICT', `The goal is ${goal.status}, not a proposal.`);
       const changed = await updateGoal(deps, access.ownerGhii, id, cur => cur.status !== 'proposed' ? UNCHANGED : ({
-        ...cur, status: 'active',
+        // approvedAt: the works in the goal are the owner's own yes (goals-model-spend.ts).
+        ...cur, status: 'active', approvedAt: now,
         log: [...cur.log, logEntry(access.who, 'changed', `The owner approved the proposed goal${reason ? `: ${reason}` : '.'}`)],
       }));
       return { goal: goalView((await advanceGoal(deps, access.ownerGhii, id)) ?? changed) };

@@ -30,6 +30,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.11.1 -- 2026-10-29 -- Attachments are read under the node's PDF read limits
+ *     (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.11.0 -- 2026-10-27 -- A goose session's MCP token is revoked when its session ends: a reset, a
  *     deleted conversation (endChatSession), a session that replaces it, and the close of the process
  *     that holds it. A chat agent's tokens from an earlier run of the node, whose processes are gone,
@@ -90,6 +92,7 @@ import { prepareAiCall } from './ai/completion.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
+import { pdfReadLimits } from './file-text/pdf-bounded.js';
 import { systemReader } from './classification/reader.js';
 import { logger } from '../utils/logger.js';
 
@@ -355,7 +358,7 @@ export async function* runChatTurn(
     // format negotiation nobody asked for. Anything else is left out of the prompt and said out
     // loud — a file the model never saw is worse than one it was told about.
     // The attached files go to the chat's model: the classification reader's useForAi decides (TARGET-082).
-    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys);
+    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys, { pdfLimits: pdfReadLimits(config) });
 
     const prompt = [
         text,

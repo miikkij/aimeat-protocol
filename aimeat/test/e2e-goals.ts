@@ -12,6 +12,8 @@
  *   work the node's model does (against a local OpenAI-compatible stand-in), the spending limit
  *   holding it, and a goal the owner's AI proposes, which only the person approves.
  * @version-history
+ *   v1.3.0 — 2026-10-29 — Tests 26 and 27: a model work an agent without ai:use asked for waits for
+ *     the owner's one press; one with ai:use runs at once (secaudit2026oct26 round 8c, background-05).
  *   v1.2.0 — 2026-10-25 — Tests 20 to 22: the node's model as a worker, its limit, and a proposal.
  *   v1.1.0 — 2026-10-25 — Tests 18 and 19: the scope refusal on every route, and the MCP tools.
  *   v1.0.0 — 2026-10-25 — Initial (session cc-jouni-goals).
@@ -518,6 +520,47 @@ await test('25. a worker agent that sets its own mode to workstation answers the
   const n2 = await json('/v1/notifications', { headers: auth(tokenA) });
   const count = (n2.body?.data?.notifications ?? []).filter((x: any) => x.i18n?.key === 'agent_mode_self_set' && x.i18n?.vars?.agent === worker.name).length;
   assert(count === 1, `one notice for one change: ${count}`);
+});
+
+await test('26. an agent without ai:use asks for a model work: it waits for the owner\'s one press, and runs when the owner allows it', async () => {
+  provider.reset();
+  provider.setDefault('chat', chatJson('Viikon tiivistelmä on valmis.'));
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(grok1.token), body: JSON.stringify({ statement: 'Tiivistä viikko.', limits: { usd: 5 }, works: [{ title: 'Tiivistä viikko', runner: 'model' }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id; const wid = c.body.data.goal.works[0].id;
+  const waiting = await waitFor('the work to wait', async () => {
+    const g = await readGoal(grok1.token, id);
+    const w = g.works.find((x: any) => x.id === wid);
+    return w.status === 'waiting' && w.spend_request ? w : null;
+  });
+  assert(waiting.spend_request.agent === grok1.gaii && /grok1/.test(waiting.reason ?? ''), `the work says who asked and why it waits: ${JSON.stringify(waiting)}`);
+  assert(!provider.lastRequest('chat'), 'the model was not called before the owner answered');
+  const rid = waiting.spend_request.request_id;
+  const seen = await json(`/v1/publish-requests/${rid}`, { headers: auth(grok1.token) });
+  assert(seen.status === 200 && JSON.stringify(seen.body.data).includes('awaiting_owner'), `the agent sees its request pending: ${seen.status} ${JSON.stringify(seen.body).slice(0, 300)}`);
+  const yes = await json(`/v1/publish-requests/${rid}/decision`, { method: 'POST', headers: auth(tokenA), body: JSON.stringify({ decision: 'approve' }) });
+  assert(yes.status === 200, `the owner allows it: ${yes.status} ${JSON.stringify(yes.body.error)}`);
+  const done = await waitFor('the model work to finish', async () => {
+    const g = await readGoal(tokenA, id);
+    const w = g.works.find((x: any) => x.id === wid);
+    return w.status === 'done' || w.status === 'failed' ? w : null;
+  }, 30_000);
+  assert(done.status === 'done' && /tiivistelmä/.test(done.result?.summary ?? ''), `the work ran after the yes: ${JSON.stringify({ status: done.status, reason: done.reason })}`);
+});
+
+await test('27. usage: an agent holding ai:use asks for a model work and it runs at once, as before', async () => {
+  provider.reset();
+  provider.setDefault('chat', chatJson('Valmis heti.'));
+  const spender = await scopedAgent(BASE, ownerAObj, ['task:read', 'task:write', 'ai:use']);
+  const c = await json('/v1/goals', { method: 'POST', headers: auth(spender.token), body: JSON.stringify({ statement: 'Kirjoita heti.', limits: { usd: 5 }, works: [{ title: 'Kirjoita', runner: 'model' }] }) });
+  assert(c.status === 201, `create: ${c.status} ${JSON.stringify(c.body.error)}`);
+  const id = c.body.data.goal.id; const wid = c.body.data.goal.works[0].id;
+  const done = await waitFor('the model work to finish', async () => {
+    const g = await readGoal(tokenA, id);
+    const w = g.works.find((x: any) => x.id === wid);
+    return w.status === 'done' || w.status === 'failed' ? w : null;
+  }, 30_000);
+  assert(done.status === 'done' && !done.spend_request, `it ran without a question: ${JSON.stringify({ status: done.status, reason: done.reason })}`);
 });
 
 await provider.close();
