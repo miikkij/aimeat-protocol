@@ -4970,7 +4970,8 @@
       "review": "Tarkistettavana",
       "draft": "Luonnos",
       "expired": "Korvattu",
-      "ended": "Päättynyt"
+      "ended": "Päättynyt",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "event": {
       "created": "Luonnos tehty",
@@ -4989,7 +4990,8 @@
       "objection": "Muutosta vastustettu",
       "breach-notice": "Loukkausilmoitus lähetetty",
       "ended": "Sopimus päättyi",
-      "deletion-done": "Tiedot poistettu tai palautettu"
+      "deletion-done": "Tiedot poistettu tai palautettu",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "next": {
       "deletion": "Poista tai palauta tiedot {date} mennessä",
@@ -4999,7 +5001,9 @@
       "objected": "Muutosta on vastustettu, eikä se tule voimaan",
       "notice": "Muutos tulee voimaan {date}, jos sitä ei vastusteta",
       "waitingCp": "Odottaa vastapuolen allekirjoitusta",
-      "signCp": "Odottaa sinun allekirjoitustasi"
+      "signCp": "Odottaa sinun allekirjoitustasi",
+      "testSigned": "Sopimus allekirjoitettiin testilompakolla, joten se ei ole voimassa. Tee uusi versio ja lähetä se allekirjoitettavaksi",
+      "testSignedCp": "Allekirjoituksesi oli testiallekirjoitus, jolla ei ole oikeusvaikutusta. Saat tiedon, kun uusi versio odottaa allekirjoitustasi"
     },
     "colStep": "Vaihe",
     "colWhen": "Milloin",
@@ -5181,7 +5185,8 @@
       "next": {
         "draft": "Lähetä allekirjoitettavaksi",
         "review": "Päätä allekirjoitetusta kopiosta",
-        "waitingCp": "Odottaa vastapuolta"
+        "waitingCp": "Odottaa vastapuolta",
+        "test-signed": "Allekirjoitettu vain testissä: tee uusi versio"
       }
     },
     "gap": {

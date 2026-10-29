@@ -23460,8 +23460,11 @@ paths:
       tags: [Compliance]
       description: >
         Every data processing agreement (GDPR art. 28) the operator keeps, each with its status
-        (draft, sent, review, signed, expired, ended), the version in force, what it waits for and an
-        announced change. Operator only; something acting for the operator needs `compliance:read`.
+        (draft, sent, review, signed, expired, ended, test-signed), the version in force, what it waits
+        for and an announced change. `test-signed` is a version both parties signed where a signature
+        is a test wallet signature with no legal effect, on a node running production settings: it is
+        not in force, and the version in force before it stays in force (the agreement then reads
+        `signed`). On a node in test or development settings such a version comes into force as before. Operator only; something acting for the operator needs `compliance:read`.
         A fleet manager reads the agreement status per customer from here (`external_ref`).
       security:
         - BearerAuth: []
