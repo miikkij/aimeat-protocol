@@ -73,6 +73,9 @@
  *   v1.3.0 — 2026-10-20 — storage:read joins the list: S3-03 (2026-10-16) checks it inline on GET /v1/pub,
  *     which the test's scan did not read, so no app kept it (found on originalmiskate.com). tellAppOwners
  *     is exported for the storage:read step and takes the record it reports.
+ *   v1.3.0 — 2026-10-29 — The result names the halves this process ran (`halves`): of two processes
+ *     starting together one may claim the principals' half and the other the apps' half, so `ran` is true
+ *     on both while each half runs once.
  *   v1.2.0 — 2026-10-18 — Both records are claimed before the work (services/once-only-step.ts) and each
  *     scope list is written on the list that was read (services/scope-list-swap.ts), the take-back from
  *     anonymous mode's shared agent included (check:atomic-writes).
@@ -234,6 +237,8 @@ export interface KeptPrincipal { id: string; owner: string; name: string; words:
 export interface KeepWorkingResult {
   /** False on a node before 4.0.0 and on a node that ran it before: nothing was read or written. */
   ran: boolean;
+  /** The halves this process claimed and ran. Of two processes starting together each may run one. */
+  halves: Array<'principals' | 'apps'>;
   agents: KeptPrincipal[];
   ecosystemApps: KeptPrincipal[];
   /** Published apps that got an allowance (services/app-scope-allowance.ts). */
@@ -289,7 +294,7 @@ export async function migrateRestScopeKeepWorkingOnce(
   config: Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>,
   opts: KeepWorkingOptions = {},
 ): Promise<KeepWorkingResult> {
-  const result: KeepWorkingResult = { ran: false, agents: [], ecosystemApps: [], apps: [] };
+  const result: KeepWorkingResult = { ran: false, halves: [], agents: [], ecosystemApps: [], apps: [] };
   if (!versionAtLeast(opts.version ?? getSoftwareVersion(), REST_SCOPE_GATES_ENFORCED_IN)) return result;
   const system = `system@${config.nodeId}`;
   // Each half's record is claimed before its work (services/once-only-step.ts), so of two node
@@ -327,6 +332,8 @@ export async function migrateRestScopeKeepWorkingOnce(
     throw err;
   }
   result.ran = true;
+  if (principals) result.halves.push('principals');
+  if (apps) result.halves.push('apps');
   const changed = [...result.agents, ...result.ecosystemApps];
   if (changed.length + result.apps.length > 0) {
     logger.info(`REST scope gates: ${result.agents.length} agent(s), ${result.ecosystemApps.length} ecosystem app(s) `
