@@ -10,6 +10,8 @@
  *   written down, the turn ends with a reason rather than a hang, and the node stays up.
  * @usage cd aimeat && pnpm vitest run test/unit/chat-session.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-29 — A turn when the node's key is at its limit ends with the notice and its
+ *     three ways on (UX review A1).
  *   v1.1.0 — 2026-10-29 — A turn with no AI to pay for it ends before the agent starts, in the
  *     person's language with the settings address (UX review A2). The agent-start tests now run with
  *     the node's key and an allowance, so they still reach the process rather than the refusal.
@@ -21,6 +23,7 @@ import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
 import { loadConfig, type AimeatConfig } from '../../src/config.js';
 import { loadCatalog } from '../../src/services/ai/catalog/store.js';
 import { chatEnabled, runChatTurn } from '../../src/services/chat-session.js';
+import { markNodeKeySpent, resetNodeKeyBalanceForTests } from '../../src/services/ai/node-key-balance.js';
 import { createThread, readThread } from '../../src/services/chat-threads.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
 import { generateKeyPair } from '../../src/auth/keypair.js';
@@ -144,6 +147,29 @@ describe('a turn that no AI would pay for', () => {
     const events = await collect(runChatTurn({ storage, config }, OWNER, t.id, 'hi', undefined, [], { locale: 'en' }));
     expect(String(events[0]?.message)).toMatch(/Open your AI settings/);
     storage.close?.();
+  });
+});
+
+describe('a turn when the AI allowance the owner bought is spent', () => {
+  it('ends before the agent starts with the notice and the ways on', async () => {
+    const storage = await freshStorage();
+    const config = cfg({
+      modelDefaultChat: 'anthropic/claude-opus-4.1', modelDefaultExecution: 'anthropic/claude-opus-4.1',
+      siteLinks: { ...loadConfig().config.siteLinks, storeTopup: 'https://shop.example/?topup=seat1' },
+    });
+    const t = await createThread(storage, config, GAII);
+    resetNodeKeyBalanceForTests();
+    markNodeKeySpent();
+    try {
+      const events = await collect(runChatTurn({ storage, config }, OWNER, t.id, 'hei', undefined, [], { locale: 'fi' }));
+      expect(events).toHaveLength(1);
+      expect(events[0]?.code).toBe('AI_BALANCE_SPENT');
+      expect(String(events[0]?.message)).toMatch(/Tekoälysaldosi on käytetty/);
+      expect((events[0]?.choices as Array<{ kind: string }>).map((c) => c.kind)).toEqual(['buy', 'own_key', 'free_model']);
+    } finally {
+      resetNodeKeyBalanceForTests();
+      storage.close?.();
+    }
   });
 });
 

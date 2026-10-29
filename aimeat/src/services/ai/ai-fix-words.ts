@@ -16,8 +16,11 @@
  *   The language: the language the person chose in the interface (the aimeat-lang cookie), then the
  *   one saved on their account, then their browser's, then English.
  * @structure CapabilityReason · reasonOf · agentFixFor · aiSettingsUrl · personLocale · personFixFor ·
- *   withPersonFix
+ *   withPersonFix · BalanceChoice · balanceChoices
  * @version-history
+ *   v1.1.0 — 2026-10-29 — BALANCE_SPENT (AI_BALANCE_SPENT: the allowance the owner bought is used up)
+ *     carries `choices`, the three ways on that Jouni named: buy more, their own key, the free model
+ *     (UX review 2026-10-29, A1).
  *   v1.0.0 — 2026-10-02 — Initial: reasonOf and the AI-facing fix moved here from capabilities.ts; the
  *     person's sentence, the settings link and the refusal decorator added.
  */
@@ -30,7 +33,7 @@ import type { AiCapability } from './types.js';
 
 export type CapabilityReason =
   | 'NO_MODEL' | 'NO_PROVIDER_SUPPORTS' | 'NO_KEY' | 'POLICY_EMPTY' | 'BUDGET_EXHAUSTED' | 'RETIRED_MODEL'
-  | 'UNTESTED' | 'APP_NOT_ALLOWED' | 'UNAVAILABLE';
+  | 'UNTESTED' | 'APP_NOT_ALLOWED' | 'UNAVAILABLE' | 'BALANCE_SPENT';
 
 const KEY_CODES = new Set(['NO_API_KEY', 'NODE_KEY_HOST', 'ENCRYPTION_NOT_CONFIGURED']);
 const MODEL_CODES = new Set(['NO_IMAGE_MODEL', 'NO_STT_MODEL', 'NO_TTS_MODEL', 'NO_EMBED_MODEL']);
@@ -40,6 +43,7 @@ const BUDGET_CODES = new Set(['QUOTA_EXHAUSTED', 'APP_QUOTA_EXHAUSTED', 'AGENT_Q
 export function reasonOf(e: AiCompletionError): CapabilityReason {
   if (MODEL_CODES.has(e.code)) return 'NO_MODEL';
   if (KEY_CODES.has(e.code)) return 'NO_KEY';
+  if (e.code === 'AI_BALANCE_SPENT') return 'BALANCE_SPENT';
   if (BUDGET_CODES.has(e.code)) return 'BUDGET_EXHAUSTED';
   if (e.code === 'AI_MODEL_POLICY_EMPTY' || e.code === 'AI_MODEL_NOT_ALLOWED') return 'POLICY_EMPTY';
   if (e.code === 'APP_NOT_ALLOWED' || e.code === 'APP_ID_REQUIRED') return 'APP_NOT_ALLOWED';
@@ -69,6 +73,7 @@ export function agentFixFor(reason: CapabilityReason, cap: AiCapability, provide
     case 'NO_KEY': return 'The provider has no key. The owner sets it on the AI settings page; never ask for a key in chat.';
     case 'POLICY_EMPTY': return `The owner's model policy allows no model for ${cap} here. Propose a change with aimeat_ai_policy_set; the owner confirms it.`;
     case 'BUDGET_EXHAUSTED': return 'Today\'s AI budget is spent. The owner raises it in Settings, or it resets at midnight UTC.';
+    case 'BALANCE_SPENT': return 'The AI allowance the owner bought is used up. Give the owner the choices in details.choices: buy more (topupUrl), their own key (settingsUrl), or the free model, which the owner turns on with aimeat_ai_routing_set { rules: { freeModelLastResort: true } } and which answers less well.';
     case 'RETIRED_MODEL': return `The model is retired. Find another with aimeat_ai_models { capability: "${cap}" } and propose it to the owner.`;
     case 'UNTESTED': return `The owner's rules use only tested providers. Offer to test it: with the owner's yes, aimeat_ai_provider_test { provider, capability: "${cap}" } (a text test costs a fraction of a cent). Or give the owner settingsUrl, which opens the provider with its test.`;
     case 'APP_NOT_ALLOWED': return 'The owner allows AI only for listed apps. The owner adds this app to the list in Settings.';
@@ -130,13 +135,40 @@ export async function withPersonFix(
   if (reason === 'UNAVAILABLE' && e.code !== 'AI_CAPABILITY_UNAVAILABLE') return e;
   const untested = reason === 'UNTESTED' ? untestedProviderOf(e) : undefined;
   const locale = await personLocale(storage, gaii, lang);
+  const settingsUrl = aiSettingsUrl(config, untested ? { provider: untested.id, capability: cap } : undefined);
   e.details = {
     ...details,
     reason,
     fix: personFixFor(locale, reason, cap, untested?.title),
     agentFix: agentFixFor(reason, cap, []),
-    settingsUrl: aiSettingsUrl(config, untested ? { provider: untested.id, capability: cap } : undefined),
+    settingsUrl,
     ...(untested ? { testProvider: { id: untested.id, title: untested.title, capability: cap } } : {}),
+    ...(reason === 'BALANCE_SPENT' ? { choices: balanceChoices(config, locale, settingsUrl, cap) } : {}),
   };
   return e;
+}
+
+/** One way on from a spent AI allowance, for the notice that says it is spent. */
+export type BalanceChoice =
+  | { kind: 'buy'; url: string }
+  | { kind: 'own_key'; url: string }
+  | { kind: 'free_model' };
+
+/**
+ * The three ways on when the allowance the owner bought is spent (Jouni, 2026-10-29): buy more in
+ * the store, bring their own key, or the free model, which answers less well. A way the node cannot
+ * offer is left out: no purchase without the store's top-up page, no free model without one set or
+ * for anything but text.
+ */
+export function balanceChoices(config: AimeatConfig, locale: Locale, settingsUrl: string, cap: AiCapability): BalanceChoice[] {
+  const out: BalanceChoice[] = [];
+  const topup = (config.siteLinks?.storeTopup ?? '').trim();
+  if (topup && URL.canParse(topup)) {
+    const url = new URL(topup);
+    url.searchParams.set('lang', locale);
+    out.push({ kind: 'buy', url: url.toString() });
+  }
+  out.push({ kind: 'own_key', url: settingsUrl });
+  if (cap === 'text' && (config.modelFreeFallback ?? '').trim()) out.push({ kind: 'free_model' });
+  return out;
 }

@@ -31,6 +31,9 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.13.0 — 2026-10-29 — A refusal carries `choices` when the allowance the owner bought is spent,
+ *     and a turn whose agent met a refusal midway ends with the same notice when the gate now
+ *     refuses (UX review 2026-10-29, A1).
  *   v1.12.0 — 2026-10-29 — A turn that /v1/llm would refuse ends before the agent starts, with the
  *     person's sentence in their language and the AI settings address (chatRefusal). Until now goose
  *     ran, met the refusal and relayed its English text, so a new Solo customer read "No OpenRouter
@@ -93,6 +96,7 @@ import { chatUsesSharedKey } from './goose-env.js';
 import { ensureChatGooseConfig } from './goose-chat-config.js';
 import { prepareAiCall } from './ai/completion.js';
 import { AiCompletionError } from './ai/errors.js';
+import type { BalanceChoice } from './ai/ai-fix-words.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
@@ -102,7 +106,7 @@ import { logger } from '../utils/logger.js';
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
 
 /** A turn the node refused before the agent started: the person's sentence and where to fix it. */
-export interface ChatRefusedUpdate { kind: 'error'; message: string; code: string; settingsUrl?: string }
+export interface ChatRefusedUpdate { kind: 'error'; message: string; code: string; settingsUrl?: string; choices?: BalanceChoice[] }
 
 /** What a turn streams: the agent's own updates, and the node's progress, guard and refusal events. */
 export type ChatUpdate = SessionUpdate | NodeUpdate | ChatRefusedUpdate;
@@ -304,11 +308,12 @@ export async function chatRefusal(deps: ChatDeps, gaii: string, locale: Locale):
         return null;
     } catch (err) {
         if (!(err instanceof AiCompletionError)) throw err;
-        const details = (err.details ?? {}) as { fix?: unknown; settingsUrl?: unknown };
+        const details = (err.details ?? {}) as { fix?: unknown; settingsUrl?: unknown; choices?: unknown };
         if (typeof details.fix !== 'string' || !details.fix) return null;
         return {
             kind: 'error', code: err.code, message: details.fix,
             ...(typeof details.settingsUrl === 'string' ? { settingsUrl: details.settingsUrl } : {}),
+            ...(Array.isArray(details.choices) ? { choices: details.choices as BalanceChoice[] } : {}),
         };
     }
 }
@@ -535,7 +540,7 @@ export async function* runChatTurn(
         const main = yield* phase(`${prompt}\n\n${turnNote()}`, images, new TurnWatch({
             toolCalls: TURN_LIMITS.softToolCalls, rounds: TURN_LIMITS.softRounds, ms: TURN_LIMITS.softMs,
         }, startedAt));
-        let end = main.end;
+        let end: ChatUpdate | null = main.end;
 
         // THE CEILING. The main phase ran out, so the agent is asked once more, in the same session,
         // to answer from what it found; past the answer phase's own limit the node ends the turn in
@@ -557,6 +562,16 @@ export async function* runChatTurn(
                 yield { kind: 'guard', phase: 'stopped', reason: wrap?.limit ?? main.limit, text: stopped };
                 end = { kind: 'done', stopReason: 'max_turn_requests' };
             }
+        }
+        // An agent that met a refusal in the middle of the turn relays the gate's English message. When
+        // the gate now refuses this person's chat (the allowance ran out during this very turn), the
+        // person reads the same notice a new turn would give them instead.
+        if (end?.kind === 'error') {
+            const refused = await chatRefusal(deps, gaii, locale).catch((e: Error) => {
+                logger.warn(`[chat] the refusal after a failed turn could not be read: ${e.message}`);
+                return null;
+            });
+            if (refused) end = refused;
         }
         if (end) yield end;
     } finally {

@@ -8,6 +8,8 @@
  * @structure SITE_LINK_CONFIG_FIELDS
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
  * @version-history
+ *   v1.3.0 — 2026-10-29 — site.store_topup_url and site.store_orders_url: a customer node's top-up and
+ *     orders pages in the store, set by the fleet service (UX review 2026-10-29, A1 and D).
  *   v1.2.1 — 2026-10-08 — site.store_soon_code's description: the store checks the code (ext:shop's
  *     DISCOUNT_CODE), not Stripe; a Stripe coupon makes the store refuse the payment.
  *   v1.2.0 — 2026-10-06 — site.store_soon_code: the shared discount code "Opens soon" shows when pressed.
@@ -55,6 +57,9 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   // from the order, and the store would refuse to settle. This node only shows it: a visitor who
   // presses "Opens soon" gets it to use when the store opens.
   { key: 'siteLinks.storeSoonCode', dotPath: 'site.store_soon_code', envVar: 'AIMEAT_SITE_STORE_SOON_CODE', type: 'string', validate: isSoonCode, immutable: false, description: 'The discount code a visitor gets by pressing "Opens soon" while the store status is "soon": one code for everybody. Set the same code in the store\'s own setting DISCOUNT_CODE (the shop extension); the store checks the code and takes the discount off the first payment. Do not make it a Stripe coupon: the Stripe total then differs from the order and the store refuses the payment. This node only shows the code. Letters, digits, - and _, at most 40. Empty keeps "Opens soon" a label with nothing to press' },
+  // A customer node's own pages in the store, set by the fleet service that made the node.
+  { key: 'siteLinks.storeTopup', dotPath: 'site.store_topup_url', envVar: 'AIMEAT_SITE_STORE_TOPUP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Where this node\'s owner buys more AI allowance: the store\'s top-up page for this node. The node adds the person\'s language. Empty: the notice that the allowance is spent offers no purchase' },
+  { key: 'siteLinks.storeOrders', dotPath: 'site.store_orders_url', envVar: 'AIMEAT_SITE_STORE_ORDERS_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The owner\'s orders and invoices in the store. The node adds the person\'s language. Empty hides the "Orders and invoices" link' },
   { key: 'siteLinks.signage', dotPath: 'site.signage_url', envVar: 'AIMEAT_SITE_SIGNAGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The signage screen the front page frames as its "built by asking" example. Empty hides the example; aimeat.io sets its own screen here' },
   { key: 'siteLinks.signageAdmin', dotPath: 'site.signage_admin_url', envVar: 'AIMEAT_SITE_SIGNAGE_ADMIN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The admin panel the front page\'s signage example was made in (its second door)' },
   { key: 'siteLinks.incubator', dotPath: 'site.incubator_url', envVar: 'AIMEAT_SITE_INCUBATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The agent incubator (adopt a ready-made helper): the "start here" door on the front page\'s incubator card' },
