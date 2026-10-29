@@ -1280,10 +1280,12 @@
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
-          "subdomain_site_origin": "Other people's apps at addresses on your own domain"
+          "subdomain_site_origin": "Other people's apps at addresses on your own domain",
+          "platform_fee_records": "Money fee records whose writer is not known"
         },
         "detail": {
-          "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose."
+          "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose.",
+          "platform_fee_records": "These money fee records ({count}) look like the ones a sale writes, but nothing shows whether a sale or the account itself wrote them. They count in your money fees as before until you choose."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1313,7 +1315,8 @@
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
             "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
-            "subdomain_site_origin": "An app that another person published also opens at an address on your own domain. For each address, choose where the app opens from now on. Until you choose, everything works as before."
+            "subdomain_site_origin": "An app that another person published also opens at an address on your own domain. For each address, choose where the app opens from now on. Until you choose, everything works as before.",
+            "platform_fee_records": "Before 27 October 2026, any account could write a money fee record into its own memory, and the Economy page counted it in the fees owed to you. For each record below, choose whether it counts. Nothing is deleted, and until you choose, every record counts as before."
           },
           "subdomain": {
             "appOnly": "Only the app's own address (recommended)",
@@ -1323,13 +1326,16 @@
             "choose": "Choose"
           },
           "action": {
-            "subdomain": "App only"
+            "subdomain": "App only",
+            "platform_fee": "Do not count"
           },
           "keepAction": {
-            "subdomain": "My own site"
+            "subdomain": "My own site",
+            "platform_fee": "Count"
           },
           "confirm": {
-            "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before."
+            "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before.",
+            "platform_fee": "Leave this record out of your money fees? {line} The record stays, and the Economy page no longer counts it."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1347,7 +1353,8 @@
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
             "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})",
-            "subdomain": "{label}: the app {app}, published by {owner}"
+            "subdomain": "{label}: the app {app}, published by {owner}",
+            "platform_fee": "{amount} in the memory of {owner} ({key}), seller {seller}, buyer {buyer}"
           }
         },
         "source": {
