@@ -5,6 +5,10 @@
  * @description Federation peer directory + node-to-node introduction/handshake routes (directory,
  *   service-summary, signed introduce, peering-request CRUD, readiness test). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 — A peering request nobody answered in federation.peering_request_days (30, 0 never)
+ *     expires: the introduction sweeps expired rows before it stores one, and the status route answers
+ *     404 for an expired request and deletes it (services/peering-request-expiry.ts; secaudit2026oct26
+ *     round 8c, federation-06).
  *   2026-10-27 — An invite that names no node, presented for a node id held under another key, files a
  *     pending request the operators allow with one press (services/peer-replace-ask.ts) instead of the
  *     409 PEER_KEY_MISMATCH the entry below names; the invite is used only on Allow (coordinator's ruling, secaudit2026oct26).
@@ -70,6 +74,7 @@ import { reportPeerIncident } from '../../services/peer-incidents.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
 import { selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 import { askPeerReplacement } from '../../services/peer-replace-ask.js';
+import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
 import { unsignedServiceSummaryAccepted, UNSIGNED_SERVICE_SUMMARY_REMOVED_IN } from '../../config-federation.js';
 
 /** Peers whose unsigned service summary request was answered since this process started, logged once each. */
@@ -454,6 +459,9 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
                 429, { retry_after_seconds: wait }));
             return;
         }
+        // A request nobody answered in federation.peering_request_days expires before a new one is
+        // stored, so the table holds only requests still waiting (secaudit2026oct26 round 8c).
+        await sweepExpiredPeeringRequests(storage, config);
         const earlier = (await storage.listPeeringRequests('pending'))
             .filter(r => r.fromNodeId === node_id && r.publicKey === public_key);
         // The same node, key and address again: its waiting request stands, under the id the node
@@ -501,6 +509,11 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         const request = await storage.getPeeringRequest(id);
         if (!request) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Introduction request not found: ${id}`));
+            return;
+        }
+        if (peeringRequestExpired(request, config)) {
+            await storage.deletePeeringRequest(id);
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', expiredRequestMessage(id, config.federationPeeringRequestDays)));
             return;
         }
 

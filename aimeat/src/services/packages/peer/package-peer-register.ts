@@ -41,6 +41,9 @@
  *   if (!link.ok) return link;                          // nothing was written
  *   await adoptPendingPeer({ storage, peers, timeoutMs }, headerNodeId, proves);   // before verifyPackageNode
  * @version-history
+ *   v2.5.0 — 2026-10-29 — With `thisNodeId` in the deps, linkPackagePeer refuses this node's own id
+ *     (400 SELF_NODE_ID, nothing written) before the card read, and adoptPendingPeer never adopts a
+ *     pending registration under it (secaudit2026oct26 round 8c, federation-07).
  *   v2.4.0 — 2026-10-27 — linkPackagePeer asks peerUrlRefusal before the card read: with
  *     `securityProfile: 'public'` in the deps a new plain http:// address is refused
  *     (PEER_HTTPS_REQUIRED, nothing written), as every other peer admission does (secaudit2026oct26,
@@ -68,6 +71,7 @@ import { peerUrlRefusal } from '../../peer-url-policy.js';
 import { stripTrailingSlashes } from '../../../utils/url-validator.js';
 import type { PeerInfo } from '../../federation.js';
 import { deriveTierFlags } from '../../federation-tiers.js';
+import { selfNodeIdMessage } from '../../federation-peer-gate.js';
 import { readNodeCard } from '../../node-card.js';
 import { capRefusal, PACKAGE_PEER_SOURCES, DEFAULT_PACKAGE_PEER_CAP } from './package-peer-limits.js';
 import {
@@ -156,6 +160,11 @@ export type PeerLinkResult = Refusal | { ok: true; registered: boolean; pending:
 export async function linkPackagePeer(
     deps: PeerLinkDeps, nodeId: string, raw: unknown, who: PeerLinkWho, opts: { pendingWhenUnreachable: boolean },
 ): Promise<PeerLinkResult> {
+    // A peer speaks for the people of its node id, so a peer under this node's own id would speak for
+    // every person here. The card cannot rule it out: whoever names the url decides what it says.
+    if (deps.thisNodeId && nodeId === deps.thisNodeId) {
+        return { ok: false, status: 400, code: 'SELF_NODE_ID', message: selfNodeIdMessage(deps.thisNodeId) };
+    }
     const check = checkPackagePeer(deps.peers, nodeId, raw);
     if (!check.ok) {
         const held = deps.peers.get(nodeId);
@@ -237,6 +246,9 @@ export async function adoptPendingPeer(
     if (!nodeId || deps.peers.has(nodeId)) return;
     const pending = await readPendingPeer(deps.storage, nodeId);
     if (!pending) return;
+    // A registration under this node's own id, left before linkPackagePeer refused it, is never adopted.
+    // It stays for the operator, who removes it with DELETE /v1/federation/peers/:nodeId.
+    if (deps.thisNodeId && nodeId === deps.thisNodeId) return;
     if (!await proves(pending.publicKey)) return;
     if (pendingExpired(pending)) { await deletePendingPeer(deps.storage, nodeId); return; }
     const now = Date.now();

@@ -31606,6 +31606,10 @@ paths:
     get:
       operationId: listPeeringRequests
       summary: List pending peering requests
+      description: >-
+        A request another node left here that nobody answered in `federation.peering_request_days` (30
+        by default, 0 for never) has expired; it is deleted before the list is read and is not in it.
+        Requests this node sent are kept.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -31670,6 +31674,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           description: SELF_NODE_ID — the request names this node's own id, so approving it would make a peer of this node itself; reject it instead
+        '404':
+          description: NOT_FOUND — no such request, or it expired (nobody answered it in `federation.peering_request_days`) and was deleted
         '409':
           description: PEER_KEY_REQUIRED — the request carries no key; INVITE_NOT_OPEN — a replacement request whose invite was used, revoked or ran out meanwhile, so nothing was replaced
 
@@ -31704,7 +31710,7 @@ paths:
         '400':
           description: SELF_NODE_ID — the request names this node's own id
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: NOT_FOUND — no such request, or it expired and was deleted, as on the PUT
         '409':
           description: PEER_KEY_REQUIRED or INVITE_NOT_OPEN, as on the PUT
 
@@ -54051,6 +54057,10 @@ paths:
     get:
       operationId: getIntroductionStatus
       summary: Check introduction status
+      description: >-
+        404 NOT_FOUND also when the request expired: nobody answered it in this node's
+        `federation.peering_request_days` (30 by default), so it was deleted and the node can introduce
+        itself again.
       tags: [Federation]
       parameters:
         - name: id
@@ -54153,6 +54163,12 @@ paths:
         given out. An identity no listed peer knows is remembered as unknown for 30 seconds, and
         lookups of one identity made at the same time share one round of questions, so the same
         unknown identity asked again in that time answers 404 without asking the peers again.
+
+        An identity that names its home node (`alice@node-id`) is answered from what this node knows
+        when that node is this node or a peer it knows: a listed peer is named without being asked, and
+        this node or an unlisted peer answers 404 with no peer asked. Only an identity that names no
+        known node is asked of the listed peers, one at a time and at most
+        `federation.resolve_max_peers` of them (500 by default, 0 for no limit).
       tags: [Federation]
       parameters:
         - name: gaii
@@ -54730,7 +54746,8 @@ paths:
         ({ url, public_key }) registers a node this repository does not know yet as a packages-only peer,
         once the node's own /.well-known/aimeat answers with the same node id and key (409
         PEER_ID_MISMATCH or PEER_KEY_MISMATCH when it does not, 400 INVALID_URL for an address this node
-        may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). Without
+        may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). This node's
+        own id answers 400 SELF_NODE_ID and nothing is written. Without
         `node` the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under another
         key answers 409 PEER_KEY_MISMATCH. 404 NOT_A_REPOSITORY when the repository role is off; 403
         NOT_AN_AUTHOR when the caller has no package here. Requires packages:write.
@@ -56655,7 +56672,8 @@ paths:
                   description: >-
                     `{ spec: "aimeat.install-set/1", bundle: { group_id, node_id?, version? }, repository?: {
                     node_id, url, public_key } (links a repository this node does not know yet as an active
-                    peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key), owner: { name,
+                    peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key; 400
+                    SELF_NODE_ID when it names this node itself), owner: { name,
                     email, display_name? }, members?: [{ email, name?, display_name?, join: invite|account,
                     memberships: [{ organism, role: admin|member, workspaces: [key | { key, role:
                     viewer|contributor }] }] }], organism_names?: { <key>: name }, config?: { <group id>: {
