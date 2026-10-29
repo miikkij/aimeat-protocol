@@ -10,7 +10,9 @@
  *     - Settlement: copies of one signed settlement that arrive together credit once (one 200, the
  *       rest 409 CONFLICT), and a single settlement credits once as before.
  *     - Resolve: an identity no node knows is asked of the peers once inside a short window, however
- *       many times it is resolved; a known identity and a node-hinted one resolve as before.
+ *       many times it is resolved; a known identity and a node-hinted one resolve as before. An
+ *       identity naming this node or a known unlisted peer asks nobody, and one with no known home
+ *       reaches at most federation.resolve_max_peers peers.
  *     - Deactivated account: a member peer that holds a person's sign-in consent lists and writes
  *       their records while the account is active, is refused (403 ACCOUNT_DISABLED) while it is
  *       deactivated, and works again after reactivation with the consent untouched.
@@ -35,6 +37,9 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   v1.3.0 — 2026-10-29 — R4, R5: an identity that names this node or a known unlisted peer asks no
+ *     peer, and one with no known home reaches at most federation.resolve_max_peers peers
+ *     (secaudit2026oct26 round 8c, federation-03).
  *   v1.2.0 — 2026-10-29 — E1, E2: a peering request unanswered for federation.peering_request_days
  *     (30 by default, 0 never) is gone from the list, the decision and the status route
  *     (secaudit2026oct26 round 8c, federation-06).
@@ -244,6 +249,40 @@ try {
         assert(answers.every(a => a.status === 404), `all 404: ${JSON.stringify(answers.map(a => a.status))}`);
         const asked = fakeAsked.filter(a => a === who).length;
         assert(asked === 1, `F was asked ${asked} times for one identity looked up together`);
+    });
+
+    await test('R4. BOUNDED — an identity that names H, or a peer H knows but does not list, asks no peer', async () => {
+        const G_ID = `aimeat-bounds-g-${stamp}`;
+        await addPeer(H, G_ID, 'http://localhost:49963', (await generateKeyPair()).publicKey, { peer_mode: 'private' });
+        try {
+            const own = `ghost-own-${stamp}@${H_ID}`;
+            const hidden = `ghost-hidden-${stamp}@${G_ID}`;
+            const a = await H.json(`/v1/federation/resolve/${encodeURIComponent(own)}`);
+            const b = await H.json(`/v1/federation/resolve/${encodeURIComponent(hidden)}`);
+            assert(a.status === 404 && b.status === 404, `both 404: ${a.status} ${b.status}`);
+            assert(!JSON.stringify(b.body).includes('49963'), `the private peer's address is not given out: ${JSON.stringify(b.body)}`);
+            assert(!fakeAsked.includes(own) && !fakeAsked.includes(hidden), `F was asked: ${JSON.stringify(fakeAsked.filter(w => w === own || w === hidden))}`);
+        } finally {
+            await H.json(`/v1/federation/peers/${G_ID}`, { method: 'DELETE', headers: auth(H.ownerToken) });
+        }
+    });
+
+    await test('R5. BOUNDED — an identity with no known home reaches at most federation.resolve_max_peers peers; 0 is no limit', async () => {
+        const cfg = H.config as unknown as Record<string, unknown>;
+        const saved = cfg.federationResolveMaxPeers;
+        try {
+            // H lists P first and F second, so with 1 only P is asked.
+            cfg.federationResolveMaxPeers = 1;
+            const one = `ghost-capped-${stamp}`;
+            const r = await H.json(`/v1/federation/resolve/${encodeURIComponent(one)}`);
+            assert(r.status === 404, `capped: ${r.status} ${JSON.stringify(r.body)}`);
+            assert(!fakeAsked.includes(one), 'F, the second listed peer, is not asked with the limit at 1');
+            cfg.federationResolveMaxPeers = 0;
+            const known = await H.json(`/v1/federation/resolve/${encodeURIComponent(KNOWN_ON_F)}`);
+            assert(known.status === 200 && known.body.data?.node_id === F_ID, `0 is no limit, F answers: ${known.status} ${JSON.stringify(known.body)}`);
+        } finally {
+            cfg.federationResolveMaxPeers = saved;
+        }
     });
 
     // ── 3. A deactivated account ──
