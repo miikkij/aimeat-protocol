@@ -22,6 +22,9 @@
  * @structure runModelWork() · settleModelJob() · checkModelWorks()
  * @usage runModelWork(deps, ownerGhii, goalId, workId);   // goals-advance.ts; settleModelJob from goals-sweep.ts's job listener
  * @version-history
+ *   v1.2.0 — 2026-10-29 — A model work an agent without ai:use asked for waits for the owner's one
+ *     press before it spends the AI allowance (goals-model-spend.ts; secaudit2026oct26 round 8c,
+ *     goals:model-work-runs-as-owner-without-requesting-agent-authority).
  *   v1.1.0 — 2026-10-27 — A record goes to the model with the reach of whoever named it in the goal; a
  *     private one an agent named and may not read waits for the owner's one press before the work is
  *     taken, and one the owner did not allow is left out (goals-model-reach.ts; secaudit2026oct26,
@@ -35,6 +38,7 @@ import { logger } from '../../utils/logger.js';
 import { logEntry, readGoal, updateGoal, type GoalDeps } from './goals-store.js';
 import { countTake, taskBody } from './goals-work.js';
 import { askOwnerForModelRead, modelInputKeys, modelWorkReadNeed } from './goals-model-reach.js';
+import { askOwnerForModelSpend, modelWorkSpendNeed } from './goals-model-spend.js';
 import {
   MAX_ATTEMPTS, MAX_RESULTS, MODEL_TAKER, TEXT_MAX, goalSettled, parseRunKey, resultsKey, runKey,
   type GoalRecord, type GoalWork,
@@ -68,6 +72,11 @@ export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: st
   const before = await readGoal(deps, ownerGhii, goalId);
   const open = before?.works.find(w => w.id === workId && w.status === 'open' && w.runner === 'model');
   if (before && open) {
+    // The owner's AI allowance is spent under the permission of the agent that asked for the work,
+    // as POST /v1/ai/jobs asks it; without ai:use the work waits for the owner's one press
+    // (goals-model-spend.ts; secaudit2026oct26 round 8c).
+    const spender = await modelWorkSpendNeed(deps, ownerGhii, before, open);
+    if (spender) { await askOwnerForModelSpend(deps, ownerGhii, before, open, spender); return; }
     const need = await modelWorkReadNeed(deps, ownerGhii, before, open, modelInputKeys(open, taskBody(before, open, true).memoryKeys));
     if (need) { await askOwnerForModelRead(deps, ownerGhii, before, open, need); return; }
   }

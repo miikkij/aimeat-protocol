@@ -9299,6 +9299,8 @@
   "notiftext.approval_crew_model_default.body": "Cuando los equipos de tus agentes llaman a su modelo, envían tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, los equipos la usan desde su próxima ejecución. Si no, siguen con el modelo que tienen. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_goal_model_read.title": "{who} pide que la IA de AIMEAT lea tus entradas privadas {records}",
   "notiftext.approval_goal_model_read.body": "{agent} necesita {records} para la tarea «{work}» de tu objetivo «{goal}». {agent} no puede leer tus entradas privadas, pero ve lo que responde la IA. Si lo permites, la IA usa estas entradas en la tarea. Si no lo permites, la tarea se hace sin ellas.",
+  "notiftext.approval_goal_model_spend.title": "{who} pide que la IA de AIMEAT haga la tarea «{work}» a tu costo",
+  "notiftext.approval_goal_model_spend.body": "{agent} agregó la tarea «{work}» a tu objetivo «{goal}» para la IA de AIMEAT. {agent} no puede usar tu IA por sí mismo, así que el costo de la tarea espera tu respuesta. Si lo permites, la IA hace esta tarea y las tareas de IA que {agent} agregue a este objetivo más adelante. Si no lo permites, esta tarea no se hace.",
   "notiftext.approval_schedule_instruction.title": "{who} cambió la programación «{schedule}», y el cambio espera tu aprobación",
   "notiftext.approval_schedule_instruction.body": "{maker} hizo esta programación, así que lee tus datos con los permisos de {maker}. {who} cambió sus instrucciones, pero {who} no puede leer todo lo que {maker} puede leer. Por eso el cambio espera tu aprobación. Si lo permites, la programación usa las nuevas instrucciones. Si no lo permites, vuelve a las anteriores.",
   "notiftext.approval_refinery_definition.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
@@ -23891,6 +23893,17 @@
         "high": "La tarea se hace sin estas entradas.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si no te molesta que el agente sepa lo que dicen estas entradas. Si el agente puede leer todas tus entradas, puedes darle ese permiso en la página del agente, y así ya no pregunta."
+      },
+      "approval_goal_model_spend": {
+        "title": "Un agente pide a la IA que haga una tarea a tu costo",
+        "short": "La IA de AIMEAT haría una tarea de tu objetivo, pagada con tu propia clave o con tu saldo de IA.",
+        "what": "En un objetivo, un agente puede darle una tarea a la IA de AIMEAT. La IA trabaja en tu cuenta y tú la pagas, con tu propia clave o con tu saldo de IA. Este agente no tiene permiso para usar tu IA, así que no puede gastar tu dinero por su cuenta. Por eso se te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "La IA hace esta tarea y las tareas de IA que este agente agregue a este objetivo más adelante, a tu costo.",
+        "highLabel": "Si no lo permites",
+        "high": "Esta tarea no se hace. No se gasta nada.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si quieres que el objetivo siga con esta tarea. Si el agente siempre puede usar tu IA, dale ese permiso en la página del agente, y así ya no pregunta."
       },
       "approval_schedule_instruction": {
         "title": "Alguien cambió una programación",
