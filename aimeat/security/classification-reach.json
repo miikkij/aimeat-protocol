@@ -2553,10 +2553,9 @@
     },
     "src/services/storage-file-write.ts": {
       "reads": {
-        "getStorageFile": 2,
-        "getStorageFileMeta": 1
+        "getStorageFileMeta": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete. 2026-10-26: the second getStorageFile is the same check under the account's own extension file key, and the getStorageFileMeta decides which key a visibility change names; neither hands content to a caller."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete. 2026-10-26: the second read is the same check under the account's own extension file key, and the third decides which key a visibility change names; none hands content to a caller. 2026-10-30: the delete check reads metadata, not the bytes."
     },
     "src/services/structure-overview.ts": {
       "reads": {
