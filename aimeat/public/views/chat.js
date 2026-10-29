@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-29: A turn the node refused before the agent started shows the node's sentence in the
+ *     person's language and a link to the AI settings (UX review A2).
  *   2026-10-19: On a phone the chat is pinned to the visible area (js/visual-viewport.js), so the
  *     composer stays on the keyboard on iOS too.
  *   2026-10-06: The cap box's "Get your own place" way says it opens soon and leads nowhere while the
@@ -206,7 +208,12 @@ export default function ChatView() {
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState({ text: '', thought: '', progress: '', tools: [], cards: [] });
-    const [failure, setFailure] = useState('');
+    // A sentence, or { message, href } when the node named a fix for the refusal and the AI settings
+    // address that makes it (A2, 2026-10-29). One state, so a later failure never carries an
+    // earlier one's link.
+    const [failureState, setFailure] = useState('');
+    const failure = typeof failureState === 'string' ? failureState : failureState.message;
+    const fixHref = typeof failureState === 'string' ? '' : failureState.href;
     const [loading, setLoading] = useState(true);
     // On a phone the conversation takes the whole screen, so the list is a separate place rather
     // than a column that would leave neither readable.
@@ -422,7 +429,8 @@ export default function ChatView() {
                         setLive((l) => ({ ...l, cards: [...cards.values()] }));
                     }
                 } else if (update.kind === 'error') {
-                    setFailure(update.message || tr('chat.turnFailed', 'The turn could not be completed.'));
+                    const message = update.message || tr('chat.turnFailed', 'The turn could not be completed.');
+                    setFailure(update.settingsUrl ? { message, href: update.settingsUrl } : message);
                 }
             }
         } catch (err) {
@@ -682,7 +690,7 @@ export default function ChatView() {
                     <${LiveTurn} text=${live.text} thought=${live.thought} progress=${live.progress} tools=${live.tools} cards=${live.cards} busy=${busy} />
                     ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
                         onPick=${(opt) => send(opt)} />`}
-                    <${TurnError} message=${failure}
+                    <${TurnError} message=${failure} fixHref=${fixHref}
                         onRetry=${lastAskRef.current && !busy ? () => send(lastAskRef.current) : null} />
                     <div ref=${bottomRef}></div>
                 <//>

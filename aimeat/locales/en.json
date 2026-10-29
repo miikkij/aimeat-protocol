@@ -5959,6 +5959,7 @@
   "chat.new": "New conversation",
   "chat.nodeKey": "This server pays for the conversation, on its own key.",
   "chat.noThreads": "Nothing here yet. Say something and this is where it will be.",
+  "chat.openAiSettings": "Open AI settings",
   "chat.openList": "Conversations",
   "chat.ownKey": "Running on your own OpenRouter key.",
   "chat.placeholder": "Ask for something, or describe what you want built.",

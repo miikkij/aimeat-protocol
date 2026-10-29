@@ -24,12 +24,17 @@
  * @structure
  *   - chatEnabled() — whether this node has an agent at all
  *   - chatPayer() — who pays for this person's turns, and on which model, as the node decides it
+ *   - chatRefusal() — the refusal /v1/llm would give this person's chat, as they read it
  *   - runChatTurn() — the whole turn, yielding updates as they happen and persisting both sides
  *   - resetChatSession() / endChatSession() — a conversation's session ends, with its MCP token
  *   - shutdownChat() — stop every agent process
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.12.0 — 2026-10-29 — A turn that /v1/llm would refuse ends before the agent starts, with the
+ *     person's sentence in their language and the AI settings address (chatRefusal). Until now goose
+ *     ran, met the refusal and relayed its English text, so a new Solo customer read "No OpenRouter
+ *     API key configured. Set one in Settings." (UX review 2026-10-29, A2).
  *   v1.11.0 -- 2026-10-27 -- A goose session's MCP token is revoked when its session ends: a reset, a
  *     deleted conversation (endChatSession), a session that replaces it, and the close of the process
  *     that holds it. A chat agent's tokens from an earlier run of the node, whose processes are gone,
@@ -87,6 +92,7 @@ import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js
 import { chatUsesSharedKey } from './goose-env.js';
 import { ensureChatGooseConfig } from './goose-chat-config.js';
 import { prepareAiCall } from './ai/completion.js';
+import { AiCompletionError } from './ai/errors.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
@@ -95,8 +101,11 @@ import { logger } from '../utils/logger.js';
 
 export interface ChatDeps { storage: Storage; config: AimeatConfig }
 
-/** What a turn streams: the agent's own updates, and the node's progress and guard events. */
-export type ChatUpdate = SessionUpdate | NodeUpdate;
+/** A turn the node refused before the agent started: the person's sentence and where to fix it. */
+export interface ChatRefusedUpdate { kind: 'error'; message: string; code: string; settingsUrl?: string }
+
+/** What a turn streams: the agent's own updates, and the node's progress, guard and refusal events. */
+export type ChatUpdate = SessionUpdate | NodeUpdate | ChatRefusedUpdate;
 
 /** How one phase of a turn ended: its `done` or `error`, the limit it reached, and whether goose ignored the cancel. */
 interface PhaseEnd { end: SessionUpdate | null; limit: GuardReason | null; stuck: boolean }
@@ -281,6 +290,30 @@ export async function chatPayer(
 }
 
 /**
+ * The refusal /v1/llm would give this person's chat, in the words they read: the gate's own `fix`
+ * sentence in their language and the AI settings address, or null when a call would run. The same
+ * question chatPayer() asks, asked before the agent starts, because an agent that meets the refusal
+ * relays the gate's English message, which is written for a developer. Only a refusal that names
+ * something to fix in settings ends the turn here; anything else is left for the turn to meet.
+ */
+export async function chatRefusal(deps: ChatDeps, gaii: string, locale: Locale): Promise<ChatRefusedUpdate | null> {
+    const { storage, config } = deps;
+    if (chatUsesSharedKey(config)) return null;
+    try {
+        await prepareAiCall(storage, config, gaii, { appId: 'llm-proxy', agent: CHAT_AGENT_NAME, caller: 'chat', lang: { chosen: locale } });
+        return null;
+    } catch (err) {
+        if (!(err instanceof AiCompletionError)) throw err;
+        const details = (err.details ?? {}) as { fix?: unknown; settingsUrl?: unknown };
+        if (typeof details.fix !== 'string' || !details.fix) return null;
+        return {
+            kind: 'error', code: err.code, message: details.fix,
+            ...(typeof details.settingsUrl === 'string' ? { settingsUrl: details.settingsUrl } : {}),
+        };
+    }
+}
+
+/**
  * Get, or create, the goose session this conversation runs on.
  *
  * The MCP token is minted per session and never stored: it is a bearer credential for the whole of
@@ -373,6 +406,13 @@ export async function* runChatTurn(
 
     // The process is held for the whole turn: the pool neither closes it as idle nor counts it free
     // until release() runs in the finally block below.
+    const refused = await chatRefusal(deps, gaii, locale);
+    if (refused) {
+        logger.info(`[chat] ${gaii}'s turn refused before the agent started: ${refused.code}`);
+        yield refused;
+        return;
+    }
+
     let lease: AgentLease<GooseAcpClient>;
     let sessionId: string;
     try {

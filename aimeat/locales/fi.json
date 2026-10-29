@@ -6136,6 +6136,7 @@
   "chat.new": "Uusi keskustelu",
   "chat.nodeKey": "Tämä palvelin maksaa keskustelun omalla avaimellaan.",
   "chat.noThreads": "Täällä ei ole vielä mitään. Sano jotain, niin keskustelu ilmestyy tähän.",
+  "chat.openAiSettings": "Avaa tekoälyasetukset",
   "chat.openList": "Keskustelut",
   "chat.ownKey": "Käytössä on oma OpenRouter-avaimesi.",
   "chat.placeholder": "Pyydä jotain tai kerro, mitä haluat rakennettavan.",

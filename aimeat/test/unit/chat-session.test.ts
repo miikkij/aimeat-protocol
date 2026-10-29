@@ -10,12 +10,16 @@
  *   written down, the turn ends with a reason rather than a hang, and the node stays up.
  * @usage cd aimeat && pnpm vitest run test/unit/chat-session.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A turn with no AI to pay for it ends before the agent starts, in the
+ *     person's language with the settings address (UX review A2). The agent-start tests now run with
+ *     the node's key and an allowance, so they still reach the process rather than the refusal.
  *   v1.0.0 — 2026-08-16 — initial: write-before-prompt, named failure, no unhandled spawn error.
  */
 import { describe, it, expect } from 'vitest';
 import { SqliteStorage } from '../../src/storage/providers/sqlite/index.js';
 import type { Storage, GHIIRecord } from '../../src/storage/interface.js';
-import type { AimeatConfig } from '../../src/config.js';
+import { loadConfig, type AimeatConfig } from '../../src/config.js';
+import { loadCatalog } from '../../src/services/ai/catalog/store.js';
 import { chatEnabled, runChatTurn } from '../../src/services/chat-session.js';
 import { createThread, readThread } from '../../src/services/chat-threads.js';
 import { initNodeKeys } from '../../src/auth/jwt.js';
@@ -28,7 +32,16 @@ const GAII = `${OWNER}@${NODE}`;
 /** A binary that is not on any PATH, so the spawn fails the way a mistyped setting does. */
 const MISSING_BINARY = 'aimeat-no-such-agent-binary';
 
+/**
+ * A node whose own key pays for a person's first turns, so a turn passes the AI gate and reaches the
+ * agent process. `noAi()` takes the key away: then nothing pays and the gate refuses.
+ */
 const cfg = (over: Record<string, unknown> = {}): AimeatConfig => ({
+  ...loadConfig().config,
+  openrouterInstanceKey: 'sk-node-never-sent',
+  chatFreeAllowanceUsd: 1,
+  aiNodeKeyWhenSpent: 'refuse',
+  modelFreeFallback: 'openrouter/free',
   nodeId: NODE,
   baseUrl: 'http://localhost:40050',
   chatMaxLiveThreads: 50,
@@ -53,6 +66,8 @@ function withNodeKeys(): Promise<void> {
   return keysReady;
 }
 
+const noAi = (over: Record<string, unknown> = {}): AimeatConfig => cfg({ openrouterInstanceKey: '', chatFreeAllowanceUsd: 0, ...over });
+
 async function freshStorage(): Promise<Storage> {
   await withNodeKeys();
   const storage = new SqliteStorage(':memory:');
@@ -62,6 +77,7 @@ async function freshStorage(): Promise<Storage> {
     verificationLevel: 0, ownerName: OWNER, createdAt: now, updatedAt: now, totpEnabled: false,
   };
   await storage.createGHII(ghii);
+  await loadCatalog(storage as unknown as Storage, cfg());
   return storage as unknown as Storage;
 }
 
@@ -97,6 +113,40 @@ describe('a turn on a node with no agent configured', () => {
   });
 });
 
+describe('a turn that no AI would pay for', () => {
+  it('ends before the agent starts, in the person\'s language, with the AI settings address', async () => {
+    // The agent binary does not exist, so a turn that reached the process would end with a spawn
+    // error instead. A refusal in Finnish with the address proves the gate answered first.
+    const storage = await freshStorage();
+    const config = noAi();
+    const t = await createThread(storage, config, GAII);
+
+    const events = await collect(runChatTurn({ storage, config }, OWNER, t.id, 'hei', undefined, [], { locale: 'fi' }));
+    expect(events).toHaveLength(1);
+    const e = events[0]!;
+    expect(e.kind).toBe('error');
+    expect(e.code).toBe('NO_API_KEY');
+    expect(String(e.message)).toMatch(/tekoälyasetukset/);
+    expect(String(e.message)).not.toMatch(/OpenRouter API key/);
+    expect(String(e.settingsUrl)).toMatch(/\/v1\/profile\?tab=ai/);
+
+    // The person's words are kept, as on every other failed turn.
+    const read = await readThread(storage, GAII, t.id);
+    expect(read?.turns[0]?.text).toBe('hei');
+
+    storage.close?.();
+  });
+
+  it('reads in English for a person whose page is in English', async () => {
+    const storage = await freshStorage();
+    const config = noAi();
+    const t = await createThread(storage, config, GAII);
+    const events = await collect(runChatTurn({ storage, config }, OWNER, t.id, 'hi', undefined, [], { locale: 'en' }));
+    expect(String(events[0]?.message)).toMatch(/Open your AI settings/);
+    storage.close?.();
+  });
+});
+
 describe('a turn on a node whose agent will not start', () => {
   it('keeps the person\'s words, and ends with the reason', async () => {
     // The ordering is the point. The words are written BEFORE the agent is asked anything, so a
@@ -110,6 +160,8 @@ describe('a turn on a node whose agent will not start', () => {
     const last = events.at(-1);
     expect(last?.kind).toBe('error');
     expect(String(last?.message).length).toBeGreaterThan(0);
+    // The process failed, not the AI gate: a refusal carries a code, a spawn failure does not.
+    expect(last?.code).toBeUndefined();
 
     const read = await readThread(storage, GAII, t.id);
     expect(read?.turns[0]?.role).toBe('user');
