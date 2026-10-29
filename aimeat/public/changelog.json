@@ -2,6 +2,28 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-30",
+      "kind": "feature",
+      "id": "2026-10-30-ornaments-that-grow-round-your-app",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Ornaments that grow round your app",
+        "fi": "Koristeet, jotka kasvavat sovelluksen ympärille"
+      },
+      "summary": {
+        "en": "Frames, vines and wreaths grow round your app's cards, bars and titles, in its own colours.",
+        "fi": "Kehykset, köynnökset ja seppeleet kasvavat sovelluksesi korttien, palkkien ja otsikoiden ympärille."
+      },
+      "body": {
+        "en": "An engraved frame round a card, a vine that grows with a progress bar, a wreath round a badge, flourishes beside a title: 23 ornaments in your app's own colours, each shown live in the Design Book.",
+        "fi": "Kaiverrettu kehys kortin ympärille, köynnös, joka kasvaa edistymispalkin mukana, seppele merkin ympärille ja kiehkurat otsikon vierelle. Koristeita on 23. Ne ovat sovelluksesi omissa väreissä, ja jokainen näkyy Design Bookissa elävänä."
+      }
+    },
+    {
       "date": "2026-10-29",
       "kind": "feature",
       "id": "2026-10-29-files-in-s3-or-azure-blob-storage",
