@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-29 — An extension ZIP under a new name that starts with aimeat- is refused to anyone but an
+ *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — An app upload passes the token's `publishing_app` (the app whose grant minted it) to publishApp (secaudit2026oct26).
  *   2026-10-26 — The owner is additive: a ZIP keeps its bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — An extension ZIP lands in the installer's namespace, `<owner>/<name>`, or on the
@@ -200,6 +202,7 @@ import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
 import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
+import { nodePrefixRefusal } from '../services/component-name-prefix.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -516,6 +519,14 @@ async function handleExtensionUpload(
     if (roleRefused) {
         res.status(403).json({ success: false, error: 'INSUFFICIENT_ROLE', message: roleRefused });
         return;
+    }
+    // A new name with the node's prefix is kept for what the node ships next, as on the inline doors
+    // (services/component-name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
+    if (!existing) {
+        const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
+        const isOperator = (await operatorName(storage, { sub, ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}) })) !== null;
+        const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator });
+        if (prefixed) { res.status(prefixed.status).json({ success: false, error: prefixed.code, message: prefixed.message }); return; }
     }
 
     // A flagged action whose changed text would break an ODPS length cap is refused before the write,

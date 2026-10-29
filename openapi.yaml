@@ -50584,7 +50584,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >-
+            ALREADY_EXISTS, an extension of that name is already installed; or NAME_RESERVED, the name
+            starts with aimeat-, which is kept for what this node ships, and only an operator may
+            install a new extension under it.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
 
@@ -50672,7 +50675,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Install limit exceeded, or VERSION_EXISTS, this version is already kept with other code.
+          description: >-
+            Install limit exceeded; VERSION_EXISTS, this version is already kept with other code; or
+            NAME_RESERVED, a new extension under a name that starts with aimeat-, which only an
+            operator may create.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
@@ -52471,7 +52477,7 @@ paths:
         '409':
           description: >-
             CONFLICT, a cortex of that name is already installed; or NAME_RESERVED, the name is a
-            library this node ships and only an operator may install it.
+            library this node ships, or starts with aimeat-, and only an operator may install it.
 
   /v1/cortex/{name}:
     get:
@@ -52556,7 +52562,8 @@ paths:
             VERSION_EXISTS, this version is already kept with other lib bytes; BOARD_ID_TAKEN, the
             redeploy of an active cortex would make a board whose id is a board of another account;
             CONFLICT, another install took the free name first, and nothing was written; or
-            NAME_RESERVED, the name is a library this node ships and only an operator may create it.
+            NAME_RESERVED, the name is a library this node ships, or starts with aimeat-, and only an
+            operator may create it.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:
