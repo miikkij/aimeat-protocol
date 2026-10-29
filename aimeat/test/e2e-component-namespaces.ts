@@ -21,6 +21,8 @@
  *   name, and two such accounts make the bare name answer 409 AMBIGUOUS_NAME naming both.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-component-namespaces
  * @version-history
+ *   v1.3.1 — 2026-10-30 — The app owner's Don't allow holds the app back, and approving the same request
+ *     later releases it (secaudit2026oct26 round 8c, no dead end).
  *   v1.3.0 — 2026-10-29 — A cortex name an account erasure freed stays free for a new holder, and an app
  *     that loaded it loads the new holder's library only after its owner's one-press Allow
  *     (secaudit2026oct26 round 8c, memory-b-08).
@@ -240,8 +242,13 @@ await test('a cortex name an account erasure freed stays free; an app that loade
     assert(ask && ask.state === 'awaiting_owner', `carol has the question: ${short(list.body)}`);
     const pending = await json(`/v1/publish-requests/${ask.id}?account=${carol.name}`, as(erin.token));
     assert(pending.status === 200 && pending.body.data.request.state === 'awaiting_owner', `erin sees it pending: ${pending.status} ${short(pending.body)}`);
+    // Don't allow holds the app back, and carol can change her mind on the same request later.
+    const no = await json(`/v1/publish-requests/${ask.id}/decision`, as(carol.token, { method: 'POST', body: JSON.stringify({ decision: 'decline' }) }));
+    assert(no.status === 200, `carol does not allow it: ${no.status} ${short(no.body)}`);
+    const stillHeld = await fromApp();
+    assert(stillHeld.status === 404, `Don't allow holds carol's app back: ${stillHeld.status}`);
     const yes = await json(`/v1/publish-requests/${ask.id}/decision`, as(carol.token, { method: 'POST', body: JSON.stringify({ decision: 'approve' }) }));
-    assert(yes.status === 200, `carol allows it: ${yes.status} ${short(yes.body)}`);
+    assert(yes.status === 200, `carol allows it later on the same request: ${yes.status} ${short(yes.body)}`);
     const after = await fromApp();
     assert(after.status === 200 && after.text.includes("'erin'"), `carol's app loads erin's library after the Allow: ${after.status}`);
     const told = ((await json('/v1/notifications', as(erin.token))).body?.data?.notifications ?? [])
