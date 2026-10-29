@@ -23,6 +23,9 @@ const html = htm.bind(h);
  *   html`<${SearchBar} value=${q} onInput=${e => setQ(e.target.value)}
  *        placeholder=${t('common.search')} />`
  * @version-history
+ *   v1.0.1 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
+ *     owner's sign-in name into a find field. The Ctrl K search uses this field.
  *   v1.0.0 — 2026-06-02 — Component unification (#24): created canonical
  *     search-bar shell backed by .search-bar / .search-bar-input in theme.css.
  */
@@ -35,6 +38,7 @@ export function SearchBar({ value, onInput, placeholder, onSubmit, ariaLabel }) 
       <input
         class="input-field search-bar-input"
         type="search"
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${placeholder}
         aria-label=${ariaLabel || placeholder}
         value=${value}
