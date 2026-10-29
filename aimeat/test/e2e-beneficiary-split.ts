@@ -795,7 +795,7 @@ await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () =>
 // never came back (commerce/x402-facilitator.ts X402_TEST_UNANSWERED_NONCE_PREFIX).
 const UNANSWERED_NONCE = '0xdead5e771e' + Date.now().toString(16).padStart(54, '0');
 
-await test('POSSIBLE PAYOUT: an unanswered settle is held, and only an operator lists it', async () => {
+await test('POSSIBLE PAYOUT: an unanswered settle is held and answered 502', async () => {
   const r = await invoke(consumer.token, 'paid');
   assert(r.status === 200, `money call ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const list = await obligations(provider.token);
@@ -813,7 +813,9 @@ await test('POSSIBLE PAYOUT: an unanswered settle is held, and only an operator 
     method: 'POST', headers: auth(provider.token), body: JSON.stringify({ beneficiary: gamma.ghii, payment: pay }),
   });
   assert(s.status === 502 && s.body?.error?.code === 'X402_SETTLE_UNKNOWN', `expected 502 X402_SETTLE_UNKNOWN, got ${s.status}`);
+});
 
+await test('POSSIBLE PAYOUT: only an operator lists the held payouts', async () => {
   const refused = await json('/v1/commerce/beneficiary/possible-payouts', { headers: auth(provider.token) });
   assert(refused.status === 403, `a provider does not read the node's list: ${refused.status}`);
   const ops = await json('/v1/commerce/beneficiary/possible-payouts', { headers: auth(operator.token) });
@@ -822,11 +824,14 @@ await test('POSSIBLE PAYOUT: an unanswered settle is held, and only an operator 
   assert(!!held && held.provider === provider.ghii && held.beneficiary === gamma.ghii, `held: ${JSON.stringify(ops.body.data)}`);
 });
 
-await test('POSSIBLE PAYOUT: the operator marks it arrived with a reference; the share reads paid and both are told', async () => {
+await test('POSSIBLE PAYOUT: a non-operator cannot mark it arrived', async () => {
   const stranger403 = await json('/v1/commerce/beneficiary/possible-payouts/arrived', {
     method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ provider: provider.ghii, nonce: UNANSWERED_NONCE, reference: '0xfeed' }),
   });
   assert(stranger403.status === 403, `a non-operator cannot mark it: ${stranger403.status}`);
+});
+
+await test('POSSIBLE PAYOUT: the operator marks it arrived with a reference; the share reads paid and both are told', async () => {
   const r = await json('/v1/commerce/beneficiary/possible-payouts/arrived', {
     method: 'POST', headers: auth(operator.token), body: JSON.stringify({ provider: provider.ghii, nonce: UNANSWERED_NONCE, reference: '0xfeed' }),
   });
