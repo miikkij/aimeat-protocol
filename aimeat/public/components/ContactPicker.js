@@ -13,6 +13,9 @@
  * @usage import { ContactPicker } from '/components/ContactPicker.js';
  *   <${ContactPicker} value=${who} onChange=${setWho} onSubmit=${submit} />
  * @version-history
+ *   v1.2.2 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): it takes a name or an
+ *     email, which is what LastPass fills with the owner's own sign-in name.
  *   v1.2.1 — 2026-09-27 — Draws its own class names (.cp-root → .contact-picker, every other .cp-* →
  *     .contact-picker-*), and the input's small size is its own rule (.input-field.contact-picker-input,
  *     the values of the page's .input-field.input-sm) in css/components/contact-picker.css (a move,
@@ -131,6 +134,7 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
   return html`
     <div class="contact-picker" ref=${rootRef}>
       <input class="input-field contact-picker-input" autofocus=${autofocus} disabled=${disabled}
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${placeholder || (t('contacts.pickerPlaceholder') || 'owner name, email, or pick a contact')}
         value=${value}
         onInput=${(e) => { onChange?.(e.target.value); setOpen(true); setHi(-1); }}

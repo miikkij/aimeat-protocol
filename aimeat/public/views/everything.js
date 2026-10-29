@@ -17,6 +17,7 @@
  * @structure Everything (default) · Toggle · Section
  * @usage routed at /v1/everything by spa.html; /everything redirects there
  * @version-history
+ *   v1.1.2 — 2026-10-29 — The search field is kept out of password managers (autocomplete off, data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
  *   v1.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 - 2026-09-15 - Search headings and normalized words; feature links and matching contents.
  *   v1.0.0 — 2026-09-15 — Initial.
@@ -116,7 +117,8 @@ export default function Everything({ navigate }) {
         <div class="ev-controls poster-frame">
           <label class="ev-search">
             <span class="ev-label">${tr('everything.search', 'Search the list')}</span>
-            <input type="search" class="ev-search-input poster-frame" maxLength=${INPUT_LIMITS.line} value=${query} onInput=${(e) => setQuery(e.target.value)}
+            <input type="search" class="ev-search-input poster-frame" maxLength=${INPUT_LIMITS.line} value=${query}
+              autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" onInput=${(e) => setQuery(e.target.value)}
               placeholder=${tr('everything.searchPh', 'A feature, a standard, an API…')} />
           </label>
           <button type="button" class=${`btn-outline ev-toggle ${reach ? 'is-on' : ''}`} aria-pressed=${reach} onClick=${toggle}>
