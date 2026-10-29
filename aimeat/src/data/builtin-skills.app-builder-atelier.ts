@@ -13,6 +13,7 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.36.0 — 2026-10-29 — The Design Book's shelf names ornaments among the kinds it holds.
  *   v1.35.0 — 2026-10-29 — The interview starts the structure page before its first question and the look
  *     question points there: the first real build on innokas.aimeat.io sent Design Book links instead,
  *     because the page was named only inside the research step (Jouni's test, 2026-10-29).
@@ -251,8 +252,8 @@ moved under you says so.
    (\`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose }\` when a new app
    starts, and hand the person \`page_url\`; \`{ action: "structure" }\` before the screens, where a
    choice with state \`waiting\` is the person's layout or look to build), and
-   **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
-   effects that each passed their own bench. Called with nothing, the search answers the WHOLE
+   **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients,
+   effects and ornaments that each passed their own bench. Called with nothing, the search answers the WHOLE
    Book on one page, every part on a line under its kind, and part \`book\` of the
    specification ends with the same page: read it, because you cannot search for a part you do
    not know exists. Adopting one is one call (\`aimeat_designbook_adopt\`)

@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.39.0 — 2026-10-29 — ADDITIVE: ORNAMENTS in the genre part, the kit's ornament figures named from data/atelier-ornaments.ts.
  *   v1.38.0 — 2026-10-29 — ADDITIVE: the interview starts the structure page before its first question
  *     and points the look question there. The section itself is served in part `libraries`, which an
  *     agent reads after the interview, so on innokas.aimeat.io the first real build never opened the
@@ -158,6 +159,7 @@ import { atelierMotionParts } from './build-atelier-motion-parts.js';
 import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
 import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
+import { ORNAMENTS } from '../data/atelier-ornaments.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -486,6 +488,13 @@ function composeBody(config: AimeatConfig): string {
     + 'stagecraft. When an app needs a full animation library, the node serves three as packs — '
     + 'Motion (`motion`), anime.js (`anime`) and Lenis (`lenis`) — read the pack\'s doc before '
     + 'writing a line, because every one of them changed its API after the version you know.\n\n';
+  // The ornaments come from their registry, so a figure added there is named here the same day.
+  body += 'ORNAMENTS: `AIMEAT.atelier.ornament(el, id, { speed, delay, leaves })` grows an engraved or '
+    + 'living SVG figure round ONE element, in the look\'s colours, once, then holds still: '
+    + ORNAMENTS.map((o) => '`' + o.id + '` (' + o.wraps + ')').join(', ')
+    + '. The word in brackets is the element it was drawn for. One or two per screen, on what matters: '
+    + 'a frame round the card, a vine round the progress bar, flourishes beside the title. Never draw '
+    + 'an ornament of your own. See each: ' + base + '/v1/designbook/ornament-<id>/preview\n\n';
   // Each line ends with the two things an owner chooses by: whether the page keeps its own
   // colours or follows their theme, and an address where they can LOOK at it.
   const bookUrl = config.baseUrl.replace(/\/+$/, '');

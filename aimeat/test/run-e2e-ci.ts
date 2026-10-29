@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-29 -- e2e-designbook-ornaments.ts joins the list (not the guard tier): the ornament kind and the kit's ornaments (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
  *   2026-10-29 -- e2e-app-structure.ts joins the list (not the guard tier): the app's structure and plan from the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  *   2026-10-29 -- e2e-agent-scope-add.ts joins the list (not the guard tier): agent:permissions-add (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-28 -- The round-8 suites' fixed ports follow main's move to 28000-29999 (down 12000).
@@ -1056,6 +1057,9 @@ const ALL_SUITES = [
     // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
     // refused, who may set it, the onboarding step and the Design Book templates.
     'test/e2e-agent-avatar.ts',
+    // The Design Book's ornament kind and the kit's ornaments: the seeded figures, their previews,
+    // what a proposal may carry, the adopt line, and the kit bundle and catalogue.
+    'test/e2e-designbook-ornaments.ts',
     // A label's audience cap: the refusal at every kind of place that sets who may read, the owner's
     // override with a reason, the publish request held to it again, a rise that lowers (plan doc-mvdipuyqraas, L3).
     'test/e2e-classification-audience-cap.ts',

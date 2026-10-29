@@ -36678,7 +36678,7 @@ paths:
       tags: [Apps]
       security: []
       parameters:
-        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect, component] } }
+        - { name: kind, in: query, schema: { type: string, enum: [layout, fill, look, motion, illustration, genre, ambient, effect, component, avatar, ornament] } }
         - { name: status, in: query, schema: { type: string, enum: [proposed, published, aging, retired] } }
         - { name: q, in: query, schema: { type: string }, description: Matched against id, title, summary and tags }
         - { name: limit, in: query, schema: { type: integer, default: 50, maximum: 200 } }
@@ -36697,7 +36697,9 @@ paths:
         for ambient (the preset proven on the part's look through the contrast matrix, so a
         layer too loud for its ground refuses with numbers), the effect bench for effect (the
         knobs against the registry's bounds, the target it lands on — a picture effect never on
-        words, living motion only on the layer) — and a refusal is worded, with the
+        words, living motion only on the layer), the ornament bench for ornament (body `{ ornament,
+        params?, look? }`: a figure the Atelier kit draws, its knobs speed, delay, leaves, value and
+        strands inside the registry's bounds) — and a refusal is worded, with the
         nearest real name suggested. A COMPONENT is the ninth kind, what an app made by hand
         because the Book had nothing for it: body `{ prefix, html, css, use, judgement: { reach:
         general|special, why }, from_app? }`, markup and a stylesheet under one class prefix, every
@@ -36928,7 +36930,10 @@ paths:
         and the app must belong to the caller's owner. A COMPONENT is taken before the app exists:
         the answer carries `snippet` { html, css, use, prefix }, nothing is written, and the app
         need not be published yet. The component is benched again first, and one that no longer
-        passes answers 422 BODY_INVALID with the bench's reason.
+        passes answers 422 BODY_INVALID with the bench's reason. An ORNAMENT is taken the same
+        way: the answer carries `ornament` { ornament, code, use }, the one line
+        (`AIMEAT.atelier.ornament(el, id, params)`) that puts the figure on an element of the
+        app's own page; nothing is written, and the take counts as usage.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
@@ -36968,6 +36973,8 @@ paths:
         an effect by rendering the demo arrangement wearing it where it lands, and it passes when
         something wears it and nothing on it is still running after the settle (fx_applied,
         fx_running), or, as a pass over the layer, when the layer painted;
+        an ornament by rendering its figure on the element it was drawn for, and it passes only
+        when the figure drew at every viewport (ornaments_drawn);
         an illustration answers ran:false with the reason (its bench is the field validation at
         propose time). A node with no browser answers ran:false with the reason and stamps
         nothing. The operator's or the part's own proposer's call (its result changes what the
@@ -36977,7 +36984,7 @@ paths:
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
       responses:
-        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min, ambient_layers, ambient_painted }], reason?, at }" }
+        '200': { description: "{ ran, passed?, viewports?: [{ viewport, overflow_px, units_rendered, controls_below_touch_min, ambient_layers, ambient_painted, fx_applied, fx_running, ornaments_drawn }], reason?, at }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Not the operator and not the proposer }
         '404': { $ref: '#/components/responses/NotFound' }

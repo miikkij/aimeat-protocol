@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.13.0 — 2026-10-29 — The ORNAMENT kind (ornament.ts): adopt() answers the line that puts the
+ *     figure on an element, writes nothing and counts the take.
  *   v1.12.1 — 2026-10-19 — countUse() counts on the usage record's version (record-cas.ts) (check:atomic-writes).
  *   v1.12.0 — 2026-10-19 — The AVATAR kind (avatar.ts): adopt() answers the SVG and writes nothing,
  *     as for a component. proposeChecksFor moved to propose-checks.ts (pure extraction, 800 lines).
@@ -105,6 +107,7 @@ import { DesignBookReasons } from './reasons.js';
 import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
 import { proposeChecksFor } from './propose-checks.js';
+import { ornamentSnippet, type OrnamentBody } from './ornament.js';
 import { avatarPartSnippet, type AvatarBody } from './avatar.js';
 // Where a part is stored lives beside what a generic memory door answers for one (utils/own-door-keys.ts).
 import { DESIGN_BOOK_PART_PREFIX as PART_KEY_PREFIX } from '../../utils/own-door-keys.js';
@@ -144,6 +147,7 @@ export interface DesignBookPart {
       viewports?: Array<{
         viewport: string; overflow_px: number; units_rendered: number; controls_below_touch_min: number;
         ambient_layers?: number; ambient_painted?: number; fx_applied?: number; fx_running?: number;
+        ornaments_drawn?: number;
       }>;
     };
   };
@@ -480,6 +484,8 @@ export class DesignBookService {
     snippet?: ReturnType<typeof componentSnippet>;
     /** An avatar only: the SVG and how to make it the agent's own. */
     avatar?: ReturnType<typeof avatarPartSnippet>;
+    /** An ornament only: the one line that puts it on an element. */
+    ornament?: ReturnType<typeof ornamentSnippet>;
   }> {
     const record = await this.findRecord(id);
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
@@ -503,6 +509,12 @@ export class DesignBookService {
     // An AVATAR belongs to an agent, not to an app: taking one answers the SVG and writes nothing.
     if (part.kind === 'avatar') {
       return { id, filename, version: record.version, replaced_version: null, kind: part.kind, avatar: avatarPartSnippet(part.body as unknown as AvatarBody) };
+    }
+    // An ORNAMENT lives in the app's own code, on the element the app chooses: like a component it
+    // is taken before or after the app exists, writes nothing, and answers the line to call.
+    if (part.kind === 'ornament') {
+      await this.countUse(id, `${localAccountName(callerGaii)}/${filename}`, true);
+      return { id, filename, version: record.version, replaced_version: null, kind: part.kind, ornament: ornamentSnippet(part.body as unknown as OrnamentBody) };
     }
 
     const apps = new AppUiService(this.storage, this.config);
