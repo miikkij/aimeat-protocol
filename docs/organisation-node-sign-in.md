@@ -345,7 +345,9 @@ that names the deactivation, and none of them is deleted. Reactivation lets the 
 without resurrecting the old credentials, and the waiting work runs again at its next time. The same state is behind the operator's manual
 Deactivate button on the Owners tab. A connection may only touch accounts it manages
 (`managedBy`), it can never deactivate an operator-role account, and it may ADOPT an existing
-account only when that account's locally verified email is in the connection's own domains. The
+account only when that account's locally verified email is in the connection's own domains. When
+an adopted account has two-step sign-in, the person's first SAML sign-in into it asks their code
+once; the sign-ins after that open the account without it. The
 same fence holds for an account the connection creates, by SCIM or at a first SAML sign-in: its
 address is recorded as verified only when it is in the connection's domains. A guest whose address
 is elsewhere gets an account without a verified address, and confirms the address later the way any

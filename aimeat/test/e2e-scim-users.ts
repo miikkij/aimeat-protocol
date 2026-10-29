@@ -12,6 +12,9 @@
  *   binding adds exactly a membership.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=scim-users
  * @version-history
+ *   2026-10-29 — The directory adopts a local account with two-step sign-in: the first SAML sign-in
+ *     asks the code once, the next opens without it; an adopted account without it signs in as before
+ *     (secaudit2026oct26 round 8c, adoption-skips-second-factor).
  *   v1.2.0 — 2026-10-09 — A replayed SCIM token mint (same Idempotency-Key) is answered 409
  *     IDEMPOTENCY_RESULT_UNAVAILABLE and never carries the token again (secrets audit 2026-10-09, 1.8).
  *   v1.1.0 — 2026-09-04 — Clears the SSO flags before its first assertion. It builds connections
@@ -21,6 +24,8 @@
  */
 import { buildSamlResponse, buildIdpMetadataXml, requestIdFromAuthorizeUrl } from './helpers/fake-saml-idp.js';
 import { requireCleanSsoState } from './helpers/sso-state.js';
+import { markEmailVerified } from './helpers/verified-email.js';
+import { TOTP, Secret } from 'otpauth';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -72,6 +77,47 @@ async function scim(token: string, method: string, path: string, body?: unknown,
     });
     const text = await res.text();
     return { status: res.status, body: text ? JSON.parse(text) : null };
+}
+
+/** A live `name=value` pair; a clearing header (empty value) does not count. */
+const liveCookie = (setCookie: string[], name: string): string | null => {
+    for (const c of setCookie) {
+        const pair = c.split(';')[0];
+        if (pair.startsWith(name + '=') && pair.length > name.length + 1) return pair;
+    }
+    return null;
+};
+
+/** The code an authenticator app shows now for this secret. */
+const totpAt = (secret: string): string =>
+    new TOTP({ secret: Secret.fromBase32(secret), algorithm: 'SHA1', digits: 6, period: 30 }).generate({ timestamp: Date.now() });
+
+/** Arm two-step sign-in on the account the token is for, and return its base32 secret. */
+async function armTotp(token: string): Promise<string> {
+    const setup = await json('/v1/ghii/totp/setup', { method: 'POST', headers: bearer(token), body: '{}' });
+    assert(setup.status === 200, `totp setup ${setup.status}: ${JSON.stringify(setup.body?.error)}`);
+    const secret = setup.body.data.totp_secret as string;
+    const verify = await json('/v1/ghii/totp/verify', { method: 'POST', headers: bearer(token), body: JSON.stringify({ code: totpAt(secret) }) });
+    assert(verify.status === 200, `totp verify ${verify.status}: ${JSON.stringify(verify.body?.error)}`);
+    return secret;
+}
+
+/** One SP-initiated SAML round on CONN for this NameID; the ACS answer without following it. */
+async function samlSignIn(nameId: string) {
+    const authz = await fetch(`${BASE}/v1/ghii/login/saml/${CONN}?redirect=/`, { redirect: 'manual' });
+    await authz.body?.cancel();
+    const location = authz.headers.get('location')!;
+    const resp = buildSamlResponse({
+        acsUrl: `${BASE}/v1/ghii/login/saml/${CONN}/acs`, audience: `${BASE}/v1/sso/${CONN}/metadata`,
+        inResponseTo: requestIdFromAuthorizeUrl(location), nameId,
+    });
+    const acs = await fetch(`${BASE}/v1/ghii/login/saml/${CONN}/acs`, {
+        method: 'POST', redirect: 'manual',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ SAMLResponse: resp, RelayState: new URL(location).searchParams.get('RelayState')! }).toString(),
+    });
+    await acs.body?.cancel();
+    return { status: acs.status, location: acs.headers.get('location') ?? '', setCookie: acs.headers.getSetCookie?.() ?? [] };
 }
 
 console.log('\n=== SCIM provisioning over live HTTP (BR-04) ===\n');
@@ -234,6 +280,56 @@ async function run() {
         assert(r.status === 200 && r.body.active === true, `patch ${r.status}`);
         const stillDead = await json('/v1/memory?limit=1', { headers: bearer(userAccessToken) });
         assert(stillDead.status === 401, `old token must stay dead, got ${stillDead.status}`);
+    });
+
+    // secaudit2026oct26 round 8c (scim-users.ts createUser adoption-skips-second-factor): the directory
+    // adopts a local account that has two-step sign-in. The first organisation sign-in into it asks
+    // the person's code once; the sign-ins after it open the account without the code, as before.
+    await test('an adopted account with two-step sign-in: the first SAML sign-in asks the code once', async () => {
+        const local = await setupOwner('tf');
+        const email = `${local.owner}@contoso.com`;
+        await markEmailVerified(local.owner, email);
+        const secret = await armTotp(local.ownerToken);
+        const nameId = `objectid-${local.owner}`;
+        const adopt = await scim(scimToken, 'POST', '/Users', {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            userName: email, externalId: nameId, active: true, emails: [{ value: email, primary: true }],
+        });
+        assert(adopt.status === 201 && adopt.body.id === local.owner, `adoption ${adopt.status}: ${JSON.stringify(adopt.body)}`);
+
+        const first = await samlSignIn(nameId);
+        assert(first.status === 302 && first.location.endsWith('/?auth_step=second_factor'), `expected the code step, got ${first.status} ${first.location}`);
+        assert(!liveCookie(first.setCookie, 'aimeat_rt'), 'the adoption alone must not set the refresh cookie');
+        const ticket = liveCookie(first.setCookie, 'aimeat_link_2fa');
+        assert(!!ticket, `a code-step ticket cookie: ${first.setCookie.join(' | ')}`);
+
+        const res = await fetch(`${BASE}/v1/ghii/magic-link/second-factor`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: ticket! },
+            body: JSON.stringify({ totp_code: totpAt(secret) }),
+        });
+        const body = await res.json() as any;
+        assert(res.status === 200, `the right code: ${res.status} ${JSON.stringify(body?.error)}`);
+        assert(!!liveCookie(res.headers.getSetCookie(), 'aimeat_rt'), 'the right code sets the refresh cookie');
+
+        const next = await samlSignIn(nameId);
+        assert(next.status === 302 && !next.location.includes('auth_step') && !next.location.includes('auth_error'), `the next sign-in opens without the code: ${next.status} ${next.location}`);
+        assert(!!liveCookie(next.setCookie, 'aimeat_rt'), 'session cookie on the next sign-in');
+    });
+
+    await test('usage: an adopted account without two-step sign-in signs in through SAML as before', async () => {
+        const local = await setupOwner('plain');
+        const email = `${local.owner}@contoso.com`;
+        await markEmailVerified(local.owner, email);
+        const nameId = `objectid-${local.owner}`;
+        const adopt = await scim(scimToken, 'POST', '/Users', {
+            schemas: ['urn:ietf:params:scim:schemas:core:2.0:User'],
+            userName: email, externalId: nameId, active: true, emails: [{ value: email, primary: true }],
+        });
+        assert(adopt.status === 201 && adopt.body.id === local.owner, `adoption ${adopt.status}: ${JSON.stringify(adopt.body)}`);
+        const first = await samlSignIn(nameId);
+        assert(first.status === 302 && !first.location.includes('auth_step') && !first.location.includes('auth_error') && !first.location.includes('aimeat_signup'),
+            `straight in: ${first.status} ${first.location}`);
+        assert(!!liveCookie(first.setCookie, 'aimeat_rt'), 'session cookie on the first sign-in');
     });
 
     await test('a colliding foreign-domain email answers 409 uniqueness', async () => {
