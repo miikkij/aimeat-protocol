@@ -15,6 +15,9 @@
  *       split against someone else's revenue, and cannot release someone else's obligation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=beneficiary-split
  * @version-history
+ *   v1.3.0 — 2026-10-29 — A payout whose settle did not answer is held, listed only for the operator, and
+ *     marked arrived with a reference: the share reads paid and both parties are told (secaudit2026oct26
+ *     round 8c).
  *   v1.2.0 — 2026-10-12 — Node 4.0.0 refuses the 3.x morsel price fields (MORSEL_PRICE_REMOVED): the
  *     paced action states `tollMorsels` instead of `commercial.payMorsels`, and the chain tool drops its
  *     `price: { morsels: 0 }`, which said nothing. Both forms are accepted by 3.x too.
@@ -785,6 +788,63 @@ await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () =>
   const q = await json('/v1/commerce/beneficiary/payout?beneficiary=' + encodeURIComponent(gamma.ghii), { headers: auth(stranger.token) });
   assert(q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
   assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
+});
+
+// ── A payout whose settlement did not answer, marked arrived by the operator (round 8c) ──────
+// The x402 test double settles a nonce with this prefix and then throws, as a /settle whose answer
+// never came back (commerce/x402-facilitator.ts X402_TEST_UNANSWERED_NONCE_PREFIX).
+const UNANSWERED_NONCE = '0xdead5e771e' + Date.now().toString(16).padStart(54, '0');
+
+await test('POSSIBLE PAYOUT: an unanswered settle is held, and only an operator lists it', async () => {
+  const r = await invoke(consumer.token, 'paid');
+  assert(r.status === 200, `money call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const list = await obligations(provider.token);
+  const entry = list.body.data.entries.find((e: any) => e.beneficiary === gamma.ghii && e.status === 'accrued');
+  assert(!!entry, 'a new accrued share to gamma');
+  const rel = await json('/v1/commerce/beneficiary/release', {
+    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ tracking_code: entry.tracking_code, beneficiary: gamma.ghii }),
+  });
+  assert(rel.status === 200, `release ${rel.status}: ${JSON.stringify(rel.body?.error)}`);
+  const q = await payoutQuote(provider.token, gamma.ghii);
+  assert(q.body.data.payable === true, `payable: ${JSON.stringify(q.body.data)}`);
+  const pay = signedPayment(q.body.data.accepts[0]);
+  pay.payload.authorization.nonce = UNANSWERED_NONCE;
+  const s = await json('/v1/commerce/beneficiary/payout', {
+    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ beneficiary: gamma.ghii, payment: pay }),
+  });
+  assert(s.status === 502 && s.body?.error?.code === 'X402_SETTLE_UNKNOWN', `expected 502 X402_SETTLE_UNKNOWN, got ${s.status}`);
+
+  const refused = await json('/v1/commerce/beneficiary/possible-payouts', { headers: auth(provider.token) });
+  assert(refused.status === 403, `a provider does not read the node's list: ${refused.status}`);
+  const ops = await json('/v1/commerce/beneficiary/possible-payouts', { headers: auth(operator.token) });
+  assert(ops.status === 200, `operator list ${ops.status}: ${JSON.stringify(ops.body?.error)}`);
+  const held = ops.body.data.possible_payouts.find((p: any) => p.nonce === UNANSWERED_NONCE);
+  assert(!!held && held.provider === provider.ghii && held.beneficiary === gamma.ghii, `held: ${JSON.stringify(ops.body.data)}`);
+});
+
+await test('POSSIBLE PAYOUT: the operator marks it arrived with a reference; the share reads paid and both are told', async () => {
+  const stranger403 = await json('/v1/commerce/beneficiary/possible-payouts/arrived', {
+    method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ provider: provider.ghii, nonce: UNANSWERED_NONCE, reference: '0xfeed' }),
+  });
+  assert(stranger403.status === 403, `a non-operator cannot mark it: ${stranger403.status}`);
+  const r = await json('/v1/commerce/beneficiary/possible-payouts/arrived', {
+    method: 'POST', headers: auth(operator.token), body: JSON.stringify({ provider: provider.ghii, nonce: UNANSWERED_NONCE, reference: '0xfeed' }),
+  });
+  assert(r.status === 200 && r.body.data.arrived === true && r.body.data.entries_paid === 1, `arrived ${r.status}: ${JSON.stringify(r.body)}`);
+  const again = await json('/v1/commerce/beneficiary/possible-payouts/arrived', {
+    method: 'POST', headers: auth(operator.token), body: JSON.stringify({ provider: provider.ghii, nonce: UNANSWERED_NONCE, reference: '0xother' }),
+  });
+  assert(again.status === 409, `a second press changes nothing: ${again.status}`);
+
+  const e = await earnings(gamma.token);
+  const paid = e.body.data.entries.find((x: any) => x.payout_reference === '0xfeed');
+  assert(!!paid && paid.status === 'paid', `the share reads paid with the reference: ${JSON.stringify(e.body.data.entries.map((x: any) => [x.status, x.payout_reference]))}`);
+  const q = await payoutQuote(provider.token, gamma.ghii);
+  assert(q.body.data.reason === 'NOTHING_OWED', `nothing is quoted again: ${q.body.data.reason}`);
+  const gn = await json('/v1/notifications', { headers: auth(gamma.token) });
+  assert((gn.body.data.notifications as any[]).some(n => n.type === 'payout_arrived'), 'the beneficiary was told');
+  const pn = await json('/v1/notifications', { headers: auth(provider.token) });
+  assert((pn.body.data.notifications as any[]).some(n => n.type === 'payout_arrived_provider'), 'the provider was told');
 });
 
 // ── THE ROLE CHAIN: a value chain where nobody dilutes anybody ───────────────
