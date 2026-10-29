@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26; MCP tasks, the ARD manifest and WebMCP on the static front pages on 2026-10-26; input limits and junk refusal on 2026-10-27; an agent keeps all permissions until you narrow it on 2026-10-28; the compliance register's apps that use AI and the data map's regulated data on 2026-10-28; the compliance printout of the whole state on 2026-10-28; the app maker's AI Act answers on 2026-10-28; the A2A directory, the MCP Server Card, generating an app with your AI and the register drafts on the Compliance page on 2026-10-29; your AI fixes your other agents' permissions on 2026-10-29; the app structure page on 2026-10-29; who sees each app's data, the AI Act questions by area and the compliance printout by person on 2026-10-29; files in S3 or Azure Blob storage on 2026-10-29.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26; MCP tasks, the ARD manifest and WebMCP on the static front pages on 2026-10-26; input limits and junk refusal on 2026-10-27; an agent keeps all permissions until you narrow it on 2026-10-28; the compliance register's apps that use AI and the data map's regulated data on 2026-10-28; the compliance printout of the whole state on 2026-10-28; the app maker's AI Act answers on 2026-10-28; the A2A directory, the MCP Server Card, generating an app with your AI and the register drafts on the Compliance page on 2026-10-29; your AI fixes your other agents' permissions on 2026-10-29; the app structure page on 2026-10-29; who sees each app's data, the AI Act questions by area and the compliance printout by person on 2026-10-29; when the AI allowance you bought runs out on 2026-10-29; a node bought from the store speaking to you as a customer on 2026-10-29; files in S3 or Azure Blob storage on 2026-10-29.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -1945,6 +1945,15 @@
      "plain": "OpenAI-compatible proxy Outside agents call the node like an OpenAI endpoint and spend under the node's rules. /v1/llm/chat/completions, /v1/llm/models"
     },
     {
+     "slug": "g-9-when-the-ai-allowance-you-bought-runs-out",
+     "cells": [
+      "<strong>When the AI allowance you bought runs out</strong>",
+      "A node bought from the store keeps the AI allowance you paid for as the spending limit of its own OpenRouter key. The AI page shows what is left of it and says when it runs low. When it is spent, the chat says so in your language before anything else is tried, and offers three ways on: buy more in the store, use your own key, or switch to the free model, which answers less well; the free model takes over only when you choose it. A top-up is seen within a minute, without a restart. Limitation: the node learns the key is spent from its first refused call, so that call fails once.",
+      "<code>GET /v1/chat/status</code> (<code>allowance_remaining_usd</code>, <code>allowance_low</code>), the chat turn's refusal (<code>code: AI_BALANCE_SPENT</code>, <code>choices</code>), <code>PUT /v1/ai/routing</code> (<code>rules.freeModelLastResort</code>); setting <code>site.store_topup_url</code>"
+     ],
+     "plain": "When the AI allowance you bought runs out A node bought from the store keeps the AI allowance you paid for as the spending limit of its own OpenRouter key. The AI page shows what is left of it and says when it runs low. When it is spent, the chat says so in your language before anything else is tried, and offers three ways on: buy more in the store, use your own key, or switch to the free model, which answers less well; the free model takes over only when you choose it. A top-up is seen within a minute, without a restart. Limitation: the node learns the key is spent from its first refused call, so that call fails once. GET /v1/chat/status (allowance_remaining_usd, allowance_low), the chat turn's refusal (code: AI_BALANCE_SPENT, choices), PUT /v1/ai/routing (rules.freeModelLastResort); setting site.store_topup_url"
+    },
+    {
      "slug": "g-9-background-ai-jobs",
      "cells": [
       "<strong>Background AI jobs</strong>",
@@ -3237,6 +3246,15 @@
      "plain": "Home Your own page after sign-in: your status, the door to the chat, your playbooks and what happened. Home"
     },
     {
+     "slug": "g-16-a-node-you-bought-from-the-store-speaks-to-you-as-a-customer",
+     "cells": [
+      "<strong>A node you bought from the store speaks to you as a customer</strong>",
+      "A node the store made for you opens in your language, whatever your browser says, and your first home says welcome with your name, what you bought, three steps to start, a field to say in one sentence what you want done, and links to your orders and invoices and to support. Settings &amp; Controls shows eight places (your shared spaces, memory, agents, connecting your AI, the AI and its allowance, apps, access, and orders and invoices) and the rest behind &quot;Show all tools&quot;, where the node's maintenance is too, not in the top bar. The overview card leaves out the node's address, its federation state, your full identity and the pacing balance; the news on your home are only those for people who use AIMEAT, and none before your AI is connected. The Access page says the password is one the store set, which you do not need because you sign in with an email link. The phone and install suggestions in the chat wait until you have had a conversation. Limitation: a visitor's own language choice wins over the node's.",
+      "settings <code>site.purchase_plan</code>, <code>site.purchase_package</code>, <code>site.default_locale</code>, <code>site.store_orders_url</code> (the store's fleet service sets them)"
+     ],
+     "plain": "A node you bought from the store speaks to you as a customer A node the store made for you opens in your language, whatever your browser says, and your first home says welcome with your name, what you bought, three steps to start, a field to say in one sentence what you want done, and links to your orders and invoices and to support. Settings & Controls shows eight places (your shared spaces, memory, agents, connecting your AI, the AI and its allowance, apps, access, and orders and invoices) and the rest behind \"Show all tools\", where the node's maintenance is too, not in the top bar. The overview card leaves out the node's address, its federation state, your full identity and the pacing balance; the news on your home are only those for people who use AIMEAT, and none before your AI is connected. The Access page says the password is one the store set, which you do not need because you sign in with an email link. The phone and install suggestions in the chat wait until you have had a conversation. Limitation: a visitor's own language choice wins over the node's. settings site.purchase_plan, site.purchase_package, site.default_locale, site.store_orders_url (the store's fleet service sets them)"
+    },
+    {
      "slug": "g-16-settings-controls",
      "cells": [
       "<strong>Settings &amp; Controls</strong>",
@@ -4478,6 +4496,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 454
+  "rows": 456
  }
 }

@@ -13794,8 +13794,11 @@ paths:
       responses:
         '200':
           description: |
-            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, own_key, pays, model, push_devices, note? }`.
+            `{ enabled, agent_name, allowance_remaining_usd, allowance_low, has_own_key, own_key, pays, model, push_devices, note? }`.
             `note` is present only when `enabled` is false, and names what an operator has to set.
+            `allowance_remaining_usd` is the node's own OpenRouter key's remaining limit when that is
+            smaller than the person's allowance (a customer node keeps the balance its owner bought as
+            that limit), and `allowance_low` is true below a tenth of the limit.
             `has_own_key` is true when the owner has a key of their own (the OpenRouter key or a key on
             one of their AI providers). `own_key` is what that key reaches on this node:
             `{ set, covers, not_covered: [{ part, reason }] }`. A part is `node_ai` (apps, scheduled
@@ -13928,6 +13931,14 @@ paths:
         starts and finishes, `{ kind: 'done', stopReason, tokens }` at the end, and
         `{ kind: 'error', message }` when the turn could not run — a node with no agent configured
         answers with exactly that rather than hanging. `:keepalive` comments arrive every 15 s.
+        When the AI gate would refuse the turn (no key, no allowance left, no model), the turn ends
+        before the agent starts with `{ kind: 'error', code, message, settingsUrl }`: `message` is
+        the sentence for the person in their language, and `settingsUrl` opens their AI settings.
+        When the AI allowance the owner bought is spent (code AI_BALANCE_SPENT), it also carries
+        `choices`, the ways on: `{ kind: 'buy', url }` (the store's top-up page, site.store_topup_url),
+        `{ kind: 'own_key', url }`, and `{ kind: 'free_model' }`, which the person takes with
+        PUT /v1/ai/routing `{ routing: { rules: { freeModelLastResort: true } } }`. A turn whose agent
+        met that refusal midway ends with the same event.
 
         The node adds two of its own. `{ kind: 'progress', step, text }` says what the agent is
         doing before it says so itself: `start` within 1.5 s when no words have come, then

@@ -22,6 +22,9 @@
  * @structure
  *   AttemptRecord · AiRoute · classifyFailure · noCreditRetry · runRoute · routeOf
  * @version-history
+ *   v1.3.0 — 2026-10-29 — A key at its spending limit (OpenRouter's 403 in key-limit words) is a
+ *     spent key like a 402: not an `auth` failure, and retried on the free router like one. A spent
+ *     node key is marked (ai/node-key-balance.ts), so the next call is refused before it is made.
  *   v1.2.0 — 2026-10-08 — CONTENT_REFUSAL lives in ./errors.ts, so the failure class and the caller's
  *     answer split a 403 the same way; the class reads the provider's reason when the transport
  *     carried one (aiprov plan, A1).
@@ -36,7 +39,8 @@ import { persistHealth } from './provider-store.js';
 import type { AiCandidate, ChosenBy } from './route-plan.js';
 import type { RoutingRules } from './routing.js';
 import type { AiCapability } from './types.js';
-import { CONTENT_REFUSAL } from './errors.js';
+import { CONTENT_REFUSAL, isNoCreditFailure } from './errors.js';
+import { markNodeKeySpent } from './node-key-balance.js';
 
 export interface AttemptRecord {
   provider: string;
@@ -72,6 +76,8 @@ export function classifyFailure(e: unknown, callerSignal?: AbortSignal): Failure
   const status = typeof err?.status === 'number' ? err.status : undefined;
   if (status === 429) return 'rate_limit';
   if (status !== undefined && status >= 400 && status < 500 && CONTENT_REFUSAL.test(message)) return 'content';
+  // A key at its spending limit is spent, as a 402 is, not refused: its capability is not skipped.
+  if (isNoCreditFailure(e)) return 'bad_request';
   if (status === 401 || status === 403) return 'auth';
   if (status === 503 || status === 529) return 'unavailable';
   if (status !== undefined && status >= 500) return 'server_error';
@@ -104,8 +110,7 @@ export interface RunContext {
  * (the free router is its), and only when the failed attempt was not already on that model.
  */
 export function noCreditRetry(ctx: Pick<RunContext, 'noCreditModel'>, c: AiCandidate, e: unknown): AiCandidate | null {
-  const status = (e as { status?: unknown } | null)?.status;
-  if (status !== 402 || !ctx.noCreditModel) return null;
+  if (!isNoCreditFailure(e) || !ctx.noCreditModel) return null;
   if (c.keyScope === 'node' || c.provider.type !== 'openrouter' || c.model === ctx.noCreditModel) return null;
   return { ...c, model: ctx.noCreditModel, degradedToFree: true, policyChoseModel: false };
 }
@@ -166,6 +171,9 @@ export async function runRoute<T>(
       noteHealth(ctx, c, { error: cls, message: e instanceof Error ? e.message : String(e) });
       attempts.push({ provider: c.provider.id, model: c.model, error: cls, costUsd });
       failed.push({ candidate: c, error: cls, costUsd });
+      // The node's own key at its limit: from now on the planner refuses before calling, with the
+      // person's notice, until the limit is raised (ai/node-key-balance.ts).
+      if (c.keyScope === 'node' && isNoCreditFailure(e)) markNodeKeySpent();
       // A spent key is tried once more on the free router before anything else moves: the same
       // provider, so the owner's fallback rules are not the question.
       const retry = noCreditRetry(ctx, c, e);

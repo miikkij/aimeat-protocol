@@ -4,7 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
- *   v1.28.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
+ *   v1.29.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
+ *   v1.28.0 -- 2026-10-29 -- CUSTOMER_TAB_IDS: the menu on a node the store made for a buyer, the eight Jouni chose (UX review 2026-10-29, C). On such a node the profile card shows no node address, federation state, full identity, presence or pacer balance, and says "Your AI is connected" for MCP connected.
  *   v1.27.0 -- 2026-10-25 -- "Goals" under Automation, after Agents: the agents' goals and their rules.
  *   v1.26.0 -- 2026-10-24 -- "Agreements" under Account, after What others can see: the data processing agreements a person is the counterparty of (plan doc-mvmr4i2wdk0p).
  *   v1.26.0 -- 2026-10-19 -- The Agents card's rows show the agent's own picture (components/AgentAvatar.js) in place of the robot sign, when the agent has set one.
@@ -67,6 +68,7 @@ const html = htm.bind(h);
 import { t } from "/js/i18n.js";
 import { fmtMoney } from "/js/utils.js";
 import { getNodeUrl } from "/js/services/auth.js";
+import { customerNode } from "/js/site.js";
 import { listAgents } from "/js/services/agents.js";
 import { listAllSchedules } from "/js/services/schedules.js";
 import * as orgService from "/js/services/organisms.js";
@@ -489,7 +491,8 @@ function McpConnectedBadge() {
     return () => { cancelled = true; };
   }, []);
   if (!proven) return null;
-  return html`<${Mark} tone="sun" live>${t('profile.mcpConnected') || 'MCP connected'}<//>`;
+  // A buyer never met the protocol's name: the same fact in their words (UX review 2026-10-29, C).
+  return html`<${Mark} tone="sun" live>${customerNode() ? t('profile.aiConnected') : (t('profile.mcpConnected') || 'MCP connected')}<//>`;
 }
 
 export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
@@ -501,7 +504,10 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
 
   // Stats are NAVIGATION, not decoration — each one opens its own section.
   const stat = (icon, val, labelKey, tabId, fine) => ({ key: labelKey, icon, n: val, label: t(labelKey), onOpen: () => switchTab?.(tabId), fine });
-  const hasMorsels = stats.balance != null && stats.balance !== '-' && stats.balance > 0;
+  // On a customer's node the card speaks the buyer's words (UX review 2026-10-29, C): no node address,
+  // no federation state, no full identity with the node's id, no presence and no pacer balance.
+  const customer = customerNode();
+  const hasMorsels = !customer && stats.balance != null && stats.balance !== '-' && stats.balance > 0;
   const band = isNew ? [
     stats.memory > 0 && stat('\u{1F9E0}', stats.memory, 'profile.stats.memories', 'memory'),
     hasMorsels && stat('\u{1F48E}', stats.balance, 'profile.stats.morsels', 'wallet', true),
@@ -516,18 +522,18 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
 
   return html`
     <${Masthead} avatarSvg=${avatarSvg} name=${session.displayName || session.owner}
-      identity=${session.ghii || ''}
+      identity=${customer ? '' : session.ghii || ''}
       identityTitle=${t('home.identityHint')}
       onAvatar=${() => onEditProfile?.()} avatarTitle=${t('profile.landing.editProfile')}
       plate=${html`
-        <${Note} kind="meta" mono>${t('profile.node')}: ${NODE_URL}<//>
+        ${!customer && html`<${Note} kind="meta" mono>${t('profile.node')}: ${NODE_URL}<//>`}
         <${Space} above="small"><${Marks}>
           <${McpConnectedBadge} />
-          ${federated
+          ${customer ? null : federated
             ? html`<${Mark} live>${t('profile.federation.statusConnected').replace('{count}', String(stats.nodes))}<//>`
             : html`<${Mark}>${t('profile.federation.statusStandalone')}<//>`}
         <//><//>`}>
-      <${PresencePill} />
+      ${!customer && html`<${PresencePill} />`}
       <${Action} onClick=${() => setInstrOpen(true)}
         title=${t('setup.instrBtnHint') || 'The block to paste into your AI chat’s instructions, and where it goes in your tool'}>
         ${t('setup.instrBtn') || 'AI chat instructions'}<//>
@@ -694,6 +700,15 @@ export const BASIC_TAB_IDS = new Set([
   'apps', 'packages', 'portfolio',              // what you made, and the apps you get
   'wallet', 'access', 'exposure',               // account
 ]);
+
+/**
+ * The menu on a customer's node (one the store made for a buyer, site.js customerNode()): seven
+ * places plus Orders and invoices, which the menu adds as a link to the store. Jouni chose it on
+ * 2026-10-29 from the UX review of the first purchase ("Karsittu, 8 kohtaa"): the shared spaces,
+ * memory, agents, connecting their AI, the AI and its allowance, apps, and access. Everything else
+ * is one "Show all tools" toggle away, as in the basic menu.
+ */
+export const CUSTOMER_TAB_IDS = new Set(['organisms', 'memory', 'agents', 'mcp', 'ai', 'apps', 'access']);
 
 // Flat item lookup (pinned section renders items by id).
 export const SIDEBAR_ITEM_BY_ID = Object.fromEntries(SIDEBAR_GROUPS.flatMap(g => g.items.map(it => [it.id, it])));
