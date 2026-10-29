@@ -267,6 +267,114 @@
         "closed": "Cerrada"
       }
     },
+    "fileStores": {
+      "title": "Almacenamiento de archivos",
+      "lead": "El contenido de cada archivo guardado está en un solo lugar: en la base de datos de este servidor, en un bucket de S3 o en un contenedor de Azure Blob. Las personas también pueden conectar su propio almacenamiento si tu regla lo permite. En esta página ves adónde van los archivos nuevos, cuántos archivos hay en cada lugar y quiénes guardan sus archivos en su propio almacenamiento.",
+      "loadFailed": "No se pudo leer el almacenamiento de archivos. Vuelve a cargar la página para intentarlo de nuevo.",
+      "toConfig": "Cambiar en la página Configuración →",
+      "strip": {
+        "database": "En la base de datos",
+        "node": "En el almacenamiento del servidor",
+        "own": "En el almacenamiento propio de las personas",
+        "waiting": "Te esperan",
+        "waitingSub": "solicitudes de almacenamiento propio"
+      },
+      "place": {
+        "title": "Adónde van los archivos nuevos",
+        "leadDatabase": "El contenido de los archivos nuevos se guarda en la base de datos de este servidor. Para guardarlo en un bucket de S3 o en un contenedor de Azure Blob, elige el almacenamiento en la página Configuración. Las claves van solo en variables de entorno.",
+        "leadStore": "El contenido de los archivos nuevos se guarda en el almacenamiento de abajo. Los archivos escritos antes del cambio se quedan donde están y se siguen leyendo desde allí. Prueba la conexión antes de mover archivos más antiguos.",
+        "kind": "Almacenamiento",
+        "where": "Dirección",
+        "notYet": "Sin definir",
+        "folder": "Carpeta",
+        "state": "Ajustes",
+        "ready": "Completos",
+        "incomplete": "Incompletos",
+        "missingSub": "Hasta que se definan, los archivos nuevos se quedan en la base de datos.",
+        "missing": "Faltan",
+        "test": "Probar la conexión",
+        "testing": "Probando…",
+        "testHint": "Escribe un archivo de prueba pequeño en la carpeta, lo lee, lo busca en la lista y lo elimina.",
+        "testOk": "Todos los pasos de la prueba pasaron para el {where}.",
+        "testFailed": "La prueba no pasó para el {where}. El paso que falló dice por qué."
+      },
+      "move": {
+        "title": "Archivos en la base de datos",
+        "lead": "Los archivos más antiguos pueden quedarse en la base de datos, o puedes sacarlos. Si el propietario de un archivo tiene un almacenamiento propio aprobado, el archivo va allí. Los demás archivos van al almacenamiento del servidor. Para quienes usan los archivos nada cambia: el propietario, quién puede leerlos y la cuota siguen iguales.",
+        "colPlace": "Lugar",
+        "colFiles": "Archivos",
+        "colSize": "Tamaño",
+        "place": {
+          "database": "Base de datos",
+          "databaseSub": "La base de datos propia de este servidor",
+          "node": "El almacenamiento del servidor",
+          "nodeSub": "El bucket de S3 o el contenedor de Azure elegido en la página Configuración",
+          "own": "El almacenamiento propio de las personas",
+          "ownSub": "Buckets y contenedores que las personas conectaron con sus propias claves"
+        },
+        "start": "Mover archivos de la base de datos",
+        "stop": "Detener después de este lote",
+        "hint": "Mueve 100 archivos a la vez hasta que no quede ninguno. Deja esta página abierta mientras tanto.",
+        "needStore": "Primero elige el almacenamiento del servidor. Los archivos solo pueden salir de la base de datos cuando tienen un lugar adónde ir.",
+        "nothing": "No quedan archivos en la base de datos.",
+        "progress": "Moviendo: {moved} archivos movidos ({size}), {remaining} siguen en la base de datos.",
+        "done": "{moved} archivos movidos ({size}). {remaining} siguen en la base de datos.",
+        "failedCount": "No se pudieron mover {n} archivos. Se quedan en la base de datos y se siguen leyendo desde allí. Presiona el botón otra vez para intentarlo de nuevo."
+      },
+      "owners": {
+        "title": "Almacenamiento propio de las personas",
+        "lead": "Una persona puede conectar su propio bucket de S3 o contenedor de Azure con sus propias claves. Sus archivos van entonces allí y no cuentan en la cuota de almacenamiento de este servidor. Tu regla en la página Configuración decide quién puede hacerlo.",
+        "rule": "Regla",
+        "mode": {
+          "self": "Todos pueden conectar su propio almacenamiento.",
+          "operator": "Un operador aprueba primero a cada persona. Los demás pueden pedirlo.",
+          "off": "Nadie puede conectar su propio almacenamiento. Un almacenamiento ya conectado no recibe archivos nuevos."
+        },
+        "auto": "El ajuste es Automático: un operador aprueba cuando este servidor muestra su contenido solo a cuentas con sesión iniciada; si no, todos pueden.",
+        "waitingTitle": "Esperan tu decisión ({n})",
+        "noneWaiting": "Nadie espera una decisión.",
+        "asked": "Pedido",
+        "reason": "Motivo",
+        "noReason": "Sin motivo",
+        "where": "Almacenamiento",
+        "checked": "Probado el {date}",
+        "approve": "Aprobar",
+        "decline": "Rechazar",
+        "declineAsk": "Los archivos nuevos de {owner} se quedan en este servidor. Dile por qué: lee tu nota.",
+        "declineNote": "Tu nota para la persona",
+        "declineNow": "Rechazar",
+        "revoke": "Retirar",
+        "revokeAsk": "El almacenamiento de {owner} deja de recibir archivos nuevos. Los archivos que ya están allí se quedan y se siguen leyendo. Dile por qué: lee tu nota.",
+        "revokeNote": "Tu nota para la persona",
+        "revokeNow": "Retirar la aprobación",
+        "noteHint": "La persona la lee en sus notificaciones.",
+        "noteNeeded": "Escribe una nota de 3 caracteres o más.",
+        "cancel": "Cancelar",
+        "noneConnected": "Nadie ha conectado su propio almacenamiento.",
+        "colWho": "Persona",
+        "colCheck": "Última prueba",
+        "colState": "Aprobación",
+        "since": "Conectado el {date}",
+        "checkOk": "Pasó el {date}",
+        "checkFailed": "Falló el {date}: {message}",
+        "notChecked": "Aún sin probar",
+        "state": {
+          "approved": "Aprobado",
+          "requested": "En espera",
+          "declined": "No aprobado",
+          "none": "Sin decisión"
+        },
+        "done": {
+          "approve": "Aprobado. Los archivos nuevos de {owner} van ahora a su propio almacenamiento.",
+          "decline": "Rechazado. {owner} recibe tu nota.",
+          "revoke": "Aprobación retirada. {owner} recibe tu nota."
+        }
+      },
+      "ai": {
+        "title": "Tu propia IA también puede hacerlo.",
+        "text": "Lee los mismos datos, prueba el almacenamiento, mueve los archivos y decide las solicitudes con estas herramientas:"
+      }
+    },
     "security": {
       "title": "Seguridad",
       "intro": "Las solicitudes que este servidor rechazó, lo que rechazó y guardó para que lo mires, y los ajustes que deciden ambas cosas. Cada cifra cubre las últimas 24 horas, salvo que su fila diga que cuenta desde el reinicio.",
@@ -11690,6 +11798,45 @@
     "cfgGroup_features": "Funciones",
     "cfgGroup_work": "Trabajo",
     "cfgGroup_quota": "Cuotas",
+    "cfgGroup_file_store": "Almacenamiento de archivos",
+    "cfg_file_store_kind": "Dónde se guarda el contenido de los archivos",
+    "cfgDesc_file_store_kind": "Dónde se guarda el contenido de un archivo nuevo: en la base de datos de este servidor, en un bucket de S3 o en un contenedor de Azure Blob. Un archivo escrito antes de un cambio se queda donde se escribió y se sigue leyendo desde allí. La página Almacenamiento de archivos mueve los archivos más antiguos. El propietario, quién puede leer el archivo y la cuota siguen iguales, esté donde esté el contenido.",
+    "cfgOpt_file_store_kind_database": "La base de datos de este servidor",
+    "cfgOpt_file_store_kind_s3": "Un bucket de S3",
+    "cfgOpt_file_store_kind_azure": "Un contenedor de Azure Blob",
+    "cfg_file_store_prefix": "Carpeta en el almacenamiento",
+    "cfgDesc_file_store_prefix": "La carpeta del bucket o contenedor adonde van los archivos de este servidor. Vacía: aimeat/<id del servidor>/files. Da a cada servidor su propia carpeta si comparten un bucket: la limpieza diaria elimina de esta carpeta los objetos que ningún archivo de este servidor nombra.",
+    "cfg_file_store_s3_endpoint": "Dirección de S3",
+    "cfgDesc_file_store_s3_endpoint": "La dirección del servicio S3, por ejemplo https://<account>.r2.cloudflarestorage.com. Vacía para Amazon S3, al que se llega entonces por la región.",
+    "cfg_file_store_s3_region": "Región de S3",
+    "cfgDesc_file_store_s3_region": "La región de S3, por ejemplo eu-north-1. Cloudflare R2 usa auto. La mayoría de los demás servicios aceptan us-east-1.",
+    "cfg_file_store_s3_bucket": "Bucket de S3",
+    "cfgDesc_file_store_s3_bucket": "El bucket de S3 adonde van los archivos. El servidor no lo crea: créalo primero, privado y sin acceso público.",
+    "cfg_file_store_s3_addressing": "Cómo la dirección de S3 nombra el bucket",
+    "cfgDesc_file_store_s3_addressing": "En la ruta: <dirección>/<bucket>/<archivo>. En el nombre del host: <bucket>.<dirección>/<archivo>. Automático: en la ruta cuando hay una dirección, en el nombre del host para Amazon S3.",
+    "cfgOpt_file_store_s3_addressing_auto": "Automático",
+    "cfgOpt_file_store_s3_addressing_path": "En la ruta",
+    "cfgOpt_file_store_s3_addressing_host": "En el nombre del host",
+    "cfg_file_store_s3_access_key_id_configured": "¿ID de clave de acceso de S3 definido?",
+    "cfgDesc_file_store_s3_access_key_id_configured": "Si el ID de clave de acceso de S3 está definido en la variable de entorno AIMEAT_FILE_STORE_S3_ACCESS_KEY_ID. Solo lectura; el valor nunca se muestra.",
+    "cfg_file_store_s3_secret_access_key_configured": "¿Clave de acceso secreta de S3 definida?",
+    "cfgDesc_file_store_s3_secret_access_key_configured": "Si la clave de acceso secreta de S3 está definida en la variable de entorno AIMEAT_FILE_STORE_S3_SECRET_ACCESS_KEY. La clave debe poder leer, escribir, eliminar y listar en el bucket. Solo lectura; el valor nunca se muestra.",
+    "cfg_file_store_azure_account": "Cuenta de almacenamiento de Azure",
+    "cfgDesc_file_store_azure_account": "El nombre de la cuenta de almacenamiento de Azure. Puede quedar vacío si la clave es una cadena de conexión o una URL SAS, porque nombran la cuenta.",
+    "cfg_file_store_azure_container": "Contenedor de Azure",
+    "cfgDesc_file_store_azure_container": "El contenedor de Azure Blob adonde van los archivos. El servidor no lo crea: créalo primero, privado. Puede quedar vacío si la clave es una URL SAS del contenedor.",
+    "cfg_file_store_azure_endpoint": "Dirección de Azure (solo pruebas)",
+    "cfgDesc_file_store_azure_endpoint": "La dirección del servicio blob. Vacía para Azure. Defínela solo para una prueba con Azurite, por ejemplo http://127.0.0.1:10000/devstoreaccount1.",
+    "cfg_file_store_azure_credential_configured": "¿Clave de Azure definida?",
+    "cfgDesc_file_store_azure_credential_configured": "Si la clave de Azure está definida en la variable de entorno AIMEAT_FILE_STORE_AZURE_CREDENTIAL: la clave de la cuenta de almacenamiento, la cadena de conexión de la cuenta o una URL SAS del contenedor con permisos de lectura, adición, creación, escritura, eliminación y listado. Solo lectura; el valor nunca se muestra.",
+    "cfg_file_store_owner_stores": "Almacenamiento propio de las personas",
+    "cfgDesc_file_store_owner_stores": "Si una persona puede conectar su propio bucket de S3 o contenedor de Azure con sus propias claves. Sus archivos van entonces allí y no cuentan en la cuota de almacenamiento de este servidor.",
+    "cfgOpt_file_store_owner_stores_auto": "Automático",
+    "cfgOpt_file_store_owner_stores_off": "Nadie",
+    "cfgOpt_file_store_owner_stores_operator": "Un operador aprueba a cada persona",
+    "cfgOpt_file_store_owner_stores_self": "Todos pueden",
+    "cfg_file_store_owner_private_origins": "Direcciones privadas para el almacenamiento propio",
+    "cfgDesc_file_store_owner_private_origins": "Direcciones de una red privada donde puede estar el almacenamiento propio de una persona, cada una un origen exacto como http://10.0.5.20:9000, una por línea. Para una empresa cuyo servicio S3 funciona dentro de su propia red. Vacío: el almacenamiento de una persona debe estar en una dirección https pública.",
     "cfgGroup_federation": "Federación",
     "cfgGroup_rate_limits": "Límites de frecuencia",
     "cfgGroup_email": "Correo",
@@ -16390,6 +16537,29 @@
       "saveError": "No se pudo actualizar la presencia"
     }
   },
+  "fileStore": {
+    "kind": {
+      "database": "Base de datos",
+      "s3": "Bucket de S3",
+      "azure": "Contenedor de Azure Blob"
+    },
+    "place": {
+      "s3": "bucket de S3 \"{name}\" en {at}",
+      "s3Amazon": "bucket de S3 \"{name}\" en Amazon S3",
+      "azure": "contenedor de Azure \"{name}\" en la cuenta {at}",
+      "azureBare": "contenedor de Azure \"{name}\""
+    },
+    "step": {
+      "write": "Escribir un archivo de prueba",
+      "read": "Leerlo",
+      "read_part": "Leer una parte",
+      "list": "Encontrarlo en la lista",
+      "remove": "Eliminarlo"
+    },
+    "stepOk": "Pasó",
+    "stepFailed": "Falló",
+    "noAnswer": "El almacenamiento no respondió."
+  },
   "profile": {
     "title": "Mi perfil",
     "subtitle": "Perfil",
@@ -16464,7 +16634,116 @@
       "usage": "Uso",
       "visibility": "Visibilidad",
       "companies": "Empresas",
-      "fleet": "Estado de los agentes"
+      "fleet": "Estado de los agentes",
+      "storage": "Almacenamiento propio"
+    },
+    "storage": {
+      "title": "Tu propio almacenamiento",
+      "desc": "Guarda tus archivos en tu propio bucket de S3 o contenedor de Azure, con tus propias claves. Así tus archivos están en un lugar que tú controlas y no ocupan espacio de este servicio.",
+      "loading": "Cargando tu almacenamiento…",
+      "strip": {
+        "own": "En tu propio almacenamiento",
+        "elsewhere": "En este servicio"
+      },
+      "rule": {
+        "title": "Cómo funciona aquí",
+        "mode": {
+          "self": "Aquí puedes conectar tu propio almacenamiento cuando quieras. Los archivos nuevos van allí apenas pasa la prueba de conexión.",
+          "operator": "Aquí un operador aprueba primero a cada persona. Conecta tu almacenamiento y di por qué. Los archivos nuevos van allí cuando un operador lo aprueba.",
+          "off": "Quienes gestionan este servicio no permiten conectar un almacenamiento propio aquí. Tus archivos se quedan en este servicio."
+        },
+        "approval": "Tu aprobación",
+        "state": {
+          "approved": "Aprobado",
+          "requested": "Esperando a un operador",
+          "declined": "No aprobado",
+          "none": "Aún no lo pediste"
+        },
+        "noneSub": "Conecta tu almacenamiento abajo para pedirlo."
+      },
+      "store": {
+        "title": "Tu almacenamiento",
+        "none": "No has conectado un almacenamiento propio. Tus {n} archivos ({size}) están en este servicio.",
+        "where": "Dónde",
+        "folder": "Carpeta",
+        "since": "Conectado",
+        "byYou": "por ti",
+        "byAgent": "por tu agente {agent}",
+        "check": "Última prueba",
+        "checkOk": "Pasó el {when}",
+        "checkFailed": "Falló el {when}: {message}",
+        "notChecked": "Aún sin probar",
+        "newFiles": "Archivos nuevos",
+        "taking": "Van a tu almacenamiento",
+        "notTaking": "Se quedan en este servicio",
+        "takingSub": "Cada archivo que tú o tus agentes guarden de ahora en adelante va a tu almacenamiento.",
+        "notTakingWaiting": "Un operador aún no aprobó tu almacenamiento. Recibes una notificación cuando decida.",
+        "notTakingDeclined": "Un operador no aprobó tu almacenamiento. Su nota está arriba.",
+        "notTakingOff": "Quienes gestionan este servicio desactivaron el almacenamiento propio. Mueve tus archivos de vuelta y luego desconecta.",
+        "notTakingOther": "No se puede llegar a tu almacenamiento con las claves que diste. Conéctalo otra vez abajo con claves nuevas.",
+        "inOwn": "En tu almacenamiento",
+        "elsewhere": "En este servicio",
+        "elsewhereSub": "Archivos guardados antes de conectar, o mientras los archivos nuevos no iban a tu almacenamiento.",
+        "files": "{n} archivos, {size}",
+        "disconnect": "Desconectar",
+        "disconnectHint": "Al desconectar, tus claves se eliminan de este servicio. Tu bucket o contenedor y lo que tiene se quedan como están.",
+        "disconnectFirst": "{n} de tus archivos están en tu almacenamiento. Primero muévelos de vuelta a este servicio. Después puedes desconectar.",
+        "disconnectAsk": "¿Desconectar el {where}? Después, los archivos nuevos se quedan en este servicio y tus claves se eliminan de aquí.",
+        "disconnected": "Tu almacenamiento está desconectado."
+      },
+      "move": {
+        "own": "Mover mis archivos aquí",
+        "home": "Devolver mis archivos a este servicio",
+        "stop": "Detener después de este lote",
+        "progress": "Moviendo: {moved} archivos movidos, quedan {remaining}.",
+        "done": "{moved} archivos movidos. Quedan {remaining}.",
+        "failedCount": "No se pudieron mover {n} archivos. Se quedan donde estaban y puedes seguir abriéndolos. Inténtalo más tarde."
+      },
+      "connect": {
+        "title": "Conecta tu almacenamiento",
+        "titleReplace": "Conecta otro almacenamiento"
+      },
+      "form": {
+        "lead": "La conexión se prueba antes de guardar nada: se escribe un archivo pequeño, se lee, se busca en la lista y se elimina. Crea primero el bucket o contenedor, privado y sin acceso público.",
+        "leadReplace": "Puedes dar claves nuevas para el mismo almacenamiento cuando quieras. Para usar otro bucket o contenedor, primero devuelve tus archivos a este servicio.",
+        "kind": "Dónde está tu almacenamiento",
+        "kindS3": "Bucket de S3",
+        "kindAzure": "Contenedor de Azure Blob",
+        "endpoint": "Dirección",
+        "endpointHint": "Déjala vacía para Amazon S3. Para otro servicio, su dirección de S3, por ejemplo https://<account>.r2.cloudflarestorage.com.",
+        "region": "Región",
+        "regionHint": "Por ejemplo eu-north-1. Cloudflare R2 usa auto. Vacía: us-east-1.",
+        "bucket": "Bucket",
+        "bucketHint": "El nombre de un bucket que creaste para estos archivos.",
+        "keyId": "ID de clave de acceso",
+        "secret": "Clave de acceso secreta",
+        "secretHint": "La clave debe poder leer, escribir, eliminar y listar en el bucket. Se guarda cifrada y nunca se vuelve a mostrar.",
+        "addressing": "Cómo la dirección nombra el bucket",
+        "addressingHint": "Deja Automático, salvo que la guía de tu servicio diga otra cosa.",
+        "addrAuto": "Automático",
+        "addrPath": "En la ruta",
+        "addrHost": "En el nombre del host",
+        "account": "Cuenta de almacenamiento",
+        "accountHint": "Puede quedar vacía si la clave de abajo es una cadena de conexión o una URL SAS, porque nombran la cuenta.",
+        "container": "Contenedor",
+        "containerHint": "Puede quedar vacío si la clave de abajo es una URL SAS del contenedor.",
+        "credential": "Clave de la cuenta, cadena de conexión o URL SAS",
+        "credentialHint": "Sirve cualquiera de estas: la clave de la cuenta de almacenamiento, la cadena de conexión de la cuenta o una URL SAS del contenedor con permisos de lectura, adición, creación, escritura, eliminación y listado. Se guarda cifrada y nunca se vuelve a mostrar.",
+        "folder": "Carpeta (opcional)",
+        "folderHint": "La carpeta del bucket o contenedor adonde van tus archivos. Vacía: una carpeta con el nombre de tu cuenta.",
+        "reason": "Por qué lo quieres",
+        "reasonHint": "Un operador lo lee antes de decidir.",
+        "connect": "Probar y conectar",
+        "testing": "Probando…",
+        "fillFirst": "Completa primero: {fields}",
+        "testFirst": "No se guarda nada si algún paso de la prueba falla.",
+        "connected": "Conectado. Todos los pasos de la prueba pasaron, y los archivos nuevos van ahora a tu almacenamiento.",
+        "waiting": "Todos los pasos de la prueba pasaron. Tu almacenamiento quedó guardado y espera la aprobación de un operador. Mientras tanto, los archivos nuevos se quedan en este servicio."
+      },
+      "ai": {
+        "title": "Tu propia IA también puede hacerlo.",
+        "text": "Pídele que conecte tu almacenamiento, mueva tus archivos o desconecte. Usa estas herramientas:"
+      }
     },
     "offers": {
       "title": "¿Qué puedo hacer?",
@@ -25744,6 +26023,28 @@
           "ex1": "90 (el valor predeterminado): una página de campaña para un trimestre.",
           "ex2": "30: una empresa que quiere revisar cada página pública cada mes.",
           "tip": "Ajústalo a la frecuencia con que quieres revisar cada página pública. Un límite más largo significa menos solicitudes de ampliación por aprobar."
+        }
+      },
+      "file_store": {
+        "kind": {
+          "title": "Dónde se guarda el contenido de los archivos",
+          "short": "Dónde se guarda el contenido de un archivo nuevo: en la base de datos de este servidor, en un bucket de S3 o en un contenedor de Azure Blob.",
+          "what": "El contenido de cada archivo que guarda una persona, un agente o una aplicación está en un solo lugar. Con Base de datos, está en la base de datos propia de este servidor, como antes. Con un bucket de S3 o un contenedor de Azure Blob, los archivos nuevos van allí, a la carpeta que definas. El bucket o contenedor debe existir y ser privado, y su clave debe poder leer, escribir, eliminar y listar. Las claves se definen solo en variables de entorno. Un archivo escrito antes de un cambio se queda donde se escribió y se sigue leyendo desde allí. En la página Almacenamiento de archivos pruebas la conexión y sacas los archivos más antiguos de la base de datos. El propietario, quién puede leer el archivo y la cuota siguen iguales, esté donde esté el contenido.",
+          "range": "La base de datos de este servidor (predeterminado), un bucket de S3 o un contenedor de Azure Blob.",
+          "ex1": "Base de datos: un servidor pequeño cuyos archivos caben en su propia base de datos y sus copias de seguridad.",
+          "ex2": "Un bucket de S3: un servidor con muchos archivos grandes, en Amazon S3 o en un servicio compatible con S3, como Cloudflare R2, Hetzner o Backblaze B2.",
+          "ex3": "Un contenedor de Azure Blob: una empresa que guarda sus datos en su propia suscripción de Azure.",
+          "tip": "Define primero la dirección, el bucket o contenedor y las claves. Luego presiona Probar la conexión en la página Almacenamiento de archivos. Mueve los archivos más antiguos solo cuando la prueba pase."
+        },
+        "owner_stores": {
+          "title": "Almacenamiento propio de las personas",
+          "short": "Si una persona puede conectar su propio bucket de S3 o contenedor de Azure, para que sus archivos vayan allí.",
+          "what": "Una persona conecta su propio bucket o contenedor con sus propias claves en la página Tu propio almacenamiento, o con su propia IA. El servidor prueba el almacenamiento antes de guardar nada. Después, sus archivos nuevos van allí y no cuentan en la cuota de almacenamiento de este servidor, y la persona puede mover allí sus archivos más antiguos y devolverlos. Con Todos pueden, el almacenamiento recibe archivos de inmediato. Con Un operador aprueba a cada persona, la persona lo pide con un motivo y los operadores ven la solicitud en la página Almacenamiento de archivos; mientras tanto, los archivos nuevos se quedan en este servidor. Con Nadie, nadie puede conectar un almacenamiento, y uno ya conectado no recibe archivos nuevos. Automático es Un operador aprueba a cada persona cuando este servidor muestra su contenido solo a cuentas con sesión iniciada, y Todos pueden en otro caso.",
+          "range": "Automático (predeterminado), Nadie, Un operador aprueba a cada persona o Todos pueden.",
+          "ex1": "Un operador aprueba a cada persona: el servidor de una empresa, donde TI revisa que cada bucket sea de la empresa.",
+          "ex2": "Todos pueden: un servidor público donde las personas quieren guardar sus archivos en su propia cuenta de un servicio en la nube.",
+          "ex3": "Nadie: un servidor cuyos datos deben quedarse en sus propios discos.",
+          "tip": "Las claves de las personas se guardan cifradas con la clave de cifrado de este servidor, así que define primero AIMEAT_ENCRYPTION_KEY. Si retiras una aprobación, los archivos nuevos dejan de ir a ese almacenamiento; los que ya están allí se quedan y se siguen leyendo."
         }
       }
     },

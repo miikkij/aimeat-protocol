@@ -8,6 +8,8 @@
  * @structure Three describes: writeStorageFile(), mintStorageUploadUrl() and removeStorageFile().
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-write.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-29 — The fake storage answers getMemory: the quota now asks whether the owner keeps
+ *     files in storage of their own (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.1.0 — 2026-09-24 — A7-2: the write and the mint refuse an app's icon and screenshot keys;
  *     removing a file under them still works.
  *   v1.0.0 — 2026-08-11 — Initial, with services/storage-file-write.ts (August 2026 audit step 8).
@@ -45,8 +47,11 @@ const getGHIIByOwner = vi.fn(async () => ({ morselBalance: 0 }));
 const debitBalance = vi.fn(async () => undefined);
 const addTransaction = vi.fn(async () => undefined);
 
+// The quota asks whether the owner keeps files in storage of their own (services/file-store/): none here.
+const getMemory = vi.fn(async () => null);
+
 const storage = {
-    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction,
+    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction, getMemory,
 } as unknown as Storage;
 
 const deps = { storage, config };

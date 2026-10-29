@@ -11,6 +11,9 @@
  *   - chunked-upload methods: create/get/addChunk/delete for resumable uploads
  *
  * @version-history
+ *   2026-10-29 — setStorageFileBlobRef, storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore, and
+ *     StorageFileRecord.blobRef on every read: a file's bytes may live in an S3 or Azure Blob store
+ *     (storage/blob/; wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   2026-10-16 — chunkedUploadsHeldBy and sweepExpiredChunkedUploads; every chunked-upload read honours
  *     the session expiry on both backends (QA audit F05b-02).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -56,6 +59,19 @@ export interface FileRepository {
   /** Point a stored file at its AI-provenance record, for a write whose record is minted only after
    *  the bytes landed (image generation settles after the store). False when no such file. */
   setStorageFileProvenance(ownerGaii: string, key: string, aiProvenanceId: string): Promise<boolean>;
+  /** The bytes of a file the database holds have been copied to an object store: point the row at
+   *  the object and empty its `data`. Only while the row still holds its bytes and still has `size`,
+   *  so a re-upload that landed in between is never emptied. False when it did not match. */
+  setStorageFileBlobRef(ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean>;
+  /** Of these object references, the ones some row still holds. The orphan sweep asks this for each
+   *  page of objects it lists, so an object no row names can be removed. */
+  storageFileBlobRefsIn(refs: string[]): Promise<string[]>;
+  /** Files whose bytes the database holds, metadata only, ordered by (ownerGaii, key) after `after`.
+   *  `owners` narrows to those identities. The page the move to an object store works through. */
+  listStorageFilesInDatabase(opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]>;
+  /** How many files, and how many bytes, each place holds: `database` for the rows that hold their
+   *  own bytes, else the store id of the reference (`node:s3`, `owner:<ghii>`). One grouped query. */
+  countStorageFilesByStore(): Promise<{ store: string; count: number; bytes: number }[]>;
   createChunkedUpload(record: ChunkedUploadRecord): Promise<ChunkedUploadRecord>;
   getChunkedUpload(uploadId: string): Promise<ChunkedUploadRecord | null>;
   addChunk(uploadId: string, chunkIndex: number, data: Buffer): Promise<boolean>;

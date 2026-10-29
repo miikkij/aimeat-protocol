@@ -7,6 +7,7 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.23.0 — 2026-10-29 — FileStoreConfig mixed in (config-file-store.ts): where stored files keep their bytes.
  *   v1.22.1 — 2026-10-25 — personalNodeMaxPerOwner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   v1.22.0 — 2026-10-25 — NodeLimitsConfig mixed in (config-node-limits.ts; secaudit2026oct22).
  *   v1.21.1 — 2026-10-25 — refreshCookieLegacyUntil: the last day an https node reads the old refresh cookie name (secaudit2026oct22).
@@ -136,8 +137,9 @@ import type { ContentClassConfig } from './config-content-class.js';
 import type { RuntimeConfig } from './config-runtime.js';
 import type { ExtensionLoadConfig } from './config-extension-load.js';
 import type { NodeLimitsConfig } from './config-node-limits.js';
+import type { FileStoreConfig } from './config-file-store.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig {
   port: number;
   baseUrl: string;
   /**

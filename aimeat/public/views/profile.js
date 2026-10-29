@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-29 — The "Your own storage" tab (views/profile/storage-tab.js, id 'storage'): a person keeps
+ *     their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   2026-10-25 — The "Goals" tab (views/profile/goals-tab.js): the agents' goals and their rules.
  *   2026-10-24 — The "Agreements" tab (views/profile/agreements-tab.js): the data processing agreements in
  *     which the person is the counterparty, and the four ways to sign them (plan doc-mvmr4i2wdk0p).
@@ -88,6 +90,7 @@ import AccessTab from './profile/access-tab.js';
 import ExposureTab from './profile/exposure-tab.js';
 import AgreementsTab from './profile/agreements-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
+import StorageTab from './profile/storage-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
 import AppDevTab from './profile/appdev-tab.js';
 import SecurityTab from './profile/security-tab.js';
@@ -173,6 +176,7 @@ const TABS = [
   { id: 'exposure',      key: 'profile.tabs.exposure',       component: ExposureTab,       minTier: 'new' },
   { id: 'agreements',    key: 'profile.tabs.agreements',     component: AgreementsTab,     minTier: 'new' },
   { id: 'dataWallet',    key: 'profile.tabs.dataWallet',     component: DataWalletTab,     minTier: 'active' },
+  { id: 'storage',       key: 'profile.tabs.storage',        component: StorageTab,        minTier: 'new' },
   { id: 'nodeStats',     key: 'profile.tabs.nodeStats',      component: NodeStatsTab,      minTier: 'experienced' },
   // 'new', not 'experienced': this tab is where two-step sign-in is switched on, and that is not an
   // expert setting — it is the first thing a careful person looks for after making an account.

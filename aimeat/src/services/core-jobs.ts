@@ -16,6 +16,8 @@
  *   2026-10-25 — held-label-release: the own addresses of removed apps are held, then released after
  *     apps.held_label_days and past apps.held_labels_per_owner (services/held-app-labels.ts;
  *     secaudit2026oct22, app-label-recycled-after-delete).
+ *   2026-10-29 — file-store-sweep: the objects in a file store that no stored file names are removed
+ *     daily (services/file-store/file-store-sweep.ts).
  *   2026-10-25 — mcp-client-cleanup: MCP client registrations no sign-in used are deleted after
  *     mcp.unused_client_days (services/mcp-client-cleanup.ts; secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-25 — The work expiry and the dispute timeout move the status with one conditional UPDATE
@@ -235,6 +237,12 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('mcp-client-cleanup', async () => {
     const { runMcpClientCleanup } = await import('./mcp-client-cleanup.js');
     await runMcpClientCleanup(storage, config);
+  });
+  // The objects in a file store that no stored file names: an erased account's, or a failed removal's
+  // (services/file-store/file-store-sweep.ts).
+  scheduler.registerCoreHandler('file-store-sweep', async () => {
+    const { sweepFileStores } = await import('./file-store/file-store-sweep.js');
+    await sweepFileStores({ storage, config });
   });
   // The own addresses of removed apps: held for their owner, released by age and the per-owner limit
   // (services/held-app-labels.ts).

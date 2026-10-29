@@ -19,6 +19,8 @@
  *   NOT_SECRET is the explicit list of secret-named rows that are public on purpose (a public key, a
  *   key id), each with its reason. A row goes there only with that reason written down.
  * @version-history
+ *   v1.0.5 — 2026-10-29 — AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS joins NOT_SECRET: an address list, named after
+ *     the networks it opens (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.0.4 — 2026-10-25 — AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS joins NOT_SECRET: a host list, named after
  *     the networks it opens, as AIMEAT_ALLOW_PRIVATE_EGRESS is (secaudit2026oct22).
  *   v1.0.3 — 2026-10-25 — AIMEAT_VAPID_PUBLIC_KEY, AIMEAT_PUBLIC_KEY and AIMEAT_ALLOW_PRIVATE_EGRESS join
@@ -41,6 +43,7 @@ const NOT_SECRET: Readonly<Record<string, string>> = {
   AIMEAT_PUBLIC_KEY: 'the public half of the federation key pair; peers receive it when this node joins (config-schema-runtime.ts)',
   AIMEAT_ALLOW_PRIVATE_EGRESS: 'a true/false switch for calls into private networks, named after the networks it opens (config-schema-runtime.ts)',
   AIMEAT_COMPANY_SMTP_PRIVATE_HOSTS: 'the list of mail hosts on a private network that companies may send through, named after the networks it opens; the operator edits it on the Config page (config-schema-node-limits.ts)',
+  AIMEAT_FILE_STORE_OWNER_PRIVATE_ORIGINS: 'the list of private-network addresses a person\'s own file storage may be at, named after the networks it opens; the operator edits it on the Config page (config-schema-file-store.ts)',
 };
 
 function secretNamed(envVar: string): boolean {

@@ -4,6 +4,29 @@
     {
       "date": "2026-10-29",
       "kind": "feature",
+      "id": "2026-10-29-files-in-s3-or-azure-blob-storage",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Files in S3 or Azure Blob storage",
+        "fi": "Tiedostot S3- tai Azure Blob -tallennustilaan"
+      },
+      "summary": {
+        "en": "Your own S3 bucket or Azure container can hold your files, outside the node's quota.",
+        "fi": "Oma S3-bucket tai Azure-säilö voi pitää tiedostosi, eikä se kuluta noden kiintiötä."
+      },
+      "body": {
+        "en": "An operator can keep the node's files in one S3 bucket or Azure container, and people can connect storage of their own that does not count toward the node's quota.",
+        "fi": "Operaattori voi pitää noden tiedostot yhdessä S3-säilössä tai Azure-säilössä, ja jokainen voi liittää oman tallennustilansa, joka ei kuluta noden kiintiötä."
+      }
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "feature",
       "id": "2026-10-29-your-apps-structure-from-the-first-moment",
       "highlight": true,
       "audience": [

@@ -12,6 +12,8 @@
  *   - CONFIG_FIELDS: the exhaustive field list grouped by domain (node, morsel policy, auth, features, work, quotas, federation, ...)
  *
  * @version-history
+ *   2026-10-29 — The file_store rows (config-schema-file-store.ts) after the storage quota; the marketplace
+ *     and commerce core rows move to config-schema-commerce.ts unchanged (max-file-lines).
  *   2026-10-25 — extensions.install_role says what operator means: only the operator's account, its
  *     agents included, writes extension code (secaudit2026oct22 lead 128).
  *   2026-10-25 — personal_nodes.max_per_owner (AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, 0 = no
@@ -151,6 +153,8 @@ import { ACCESS_CONFIG_FIELDS } from './config-schema-access.js';
 import { FEATURE_CONFIG_FIELDS } from './config-schema-features.js';
 import { EXTENSION_LOAD_CONFIG_FIELDS } from './config-schema-extension-load.js';
 import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
+import { COMMERCE_CONFIG_FIELDS } from './config-schema-commerce.js';
+import { FILE_STORE_CONFIG_FIELDS } from './config-schema-file-store.js';
 
 // ── Field Definition ── the row's shape is in config-field-def.ts (this file reached the line ceiling).
 
@@ -234,6 +238,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Quotas (mutable) ──
   { key: 'memoryQuotaMb', dotPath: 'quota.memory_mb', envVar: 'AIMEAT_MEMORY_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Memory quota in MB, for each owner and for each agent separately', range: '1-10000' },
   { key: 'storageQuotaMb', dotPath: 'quota.storage_mb', envVar: 'AIMEAT_STORAGE_QUOTA_MB', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'File storage quota in MB, for each owner and for each agent separately', range: '1-100000' },
+  // ── Where stored files keep their bytes ── config-schema-file-store.ts
+  ...FILE_STORE_CONFIG_FIELDS,
 
   // ── Federation (mutable) ──
   { key: 'maxRelayHops', dotPath: 'federation.max_relay_hops', envVar: 'AIMEAT_MAX_RELAY_HOPS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1, immutable: false, description: 'Max relay hops for federated requests', range: '1-10' },
@@ -285,17 +291,8 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Visibility and visitors ── one switch per layer (config-schema-visibility.ts).
   ...VISIBILITY_CONFIG_FIELDS,
 
-  // ── Marketplace (Phase 2.6, mutable) ──
-  { key: 'marketplaceEnabled', dotPath: 'marketplace.enabled', envVar: 'AIMEAT_MARKETPLACE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Marketplace feature enabled' },
-  { key: 'marketplaceTransactionFeePercent', dotPath: 'marketplace.tx_fee_percent', envVar: 'AIMEAT_MARKETPLACE_TX_FEE_PERCENT', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50, immutable: false, description: 'Transaction fee percentage', range: '0-50' },
-
-  // ── Commerce core + fee policy (TARGET-033, mutable) ──
-  { key: 'marketplaceFeeMode', dotPath: 'commerce.fee_mode', envVar: 'AIMEAT_MARKETPLACE_FEE_MODE', type: 'string', ...oneOf('operator', 'burn'), immutable: false, description: 'Marketplace fee destination: operator (credited to node operator) or burn', range: 'operator|burn' },
-  { key: 'operatorFeeAccount', dotPath: 'commerce.operator_fee_account', envVar: 'AIMEAT_OPERATOR_FEE_ACCOUNT', type: 'string', validate: v => v === null || (typeof v === 'string' && (v as string).length <= 100), immutable: false, description: 'Owner name whose GHII receives operator-mode fees (empty = first operator-role owner)' },
-  { key: 'commerceFeePercent', dotPath: 'commerce.fee_percent', envVar: 'AIMEAT_COMMERCE_FEE_PERCENT', type: 'number', validate: v => v === null || (typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 50), immutable: false, description: 'Checkout fee percentage (empty inherits marketplace tx fee percent)', range: '0-50' },
-  { key: 'commerceEnabled', dotPath: 'commerce.enabled', envVar: 'AIMEAT_COMMERCE_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Checkout sessions (/v1/commerce) enabled' },
-  { key: 'commerceSessionTtlMinutes', dotPath: 'commerce.session_ttl_minutes', envVar: 'AIMEAT_COMMERCE_SESSION_TTL_MINUTES', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 5 && (v as number) <= 10080, immutable: false, description: 'Open checkout-session lifetime in minutes', range: '5-10080' },
-  { key: 'mcpCardCommerceTools', dotPath: 'commerce.mcp_card_tools', envVar: 'AIMEAT_MCP_CARD_COMMERCE_TOOLS', type: 'string', ...oneOf('inline', 'pointer'), immutable: false, description: 'MCP Server Card commerce_tools mode: inline (embed priced app-tool catalog) or pointer (link /v1/commerce/tools)' },
+  // ── Marketplace and the commerce core ── config-schema-commerce.ts
+  ...COMMERCE_CONFIG_FIELDS,
   { key: 'contentSignal', dotPath: 'site.content_signal', envVar: 'AIMEAT_CONTENT_SIGNAL', type: 'string', validate: v => typeof v === 'string' && (v.trim() === '' || /^(off|(search|ai-input|ai-train)=(yes|no)(\s*,\s*(search|ai-input|ai-train)=(yes|no)){0,2})$/i.test(v.trim())), immutable: false, description: 'robots.txt Content Signals Policy directive (contentsignals.org), e.g. "search=yes, ai-input=yes, ai-train=no"; "off" removes it; empty pairs it to AIMEAT_AI_TRAINING' },
   { key: 'aiTraining', dotPath: 'site.ai_training', envVar: 'AIMEAT_AI_TRAINING', type: 'string', ...oneOf('allow', 'deny'), immutable: false, description: 'Allow AI training crawlers in robots.txt ("allow" | "deny"). Search and retrieval bots are always allowed' },
   { key: 'appBadge', dotPath: 'site.app_badge', envVar: 'AIMEAT_APP_BADGE', type: 'string', ...oneOf('aimeat', 'off'), immutable: false, description: 'The "aimeat.io · Publish your own app for free" badge on every served app: "aimeat" keeps it (default), "off" removes it from every app on this node. An owner can still switch it off per app' },
