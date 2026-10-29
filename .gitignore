@@ -71,6 +71,11 @@ logs/**
 # (aimeat/package.json) at publish time. A tracked copy only drifted or doubled every README diff.
 aimeat/README.md
 
+# The npm package's lock, written by `pnpm gen:shrinkwrap` from pnpm-lock.yaml before every publish
+# (prepublishOnly) and before the nightly pack-smoke. pnpm-lock.yaml is the source; a tracked copy
+# could only fall behind it (secaudit2026oct26 round 8c, operator-01).
+aimeat/npm-shrinkwrap.json
+
 # A node that boots with no owner writes its setup secret beside its database
 # (services/admin-setup-secret.ts). A test server whose database is under test/ leaves it there.
 aimeat/test/admin-setup-secret
