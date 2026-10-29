@@ -456,6 +456,19 @@ async function livePublishAsk(
 
 // ── Handler: Storage ── routes/upload-storage.ts (handleStorageUpload, declaredFromMeta)
 
+/**
+ * Is the principal an upload token names an operator? A presigned token carries neither roles nor
+ * scopes, so the question is asked of the principal it names with the grant its own record holds now:
+ * an agent passes only while it holds operator:admin (services/operator-principal.ts).
+ */
+async function uploaderIsOperator(storage: Storage, sub: string): Promise<boolean> {
+    const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
+    return (await operatorName(storage, {
+        sub,
+        ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
+    })) !== null;
+}
+
 // ── Handler: Extension ──
 
 async function handleExtensionUpload(
@@ -523,9 +536,7 @@ async function handleExtensionUpload(
     // A new name with the node's prefix is kept for what the node ships next, as on the inline doors
     // (services/component-name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
     if (!existing) {
-        const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
-        const isOperator = (await operatorName(storage, { sub, ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}) })) !== null;
-        const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator });
+        const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator: await uploaderIsOperator(storage, sub) });
         if (prefixed) { res.status(prefixed.status).json({ success: false, error: prefixed.code, message: prefixed.message }); return; }
     }
 
@@ -673,14 +684,8 @@ async function handleCortexUpload(
 
     // The operator answer buys one thing: a namespace this owner does not own. POST /v1/cortex and
     // the MCP tool both grant it, and this door must answer as they do, or the same bundle installs as
-    // an inline manifest and is refused as a ZIP. A presigned token carries neither roles nor scopes,
-    // so the question is asked of the principal it names with the grant its own record holds now:
-    // an agent passes only while it holds operator:admin (services/operator-principal.ts).
-    const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
-    const isOperator = (await operatorName(storage, {
-        sub,
-        ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
-    })) !== null;
+    // an inline manifest and is refused as a ZIP.
+    const isOperator = await uploaderIsOperator(storage, sub);
 
     // The cortex under that name (services/component-address.ts): `<owner>/<name>` as written, or for
     // a bare manifest name the bare record as before, else the uploader's own of that name.
