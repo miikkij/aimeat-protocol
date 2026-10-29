@@ -3915,7 +3915,8 @@
       "review": "En revisión",
       "draft": "Borrador",
       "expired": "Sustituido",
-      "ended": "Terminado"
+      "ended": "Terminado",
+      "test-signed": "Firmado en prueba, sin vigor"
     },
     "next": {
       "deletion": "Borra o devuelve los datos antes del {date}",
@@ -3923,7 +3924,8 @@
       "objected": "Te has opuesto al cambio y no entra en vigor",
       "notice": "El cambio entra en vigor el {date} si nadie se opone",
       "waitingCp": "Pendiente de la firma de la otra parte",
-      "signCp": "Pendiente de tu firma"
+      "signCp": "Pendiente de tu firma",
+      "testSignedCp": "Tu firma fue una firma de prueba sin efecto legal. Te avisamos cuando una nueva versión esté pendiente de tu firma"
     },
     "colStep": "Paso",
     "colWhen": "Cuándo",

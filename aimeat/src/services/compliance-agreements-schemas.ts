@@ -19,6 +19,8 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   2026-10-29 — A version and an agreement may be `test-signed`: signed in test, not in force, on a node
+ *     running production settings (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A signature's level may be `test`: a wallet signature on the EU reference wallet's test roots (secaudit2026oct26).
  *   2026-10-27 — Agreement.counterpartyNamedAt; a review keeps the sha256 of the checked bytes and the
  *     node's copy of them (sha256, copyKey) (secaudit2026oct26).
@@ -30,9 +32,14 @@ import { INPUT_LIMITS } from '../models/input-limits.js';
 import { isValidEmail } from '../utils/email-validator.js';
 
 /** The state of one version, in order. `review` means a signed copy arrived and waits for a person. */
-export const VERSION_STATUSES = ['draft', 'sent', 'review', 'signed', 'superseded'] as const;
+/**
+ * `test-signed`: both parties signed, and a signature is a test wallet signature with no legal effect,
+ * on a node running production settings. The version is not in force (compliance-agreements-sign.ts
+ * completeIfSigned).
+ */
+export const VERSION_STATUSES = ['draft', 'sent', 'review', 'signed', 'superseded', 'test-signed'] as const;
 /** The state of an agreement as a whole, the field the processor list and fleet read. */
-export const AGREEMENT_STATUSES = ['draft', 'sent', 'review', 'signed', 'expired', 'ended'] as const;
+export const AGREEMENT_STATUSES = ['draft', 'sent', 'review', 'signed', 'expired', 'ended', 'test-signed'] as const;
 export type AgreementStatus = typeof AGREEMENT_STATUSES[number];
 
 /**

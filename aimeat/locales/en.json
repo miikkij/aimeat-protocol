@@ -4960,18 +4960,21 @@
     "publicWho": "Anyone, signed in or not. It can show up in lists and searches."
   },
   "agreements": {
-    "status": { "signed": "In force", "sent": "Waiting for signature", "review": "Being checked", "draft": "Draft", "expired": "Replaced", "ended": "Ended" },
+    "status": { "signed": "In force", "sent": "Waiting for signature", "review": "Being checked", "draft": "Draft", "expired": "Replaced", "ended": "Ended", "test-signed": "Signed in test, not in force" },
     "event": {
       "created": "Draft made", "edited": "Draft changed", "version": "New version drafted", "sent": "Sent for signature", "reminder": "Reminder sent",
       "signed": "Signed", "copy-received": "Signed copy received", "copy-accepted": "Signed copy accepted", "copy-rejected": "Signed copy rejected",
       "in-force": "In force", "notice": "Change announced", "notice-reminder": "Change reminder sent", "notice-lapsed": "New version in force",
-      "objection": "Objection to the change", "breach-notice": "Breach notice sent", "ended": "Agreement ended", "deletion-done": "Data deleted or returned"
+      "objection": "Objection to the change", "breach-notice": "Breach notice sent", "ended": "Agreement ended", "deletion-done": "Data deleted or returned",
+      "test-signed": "Signed in test, not in force"
     },
     "next": {
       "deletion": "Delete or return the data by {date}", "sendDraft": "Version {n} is a draft: send it for signature",
       "review": "A signed copy waits for your decision", "reviewCp": "Your signed copy is being checked",
       "objected": "The change was objected to and does not take effect", "notice": "The change takes effect on {date} unless objected to",
-      "waitingCp": "Waiting for the counterparty's signature", "signCp": "Waiting for your signature"
+      "waitingCp": "Waiting for the counterparty's signature", "signCp": "Waiting for your signature",
+      "testSigned": "A test wallet signed it, so it is not in force. Make a new version and send it for signature",
+      "testSignedCp": "Your signature was a test signature with no legal effect. You get word when a new version waits for your signature"
     },
     "colStep": "Step", "colWhen": "When", "colWith": "With", "colSubject": "What it covers", "colState": "State", "colNext": "Next step",
     "noSteps": "Nothing has happened yet.", "waits": "waits",
@@ -5037,7 +5040,7 @@
       "ended": "The agreement ended.", "deletionDone": "Mark the data deleted", "deletionRecorded": "The deletion was recorded.",
       "empty": "No agreements yet. Make the first one, or ask your AI to.", "copyForAi": "Copy for your AI", "copied": "Copied. Paste it into your own AI chat.",
       "aiPrompt": "Use aimeat_compliance_agreement. Make a data processing agreement for my customer: action \"create\" with dry_run first, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Show me the missing_measures and ask me for them, write them with action \"update\", and send it with action \"send\" when I say yes.",
-      "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty" }
+      "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty", "test-signed": "Signed in test only: make a new version" }
     },
     "gap": {
       "agreement-review-waiting": "{who}: a signed copy waits for your decision.", "subprocessor-change-unannounced": "{who}: a new sub-processor has not been announced.",
