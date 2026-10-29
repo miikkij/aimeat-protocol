@@ -9,7 +9,9 @@
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
  * @version-history
  *   v1.3.0 — 2026-10-29 — site.store_topup_url: a customer node's top-up page in the store, set by
- *     the fleet service (UX review 2026-10-29, A1).
+ *     the fleet service (UX review 2026-10-29, A1). site.default_locale: the node's own language
+ *     before the browser's (C). site.store_orders_url, site.purchase_plan and site.purchase_package:
+ *     the customer's orders page and what they bought (B, D).
  *   v1.2.1 — 2026-10-08 — site.store_soon_code's description: the store checks the code (ext:shop's
  *     DISCOUNT_CODE), not Stripe; a Stripe coupon makes the store refuse the payment.
  *   v1.2.0 — 2026-10-06 — site.store_soon_code: the shared discount code "Opens soon" shows when pressed.
@@ -24,6 +26,8 @@ import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validato
 /** A note is one sentence on the front page: plain text, short. */
 const isStoreNote = (v: unknown) => typeof v === 'string' && v.length <= 300;
 /** A discount code as the store takes one: letters, digits, - and _, at most 40; empty is none. */
+/** A plan's or a package's visible name: plain text, at most 80 characters; empty is none. */
+const isPurchaseName = (v: unknown) => typeof v === 'string' && v.length <= 80 && !/[<>]/.test(v);
 const isSoonCode = (v: unknown) => typeof v === 'string' && /^[A-Za-z0-9_-]{0,40}$/.test(v);
 
 export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLinksConfig}`>[] = [
@@ -57,7 +61,11 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   // from the order, and the store would refuse to settle. This node only shows it: a visitor who
   // presses "Opens soon" gets it to use when the store opens.
   { key: 'siteLinks.storeSoonCode', dotPath: 'site.store_soon_code', envVar: 'AIMEAT_SITE_STORE_SOON_CODE', type: 'string', validate: isSoonCode, immutable: false, description: 'The discount code a visitor gets by pressing "Opens soon" while the store status is "soon": one code for everybody. Set the same code in the store\'s own setting DISCOUNT_CODE (the shop extension); the store checks the code and takes the discount off the first payment. Do not make it a Stripe coupon: the Stripe total then differs from the order and the store refuses the payment. This node only shows the code. Letters, digits, - and _, at most 40. Empty keeps "Opens soon" a label with nothing to press' },
-  // A customer node's own page in the store, set by the fleet service that made the node.
+  { key: 'siteLinks.defaultLocale', dotPath: 'site.default_locale', envVar: 'AIMEAT_SITE_DEFAULT_LOCALE', type: 'string', validate: v => typeof v === 'string' && ['', 'en', 'fi', 'es'].includes(v), range: 'en | fi | es, or empty', immutable: false, description: 'The language this node\'s pages use before a visitor chooses one, ahead of the browser\'s. A node bought from the store gets its buyer\'s language. Empty: the browser\'s language' },
+  // A customer node's own pages in the store and what its owner bought, set by the fleet service.
+  { key: 'siteLinks.storeOrders', dotPath: 'site.store_orders_url', envVar: 'AIMEAT_SITE_STORE_ORDERS_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The owner\'s orders and invoices in the store. The node adds the person\'s language. Empty hides the "Orders and invoices" link' },
+  { key: 'siteLinks.purchasePlan', dotPath: 'site.purchase_plan', envVar: 'AIMEAT_SITE_PURCHASE_PLAN', type: 'string', validate: isPurchaseName, immutable: false, description: 'What the owner bought (Solo, Team), set by the store\'s fleet service. Set, this is a customer\'s node: the welcome on the home, the shorter menu, and no node maintenance in the top bar. Empty: the full view' },
+  { key: 'siteLinks.purchasePackage', dotPath: 'site.purchase_package', envVar: 'AIMEAT_SITE_PURCHASE_PACKAGE', type: 'string', validate: isPurchaseName, immutable: false, description: 'The visible name of the package the owner bought with the plan, for the welcome on the home. Empty: no package' },
   { key: 'siteLinks.storeTopup', dotPath: 'site.store_topup_url', envVar: 'AIMEAT_SITE_STORE_TOPUP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Where this node\'s owner buys more AI allowance: the store\'s top-up page for this node. The node adds the person\'s language. Empty: the notice that the allowance is spent offers no purchase' },
   { key: 'siteLinks.signage', dotPath: 'site.signage_url', envVar: 'AIMEAT_SITE_SIGNAGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The signage screen the front page frames as its "built by asking" example. Empty hides the example; aimeat.io sets its own screen here' },
   { key: 'siteLinks.signageAdmin', dotPath: 'site.signage_admin_url', envVar: 'AIMEAT_SITE_SIGNAGE_ADMIN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The admin panel the front page\'s signage example was made in (its second door)' },

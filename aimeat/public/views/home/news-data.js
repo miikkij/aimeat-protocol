@@ -13,6 +13,8 @@
  * @structure useNews(session) · re-exports AUDIENCES, WINDOW_DAYS, OTHERS_SHOWN, entryAddress, audienceOf
  * @usage const { highlights, others, mode, count, confirm } = useNews(session);
  * @version-history
+ *   v1.1.0 — 2026-10-29 — On a customer's node only the news for people who use AIMEAT, and none
+ *     before their AI is connected (UX review 2026-10-29, C; Jouni's choice).
  *   v1.0.0 — 2026-10-18 — Initial (wish-uutta-aimeatissa-mit-on-tullut-sitten-viime-katselun-kenelle).
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -20,6 +22,7 @@ import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { useShared, invalidateShared } from '/views/surface/shared-read.js';
 import { newsFor, audiencesOf, OTHERS_SHOWN } from '/js/services/news.js';
+import { customerNode } from '/js/site.js';
 
 export { AUDIENCES, WINDOW_DAYS, OTHERS_SHOWN, entryAddress, audienceOf } from '/js/services/news.js';
 
@@ -58,10 +61,17 @@ export function useNews(session) {
   const seenRead = useShared(SEEN_KEY, signedIn ? SEEN_PATH : '', ['memory'], (d) => (d?.exists === false ? {} : (d?.value ?? {})));
   const appsRead = useShared(APPS_KEY, signedIn ? APPS_PATH : '', [], (d) => Number(d?.total ?? d?.apps?.length ?? 0) > 0);
 
-  const operator = Array.isArray(session?.roles) && session.roles.includes('operator');
-  const ready = signedIn && entries !== null && seenRead.ready && appsRead.ready;
-  const news = ready
-    ? newsFor(entries, seenRead.data, audiencesOf({ operator, developer: appsRead.data === true }))
+  // A CUSTOMER'S NODE (site.js customerNode()) shows its buyer the news for people who use AIMEAT
+  // only, never the operator's or the app builder's, and nothing before their AI is connected
+  // (Jouni, 2026-10-29: "Vain käyttäjän uutiset"). The buyer is their node's operator and owns apps,
+  // but the band is for what they came to do, and the count on the header's Home link follows it.
+  const customer = customerNode();
+  const homeRead = useShared('news-home-initialized', customer && signedIn ? '/v1/home/state' : '',
+    ['home', 'agents', 'agent-onboarding'], (d) => d?.state?.initialized === true);
+  const operator = !customer && Array.isArray(session?.roles) && session.roles.includes('operator');
+  const ready = signedIn && entries !== null && seenRead.ready && appsRead.ready && (!customer || homeRead.ready);
+  const news = ready && (!customer || homeRead.data === true)
+    ? newsFor(entries, seenRead.data, audiencesOf({ operator, developer: !customer && appsRead.data === true }))
     : { mode: 'none', highlights: [], others: [], hidden: 0 };
 
   const newestId = entries?.[0]?.id || '';

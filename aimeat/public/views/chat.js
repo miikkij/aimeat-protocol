@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-29: The phone suggestion and the install suggestion wait until the person has had a
+ *     conversation here (UX review D).
  *   2026-10-29: When the AI allowance is spent, the refusal shows the ways on: buy more, your own
  *     key, or the free model, which turns on the routing rule and sends the question again (A1).
  *   2026-10-29: A turn the node refused before the agent started shows the node's sentence in the
@@ -486,7 +488,10 @@ export default function ChatView() {
     const onDesktop = typeof window !== 'undefined'
         && window.matchMedia?.('(pointer: fine)').matches
         && (navigator.maxTouchPoints ?? 0) === 0;
-    const showMobileNudge = !nudgeDismissed && onDesktop && status && status.push_devices === 0;
+    // Not the first thing a newcomer reads (UX review 2026-10-29, D): the phone and the install
+    // suggestion wait until the person has had a conversation here.
+    const hasTalked = (thread?.turns?.length ?? 0) > 0 || threads.length > 1;
+    const showMobileNudge = hasTalked && !nudgeDismissed && onDesktop && status && status.push_devices === 0;
 
     const dismissNudge = useCallback(() => {
         setNudgeDismissed(true);
@@ -680,7 +685,7 @@ export default function ChatView() {
                       the rail, so this copy is phone-only via CSS. */''}
                 <${AiNotice} main compact=${turns.length > 0 || threads.length > 1} />
                 ${showMobileNudge && html`<${MobileNudge} onDismiss=${dismissNudge} />`}
-                ${!showMobileNudge && html`<${InstallCta} compact=${true} />`}
+                ${hasTalked && !showMobileNudge && html`<${InstallCta} compact=${true} />`}
 
                 <${ConversationScroll} onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`

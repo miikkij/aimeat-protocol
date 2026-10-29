@@ -60,6 +60,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { PageSection } from '/components/PageSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
@@ -130,7 +131,9 @@ function mast(ctx) {
     : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null,
       // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
       ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null, { label: x('provider.openrouter') }];
-  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x('descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
+  // On a customer's node the allowance is what the buyer paid for, not a starter gift (UX review C).
+  const bought = customerNode();
+  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
   const loud = keyed
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
     : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
@@ -152,7 +155,7 @@ function strip(ctx) {
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
   return html`<${FigureStrip} items=${[
     { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
-      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x('stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
+      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
     { key: 'today', n: u ? money(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : '' },
     { key: 'month', n: r ? money(r.cost) : '…', label: x('stripMonth'), sub: r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : '' },
     { key: 'roles', n: rl.view ? String(rl.roles.length) : '…', label: x('rl.title'), tone: rl.waiting ? 'coral' : undefined,
