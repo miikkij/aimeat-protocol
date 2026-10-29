@@ -20,17 +20,22 @@
  *   format wearing a similar name, and nothing here reads them. They are NAMED as unsupported
  *   rather than failing quietly, because "nothing happened" is the worst answer and a person who is
  *   told to save it again as .xlsx can act.
- * @structure ExtractedText; extractableKind(); extractFileText()
+ * @structure ExtractedText; ExtractOptions; extractableKind(); extractFileText(); normalisePdfText();
+ *   pdfLimitNote(); pdfTextResult()
  * @usage
- *   const got = await extractFileText(bytes, mimeType, filename);
+ *   const got = await extractFileText(bytes, mimeType, filename, { pdfLimits: pdfReadLimits(config) });
  *   if (got) prompt.push(`Attached file: ${filename}\n\n${got.text}`);
  * @version-history
+ *   v1.1.0 -- 2026-10-29 -- secaudit2026oct26 round 8c (memory-b-09): a PDF whose decode cost the
+ *     budget cannot measure is read in a worker under the time and memory limits (pdf-bounded.ts);
+ *     past one, its text is not read and the note says so (`limit`).
  *   v1.0.0 -- 2026-08-17 -- Initial: xlsx, docx and pdf.
  *   v1.0.1 -- 2026-10-25 -- secaudit2026oct22: a PDF whose streams decode past 256 MB is not handed
  *     to pdf.js (pdf-budget.ts); the person hears that it was not read.
  */
 import { extractText as extractPdfText } from 'unpdf';
-import { pdfDecodesWithin } from './pdf-budget.js';
+import { pdfDecodeMeasure } from './pdf-budget.js';
+import { DEFAULT_PDF_READ_LIMITS, PdfLimitReached, limitsActive, readPdfBounded, type PdfReadLimits } from './pdf-bounded.js';
 import { safeUnzip, ZipSecurityError, type SafeZipLimits } from '../safe-zip.js';
 import { logger } from '../../utils/logger.js';
 import { extractXlsxText } from './xlsx.js';
@@ -42,6 +47,13 @@ export interface ExtractedText {
     kind: ExtractableKind;
     /** Said out loud in the prompt when present: clipped, empty, or a format that failed. */
     note?: string;
+    /** A PDF whose text was not read because its read reached this limit (pdf-bounded.ts). */
+    limit?: 'time' | 'memory';
+}
+
+/** How a file is read. `pdfLimits` are the node's settings for a PDF the budget cannot measure. */
+export interface ExtractOptions {
+    pdfLimits?: PdfReadLimits;
 }
 
 export type ExtractableKind = 'spreadsheet' | 'document' | 'pdf';
@@ -103,17 +115,21 @@ export function isLegacyOfficeFile(filename: string): boolean {
  * says it out loud.
  */
 export async function extractFileText(
-    bytes: Buffer, mimeType: string, filename: string,
+    bytes: Buffer, mimeType: string, filename: string, opts: ExtractOptions = {},
 ): Promise<ExtractedText | null> {
     const kind = extractableKind(mimeType, filename);
     if (!kind) return null;
 
     try {
         const text = kind === 'pdf'
-            ? await readPdf(bytes)
+            ? await readPdf(bytes, opts.pdfLimits ?? DEFAULT_PDF_READ_LIMITS)
             : await readOffice(bytes, kind);
         return finish(text, kind);
     } catch (err) {
+        if (err instanceof PdfLimitReached) {
+            logger.warn(`[file-text] pdf text of ${filename} not read: ${err.message}`);
+            return { text: '', kind, limit: err.limit, note: pdfLimitNote(filename, err) };
+        }
         const why = err instanceof ZipSecurityError
             ? 'it does not open as one'
             : 'it could not be read';
@@ -140,12 +156,32 @@ async function readOffice(bytes: Buffer, kind: ExtractableKind): Promise<string>
  * error. That case is caught by the emptiness check below and reported, because a person who
  * photographed a document needs to hear "this is a picture of text" and not silence.
  */
-async function readPdf(bytes: Buffer): Promise<string> {
+async function readPdf(bytes: Buffer, limits: PdfReadLimits): Promise<string> {
     // pdf.js inflates streams with no size limit; a PDF whose streams decode past the budget is not
-    // handed to it (pdf-budget.ts).
-    if (!(await pdfDecodesWithin(bytes))) throw new Error('the PDF\'s content decodes to more than 256 MB');
+    // handed to it (pdf-budget.ts), and one the budget cannot measure is read in a worker under the
+    // time and memory limits (pdf-bounded.ts).
+    const measure = await pdfDecodeMeasure(bytes);
+    if (measure.verdict === 'over') throw new Error('the PDF\'s content decodes to more than 256 MB');
+    if (measure.verdict === 'unmeasured' && limitsActive(limits)) {
+        return normalisePdfText((await readPdfBounded(bytes, limits, { text: true })).text ?? '');
+    }
     const { text } = await extractPdfText(new Uint8Array(bytes), { mergePages: true });
+    return normalisePdfText(text);
+}
+
+/** pdf.js's text with the spaces before a line end and the runs of empty lines taken out. */
+export function normalisePdfText(text: string): string {
     return text.replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+}
+
+/** What a reader is told when a PDF's text was not read at a limit. The file itself stays stored. */
+export function pdfLimitNote(filename: string, err: PdfLimitReached): string {
+    return `An attached PDF (${filename}) is stored, but its text was not read: ${err.message}, which this node sets for PDFs whose size it cannot check first. Say so: the file is kept, and only its text was not read.`;
+}
+
+/** The text of a PDF read elsewhere (pdf-bounded.ts), clipped and noted as extractFileText does. */
+export function pdfTextResult(raw: string): ExtractedText {
+    return finish(normalisePdfText(raw), 'pdf');
 }
 
 function finish(text: string, kind: ExtractableKind): ExtractedText {

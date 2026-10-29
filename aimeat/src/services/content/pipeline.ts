@@ -25,6 +25,8 @@
  * @structure ContentError · InspectOptions · InspectResult · inspectSource · stagesToRun · loadItem
  * @usage const out = await inspectSource(deps, caller, { kind: 'file', owner, key }, { automatic: true });
  * @version-history
+ *   v1.2.0 — 2026-10-29 — An automatic read of a PDF whose text reached the node's PDF read limit
+ *     tells the account (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.1.0 — 2026-10-21 — Extracting a class again keeps the values a person corrected (correct.ts).
  *   v1.0.0 — 2026-10-20 — Initial.
  */
@@ -51,6 +53,7 @@ import {
   AI_STAGES, type ContentFacts, type ContentSource, type ContentSettings, type StageName, type ClassProposal,
 } from './types.js';
 import { createHash } from 'node:crypto';
+import { notify } from '../notify.js';
 
 /** The largest file the pipeline loads to read. Above it only the stored record is used. */
 export const MAX_READ_BYTES = 64 * 1024 * 1024;
@@ -157,6 +160,20 @@ async function loadItem(deps: Deps, reader: ContentReader, source: ContentSource
   };
 }
 
+/** The account hears that a stored PDF's text was not read at a limit. Never throws. */
+async function tellTextNotRead(deps: Deps, ownerGhii: string, source: ContentSource, why: { reason: 'time' | 'memory'; limit: number }): Promise<void> {
+  const limit = why.reason === 'time' ? `${why.limit} s` : `${why.limit} MB`;
+  const vars = { key: source.key, limit };
+  await notify(deps.storage, ownerGhii, {
+    type: 'content_pdf_text_not_read',
+    title: `The text of your PDF ${source.key} was not read`,
+    body: `The file is stored as it was. Reading its text reached this node's ${why.reason === 'time' ? 'time' : 'memory'} limit of ${limit}, `
+      + 'which applies to a PDF whose size the node cannot check before it reads it. Its details on your Data Wallet page say the same.',
+    link: '/v1/profile?tab=datawallet',
+    i18n: { key: why.reason === 'time' ? 'content_pdf_text_not_read_time' : 'content_pdf_text_not_read_memory', vars },
+  }).catch((err: unknown) => logger.warn('contentclass: the notice about an unread PDF text was not sent', { key: source.key, error: String(err) }));
+}
+
 function hashOf(item: LoadedItem): string {
   const h = createHash('sha256');
   if (item.bytes) h.update(item.bytes);
@@ -215,6 +232,9 @@ export async function inspectSource(
       });
       facts.technical = t.technical;
       text = t.text;
+      // Nobody asked for an automatic read, so the account hears when a PDF's text was not read at a
+      // limit; a caller who asked gets the facts back (file-text/pdf-bounded.ts).
+      if (automatic && t.technical.pdf?.textNotRead) await tellTextNotRead(deps, ownerGhii, source, t.technical.pdf.textNotRead);
     }
     if (text && text.trim() && item.memoryText === null) facts.textKey = await putText(deps, writer, sourceId, text);
     facts.stages.technical = { at: now, ok: true, ...(item.tooLarge ? { note: 'too large to read' } : {}) };

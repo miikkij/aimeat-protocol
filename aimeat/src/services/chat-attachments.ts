@@ -16,8 +16,9 @@
  *   Anything left over is NAMED in the prompt rather than dropped, because the agent is the one who
  *   has to tell the person their file was not read, and it can only do that if it knows.
  * @structure ReadAttachments; readAttachments()
- * @usage const { images, quoted, notes, skipped } = await readAttachments(storage, reader, gaii, keys);
+ * @usage const { images, quoted, notes, skipped } = await readAttachments(storage, reader, gaii, keys, { pdfLimits });
  * @version-history
+ *   v1.2.0 -- 2026-10-29 -- The node's PDF read limits reach the extractor (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.0.0 -- 2026-08-17 -- Initial: pure extraction out of chat-session, plus office and PDF files.
  *   v1.1.0 -- 2026-09-29 -- Files are read through readAiFile with a classification reader (TARGET-082).
  */
@@ -25,7 +26,7 @@ import type { Storage } from '../storage/interface.js';
 import { readAiFile } from './ai-inputs.js';
 import type { ContentReader } from './classification/reader.js';
 import type { PromptImage } from './goose-acp.js';
-import { extractFileText, extractableKind, isLegacyOfficeFile, NAME } from './file-text/index.js';
+import { extractFileText, extractableKind, isLegacyOfficeFile, NAME, type ExtractOptions } from './file-text/index.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -74,7 +75,7 @@ export function readableAsText(mimeType: string, key: string): boolean {
  * our side and not something the person can act on.
  */
 export async function readAttachments(
-    storage: Storage, reader: ContentReader, gaii: string, keys: string[],
+    storage: Storage, reader: ContentReader, gaii: string, keys: string[], opts: ExtractOptions = {},
 ): Promise<ReadAttachments> {
     const out: ReadAttachments = { images: [], quoted: [], notes: [], skipped: [] };
 
@@ -106,7 +107,7 @@ export async function readAttachments(
         // A sheet arrives as CSV, which is the shape the person's next question usually wants it in.
         const kind = extractableKind(mimeType, key);
         if (kind) {
-            const got = await extractFileText(bytes, mimeType, key);
+            const got = await extractFileText(bytes, mimeType, key, opts);
             if (got?.text) {
                 out.quoted.push(`Attached ${NAME[kind]}: ${key}${got.note ? ` (${got.note})` : ''}\n\n${got.text}`);
                 continue;
