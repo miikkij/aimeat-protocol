@@ -10856,6 +10856,7 @@
     "cfg_site_store_note_fi": "Aviso de la tienda en finés",
     "cfg_site_store_note_es": "Aviso de la tienda en español",
     "cfg_site_store_soon_code": "Código de descuento de apertura",
+    "cfg_site_store_topup_url": "Página de la tienda para comprar más saldo de IA",
     "cfg_site_incubator_url": "Enlace de la incubadora",
     "cfg_site_contacts": "Contactos públicos",
     "cfgDesc_node_id": "Identificador único de esta instancia.",

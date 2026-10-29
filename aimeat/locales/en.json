@@ -12293,6 +12293,7 @@
     "cfg_site_store_note_fi": "Store notice, Finnish",
     "cfg_site_store_note_es": "Store notice, Spanish",
     "cfg_site_store_soon_code": "Opening discount code",
+    "cfg_site_store_topup_url": "Store page for buying more AI allowance",
     "cfg_site_incubator_url": "Incubator link",
     "cfg_site_contacts": "Public contacts",
     "cfgDesc_node_id": "Unique identifier of this instance",

@@ -29,6 +29,7 @@
  */
 import type { AimeatConfig } from '../../config.js';
 import { safeFetch } from '../../utils/url-validator.js';
+import { readJson } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { fixedBaseUrlOf } from './providers.js';
 
@@ -40,6 +41,8 @@ const SPENT_RECHECK_MS = 60_000;
 /** How long an answer is reused for a page that shows the balance. */
 const BALANCE_TTL_MS = 5 * 60_000;
 const FETCH_TIMEOUT_MS = 5_000;
+/** GET /key answers a few hundred bytes; anything far larger is not that answer. */
+const BALANCE_READ_BYTES = 64 * 1024;
 
 let spentSince: number | null = null;
 let lastRecheck = 0;
@@ -86,7 +89,7 @@ export async function readNodeKeyBalance(config: AimeatConfig, opts: { fresh?: b
       logger.warn(`[ai] OpenRouter did not tell the node's key balance (HTTP ${res.status})`);
       return null;
     }
-    const data = ((await res.json()) as { data?: Record<string, unknown> }).data ?? {};
+    const data = ((await readJson(res, BALANCE_READ_BYTES)) as { data?: Record<string, unknown> } | null)?.data ?? {};
     const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
     const limitUsd = num(data.limit);
     const usageUsd = num(data.usage) ?? 0;
