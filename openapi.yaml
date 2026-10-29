@@ -35821,6 +35821,180 @@ paths:
         '200': { description: Closed }
         '403': { description: Not the owner and not an operator }
         '409': { description: Not open and nothing waits }
+  /v1/file-store:
+    get:
+      operationId: getOwnFileStore
+      summary: Where the caller's files keep their bytes, and their own storage
+      description: >-
+        `mode` is the node's rule on storage of one's own (self, operator, off), `approval` the
+        operator's answer on an operator node, `store` the connected S3 bucket or Azure container
+        (null when none), `taking_new_files` whether a new file goes there now, and `files` the count
+        and bytes in it and elsewhere. Files in one's own storage do not count toward the node's
+        storage quota. Needs `storage:read`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The view }
+        '403': { description: A session from another node }
+    put:
+      operationId: connectOwnFileStore
+      summary: Connect storage of one's own for one's files (S3 or Azure Blob)
+      description: >-
+        The node tests the storage (write, read, read part, list, remove under the folder) before it
+        saves anything, then sends every new file of the person and their agents there. The keys are
+        kept encrypted under the node key and never returned. On a node where operators approve, the
+        answer is 202 with `outcome` waiting_for_operator and files keep going to the node until
+        approved. Needs the person in person, or an agent with `secrets:manage`. 400 INVALID_INPUT names
+        what is missing; 403 OWNER_FILE_STORES_OFF; 409 FILES_IN_STORE when a store holding files would
+        be replaced by a different bucket; 422 STORE_TEST_FAILED names the failing step; 503
+        NO_ENCRYPTION_KEY.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [s3, azure] }
+                endpoint: { type: string, description: 'S3: https address of the service; empty for Amazon S3.' }
+                region: { type: string }
+                bucket: { type: string }
+                addressing: { type: string, enum: [auto, path, host] }
+                access_key_id: { type: string }
+                secret_access_key: { type: string }
+                account: { type: string }
+                container: { type: string }
+                credential: { type: string, description: 'Azure: account key, connection string or container SAS URL.' }
+                prefix: { type: string, description: 'The folder inside the bucket or container.' }
+                reason: { type: string, description: 'For the operators, on a node where they approve.' }
+      responses:
+        '200': { description: Connected }
+        '202': { description: Saved; waits for an operator's approval }
+        '400': { description: Missing or not valid input }
+        '403': { description: Not allowed on this node, or not in person and no secrets:manage }
+        '409': { description: Files are in the current storage }
+        '422': { description: The storage did not pass the test }
+        '503': { description: The node has no encryption key }
+    delete:
+      operationId: disconnectOwnFileStore
+      summary: Disconnect one's own storage
+      description: >-
+        Refused with 409 FILES_IN_STORE while files are in it; move them home first. Needs the person in
+        person, or an agent with `secrets:manage`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Disconnected }
+        '404': { description: No storage connected }
+        '409': { description: Files are still in it }
+  /v1/file-store/move:
+    post:
+      operationId: moveOwnFiles
+      summary: Move one's files into one's own storage, or back to the node
+      description: >-
+        `direction` own moves the person's other files (theirs and their agents') into their storage;
+        home moves the files in it to where the node keeps files. Up to `limit` (1 to 200, default 50)
+        per call; call again while `remaining` is above 0. Needs `storage:write`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [direction]
+              properties:
+                direction: { type: string, enum: [own, home] }
+                limit: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200': { description: 'moved, skipped, failed, remaining' }
+        '409': { description: Own storage is not taking files }
+  /v1/admin/file-store:
+    get:
+      operationId: getNodeFileStore
+      summary: Where this node keeps the bytes of stored files
+      description: >-
+        `kind` (database, s3, azure), `ready` and `missing` (settings or environment variables still
+        needed), `where`, `prefix`, `files` (count and bytes in the database, the node's store and
+        people's own storage) and `owner_stores` (the rule, each person's storage, the requests that
+        wait). Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The status }
+  /v1/admin/file-store/test:
+    post:
+      operationId: testNodeFileStore
+      summary: Test the node's file store
+      description: >-
+        Writes, reads, reads part of, lists and removes one small object under the store's folder, and
+        answers each step. 409 NO_FILE_STORE when files are kept in the database, 409
+        FILE_STORE_INCOMPLETE with the missing settings. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: 'where, ok and the steps' }
+        '409': { description: No store, or its settings are incomplete }
+  /v1/admin/file-store/move:
+    post:
+      operationId: moveFilesOutOfDatabase
+      summary: Move files from the database to where new files go
+      description: >-
+        Up to `limit` (1 to 500, default 100) files whose bytes are in the database move to their
+        owner's own storage when the node lets them use it, else to the node's store. Answers moved,
+        skipped, failed, moved_bytes_mb, remaining and `next`; pass `next` back as `after` to go on past
+        files that failed. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, maximum: 500 }
+                after: { type: string }
+      responses:
+        '200': { description: The batch result }
+        '409': { description: No store set up }
+  /v1/admin/file-store/owners/{owner}/decision:
+    post:
+      operationId: decideOwnFileStore
+      summary: Approve, decline or revoke a person's own storage
+      description: >-
+        On a node where operators approve. Approve lets the person's storage take their new files;
+        decline answers a request; revoke takes an approval back and new files go to the node again.
+        Decline and revoke need `note`. The person is told. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline, revoke] }
+                note: { type: string }
+      responses:
+        '200': { description: Decided }
+        '400': { description: No decision, or a decline or revoke without a note }
   /v1/admin/internet-openings:
     get:
       operationId: listInternetOpenings

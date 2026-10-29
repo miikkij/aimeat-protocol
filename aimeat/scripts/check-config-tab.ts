@@ -92,6 +92,7 @@ const PLUMBING = /^src[\\/](config[^\\/]*\.ts|services[\\/]config-[^\\/]*\.ts|ut
  * An entry here is an answer, not a backlog: delete it when the code starts reading the key.
  */
 const READ_ANOTHER_WAY: Record<string, string> = {
+  'file_store.prefix': 'read through nodeFilePrefix() in config-file-store.ts, which services/file-store/file-store-specs.ts calls: an empty folder means aimeat/<node id>/files/',
   'decide.jeff_key': 'the provider reads AIMEAT_DECIDE_JEFF_KEY from the environment by name (services/decide/providers.ts); the row shows whether it is set',
   'decide.laya_key': 'the provider reads AIMEAT_DECIDE_LAYA_KEY from the environment by name; the row shows whether it is set',
   'decide.von_key': 'the provider reads AIMEAT_DECIDE_VON_KEY from the environment by name; the row shows whether it is set',

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.28.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.27.0 -- 2026-10-25 -- "Goals" under Automation, after Agents: the agents' goals and their rules.
  *   v1.26.0 -- 2026-10-24 -- "Agreements" under Account, after What others can see: the data processing agreements a person is the counterparty of (plan doc-mvmr4i2wdk0p).
  *   v1.26.0 -- 2026-10-19 -- The Agents card's rows show the agent's own picture (components/AgentAvatar.js) in place of the robot sign, when the agent has set one.
@@ -663,6 +664,7 @@ export const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuAccount', items: [
     { id: 'wallet', labelKey: 'profile.tabs.wallet' },
     { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
+    { id: 'storage', labelKey: 'profile.tabs.storage' },
     { id: 'access', labelKey: 'profile.tabs.access' },
     { id: 'exposure', labelKey: 'profile.tabs.exposure' },
     { id: 'agreements', labelKey: 'profile.tabs.agreements' },
