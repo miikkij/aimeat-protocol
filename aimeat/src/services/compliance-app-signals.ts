@@ -24,6 +24,9 @@
  * @structure DOMAIN_WORDS · ANNEX3_BY_DOMAIN · AppAiSignals · appAiSignals()
  * @usage const s = appAiSignals(map, app.manifest?.aiPosture);
  * @version-history
+ *   v1.0.2 — 2026-10-29 — "candidates" alone and "fingerprint" alone no longer read as employment or
+ *     biometric data: on aimeat.io's maps they were a comic's image candidates and a game save's
+ *     fingerprint, and four games read as high-risk candidates.
  *   v1.0.1 — 2026-10-28 — A map that only keeps AI-made content is not an AI use: live on
  *     innokas.aimeat.io it listed two apps that call no model.
  *   v1.0.0 — 2026-10-28 — Initial.
@@ -45,10 +48,10 @@ const vocabulary = (terms: string[]): RegExp => new RegExp(
  * data and "user" does not make employment data.
  */
 export const DOMAIN_WORDS: ReadonlyArray<{ domain: string; words: RegExp }> = [
-  { domain: 'employment', words: vocabulary(['cvs?', 'resumes?', 'curriculum vitae', 'recruit*', 'hiring', 'candidates?', 'applicants?', 'job applications?', 'employees?', 'employment', 'staffing', 'personnel', 'human resources', 'hr', 'payroll', 'salar(?:y|ies)', 'competenc*', 'skill (?:matrix|entries|levels?|ratings?)', 'resourcing', 'allocation', 'consultants?', 'work history', 'performance reviews?', 'appraisals?', 'työntekij*', 'henkilöstö*', 'rekry*', 'palkka*', 'palkan', 'osaamis*', 'työhistori*', 'työsuhte*', 'hakij*', 'resursoin*']) },
+  { domain: 'employment', words: vocabulary(['cvs?', 'resumes?', 'curriculum vitae', 'recruit*', 'hiring', 'job candidates?', 'candidate (?:profiles?|cvs?|pipeline)', 'applicants?', 'job applications?', 'employees?', 'employment', 'staffing', 'personnel', 'human resources', 'hr', 'payroll', 'salar(?:y|ies)', 'competenc*', 'skill (?:matrix|entries|levels?|ratings?)', 'resourcing', 'allocation', 'consultants?', 'work history', 'performance reviews?', 'appraisals?', 'työntekij*', 'henkilöstö*', 'rekry*', 'palkka*', 'palkan', 'osaamis*', 'työhistori*', 'työsuhte*', 'hakij*', 'resursoin*']) },
   { domain: 'health', words: vocabulary(['patients?', 'diagnos*', 'medical records?', 'health data', 'health records?', 'symptoms?', 'medications?', 'potila*', 'terveystie*', 'diagnoos*', 'lääkity*', 'oire*']) },
   { domain: 'children', words: vocabulary(['child(?:ren)?', 'minors?', 'pupils?', 'under 1[3-8]', 'lapsi', 'lapse*', 'lasten', 'oppila*', 'alaikäi*']) },
-  { domain: 'biometric-genetic', words: vocabulary(['biometric*', 'fingerprints?', 'face recognition', 'facial recognition', 'face templates?', 'genetic*', 'dna', 'biometri*', 'sormenjälj*', 'kasvojentunnist*', 'geneetti*']) },
+  { domain: 'biometric-genetic', words: vocabulary(['biometric*', 'fingerprint (?:scans?|images?|templates?|readers?)', 'face recognition', 'facial recognition', 'face templates?', 'genetic*', 'dna', 'biometri*', 'sormenjälj*', 'kasvojentunnist*', 'geneetti*']) },
   { domain: 'criminal', words: vocabulary(['criminal records?', 'convictions?', 'offen[cs]es?', 'rikosrekister*', 'rikostuomi*']) },
   { domain: 'special-category', words: vocabulary(['ethnic*', 'religio*', 'political opinions?', 'trade unions?', 'sexual orientation', 'ammattiliit*', 'uskon*', 'etnis*']) },
   { domain: 'payment-financial', words: vocabulary(['card numbers?', 'credit cards?', 'iban', 'bank accounts?', 'luottokort*', 'tilinumer*']) },

@@ -28,7 +28,8 @@
  *     that have a value (`fields` [{ key, label, value, list }], a list value joined with commas, or
  *     one item per line with `list`, an empty one left out), the answers as two columns (`answers` [{ key, question, answer, source }]: an empty
  *     answer says `emptyAnswer` in italics, a source stands in brackets after the answer) and the
- *     reasons under `reasonsLabel` as a bulleted list; it is kept on one sheet.
+ *     reasons under `reasonsLabel` as a bulleted list; a long one runs on to the next sheet with no
+ *     row split.
  *   - PrintList({ items }): a numbered list [{ key, text, help }], the help on its own line in grey.
  *   - PrintToc({ title, items }): the contents, one linked line per part [{ id, num, label, note }];
  *     a PDF keeps the links. PrintHeading takes the same `id` and `num`.

@@ -10,6 +10,8 @@
  *   component's own names.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.4.0 — 2026-10-29 — On paper an entry runs on to the next sheet, its heading and description
+ *     kept with its fields and no row split: a long entry kept whole left a third of a sheet empty.
  *   v1.3.0 — 2026-10-29 — An entry's tag is a mark, its description a quoted lead, a list field one
  *     item per line (print-entry-list), and entries are divided by a darker rule.
  *   v1.2.0 — 2026-10-28 — The frames that hold the page grow to their content on paper: with the
@@ -32,9 +34,9 @@
 .print-entry h4 { margin: 0 0 .45rem; font-size: 1.05rem; }
 /* The tag is a status mark, not part of the name: in grey after the title it read as the title's
    second half ("Innokas Outreach järjestelmän löytämä, ei tallennettu"). */
-.print-entry-tag { display: inline-block; margin-left: .6rem; padding: .05rem .45rem; border: 1px solid var(--border); border-radius: 3px; font-size: .72rem; font-weight: 500; color: var(--muted); vertical-align: middle; }
+.print-entry-tag { display: inline-block; margin-left: .6rem; padding: .05rem .45rem; border: 1px solid var(--border); border-radius: var(--shape-corner-control); font-size: .72rem; font-weight: 500; color: var(--muted); vertical-align: middle; }
 /* The app's own description, in its maker's words: a quoted lead, set apart from the node's fields. */
-.print-entry-desc { margin: 0 0 .4rem; padding-left: .6rem; border-left: 3px solid var(--border); font-size: .8rem; color: var(--muted); }
+.print-entry-desc { margin: 0 0 .4rem; padding-left: .6rem; border-left: var(--shape-frame) solid var(--border); font-size: .8rem; color: var(--muted); }
 .print-entry-list { margin: 0; padding-left: 1rem; }
 .print-entry-list li { margin: 0 0 .1rem; }
 /* Fields and answers are tables: on 2026-10-28 they were runs of "Label value" lines, and a reader
@@ -77,8 +79,13 @@
   body.print-page-active .print-screen-only { display: none !important; }
   body.print-page-active .print-only { display: block; }
   body.print-page-active .print-page { width: 100%; margin: 0; padding: 0; }
-  body.print-page-active .print-entry { break-inside: avoid; }
-  body.print-page-active .print-table tr, body.print-page-active .print-entry-answers tr { break-inside: avoid; }
+  /* An entry runs on to the next sheet rather than leaving the rest of this one blank: on aimeat.io
+     each AI use filled two thirds of a sheet, and keeping it whole left a third of every sheet empty.
+     Its heading stays with its first line and no table row splits (below). */
+  body.print-page-active .print-entry { break-inside: auto; }
+  body.print-page-active .print-table tr, body.print-page-active .print-entry-answers tr,
+  body.print-page-active .print-entry-fields tr { break-inside: avoid; }
+  body.print-page-active .print-entry-desc { break-after: avoid; }
   body.print-page-active .print-page-break { break-before: page; }
   body.print-page-active .print-page h3, body.print-page-active .print-page h4 { break-after: avoid; }
   @page { margin: 1.8cm; }

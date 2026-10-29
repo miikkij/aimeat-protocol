@@ -9,8 +9,10 @@
  *
  *   - The node's own registers (C1.3): the accounts, the sign-in and security log, the consent
  *     ledger, the AI usage ledger. The node is their controller on every installation.
- *   - An app's register (C1.4, C1.6): read from the app's data map. A key family the map marks as
- *     personal data goes in; one marked `unstated` is named, because silence is not a considered no.
+ *   - An app's register (C1.4, C1.6): read from the app's data map, for an app whose personal data
+ *     someone other than its user can read. A key family the map marks as personal data goes in; one
+ *     marked `unstated` that others can read is named, because silence is not a considered no.
+ *   - The content people keep in their own account, through apps only they see: one node record.
  *   - An organism's register (C1.4): its member list is a personal data register on every organism.
  *     Its workspaces are listed as containers for the person or their AI to sort into registers.
  *   - The processors (C4.1): the AI providers whose prompts leave this machine, the mail server and
@@ -21,6 +23,10 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.3.0 — 2026-10-29 — An app gets a register only when someone other than its user can read its
+ *     personal data (compliance-app-reach.ts) or it keeps regulated data; other data only its owner
+ *     sees is in the node's new `node-user-content` record. On aimeat.io every app that kept
+ *     anything read as unlawful.
  *   v1.2.0 — 2026-10-28 — An app's register carries its regulated data domains: the ones its map's
  *     personal rows state (evidence), or the ones the map's words point to (proposed), so the label
  *     floor and the DPIA duty can follow employment and health data an app keeps.
@@ -36,6 +42,7 @@ import type { Storage } from '../storage/interface.js';
 import { nodeAiProviders } from './ai/providers.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { appAiSignals } from './compliance-app-signals.js';
+import { appReach, type AppReachReading } from './compliance-app-reach.js';
 import { classifyUseCase, type ComplianceRiskVerdict } from './compliance-register.js';
 import { COMPLIANCE_FRAMEWORKS } from '../data/compliance-frameworks.js';
 import type { ComplianceFrameworkAnswers, ComplianceProcessor, ComplianceRegister } from './compliance-docs-schemas.js';
@@ -86,6 +93,17 @@ export function nodeRegistersDraft(config: Pick<AimeatConfig, 'operator' | 'cons
       source: 'The node, on every AI call it carries.',
       answerSources: src(['type', 'purpose', 'role', 'subjects', 'dataCategories', 'source']),
     },
+    {
+      // What a person keeps in their own account through an app only they see (compliance-app-reach.ts,
+      // `self`). One record for every such app: the app's maker never receives the data, so the app
+      // has no register of its own (Jouni, 2026-10-29).
+      id: 'node-user-content', title: 'Content people keep in their own account', type: 'personal', purpose: 'service-operation', ...common,
+      legalBasis: ['contract'], subjects: ['account holders'],
+      dataCategories: ['what the person writes, saves and generates in apps only they and their own agents can read'],
+      retentionMonths: null, retentionText: 'Until the person deletes it or their account.',
+      source: 'The person, through the apps they use.',
+      answerSources: src(['type', 'purpose', 'role', 'subjects', 'dataCategories', 'retentionText', 'source']),
+    },
   ];
 }
 
@@ -111,23 +129,36 @@ function familyOf(row: DataMapRow): string {
 /**
  * C1.4, C1.6: an app's register from its data map. Null when the app has no map: nobody has said
  * what it keeps, which the report names as a gap.
+ *
+ * Only an app whose personal data someone other than its user can read gets one (`reach` shared,
+ * exposed or unknown, compliance-app-reach.ts), or one that keeps regulated data (a domain stated
+ * or read from the map's words), whoever reads it. Other data only its owner sees is the person's
+ * own account content, in the node's `node-user-content` record, and `unstated` names only the
+ * unsaid rows others can read: whether a row only its owner sees is personal asks nothing of the app.
  */
 export async function appRegisterDraft(
   storage: Storage, ownerGhii: string, filename: string,
-): Promise<{ register: ComplianceRegister | null; unstated: string[]; hasMap: boolean }> {
+): Promise<{ register: ComplianceRegister | null; unstated: string[]; hasMap: boolean; reach: AppReachReading }> {
   const map = await readAppDataMap(storage, ownerGhii, filename.replace(/\.html$/i, ''));
-  if (!map) return { register: null, unstated: [], hasMap: false };
-  const personal = map.held.filter(r => personalMark(r) === 'yes');
-  const unstated = map.held.filter(r => personalMark(r) === 'unstated').map(familyOf);
-  const keptForever = personal.some(r => r.keptFor === 'until-deleted' || r.keptFor === 'append-only');
+  const reach = appReach(map);
+  if (!map) return { register: null, unstated: [], hasMap: false, reach };
   // The regulated domains: stated on a row, or read from the map's words when no row states one.
   // A register whose every domain a row states carries them as evidence; one that rests on a
   // proposal says so, and a person decides before the label floor and the DPIA duty follow it.
   const found = appAiSignals(map).domains;
+  // A row only its user sees still needs a record when it holds regulated data (employment, health,
+  // children and the rest): TalentGrid kept colleagues' competence ratings in one person's private
+  // memory, data about other people that an employer answers for, whoever can read it.
+  const regulated = new Set(found.flatMap(d => d.rows));
+  const beyondOwner = new Set(reach.rows.filter(r => r.reach !== 'self').map(r => r.what));
+  const personal = map.held.filter(r => personalMark(r) === 'yes'
+    && ((reach.reach !== 'none' && reach.reach !== 'self' && beyondOwner.has(familyOf(r))) || regulated.has(familyOf(r))));
+  const unstated = reach.personalUnstated;
+  const keptForever = personal.some(r => r.keptFor === 'until-deleted' || r.keptFor === 'append-only');
   const domains = [...new Set(found.map(d => d.domain))];
   const domainSource = found.some(d => d.source === 'proposed') ? 'proposed' as const : EVIDENCE;
   return {
-    hasMap: true, unstated,
+    hasMap: true, unstated, reach,
     register: personal.length ? {
       id: `app-${filename.replace(/\.html$/i, '').replace(/[^A-Za-z0-9_-]+/g, '-')}`,
       title: `${map.what.slice(0, 120) || filename}`, type: 'personal', role: 'controller',

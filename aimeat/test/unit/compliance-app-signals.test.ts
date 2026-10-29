@@ -14,6 +14,8 @@
  *   much personal data it keeps.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-app-signals.test.ts
  * @version-history
+ *   v1.0.2 — 2026-10-29 — "candidates" and "fingerprint" alone fire no domain (the source was broken:
+ *     on aimeat.io four games read as high-risk candidates).
  *   v1.0.1 — 2026-10-28 — Kept AI-made content alone is not an AI use (the source was broken: live
  *     on innokas.aimeat.io it listed suuntai and Rautavasara).
  *   v1.0.0 — 2026-10-28 — Initial.
@@ -120,6 +122,16 @@ describe('what does not fire', () => {
     const s = appAiSignals(m, null);
     expect(s.domains.find(d => d.domain === 'health')).toBeUndefined();
     expect(s.personalRowsWithoutDomain).toEqual(['pm.projects']);
+  });
+
+  it('a comic\'s image candidates and a game save\'s fingerprint are neither employment nor biometric data', () => {
+    // aimeat.io, 2026-10-29: four games read as high-risk candidates on these two words.
+    const comic = mapOf({ machinery: ['ai-generation'], held: [row({ what: 'pages', personalData: 'yes', holds: 'page drafts and the image candidates the artist picks from' })] });
+    const game = mapOf({ machinery: ['ai-generation'], held: [row({ what: 'bank', personalData: 'yes', holds: 'the saved bank with a fingerprint of the caller\'s owner' })] });
+    expect(appAiSignals(comic, null).annex3).toBeNull();
+    expect(appAiSignals(game, null).annex3).toBeNull();
+    const hr = mapOf({ machinery: ['ai-generation'], held: [row({ what: 'pipeline', personalData: 'yes', holds: 'job candidates and their fingerprint scans' })] });
+    expect(appAiSignals(hr, null).domains.map(d => d.domain).sort()).toEqual(['biometric-genetic', 'employment']);
   });
 
   it('an app that keeps CVs and never uses a model is not an AI use, and gets no Annex III area', () => {

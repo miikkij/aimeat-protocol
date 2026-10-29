@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.25.0 -- 2026-10-29 -- Records of processing: an app gets a register only when others see its
+ *     personal data or it keeps regulated data; every app's reach is in the report's processing.apps.
  *   v1.24.0 -- 2026-10-27 -- The subdomain incident's addresses are entries decided with "app_only" or
  *     "keep" (Jouni, 2026-10-27).
  *   v1.23.0 -- 2026-10-26 -- The incident that names capabilities with an unknown visibility word
@@ -193,7 +195,11 @@ The same tools keep \`processors\` (add the contract date, country and transfer 
 \`scope: "organism"\` and \`organism_id\`, or \`scope: "app"\`, \`app\` and \`app_owner\`, to read an
 organism's or an app's; you read every one and write only the node's. \`scope: "all"\` reads one
 part across every place at once, each place named. To change one entry (a register reviewed, a
-request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`.
+request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`. An app gets a
+register of its own only when someone other than its user sees its personal data, or it keeps
+regulated data: \`aimeat_compliance_report\` with \`scope: "node"\` lists every app's \`reach\` in
+\`processing.apps\`, and what a person keeps through an app only they see is in the node's record
+\`node-user-content\`.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:
