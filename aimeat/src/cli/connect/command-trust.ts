@@ -17,7 +17,9 @@
  *      approved) is trusted by that act: trustWrittenCommands() records it as it is written.
  *   2. Every command an install already has at the first start after this update is adopted once
  *      (adoptExistingCommands): a config file older than the record's `firstRunAt`, which the first
- *      start writes. No existing fleet or unattended daemon stops, and nobody is asked.
+ *      start writes. No existing fleet or unattended daemon stops, and nobody is asked. A record
+ *      that exists but cannot be read, or has no `firstRunAt`, adopts nothing and gets no new
+ *      `firstRunAt`: its commands are held as in 3 until `aimeat connect` takes each one into use.
  *   3. Any other command, one in a folder that arrived after that first start and that nobody
  *      connected through the connector, does not run: heldBackCommands() takes it out of the config,
  *      and heldNotices() gives one plain line that names it and says that `aimeat connect` in that
@@ -30,12 +32,26 @@
  *   trusted in another; the agent's name is not, so a fleet with one runner is one entry, and the
  *   connector's own copies of a recorded command (the move to the per-owner layout) stay trusted.
  *
+ *   A RELATIVE PROGRAM PATH. A runner command or the first word of a wake command with a directory
+ *   part that is not absolute (`./run.sh`, `bin/agent`) is resolved to an absolute path in the
+ *   directory it runs in (runner.cwd, else the daemon's working directory), and that absolute path is
+ *   in the hash. With AIMEAT_HOME set the home does not say which directory that is, so a start in
+ *   another directory holds the command until `aimeat connect` there takes it into use. A record
+ *   from before this rule (the command text only) is bound once, at the first start in a directory
+ *   that holds the program (secaudit2026oct26 round 8c, home-bound-not-resolution-directory).
+ *   Absolute paths and bare names keep the hash they had.
+ *
  *   KNOWN RESIDUAL. Adoption reads file times. An archive that keeps the times of its files, older
  *   than this machine's first start after the update, is adopted as an existing install would be.
+ *   A machine with no record at all treats its first start as the first start after the update.
  * @structure HeldCommands · commandTrustFile · commandHash · isTrustedCommand · trustWrittenCommands ·
  *   adoptExistingCommands · heldBackCommands · heldNotices
  * @usage adoptExistingCommands(home); const { config, held } = heldBackCommands(perAgent, home);
  * @version-history
+ *   v2.2.0 -- 2026-10-29 -- A record that cannot be read, or has no firstRunAt, adopts nothing and gets
+ *     no new firstRunAt (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update). A relative
+ *     program path is resolved where it runs and the hash binds the absolute path; a record from
+ *     before is bound once (secaudit2026oct26 round 8c, home-bound-not-resolution-directory).
  *   v2.1.0 -- 2026-10-27 -- enrolmentTookHeldNotice: an enrolment the owner approved on the node that
  *     takes held commands into use says so in one line, printed by the daemon and kept in its log
  *     (secaudit2026oct26, node-offer-trusts-held-commands; designed use, decision 2026-10-27). Each
@@ -50,7 +66,7 @@
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync, mkdirSync, renameSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, isAbsolute } from 'node:path';
 import { parse } from 'yaml';
 import { logger } from '../../utils/logger.js';
 
@@ -66,6 +82,8 @@ export interface HeldCommands {
   home: string;
   runner?: RunnerConfig;
   wakeCommand?: string;
+  /** The absolute paths a relative program path resolves to in the directory the commands run in. */
+  programs?: { runner?: string; wake?: string };
 }
 
 interface TrustRecord { firstRunAt?: string; hashes: Record<string, { at: string; how: 'connected' | 'adopted' }> }
@@ -85,9 +103,77 @@ function canonical(v: unknown): string {
   return JSON.stringify(v ?? null);
 }
 
-/** The hash of a home's commands. */
-export function commandHash(home: string, runner: RunnerConfig | undefined, wakeCommand: string | undefined): string {
-  return createHash('sha256').update(canonical({ home: resolve(home), runner: runner ?? null, wake: wakeCommand ?? null })).digest('hex');
+/** A program path with a directory part that is not absolute: `./run.sh`, `bin/agent`. Not a bare name. */
+function isRelativeProgram(program: string): boolean {
+  return /[\\/]/.test(program) && !isAbsolute(program);
+}
+
+/** The program a wake command starts: its first word, without quotes. */
+function wakeProgram(wakeCommand: string): string {
+  const m = /^\s*(?:"([^"]+)"|(\S+))/.exec(wakeCommand);
+  return m?.[1] ?? m?.[2] ?? '';
+}
+
+/**
+ * The absolute paths of the programs the commands name by a relative path, resolved where each runs:
+ * a runner in runner.cwd (itself resolved in `dir`), else in `dir`; a wake command in `dir`. Null when
+ * no program is named by a relative path, so the hash of such commands is the one they always had.
+ */
+function relativePrograms(runner: RunnerConfig | undefined, wakeCommand: string | undefined, dir: string): { runner?: string; wake?: string } | null {
+  const out: { runner?: string; wake?: string } = {};
+  if (runner?.command && isRelativeProgram(runner.command)) out.runner = resolve(dir, runner.cwd ?? '.', runner.command);
+  const wp = wakeCommand ? wakeProgram(wakeCommand) : '';
+  if (wp && isRelativeProgram(wp)) out.wake = resolve(dir, wp);
+  return out.runner || out.wake ? out : null;
+}
+
+function hashOf(home: string, runner: RunnerConfig | undefined, wakeCommand: string | undefined, programs: { runner?: string; wake?: string } | null): string {
+  return createHash('sha256').update(canonical({ home: resolve(home), runner: runner ?? null, wake: wakeCommand ?? null, ...(programs ? { programs } : {}) })).digest('hex');
+}
+
+/**
+ * The hash of a home's commands. A relative program path is resolved in `dir`, the directory the
+ * command runs in (the daemon's working directory), and the absolute path is part of the hash.
+ */
+export function commandHash(home: string, runner: RunnerConfig | undefined, wakeCommand: string | undefined, dir: string = process.cwd()): string {
+  return hashOf(home, runner, wakeCommand, relativePrograms(runner, wakeCommand, dir));
+}
+
+/** True when a file the program path names exists, with the extensions Windows tries for it. */
+function programExists(path: string): boolean {
+  const exts = process.platform === 'win32' ? ['', '.com', '.exe', '.bat', '.cmd'] : [''];
+  return exts.some(e => {
+    try { return Boolean(statSync(path + e, { throwIfNoEntry: false })?.isFile()); } catch (err) {
+      logger.warn('connector: a program path could not be read while binding a trusted command', { path: path + e, error: String(err) });
+      return false;
+    }
+  });
+}
+
+/**
+ * A record from before relative program paths were bound holds the hash of the command text only.
+ * The first time such a command is met in a directory that holds its program, the record is bound to
+ * the absolute path there: the new hash is added and the text-only one removed, so it is resolved
+ * once. Returns true when the command may run here: bound now, or no program by that name is here
+ * to run (the record then stays for the directory the command runs from).
+ */
+function bindTextOnlyRecord(file: string, record: TrustRecord, home: string, c: { runner?: RunnerConfig; wakeCommand?: string }, dir: string): boolean {
+  const programs = relativePrograms(c.runner, c.wakeCommand, dir);
+  if (!programs) return false;
+  const old = hashOf(home, c.runner, c.wakeCommand, null);
+  const entry = record.hashes[old];
+  if (!entry) return false;
+  if (!Object.values(programs).every(p => programExists(p!))) return true;
+  const hash = hashOf(home, c.runner, c.wakeCommand, programs);
+  record.hashes[hash] = { at: new Date().toISOString(), how: entry.how };
+  delete record.hashes[old];
+  try { writeTrust(file, record); } catch (err) {
+    // The text-only record stays, and the next start binds it.
+    logger.warn('connector: the record of trusted commands could not be written', { file, error: String(err) });
+    return true;
+  }
+  logger.info('connector: a trusted command with a relative program path is bound to the program in this directory', { home: resolve(home), dir, programs });
+  return true;
 }
 
 /** The commands a config names, or null when it names none. A wake webhook is not a command. */
@@ -103,10 +189,10 @@ function readTrust(file: string): TrustRecord | null {
     const v = JSON.parse(readFileSync(file, 'utf-8')) as Partial<TrustRecord>;
     return { ...(typeof v.firstRunAt === 'string' ? { firstRunAt: v.firstRunAt } : {}), hashes: v.hashes && typeof v.hashes === 'object' ? v.hashes : {} };
   } catch (err) {
-    // A record that does not parse has no hashes and no firstRunAt. The next adoption run treats it
-    // as a first start and adopts the commands this home has at that moment; the write then
-    // replaces it with a whole file. The file lies outside every connector home, so a folder cannot
-    // bring this state with it.
+    // A record that does not parse has no hashes and no firstRunAt. Adoption adopts nothing from it
+    // and writes no firstRunAt, so every command is held until `aimeat connect` takes it into use;
+    // that connect replaces the file with a whole one, still without firstRunAt (secaudit2026oct26
+    // round 8c, mtime-cutoff-not-bound-to-update).
     logger.warn('connector: the record of trusted commands could not be read', { file, error: String(err) });
     return { hashes: {} };
   }
@@ -125,12 +211,12 @@ export function isTrustedCommand(hash: string, env: NodeJS.ProcessEnv = process.
 }
 
 /** Record that the connect flow wrote these commands in `home`: the person who connected approved them. */
-export function trustWrittenCommands(config: AimeatPerAgentConfig, home: string, env: NodeJS.ProcessEnv = process.env): void {
+export function trustWrittenCommands(config: AimeatPerAgentConfig, home: string, env: NodeJS.ProcessEnv = process.env, dir: string = process.cwd()): void {
   const c = commandsOf(config);
   if (!c) return;
   const file = commandTrustFile(env);
   const record = readTrust(file) ?? { firstRunAt: new Date().toISOString(), hashes: {} };
-  const hash = commandHash(home, c.runner, c.wakeCommand);
+  const hash = commandHash(home, c.runner, c.wakeCommand, dir);
   if (record.hashes[hash]) return;
   record.hashes[hash] = { at: new Date().toISOString(), how: 'connected' };
   writeTrust(file, record);
@@ -156,14 +242,20 @@ function configFilesOf(home: string): string[] {
 /**
  * The once-only adoption: the first start after this update writes `firstRunAt`, and every command
  * of this home whose config file is older than that is trusted, so an install keeps running what it
- * ran. A file written later (a folder cloned after the update) is not adopted. Never throws: a home
- * that cannot be read adopts nothing, and its commands do not run.
+ * ran. A file written later (a folder cloned after the update) is not adopted. A record that exists
+ * but cannot be read, or has no firstRunAt, adopts nothing and gets no firstRunAt: its commands are
+ * held until `aimeat connect` takes each one into use. Never throws: a home that cannot be read
+ * adopts nothing, and its commands do not run.
  */
-export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = process.env): void {
+export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = process.env, dir: string = process.cwd()): void {
   try {
     const file = commandTrustFile(env);
     const found = readTrust(file);
-    const record: TrustRecord = found?.firstRunAt ? found : { firstRunAt: new Date().toISOString(), hashes: found?.hashes ?? {} };
+    if (found && !found.firstRunAt) {
+      logger.warn('connector: the record of trusted commands has no first-start time, so no command is adopted; a held command runs after `aimeat connect` in its folder', { file });
+      return;
+    }
+    const record: TrustRecord = found ?? { firstRunAt: new Date().toISOString(), hashes: {} };
     const before = Date.parse(record.firstRunAt!);
     let changed = !found?.firstRunAt;
     for (const path of configFilesOf(home)) {
@@ -174,8 +266,14 @@ export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = pro
         continue;
       }
       if (!c) continue;
-      const hash = commandHash(home, c.runner, c.wakeCommand);
+      const programs = relativePrograms(c.runner, c.wakeCommand, dir);
+      const hash = hashOf(home, c.runner, c.wakeCommand, programs);
       if (record.hashes[hash]) continue;
+      // A record from before relative program paths were bound is bound by heldBackCommands, once,
+      // in a directory that holds the program. A relative program this directory does not hold is
+      // adopted at a later start in the directory that does: its file stays older than firstRunAt.
+      if (programs && record.hashes[hashOf(home, c.runner, c.wakeCommand, null)]) continue;
+      if (programs && !Object.values(programs).every(p => programExists(p!))) continue;
       record.hashes[hash] = { at: new Date().toISOString(), how: 'adopted' };
       changed = true;
       // Each adoption is named in the log, so a command taken into use without a connect can be seen.
@@ -193,17 +291,25 @@ export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = pro
 
 /**
  * The config with an untrusted runner and wake.command taken out, and what was taken out. A config
- * with no command, or with trusted ones, comes back unchanged and `held` is null.
+ * with no command, or with trusted ones, comes back unchanged and `held` is null. `dir` is the
+ * directory the commands run in, where a relative program path is resolved.
  */
-export function heldBackCommands<T extends AimeatPerAgentConfig>(config: T, home: string, env: NodeJS.ProcessEnv = process.env): { config: T; held: HeldCommands | null } {
+export function heldBackCommands<T extends AimeatPerAgentConfig>(config: T, home: string, env: NodeJS.ProcessEnv = process.env, dir: string = process.cwd()): { config: T; held: HeldCommands | null } {
   const c = commandsOf(config);
   if (!c) return { config, held: null };
-  const hash = commandHash(home, c.runner, c.wakeCommand);
+  const hash = commandHash(home, c.runner, c.wakeCommand, dir);
   if (isTrustedCommand(hash, env)) return { config, held: null };
+  const file = commandTrustFile(env);
+  const record = readTrust(file);
+  if (record && bindTextOnlyRecord(file, record, home, c, dir)) return { config, held: null };
   const wake = config.wake ? { ...config.wake, command: undefined } : undefined;
+  const programs = relativePrograms(c.runner, c.wakeCommand, dir);
   return {
     config: { ...config, runner: undefined, ...(wake ? { wake } : {}) },
-    held: { hash, home: resolve(home), ...(c.runner ? { runner: c.runner } : {}), ...(c.wakeCommand ? { wakeCommand: c.wakeCommand } : {}) },
+    held: {
+      hash, home: resolve(home), ...(c.runner ? { runner: c.runner } : {}), ...(c.wakeCommand ? { wakeCommand: c.wakeCommand } : {}),
+      ...(programs ? { programs } : {}),
+    },
   };
 }
 
@@ -235,6 +341,9 @@ export function heldNotices(agents: Array<{ agent: string; owner: string; heldCo
   }
   return [...byHash.values()].map(({ held, names }) => {
     const cmds = heldCommandText(held);
-    return `The settings in ${held.home} name ${cmds} for ${names.join(', ')}, but nobody connected this folder through the connector, so the command does not run. Run \`aimeat connect\` in this folder to connect it.`;
+    // A relative program path is trusted for the program it names in one directory: the line says
+    // which program it names here.
+    const here = held.programs ? ` In this directory it starts ${[held.programs.runner, held.programs.wake].filter(Boolean).join(' and ')}.` : '';
+    return `The settings in ${held.home} name ${cmds} for ${names.join(', ')}, but nobody connected this folder through the connector, so the command does not run.${here} Run \`aimeat connect\` in this folder to connect it.`;
   });
 }
