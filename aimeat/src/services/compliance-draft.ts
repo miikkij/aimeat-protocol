@@ -40,6 +40,10 @@
  *   const draft = await draftRegisterFromActivity(storage, config, { sinceDays: 30 });
  *   res.json(success(config.nodeId, draft));
  * @version-history
+ *   v1.3.0 — 2026-10-29 — An app that uses AI with no employment or biometric data in its map gets
+ *     "none of these" proposed as its Annex III area, so only the transparency questions are asked
+ *     of it (askedWhen); each entry carries its verdict, and the count left to answer is of the
+ *     questions each entry is asked.
  *   v1.2.0 — 2026-10-28 — The maker's answers and notes from the app's data map (`aiAct`) enter the
  *     draft marked `maker`, below evidence and over a rule's proposal; an entry already stored gets
  *     them in `makerUpdates` for the questions it has not answered (Jouni: the maker answers for
@@ -60,7 +64,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { AiProvenanceListQuery, AiProvenanceRecordRow } from '../storage/types/ai-provenance.js';
 import type { ComplianceAnswerSource, ComplianceUseCase } from './compliance-register.js';
-import { effectiveQuestionnaire, readUseCases } from './compliance-register.js';
+import { classifyUseCase, effectiveQuestionnaire, readUseCases, type ComplianceRiskVerdict } from './compliance-register.js';
 import { appAiSignals } from './compliance-app-signals.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import type { AiActStatement } from './data-map/data-map-types.js';
@@ -87,9 +91,16 @@ export interface DraftProposal {
   value: unknown;
   /** The reason in English, for a machine or a log. */
   reason: string;
-  /** The same reason as data, for a page that says it in its reader's language. */
-  basis: { domain: string; source: 'evidence' | 'proposed'; rows: string[]; words: string[] };
+  /**
+   * The same reason as data, for a page that says it in its reader's language. Null for "none of
+   * these areas", which rests on what the map does NOT hold: no employment or biometric data.
+   */
+  basis: { domain: string; source: 'evidence' | 'proposed'; rows: string[]; words: string[] } | null;
 }
+
+/** The reason beside a proposed "none of these" area. */
+const NO_AREA_REASON = 'The data map holds no employment or biometric data, the two Annex III areas a data map can show. '
+  + 'The other areas (education, credit, critical infrastructure and the rest) are a person\'s call.';
 
 /**
  * The maker's answers for an entry the stored register already holds: the questions that entry has
@@ -104,8 +115,8 @@ export interface MakerUpdate {
 }
 
 export interface RegisterDraft {
-  /** The proposed entries. Not stored: the caller shows these and somebody approves them. */
-  usecases: ComplianceUseCase[];
+  /** The proposed entries, each with its verdict. Not stored: the caller shows these and somebody approves them. */
+  usecases: Array<ComplianceUseCase & { risk: ComplianceRiskVerdict }>;
   /** Every `proposed` answer in `usecases`, with why. */
   proposals: DraftProposal[];
   /** The maker's answers that stored entries do not carry yet. */
@@ -362,6 +373,11 @@ export async function draftRegisterFromActivity(
     if (signals.annex3) {
       proposals.push({ usecase_id: id, question: Q.annex3, value: signals.annex3.area, reason: signals.annex3.reason, basis: signals.annex3.basis });
       if (!(Q.annex3 in maker.answers) && answer(answers, answerSources, Q.annex3, signals.annex3.area, 'proposed')) proposed++;
+    } else if (!(Q.annex3 in maker.answers) && questionnaire.questions.some(q => q.id === Q.annex3 && (q.options || []).some(o => o.value === 'none'))) {
+      // No employment or biometric data in the map: "none of these" is proposed, so the full survey
+      // is not asked until a person or the maker names an area (Jouni, 2026-10-29).
+      proposals.push({ usecase_id: id, question: Q.annex3, value: 'none', reason: NO_AREA_REASON, basis: null });
+      if (answer(answers, answerSources, Q.annex3, 'none', 'proposed')) proposed++;
     }
     // The maker's answers, below what the record evidences and over what a rule proposes.
     for (const [q, a] of Object.entries(maker.answers)) {
@@ -387,9 +403,11 @@ export async function draftRegisterFromActivity(
     });
   }
 
-  const perEntry = questionnaire.questions.length;
+  // Each entry with its verdict, so a page shows the questions asked of it and the class its answers
+  // give; the register's write strips `risk`, which is derived on read.
+  const withRisk = usecases.map(u => ({ ...u, risk: classifyUseCase(u, questionnaire) }));
   return {
-    usecases,
+    usecases: withRisk,
     proposals,
     makerUpdates,
     counts: {
@@ -397,7 +415,8 @@ export async function draftRegisterFromActivity(
       answeredFromEvidence,
       fromMaker,
       proposed,
-      leftToAnswer: Math.max(0, usecases.length * perEntry - answeredFromEvidence - fromMaker - proposed),
+      // The questions still open, of the ones each entry is asked (askedWhen), not of all of them.
+      leftToAnswer: withRisk.reduce((n, u) => n + u.risk.unanswered.length, 0),
     },
     notes: [
       'Grouped by what called the model, not by the model: an agent is a named thing with a purpose, '
@@ -405,8 +424,10 @@ export async function draftRegisterFromActivity(
       'The titles, descriptions and capabilities are the ones whoever created each agent or app wrote. '
         + 'Nothing here was invented.',
       'Answers read from the record are marked evidence. An app\'s Annex III area is marked proposed when its '
-        + 'data map holds employment or biometric data and the app uses AI; the reason is in proposals, and a '
-        + 'person decides. Every other answer is left empty rather than guessed.',
+        + 'data map holds employment or biometric data and the app uses AI, and "none of these" is proposed when it '
+        + 'holds neither; the reason is in proposals, and a person decides. Every other answer is left empty rather than guessed.',
+      'Outside the Annex III areas only the area and the two transparency questions are asked; the rest of the set '
+        + 'waits for an area (each question\'s askedWhen, and each entry\'s risk.notAsked).',
       'An app\'s maker answers the questions in the app\'s data map (aiAct), with a note each; those answers are marked '
         + 'maker, below what the record evidences and over what a rule proposes. A stored entry gets the maker\'s answers '
         + 'to the questions it has not answered, in makerUpdates, never over a saved answer.',

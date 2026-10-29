@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.2.0 — 2026-10-29 — structure, structure_set and plans call services/app-structure.ts.
  *   v1.1.0 — 2026-10-13 — scope_allowance and scope_allowance_remove call services/app-scope-allowance.ts.
  *   v1.0.0 — 2026-10-05 — Initial: aimeat_app_manage calls the service in place of the route over
  *     loopback HTTP (secaudit 2026-10, M6).
@@ -31,6 +32,7 @@ import { setCarryPlan, setMember, removeRosterMember } from '../services/app-ros
 import { listAppBuilders, setAppBuilder, removeAppBuilder } from '../services/app-dev-grant-ops.js';
 import { readDesignSpecFor, writeDesignSpecFor, clearDesignSpecFor } from '../services/app-design-spec-ops.js';
 import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app-scope-allowance.js';
+import { readStructureFor, writePlanFor, listPlansFor } from '../services/app-structure.js';
 import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app-audit-keep.js';
 import { opAnswer, type ToolAnswer } from './app-manage-answers.js';
 
@@ -112,6 +114,12 @@ export async function appManageMemberAction(
       return opAnswer(await writeDesignSpecFor(storage, config, caller, ref, pick(args, ['markdown', 'expected_revision'])));
     case 'spec_clear':
       return opAnswer(await clearDesignSpecFor(storage, config, caller, ref));
+    case 'structure':
+      return opAnswer(await readStructureFor(storage, config, caller, ref));
+    case 'structure_set':
+      return opAnswer(await writePlanFor(storage, config, caller, ref, pick(args, ['name', 'purpose', 'data', 'choices', 'now', 'expected_revision'])));
+    case 'plans':
+      return opAnswer(await listPlansFor(storage, config, caller));
     case 'scope_allowance':
       return opAnswer(await readScopeAllowanceFor(storage, config, caller, ref));
     case 'scope_allowance_remove':

@@ -26,6 +26,7 @@
  *   - Types: ComplianceQuestionnaire · ComplianceUseCase · ComplianceRiskVerdict
  *   - Zod: QuestionnaireSchema · UseCasesSchema — one definition, used by the route and the tool
  *   - classifyUseCase(useCase, questionnaire) — the pure function; no ids, no class names
+ *   - askedQuestions(questionnaire, answers) — which questions a use is asked, from `askedWhen`
  *   - readQuestionnaire / writeQuestionnaire / readUseCases / writeUseCases
  *   - effectiveQuestionnaire(storage, nodeId) — the stored set, or the seed; never null
  *   - reportKeyFor / storedReportKind / snapshotIdFor — the id shapes of a stored report
@@ -34,6 +35,10 @@
  *   const q = await readQuestionnaire(storage, config.nodeId);
  *   const verdict = classifyUseCase(useCase, q);
  * @version-history
+ *   v1.5.0 — 2026-10-29 — A question may carry `askedWhen`, a condition on another question's
+ *     answer; one whose condition is not met is not asked (`notAsked` in the verdict, askedQuestions).
+ *     A stored set takes the shipped conditions for the questions it holds as shipped. Jouni: the
+ *     full AI Act survey only in the Annex III areas, the transparency questions of every use.
  *   v1.4.0 — 2026-10-28 — An answer's source may be `maker` (the app's maker answered it in the data
  *     map), and an entry carries `answerNotes`, a reason per answer.
  *   v1.3.0 — 2026-10-28 — An answer's source may be `proposed` (ComplianceAnswerSource): the node
@@ -81,6 +86,14 @@ export interface ComplianceQuestion {
    * question can be asked for the record without moving the class.
    */
   implies: Record<string, string>;
+  /**
+   * When this question is asked: only when another question's answer is `in` the list, or is not
+   * `notIn` it, keyed as `implies` keys them (`'true'`, `'false'`, an option value). Absent means it
+   * is asked of every use. A question whose condition is not met is not asked, and the verdict lists
+   * it under `notAsked` instead of `unanswered`; one whose condition question is still open waits.
+   * An answer already given always counts, asked or not.
+   */
+  askedWhen?: { question: string; in?: string[]; notIn?: string[] };
 }
 
 export interface ComplianceQuestionnaire {
@@ -146,6 +159,8 @@ export interface ComplianceRiskVerdict {
   reasons: Array<{ questionId: string; question: string; answer: string; impliesClass: string }>;
   /** Question ids with no answer. Non-empty means `unclassified`, whatever the answered ones said. */
   unanswered: string[];
+  /** Question ids not asked of this use, because their `askedWhen` condition is not met. */
+  notAsked: string[];
   /** The version of the set this verdict was computed against. */
   questionnaireVersion: string;
 }
@@ -169,6 +184,11 @@ const QuestionSchema = z.object({
   type: z.enum(['boolean', 'choice']),
   options: z.array(OptionSchema).max(50).optional(),
   implies: z.record(z.string(), z.string().max(INPUT_LIMITS.id)),
+  askedWhen: z.object({
+    question: z.string().min(1).max(120),
+    in: z.array(z.string().max(120)).max(50).optional(),
+    notIn: z.array(z.string().max(120)).max(50).optional(),
+  }).optional(),
 });
 
 export const QuestionnaireSchema = z.object({
@@ -206,6 +226,13 @@ export const QuestionnaireSchema = z.object({
       ctx.addIssue({ code: 'custom', path: ['questions', qi, 'id'], message: `duplicate question id "${question.id}"` });
     }
     seen.add(question.id);
+  }
+  // A condition on a question that does not exist would leave its question waiting forever.
+  for (const [qi, question] of q.questions.entries()) {
+    const on = question.askedWhen?.question;
+    if (on !== undefined && (!seen.has(on) || on === question.id)) {
+      ctx.addIssue({ code: 'custom', path: ['questions', qi, 'askedWhen', 'question'], message: `askedWhen names "${on}", which is not another question of the set` });
+    }
   }
 });
 
@@ -265,11 +292,18 @@ export function classifyUseCase(
   const answers = useCase.answers ?? {};
   const reasons: ComplianceRiskVerdict['reasons'] = [];
   const unanswered: string[] = [];
+  const notAsked: string[] = [];
+  const asked = askedQuestions(questionnaire, answers);
   let best: ComplianceRiskClass | null = null;
 
   for (const question of questionnaire.questions) {
     const key = answerKey(answers[question.id]);
-    if (key === null) { unanswered.push(question.id); continue; }
+    if (key === null) {
+      const state = asked.get(question.id);
+      if (state === 'asked') unanswered.push(question.id);
+      else if (state === 'not-asked') notAsked.push(question.id);
+      continue;
+    }
     const impliedId = question.implies[key];
     if (!impliedId) continue;
     const implied = byId.get(impliedId);
@@ -279,16 +313,49 @@ export function classifyUseCase(
   }
 
   const version = questionnaire.version;
+  // A question still waiting for its condition's answer makes the verdict unclassified too, through
+  // the condition question itself, which is then among the unanswered.
   if (unanswered.length) {
-    return { class: UNCLASSIFIED, label: 'Not yet classified', reasons, unanswered, questionnaireVersion: version };
+    return { class: UNCLASSIFIED, label: 'Not yet classified', reasons, unanswered, notAsked, questionnaireVersion: version };
   }
   const fallback = byId.get(questionnaire.defaultClass);
   const chosen = best ?? fallback;
   return {
     class: chosen?.id ?? questionnaire.defaultClass,
     label: chosen?.label ?? questionnaire.defaultClass,
-    reasons, unanswered, questionnaireVersion: version,
+    reasons, unanswered, notAsked, questionnaireVersion: version,
   };
+}
+
+/**
+ * Which questions are asked of one use, from their `askedWhen` conditions and its answers: `asked`,
+ * `not-asked` (the condition's answer rules it out) or `waiting` (the condition is not answered
+ * yet). Pure, and as ignorant of ids as the classifier: the conditions are the set's own data.
+ */
+export function askedQuestions(
+  questionnaire: Pick<ComplianceQuestionnaire, 'questions'>, answers: Record<string, unknown>,
+): Map<string, 'asked' | 'not-asked' | 'waiting'> {
+  const byId = new Map(questionnaire.questions.map(q => [q.id, q]));
+  const out = new Map<string, 'asked' | 'not-asked' | 'waiting'>();
+  const stateOf = (id: string, depth: number): 'asked' | 'not-asked' | 'waiting' => {
+    const known = out.get(id);
+    if (known) return known;
+    const cond = byId.get(id)?.askedWhen;
+    let state: 'asked' | 'not-asked' | 'waiting' = 'asked';
+    // A chain deeper than the set, or a loop an edit made, asks the question rather than hiding it.
+    if (cond && byId.has(cond.question) && depth < byId.size) {
+      const parent = stateOf(cond.question, depth + 1);
+      const key = answerKey(answers[cond.question]);
+      if (parent === 'not-asked') state = 'not-asked';
+      else if (key === null) state = 'waiting';
+      else if (cond.in) state = cond.in.includes(key) ? 'asked' : 'not-asked';
+      else if (cond.notIn) state = cond.notIn.includes(key) ? 'not-asked' : 'asked';
+    }
+    out.set(id, state);
+    return state;
+  };
+  for (const q of questionnaire.questions) stateOf(q.id, 0);
+  return out;
 }
 
 // ── Reading and writing ──────────────────────────────────────────────────────────────────────
@@ -446,7 +513,19 @@ export async function effectiveQuestionnaire(
   storage: Storage, nodeId: string,
 ): Promise<ComplianceQuestionnaire> {
   const stored = await readQuestionnaire(storage, nodeId);
-  if (stored) return stored;
-  const { COMPLIANCE_QUESTIONNAIRE_SEED } = await import('../data/compliance-questionnaire.js');
-  return COMPLIANCE_QUESTIONNAIRE_SEED;
+  const { COMPLIANCE_QUESTIONNAIRE_SEED, builtInQuestionIds } = await import('../data/compliance-questionnaire.js');
+  if (!stored) return COMPLIANCE_QUESTIONNAIRE_SEED;
+  // A set stored before the shipped questions had conditions (2026-10-29) takes them for every
+  // question it still holds as shipped. A question somebody reworded keeps what they wrote, and
+  // without a condition of its own it is asked of every use, as before.
+  const shipped = new Set(builtInQuestionIds(stored));
+  const seed = new Map(COMPLIANCE_QUESTIONNAIRE_SEED.questions.map(q => [q.id, q]));
+  const ids = new Set(stored.questions.map(q => q.id));
+  return {
+    ...stored,
+    questions: stored.questions.map((q) => {
+      const cond = seed.get(q.id)?.askedWhen;
+      return !q.askedWhen && cond && shipped.has(q.id) && ids.has(cond.question) ? { ...q, askedWhen: cond } : q;
+    }),
+  };
 }

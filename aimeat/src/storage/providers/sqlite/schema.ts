@@ -12,7 +12,9 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
- *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0121).
+ *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0122).
+ *   2026-10-29 — storage_files.blobRef (migration 0121); the storage_files utf8Verified and
+ *     aiProvenanceId lines move to schema-columns-files.ts unchanged (max-file-lines).
  *   2026-10-25 — subdomain_sites.heldSince (migration 0119, secaudit2026oct22).
  *   2026-10-25 — subdomain_sites.origin (migration 0116, secaudit2026oct22).
  *   2026-10-18 — companies.frontPageAccess (migration 0106).
@@ -98,6 +100,7 @@ import { backfillMemorySearchValues } from './schema-memory-search.js';
 import { applySchedulerColumns } from './schema-columns-scheduler.js';
 import { applyExtensionColumns } from './schema-columns-extensions.js';
 import { applyAgentRuntimeColumns } from './schema-columns-agents.js';
+import { applyFileColumns } from './schema-columns-files.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -399,10 +402,6 @@ export function initializeSchema(db: Database.Database): void {
   // Workspace-scoped visibility tier (files reach parity with memory): "<org>/<ws>" whose members may read.
   safeAddColumn('memory', 'workspaceRef', 'TEXT');
   safeAddColumn('storage_files', 'workspaceRef', 'TEXT');
-  // TARGET-063: does the whole file decode as UTF-8? Settled on write, so a byte-range or HEAD
-  // response can name the charset without loading the file. No DEFAULT: NULL means "not
-  // established", which is a different thing from "not UTF-8" and is read as such.
-  safeAddColumn('storage_files', 'utf8Verified', 'INTEGER');
   safeAddColumn('agents', 'technicalCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'domainCapabilities', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'activityStats', "TEXT DEFAULT '{}'");
@@ -707,9 +706,8 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('companies', 'descriptionProvenanceId', 'TEXT');
   // Who may open a company's front page: NULL anyone, 'signed-in' or 'organism:<id>'. Mirrors Postgres 0106.
   safeAddColumn('companies', 'frontPageAccess', 'TEXT');
-  // A stored file's AI-provenance record, and the index PUBLICLY_LINKED reads. Mirrors Postgres 0096.
-  safeAddColumn('storage_files', 'aiProvenanceId', 'TEXT');
-  db.exec('CREATE INDEX IF NOT EXISTS idx_storage_files_ai_provenance ON storage_files(aiProvenanceId) WHERE aiProvenanceId IS NOT NULL;');
+  // storage_files: the UTF-8 verdict, the AI-provenance record and the object reference (schema-columns-files.ts).
+  applyFileColumns(safeAddColumn, sql => db.exec(sql));
   // Who chose a subdomain label, 'operator' or 'publisher'; NULL until classified. Mirrors Postgres 0116.
   safeAddColumn('subdomain_sites', 'origin', 'TEXT');
   // When the app a label served went away, so the label is held (ISO text); NULL otherwise. Mirrors Postgres 0117.
@@ -793,7 +791,7 @@ export function initializeSchema(db: Database.Database): void {
     DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
   // Ledger, action and work rows move from the bare account name to the GHII on evidence, once (Postgres 0086);
-  // then one ledger row per federation settlement (Postgres 0121), after the move has renamed rows.
+  // then one ledger row per federation settlement (Postgres 0122), after the move has renamed rows.
   moveActionsAndWorkToFullIdentity(db);
   settleOncePerTrackingCode(db);
 }

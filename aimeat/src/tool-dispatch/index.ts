@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.16.0 -- 2026-10-29 -- fileStoreCliTools: where stored files keep their bytes (eight tools).
  *   v1.15.0 -- 2026-10-25 -- internetOpeningCliTools: an app opened to the internet on a closed node (six tools).
  *   v1.15.0 -- 2026-10-26 -- dmReactionCliTools: aimeat_dm_react (a mark on one message).
  *   v1.14.0 -- 2026-10-21 -- dmGroupCliTools: the six aimeat_dm_group_* tools (group chat).
@@ -70,6 +71,7 @@ import { organismOwnerCliTools } from './tool-call-defs-organism-owners.js';
 import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
 import { exposureCliTools } from './tool-call-defs-exposure.js';
 import { internetOpeningCliTools } from './tool-call-defs-internet-opening.js';
+import { fileStoreCliTools } from './tool-call-defs-file-store.js';
 import { publishCliTools } from './tool-call-defs-publish.js';
 import { accountRightsCliTools } from './tool-call-defs-account-rights.js';
 import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
@@ -122,6 +124,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...notifyUsageCliTools,
     ...exposureCliTools,
     ...internetOpeningCliTools,
+    ...fileStoreCliTools,
     ...publishCliTools,
     ...accountRightsCliTools,
     ...dmGroupCliTools,

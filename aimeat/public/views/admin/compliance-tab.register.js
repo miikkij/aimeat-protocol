@@ -34,6 +34,8 @@
  *   - QuestionnaireSection — section 05
  * @usage imported by compliance-tab.js
  * @version-history
+ *   v3.4.0 — 2026-10-29 — An opened entry shows the questions it is asked (`askedWhen`) and says how
+ *     many are not; a proposed "none of these areas" says why in the reader's language.
  *   v3.3.0 — 2026-10-28 — An answer from the app's maker says so; an opened entry has a reason field
  *     per answered question (`answerNotes`), and a reason stands beside its answer.
  *   v3.2.0 — 2026-10-28 — The questions, their help and their options in the reader's language while
@@ -60,6 +62,7 @@ import { num } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import {
   PAGE, CLASS_ORDER, answersOf, answerStats, classCounts, orderUsecases, filterUsecases, impliesSummary, modelsShort,
+  questionsFor,
 } from './compliance-tab.gaps.js';
 import { Section } from '/components/Section.js';
 import { Action, Loud, Actions } from '/components/Action.js';
@@ -167,6 +170,8 @@ function questionRow(q, value, source, onChange, last, reason, note) {
  */
 export function proposalText(p) {
   const b = p && p.basis;
+  // "None of these areas" rests on what the map does not hold, so it has no facts to name.
+  if (!b && p && p.value === 'none') return C('proposedNoArea');
   if (!b) return (p && p.reason) || '';
   const domain = tOr(`admin.compliance.records.domain.${b.domain}`, b.domain);
   const rows = (b.rows || []).join(', ');
@@ -188,6 +193,9 @@ function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer
   const reasons = (u.risk && u.risk.reasons) || [];
   const open = answersOf(u, questions).unanswered;
   const answered = questions.filter(q => !isBlank((u.answers || {})[q.id]));
+  // Only the questions this entry is asked (askedWhen), so "none of these areas" leaves three rows.
+  const asked = questionsFor(u, questions);
+  const notAsked = questions.length - asked.length;
   return html`
     <${Box} id="adm-cmp-sheet" name=${u.title || u.id} marks=${html` <${ClassChip} cls=${u.risk && u.risk.class} />`}
       end=${html`<${Actions}>
@@ -207,9 +215,10 @@ function EntrySheet({ u, questions, reasons: proposedWhy = {}, onPatch, onAnswer
       ${reasons.length > 0 ? html`<${Note} kind="hint"><${Tinted} strong>${C('printWhy')}<//> ${reasons.map(reasonText).join(' · ')}<//>` : null}
       <${Label} block>${C('answersTitle')}<//>
       ${open > 0 ? html`<${Note} kind="hint"><${Tinted} tone="notice" strong>${open === 1 ? C('unansweredOne') : C('unansweredMany', { n: num(open) })}<//><//>` : null}
-      <${Readings} rows=${questions.map((q, i) => questionRow(q, (u.answers || {})[q.id], (u.answerSources || {})[q.id],
-        (v) => onAnswer(q.id, v), i === questions.length - 1, proposedWhy[q.id] ? proposalText(proposedWhy[q.id]) : undefined,
+      <${Readings} rows=${asked.map((q, i) => questionRow(q, (u.answers || {})[q.id], (u.answerSources || {})[q.id],
+        (v) => onAnswer(q.id, v), i === asked.length - 1, proposedWhy[q.id] ? proposalText(proposedWhy[q.id]) : undefined,
         (u.answerNotes || {})[q.id]))} />
+      ${notAsked > 0 ? html`<${Note} kind="quiet">${C('notAskedNote', { n: num(notAsked) })}<//>` : null}
       ${answered.length > 0 ? html`
         <${Label} block>${C('notesTitle')}<//>
         <${Note} kind="quiet">${C('notesHint')}<//>

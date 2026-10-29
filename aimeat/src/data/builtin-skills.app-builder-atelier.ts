@@ -13,6 +13,8 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.34.0 — 2026-10-29 — Research names the app's structure page: structure_set when a new app starts
+ *     and page_url to the person, structure before the screens (services/app-structure.ts).
  *   v1.33.1 — 2026-10-21 — A key is stored "for host X" (secaudit 2026-10, v58 and v59 follow-up).
  *   v1.33.0 — 2026-10-17 —Step 1 asks the data map and waits for a yes on a scenario with named
  *     people before building; team data goes to one organism workspace (services/build-data-map-step.ts).
@@ -235,7 +237,10 @@ moved under you says so.
 2. **Research first** — \`aimeat_appdev_overview\`, existing apps and skills, the pitfalls, and
    **on an app that already exists, its design spec** (\`aimeat_app_manage\` \`{ action: "spec",
    owner, filename }\`: what it is for, its screens, where its data lives, what was decided and what
-   is open; after the publish, write it back with \`spec_set\`), and
+   is open; after the publish, write it back with \`spec_set\`), **its structure page**
+   (\`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose }\` when a new app
+   starts, and hand the person \`page_url\`; \`{ action: "structure" }\` before the screens, where a
+   choice with state \`waiting\` is the person's layout or look to build), and
    **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
    effects that each passed their own bench. Called with nothing, the search answers the WHOLE
    Book on one page, every part on a line under its kind, and part \`book\` of the

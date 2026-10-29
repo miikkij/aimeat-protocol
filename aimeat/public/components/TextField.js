@@ -42,6 +42,9 @@
  *          actions=${html`<${Action} small onClick=${save}>${x('save')}<//>`} />`
  *        html`<${TextArea} label=${t('x.body')} rows=${4} value=${body} onInput=${setBody} />`
  * @version-history
+ *   v1.8.1 — 2026-10-29 — A `search` field is kept out of password managers too (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's
+ *     sign-in name into a find field. The other kept-out fields get data-bwignore and data-form-type.
  *   v1.8.0 — 2026-10-27 — A refused write's message for the field's `name` shows under it (Fields
  *     `errors`, components/Field.js), and aria-describedby names the message too. Without a page's own
  *     maxLength, a TextField stops at INPUT_LIMITS.line and a TextArea at INPUT_LIMITS.text
@@ -141,7 +144,9 @@ export function TextField(given) {
   // `unmanaged`: a key typed hidden with no eye (main's look for a key); password managers keep out.
   // `noManager` (added by page group G7, Wallet): a field shown as typed that password managers keep
   // out of too (a payout address: main's autocomplete="off" data-1p-ignore data-lpignore).
-  const keepOut = (secret || unmanaged || noManager) && !autoComplete;
+  // A `search` field is kept out as well: a password manager reads a lone text field as the
+  // sign-in name and fills the owner's name into it.
+  const keepOut = (secret || unmanaged || noManager || search) && !autoComplete;
   const ids = useFieldIds(id);
   const [own, setRef] = useBothRefs(inputRef);
   const [shown, setShown] = useState(false);
@@ -158,8 +163,9 @@ export function TextField(given) {
     class=${cx('og-input', code && 'og-input--code', SIZES.has(size) && `text-field--${size}`, bad && 'og-input--invalid')}
     type=${kind} value=${value ?? ''} placeholder=${placeholder} title=${title}
     min=${min} max=${max} step=${step} maxLength=${limit} inputMode=${inputMode} list=${list}
-    autoComplete=${autoComplete ?? (secret || unmanaged || noManager ? 'off' : undefined)} spellCheck=${secret || unmanaged || code ? false : spellCheck}
+    autoComplete=${autoComplete ?? (keepOut ? 'off' : undefined)} spellCheck=${secret || unmanaged || code ? false : spellCheck}
     data-1p-ignore=${keepOut ? '' : undefined} data-lpignore=${keepOut ? 'true' : undefined}
+    data-bwignore=${keepOut ? 'true' : undefined} data-form-type=${keepOut ? 'other' : undefined}
     required=${required} disabled=${disabled} readOnly=${readOnly}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
     aria-describedby=${describedBy(props, ids)}

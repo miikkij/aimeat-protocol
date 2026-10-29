@@ -10,6 +10,7 @@
  *   locale's `glossary.area.<id>`, with the registry's English title as the fallback.
  * @usage routed at /v1/glossary by spa.html
  * @version-history
+ *   v1.1.2 — 2026-10-29 — The filter field is kept out of password managers (autocomplete off, data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
  *   v1.1.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.0 — 2026-10-03 — The plain sentence first, in the reader's language, and the technical
  *     definition under it; area titles from the locales; reloads when the language changes.
@@ -62,6 +63,7 @@ export default function Glossary() {
       <p class="gl-lede">${tr('glossary.lede', 'The words AIMEAT uses, each one first in plain words and then defined exactly.')}</p>
 
       <input class="gl-filter" type="search" maxLength=${INPUT_LIMITS.line} value=${q}
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${tr('glossary.filter', 'Filter terms')}
         aria-label=${tr('glossary.filter', 'Filter terms')}
         onInput=${(e) => setQ(e.target.value)} />

@@ -11,6 +11,8 @@
  * @structure HomeFeed({ items }) · FeedRow({ item }) · line · when
  * @usage import { HomeFeed } from './feed.js';
  * @version-history
+ *   2026-10-29: agent_permissions_added, filed under access: one of your agents gave another new
+ *     permissions, and where to take them away.
  *   2026-10-27: operator_acted for a restored backup names how many of your entries and agents it
  *     wrote (secaudit2026oct26).
  *   2026-10-25: agent_device_takeover: a new device took over an agent, with or without its other
@@ -187,6 +189,9 @@ export function line(item) {
           .replace('{name}', d.names || '').replace('{words}', d.words || '')
         : tr('home.feed.scopeWordsKeptMany', '{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one\'s settings.')
           .replace('{names}', d.names || '').replace('{words}', d.words || '');
+    case 'agent_permissions_added':
+      return tr('home.feed.agentPermissionsAdded', '{by} gave {name} new permissions: {words}. You can take them away on {name}\'s page.')
+        .replace('{by}', d.by || '').replace(/\{name\}/g, d.name || '').replace('{words}', d.words || '');
     case 'app_scope_words_kept':
       return d.count === '1'
         ? tr('home.feed.appScopeWordsKeptOne', 'Your app {name} keeps working as before after the AIMEAT update: it kept the permissions its code uses ({words}). Each app\'s change log in Apps says why; you can remove a permission there with your AI.')
@@ -308,7 +313,7 @@ export function kindCategory(kind) {
     'contract_started', 'contract_ended'].includes(k)) return 'money';
   if (['consent_granted', 'consent_revoked', 'app_granted', 'app_revoked', 'organism_joined',
     'organism_left', 'organism_member_joined', 'two_factor_armed', 'two_factor_removed',
-    'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept'].includes(k)) return 'access';
+    'passkey_added', 'passkey_removed', 'password_changed', 'memory_accessed_by_operator', 'operator_acted', 'operator_admin_granted', 'scope_words_kept', 'app_scope_words_kept', 'agent_permissions_added'].includes(k)) return 'access';
   return 'system';
 }
 

@@ -142,14 +142,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-10-17",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:eb8cf758a4b278e13b7199b1"
+      "digest": "sha256:b9df8e2d2fb18fdd40f9e8ec"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -362,7 +362,7 @@
       "digest": "sha256:42b8cef2b7d1d4428fb2b6aa"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:d8864eeedecfd4bc338c8277",
+      "digest": "sha256:cf6eeaaa95246de78763e1ae",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -434,14 +434,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-28",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:35f7a09a6b574f674337cbe2"
+      "digest": "sha256:d39d53efdbdc69f7277de2eb"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -469,11 +469,11 @@
       "digest": "sha256:ecd2ea95b087c651f50c4117"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:dfa324985637104dba2918b4",
+      "digest": "sha256:90fbf1167df33d165929efe5",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -557,8 +557,8 @@
       "aimeat/src/services/app-spec-gate.ts": "023890ba92c1090e"
     },
     "node:aimeat-app-builder-atelier": {
-      "aimeat/src/services/build-atelier-prompt.ts": "35cf07fc85b24a03",
-      "aimeat/src/services/build-atelier-layers.ts": "ad58cc853ca03d53",
+      "aimeat/src/services/build-atelier-prompt.ts": "4bbf91d680430e45",
+      "aimeat/src/services/build-atelier-layers.ts": "cf45add323b4731c",
       "aimeat/src/static/sdk-libs/atelier/describe-data.js": "baca79b3b245ef12",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
-      "aimeat/src/services/ai/route-plan.ts": "30144046b44b48bc"
+      "aimeat/src/services/ai/route-plan.ts": "7b7530020363a980"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
@@ -677,7 +677,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "cff1b3fc1029b6c2"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "f2a31562094f396c"
+      "aimeat/scripts/sandbox.ts": "e0908125aa35620b"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"
@@ -760,7 +760,7 @@
       "aimeat/src/services/memory-bin.ts": "7b4a28a9cdc84171",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
-      "aimeat/src/services/owner-erasure.ts": "1f2f20867c120b5a",
+      "aimeat/src/services/owner-erasure.ts": "c6d160d686be395a",
       "aimeat/src/services/archive.ts": "7d620e0485084843",
       "aimeat/src/mcp/organisms.ts": "0f3e0686120d8db8"
     },

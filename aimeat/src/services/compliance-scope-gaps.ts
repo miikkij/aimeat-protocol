@@ -19,6 +19,10 @@
  *   const gaps = await scopeGaps({ storage, config }, { kind: 'organism', organismId });
  *   const all = await nodeWideScopeGaps({ storage, config });
  * @version-history
+ *   v1.3.0 — 2026-10-29 — An app's gaps follow who can see its data (compliance-app-reach.ts): an app
+ *     whose data only its user sees gets no register, notice or domain gap, an unsaid row matters only
+ *     when others can read it, and a map whose location or readers words the node cannot read is its
+ *     own gap (app-data-map-unreadable). On aimeat.io every app that kept anything read as unlawful.
  *   v1.2.0 — 2026-10-28 — app-personal-data-domain-unstated: an app's personal key families whose
  *     data map names no regulated domain, with the domains the map's words point to.
  *   2026-10-27 — A register container outside the register's reach is a gap that says so (not-in-scope,
@@ -53,7 +57,7 @@ export type ScopeGapKind =
   | 'request-overdue' | 'breach-risk-unassessed' | 'breach-notification-overdue' | 'breach-subjects-not-notified'
   | 'breach-hipaa-overdue' | 'framework-unanswered'
   | 'app-personal-data-without-register' | 'app-personal-data-unstated' | 'app-register-without-privacy-notice'
-  | 'app-personal-data-domain-unstated' | 'retention-conflict'
+  | 'app-personal-data-domain-unstated' | 'app-data-map-unreadable' | 'retention-conflict'
   | 'processor-without-dpa' | 'processor-country-unknown' | 'transfer-without-basis' | 'processor-without-baa'
   | 'processor-not-itar-eligible' | 'classification-pack-not-accredited';
 
@@ -205,13 +209,28 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
   if (!draft.hasMap) {
     out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} has no data map, so nothing says whether it keeps personal data or where it goes.`, evidence: { ...at, families: [] } });
   } else if (draft.unstated.length) {
-    out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} does not say whether ${draft.unstated.length} of its key families hold personal data.`, evidence: { ...at, families: draft.unstated.slice(0, 20) } });
+    out.push({ kind: 'app-personal-data-unstated', detail: `The app ${scope.app} does not say whether ${draft.unstated.length} of its key families that others can read hold personal data.`, evidence: { ...at, families: draft.unstated.slice(0, 20) } });
   }
+  // Words the node cannot read in the location or readers column: nobody can say who sees the data.
+  if (draft.reach.unreadable.length) {
+    const rows = draft.reach.unreadable;
+    out.push({
+      kind: 'app-data-map-unreadable',
+      detail: `The data map of ${scope.app} says where ${rows.length === 1 ? 'one key family is' : `${rows.length} key families are`} kept or who reads ${rows.length === 1 ? 'it' : 'them'} in words this node does not know, so nobody can tell who sees that data.`,
+      evidence: { ...at, families: rows.map(r => r.what).slice(0, 20), words: rows.slice(0, 20) },
+    });
+  }
+  // Data only its user sees asks for no register and no notice of the app (compliance-app-reach.ts),
+  // unless it is regulated data, which appRegisterDraft drafts a register for whoever reads it.
+  const ownOnly = (draft.reach.reach === 'none' || draft.reach.reach === 'self') && !draft.register;
   // A personal row with no stated domain: the label floor, the DPIA duty and the AI Act area cannot
   // follow data nobody placed. What the map's words point to rides along, so the fix is one look.
   if (draft.hasMap && draft.register) {
     const map = await readAppDataMap(deps.storage, ownerGhii, scope.app.replace(/\.html$/i, ''));
-    const unstated = (map?.held ?? []).filter(r => r.personalData === 'yes' && r.domains === undefined);
+    // The rows the register holds: the ones others can read, and regulated ones only the user sees.
+    const held = draft.register.dataCategories ?? [];
+    const unstated = (map?.held ?? []).filter(r => r.personalData === 'yes' && r.domains === undefined
+      && held.some(c => c.startsWith(`${r.what}: `)));
     if (unstated.length) {
       const proposed = appAiSignals(map).domains.filter(d => d.source === 'proposed').map(d => d.domain);
       out.push({
@@ -222,7 +241,7 @@ async function appGaps(deps: Deps, scope: Extract<ComplianceScope, { kind: 'app'
       });
     }
   }
-  if (personalRegs.length || draft.register) {
+  if ((personalRegs.length || draft.register) && !ownOnly) {
     const app = await deps.storage.getAppByOwnerName(scope.ownerName, scope.app);
     if (app && !app.manifest?.legal?.privacy) {
       out.push({ kind: 'app-register-without-privacy-notice', detail: `The app ${scope.app} keeps personal data and has no privacy notice of its own for the people who use it.`, evidence: at });

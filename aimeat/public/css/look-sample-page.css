@@ -1,0 +1,19 @@
+/**
+ * @file look-sample-page.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The parts of /look-sample.html, drawn only with the Atelier kit's --ak-* tokens, so the
+ *   look set on the page decides every colour, face, corner and shadow. Linked by that page alone.
+ * @version-history
+ *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+ */
+
+html, body { margin: 0; height: 100%; overflow: hidden; }
+body { box-sizing: border-box; display: flex; flex-direction: column; gap: 6px; padding: 8px; background: var(--ak-bg); color: var(--ak-ink); font-family: var(--ak-font); }
+.ls-hero { padding: 8px 10px; border-radius: var(--ak-radius); background: var(--ak-grad, var(--ak-surface)); color: var(--ak-hero-ink, var(--ak-ink)); }
+.ls-title { display: block; font-family: var(--ak-font-display); font-weight: 800; font-size: 19px; line-height: 1.05; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.ls-card { display: flex; gap: 8px; align-items: center; padding: 7px 9px; border: var(--ak-line-w, 1px) solid var(--ak-line); border-radius: var(--ak-radius-sm); background: var(--ak-surface); box-shadow: var(--ak-elev-1); }
+.ls-card--quiet { background: var(--ak-surface-2, var(--ak-surface)); }
+.ls-line { flex: 1; height: 6px; border-radius: 3px; background: var(--ak-ink-dim); opacity: .55; }
+.ls-line--short { flex: 0 0 55%; }
+.ls-action { padding: 4px 10px; border-radius: var(--ak-radius-pill); background: var(--ak-accent); color: var(--ak-accent-ink); font: 700 11px var(--ak-font); }

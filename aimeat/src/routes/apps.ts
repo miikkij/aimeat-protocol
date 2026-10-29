@@ -115,6 +115,8 @@
  *     route over loopback HTTP (secaudit 2026-10, M6).
  *   2026-10-13 -- registerScopeAllowanceRoutes: the permissions an app kept when the node moved to 4.0
  *     (apps/scope-allowance.ts).
+ *   2026-10-29 -- registerStructureRoutes: the app's structure and status, and its plan, from the first
+ *     moment of building (apps/structure.ts).
  */
 import { Router } from 'express';
 import { localAccountName } from '../utils/gaii.js';
@@ -133,6 +135,7 @@ import { registerLegalRoutes } from './apps/legal.js';
 import { registerRoadmapRoutes } from './apps/roadmap.js';
 import { registerAppNewsRoutes } from './apps/news.js';
 import { registerDesignSpecRoutes } from './apps/design-spec.js';
+import { registerStructureRoutes } from './apps/structure.js';
 import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 import { registerScopeAllowanceRoutes } from './apps/scope-allowance.js';
 import { registerAppConfigRoutes } from './apps/app-config.js';
@@ -201,6 +204,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerRoadmapRoutes(router, config, storage, appTarget);
     registerAppNewsRoutes(router, config, storage);
     registerDesignSpecRoutes(router, config, storage);
+    registerStructureRoutes(router, config, storage);
     registerScopeAllowanceRoutes(router, config, storage);
     registerAppAgentRoutes(router, config, storage);
     registerAppConfigRoutes(router, config, storage);

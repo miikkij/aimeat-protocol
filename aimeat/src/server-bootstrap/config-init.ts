@@ -12,6 +12,8 @@
  *     name an account by its bare name), and initializes revocation/session auth storage
  *
  * @version-history
+ *   v1.12.0 — 2026-10-29 — installFileStores wraps the storage before the perf-trace Proxy: stored files
+ *     keep their bytes in an S3 or Azure Blob store when one is set (services/file-store/).
  *   v1.11.1 — 2026-10-25 — The refresh cookie's migration window (auth.refresh_cookie_legacy_until) is
  *     set once at start when no source gave it (secaudit2026oct22, refresh-cookie-unprefixed-first-match).
  *   v1.11.0 — 2026-10-25 — The provenance registry is bound to the config (bindConfigProvenance), so
@@ -68,6 +70,7 @@ import { settleSettingIncidentsAtStart } from '../services/config-setting-incide
 import { settleDefaultCapsAtStart } from '../services/classification/default-caps.js';
 import { bindAppAuditConfig } from '../services/app-audit-archive.js';
 import type { Storage } from '../storage/interface.js';
+import { installFileStores } from '../services/file-store/file-store-resolver.js';
 import { logger } from '../utils/logger.js';
 import type { ConfigSources } from '../server.js';
 
@@ -87,11 +90,16 @@ export async function initializeConfig(
 ): Promise<ConfigInitResult> {
   // Storage — select based on config. Wrap in the perf-trace Proxy only when config.perfTrace is on
   // (env AIMEAT_PERF_TRACE=true, read via loadConfig like every other flag); a no-op otherwise.
-  const storage = instrumentStorage(await createStorage({
+  const database = await createStorage({
     provider: config.storageProvider,
     sqlitePath: config.sqlitePath,
     dbUrl: config.dbUrl ?? undefined,
-  }), config.perfTrace);
+  });
+  // Stored files keep their bytes in an S3 or Azure Blob store when the operator or the file's owner
+  // set one (services/file-store/). The wrapper reads the config on every file, so the overrides
+  // applied below and later changes on the Config tab take effect without a restart.
+  installFileStores(database, config);
+  const storage = instrumentStorage(database, config.perfTrace);
   const storageLabels: Record<string, string> = {
     memory: 'in-memory (data will not persist across restarts)',
     sqlite: `SQLite (${config.sqlitePath})`,
