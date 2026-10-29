@@ -18,7 +18,9 @@
  *        hoisted linker, which lays node_modules out the way npm does. No install script runs.
  *     2. npm reads that tree (`npm shrinkwrap`) and writes the lock in its own format, with each
  *        package's bin, engines and install-script flags taken from the package itself.
- *     3. This script adds each package's registry address and pnpm-lock.yaml's integrity, takes the
+ *     3. This script adds each package's registry address and pnpm-lock.yaml's integrity, copies
+ *        `gypfile: false` from a package that ships prebuilt binaries (npm reads a shrinkwrapped
+ *        package's manifest from its entry and would otherwise run node-gyp), takes the
  *        removed dependencies out of their parents' entries (`cbor-x>cbor-extract: "-"`), and refuses
  *        to write the file unless it holds every override and resolves exactly as pnpm-lock.yaml does
  *        (scripts/lib/npm-shrinkwrap.mjs).
@@ -84,6 +86,14 @@ function generate(pkg, lock) {
             if (e.extraneous && pinned.optionalPeerOnly) { delete shrinkwrap.packages[path]; continue; }
             e.resolved = pinned.tarball ?? tarballUrl(name, e.version);
             e.integrity = pinned.integrity;
+            // npm takes a shrinkwrapped package's manifest from its lock entry, which has no
+            // `gypfile`, and runs `node-gyp rebuild` for any package with a binding.gyp unless
+            // gypfile is false. better-sqlite3 ships prebuilt binaries and says gypfile: false, so the
+            // entry carries that field from the package's own package.json; without it every
+            // install would need Python and a C++ compiler.
+            const manifest = JSON.parse(readFileSync(join(work, path, 'package.json'), 'utf8'));
+            if (manifest.gypfile === false) e.gypfile = false;
+            else if (existsSync(join(work, path, 'binding.gyp')) && !manifest.scripts?.install && !manifest.scripts?.preinstall) e.hasInstallScript = true;
         }
         // A removal override ("-") has no npm form: the parent's entry stops declaring the package,
         // so npm has no edge to fill from the registry.
@@ -116,6 +126,8 @@ function main() {
     if (!CHECK) writeFileSync(OUT, `${JSON.stringify(shrinkwrap, null, 2)}\n`);
     console.log(`gen-shrinkwrap: ${CHECK ? 'checked' : 'wrote'} aimeat/npm-shrinkwrap.json: ${entries.length} packages, each the version pnpm-lock.yaml pins, with its integrity; every pnpm.overrides rule holds.`);
     console.log(`  packages with an install script npm runs: ${scripted.length ? scripted.join(', ') : 'none'}`);
+    const prebuilt = entries.filter(([, e]) => e.gypfile === false).map(([p, e]) => `${entryName(p, e)}@${e.version}`);
+    console.log(`  packages marked gypfile: false (prebuilt, no node-gyp): ${prebuilt.length ? prebuilt.join(', ') : 'none'}`);
 }
 
 main();
