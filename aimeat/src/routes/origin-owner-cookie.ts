@@ -19,9 +19,18 @@
  *   visitor's sign-in on the node is not touched. A first visit (no cookie) and a visit to an origin
  *   whose owner did not change send no such header; the hold, the release and the reuse of labels are
  *   unchanged. A browser that last visited before this existed carries no cookie and is not cleared.
+ *
+ *   THE OTHER ORIGIN FAMILIES. The portfolio origin `<username>.portfolio.<apex>` (its label is the
+ *   account name, which erasure releases for reuse) and the company origin `{slug}.co.<apex>` (a
+ *   deleted company's slug is free for any account) mark their holder the same way: the portfolio's
+ *   account, and the company's owning account. The next holder gets the address as before; its first
+ *   served page clears the old holder's storage in each visitor's browser once (secaudit2026oct26
+ *   round 8c, subdomains.ts:ensureAppSubdomain:origin-handed-to-next-name-holder).
  * @structure ORIGIN_OWNER_COOKIE · ownerMark() · markOriginOwner()
  * @usage await markOriginOwner(req, res, storage, config, app);   // before the app's page is sent
+ *   await markOriginOwner(req, res, storage, config, { ownerName: sub });   // a portfolio origin
  * @version-history
+ *   2026-10-29 — The portfolio and company origins call it too (secaudit2026oct26 round 8c).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { createHash } from 'node:crypto';
