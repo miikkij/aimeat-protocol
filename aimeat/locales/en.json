@@ -10415,6 +10415,9 @@
   "notiftext.agent_permission_ask_page.body": "{agent} tried to do something for you that you have not allowed. You give this permission on the agent's page, if you want to. Open it to see what it is.",
   "notiftext.agent_permission_ask_page.open": "Open the agent's page",
   "notiftext.agent_permission_ask_page.deny": "Don't allow",
+  "notiftext.agent_permissions_added.title": "{by} gave {agent} new permissions",
+  "notiftext.agent_permissions_added.body": "{by} added these permissions to {agent}: {words}. You can take them away on {agent}'s page. On {by}'s page you can also stop it from adding permissions.",
+  "notiftext.agent_permissions_added.open": "Open {agent}'s page",
   "notiftext.secret_use_ask.title": "Extension {extension} asks to use your secret {secret}",
   "notiftext.secret_use_ask.body": "{extension}, installed by {installer}, needs your secret {secret} for {host}. Your secret has not gone to this address before, so you are asked first, and nothing was sent. Open this to see why, or answer here.",
   "notiftext.secret_use_ask.allow": "Allow",
@@ -15429,6 +15432,7 @@
       "operatorAdminGrantedOne": "{name} got the permission to administer this installation because it had full access. You can take it away in the agent's settings.",
       "operatorAdminGrantedMany": "{names} got the permission to administer this installation because they had full access. You can take it away in each agent's settings.",
       "scopeWordsKeptOne": "{name} keeps working as before after the AIMEAT update: it got the permissions the update now asks for ({words}). You can take them away in the agent's settings.",
+      "agentPermissionsAdded": "{by} gave {name} new permissions: {words}. You can take them away on {name}'s page.",
       "scopeWordsKeptMany": "{names} keep working as before after the AIMEAT update: they got the permissions the update now asks for ({words}). You can take them away in each one's settings.",
       "appScopeWordsKeptOne": "Your app {name} keeps working as before after the AIMEAT update: it kept the permissions its code uses ({words}). Each app's change log in Apps says why; you can remove a permission there with your AI.",
       "appScopeWordsKeptMany": "Your apps {names} keep working as before after the AIMEAT update: they kept the permissions their code uses ({words}). Each app's change log in Apps says why; you can remove a permission there with your AI.",
@@ -18861,7 +18865,8 @@
           "agent": {
             "read": "See the list of your agents: their names, settings and permissions, and whether each one can sign in.",
             "write": "Change the settings of your OTHER agents: what mode they run in and how they are tagged.",
-            "permissions": "Change what your OTHER agents are allowed to do. Separate from their settings, because this is the permission list itself.",
+            "permissions": "Take permissions away from your OTHER agents. Separate from their settings, because this is the permission list itself.",
+            "permissions-add": "Give your OTHER agents permissions that this agent has itself. It never gives itself more, and you are told of each one. Only you can give this.",
             "delete": "Delete agents it created itself, and only those. For a runtime that builds agents for you and has to clear them away again."
           },
           "app": {

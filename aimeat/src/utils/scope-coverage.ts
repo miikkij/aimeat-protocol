@@ -31,6 +31,9 @@
  *   const added = uncoveredScopes(agent.defaultScopes ?? [], proposed.scopes);
  *   if (added.length > 0) return err(`…${added.join(', ')}`);
  * @version-history
+ *   2026-10-29 — agent:permissions-add (PERMISSIONS_ADD_SCOPE) joins the own-tick family: an agent adding
+ *     permissions it holds to another of the owner's agents
+ *     (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-18 — publish:public (PUBLISH_PUBLIC_SCOPE) joins the own-tick family: making something
  *     public without a request to the owner (plan doc-mvcn6c7e4e5q, V4.1).
  *   2026-10-15 — memory:read-as-owner (READ_AS_OWNER_SCOPE) joins the own-tick family: an agent reading
@@ -263,6 +266,16 @@ export const MCP_MANAGE_SCOPE = 'mcp:manage';
 export const PUBLISH_PUBLIC_SCOPE = 'publish:public';
 
 /**
+ * Add permissions to another of the owner's agents: from the words this agent holds itself, never
+ * this word, and never to itself (services/agent-scope-add.ts). Without it an agent holding
+ * agent:permissions only narrows a sibling's list. The owner gives it on the agent's page, signed in
+ * themselves, because no agent may pass it on; every addition made with it is written to the
+ * owner's account feed and bell (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin,
+ * 2026-10-29). Outside every wildcard and not grandfathered: the capability did not exist before.
+ */
+export const PERMISSIONS_ADD_SCOPE = 'agent:permissions-add';
+
+/**
  * Scopes no wildcard carries — neither `*` nor `{domain}:*`. Only the exact string counts, anywhere
  * a scope is checked, proposed, or approved.
  *
@@ -331,6 +344,8 @@ const OWN_TICK_SCOPES = [
     // Not grandfathered (decision 11.3 of plan doc-mvcn6c7e4e5q): an agent without it files a
     // request the owner approves, so no agent loses a capability, it only gains a question.
     PUBLISH_PUBLIC_SCOPE,
+    // Add permissions to another of the owner's agents (PERMISSIONS_ADD_SCOPE above).
+    PERMISSIONS_ADD_SCOPE,
 ] as const;
 
 export const SCOPES_OUTSIDE_WILDCARD: readonly string[] = [

@@ -5,7 +5,7 @@
   "date": "2026-10-18"
  },
  "intro": [
-  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26; MCP tasks, the ARD manifest and WebMCP on the static front pages on 2026-10-26; input limits and junk refusal on 2026-10-27; an agent keeps all permissions until you narrow it on 2026-10-28; the compliance register's apps that use AI and the data map's regulated data on 2026-10-28; the compliance printout of the whole state on 2026-10-28; the app maker's AI Act answers on 2026-10-28; the A2A directory, the MCP Server Card, generating an app with your AI and the register drafts on the Compliance page on 2026-10-29.",
+  "<strong>What an AIMEAT node does today.</strong> Node version 4.2.0, checked against the code on 2026-10-18; the MCP row on 2026-10-20; the records of processing and the security classes on 2026-10-23; one app open to the internet on a closed node on 2026-10-25; the Messages list's browser copy on 2026-10-25; goals for your agents on 2026-10-25; who waits for your answer on the home on 2026-10-25; reactions on a message on 2026-10-26; everyone on a company node sees each other on 2026-10-26; skills in the Agent Skills format on 2026-10-26; MCP tasks, the ARD manifest and WebMCP on the static front pages on 2026-10-26; input limits and junk refusal on 2026-10-27; an agent keeps all permissions until you narrow it on 2026-10-28; the compliance register's apps that use AI and the data map's regulated data on 2026-10-28; the compliance printout of the whole state on 2026-10-28; the app maker's AI Act answers on 2026-10-28; the A2A directory, the MCP Server Card, generating an app with your AI and the register drafts on the Compliance page on 2026-10-29; your AI fixes your other agents' permissions on 2026-10-29.",
   "AIMEAT (AI Memory Exchange and Action Transfer) is a place where a person keeps what they know, and where their own AIs, other people's AIs and the apps they build can read it, act on it and share it, under the person's consent. The main road in is the AI chat the person already uses, connected over MCP. The web pages show what happened and hold the controls that need a screen.",
   "This list covers two layers:",
   "- <strong>Core</strong> is the protocol any node can implement: identity, memory, consent, organisms and workspaces, pacing, federation. Specified in <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Core-2026-11.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-Core-2026-11.md</a>, normative since node 4.0.0; before it, <a href=\"https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-RFC-v4.0-Core-full.md\" target=\"_blank\" rel=\"noopener\">AIMEAT-RFC-v4.0-Core-full.md</a> with its errata.",
@@ -3673,10 +3673,19 @@
      "slug": "g-19-operator-agents",
      "cells": [
       "<strong>Operator agents</strong>",
-      "Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot add permissions or read your API key.",
+      "Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot read your API key.",
       "<code>aimeat_operator_agent_configure</code>, <code>aimeat_operator_ai_config</code>"
      ],
-     "plain": "Operator agents Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot add permissions or read your API key. aimeat_operator_agent_configure, aimeat_operator_ai_config"
+     "plain": "Operator agents Despite the name, these work for any owner, on the owner's own agents and settings, not on the node's. Your agent changes another of your agents (name, description, mode, tags, and a narrower set of permissions) and your AI models and daily budget, each time first showing you the change and applying it only after you confirm. It cannot read your API key. aimeat_operator_agent_configure, aimeat_operator_ai_config"
+    },
+    {
+     "slug": "g-19-your-ai-fixes-your-other-agents-permissions",
+     "cells": [
+      "<strong>Your AI fixes your other agents' permissions</strong>",
+      "When an agent of yours lacks a permission, your own AI can give it, so you do not open each agent's page by hand. You allow this once, on the AI's agent page (&quot;Give your other agents permissions that this agent has itself&quot;). Then it adds to your other agents only permissions it holds itself, never to itself, and it cannot pass this permission on. Each addition is a line on your home feed and a notice in your bell, naming which agent gave which agent what; you take the permissions away on that agent's page, and the AI's right to add them on its own page, with effect on its next call.",
+      "<code>PATCH /v1/agents/{name}/scopes</code>, <code>aimeat_operator_agent_configure</code> (<code>scopes</code>), permission <code>agent:permissions-add</code>"
+     ],
+     "plain": "Your AI fixes your other agents' permissions When an agent of yours lacks a permission, your own AI can give it, so you do not open each agent's page by hand. You allow this once, on the AI's agent page (\"Give your other agents permissions that this agent has itself\"). Then it adds to your other agents only permissions it holds itself, never to itself, and it cannot pass this permission on. Each addition is a line on your home feed and a notice in your bell, naming which agent gave which agent what; you take the permissions away on that agent's page, and the AI's right to add them on its own page, with effect on its next call. PATCH /v1/agents/{name}/scopes, aimeat_operator_agent_configure (scopes), permission agent:permissions-add"
     },
     {
      "slug": "g-19-email-and-push-templates",
@@ -4451,6 +4460,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 451
+  "rows": 452
  }
 }

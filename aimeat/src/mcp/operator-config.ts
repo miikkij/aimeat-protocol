@@ -9,13 +9,17 @@
  *   single-use, 10 min TTL) it applies. Server MCP surface only (not the connector CLI).
  *
  *   Tool: aimeat_operator_agent_configure — update a SAME-OWNER agent's display_name /
- *   description / mode / tags / scopes / clearance. Scope changes may only NARROW the granted set
- *   (drop scopes); adding scopes stays an owner-approval action in the profile UI, so
- *   an agent can never talk itself into more privilege through this tool.
+ *   description / mode / tags / scopes / clearance. Scope changes NARROW the granted set; they add
+ *   only for a caller holding agent:permissions-add, which the owner gives in person, and then only
+ *   words the caller holds itself and never to itself (services/agent-scope-add.ts), so an agent
+ *   can never talk itself into more privilege through this tool.
  * @structure registerOperatorConfigTools() — registers the tools on an McpServer
  * @usage
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
+ *   2026-10-29 — aimeat_operator_agent_configure adds scopes for a caller holding agent:permissions-add,
+ *     on the rule PATCH /v1/agents/:name/scopes asks (services/agent-scope-add.ts), and tells the
+ *     owner of each addition (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_operator_ai_config writes `openrouter.settings` on the version it read
@@ -67,7 +71,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { logger } from '../utils/logger.js';
-import { uncoveredScopes } from '../utils/scope-coverage.js';
+import { checkScopeAddition, recordScopeAddition } from '../services/agent-scope-add.js';
 import { resolveMcpWriteTarget } from '../routes/memory/owner-target.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
 import { CAS_ATTEMPTS } from '../services/record-cas.js';
@@ -184,12 +188,22 @@ export function registerOperatorConfigTools(
             // So: no escape hatch, and coverage is decided by utils/scope-coverage.ts rather than
             // by testing for '*' here. Anything the target does not already effectively hold is an
             // addition, whatever its current scopes look like.
+            //
+            // An addition passes only on the rule PATCH /v1/agents/:name/scopes asks
+            // (services/agent-scope-add.ts): the caller holds agent:permissions-add, which only the
+            // owner in person gives, and adds words it holds itself, never that word, never to
+            // itself. Asked at propose time and again at confirm, on the session's scopes narrowed to
+            // the caller's record, so a word the owner took away in between stops the change. The '*'
+            // self-escalation above stays refused: an agent never adds to its own list.
+            let scopesAdded: string[] = [];
             if (proposed.scopes) {
-                const granted = (agent as { defaultScopes?: string[] }).defaultScopes ?? [];
-                const added = uncoveredScopes(granted, proposed.scopes);
-                if (added.length > 0) {
-                    return err(`Scope additions are not allowed through this tool (requested new: ${added.join(', ')}). Adding scopes is an owner approval in the profile UI; this tool can only narrow.`);
+                const c = caller();
+                const check = checkScopeAddition({ gaii: c.principal, scopes: c.scopes, inPerson: c.inPerson }, agent, proposed.scopes);
+                if (!check.ok) {
+                    const asked = (check.details.added as string[] | undefined) ?? [];
+                    return err(`${check.code}: ${check.message}${asked.length ? ` Asked to add: ${asked.join(', ')}.` : ''}`);
                 }
+                scopesAdded = check.added;
             }
 
             // The field vocabulary is services/agent-profile-write.ts, and it runs HERE as well as
@@ -256,6 +270,8 @@ export function registerOperatorConfigTools(
                 if (!set.ok) return err(`${set.code}: ${set.message}`);
                 after = set.agent;
             }
+            // The owner reads every addition an agent made on the account feed and in the bell.
+            if ('scopes' in diff) await recordScopeAddition({ storage, config }, agentGaii, after, scopesAdded);
             logger.info(`Operator-configure applied to ${targetGaii}`, { by: agentGaii, fields: Object.keys(diff) });
             return ok({ mode: 'applied', agent: agent_name, applied: diff, current: currentView(after) });
         },

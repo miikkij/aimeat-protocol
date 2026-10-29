@@ -14690,8 +14690,13 @@ paths:
       description: >-
         Update the default scopes for an agent. The owner in person sets any list the node allows. The
         owner's agent holding `agent:permissions` and `agent:write` (the words of
-        aimeat_operator_agent_configure) may only narrow another agent's list: a word the target does not
-        already hold is refused with 403 SCOPE_ADDITION_REFUSED. An app grant and an ecosystem app are refused.
+        aimeat_operator_agent_configure) narrows another agent's list. It adds a word the target does not
+        already hold only when it also holds `agent:permissions-add` (outside every wildcard, given by the
+        owner in person), on its token and on its agent record, and then only words it holds itself:
+        without that word 403 SCOPE_ADDITION_REFUSED, to itself 403 SCOPE_ADDITION_REFUSED, a word it does
+        not hold 403 SCOPE_NOT_HELD (details.not_held), and `agent:permissions-add` itself 403
+        PERSON_REQUIRED. Each addition an agent makes is written to the owner's account feed
+        (`agent_permissions_added`) and bell. An app grant and an ecosystem app are refused.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14737,7 +14742,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
-          description: The caller is not the owner or their agent, lacks a word, or (an agent) asked to add a permission (SCOPE_ADDITION_REFUSED, details.added).
+          description: The caller is not the owner or their agent, lacks a word, or (an agent) asked to add a permission it may not add (SCOPE_ADDITION_REFUSED, SCOPE_NOT_HELD or PERSON_REQUIRED, details.added).
         '404':
           $ref: '#/components/responses/NotFound'
 

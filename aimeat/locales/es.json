@@ -9309,6 +9309,9 @@
   "notiftext.agent_permission_ask_page.body": "{agent} intentó hacer por ti algo que no has permitido. Este permiso lo das en la página del agente, si quieres. Ábrela para ver de qué se trata.",
   "notiftext.agent_permission_ask_page.open": "Abrir la página del agente",
   "notiftext.agent_permission_ask_page.deny": "No permitir",
+  "notiftext.agent_permissions_added.title": "{by} dio nuevos permisos a {agent}",
+  "notiftext.agent_permissions_added.body": "{by} añadió estos permisos a {agent}: {words}. Puedes quitárselos en la página de {agent}. En la página de {by} también puedes impedir que añada permisos.",
+  "notiftext.agent_permissions_added.open": "Abrir la página de {agent}",
   "notiftext.secret_use_ask.title": "La extensión {extension} pide permiso para usar tu secreto {secret}",
   "notiftext.secret_use_ask.body": "{extension}, instalada por {installer}, necesita tu secreto {secret} para {host}. Tu secreto no ha ido antes a esta dirección, así que se te pregunta primero, y no se ha enviado nada. Ábrelo para ver por qué, o responde aquí.",
   "notiftext.secret_use_ask.allow": "Permitir",
@@ -13756,6 +13759,7 @@
       "operatorAdminGrantedOne": "{name} recibió el permiso para administrar esta instalación porque tenía acceso total. Puedes quitárselo en la configuración del agente.",
       "operatorAdminGrantedMany": "{names} recibieron el permiso para administrar esta instalación porque tenían acceso total. Puedes quitárselo en la configuración de cada agente.",
       "scopeWordsKeptOne": "{name} sigue funcionando como antes tras la actualización de AIMEAT: recibió los permisos que la actualización ahora pide ({words}). Puedes quitárselos en la configuración del agente.",
+      "agentPermissionsAdded": "{by} dio nuevos permisos a {name}: {words}. Puedes quitárselos en la página de {name}.",
       "scopeWordsKeptMany": "{names} siguen funcionando como antes tras la actualización de AIMEAT: recibieron los permisos que la actualización ahora pide ({words}). Puedes quitárselos en la configuración de cada uno.",
       "appScopeWordsKeptOne": "Tu app {name} sigue funcionando como antes tras la actualización de AIMEAT: conservó los permisos que usa su código ({words}). El registro de cambios de la app en Apps dice por qué; puedes quitar un permiso con tu IA.",
       "appScopeWordsKeptMany": "Tus apps {names} siguen funcionando como antes tras la actualización de AIMEAT: conservaron los permisos que usa su código ({words}). El registro de cambios de cada app en Apps dice por qué; puedes quitar un permiso con tu IA.",
@@ -17115,7 +17119,8 @@
           "agent": {
             "read": "Ver la lista de tus agentes: sus nombres, ajustes y permisos, y si cada uno puede iniciar sesión.",
             "write": "Cambiar los ajustes de tus OTROS agentes: en qué modo corren y cómo están etiquetados.",
-            "permissions": "Cambiar lo que pueden hacer tus OTROS agentes. Va aparte de sus ajustes, porque esto es la lista de permisos en sí.",
+            "permissions": "Quitar permisos a tus OTROS agentes. Va aparte de sus ajustes, porque esto es la lista de permisos en sí.",
+            "permissions-add": "Dar a tus OTROS agentes permisos que este agente tiene. Nunca se da más a sí mismo, y se te avisa de cada uno. Solo tú puedes dar esto.",
             "delete": "Borrar los agentes que ha creado él mismo, y ninguno más. Para un entorno que te construye agentes y luego tiene que retirarlos."
           },
           "app": {
