@@ -199,10 +199,26 @@ describe('removeStorageFile', () => {
         const key = 'apps/icons/demo.html';
         const file = { key, ownerGaii: OWNER, size: 3, mimeType: 'text/html', visibility: 'public' } as StorageFileRecord;
         const own = {
-            getStorageFile: vi.fn(async () => file),
+            getStorageFileMeta: vi.fn(async () => file),
             deleteStorageFile: vi.fn(async () => true),
         } as unknown as Storage;
         const out = await removeStorageFile({ storage: own, config }, OWNER, key);
         expect(out).toMatchObject({ ok: true, key });
+    });
+
+    // A delete reads the row, never the bytes: a file kept in an object store whose object has gone
+    // (a store moved without its objects) is still removed rather than answering 404 for ever.
+    it('removes a file without reading its bytes', async () => {
+        const key = 'notes/gone.txt';
+        const file = { key, ownerGaii: OWNER, size: 3, mimeType: 'text/plain', visibility: 'private' } as StorageFileRecord;
+        const getStorageFile = vi.fn(async () => null);
+        const own = {
+            getStorageFile,
+            getStorageFileMeta: vi.fn(async () => file),
+            deleteStorageFile: vi.fn(async () => true),
+        } as unknown as Storage;
+        const out = await removeStorageFile({ storage: own, config }, OWNER, key);
+        expect(out).toMatchObject({ ok: true, key });
+        expect(getStorageFile).not.toHaveBeenCalled();
     });
 });
