@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-29 — The kind `accountant-grant`: an older accountant grant whose holder the node cannot
+ *     place is asked of the client (finance/accountant-grant-ask.ts; secaudit2026oct26 round 8c).
  *   2026-10-29 — The kind `delegation-binding`: an app by another author publishing through a channel
  *     delegation that names its app by file name alone waits for the channel owner
  *     (services/connections/delegation-caller.ts; secaudit2026oct26 round 8c).
@@ -130,7 +132,9 @@ export type PublishKind =
   // Extension code a package brought into an account that may not install extension code (services/extension-code-hold.ts).
   | 'extension-code'
   // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex-holder-change.ts).
-  | 'cortex-holder';
+  | 'cortex-holder'
+  // An older accountant grant whose holder the node cannot place, asked of the client (finance/accountant-grant-ask.ts).
+  | 'accountant-grant';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

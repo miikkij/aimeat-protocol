@@ -19,6 +19,8 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.6.0 — 2026-10-29 — A declined request runs its kind's decliner, when it has one (appliers.ts
+ *     PUBLISH_DECLINERS: an older accountant grant is removed; secaudit2026oct26 round 8c).
  *   v1.5.0 — 2026-10-30 — A declined `cortex-holder` request can be approved later by its owner: the
  *     Don't allow holds the apps back until the owner changes it (secaudit2026oct26 round 8c).
  *   v1.4.0 — 2026-10-29 — The one who asked reads its own request in the account it asked (`account`),
@@ -42,7 +44,7 @@ import {
   type PublishRequest, type PublishRequestFail, type PublishStoreCtx,
 } from './store.js';
 import { publishDecisionRefusal, approvalDecisionRefusal, publishRequestExpired } from './policy.js';
-import { PUBLISH_APPLIERS } from './appliers.js';
+import { PUBLISH_APPLIERS, PUBLISH_DECLINERS } from './appliers.js';
 import { accountGhii } from './ask.js';
 import { requestCapRefusal } from './cap-recheck.js';
 
@@ -158,6 +160,8 @@ export async function decidePublishRequest(ctx: PublishStoreCtx, decider: Publis
     if (decision === 'decline') {
       // A declined parent declines its waiting parts too (store.ts settlePublishRequest).
       const settled = await settlePublishRequest(ctx, ownerGhii, request, 'declined', { by });
+      // A kind whose "Don't allow" changes something (appliers.ts PUBLISH_DECLINERS).
+      await PUBLISH_DECLINERS[request.kind]?.(ctx, ownerGhii, request);
       return { ok: true as const, decision, request: summarizePublishRequest(settled) };
     }
     const kind = decider.caller.kind === 'agent' ? 'ai' as const : 'human' as const;

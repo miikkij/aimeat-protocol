@@ -1279,10 +1279,12 @@
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
-          "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa"
+          "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
+          "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä"
         },
         "detail": {
-          "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset."
+          "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset.",
+          "platform_fee_records": "Nämä rahamaksujen tietueet ({count}) näyttävät samalta kuin ne, jotka kauppa kirjoittaa, mutta mikään ei kerro, kirjoittiko ne kauppa vai tili itse. Ne lasketaan rahamaksuihisi kuten ennenkin, kunnes valitset."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1312,7 +1314,8 @@
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
-            "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen."
+            "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen.",
+            "platform_fee_records": "Ennen 27.10.2026 mikä tahansa tili pystyi kirjoittamaan rahamaksun tietueen omaan muistiinsa, ja Talous-sivu laski sen sinulle kuuluviin maksuihin. Valitse jokaisesta alla olevasta tietueesta, lasketaanko se. Mitään ei poisteta, ja kunnes valitset, jokainen tietue lasketaan kuten ennenkin."
           },
           "subdomain": {
             "appOnly": "Vain sovelluksen oma osoite (suositus)",
@@ -1322,13 +1325,16 @@
             "choose": "Valitse"
           },
           "action": {
-            "subdomain": "Vain sovellus"
+            "subdomain": "Vain sovellus",
+            "platform_fee": "Älä laske"
           },
           "keepAction": {
-            "subdomain": "Oma sivusto"
+            "subdomain": "Oma sivusto",
+            "platform_fee": "Laske"
           },
           "confirm": {
-            "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin."
+            "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin.",
+            "platform_fee": "Jätetäänkö tämä tietue pois rahamaksuistasi? {line} Tietue säilyy, mutta Talous-sivu ei enää laske sitä."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1346,7 +1352,8 @@
             "skill": "Taito {name} tiedostoineen",
             "datapackage": "Datapaketti {name} tiedostoineen",
             "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})",
-            "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}"
+            "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}",
+            "platform_fee": "{amount} tilin {owner} muistissa ({key}), myyjä {seller}, ostaja {buyer}"
           }
         },
         "source": {
@@ -10517,6 +10524,10 @@
   "notiftext.payment_possible.body": "Maksupalvelu ei vastannut, kun ostaja maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Jos raha tuli, toimita tilaus tai palauta maksu. Tunniste: {reference}.",
   "notiftext.payout_possible.title": "Sait ehkä maksun {amount}",
   "notiftext.payout_possible.body": "{provider} lähetti sinulle {amount}, mutta maksuverkko ei vahvistanut, että siirto meni perille. Katso, onko tilitysosoitteeseesi tullut siirto osoitteesta {payer}. Viite: {reference}.",
+  "notiftext.payout_arrived.title": "Maksu {amount} tuli perille",
+  "notiftext.payout_arrived.body": "Palvelimen ylläpitäjät tarkistivat, että maksu {amount} käyttäjältä {provider} tuli perille. Se on nyt kirjattu maksetuksi. Viite: {reference}.",
+  "notiftext.payout_arrived_provider.title": "Maksusi {amount} tuli perille",
+  "notiftext.payout_arrived_provider.body": "Palvelimen ylläpitäjät tarkistivat, että maksusi {amount} käyttäjälle {beneficiary} tuli perille. Se on nyt kirjattu maksetuksi, eikä sinun tarvitse maksaa sitä uudelleen. Viite: {reference}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",
@@ -10551,6 +10562,9 @@
   "notiftext.approval_change.ecosystem": "Muuta Ulkoiset sovellukset -sivulla",
   "notiftext.approval_change.agent_page": "Muuta agentin sivulla",
   "notiftext.approval_change.scheduler": "Muuta Ajastin-välilehdellä",
+  "notiftext.approval_change.accountants": "Muuta Tuloslaskelma-sivun kohdassa Kuka saa lukea kirjojasi",
+  "notiftext.approval_accountant_grant.title": "Saako {name} yhä lukea kirjojasi?",
+  "notiftext.approval_accountant_grant.body": "Annoit käyttäjälle {name} oikeuden lukea kirjojasi ennen kuin palvelin alkoi tallentaa jokaisen oikeuden päivämäärän. Tili nimeltä {name} on luotu sen jälkeen, kun aloit antaa oikeuksia, ja poistetun tilin nimen voi rekisteröidä joku toinen. Siksi palvelin ei tiedä, onko tämä se henkilö, jolle annoit oikeuden. Kunnes vastaat, {name} lukee kirjojasi kuten ennenkin. Jos sallit, {name} saa pitää oikeuden. Jos et salli, oikeus poistetaan.",
   "notiftext.approval_request.allow": "Salli",
   "notiftext.approval_request.deny": "Älä salli",
   "notiftext.approval_answer_allowed.title": "Sallittu: {what}",
@@ -12149,6 +12163,21 @@
     "ecoMoneySub": "kulkee erikseen",
     "ecoMoneyIntro": "Raha liikkuu maksupalvelujen kautta (Stripe ja kumppanit) eikä koskaan murusina. Tässä näkyy vain, paljonko rahaa täällä tehdyissä kaupoissa on liikkunut.",
     "ecoMintIntro": "Muruset kirjataan agentin omistajan tilille ja näkyvät hänen lompakossaan. Päiväraja on {cap} murusta.",
+    "possiblePayouts": {
+      "title": "Maksut, jotka ovat ehkä menneet perille",
+      "count": "{n} tarkistettavaa",
+      "lead": "Nämä myyjät maksoivat toiselle tilille sille kuuluvan osuuden tuloista, mutta x402-maksupalvelu ei vastannut. Siksi kukaan ei tiedä, lähtikö siirto. Hae jokainen nonce lohkoketjusta. Jos siirto löytyy, kirjoita sen transaction hash tai oma tapausnumerosi ja paina Merkitse perille tulleeksi. Silloin osuus kirjataan maksetuksi, ja molemmat osapuolet saavat ilmoituksen. Jos siirtoa ei löydy, älä tee mitään: myyjä sulkee maksun itse.",
+      "colWho": "Kuka maksoi kenelle",
+      "colWhen": "Aloitettu",
+      "colAmount": "Summa",
+      "who": "{provider} → {beneficiary}",
+      "nonce": "nonce {nonce}",
+      "payer": "Osoitteesta {payer} osoitteeseen {to}, verkossa {network}",
+      "reference": "Viite",
+      "referenceNote": "Siirron transaction hash tai oma tapausnumerosi.",
+      "markArrived": "Merkitse perille tulleeksi",
+      "referenceRequired": "Kirjoita ensin viite."
+    },
     "cfgSearch": "Etsi asetus nimellä, avaimella tai kuvauksella…",
     "cfgOnlyChanged": "Vain muutetut ({n})",
     "cfgAll": "Kaikki",

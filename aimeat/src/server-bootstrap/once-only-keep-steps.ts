@@ -21,6 +21,10 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-29 -- askUncertainAccountantGrantsOnce, last: an older accountant grant whose holder the
+ *     estimate cannot place is asked of the client with one press (secaudit2026oct26 round 8c).
+ *   2026-10-29 -- markPlatformFeeWritersOnce, after the capability step: the platform-fee records another writer wrote are left
+ *     out of the dashboard's money fees, the undecided ones named on the Security page (secaudit2026oct26 round 8c).
  *   2026-10-28 -- keepOperatorOwnAddressesOnce, after the entries step: a redirect and an operator's own
  *     app are kept as they are without a question (Jouni, 2026-10-28).
  *   2026-10-27 -- addSubdomainIncidentEntriesOnce, after the subdomain step: an open subdomain incident
@@ -89,6 +93,8 @@ import { reindexCredentialSearchTextOnce } from '../services/credential-search-r
 import { reportAnonymousPrincipalRecordsOnce } from '../services/anonymous-principal-records.js';
 import { reportErasureLeftoverSchedulesOnce } from '../services/erasure-leftover-schedules.js';
 import { settleUnknownCapabilityVisibilityOnce } from '../services/capability-visibility-words.js';
+import { markPlatformFeeWritersOnce } from '../commerce/platform-fee-writers.js';
+import { askUncertainAccountantGrantsOnce } from '../services/finance/accountant-grant-ask.js';
 
 /** Run the once-only keep steps. Never throws: a failed step is logged and tried at the next start. */
 export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfig): Promise<void> {
@@ -191,4 +197,14 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // changes no reach, and each owner is told (services/capability-visibility-words.ts).
   await settleUnknownCapabilityVisibilityOnce(storage, config)
     .catch(err => logger.error('Failed to look for the capabilities with an unknown visibility word; the next boot tries again', { error: String(err) }));
+  // The platform-fee records an account or an agent wrote into its own memory before the prefix was
+  // service-owned are left out of the dashboard's money fees; the ones nothing decides are named on the
+  // Security page (commerce/platform-fee-writers.ts). Nothing is deleted.
+  await markPlatformFeeWritersOnce(storage, config)
+    .catch(err => logger.error('Failed to look for the platform-fee records other writers wrote; the next boot tries again', { error: String(err) }));
+  // The accountant grants from before grant times were kept, whose holder the estimate cannot place,
+  // are asked of the client with one press; each works as before until answered
+  // (services/finance/accountant-grant-ask.ts).
+  await askUncertainAccountantGrantsOnce(storage, config)
+    .catch(err => logger.error('Failed to look for the older accountant grants to ask about; the next boot tries again', { error: String(err) }));
 }
