@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.14.0 — 2026-10-29 — A cortex name's new holder, allowed by the owner of apps that loaded the
+ *     earlier library (apply-cortex-holder.ts; secaudit2026oct26 round 8c).
  *   v1.13.0 — 2026-10-29 — Extension code a package brought into an account that may not install it,
  *     allowed by an operator (apply-extension-code.ts; secaudit2026oct26 round 8c).
  *   v1.12.0 — 2026-10-27 — AIMEAT's model reading private records an agent named in a goal, allowed by
@@ -63,6 +65,7 @@ import { applyScheduleInstruction } from './apply-schedule-instruction.js';
 import { applyGoalModelRead } from './apply-goal-model-read.js';
 import { applyRefineryDefinition } from './apply-refinery-definition.js';
 import { applyExtensionCode } from './apply-extension-code.js';
+import { applyCortexHolder } from './apply-cortex-holder.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -89,4 +92,5 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'goal-model-read': applyGoalModelRead,
   'refinery-definition': applyRefineryDefinition,
   'extension-code': applyExtensionCode,
+  'cortex-holder': applyCortexHolder,
 };

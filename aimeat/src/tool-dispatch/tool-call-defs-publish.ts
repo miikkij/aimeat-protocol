@@ -8,6 +8,7 @@
  * @structure publishCliTools[]
  * @usage import { publishCliTools } from './tool-call-defs-publish.js';
  * @version-history
+ *   v1.1.1 — 2026-10-29 — `account` also serves the one who asked, reading its own request there (secaudit2026oct26 round 8c).
  *   v1.1.0 — 2026-10-25 — `account` is forwarded on the read and the decision (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
@@ -21,7 +22,7 @@ export const publishCliTools: ConnectCliToolDefinition[] = [
     input: {
       request_id: { type: 'string', description: 'One request. Omit to list them all.' },
       decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
-      account: { type: 'string', description: 'Operators only: the account whose request waiting for the operators you read or answer.' },
+      account: { type: 'string', description: 'The account where the request lives: an operator reads or answers a request waiting for the operators there, and the one who asked reads its own request there.' },
     },
     handler: ({ client }, input) => {
       const decision = optionalString(input, 'decision');

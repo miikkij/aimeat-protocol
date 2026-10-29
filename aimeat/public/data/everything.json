@@ -1707,10 +1707,10 @@
      "slug": "g-8-cortex",
      "cells": [
       "<strong>Cortex</strong>",
-      "Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from.",
+      "Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. When the account that held a library's name is deleted, the name is free for someone else to install a new library under it; your apps that loaded the earlier one do not load the new one until you allow it with one press, and the one who installed it hears your answer. Names that start with <code>aimeat-</code> are kept for what the node ships.",
       "<code>/v1/cortex</code>, <code>aimeat_cortex_*</code>"
      ],
-     "plain": "Cortex Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. /v1/cortex, aimeat_cortex_*"
+     "plain": "Cortex Installable bundles of schemas, prompts, actions, boards, ontologies, seed data and browser libraries that apps compose from. When the account that held a library's name is deleted, the name is free for someone else to install a new library under it; your apps that loaded the earlier one do not load the new one until you allow it with one press, and the one who installed it hears your answer. Names that start with aimeat- are kept for what the node ships. /v1/cortex, aimeat_cortex_*"
     },
     {
      "slug": "g-8-extension-and-cortex-names-carry-their-owner",

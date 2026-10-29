@@ -52785,7 +52785,10 @@ paths:
         pinned (`name@1.2.0`). `<owner>/<name>` is the exact address: write it as one encoded
         segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}. A bare name
         serves the bare record, else the one account's `<owner>/<name>`; a name its holder removed
-        serves nobody else's bytes. `system/<name>` serves a shipped one too.
+        serves nobody else's bytes. `system/<name>` serves a shipped one too. A name an account
+        erasure or the held-name settlement freed stays free for a new holder; a request from the page
+        of an app that loaded the earlier holder's library (its Origin or Referer) answers 404 until
+        the app's owner allows the new holder with one press (a request of kind `cortex-holder`).
       tags: [Cortex]
       parameters:
         - name: name
@@ -78371,11 +78374,11 @@ paths:
       operationId: readPublishRequest
       tags: [Memory]
       summary: One request to make something public
-      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`.'
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`, and the one who asked reads its own question in the account it asked the same way.'
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads. Omit for your own.' }
+        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads, or where the one who asked asked it. Omit for your own.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }

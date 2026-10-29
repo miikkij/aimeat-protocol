@@ -17,6 +17,9 @@
  *     rows issued in the account name
  * @usage import { cascadeDeleteIdentityData } from './identity-erasure.js';
  * @version-history
+ *   v1.6.0 — 2026-10-29 — deleteInstalledCortexesDb writes each bare cortex name it deletes down as freed
+ *     (`freed:<pseudonym>`): free for the next install, and the apps that loaded it ask their owner first
+ *     (secaudit2026oct26 round 8c, services/cortex-holder-change.ts).
  *   v1.5.0 — 2026-10-22 — KnowledgeLink joins the per-identity cascade: the links of the identity's
  *     packages and the ones it contributed (secaudit 2026-10, v79).
  *   v1.4.0 — 2026-10-09 — Connection, ConnectionDelegation and ProviderClient join the per-identity
@@ -33,9 +36,10 @@
  */
 import type { Kysely } from 'kysely';
 import type { DB } from '../db-types.js';
-import { partyIdentities } from '../../../erased-party.js';
+import { partyIdentities, erasedPartyPseudonym } from '../../../erased-party.js';
 import { erasedCortexParts } from '../../../erased-cortex.js';
 import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
+import { FREED_RELEASE_PREFIX } from '../../../types/component-versions.js';
 
 /** A Kysely handle: the root connection or an open transaction. */
 type Db = Kysely<DB>;
@@ -249,6 +253,18 @@ export async function deleteInstalledCortexesDb(
   await db.deleteFrom('ComponentVersion').where('kind', '=', 'cortex').where('name', 'in', names).execute();
   await db.deleteFrom('DependencyEdge').where('fromKind', '=', 'cortex').where('fromRef', 'in', names).execute();
   await db.deleteFrom('CortexExtension').where('installedBy', '=', name).where('name', 'in', names).execute();
+  // Each bare name is written down as freed, under a pseudonym no account matches: it stays free for
+  // the next install, and the apps that loaded this library ask their owner before they load the next
+  // holder's (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+  const bare = names.filter(n => !n.includes('/'));
+  if (bare.length) {
+    const holder = `${FREED_RELEASE_PREFIX}${erasedPartyPseudonym()}`;
+    const releasedAt = new Date();
+    for (const n of bare) {
+      await db.insertInto('ReleasedComponentName').values({ kind: 'cortex', name: n, holder, releasedAt })
+        .onConflict(oc => oc.columns(['kind', 'name']).doUpdateSet({ holder, releasedAt })).execute();
+    }
+  }
   // Every memory write reads the schema locks from a process cache, which a delete refreshes. Its
   // short lifetime covers a write that reloads it before this transaction commits.
   if (locks > 0) invalidateSchemaLockCache();
