@@ -12,6 +12,7 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   2026-10-29 — One ledger row per federation settlement (schema-settlement-once.ts, migration 0121).
  *   2026-10-25 — subdomain_sites.heldSince (migration 0119, secaudit2026oct22).
  *   2026-10-25 — subdomain_sites.origin (migration 0116, secaudit2026oct22).
  *   2026-10-18 — companies.frontPageAccess (migration 0106).
@@ -92,6 +93,7 @@ import { applySchemaTables3 } from './schema-tables-3.js';
 import { applySchemaTables4 } from './schema-tables-4.js';
 import { splitPushSubscriptionsPerDevice, relaxPushLastUsedAt, relaxInvitationsOrganismId } from './schema-rebuilds.js';
 import { moveActionsAndWorkToFullIdentity } from './schema-identity-backfill.js';
+import { settleOncePerTrackingCode } from './schema-settlement-once.js';
 import { backfillMemorySearchValues } from './schema-memory-search.js';
 import { applySchedulerColumns } from './schema-columns-scheduler.js';
 import { applyExtensionColumns } from './schema-columns-extensions.js';
@@ -790,11 +792,9 @@ export function initializeSchema(db: Database.Database): void {
     DELETE FROM memory_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 1);
     DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
-
-  // Actions a person published, the work on them and a person's own ledger lines move from the bare
-  // account name to the GHII, on positive evidence only (mirrors Postgres 0086). Once for each
-  // database: it records in system_settings that it ran, and an open that finds the record changes
-  // nothing. What it cannot place stays as it is and is recorded for the operator.
+  // Ledger, action and work rows move from the bare account name to the GHII on evidence, once (Postgres 0086);
+  // then one ledger row per federation settlement (Postgres 0121), after the move has renamed rows.
   moveActionsAndWorkToFullIdentity(db);
+  settleOncePerTrackingCode(db);
 }
 

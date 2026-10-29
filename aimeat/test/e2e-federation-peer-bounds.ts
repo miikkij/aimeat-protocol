@@ -8,7 +8,8 @@
  *   WHAT IT ASSERTS. Node H is the node under test, node P a real member peer of H, and F a stand-in
  *   peer on an ephemeral loopback port that counts the identity lookups it is asked.
  *     - Settlement: copies of one signed settlement that arrive together credit once (one 200, the
- *       rest 409 CONFLICT), and a single settlement credits once as before.
+ *       rest 409 CONFLICT), also when two node processes over one database take them, and a single
+ *       settlement credits once as before.
  *     - Resolve: an identity no node knows is asked of the peers once inside a short window, however
  *       many times it is resolved; a known identity and a node-hinted one resolve as before. An
  *       identity naming this node or a known unlisted peer asks nobody, and one with no known home
@@ -37,6 +38,9 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   v1.4.0 — 2026-10-29 — S3, S4: copies of one settlement taken by two settlement routers over one
+ *     database (two node processes) credit once, and a settlement for an unknown identity leaves no
+ *     ledger row (secaudit2026oct26 round 8c, federation-01).
  *   v1.3.0 — 2026-10-29 — R4, R5: an identity that names this node or a known unlisted peer asks no
  *     peer, and one with no known home reaches at most federation.resolve_max_peers peers
  *     (secaudit2026oct26 round 8c, federation-03).
@@ -49,6 +53,10 @@
  */
 import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import express from 'express';
+import { federationSettlementsRouter } from '../src/routes/federation-settlements.js';
+import { deriveTierFlags } from '../src/services/federation-tiers.js';
+import type { PeerInfo } from '../src/services/federation.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
 import { buildHopSigningMessage } from '../src/types/route-manifest.js';
@@ -220,6 +228,62 @@ try {
         assert(after === before + 25, `credited ${(after - before) / 25} times, answers ${JSON.stringify(answers.map(a => a.status))}`);
         assert(ok === 1 && conflict === 4, `one 200 and four 409: ${JSON.stringify(answers.map(a => [a.status, a.body.error?.code]))}`);
         assert((await settlementRows(tc)).length === 1, 'one ledger row for the tracking code');
+    });
+
+    await test('S3. REFUSED — copies of one settlement taken by two node processes over one database credit once: one 200, one 409', async () => {
+        // Two settlement routers over H's own database stand in for two node processes: each has its
+        // own in-process claim set, so only the database can tell the two copies apart. Both copies
+        // are held after their ledger lookup until the other has looked too, the interleaving two
+        // processes on PostgreSQL meet by chance.
+        const tc = `tc-twin-${stamp}`;
+        let looked = 0;
+        let bothLooked!: () => void;
+        const barrier = new Promise<void>(resolve => { bothLooked = resolve; });
+        const held = new Proxy(H.storage, {
+            get(target, prop) {
+                if (prop === 'findTransactionByTrackingCode') return async (gaii: string, code: string, type: string) => {
+                    const found = await target.findTransactionByTrackingCode(gaii, code, type);
+                    if (code === `settle:${tc}` && looked < 2) { looked++; if (looked === 2) bothLooked(); await barrier; }
+                    return found;
+                };
+                const value = Reflect.get(target, prop);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        });
+        const twinUrls: string[] = [];
+        for (let i = 0; i < 2; i++) {
+            const twinPeers = new Map<string, PeerInfo>([[P_ID, {
+                nodeId: P_ID, url: P.baseUrl, publicKey: P.nodeKey.publicKey, status: 'active', addedAt: new Date().toISOString(), lastSeen: new Date().toISOString(),
+                ...deriveTierFlags('member'), tier: 'member',
+            }]]);
+            const twinApp = express();
+            twinApp.use(express.json());
+            twinApp.use(federationSettlementsRouter(H.config, held, twinPeers));
+            const twin = await new Promise<Server>(resolve => { const s = twinApp.listen(0, '127.0.0.1', () => resolve(s)); });
+            servers.push(twin);
+            twinUrls.push(`http://127.0.0.1:${(twin.address() as AddressInfo).port}`);
+        }
+        const before = await balance();
+        const body = await settlementBody({ gaii: H.ownerGhii, amount: 30, tracking_code: tc });
+        const post = (base: string) => fetch(`${base}/v1/federation/settle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+            .then(async r => ({ status: r.status, code: ((await r.json()) as any)?.error?.code }));
+        const answers = await Promise.all(twinUrls.map(post));
+        const after = await balance();
+        assert(after === before + 30, `credited ${(after - before) / 30} times, answers ${JSON.stringify(answers)}`);
+        assert(answers.filter(a => a.status === 200).length === 1 && answers.filter(a => a.status === 409 && a.code === 'CONFLICT').length === 1,
+            `one 200 and one 409 CONFLICT: ${JSON.stringify(answers)}`);
+        assert((await settlementRows(tc)).length === 1, 'one ledger row for the tracking code');
+        const again = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 30, tracking_code: tc }) });
+        assert(again.status === 409 && again.body.error?.code === 'CONFLICT', `a later copy at H: ${again.status} ${JSON.stringify(again.body)}`);
+    });
+
+    await test('S4. KEPT — a settlement for an identity this node does not have answers 404 and leaves no ledger row; the same code then credits a real one', async () => {
+        const tc = `tc-nobody-${stamp}`;
+        const r = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: `nobody-${stamp}@${H_ID}`, amount: 5, tracking_code: tc }) });
+        assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `unknown identity: ${r.status} ${JSON.stringify(r.body)}`);
+        const before = await balance();
+        const ok = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 5, tracking_code: tc }) });
+        assert(ok.status === 200 && await balance() === before + 5, `the owner's settlement with that code: ${ok.status} ${JSON.stringify(ok.body)}`);
     });
 
     // ── 2. Resolve ──

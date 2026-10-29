@@ -121,6 +121,7 @@
     "0117_agent_credentials_valid_after.sql": "422dbd04d3d189583d8d242ee8594466d8171f835e23cac7a2294905b856cc77",
     "0118_direct_message_reactions.sql": "4523a5a708ec0dcb8fdef8eced6d336413f049009012fa3c988630c3a419785b",
     "0119_subdomain_site_held_since.sql": "3510bb889100a92a121b015e77270429a7992cf63cd74a8c575156f92286b1e0",
-    "0120_released_component_names.sql": "f28afbc14de44fcc1cd96e49d6987cc7ca5ebf5d645a8435780c41a0435590a1"
+    "0120_released_component_names.sql": "f28afbc14de44fcc1cd96e49d6987cc7ca5ebf5d645a8435780c41a0435590a1",
+    "0121_settlement_once.sql": "86948c76f098667bd24c4cfbbbc69d08efd85d42abdfa139aa1173ce765d6937"
   }
 }
