@@ -11,6 +11,11 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   2026-10-29 — The ledger row is written before the credit, in one transaction with it, and the
+ *     database holds one federation_settlement row per identity and tracking code (migration 0121): a
+ *     copy taken by another node process at the same moment answers 409 CONFLICT and credits nothing.
+ *     An identity this node does not have answers 404 as before and leaves no row (secaudit2026oct26
+ *     round 8c, federation-01).
  *   2026-10-27 — Copies of one settlement that arrive together credit once: the identity and tracking
  *     code are claimed in this process before the ledger lookup and released after the ledger row is
  *     written, so the second copy answers 409 CONFLICT as a later one does (secaudit2026oct26).
@@ -45,6 +50,10 @@ import { buildHopSigningMessage, computeRelayFeeDistribution } from '../types/ro
 import type { RelayFeeDistribution } from '../types/route-manifest.js';
 import { emitChange } from '../services/event-bus.js';
 import { NONCE_WINDOW_MS } from '../services/request-nonce.js';
+import { isUniqueViolation } from './agent-tasks/dedupe.js';
+
+/** Thrown inside the settlement transaction when the credited identity is not on this node, to roll the ledger row back. */
+class NoSuchAccount extends Error {}
 
 export function federationSettlementsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -208,24 +217,36 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             }
         }
 
-        // Apply the settlement: credit morsels to the target agent
-        const credited = await storage.creditBalance(gaii, Math.floor(amount));
-        if (!credited) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-                `Agent ${gaii} not found on this node`));
-            return;
+        // Record the settlement, then credit, in one transaction. The ledger row goes first: the
+        // database holds one federation_settlement row per identity and tracking code (Postgres 0121,
+        // SQLite schema-settlement-once.ts), so a copy another node process took at the same moment
+        // fails here and credits nothing. An identity this node does not have rolls the row back.
+        try {
+            await storage.transaction(async () => {
+                await storage.addTransaction({
+                    id: `txn-${randomBytes(8).toString('hex')}`,
+                    gaii,
+                    type: 'federation_settlement',
+                    amount: Math.floor(amount),
+                    counterpartyGaii: from_node,
+                    trackingCode: `settle:${tracking_code}`,
+                    timestamp: new Date().toISOString(),
+                });
+                if (!await storage.creditBalance(gaii, Math.floor(amount))) throw new NoSuchAccount();
+            });
+        } catch (err) {
+            if (err instanceof NoSuchAccount) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                    `Agent ${gaii} not found on this node`));
+                return;
+            }
+            if (isUniqueViolation(err)) {
+                res.status(409).json(error(config.nodeId, 'CONFLICT',
+                    `Settlement already processed for tracking code ${tracking_code}`));
+                return;
+            }
+            throw err;
         }
-
-        // Record the settlement transaction
-        await storage.addTransaction({
-            id: `txn-${randomBytes(8).toString('hex')}`,
-            gaii,
-            type: 'federation_settlement',
-            amount: Math.floor(amount),
-            counterpartyGaii: from_node,
-            trackingCode: `settle:${tracking_code}`,
-            timestamp: new Date().toISOString(),
-        });
 
         logger.info(`Federation settlement applied: ${amount} morsels to ${gaii} from node ${from_node} (tc: ${tracking_code})`);
 
