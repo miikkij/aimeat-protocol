@@ -4921,6 +4921,7 @@
   "chat.new": "Nueva conversación",
   "chat.nodeKey": "Este servidor paga la conversación con su propia clave.",
   "chat.noThreads": "Todavía no hay nada. Di algo y la conversación aparecerá aquí.",
+  "chat.openAiSettings": "Abrir los ajustes de IA",
   "chat.openList": "Conversaciones",
   "chat.ownKey": "Se está usando tu propia clave de OpenRouter.",
   "chat.placeholder": "Pide algo o describe lo que quieres que se construya.",

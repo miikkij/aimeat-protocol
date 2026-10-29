@@ -13928,6 +13928,9 @@ paths:
         starts and finishes, `{ kind: 'done', stopReason, tokens }` at the end, and
         `{ kind: 'error', message }` when the turn could not run — a node with no agent configured
         answers with exactly that rather than hanging. `:keepalive` comments arrive every 15 s.
+        When the AI gate would refuse the turn (no key, no allowance left, no model), the turn ends
+        before the agent starts with `{ kind: 'error', code, message, settingsUrl }`: `message` is
+        the sentence for the person in their language, and `settingsUrl` opens their AI settings.
 
         The node adds two of its own. `{ kind: 'progress', step, text }` says what the agent is
         doing before it says so itself: `start` within 1.5 s when no words have come, then
