@@ -15,6 +15,9 @@
  * @usage
  *   import { registerComponent, deleteComponent, fetchComponentContent, computeHash } from '../services/component-registrar.js';
  * @version-history
+ *   v1.17.0 — 2026-10-29 — An extension component in an account that may not install extension code
+ *     (install role operator) is stored switched off and waits for an operator's one-press approval
+ *     (extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   v1.16.2 — 2026-10-27 — deleteComponent of an extension writes the released-name row for a bare name,
  *     as uninstallExtension does, so the next account's install of it is namespaced (secaudit2026oct26).
  *   v1.16.2 — 2026-10-27 — An extension component stamps installedByPrincipal from `codeWriter` when the
@@ -104,6 +107,8 @@ import { registerSkillComponent, deleteSkillComponent } from './packages/install
 import { componentCollision, cortexComponentsOf, packageTag, isOwnersLock, schemaOfPart } from './packages/compose/package-component-collisions.js';
 import { rewriteComponentRefs } from './component-ref-rewrite.js';
 import { releaseBareName } from './component-address.js';
+import { installRoleRefusal } from './extension-install-role.js';
+import { EXTENSION_CODE_HOLD_KEY, askOperatorsForExtensionCode, requesterFromPrincipal } from './extension-code-hold.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -116,6 +121,8 @@ export interface ComponentRegistrationResult {
   originalShortName?: string;
   /** A skill left alone because the owner has one of that name of their own: the warning to show. */
   skipped?: string;
+  /** An extension stored switched off, its code waiting for an operator (extension-code-hold.ts). */
+  awaitingOperator?: { extension: string; request_id: string | null };
 }
 
 export interface ComponentRegistrationInput {
@@ -325,17 +332,24 @@ export async function registerComponent(
         if (extConfig === null) {
           return { success: false, componentId, registeredAs, error: 'ENCRYPTION_NOT_CONFIGURED: a secret config value needs AIMEAT_ENCRYPTION_KEY on this node' };
         }
-        await storage.createExtension({
+        // The install role applies here as on every /v1/extensions door: an account that may not install
+        // extension code gets it switched off, waiting for an operator (extension-code-hold.ts; round 8c).
+        const roleHeld = (await installRoleRefusal(storage, config, owner)) !== null;
+        const created = await storage.createExtension({
           ...built.record,
-          config: extConfig,
+          config: roleHeld ? { ...extConfig, [EXTENSION_CODE_HOLD_KEY]: 'pending' } : extConfig,
           name: registeredAs,
           description: built.record.description || label,
           // A package component is live as soon as its package is installed; there is no separate
           // activate step in that flow.
-          status: 'active',
+          status: roleHeld ? 'inactive' : 'active',
           ...(input.codeWriter ? { installedByPrincipal: input.codeWriter } : {}),
         });
         await aggregateExtensionNow(config, storage, registeredAs); // its tools answer when the install does
+        if (roleHeld) {
+          const requestId = await askOperatorsForExtensionCode({ storage, config }, created, requesterFromPrincipal(input.callerGaii ?? ownerGaii), packageName);
+          return { success: true, componentId, registeredAs, originalShortName, awaitingOperator: { extension: registeredAs, request_id: requestId } };
+        }
         break;
       }
 

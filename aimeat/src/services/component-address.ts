@@ -32,6 +32,9 @@
  *   AmbiguousComponentName · extensionHoldersOf
  * @usage const ext = await findExtension(storage, req.params.name, req.auth?.owner, 'manage');
  * @version-history
+ *   v1.4.0 — 2026-10-29 — A released-name row an account erasure or the held-name settlement wrote
+ *     (`freed:`) leaves the name free for the next install; the apps that loaded it ask their owner
+ *     before they load the new holder's (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
  *   v1.2.1 — 2026-10-27 — /v1/ext/<a>/<b>/<action>: the account's `<a>/<b>` takes the call over a bare
  *     extension `<a>` whose instance `<b>` was made after it (secaudit2026oct26,
  *     extensionCallTarget:bare-extension-head-shadows-owner-namespace).
@@ -49,7 +52,7 @@
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish; secaudit2026oct22 leads 589 and 2827).
  */
 import type { Storage, ExtensionRecord, CortexExtensionRecord, CapabilityRecord } from '../storage/interface.js';
-import type { ComponentKind } from '../storage/types/component-versions.js';
+import { isFreedRelease, type ComponentKind } from '../storage/types/component-versions.js';
 import { bundledCortexNames } from './cortex-seeder.js';
 
 /** The namespace of what the node ships: bundled cortexes (system@<node>) and built-in extensions (system). */
@@ -92,11 +95,15 @@ type Getter<T> = (name: string) => Promise<T | null>;
 export type BareNameReading = 'call' | 'manage';
 
 /**
- * The released-name row of `name`. A storage that predates the rows (a unit test's double of the
- * storage interface) has none, so every rule reads as for a name never released.
+ * The released-name row of `name` that retires it. A storage that predates the rows (a unit test's
+ * double of the storage interface) has none, so every rule reads as for a name never released. A row
+ * an account erasure or the held-name settlement wrote (isFreedRelease) records only that the holder
+ * changed: the name stays free for the next install, as it was before the row existed, and the apps
+ * that loaded it ask their owner first (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
  */
-function releasedName(storage: Storage, kind: ComponentKind, name: string): Promise<{ holder: string } | null> {
-  return typeof storage.getReleasedComponentName === 'function' ? storage.getReleasedComponentName(kind, name) : Promise.resolve(null);
+async function releasedName(storage: Storage, kind: ComponentKind, name: string): Promise<{ holder: string } | null> {
+  const row = typeof storage.getReleasedComponentName === 'function' ? await storage.getReleasedComponentName(kind, name) : null;
+  return row && !isFreedRelease(row) ? row : null;
 }
 
 /** A bare name two accounts hold in their own namespaces, with no bare record: the caller names one in full. */

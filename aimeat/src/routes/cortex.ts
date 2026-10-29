@@ -11,6 +11,8 @@
  *   update:true; cortexLibUrls(): each lib's address.
  * @usage app.use(cortexRouter(config, storage)) in server.ts
  * @version-history
+ *   2026-10-29 — A lib request from an app that loaded the name from an earlier holder answers 404 until
+ *     the app's owner allowed the new holder (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): `:name` takes
  *     `<owner>/<name>` encoded as one segment, the alias of a bare record, or a bare name (reads take the
  *     bare record first, the managing routes the caller's own); GET /v1/cortex/:owner/:name/libs/:libFile serves a namespaced cortex's file;
@@ -76,6 +78,7 @@ import { cortexUploadOffer } from '../services/cortex-upload-offer.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { cortexDetail, cortexSource } from '../services/cortex-read.js';
 import { dependencyIndex, visibleAppRefs, usedBySummary } from '../services/dependency-map.js';
+import { heldForRequest } from '../services/cortex-holder-change.js';
 import { resolveCortexLib, listVersions } from '../services/component-versions.js';
 import { findCortex, cortexLibPath } from '../services/component-address.js';
 import { cortexOntologyToSkos } from '../services/cortex-ontology-skos.js';
@@ -525,6 +528,13 @@ export function cortexRouter(config: AimeatConfig, storage: Storage): Router {
         : found.reason === 'file' ? `Lib file "${libFile}" not found for extension "${raw}"`
         : `Extension "${found.name}" not found or not active`;
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', msg));
+      return;
+    }
+    // An app that loaded this name from an earlier holder loads the new holder's library only after its
+    // owner allowed it (services/cortex-holder-change.ts).
+    if (await heldForRequest({ storage, config }, found.name, { origin: req.get('origin'), referer: req.get('referer') })) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+        `The library "${found.name}" now belongs to another account, and the owner of this app has not allowed it yet. The owner was asked with a notification.`));
       return;
     }
 

@@ -37,6 +37,10 @@
  *     (services/connections/delegation-caller.ts; secaudit2026oct26 round 8c).
  *   2026-10-29 — The kind `goal-model-spend`: AIMEAT's model doing a goal's work on the AI allowance
  *     for an agent without ai:use waits for the owner (services/goals/goals-model-spend.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `cortex-holder`: apps that loaded a cortex library load it from its new holder
+ *     after their owner allows it (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `extension-code`: extension code a package brought into an account that may not
+ *     install extension code waits for an operator (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — The kind `goal-model-read`: AIMEAT's model reading private records an agent without
  *     memory:read-as-owner named in a goal waits for the owner (services/goals/goals-model-reach.ts).
  *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
@@ -122,7 +126,11 @@ export type PublishKind =
   // (services/connections/delegation-caller.ts).
   | 'delegation-binding'
   // AIMEAT's model doing a goal's work on the AI allowance for an agent without ai:use (services/goals/goals-model-spend.ts).
-  | 'goal-model-spend';
+  | 'goal-model-spend'
+  // Extension code a package brought into an account that may not install extension code (services/extension-code-hold.ts).
+  | 'extension-code'
+  // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex-holder-change.ts).
+  | 'cortex-holder';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

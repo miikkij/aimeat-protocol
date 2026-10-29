@@ -24,6 +24,8 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-29 — An extension ZIP under a new name that starts with aimeat- is refused to anyone but an
+ *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — An app upload passes the token's `publishing_app` (the app whose grant minted it) to publishApp (secaudit2026oct26).
  *   2026-10-26 — The owner is additive: a ZIP keeps its bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — An extension ZIP lands in the installer's namespace, `<owner>/<name>`, or on the
@@ -200,6 +202,7 @@ import { carryFirstUseKeep } from '../services/extension-first-use-keep.js';
 import { installRoleRefusal } from './extensions/permissions.js';
 import { placeExtensionInstall, settleReclaimed, isNamespacedName, findCortex, ownComponent } from '../services/component-address.js';
 import type { DoorAsk } from '../services/publish-requests/door.js';
+import { nodePrefixRefusal } from '../services/component-name-prefix.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -453,6 +456,19 @@ async function livePublishAsk(
 
 // ── Handler: Storage ── routes/upload-storage.ts (handleStorageUpload, declaredFromMeta)
 
+/**
+ * Is the principal an upload token names an operator? A presigned token carries neither roles nor
+ * scopes, so the question is asked of the principal it names with the grant its own record holds now:
+ * an agent passes only while it holds operator:admin (services/operator-principal.ts).
+ */
+async function uploaderIsOperator(storage: Storage, sub: string): Promise<boolean> {
+    const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
+    return (await operatorName(storage, {
+        sub,
+        ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
+    })) !== null;
+}
+
 // ── Handler: Extension ──
 
 async function handleExtensionUpload(
@@ -516,6 +532,12 @@ async function handleExtensionUpload(
     if (roleRefused) {
         res.status(403).json({ success: false, error: 'INSUFFICIENT_ROLE', message: roleRefused });
         return;
+    }
+    // A new name with the node's prefix is kept for what the node ships next, as on the inline doors
+    // (services/component-name-prefix.ts). The operator answer is asked as the cortex ZIP asks it.
+    if (!existing) {
+        const prefixed = await nodePrefixRefusal(storage, 'extension', record.name, { ownerName, isOperator: await uploaderIsOperator(storage, sub) });
+        if (prefixed) { res.status(prefixed.status).json({ success: false, error: prefixed.code, message: prefixed.message }); return; }
     }
 
     // A flagged action whose changed text would break an ODPS length cap is refused before the write,
@@ -662,14 +684,8 @@ async function handleCortexUpload(
 
     // The operator answer buys one thing: a namespace this owner does not own. POST /v1/cortex and
     // the MCP tool both grant it, and this door must answer as they do, or the same bundle installs as
-    // an inline manifest and is refused as a ZIP. A presigned token carries neither roles nor scopes,
-    // so the question is asked of the principal it names with the grant its own record holds now:
-    // an agent passes only while it holds operator:admin (services/operator-principal.ts).
-    const agent = sub.includes('#') ? await storage.getAgent(sub) : null;
-    const isOperator = (await operatorName(storage, {
-        sub,
-        ...(agent ? { roles: ['agent'], scopes: agent.defaultScopes ?? [] } : {}),
-    })) !== null;
+    // an inline manifest and is refused as a ZIP.
+    const isOperator = await uploaderIsOperator(storage, sub);
 
     // The cortex under that name (services/component-address.ts): `<owner>/<name>` as written, or for
     // a bare manifest name the bare record as before, else the uploader's own of that name.
