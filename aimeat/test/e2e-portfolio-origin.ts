@@ -14,6 +14,9 @@
  *     - standalone_url is advertised on /v1/portfolio/config and data/:username.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-portfolio-origin.ts
  * @version-history
+ *   2026-10-29 — The first visit after an erased name's portfolio origin passed to its next holder
+ *     clears the old storage once; an unchanged holder's visits clear nothing (secaudit2026oct26
+ *     round 8c, origin-handed-to-next-name-holder).
  *   2026-10-17 — A switched-off page's file answers 404 anonymously and 403 to another owner, and
  *     the owner still reads it (plan doc-mvcn6c7e4e5q, V0.3). Asserts the hole closed the same day:
  *     the file was public. The suite now refuses a second principal and left the exemptions.
@@ -225,6 +228,52 @@ async function main() {
         await test('/v1 API unaffected on the portfolio origin', async () => {
             const r = await portfolioGet(owner, '/v1/spec');
             assert(r.status === 200, `expected 200, got ${r.status}`);
+        });
+
+        // secaudit2026oct26 round 8c (routes/subdomains.ts:ensureAppSubdomain:origin-handed-to-next-name-holder).
+        // The portfolio origin's label is the account name, and an erased name can be registered again
+        // by somebody else. Visitors' browsers still hold what the old portfolio stored on that origin;
+        // the first visit after the holder changed clears it once, as an app origin does.
+        const visitPortfolio = async (sub: string, cookie?: string) => {
+            const r = await hostRequest(BASE, '/', `${sub}.${PORTFOLIO_HOST}:${PORT}`, {
+                headers: { 'x-portfolio-origin': '1', 'x-subdomain': sub, Accept: 'text/html', ...(cookie ? { Cookie: cookie } : {}) },
+            });
+            const set = /aimeat_origin_owner=[^;]*/.exec(r.header('set-cookie') ?? '')?.[0];
+            return { status: r.status, clear: r.header('clear-site-data'), cookie: set ?? cookie };
+        };
+        const publishPortfolio = async (tok: string) => {
+            const up = await fetch(`${BASE}/v1/portfolio/upload`, {
+                method: 'PUT', headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'text/html' }, body: HTML,
+            });
+            assert(up.status === 200, `upload status ${up.status}`);
+            const cfg = await json('/v1/portfolio/config', {
+                method: 'PUT', headers: { Authorization: `Bearer ${tok}` }, body: JSON.stringify({ enabled: true, tags: ['portfolio'] }),
+            });
+            assert(cfg.status === 200, `config status ${cfg.status}`);
+        };
+
+        await test('usage: a portfolio origin that keeps its holder keeps its visitors\' storage across visits', async () => {
+            const first = await visitPortfolio(owner);
+            const second = await visitPortfolio(owner, first.cookie);
+            const third = await visitPortfolio(owner, second.cookie);
+            assert(first.status === 200 && second.status === 200 && third.status === 200, `served: ${first.status} ${second.status} ${third.status}`);
+            assert(!first.clear && !second.clear && !third.clear, `an unchanged origin cleared its storage: ${first.clear} ${second.clear} ${third.clear}`);
+        });
+
+        await test('the first visit after an erased name\'s portfolio origin passed to its next holder clears the old storage, once', async () => {
+            const name = `pfreuse${Date.now() % 100000}`;
+            const first = await registerOwner(BASE, name);
+            await publishPortfolio(first.token);
+            const before = await visitPortfolio(name);
+            assert(before.status === 200 && !before.clear && !!before.cookie, `the first visit marks the origin's holder: ${JSON.stringify(before)}`);
+            const del = await json(`/v1/owners/${name}`, { method: 'DELETE', headers: { Authorization: `Bearer ${first.token}` } });
+            assert(del.status === 200, `erase the holder: ${del.status} ${JSON.stringify(del.body?.error)}`);
+            const next = await registerOwner(BASE, name);
+            await publishPortfolio(next.token);
+            const after = await visitPortfolio(name, before.cookie);
+            assert(after.status === 200 && /"storage"/.test(after.clear ?? ''), `the old portfolio's storage stays readable to the next holder: ${JSON.stringify(after)}`);
+            const again = await visitPortfolio(name, after.cookie);
+            assert(again.status === 200 && !again.clear, `cleared again on the next visit: ${again.clear}`);
         });
 
         console.log('\nAdvertised URLs + shim library');
