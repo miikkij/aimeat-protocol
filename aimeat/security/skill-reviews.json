@@ -434,14 +434,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-28",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:35f7a09a6b574f674337cbe2"
+      "digest": "sha256:d39d53efdbdc69f7277de2eb"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -469,11 +469,11 @@
       "digest": "sha256:ecd2ea95b087c651f50c4117"
     },
     "project:aimeat-frontend-verify": {
-      "reviewedOn": "2026-10-24",
+      "reviewedOn": "2026-10-29",
       "watches": [
         "aimeat/scripts/sandbox.ts"
       ],
-      "digest": "sha256:dfa324985637104dba2918b4",
+      "digest": "sha256:90fbf1167df33d165929efe5",
       "note": "It sends the check to the sandbox node; the styling rules it states live in the frontend path rule."
     },
     "project:aimeat-imagery": {
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
-      "aimeat/src/services/ai/route-plan.ts": "30144046b44b48bc"
+      "aimeat/src/services/ai/route-plan.ts": "7b7530020363a980"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
@@ -677,7 +677,7 @@
       "aimeat/public/lib/aimeat-fonts.css": "cff1b3fc1029b6c2"
     },
     "project:aimeat-frontend-verify": {
-      "aimeat/scripts/sandbox.ts": "f2a31562094f396c"
+      "aimeat/scripts/sandbox.ts": "e0908125aa35620b"
     },
     "project:aimeat-imagery": {
       "scripts/gen_image.py": "e2435908849b31d3"

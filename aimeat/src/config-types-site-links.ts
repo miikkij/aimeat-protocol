@@ -9,8 +9,8 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
- *   v1.4.0 — 2026-10-29 — storeTopup and storeOrders: a customer node's own top-up and orders pages in
- *     the store (UX review 2026-10-29, A1 and D).
+ *   v1.4.0 — 2026-10-29 — storeTopup: a customer node's own top-up page in the store (UX review
+ *     2026-10-29, A1).
  *   v1.3.0 — 2026-10-06 — storeSoonCode: the shared discount code "Opens soon" shows when pressed.
  *   v1.2.0 — 2026-10-06 — storeStatus ('open' | 'soon') and the per-language storeNote*: the front
  *     page can show the store and its prices while the store does not take orders yet.
@@ -100,8 +100,6 @@ export interface SiteLinksConfig {
    * spent offers no purchase.
    */
   storeTopup: string;
-  /** The owner's orders and invoices in the store, set by the fleet service. The node adds `lang`. Empty hides the link. */
-  storeOrders: string;
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
   /**

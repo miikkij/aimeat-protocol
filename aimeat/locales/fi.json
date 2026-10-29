@@ -12470,6 +12470,7 @@
     "cfg_site_store_note_fi": "Kaupan ilmoitus suomeksi",
     "cfg_site_store_note_es": "Kaupan ilmoitus espanjaksi",
     "cfg_site_store_soon_code": "Avajaisten alennuskoodi",
+    "cfg_site_store_topup_url": "Kaupan sivu, jolta ostetaan lisää tekoälysaldoa",
     "cfg_site_incubator_url": "Hautomon linkki",
     "cfg_site_contacts": "Julkiset yhteyshenkilöt",
     "cfgDesc_node_id": "Tämän instanssin yksilöivä tunniste.",
