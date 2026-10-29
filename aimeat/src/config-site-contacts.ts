@@ -8,7 +8,8 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
- *   v1.4.0 — 2026-10-29 — AIMEAT_SITE_STORE_TOPUP_URL.
+ *   v1.4.0 — 2026-10-29 — AIMEAT_SITE_STORE_TOPUP_URL, AIMEAT_SITE_STORE_ORDERS_URL,
+ *     AIMEAT_SITE_DEFAULT_LOCALE, AIMEAT_SITE_PURCHASE_PLAN and AIMEAT_SITE_PURCHASE_PACKAGE.
  *   v1.3.0 — 2026-10-06 — AIMEAT_SITE_STORE_SOON_CODE.
  *   v1.2.0 — 2026-10-06 — AIMEAT_SITE_STORE_STATUS ('open' unless it says 'soon') and
  *     AIMEAT_SITE_STORE_NOTE_EN / _FI / _ES.
@@ -86,6 +87,12 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
     storeSoonCode: (process.env.AIMEAT_SITE_STORE_SOON_CODE ?? '').trim(),
     storeTopup: (process.env.AIMEAT_SITE_STORE_TOPUP_URL ?? '').trim(),
+    storeOrders: (process.env.AIMEAT_SITE_STORE_ORDERS_URL ?? '').trim(),
+    purchasePlan: (process.env.AIMEAT_SITE_PURCHASE_PLAN ?? '').trim(),
+    purchasePackage: (process.env.AIMEAT_SITE_PURCHASE_PACKAGE ?? '').trim(),
+    // Only a language the node ships; anything else is no language, so the browser's applies.
+    defaultLocale: ['en', 'fi', 'es'].includes((process.env.AIMEAT_SITE_DEFAULT_LOCALE ?? '').trim().toLowerCase())
+        ? (process.env.AIMEAT_SITE_DEFAULT_LOCALE ?? '').trim().toLowerCase() : '',
     incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
     signage: (process.env.AIMEAT_SITE_SIGNAGE_URL ?? '').trim(),
     signageAdmin: (process.env.AIMEAT_SITE_SIGNAGE_ADMIN_URL ?? '').trim(),

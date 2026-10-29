@@ -13,12 +13,15 @@ import { relative } from '/js/format.js';
  * @structure
  *   - escHtml/escAttr/decodeEntities: XSS-safe escaping + reversal of double-escaped names
  *   - timeAgo/formatBytes: human-readable time and size formatting
- *   - LOCALES/detectLocale/persistLocale: language preference via URL → localStorage → cookie → navigator
+ *   - LOCALES/detectLocale/persistLocale: language preference via URL → localStorage → cookie → the
+ *     node's own language → navigator
  *   - sanitizeHtml: strip to a safe tag/attribute whitelist
  *   - copyToClipboard/generateStars/handleImgError: clipboard, background stars, image error placeholder
  *   - downloadBlob/toCsvBlob: hand the viewer a file the page built, and build a CSV Excel can read
  *
  * @version-history
+ *   v1.2.0 — 2026-10-29 — detectLocale reads the node's own language (window.__SITE.defaultLocale)
+ *     before the browser's: a node bought from the store speaks its buyer's language.
  *   v1.0.1 — 2026-10-05 — escHtml escapes `'` too, so its result is safe in either kind of quoted
  *     attribute (secaudit 2026-10, C8).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -146,7 +149,13 @@ export function detectLocale() {
   const match = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
   if (match && LOCALES.includes(match[1])) return match[1];
 
-  // 4. Browser language. 'es-CO' and 'es-419' both answer 'es'.
+  // 4. The node's own language, when the operator named one (site.default_locale): a node bought from
+  // the store speaks its buyer's language on the first visit, whatever the browser says (UX review
+  // 2026-10-29, the onboarding buttons read in English on a Finnish customer's node).
+  const nodeLang = typeof window !== 'undefined' ? /** @type {any} */ (window).__SITE?.defaultLocale : undefined;
+  if (LOCALES.includes(nodeLang)) return nodeLang;
+
+  // 5. Browser language. 'es-CO' and 'es-419' both answer 'es'.
   const nav = (navigator.language || '').split('-')[0].toLowerCase();
   if (LOCALES.includes(nav)) return nav;
 
