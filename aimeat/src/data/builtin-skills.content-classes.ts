@@ -18,6 +18,8 @@
  * @structure CONTENT_CLASSES_SKILL_ENTRY
  * @usage import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js';
  * @version-history
+ *   v1.1.1 — 2026-10-29 — A PDF's facts may carry textNotRead (the node's PDF read limit;
+ *     secaudit2026oct26 round 8c). Added, nothing else changed.
  *   v1.1.0 — 2026-10-21 — "When something is wrong: correct it": aimeat_content_correct, and who
  *     decided a class (by, confidence, decisionId).
  *   v1.0.0 — 2026-10-20 — Initial (wish-sis-ll-n-purku-luokittelu-ja-owl).
@@ -44,7 +46,10 @@ When content arrives on the node (a stored file, a long memory record, a publish
 document) the node reads it and keeps its **facts**. One item, one set of facts:
 
 1. **Technical facts, always, no AI.** A PDF: title, author, creator, dates, pages, whether it has a
-   text layer, and its signatures (valid, invalid or indeterminate, with the signer). A picture: size,
+   text layer, and its signatures (valid, invalid or indeterminate, with the signer). A PDF whose size
+   the node cannot check before reading it (an encrypted one, for example) is read under a time and a
+   memory limit; past one, \`pdf.textNotRead\` names the limit, the file stays stored as it was, and
+   its text was not read: say so rather than calling the file empty. A picture: size,
    bit depth, colour space, camera, when it was taken, location (when it carries one), creator and
    copyright, and any alt text it already carries. A video: length, size, frame rate, codecs, when it
    was recorded. Every item: whether it **declares** being AI-made, and how (the node's own
