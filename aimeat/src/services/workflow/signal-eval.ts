@@ -25,8 +25,11 @@
  *     watchdog's slow-vs-stuck decision (resume-on-retry).
  *   v1.2.0 — 2026-10-27 — globToRegExp matches without a backtracking RegExp, in time bounded by the
  *     glob and string lengths, with the same answers (secaudit2026oct26, globToRegExp:catastrophic-backtracking).
+ *   v1.2.1 — 2026-10-29 — Those lengths have a bound: a glob longer than a key (1 024) and a string
+ *     longer than a text (100 000) match nothing (code scanning 1768, 1769 js/loop-bound-injection).
  */
 import type { Signal, DeterministicSignal } from '../../models/workflow-schemas.js';
+import { INPUT_LIMITS } from '../../models/input-limits.js';
 
 /** A value read from owner memory (just the parts the evaluator needs). */
 export interface MemoryValue { key: string; value: unknown; }
@@ -92,9 +95,13 @@ const LINE_END = new Set(['\n', '\r', ' ', ' ']);
  * for seconds per match (secaudit2026oct26, globToRegExp:catastrophic-backtracking).
  */
 export function globToRegExp(glob: string): GlobMatcher {
+  // A glob comes from a workflow, an event filter or an offer: a key pattern, never longer than a key.
+  // Anything else, or anything longer, matches nothing, so the walk below has a known bound.
+  if (typeof glob !== 'string' || glob.length > INPUT_LIMITS.key) return { test: () => false };
   const pat = [...glob.replace(/\*{2,}/g, '*')];
   return {
     test(s: string): boolean {
+      if (typeof s !== 'string' || s.length > INPUT_LIMITS.text) return false;
       // live[i]: the glob's first i characters match the string read so far. A star may match nothing,
       // so a position before a star also makes the position after it live.
       let live = new Array<boolean>(pat.length + 1).fill(false);
