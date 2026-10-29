@@ -10407,6 +10407,8 @@
   "notiftext.approval_goal_model_read.body": "{agent} needs {records} for the task \"{work}\" in your goal \"{goal}\". {agent} may not read your private entries, but it sees what the AI answers. If you allow it, the AI uses these entries in the task. If you do not, the task is done without them.",
   "notiftext.approval_schedule_instruction.title": "{who} changed the scheduled task \"{schedule}\", and the change waits for your approval",
   "notiftext.approval_schedule_instruction.body": "{maker} made this scheduled task, so it reads your data with the permissions of {maker}. {who} changed its instructions, but {who} may not read everything that {maker} can. So the change waits for your approval. If you allow it, the task uses the new instructions. If you do not, it goes back to the old ones.",
+  "notiftext.approval_goal_model_spend.title": "{who} asks AIMEAT's AI to do the task \"{work}\" at your cost",
+  "notiftext.approval_goal_model_spend.body": "{agent} added the task \"{work}\" to your goal \"{goal}\" for AIMEAT's AI. {agent} may not use your AI itself, so the cost of the task waits for you. If you allow it, the AI does this task and the AI tasks {agent} adds to this goal later. If you do not, this task is not done.",
   "notiftext.approval_refinery_definition.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
   "notiftext.approval_refinery_definition.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
   "notiftext.approval_refinery_definition_text.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
@@ -26086,6 +26088,17 @@
         "high": "The task is done without these entries.",
         "tipLabel": "When to allow",
         "tip": "Allow if it is fine with you that the agent knows what these entries say. If the agent may read all your entries, you can give it that permission on the agent's page, and then it no longer asks."
+      },
+      "approval_goal_model_spend": {
+        "title": "An agent asks the AI to do a task at your cost",
+        "short": "AIMEAT's AI would do a task of your goal, paid from your own key or your AI allowance.",
+        "what": "In a goal, an agent can give a task to AIMEAT's AI. The AI then works on your account and you pay for it, from your own key or from your AI allowance. This agent does not have the permission to use your AI, so it cannot spend your money alone. That is why you are asked.",
+        "lowLabel": "If you allow",
+        "low": "The AI does this task, and the AI tasks this agent adds to this goal later, at your cost.",
+        "highLabel": "If you do not allow",
+        "high": "This task is not done. Nothing is spent.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you want the goal to go on with this task. If the agent may always use your AI, give it that permission on the agent's page, and then it no longer asks."
       },
       "approval_schedule_instruction": {
         "title": "Someone changed a scheduled task",

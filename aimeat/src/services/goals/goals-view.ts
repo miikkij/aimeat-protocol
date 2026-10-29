@@ -9,6 +9,8 @@
  * @structure goalSummary() · goalView() · waitingItems()
  * @usage res.json(success(nodeId, { goal: goalView(goal) }));
  * @version-history
+ *   v1.3.0 — 2026-10-29 — A model work waiting for the owner's answer on spending the AI allowance
+ *     shows `spend_request` (secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — A model work waiting for the owner's answer on records shows `read_request`
  *     (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — A work shows its runner, model and job; a proposed goal waits as one item.
@@ -35,6 +37,8 @@ function workView(w: GoalWork) {
     offered_at: w.offeredAt ?? null, nobody_took: !!w.nobodyAt, cost_usd: w.costUsd ?? 0,
     // A model work waiting for the owner's answer on records an agent named (goals-model-reach.ts).
     ...(w.readAsk ? { read_request: { request_id: w.readAsk.requestId || null, records: w.readAsk.keys, agent: w.readAsk.agent } } : {}),
+    // A model work waiting for the owner's answer on spending the AI allowance (goals-model-spend.ts).
+    ...(w.spendAsk ? { spend_request: { request_id: w.spendAsk.requestId || null, agent: w.spendAsk.agent } } : {}),
   };
 }
 

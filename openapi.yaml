@@ -23977,6 +23977,12 @@ paths:
         a `reason`, and `read_request` { request_id, records, agent }: the owner's one-press question
         (kind `goal-model-read`, readable at GET /v1/publish-requests/{id}). Allow: the work runs with
         the records. Don't allow: it runs without them, or stops when none of its records remain.
+        A model work an agent without `ai:use` asked for (the work's creator, or the goal's creator for
+        a work the goal's plan made, unless the owner approved the goal as a proposal) has status
+        `waiting`, a `reason`, and `spend_request` { request_id, agent }: the owner's one-press
+        question (kind `goal-model-spend`) whether AIMEAT's model may do it on the owner's AI. Allow:
+        the work runs, and that agent's later model works in the goal run without asking. Don't
+        allow: the work stops with the reason.
       security:
         - BearerAuth: []
       responses:

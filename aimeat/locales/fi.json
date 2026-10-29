@@ -10582,6 +10582,8 @@
   "notiftext.approval_crew_model_default.body": "Kun agenttiesi miehistöt kysyvät mallilta, ne lähettävät palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistöt käyttävät osoitetta seuraavasta ajosta alkaen. Jos et salli, ne pitävät nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_goal_model_read.title": "{who} pyytää, että AIMEATin tekoäly saa lukea yksityiset merkintäsi {records}",
   "notiftext.approval_goal_model_read.body": "{agent} tarvitsee merkinnät {records} tehtävään ”{work}” tavoitteessasi ”{goal}”. {agent} ei saa lukea yksityisiä merkintöjäsi, mutta se näkee tekoälyn vastauksen. Jos sallit, tekoäly käyttää näitä merkintöjä tehtävässä. Jos et salli, tehtävä tehdään ilman niitä.",
+  "notiftext.approval_goal_model_spend.title": "{who} pyytää, että AIMEATin tekoäly tekee tehtävän ”{work}” sinun kustannuksellasi",
+  "notiftext.approval_goal_model_spend.body": "{agent} lisäsi tavoitteeseesi ”{goal}” tehtävän ”{work}” AIMEATin tekoälylle. {agent} ei itse saa käyttää tekoälyäsi, joten tehtävän kulu odottaa sinun päätöstäsi. Jos sallit, tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka {agent} lisää tähän tavoitteeseen myöhemmin. Jos et salli, tätä tehtävää ei tehdä.",
   "notiftext.approval_schedule_instruction.title": "{who} muutti ajastusta ”{schedule}”, ja muutos odottaa hyväksyntääsi",
   "notiftext.approval_schedule_instruction.body": "Ajastuksen teki {maker}, joten se lukee tietojasi samoilla oikeuksilla kuin {maker}. {who} muutti sen ohjeita, mutta {who} ei saa lukea kaikkea, mitä {maker} saa. Siksi muutos odottaa hyväksyntääsi. Jos sallit, ajastus käyttää uusia ohjeita. Jos et salli, se palaa vanhoihin ohjeisiin.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
@@ -26248,6 +26250,17 @@
         "high": "Tehtävä tehdään ilman näitä merkintöjä.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos sinulle sopii, että agentti tietää, mitä näissä merkinnöissä lukee. Jos agentti saa lukea kaikki merkintäsi, voit antaa sille tämän luvan agentin sivulla. Silloin se ei enää kysy."
+      },
+      "approval_goal_model_spend": {
+        "title": "Agentti pyytää tekoälyä tekemään tehtävän sinun kustannuksellasi",
+        "short": "AIMEATin tekoäly tekisi tavoitteesi tehtävän, ja kulu maksetaan omalla avaimellasi tai tekoälysaldostasi.",
+        "what": "Tavoitteessa agentti voi antaa tehtävän AIMEATin tekoälylle. Tekoäly tekee työn tililläsi, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. Tällä agentilla ei ole lupaa käyttää tekoälyäsi, joten se ei voi käyttää rahojasi yksin. Siksi sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka agentti lisää tähän tavoitteeseen myöhemmin. Sinä maksat ne.",
+        "highLabel": "Jos et salli",
+        "high": "Tätä tehtävää ei tehdä, eikä rahaa kulu.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos haluat tavoitteen jatkuvan tällä tehtävällä. Jos agentti saa aina käyttää tekoälyäsi, anna sille tämä lupa agentin sivulla. Silloin se ei enää kysy."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",
