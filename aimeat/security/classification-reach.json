@@ -1367,6 +1367,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
     },
+    "src/services/cortex-holder-change.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: its own record under system@<node> (cortex.holder-change.<name>), which lists the apps that loaded a cortex name before its holder changed and whether each app's owner allowed the new holder; the library route reads it to decide. No content is read or shown."
+    },
     "src/services/cortex-seeder.ts": {
       "reads": {
         "listAllMemory": 1
