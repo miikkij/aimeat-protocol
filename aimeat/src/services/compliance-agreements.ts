@@ -19,6 +19,9 @@
  *   finalizeNotices() · releaseCounterpartyAccount() · historyEntry()
  * @usage const a = await updateAgreement(storage, nodeId, id, cur => ({ ...cur, ... }));
  * @version-history
+ *   2026-10-29 — statusOf and summaryOf read a version signed only in test (`test-signed`): the agreement
+ *     reads `test-signed` unless an earlier version is in force, and the operator acts next
+ *     (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — releaseCounterpartyAccount: the account erasure takes the erased account off the
  *     agreements that name it as the counterparty's (secaudit2026oct26,
  *     compliance-agreements:counterparty-bound-by-reusable-account-name).
@@ -160,7 +163,8 @@ export function statusOf(a: Agreement, now = Date.now()): AgreementStatus {
   if (a.endedAt) return 'ended';
   const v = newest(finalizeNotices(a, now));
   if (inForce(a) && (v.status === 'signed' || v.status === 'superseded' || (v.status === 'sent' && v.notice))) return 'signed';
-  if (inForce(a) && v.status === 'draft') return 'signed';
+  // A version signed only in test leaves the version in force before it in force (round 8c).
+  if (inForce(a) && (v.status === 'draft' || v.status === 'test-signed')) return 'signed';
   return v.status === 'superseded' ? 'expired' : v.status;
 }
 
@@ -174,7 +178,7 @@ export function summaryOf(a: Agreement): Record<string, unknown> {
     external_ref: a.externalRef ?? null,
     version_in_force: f?.n ?? null, signed_at: f?.signedAt ?? null, effective_from: f?.effectiveFrom ?? null,
     newest_version: v.n, newest_status: v.status,
-    waiting: v.status === 'review' ? 'operator' : v.status === 'sent' && !v.notice ? 'counterparty' : v.status === 'draft' ? 'operator' : null,
+    waiting: v.status === 'review' || v.status === 'draft' || v.status === 'test-signed' ? 'operator' : v.status === 'sent' && !v.notice ? 'counterparty' : null,
     notice: v.notice ?? null, ended_at: a.endedAt ?? null, deletion: a.deletion ?? null, updated_at: a.updatedAt,
   };
 }

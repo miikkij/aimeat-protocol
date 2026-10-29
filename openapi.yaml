@@ -23460,8 +23460,11 @@ paths:
       tags: [Compliance]
       description: >
         Every data processing agreement (GDPR art. 28) the operator keeps, each with its status
-        (draft, sent, review, signed, expired, ended), the version in force, what it waits for and an
-        announced change. Operator only; something acting for the operator needs `compliance:read`.
+        (draft, sent, review, signed, expired, ended, test-signed), the version in force, what it waits
+        for and an announced change. `test-signed` is a version both parties signed where a signature
+        is a test wallet signature with no legal effect, on a node running production settings: it is
+        not in force, and the version in force before it stays in force (the agreement then reads
+        `signed`). On a node in test or development settings such a version comes into force as before. Operator only; something acting for the operator needs `compliance:read`.
         A fleet manager reads the agreement status per customer from here (`external_ref`).
       security:
         - BearerAuth: []
@@ -66541,6 +66544,9 @@ paths:
                     delegation is used by the app it names (its own grant token, any user's), by a
                     person who uses that app (a live grant for it) in person or through their agents,
                     and by the channel owner. Any other caller is 403 DELEGATION_NOT_FOR_CALLER.
+                    A delegation belongs to one author's app (`bound_app` on the delegation): an app
+                    of the same file name by another author is 403, and on a delegation not yet bound
+                    an app by another author waits for the channel owner's answer (202).
                 action:
                   type: string
                   example: publish-video
@@ -66590,6 +66596,47 @@ paths:
                               error:
                                 type: string
                                 nullable: true
+        '202':
+          description: >
+            Nothing was published. The delegation names its app by file name alone and is not yet
+            bound to one author's app, and this app was made by someone other than the channel
+            owner. The channel owner was asked once, with Allow and Don't allow; every user of the
+            app gets this same answer until they decide, and the first one to ask hears the answer
+            in their notifications. After Allow the delegation takes only this author's app; after
+            Don't allow this app is 403 DELEGATION_NOT_FOR_CALLER and the channel owner is not asked
+            again.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          approval_request:
+                            type: object
+                            properties:
+                              request_id:
+                                type: string
+                              status:
+                                type: string
+                                enum: [awaiting_owner]
+                              waiting_for:
+                                type: string
+                                enum: [channel_owner]
+                              asks:
+                                type: string
+                              why:
+                                type: string
+                              expires_at:
+                                type: string
+                                format: date-time
+                              already_waiting:
+                                type: boolean
+                              next_step:
+                                type: string
         '400':
           description: >
             The gate refused: no delegation, the delegation is disabled, a per-publisher cap is
@@ -67540,7 +67587,11 @@ paths:
                   default: true
       responses:
         '201':
-          description: Delegation created or replaced
+          description: >
+            Delegation created or replaced. `bound_app` is the one app (`owner/filename`) it belongs
+            to: the app `app_id` names in full, or your own app of that file name. It is null when
+            neither exists yet; then a first use by your own app binds it to that app, and a first
+            use by an app of another author asks you first, also when you hold an app of that name.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -67563,7 +67614,9 @@ paths:
             type: string
       responses:
         '200':
-          description: Delegations over this connection
+          description: >
+            Delegations over this connection, each with `bound_app`: the one app (`owner/filename`)
+            it belongs to, or null while it is not bound.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
