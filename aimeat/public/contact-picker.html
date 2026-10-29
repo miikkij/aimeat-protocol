@@ -15,6 +15,7 @@
       frame the app controls is a frame the app can position, resize and overlay — the choice has to
       happen somewhere the app cannot dress up.
     @version-history
+      v1.0.2 — 2026-10-29 — The filter field is kept out of password managers (data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
       v1.0.1 — 2026-10-27 — Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
       v1.0.0 — 2026-08-17 — TARGET-063 phase 3.
   -->
@@ -49,7 +50,7 @@
   <div class="wrap">
     <h1 id="title">Choose a contact</h1>
     <p class="subtitle" id="subtitle"></p>
-    <input id="filter" type="search" placeholder="Filter…" autocomplete="off" maxlength="2048"><!-- js/input-limits.js line -->
+    <input id="filter" type="search" placeholder="Filter…" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" maxlength="2048"><!-- js/input-limits.js line -->
     <div id="body"></div>
     <p class="foot" id="foot"></p>
   </div>

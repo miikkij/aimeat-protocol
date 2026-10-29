@@ -16,6 +16,9 @@
  *     in a scope tab is the tab's Count (the Count look, a unification per the page family's map).
  *   v1.1.0 — 2026-09-27 — Draws its own names: .dv-desk is .question-desk and .dv-field is
  *     .question-desk-field (a move).
+ *   v1.1.1 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
+ *     owner's sign-in name into a find field.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -28,7 +31,8 @@ const html = htm.bind(h);
 export function QuestionDesk({ value, placeholder, label, onInput, onEnter, scopes, scope, onScope, scopeLabel, hint }) {
   return html`
     <div class="question-desk poster-row--thing">
-      <input type="search" class="question-desk-field"value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
+      <input type="search" class="question-desk-field" value=${value}
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" placeholder=${placeholder} aria-label=${label || placeholder}
         onInput=${(e) => onInput?.(e.target.value, e)} onKeyDown=${(e) => { if (e.key === 'Enter') onEnter?.(e); }} />
       ${scopes && scopes.length ? html`<${Tabs} label=${scopeLabel} value=${scope} onSelect=${onScope}
         items=${scopes.map((s) => ({ ...s, count: s.count === '' || s.count === null ? undefined : s.count }))} />` : null}

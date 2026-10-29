@@ -19,6 +19,10 @@
  * @usage html`<${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
  *   groups=${groups} other=${adminGroups} otherTitle=${t('menuFind.otherOperator')} onOpen=${openRow}>${menu}<//>`
  * @version-history
+ *   v1.1.1 — 2026-10-29 — Password managers skip the field (data-lpignore, data-1p-ignore,
+ *     data-bwignore, data-form-type="other"): LastPass filled the owner's sign-in name into the admin
+ *     menu find at page load, and the menu showed "No place matches" for it. autocomplete="off"
+ *     alone does not stop a password manager.
  *   v1.1.0 — 2026-10-16 — onSearchStart and busyNote (the page reads the person's own things at the
  *     first letter), and a group's uncounted rows as one quiet line.
  *   v1.0.0 — 2026-10-14 — Initial (wish-pikahaku-settings-controls-ja-admin-sivuille).
@@ -169,7 +173,8 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
         <div class="menu-find-field">
           ${glass}
           <input id=${id} ref=${inputRef} class="menu-find-input" type="text" value=${q} placeholder=${placeholder}
-            autocomplete="off" spellcheck=${false} aria-describedby=${searching ? `${id}-count` : undefined}
+            autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
+            spellcheck=${false} aria-describedby=${searching ? `${id}-count` : undefined}
             onInput=${(e) => setQ(e.currentTarget.value)} onKeyDown=${onKeyDown} />
           ${q
             ? html`<button type="button" class="poster-icon poster-icon--small menu-find-clear" aria-label=${t('menuFind.clear')} onClick=${clear}>✗</button>`

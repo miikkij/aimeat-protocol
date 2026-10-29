@@ -13,6 +13,7 @@
  * @structure EyeMark · fmtPublished · WALL_FIRST_PAGE · Gallery · StatsPanel
  * @usage import { Gallery, StatsPanel } from './landing-wall.js';
  * @version-history
+ *   v1.1.6 -- 2026-10-29 -- The search field is kept out of password managers (autocomplete off, data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
  *   v1.1.5 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.1.4 -- 2026-10-19 -- A card's screenshot loads through js/session-src.js (signed-in-only node).
  *   v1.1.3 -- 2026-10-06 -- "Get your own" is a StoreDoor: "Opens soon" while the store does not take
@@ -121,6 +122,7 @@ export function Gallery() {
       <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI. Yours goes here too.')}</h2>
       <div class="ld-wall-bar">
         <input class="ld-wall-search poster-frame" type="search" maxLength=${INPUT_LIMITS.line} value=${q}
+          autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
           onInput=${(e) => setQ(e.target.value)}
           placeholder=${tr('landing.wallSearch', 'Search apps…')}
           aria-label=${tr('landing.wallSearch', 'Search apps')} />
