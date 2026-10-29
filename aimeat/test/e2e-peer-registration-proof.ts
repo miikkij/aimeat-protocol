@@ -25,6 +25,9 @@
  *   routes the sweep found · cleanup
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-peer-registration-proof
  * @version-history
+ *   v1.3.0 -- 2026-10-29 -- Phase 2: a seller naming this node's own id is refused with 400
+ *     SELF_NODE_ID and writes nothing, whatever the card at the given address says, and a grant
+ *     naming it is refused as before (secaudit2026oct26 round 8c, federation-07).
  *   v1.2.3 -- 2026-10-23 -- setupOwner uses setupOperator (a password and the password sign-in); POST
  *     /v1/admin/setup/token answers 410 from 4.0.0 (secaudit2026oct22).
  *   v1.2.2 -- 2026-10-16 -- The node this suite starts follows the run's backend
@@ -246,6 +249,22 @@ await test('A grant whose key is not the one the node\'s card publishes is refus
     assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
     assert(!(await peerList()).peers.some(p => p.node_id === x.nodeId), 'no peer was written');
     assert(!(await entitled(x.nodeId)), 'no entitlement was written');
+});
+
+await test('A grant or a seller naming this node\'s own id is refused, even when the card answers with that id, and writes nothing', async () => {
+    // The registrant's server answers the card as this node, under its own key: the card check
+    // alone would pass it, and a peer under this node's id would speak for every person here.
+    const self = await startStub(R.nodeId); stubs.push(self);
+    const r = await grant(R.nodeId, { url: self.url, public_key: self.keys.publicKey });
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_INPUT', `grant naming this node (refused before the peer link): ${r.status} ${JSON.stringify(r.body)}`);
+    const s = await R.json(`/v1/package-sellers/${R.nodeId}`, {
+        method: 'PUT', headers: auth(opsToken), body: JSON.stringify({ node: { url: self.url, public_key: self.keys.publicKey } }),
+    });
+    assert(s.status === 400 && s.body.error?.code === 'SELF_NODE_ID', `seller naming this node: ${s.status} ${JSON.stringify(s.body)}`);
+    const list = await peerList();
+    assert(!list.peers.some(p => p.node_id === R.nodeId), 'no peer under this node\'s own id was written');
+    assert(!(list.pending_registrations ?? []).some((p: any) => p.node_id === R.nodeId), 'no pending registration either');
+    assert(!(await entitled(R.nodeId)), 'no entitlement was written');
 });
 
 console.log('\nPhase 3 — A packages-only peer reaches packages and nothing else');

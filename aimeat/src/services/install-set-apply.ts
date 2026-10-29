@@ -34,6 +34,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-10-29 — A set whose repository is this node itself is refused (400 SELF_NODE_ID) before the
+ *     card read: no peer under this node's own id (secaudit2026oct26 round 8c, federation-07).
  *   2026-10-18 — A real apply claims the set's record before it makes anything (install-set-run.ts
  *     claimRun) and its last write removes the claim (finishRun): a second apply of the same set at
  *     the same moment answers 409 APPLY_IN_PROGRESS. readRecord and writeRecord are gone; appliedValue
@@ -93,6 +95,7 @@ import { provisionWorkspace, checkWorkspaceManifest, type ProvisionWorkspaceInpu
 import { deployAppAgent } from './app-agent-deploy.js';
 import { readProposal, settleProposal } from './agent-proposals.js';
 import { deriveTierFlags } from './federation-tiers.js';
+import { selfNodeIdMessage } from './federation-peer-gate.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
@@ -272,6 +275,11 @@ async function linkRepository(
 ): Promise<{ ok: true; peers: Map<string, PeerInfo> } | { ok: false; status: number; code: string; message: string }> {
     const repo = set.repository;
     if (!repo) return { ok: true, peers: deps.peers };
+    // A peer under this node's own id would speak for every person here; this node's own card answers
+    // with that id and key, so the card check below would not stop it.
+    if (repo.nodeId === deps.config.nodeId) {
+        return { ok: false, status: 400, code: 'SELF_NODE_ID', message: `${selfNodeIdMessage(deps.config.nodeId)} An install set names the repository it installs from.` };
+    }
     const known = deps.peers.get(repo.nodeId);
     if (known) {
         if (known.publicKey !== repo.publicKey) return { ok: false, status: 409, code: 'PEER_KEY_MISMATCH', message: `${repo.nodeId} is a peer of this node under another key than the set names. Check which key is right before applying.` };

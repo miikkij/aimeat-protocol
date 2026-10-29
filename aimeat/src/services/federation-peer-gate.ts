@@ -35,6 +35,9 @@
  *   if (!gate.ok) { res.status(gate.status).json(error(config.nodeId, gate.code, gate.message)); return; }
  *   // ...then verify the signature against gate.peer.publicKey
  * @version-history
+ *   v1.5.0 — 2026-10-29 — gatePeer() refuses a source node equal to the id of the node that owns the
+ *     peer map (peer-registry.ts), whatever path put such a peer in it (secaudit2026oct26 round 8c,
+ *     federation-07).
  *   v1.4.0 — 2026-10-27 — selfNodeIdMessage(): the one sentence every admission path gives a node id
  *     equal to this node's own (secaudit2026oct26).
  *   v1.3.0 — 2026-10-05 — gatePeer() takes `null` for a door that needs an active, keyed peer and no
@@ -50,6 +53,7 @@
  *     settlement, presence, memory-list and templates each name a word now.
  */
 import type { PeerInfo } from './federation.js';
+import { ownNodeIdOf } from './peer-registry.js';
 
 /**
  * The permission words an inbound door may require. Deliberately a subset of the peer's flags: the
@@ -122,6 +126,12 @@ export function gatePeer(
   const forbidden = { ok: false as const, status: 403, code: 'FORBIDDEN', message: 'Source node is not an active peer' };
 
   if (typeof sourceNode !== 'string' || !sourceNode) return forbidden;
+  // A peer speaks for the people of its node id, so a peer under this node's own id would speak for
+  // every person here. Every admission path refuses that id; this refuses it at every door too, for
+  // a row any other path wrote (secaudit2026oct26 round 8c).
+  if (sourceNode === ownNodeIdOf(peers)) {
+    return { ok: false, status: 403, code: 'FORBIDDEN', message: `${sourceNode} is this node's own id, so no peer speaks under it here.` };
+  }
   const peer = [...peers.values()].find(p => p.nodeId === sourceNode);
   if (!peer || !accept.includes(peer.status)) return forbidden;
 
