@@ -39,6 +39,8 @@
  *     { existing, ownerName, actor, isOperator });
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.12.0 — 2026-10-29 — writeExtensionRecord refuses a new name that starts with aimeat- to anyone
+ *     but an operator, 409 NAME_RESERVED (component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   v1.11.0 — 2026-10-25 — uninstallExtension writes a bare name down with its holder, and a new
  *     install that took a released bare name settles it (services/component-address.ts; owner
  *     namespaces wish, secaudit2026oct22).
@@ -88,6 +90,7 @@ import { managedChangeRefusal } from './packages/install/package-managed.js';
 import { carryHostFieldValues } from './extension-network-hosts.js';
 import { carryFirstUseKeep } from './extension-first-use-keep.js';
 import { releaseBareName, settleReclaimed } from './component-address.js';
+import { nodePrefixRefusal } from './component-name-prefix.js';
 
 export interface ExtensionLifecycleDeps {
     storage: Storage;
@@ -173,6 +176,9 @@ export async function writeExtensionRecord(
     record.installedByPrincipal = ctx.actor;
 
     if (!existing) {
+        // A name with the node's prefix is kept for what the node ships next (component-name-prefix.ts).
+        const prefixed = await nodePrefixRefusal(storage, 'extension', name, { ownerName: ctx.ownerName, isOperator: ctx.isOperator });
+        if (prefixed) return { ok: false, ...prefixed };
         // Both ceilings, node-wide and per-owner, from services/install-quotas.ts. Only a new name
         // counts: replacing your own extension in place adds nothing to either number.
         const overQuota = await extensionInstallRefusal({ storage, config }, ctx.ownerName, ctx.isOperator);

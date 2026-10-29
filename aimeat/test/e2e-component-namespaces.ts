@@ -21,11 +21,13 @@
  *   name, and two such accounts make the bare name answer 409 AMBIGUOUS_NAME naming both.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-component-namespaces
  * @version-history
+ *   v1.2.0 — 2026-10-29 — An account does not install a new extension or cortex under a name that
+ *     starts with aimeat- (secaudit2026oct26 round 8c, extensions-02).
  *   v1.1.0 — 2026-10-26 — The owner is added, nothing else changes (Jouni, 2026-10-26: "piti lisätä
  *     omistaja johonkin tohon ja pitää toi formaatti mahdollisimman samana").
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
  */
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, tokenRoles } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now().toString(36).slice(-6);
@@ -178,6 +180,26 @@ await test('what the node ships keeps its bare name, and `system/<name>` reaches
     const extSys = await json(`/v1/extensions/${encodeURIComponent('system/vocab-finto')}`);
     assert(ext.status === extSys.status, `the shipped extension answers alike under both names: ${ext.status} / ${extSys.status}`);
     if (ext.status === 200) assert(extSys.body.data.extension.name === 'vocab-finto', `the alias is the bare record: ${short(extSys.body)}`);
+});
+
+await test('an account does not install a new extension or cortex under a name that starts with aimeat- (secaudit2026oct26 round 8c)', async () => {
+    // The first account a fresh node registers is its operator, who may; bob never is.
+    assert(!tokenRoles(bob.token).includes('operator'), 'bob is not an operator');
+    const PRE = `aimeat-nsx${stamp}`;
+    const post = await install(bob.token, 'bob', PRE);
+    assert(post.status === 409 && post.body.error?.code === 'NAME_RESERVED' && said(post).includes(`${bob.name}-nsx${stamp}`), `POST /v1/extensions: ${post.status} ${short(post.body)}`);
+    const put = await json(`/v1/extensions/${PRE}`, as(bob.token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest(PRE), scripts: extScripts('bob') }) }));
+    assert(put.status === 409 && put.body.error?.code === 'NAME_RESERVED', `PUT create: ${put.status} ${short(put.body)}`);
+    const putFull = await json(`/v1/extensions/${encodeURIComponent(`${bob.name}/${PRE}`)}`, as(bob.token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest(PRE), scripts: extScripts('bob') }) }));
+    assert(putFull.status === 409 && putFull.body.error?.code === 'NAME_RESERVED', `PUT create in his own namespace: ${putFull.status} ${short(putFull.body)}`);
+    const cx = await json('/v1/cortex', as(bob.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', PRE), libs: cxLib('bob') }) }));
+    assert(cx.status === 409 && cx.body.error?.code === 'NAME_RESERVED', `POST /v1/cortex: ${cx.status} ${short(cx.body)}`);
+    const listed = await json('/v1/extensions', as(bob.token));
+    assert(!said(listed).includes(PRE), `nothing was written under the name: ${short(listed.body)}`);
+    // The account's own names install as before.
+    const own = await install(bob.token, 'bob', `nsown${stamp}`);
+    assert(own.status === 201, `his own name: ${own.status} ${short(own.body)}`);
+    await json(`/v1/extensions/nsown${stamp}`, as(bob.token, { method: 'DELETE' }));
 });
 
 console.log('\nCleanup');
