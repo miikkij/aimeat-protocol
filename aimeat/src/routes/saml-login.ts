@@ -20,6 +20,9 @@
  *   POST /v1/ghii/login/saml/:id/acs, POST /v1/ghii/login/saml/:id/finalize.
  * @usage app.use(samlLoginRouter(config, storage));
  * @version-history
+ *   2026-10-29 — The first sign-in into an account the directory adopted, when it has two-step sign-in,
+ *     goes to the code step once (services/sso-adoption-notice.ts adoptionAsksCode; secaudit2026oct26
+ *     round 8c, adoption-skips-second-factor).
  *   2026-10-27 — A sign-in that opens an adopted account with two-step sign-in through the adoption key
  *     tells the person in the bell (services/sso-adoption-notice.ts; secaudit2026oct26, adoption-skips-second-factor).
  *   2026-10-25 — An SP-initiated round finishes only in the browser that started it: authorize sets the
@@ -58,7 +61,7 @@ import {
 } from '../services/external-login.js';
 import { startLinkSecondFactor } from './ghii/login-link-second-factor.js';
 import { twoStepArmed } from '../services/passkeys.js';
-import { tellSignedInPastCode } from '../services/sso-adoption-notice.js';
+import { tellSignedInPastCode, adoptionAsksCode } from '../services/sso-adoption-notice.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { logger } from '../utils/logger.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
@@ -238,6 +241,9 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           displayName: mapped.displayName,
           redirect: postLoginPath,
           adoptProviderKeys: [`scim:${conn.id}`],
+          // The first sign-in into an account the directory adopted asks its two-step code once
+          // (services/sso-adoption-notice.ts; secaudit2026oct26 round 8c).
+          adoptionAsksCode: (account) => adoptionAsksCode(storage, conn, account, `saml:${conn.id}`),
           emailLinkDomains: conn.domains,
         });
 
@@ -248,9 +254,11 @@ export function samlLoginRouter(config: AimeatConfig, storage: Storage): Router 
           return;
         }
 
-        // A first sign-in matched an account with two-step sign-in by its address: the code step
+        // A first sign-in matched an account with two-step sign-in by its address, or is the first
+        // organisation sign-in into an adopted account with two-step sign-in: the code step
         // (routes/ghii/login-link-second-factor.ts) saves the link, opens the session and adds the
-        // connection's membership after a correct code (secaudit2026oct22, external-login-skips-second-factor).
+        // connection's membership after a correct code (secaudit2026oct22, external-login-skips-second-factor;
+        // secaudit2026oct26 round 8c, adoption-skips-second-factor).
         if (result.outcome === 'second_factor') {
           await startLinkSecondFactor(storage, config, req, res, result.ghii, `${config.baseUrl}${postLoginPath}`,
             { ...result.link, sso: conn.id });
