@@ -16,6 +16,9 @@
  * @structure startFakeMailServer(port) · decideAnswer · chatAnswer · the CLI entry (`tsx scripts/lib/fake-mail-server.ts <port>`)
  * @usage node --import tsx scripts/lib/fake-mail-server.ts 40703
  * @version-history
+ *   v1.7.0 — 2026-10-29 — The completion stand-in has OpenRouter's key limit: GET /ai/v1/key answers
+ *     it, POST /sandbox/ai-key sets it, and a spent limit answers 403 "Key limit exceeded" to every
+ *     model but the free router, so a spent AI allowance can be seen in the sandbox.
  *   v1.6.0 — 2026-10-20 — The decision and completion stand-ins also answer the content class
  *     pipeline's prompts (fake-content-model.ts), so its model stages run with no paid key.
  *   v1.5.0 — 2026-10-13 — A transcription stand-in at /ai/v1/audio/transcriptions: every recording
@@ -207,6 +210,12 @@ export interface FakeMailServer {
 export function startFakeMailServer(port: number): Promise<FakeMailServer> {
   const { messages, attachments } = buildMailbox(Date.now());
   const seen: FakeMailServer['seen'] = { decide: [], chat: [], transcribe: [] };
+  // No limit until /sandbox/ai-key sets one.
+  const aiKey: { limit: number | null; usage: number } = { limit: null, usage: 0 };
+  const aiKeyAnswer = () => ({ data: {
+    label: 'sandbox', limit: aiKey.limit, usage: aiKey.usage,
+    limit_remaining: aiKey.limit === null ? null : Math.max(0, aiKey.limit - aiKey.usage), limit_reset: null, is_free_tier: false,
+  } });
   const tokens = new Set<string>();
   const issue = () => {
     const access = 'fm-at-' + randomBytes(12).toString('hex');
@@ -250,9 +259,22 @@ export function startFakeMailServer(port: number): Promise<FakeMailServer> {
       res.end(JSON.stringify(contentDecideAnswer(body) ?? decideAnswer(body)));
       return;
     }
+    // The node key's spending limit, as OpenRouter keeps one (GET /key). POST /sandbox/ai-key
+    // { limit, usage } sets it, so the notice for a spent allowance can be seen: a limit reached
+    // answers every model but the free router as OpenRouter does, 403 "Key limit exceeded".
+    if (path === '/sandbox/ai-key' && req.method === 'POST') {
+      const b = await readJson(req) as { limit?: unknown; usage?: unknown };
+      aiKey.limit = typeof b.limit === 'number' ? b.limit : null;
+      aiKey.usage = typeof b.usage === 'number' ? b.usage : 0;
+      return json(res, 200, aiKeyAnswer());
+    }
+    if (path === '/ai/v1/key') return json(res, 200, aiKeyAnswer());
     if (path === '/ai/v1/chat/completions' && req.method === 'POST') {
       const body = await readJson(req);
       seen.chat.push(body);
+      if (aiKey.limit !== null && aiKey.usage >= aiKey.limit && body.model !== 'openrouter/free') {
+        return json(res, 403, { error: { code: 403, message: 'Key limit exceeded (total limit). Manage it using https://openrouter.ai/workspaces/default/keys/sandbox', metadata: { limit_source: 'openrouter_key_limit' } } });
+      }
       const content = contentChatAnswer(promptText(body));
       return json(res, 200, content === null ? chatAnswer(body) : {
         id: 'chatcmpl-sandbox', object: 'chat.completion', model: body.model ?? 'sandbox-model',

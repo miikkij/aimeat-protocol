@@ -17,6 +17,7 @@
  *   - USAGE_CACHE_TTL_MS — cache lifetime (60s; staleness up to a minute is acceptable here)
  * @usage import { getOwnerUsageSummary } from '../services/usage-summary.js';
  * @version-history
+ *   v1.1.0 — 2026-10-29 — The AI allowance left is the node's key's own limit when that is smaller.
  *   v1.0.0 — 2026-06-22 — Initial: quota usage (memory/storage/micro-memory) + counts + morsels,
  *     60s TTL in-memory cache, for the profile Home usage card.
  *   v1.1.0 — 2026-06-22 — Migrate the hand-rolled Map cache onto the generic cache layer
@@ -32,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { cached, invalidateKey, TTL } from './cache.js';
 import { readAllowance, remainingOf } from './ai-allowance.js';
+import { allowanceShown } from './ai/node-key-balance.js';
 import { hasOwnAiKey } from './own-key-coverage.js';
 import { loadOwnerAgents, loadOwnerEcoApps } from './db/owner-identity.js';
 import { runInReadScope } from '../storage/read-scope/read-scope.js';
@@ -143,7 +145,8 @@ async function computeOwnerUsageSummary(
     readAllowance(storage, config, ghii),
     hasOwnAiKey(storage, ghii),
   ]);
-  const allowanceRemaining = remainingOf(allowance);
+  // The node's key's own limit when that is smaller (ai/node-key-balance.ts), as the chat status says it.
+  const allowanceRemaining = (await allowanceShown(config, remainingOf(allowance))).remainingUsd;
 
   const storageBytes = storageAgg.bytes, storageFiles = storageAgg.count;
 

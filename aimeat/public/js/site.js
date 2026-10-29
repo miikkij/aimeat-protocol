@@ -14,8 +14,11 @@
  *   - signedInOnly() — the node shows its content to signed-in accounts only (contentAccess)
  *   - SIGN_IN_STEPS · signInFirst(pathname, signedIn) — which SPA addresses a visitor without a
  *     session reaches on such a node, and whether this one shows the sign-in page instead
+ *   - customerNode() · storeOrdersHref(locale) — a node the store made for a buyer, and their orders
  * @usage import { siteLink, hasSite } from '/js/site.js';
  * @version-history
+ *   v1.6.0 — 2026-10-29 — customerNode() and storeOrdersHref(): a node the store made for a buyer
+ *     shows the customer's view, and the orders page in the store (UX review 2026-10-29, B to D).
  *   v1.5.2 — 2026-10-22 — /v1/eco-capability-allow is a sign-in step: the owner allows another
  *     account's capability to run an action of their outside app there.
  *   v1.5.1 — 2026-10-21 — /v1/secret-allow is a sign-in step: the owner allows a secret's use there.
@@ -100,6 +103,36 @@ export function storeSoonCode() {
 export function storeSoonNote(locale) {
   const key = { en: 'storeNoteEn', fi: 'storeNoteFi', es: 'storeNoteEs' }[String(locale || '').slice(0, 2)];
   return key ? siteLink(key) : '';
+}
+
+/**
+ * Whether this is a customer's node: one the store's fleet service made for a buyer and named the
+ * plan of (site.purchase_plan). The pages then show the customer's view: the welcome on the home,
+ * the shorter menu, and no node maintenance in the top bar (UX review 2026-10-29; Jouni chose the
+ * shorter menu and the maintenance move).
+ * @returns {boolean}
+ */
+export function customerNode() {
+  return siteLink('purchasePlan') !== '';
+}
+
+/**
+ * The owner's orders and invoices in the store (site.store_orders_url) in the page's language, or ''
+ * when the node has no such page.
+ * @param {string} locale
+ * @returns {string}
+ */
+export function storeOrdersHref(locale) {
+  const raw = siteLink('storeOrders');
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    url.searchParams.set('lang', String(locale || 'en').slice(0, 2));
+    return url.toString();
+  } catch (err) {
+    console.warn('[site] the orders address is not a URL:', err.message);
+    return '';
+  }
 }
 
 /**

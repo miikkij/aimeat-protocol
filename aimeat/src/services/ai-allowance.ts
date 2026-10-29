@@ -28,6 +28,9 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.5.0 — 2026-10-29 — nodeKeyStanding asks first whether the node's key itself has money left
+ *     (reason 'node-key-spent', ai/node-key-balance.ts): a customer node's balance is its key's limit
+ *     on OpenRouter (UX review 2026-10-29, A1).
  *   v1.4.0 — 2026-10-25 — nodeKeyStanding says how much one more call may cost (headroomUsd, and in
  *     'limits' mode nodeHeadroomUsd), so the planner holds a call's estimate against it before the
  *     call runs (services/ai/node-key-hold.ts; secaudit2026oct22,
@@ -52,6 +55,7 @@ import type { Storage } from '../storage/interface.js';
 import { AiCompletionError, decryptOwnerKey } from './ai/completion.js';
 import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
+import { nodeKeySpent } from './ai/node-key-balance.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -92,7 +96,7 @@ export interface NodeKeyStanding {
   /** In 'limits' mode once the allowance is spent: what is left of the node-wide daily limit. */
   nodeHeadroomUsd?: number;
   /** Why it may not. */
-  reason?: 'allowance-spent' | 'account-daily-limit' | 'node-daily-limit';
+  reason?: 'allowance-spent' | 'account-daily-limit' | 'node-daily-limit' | 'node-key-spent';
   /** The sentence the caller is told. */
   message?: string;
 }
@@ -219,6 +223,12 @@ function parseNodeDay(v: unknown): NodeDay {
  * pass the limit by what they cost together; the limit stops the next call, not one in flight.
  */
 export async function nodeKeyStanding(storage: Storage, config: AimeatConfig, gaii: string): Promise<NodeKeyStanding> {
+  // The money the key itself has, as OpenRouter keeps it, comes first: on a customer node it is the
+  // balance the owner bought, and the allowance below is set high on purpose (ai/node-key-balance.ts).
+  if (await nodeKeySpent(config)) {
+    return { remainingUsd: 0, mayPay: false, reason: 'node-key-spent',
+      message: 'The AI allowance this node bought is used up. The owner buys more, sets their own key in their AI settings, or turns on the free model.' };
+  }
   const rec = await readAllowance(storage, config, gaii);
   const remaining = remainingOf(rec);
   if (remaining > 0) return { remainingUsd: remaining, mayPay: true, headroomUsd: remaining };
