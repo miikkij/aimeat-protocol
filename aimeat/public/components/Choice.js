@@ -13,7 +13,9 @@
  *   wherever it stands; the Choice adds what a field needs: the row label, hint and message, and the
  *   answer that can be taken back.
  *
- *   `options`: [{ value, label, hint, disabled, title, count, attention }] or [value, label] pairs; a value may be null.
+ *   `options`: [{ value, label, hint, pic, disabled, title, count, attention }] or [value, label] pairs; a value may be null.
+ *   `pic` on an option (boxed only): a picture over the name, such as a LayoutSketch or a LookSample,
+ *   for an answer a person judges by seeing it.
  *   `attention` on an option (tab row only): the risky answer in the tab's attention tone (a key that
  *   acts as the owner, a key that never expires).
  *   One answer: `value`, `onChange(value, event)`; `clearable` lets a press on the chosen answer take
@@ -31,6 +33,8 @@
  *        html`<${Choice} boxed cols=${4} ariaLabel=${t('x.shape')} value=${shape} onChange=${setShape}
  *          options=${shapes.map((s) => ({ value: s.id, label: s.name, hint: s.desc }))} />`
  * @version-history
+ *   v1.2.0 — 2026-10-29 — A boxed option's `pic`: a picture over its name (the app structure page's
+ *     layouts and looks, additive).
  *   v1.1.0 — 2026-09-26 — An option's `attention` reaches its tab (G3, additive: the Access token
  *     form's risky levels and "never expires", coral on main).
  *   v1.0.0 — 2026-09-26 — Initial: the choose-one rows of the Settings forms (.pf-tabs of .poster-tab,
@@ -101,7 +105,7 @@ export function Choice(props) {
     }
     return html`<button type="button" key=${key} class=${cx('poster-choice', on && 'on')} title=${o.title} disabled=${off} data-choice
       role=${roleOf} aria-checked=${multi ? undefined : (on ? 'true' : 'false')} aria-pressed=${multi ? (on ? 'true' : 'false') : undefined}
-      onClick=${(e) => press(o.value, e)}><b>${o.label}</b>${o.hint || null}</button>`;
+      onClick=${(e) => press(o.value, e)}>${o.pic ? html`<span class="choice-pic">${o.pic}</span>` : null}<b>${o.label}</b>${o.hint || null}</button>`;
   });
   const cls = cx('choice', 'choice--boxed', COLS.has(cols) && `choice--cols-${cols}`);
   const control = html`<div class=${cls} id=${ids.id} role=${multi ? 'group' : 'radiogroup'}

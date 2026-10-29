@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-29 -- e2e-app-structure.ts joins the list (not the guard tier): the app's structure and plan from the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  *   2026-10-29 -- e2e-agent-scope-add.ts joins the list (not the guard tier): agent:permissions-add (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-28 -- The round-8 suites' fixed ports follow main's move to 28000-29999 (down 12000).
  *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
@@ -596,6 +597,7 @@ const ALL_SUITES = [
     'test/e2e-app-dev-grant.ts',
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-design-spec.ts',
+    'test/e2e-app-structure.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the app origin OFF on a fresh database: one owner first, then a second, which
     // is the moment every app moves into the isolated frame (audit A7-1).

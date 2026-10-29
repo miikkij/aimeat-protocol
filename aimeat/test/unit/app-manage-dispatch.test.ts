@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.10.0 — 2026-10-29 — structure, structure_set and plans, and the purpose, data, choices and now fields.
  *   v1.9.0 — 2026-10-25 — subdomain_set carries origin (secaudit2026oct22).
  *   v1.8.0 — 2026-10-17 — settings carries open_to (who may open the app).
  *   v1.7.0 — 2026-10-13 — scope_allowance and scope_allowance_remove, and the words field.
@@ -66,6 +67,7 @@ const VALUE: Record<string, unknown> = {
     email: 'zqx@example.com', locale: 'fi', q: 'zqxq', offset: 11, before: '2026-09-01T00:00:00Z', invite_id: 'zqxinv',
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
     markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
+    purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
@@ -123,6 +125,10 @@ const EXPECT: Record<string, [string, string]> = {
     // The permissions the app kept at the move to 4.0; the words to remove travel in the query.
     scope_allowance: ['GET', '/v1/apps/alice/shop.html/scope-allowance'],
     scope_allowance_remove: ['DELETE', '/v1/apps/alice/shop.html/scope-allowance?words=zqxword'],
+    // The app's structure and plan take an owner, as the design spec does; the plans list is the caller's.
+    structure: ['GET', '/v1/apps/alice/shop.html/structure'],
+    structure_set: ['PUT', '/v1/apps/alice/shop.html/structure'],
+    plans: ['GET', '/v1/app-plans'],
 };
 
 /** A field that travels in the path or query, or shapes the request rather than appearing in it. */

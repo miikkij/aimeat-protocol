@@ -7,6 +7,8 @@
  * @version-history
  *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
  *     host's path form, which keeps the query (pitfall-list round).
+ *   2026-10-29 — The app's structure page: structure_set when an app starts, structure before the
+ *     screens, the person's waiting choices, plans (services/app-structure.ts).
  *   2026-10-11 — The workspace-contracts guide is the skill aimeat-workspace-contracts; the handbook
  *     named docs/agent-workspace-contracts.md, which no route serves.
  *   2026-10-09 — aimeat_extension_config_set in the extension tools.
@@ -336,6 +338,16 @@ version. The publish answer carries \`design_spec_hint\` when the spec is missin
 has fallen behind. Only the owner removes it (\`spec_clear\`). The owner sees and edits it on the app's
 own page in the App Catalog, in its Design spec section, beside the Roadmap and Who else may build
 this sections.
+
+**The app's structure page.** Every app has a page that shows the person its eight steps (purpose,
+data, layout, look, build, builders, visibility, requirements), what is done and what is open, and
+lets them pick a layout and a look by seeing them. It exists from the first moment, before any code
+or publish. When you start a new app, call \`aimeat_app_manage\` \`structure_set\` with \`filename\`,
+\`name\` and \`purpose\`, and give the person \`page_url\` from the answer. Write \`data\` after the
+data map questions and \`now\` while you build. Before you build the screens, read \`structure\`: a
+choice with state \`waiting\` is the person's, so build it and write the same value with state
+\`done\`. A choice you make yourself goes in with a \`note\` saying why. \`plans\` lists the apps the
+person has started. The page is help, never a gate: build on whether they open it or not.
 
 ### can() is a HINT, never a gate
 

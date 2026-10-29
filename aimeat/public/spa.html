@@ -325,6 +325,8 @@
   <link rel="stylesheet" href="/css/components/field.css">
   <link rel="stylesheet" href="/css/components/text-field.css">
   <link rel="stylesheet" href="/css/components/choice.css">
+  <link rel="stylesheet" href="/css/components/layout-sketch.css">
+  <link rel="stylesheet" href="/css/components/look-sample.css">
   <link rel="stylesheet" href="/css/components/key-name.css">
   <link rel="stylesheet" href="/css/components/job-prompt.css">
   <link rel="stylesheet" href="/css/components/sub-heading.css">
@@ -634,6 +636,8 @@
       "/components/Select.js": "/components/Select.js",
       "/components/Check.js": "/components/Check.js",
       "/components/Choice.js": "/components/Choice.js",
+      "/components/LayoutSketch.js": "/components/LayoutSketch.js",
+      "/components/LookSample.js": "/components/LookSample.js",
       "/components/TagInput.js": "/components/TagInput.js",
       "/components/ModelPicker.js": "/components/ModelPicker.js",
       "/components/FileDrop.js": "/components/FileDrop.js",
@@ -975,6 +979,11 @@
       "/views/appcat/rows.js": "/views/appcat/rows.js",
       "/views/appcat/lists.js": "/views/appcat/lists.js",
       "/views/appcat/detail.js": "/views/appcat/detail.js",
+      "/views/appcat/structure.js": "/views/appcat/structure.js",
+      "/views/appcat/structure-data.js": "/views/appcat/structure-data.js",
+      "/views/appcat/structure-pick.js": "/views/appcat/structure-pick.js",
+      "/views/appcat/started.js": "/views/appcat/started.js",
+      "/views/appcat/sections/structure.js": "/views/appcat/sections/structure.js",
       "/views/appcat/viewer.js": "/views/appcat/viewer.js",
       "/views/appcat/dialogs/app-io.js": "/views/appcat/dialogs/app-io.js",
       "/views/appcat/detail-state.js": "/views/appcat/detail-state.js",
@@ -1193,6 +1202,9 @@
       // appcat: the app catalogue on the component library, beside the old /app-catalog.html
       // (Jouni, 2026-09-27). A spaRoute in routes/portal.ts too.
       '/v1/appcat':      () => import('/views/appcat.js' + B),
+      // One app's structure and status, from the first moment of building (2026-10-29). A spaRoute
+      // in routes/portal.ts too.
+      '/v1/appcat/structure': () => import('/views/appcat/structure.js' + B),
       '/v1/help':       () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
       '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),

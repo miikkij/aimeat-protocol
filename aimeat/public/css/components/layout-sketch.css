@@ -1,0 +1,26 @@
+/**
+ * @file layout-sketch.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The LayoutSketch's look (components/LayoutSketch.js): a fixed-height frame on the page
+ *   ground, rows of blocks in a 1px ink line on the card ground, the block's name in small typewriter
+ *   words, the top bar in ink and the block the shape is about on the sun. Reads only the theme's
+ *   tokens and the shape values.
+ *   Drawn by components/LayoutSketch.js; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+ */
+
+.layout-sketch { display: flex; flex-direction: column; gap: 4px; height: 8rem; padding: .5rem; box-sizing: border-box; background: var(--bg); border: 1px solid var(--border); border-radius: var(--shape-corner); }
+.layout-sketch-row { display: flex; gap: 4px; min-height: 0; }
+.layout-sketch-row--s { flex: 0 0 .8rem; }
+.layout-sketch-row--m { flex: 0 0 1.9rem; }
+.layout-sketch-row--l { flex: 1 1 auto; }
+.layout-sketch-cell { box-sizing: border-box; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; padding: 1px 3px; border: 1px solid var(--text); border-radius: var(--shape-corner); background: var(--card-bg); color: var(--text-dim); font-family: var(--font-mono); font-size: var(--text-2xs); line-height: 1.3; }
+.layout-sketch-cell--full { flex: 1 1 100%; }
+.layout-sketch-cell--main { flex: 2 1 0; }
+.layout-sketch-cell--side, .layout-sketch-cell--half { flex: 1 1 0; }
+.layout-sketch-cell--tiny { flex: 0 0 1.4rem; }
+.layout-sketch-cell--ink { background: var(--ink-ground); color: var(--on-ink-ground); border-color: var(--ink-ground); }
+.layout-sketch-cell--sun { background: var(--shape-chosen-ground); color: var(--on-sun); }

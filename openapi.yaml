@@ -37555,6 +37555,122 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/structure:
+    get:
+      operationId: appStructureGet
+      summary: The app's structure and status, from the first moment of building
+      description: >
+        Eight steps in the order a person meets them (purpose, data, layout, look, build, builders,
+        visibility, requirements), each `{ id, state, detail, said }`: `state` is fine, progress,
+        optional, not_needed, missing or later, `detail` carries the facts, and `said` says the same
+        in one sentence for an AI. Before a publish the steps read the app's plan and its draft; after
+        it, the design spec, the data map, the listing, the development rights, the legal pages and
+        the EU AI Act questions. Returns `{ app, name, published, has_draft, plan, steps, fine, total,
+        next, page_url }`: `plan` holds the choices made on the structure page (layout, nav, look,
+        genre, visibility), each with who chose it and whether it is built; `page_url` is the page
+        that shows all of it. 404 when there is no app, draft or plan by that name. For the owner, the
+        owner's agents and everybody holding a development right. Needs `app:write`. MCP:
+        `aimeat_app_manage` action `structure`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: appStructureWrite
+      summary: Write the app's plan
+      description: >
+        The first write starts the plan, and the structure page exists from then on, before any code.
+        Every field is optional and a field left out stays as it is; null or an empty string clears
+        one. `choices` is keyed by layout (a layout preset id), nav (a navigation mode), look (an
+        Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted); the
+        ids are those GET /v1/apps/ui/catalogue lists, so a new look or layout on the node is valid
+        here at once. A person writing in person makes a choice that waits for the AI (`state:
+        waiting`); the AI writing its own choice makes it `done`, and the AI writing the same value
+        as the person's with `state: done` keeps it the person's. With `expected_revision` the write
+        is refused (409 `REVISION_MISMATCH`, the stored plan in `details.plan`) when another write came
+        first. Answers the structure as GET does, 201 for the first write. Sends the `app-plans` live
+        event to the owner. Needs `app:write`. MCP: `aimeat_app_manage` action `structure_set`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: [string, 'null'], maxLength: 120 }
+                purpose: { type: [string, 'null'], maxLength: 800 }
+                data:
+                  type: [object, 'null']
+                  properties:
+                    summary: { type: string, maxLength: 800 }
+                    personalData: { type: string, enum: ['yes', 'no', 'unstated'] }
+                choices:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        required: [value]
+                        properties:
+                          value: { type: string, maxLength: 80 }
+                          state: { type: string, enum: [waiting, done] }
+                          note: { type: string, maxLength: 300 }
+                now: { type: [string, 'null'], maxLength: 200 }
+                expected_revision: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Written. The structure, as GET answers it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '201':
+          description: Created. The first write of this app's plan.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: >
+            `REVISION_MISMATCH`: the caller named a revision that is not the stored one. `details.plan`
+            is the plan as it stands; read it and write from that.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/app-plans:
+    get:
+      operationId: appPlanList
+      summary: The apps the caller has started, published or not
+      description: >
+        One row per app plan of the caller's own account: `{ app, filename, name, published,
+        has_draft, fine, total, next, updated_at, page_url }`, the apps not yet published first. This
+        is how a person finds an app that exists only as a plan or a draft, which the catalogue does
+        not list. Needs `app:write`. MCP: `aimeat_app_manage` action `plans`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/apps/{owner}/{filename}/scope-allowance:
     get:
       operationId: appScopeAllowanceGet

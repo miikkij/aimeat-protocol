@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.37.0 — 2026-10-29 — ADDITIVE: the structure page section after the data map step (build-structure-step.ts): start the app's plan, give the person the page, read their layout and look choices. Interview mode only; the body and its spec token are unchanged.
  *   v1.36.0 — 2026-10-17 — ADDITIVE: the data map step after the interview's five questions (unchanged) and its team branch at the end of "Data, in short" (build-data-map-step.ts, plan V7); the spec token moves with the body. To stay under 800 lines, "What the review always catches" moved verbatim to build-atelier-review.ts.
  *   v1.35.0 — 2026-10-17 — The mosaic section says block ids are a contract like source names: a renamed block needs ui_set in the same change.
  *   v1.34.0 — 2026-10-11 — EVENTS FIRST, A TIMER LAST follows LIVE BY DECLARATION in the mosaic section (build-events-first.ts): the `live` map's `domains` field, agent work as events, the domains an app may hear, and the three places a timer belongs.
@@ -151,6 +152,7 @@ import { buildAtelierLibrarySection } from '../data/library-packs.js';
 import { atelierLayoutRules, ATELIER_WORKBENCH_COMPONENTS } from './build-atelier-layout-rules.js';
 import { atelierMotionParts } from './build-atelier-motion-parts.js';
 import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
+import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
@@ -751,7 +753,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n';
-  full += buildDataMapStep('atelier');
+  full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.
   full += ATELIER_PROPOSAL_SECTION;

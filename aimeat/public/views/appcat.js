@@ -20,6 +20,8 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.3.0 — 2026-10-29 — The apps the person started and has not published (started.js) stand over
+ *     their own list, each with the way to its structure page.
  *   v1.2.0 — 2026-10-18 — ?app=<owner>/<filename> opens one app's details in its own view (Your apps,
  *     Building for others or the community): the link of the app-info mark on a served app. Jouni
  *     found the search link landing on Your apps with no match for another person's app.
@@ -42,6 +44,7 @@ import { CatRail } from '/views/appcat/rail.js';
 import { CatMasthead, openAdd } from '/views/appcat/masthead.js';
 import { CatBand, CatTools, CortexBar, SEARCH_ID } from '/views/appcat/tools.js';
 import { LibraryList, CommunityList, FavouritesList, BuildingList, CatFoot } from '/views/appcat/lists.js';
+import { StartedList } from '/views/appcat/started.js';
 import { KUNTO_KEYS, STATES, filterRows, sortRows, stateCounts } from '/views/appcat/model.js';
 
 const html = htm.bind(h);
@@ -199,6 +202,7 @@ export default function AppCat() {
       ${view === 'library' && cat.loaded && cat.own.length > 0 ? html`<${CatBand} counts=${counts} n=${cat.own.length} />` : null}
       <${CatTools} q=${q} onQuery=${setQ} sort=${sort} onSort=${setSort} />
       ${view === 'library' ? html`<${CortexBar} />` : null}
+      ${view === 'library' ? html`<${StartedList} signedIn=${!!cat.me} />` : null}
       ${view === 'library' ? html`<${LibraryList} rows=${ownRows} total=${cat.own.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${ownRedraw} />` : null}
       ${view === 'community' ? html`<${CommunityList} rows=${communityRows} order=${communityOrder} total=${cat.community.length} loaded=${cat.loaded} filtering=${filtering} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
       ${view === 'favorites' ? html`<${FavouritesList} rows=${favRows} order=${favOrder} total=${favRowsAll.length} favourites=${cat.favourites} closeOn=${serverRedraw} />` : null}
