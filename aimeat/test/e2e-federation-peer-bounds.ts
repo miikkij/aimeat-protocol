@@ -21,6 +21,7 @@
  *       fresh node and an offline peer under its own key are admitted as before.
  *     - Introductions: a long message is stored bounded, a repeated introduction keeps one pending
  *       request, and the per-address hourly bound answers 429 with when to try again (0 is no limit).
+ *       A request unanswered for 30 days expires (federation.peering_request_days, 0 never).
  *     - Own node id: no introduction, key exchange, approval or direct add makes a peer of this
  *       node's own id.
  *     - Replicas: a replica dated in the future is stored with the time it was received, an existing
@@ -34,6 +35,9 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   v1.2.0 — 2026-10-29 — E1, E2: a peering request unanswered for federation.peering_request_days
+ *     (30 by default, 0 never) is gone from the list, the decision and the status route
+ *     (secaudit2026oct26 round 8c, federation-06).
  *   v1.1.0 — 2026-10-27 — A plain invite for a held id waits for the operator's one-press answer
  *     (V2, V2b, V2c) instead of a 409 (the coordinator's ruling).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, federation group).
@@ -436,6 +440,47 @@ try {
             assert(c.status === 202, `0 is no limit: ${c.status} ${JSON.stringify(c.body)}`);
         } finally {
             cfg.federationIntroductionsPerHour = saved;
+        }
+    });
+
+    /** A pending request from `nodeId`, written as if it had arrived `daysAgo` days ago. */
+    async function agedRequest(nodeId: string, daysAgo: number): Promise<string> {
+        const at = new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+        const id = `peer-req-aged-${nodeId}`;
+        await H.storage.createPeeringRequest({ id, fromNodeUrl: 'http://localhost:49964', fromNodeId: nodeId, toNodeId: H_ID, targetUrl: 'http://localhost:49964', publicKey: (await generateKeyPair()).publicKey, message: '', status: 'pending', createdAt: at, updatedAt: at });
+        return id;
+    }
+
+    await test('E1. EXPIRES — a peering request unanswered for 30 days is gone: not listed, not approvable, its status not found', async () => {
+        const oldId = await agedRequest(`aimeat-bounds-old-${stamp}`, 31);
+        const freshId = await agedRequest(`aimeat-bounds-new-${stamp}`, 29);
+        const list = await H.json('/v1/admin/peering/requests', { headers: auth(H.ownerToken) });
+        const ids = (list.body.data?.requests ?? []).map((q: any) => q.id);
+        assert(!ids.includes(oldId), `the 31-day-old request is not listed: ${JSON.stringify(ids)}`);
+        assert(ids.includes(freshId), 'a 29-day-old request is still listed');
+        const ap = await H.json(`/v1/admin/peering/requests/${oldId}/decision`, { method: 'POST', headers: auth(H.ownerToken), body: JSON.stringify({ decision: 'approve' }) });
+        assert(ap.status === 404, `approving it: ${ap.status} ${JSON.stringify(ap.body)}`);
+        const st = await H.json(`/v1/federation/peer/introduce/${oldId}/status`);
+        assert(st.status === 404, `its status: ${st.status} ${JSON.stringify(st.body)}`);
+        assert(!(await H.storage.getPeeringRequest(oldId)), 'the row is deleted');
+        const fresh = await H.json(`/v1/federation/peer/introduce/${freshId}/status`);
+        assert(fresh.status === 200 && fresh.body.data?.status === 'pending', `the fresh one: ${fresh.status} ${JSON.stringify(fresh.body)}`);
+    });
+
+    await test('E2. KEPT — federation.peering_request_days 0 keeps an old request', async () => {
+        // H runs on an in-memory database, where PUT /v1/admin/config answers READONLY_CONFIG, so the
+        // value is set on the live config as I3 does.
+        const cfg = H.config as unknown as Record<string, unknown>;
+        const saved = cfg.federationPeeringRequestDays;
+        cfg.federationPeeringRequestDays = 0;
+        try {
+            const oldId = await agedRequest(`aimeat-bounds-older-${stamp}`, 400);
+            const list = await H.json('/v1/admin/peering/requests', { headers: auth(H.ownerToken) });
+            assert((list.body.data?.requests ?? []).some((q: any) => q.id === oldId), 'with 0 a 400-day-old request stays');
+            const st = await H.json(`/v1/federation/peer/introduce/${oldId}/status`);
+            assert(st.status === 200 && st.body.data?.status === 'pending', `its status: ${st.status} ${JSON.stringify(st.body)}`);
+        } finally {
+            cfg.federationPeeringRequestDays = saved;
         }
     });
 

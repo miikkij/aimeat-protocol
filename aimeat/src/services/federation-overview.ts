@@ -44,6 +44,9 @@
  * @usage
  *   import { buildFederationOverview } from '../services/federation-overview.js';
  * @version-history
+ *   v1.3.0 — 2026-10-29 — The requests that expired (federation.peering_request_days) are deleted before
+ *     the requests are read, so the page never offers to approve one (secaudit2026oct26 round 8c,
+ *     federation-06).
  *   v1.2.1 — 2026-10-16 — getActiveBook now throws on a failed read; the overview logs it and shows
  *     the page without the book instead of failing whole (QA audit F2-06).
  *   v1.2.0 — 2026-10-01 — Each roster row says how the peer arrived (`origin`), and the overview lists
@@ -65,6 +68,7 @@ import { logger } from '../utils/logger.js';
 import { peerRelayClaimView, relayClaimSummary, type PeerRelayClaimView, type RelayClaimSummary } from './relay-claim-policy.js';
 import { describePeerOrigins, type PeerOriginView } from './peer-origin-view.js';
 import { pendingRegistrationView } from './peer-origin.js';
+import { sweepExpiredPeeringRequests } from './peering-request-expiry.js';
 
 export type FederationStanding = 'alone' | 'waiting' | 'degraded' | 'linked';
 
@@ -273,6 +277,9 @@ export async function buildFederationOverview(
     keyless: all.filter(p => !p.publicKey).length,
   };
 
+  await sweepExpiredPeeringRequests(storage, config).catch(err => {
+    logger.warn('buildFederationOverview: expired peering requests not swept', { error: String(err) });
+  });
   const requests = await storage.listPeeringRequests().catch(err => {
     logger.warn('buildFederationOverview: peering requests unreadable', { error: String(err) });
     return [];
