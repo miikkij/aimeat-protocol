@@ -11,6 +11,9 @@
  *   import { registerExtensionsTools } from './extensions.js';
  *   registerExtensionsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller, getToken);
  * @version-history
+ *   2026-10-29 — aimeat_extension_activate refuses an extension whose code a package brought in under
+ *     install role operator until an operator allows it, as the REST door does; an operator's activate
+ *     is that approval (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   2026-10-26 — The owner is additive: aimeat_extension_install keeps the bare name and meets another account's record as before (services/component-address.ts; Jouni, 2026-10-26).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): install stores `<owner>/<name>` (or the owner's existing or released bare name), and every tool reads `name` as an address: the managing tools the caller's own first, get and invoke the bare record first (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — aimeat_extension_install asks the install rule before it hands out an upload URL, and a refusal by the install role names the setting and the operator (secaudit2026oct22 lead 128).
@@ -108,6 +111,7 @@ import { capabilitiesOfRecord } from '../services/extension-capability-declarati
 import { canManageExtensionAs, installRoleRefusal, type ExtensionCaller } from '../routes/extensions/permissions.js';
 import { findExtension, placeExtensionInstall } from '../services/component-address.js';
 import { isOperatorCaller } from '../services/operator-override.js';
+import { codeHoldRefusal, takeHoldOff } from '../services/extension-code-hold.js';
 import {
     writeExtensionRecord, activateExtension, deactivateExtension, uninstallExtension,
 } from '../services/extension-lifecycle.js';
@@ -518,6 +522,12 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" not found` }], isError: true };
             }
 
+            // Code a package brought in under install role operator waits for an operator, as on REST
+            // (services/extension-code-hold.ts); an operator's activate is that approval.
+            const isOperator = await isOperatorCaller(storage, resolveCaller());
+            const held = codeHoldRefusal(ext, isOperator);
+            if (held) return { content: [{ type: 'text' as const, text: held.message }], isError: true };
+
             try {
                 // Activating is three things: the status, the schedules the manifest declares, and
                 // the @activate jobs that do the extension's first run. This tool wrote the status
@@ -525,7 +535,7 @@ export function registerExtensionsTools(
                 // it looked installed, active and idle. One implementation, in
                 // services/extension-lifecycle.ts.
                 const updated = await activateExtension(
-                    { storage, config, scheduler: getActiveScheduler() }, ext, getAgentGaii(),
+                    { storage, config, scheduler: getActiveScheduler() }, isOperator ? await takeHoldOff(storage, ext) : ext, getAgentGaii(),
                 );
 
                 // Trigger capability aggregation so the extension appears immediately

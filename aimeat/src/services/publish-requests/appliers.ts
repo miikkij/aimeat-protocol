@@ -13,6 +13,10 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.15.0 — 2026-10-29 — A cortex name's new holder, allowed by the owner of apps that loaded the
+ *     earlier library (apply-cortex-holder.ts; secaudit2026oct26 round 8c).
+ *   v1.14.0 — 2026-10-29 — Extension code a package brought into an account that may not install it,
+ *     allowed by an operator (apply-extension-code.ts; secaudit2026oct26 round 8c).
  *   2026-10-29 — An app by another author publishing through a delegation that names its app by file
  *     name alone, allowed by the channel owner (apply-delegation-binding.ts; secaudit2026oct26 round 8c).
  *   v1.13.0 — 2026-10-29 — AIMEAT's model doing a goal's work on the AI allowance for an agent without
@@ -66,6 +70,8 @@ import { applyGoalModelRead } from './apply-goal-model-read.js';
 import { applyGoalModelSpend } from './apply-goal-model-spend.js';
 import { applyRefineryDefinition } from './apply-refinery-definition.js';
 import { applyDelegationBinding } from './apply-delegation-binding.js';
+import { applyExtensionCode } from './apply-extension-code.js';
+import { applyCortexHolder } from './apply-cortex-holder.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -93,4 +99,6 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'refinery-definition': applyRefineryDefinition,
   'delegation-binding': applyDelegationBinding,
   'goal-model-spend': applyGoalModelSpend,
+  'extension-code': applyExtensionCode,
+  'cortex-holder': applyCortexHolder,
 };

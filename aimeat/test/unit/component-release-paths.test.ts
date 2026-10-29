@@ -8,6 +8,8 @@
  *   holder, and another account's install of the name goes to `<installer>/<name>`. Run against every
  *   provider the environment names, as component-address.test.ts is.
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A cortex name an erasure or the held-name settlement freed stays free for the
+ *     next install; an uninstall's row retires it as before (secaudit2026oct26 round 8c).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  *   v1.0.1 — 2026-10-27 — Refuses a missing DATABASE_URL when the run asks for PostgreSQL, like every two-provider unit file.
  */
@@ -18,6 +20,7 @@ import type { Storage, ExtensionRecord } from '../../src/storage/interface.js';
 import { installNameFor } from '../../src/services/component-address.js';
 import { deleteComponent } from '../../src/services/component-registrar.js';
 import { requirePostgresWhenAsked } from './postgres-arm.js';
+import { FREED_RELEASE_PREFIX } from '../../src/storage/types/component-versions.js';
 
 requirePostgresWhenAsked('component-release-paths');
 
@@ -51,6 +54,19 @@ function extRecord(name: string, installedBy: string): ExtensionRecord {
         installedBy, installedAt: now,
     } as ExtensionRecord;
 }
+
+describe('a cortex name an account erasure or the held-name settlement freed', () => {
+    it('stays free for the next install, as before the row existed, while an uninstall\'s row retires it', async () => {
+        for (const { name, storage } of provs) {
+            const s = stamp();
+            const freed = `freedcx${s}`, retired = `retiredcx${s}`, next = `nextacct${s}`;
+            await storage.recordReleasedComponentName?.({ kind: 'cortex', name: freed, holder: `${FREED_RELEASE_PREFIX}erased:${s}`, releasedAt: new Date().toISOString() });
+            await storage.recordReleasedComponentName?.({ kind: 'cortex', name: retired, holder: `holder${s}`, releasedAt: new Date().toISOString() });
+            expect((await installNameFor(storage, 'cortex', next, freed)).name, `${name}: the freed name`).toBe(freed);
+            expect((await installNameFor(storage, 'cortex', next, retired)).name, `${name}: the retired name`).toBe(`${next}/${retired}`);
+        }
+    });
+});
 
 describe('a package component\'s extension removed through deleteComponent', () => {
     it('writes the released name for its holder, so another account\'s install is namespaced and the holder\'s is not', async () => {

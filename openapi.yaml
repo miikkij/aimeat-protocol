@@ -50615,7 +50615,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >-
+            ALREADY_EXISTS, an extension of that name is already installed; or NAME_RESERVED, the name
+            starts with aimeat-, which is kept for what this node ships, and only an operator may
+            install a new extension under it.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
 
@@ -50703,7 +50706,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Install limit exceeded, or VERSION_EXISTS, this version is already kept with other code.
+          description: >-
+            Install limit exceeded; VERSION_EXISTS, this version is already kept with other code; or
+            NAME_RESERVED, a new extension under a name that starts with aimeat-, which only an
+            operator may create.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
@@ -50742,6 +50748,9 @@ paths:
       description: |
         Start the extension runtime and register its action routes.
         Requires owner role. Owners can only activate extensions they installed; operators can activate any.
+        An extension whose code a package brought into an account that may not install extension code
+        (extensions.install_role "operator") answers 409 AWAITING_OPERATOR until an operator allows it;
+        an operator's activate is that approval.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50770,6 +50779,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: AWAITING_OPERATOR, the extension's code waits for an operator's approval (error.details.request_id).
 
   /v1/extensions/{name}/config:
     patch:
@@ -52502,7 +52513,7 @@ paths:
         '409':
           description: >-
             CONFLICT, a cortex of that name is already installed; or NAME_RESERVED, the name is a
-            library this node ships and only an operator may install it.
+            library this node ships, or starts with aimeat-, and only an operator may install it.
 
   /v1/cortex/{name}:
     get:
@@ -52587,7 +52598,8 @@ paths:
             VERSION_EXISTS, this version is already kept with other lib bytes; BOARD_ID_TAKEN, the
             redeploy of an active cortex would make a board whose id is a board of another account;
             CONFLICT, another install took the free name first, and nothing was written; or
-            NAME_RESERVED, the name is a library this node ships and only an operator may create it.
+            NAME_RESERVED, the name is a library this node ships, or starts with aimeat-, and only an
+            operator may create it.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:
@@ -52804,7 +52816,10 @@ paths:
         pinned (`name@1.2.0`). `<owner>/<name>` is the exact address: write it as one encoded
         segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}. A bare name
         serves the bare record, else the one account's `<owner>/<name>`; a name its holder removed
-        serves nobody else's bytes. `system/<name>` serves a shipped one too.
+        serves nobody else's bytes. `system/<name>` serves a shipped one too. A name an account
+        erasure or the held-name settlement freed stays free for a new holder; a request from the page
+        of an app that loaded the earlier holder's library (its Origin or Referer) answers 404 until
+        the app's owner allows the new holder with one press (a request of kind `cortex-holder`).
       tags: [Cortex]
       parameters:
         - name: name
@@ -56228,7 +56243,7 @@ paths:
               properties:
                 label: { type: string }
                 version: { type: string, description: 'Specific version to install; defaults to latest published.' }
-                dry_run: { type: boolean, description: 'Report what would be registered and register nothing.' }
+                dry_run: { type: boolean, description: 'Report what would be registered and register nothing. With install role operator the preview lists in extension_code_awaits_operator the extension components a real install would store switched off, waiting for an operator.' }
                 mode:
                   type: string
                   enum: [managed, editable]
@@ -56280,6 +56295,21 @@ paths:
                                 type: array
                                 items: { type: string }
                                 description: A skill left out because the owner has one of that name of their own. Absent when none.
+                              extension_code_awaiting_operator:
+                                type: array
+                                description: >-
+                                  With extensions.install_role "operator" and an installer whose account may not
+                                  install extension code: each extension component, installed switched off. Its
+                                  code waits for an operator's one press (a request of kind `extension-code`,
+                                  readable at GET /v1/publish-requests/{id}); the rest of the package is installed.
+                                  Allow switches it on, Don't allow leaves it off, and the installer hears both.
+                                  Absent when nothing waits.
+                                items:
+                                  type: object
+                                  properties:
+                                    component: { type: string }
+                                    extension: { type: string, description: The extension's stored name. }
+                                    request_id: { type: string, nullable: true }
         '202':
           description: The install waits for the owner. Nothing was registered.
           content:
@@ -56833,7 +56863,10 @@ paths:
         by an agent or an app grant costs the words POST /v1/memory asks for a write into the owner's
         namespace (see installPackage). Without them, and with every other check passed, the answer is
         202 and a request for the owner carrying these actions; nothing is deleted or written until it
-        is approved.
+        is approved. With extensions.install_role "operator" and an account that may not install
+        extension code, an extension the migration writes is stored switched off and its code waits for
+        an operator's one press; the answer lists each in `awaitingOperator` ({ component, extension,
+        request_id }).
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -78434,11 +78467,11 @@ paths:
       operationId: readPublishRequest
       tags: [Memory]
       summary: One request to make something public
-      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`.'
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`, and the one who asked reads its own question in the account it asked the same way.'
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads. Omit for your own.' }
+        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads, or where the one who asked asked it. Omit for your own.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -78459,7 +78492,9 @@ paths:
         changed) is not made public: 409 OUTDATED, and the request is settled outdated. A target whose
         classification no longer allows the level (its label's maxAudience) is not made public either:
         409 LABEL_CAPS_AUDIENCE, settled outdated with the reason; no approval passes the cap. A settled
-        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
+        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED, except that the owner may
+        approve a declined `cortex-holder` request later: Don't allow holds the apps back until the
+        owner changes it. Requires memory:write.
         A request may have parts (`parts` on it, `part_of` on each part): the picture of an AI image
         job asked public beside its answer's record. Approving the request also applies each part
         still waiting, checked as its own request; declining it, or its ending expired or outdated,

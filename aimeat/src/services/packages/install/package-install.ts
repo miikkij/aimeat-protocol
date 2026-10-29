@@ -20,6 +20,10 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.14.0 — 2026-10-29 — With install role operator, an installer whose account may not install
+ *     extension code gets the rest of the package, and each extension component switched off and
+ *     waiting for an operator (`awaitingOperator`; the preview's extension_code_awaits_operator;
+ *     services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   v1.13.1 — 2026-10-27 — Extension code an agent or app installs names that principal as its writer
  *     (codeWriterOf, the registrar's codeWriter); the owner's own install is unchanged (secaudit2026oct26).
  *   v1.13.0 — 2026-10-17 — Who may install a package is package-read.ts packageVisibleTo: a 'members'
@@ -98,6 +102,7 @@ import type { AppRecord } from '../../../storage/types/apps.js';
 import type { Scheduler } from '../../scheduler.js';
 import { logger } from '../../../utils/logger.js';
 import { isOwnerInPerson } from '../../../utils/gaii.js';
+import { installRoleRefusal } from '../../extension-install-role.js';
 
 export interface PackageInstallDeps {
     storage: Storage;
@@ -178,6 +183,8 @@ export interface PackageInstallPreview {
     /** Present when this caller lacks words the install needs: the real call files a request. */
     status?: 'would_await_owner';
     missing?: string[];
+    /** The extension components a real install stores switched off, waiting for an operator (install role operator). */
+    extension_code_awaits_operator?: string[];
     /** A skill the install would leave out, because the owner has one of that name of their own. */
     warnings?: string[];
     /**
@@ -200,8 +207,11 @@ export interface PackageInstallRefusal {
 
 export type PackageInstallResult =
     | { ok: true; kind: 'dry-run'; preview: PackageInstallPreview }
-    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[]; ownPackage: boolean; appGrants?: Record<string, AppGrantStep> }
+    | { ok: true; kind: 'installed'; instance: PackageInstanceRecord; warnings: string[]; agentsProposed: BundledAgentProposal[]; ownPackage: boolean; appGrants?: Record<string, AppGrantStep>; awaitingOperator?: ExtensionCodeAwaiting[] }
     | PackageInstallRefusal;
+
+/** An extension component installed switched off, its code waiting for an operator (services/extension-code-hold.ts). */
+export interface ExtensionCodeAwaiting { component: string; extension: string; request_id: string | null }
 
 /**
  * Topological sort by component dependencies (depth-first). A component that names another in its
@@ -469,6 +479,9 @@ export async function installPackage(
                 source,
                 ...(expectsMissing ? { expects_missing: expectsMissing } : {}),
                 ...(awaitsOwner ? { status: 'would_await_owner' as const, missing: writeRefusal!.missing } : {}),
+                // The extension components a real install would store switched off, waiting for an operator.
+                ...(plannedComponents.some(p => p.type === 'extension') && await installRoleRefusal(storage, config, owner)
+                    ? { extension_code_awaits_operator: plannedComponents.filter(p => p.type === 'extension').map(p => p.componentId) } : {}),
                 ...(warnings.length ? { warnings } : {}),
                 // Whether the install approves the package's apps by itself (package-install-requests.ts).
                 ...(caps.capabilities.apps.length ? { app_approval: { own_package: ownPackage, grant_apps_default: ownPackage } } : {}),
@@ -483,6 +496,7 @@ export async function installPackage(
     // /v1/cortex/comicland-v2/libs/...  →  /v1/cortex/<registeredAs>/libs/...
     const cortexNameMap = new Map<string, string>();
     const extensionNameMap = new Map<string, string>();
+    const awaitingOperator: ExtensionCodeAwaiting[] = [];
 
     for (const compId of componentOrder) {
         const comp = componentMap.get(compId)!;
@@ -521,7 +535,12 @@ export async function installPackage(
             // is exactly the bug that left Comicland's init action unrun on package
             // install, leaving config.app / config.genres / config.init missing in
             // ext-namespace memory.
-            if (comp.type === 'extension' && scheduler) {
+            // An extension whose code waits for an operator is switched off, so nothing of it runs yet:
+            // the operator's Allow registers its schedules (services/extension-code-hold.ts).
+            if (result.awaitingOperator) {
+                awaitingOperator.push({ component: comp.id, ...result.awaitingOperator });
+                warnings.push(`The extension ${registeredAs} is installed switched off: on this node only the operator's account installs add-on code, so it waits for an operator to allow it.`);
+            } else if (comp.type === 'extension' && scheduler) {
                 try {
                     const ext = await storage.getExtension(registeredAs) as ExtensionRecord | null;
                     if (ext) {
@@ -609,7 +628,7 @@ export async function installPackage(
             agentsProposed.push(...proposed);
             for (const s of skipped) warnings.push(`An agent of the package was not proposed: ${s}`);
         }
-        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed, ownPackage };
+        return { ok: true, kind: 'installed', instance: created, warnings, agentsProposed, ownPackage, ...(awaitingOperator.length ? { awaitingOperator } : {}) };
     } catch (e) {
         // Instance record creation failed — rollback all registered components
         for (const reg of [...registeredComponents].reverse()) {

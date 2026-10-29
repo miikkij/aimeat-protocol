@@ -5,6 +5,8 @@
  * @description Extension write/manage permission helpers — role/scope gates and ownership guard.
  *   Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 — installRoleRefusal moved unchanged to services/extension-install-role.ts and re-exported
+ *     here, so the package component registrar asks the same rule (secaudit2026oct26 round 8c).
  *   2026-10-25 — installRoleRefusal: with install role operator an agent of an account that is not
  *     the operator's writes no extension code (install, redeploy, action script); the refusal names
  *     the setting and the operator (Jouni, 2026-10-25, secaudit2026oct22 lead 128).
@@ -26,8 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { localAccountName, isOwnerInPerson } from '../../utils/gaii.js';
 import { scopeIsCovered } from '../../utils/scope-coverage.js';
-import { isOperatorAccount } from '../../utils/operator-account.js';
-import { listOperatorGhiis } from '../../services/operators.js';
+import { installRoleRefusal } from '../../services/extension-install-role.js';
 import { isOperatorCaller, operatorOverride, type OperatorAuth } from '../../services/operator-override.js';
 
 /** The caller as both surfaces describe it: the session fields the operator check reads, plus the
@@ -72,23 +73,8 @@ function installerMayManage(caller: ExtensionCaller, config: AimeatConfig, insta
   return scopeIsCovered(caller.scopes, 'ext:write');
 }
 
-/**
- * The install role as a rule on the ACCOUNT. With AIMEAT_EXT_INSTALL_ROLE=operator only the
- * operator's account writes extension code: the operator in person and the operator's agents. An
- * agent of any other account is refused an install, a redeploy and an action script change, as the
- * account holder in person already was (Jouni, 2026-10-25, secaudit2026oct22 lead 128). With the
- * default 'owner' nothing is asked here. Answers the refusal in plain words, naming the setting and
- * the operator, or null when the account may write code.
- */
-export async function installRoleRefusal(storage: Storage, config: AimeatConfig, accountName: string): Promise<string | null> {
-  if (config.extInstallRole !== 'operator') return null;
-  if (isOperatorAccount(await storage.getOwner(accountName))) return null;
-  const operators = (await listOperatorGhiis(storage, config)).map(g => localAccountName(g));
-  const who = operators.length ? `the operator (${operators.join(', ')})` : 'the operator';
-  return 'On this node only the operator\'s account installs or changes add-on code '
-    + `(the setting AIMEAT_EXT_INSTALL_ROLE is "operator"). Ask ${who} to install it for you, `
-    + 'or to change the setting. You can write to support@operators.';
-}
+/** The install role as a rule on the account (services/extension-install-role.ts), re-exported for the doors. */
+export { installRoleRefusal };
 
 // Does this caller have permission to write extensions?
 // The operator (isOperatorCaller: in person, or the operator's agent holding operator:admin) passes.

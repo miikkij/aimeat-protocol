@@ -19,6 +19,10 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.5.0 — 2026-10-30 — A declined `cortex-holder` request can be approved later by its owner: the
+ *     Don't allow holds the apps back until the owner changes it (secaudit2026oct26 round 8c).
+ *   v1.4.0 — 2026-10-29 — The one who asked reads its own request in the account it asked (`account`),
+ *     so a principal of another account sees its question pending (secaudit2026oct26 round 8c).
  *   v1.3.0 — 2026-10-25 — A request that makes nothing public is answered under
  *     approvalDecisionRefusal, and an operator reads and answers the operators' question of another
  *     account by naming it (`account`) (secaudit2026oct22, the developer's approval standard).
@@ -85,13 +89,33 @@ async function accountFor(ctx: PublishStoreCtx, viewer: PublishViewer, account: 
   return (await viewer.caller.operator()) ? { ghii: named, foreign: true } : null;
 }
 
+/**
+ * The kinds whose Don't allow keeps something held back that the owner may later release by approving
+ * the same request: an app held from a cortex's new holder (services/cortex-holder-change.ts). For
+ * every other kind a decided request stays decided, as before.
+ */
+const REVERSIBLE_KINDS: ReadonlySet<string> = new Set(['cortex-holder']);
+
+/** Did this viewer ask it: its principal, its GHII in person, or its token's subject? */
+function askedBy(v: PublishViewer, r: PublishRequest): boolean {
+  const me = [v.caller.principal, v.caller.auth.sub, ...(v.caller.inPerson ? [v.caller.ownerGhii] : [])];
+  return me.includes(r.requested_by.principal) || me.includes(r.requested_by.sub);
+}
+
 /** A request in another account is visible to an operator only when the operators answer it. */
 const operatorsQuestion = (r: PublishRequest) => r.approval?.approver === 'operators';
 
 export async function readPublishRequestFor(ctx: PublishStoreCtx, viewer: PublishViewer, id: string, account?: unknown) {
   if (outside(viewer)) return fail(403, 'ACCESS_DENIED', NO_REQUESTS_HERE);
   const where = await accountFor(ctx, viewer, account);
-  if (!where) return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  if (!where) {
+    // The one who asked reads its own question in the account it asked, as pending until it is
+    // answered (the approval standard, rule 3; secaudit2026oct26 round 8c, a cortex's new holder).
+    const asked = typeof account === 'string' && account.trim()
+      ? await readPublishRequest(ctx.storage, accountGhii(account.trim(), ctx.config.nodeId), id) : null;
+    if (asked && askedBy(viewer, asked)) return { ok: true as const, request: summarizePublishRequest(asked) };
+    return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  }
   const r = await readPublishRequest(ctx.storage, where.ghii, id);
   if (!r || (where.foreign ? !operatorsQuestion(r) : !visibleTo(ctx, viewer, r))) return fail(404, 'NOT_FOUND', 'No such request on this account.');
   return { ok: true as const, request: summarizePublishRequest(r) };
@@ -119,10 +143,13 @@ export async function decidePublishRequest(ctx: PublishStoreCtx, decider: Publis
         request.approval.approver === 'operators' && await decider.caller.operator())
       : publishDecisionRefusal(decider.caller, request, decision);
     if (refusal) return { ok: false as const, ...refusal };
-    if (request.state !== 'awaiting_owner') {
+    // A Don't allow that holds something back stays until the owner changes it, and the owner may
+    // change it on the same request: approving it then is the release (REVERSIBLE_KINDS).
+    const reversal = request.state === 'declined' && decision === 'approve' && REVERSIBLE_KINDS.has(request.kind);
+    if (request.state !== 'awaiting_owner' && !reversal) {
       return fail(409, 'ALREADY_DECIDED', `This request is already ${request.state}. Nothing changed.`);
     }
-    if (publishRequestExpired(request, Date.now())) {
+    if (!reversal && publishRequestExpired(request, Date.now())) {
       await settlePublishRequest(ctx, ownerGhii, request, 'expired', { by: null });
       return fail(410, 'EXPIRED', 'This request expired before anyone decided it. Nothing was made public. The one who asked can ask again.');
     }
