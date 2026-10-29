@@ -28,15 +28,30 @@
  *     (its Origin or Referer, matched to this node's app addresses) answers 404 until the app's owner
  *     allowed it (publish-requests/apply-cortex-holder.ts). Every other request is served as before.
  *
+ *   NO DEAD END (rule 1: the owner always has a way to release the hold).
+ *   - While an app is held and no question waits for its owner (none could be filed, the question
+ *     expired or went out of date, or a declined one reached the end of its 30-day record), the next
+ *     library request from that app files the question again (askAgainIfDue). A filed question is asked
+ *     at most once a day per app owner and holder, so a busy page does not fill the bell; a filing the
+ *     owner's full queue refused is tried again on a later load, at most once a minute, so it is filed
+ *     as soon as there is room.
+ *   - Don't allow holds the apps back until the owner changes it: no question is filed while the
+ *     declined one exists, and the owner allows later by approving that same request (POST
+ *     /v1/publish-requests/:id/decision, aimeat_publish_requests and its CLI twin; decide.ts
+ *     REVERSIBLE_KINDS).
+ *
  *   LIMITS. The app is recognised by the address its page sends. A page that sends no Origin and no
  *   Referer (its own `no-referrer` policy) is served as any other request. An app published after the
  *   holder changed is the new holder's caller from its start and is not asked.
  * @structure HOLDER_CHANGE_KEY · CortexHolderChange · noteCortexHolderChange · heldForRequest ·
- *   allowHolderChange · appRefOfRequest
+ *   askAgainIfDue · allowHolderChange · appRefOfRequest
  * @usage
  *   await noteCortexHolderChange({ storage, config }, record, caller.gaii);   // before settleReclaimed
  *   if (await heldForRequest({ storage, config }, found.name, req)) return 404;
  * @version-history
+ *   v1.1.0 — 2026-10-30 — No dead end: a held app with no waiting question files it again on its next
+ *     library request (once a day per owner and holder; a full queue is tried again once a minute), and
+ *     a Don't allow is released by approving the same request later (coordinator, round 8c).
  *   v1.0.0 — 2026-10-29 — Initial (secaudit2026oct26 round 8c, memory-b-08).
  */
 import type { AimeatConfig } from '../config.js';
@@ -44,7 +59,8 @@ import type { Storage, CortexExtensionRecord, MemoryRecord } from '../storage/in
 import { isFreedRelease } from '../storage/types/component-versions.js';
 import { dependentsOf } from './dependency-map.js';
 import { resolveAppOriginTarget } from './app-origin-target.js';
-import { fileAsk } from './publish-requests/ask.js';
+import { fileAsk, accountGhii } from './publish-requests/ask.js';
+import { readPublishRequest, effectiveState } from './publish-requests/store.js';
 import { askerKind } from './approval-standard.js';
 import { emitChange } from './event-bus.js';
 import { serialByKey } from '../utils/serial-by-key.js';
@@ -53,8 +69,22 @@ import { logger } from '../utils/logger.js';
 /** The node's record of one cortex name's holder change, under `system@<nodeId>`. */
 export const HOLDER_CHANGE_KEY = (name: string): string => `cortex.holder-change.${name}`;
 
+/** A filed question is asked again at most this often per app owner and holder. */
+export const ASK_AGAIN_AFTER_MS = 24 * 60 * 60 * 1000;
+/** A filing the owner's full queue refused is tried again at most this often. */
+export const RETRY_FULL_QUEUE_AFTER_MS = 60 * 1000;
+
 /** One app owner's answer: waiting (or not allowed), or allowed. */
-interface AppOwnerAsk { apps: string[]; request_id: string | null; allowed: boolean }
+interface AppOwnerAsk {
+    apps: string[];
+    request_id: string | null;
+    allowed: boolean;
+    /** When a question was last filed, and when a filing was last tried and refused. */
+    asked_at?: string;
+    tried_at?: string;
+    /** Earlier questions for the same apps and holder, so approving one of them still releases them. */
+    earlier?: string[];
+}
 
 export interface CortexHolderChange {
     name: string;
@@ -63,6 +93,8 @@ export interface CortexHolderChange {
     /** When the name was freed, and when the new holder installed it. */
     freedAt: string;
     since: string;
+    /** Who installed it (an agent's GAII or the account's GHII): the one a question names as asking. */
+    asker?: string;
     /** By app owner: the apps (`owner/filename`) that loaded the earlier holder's library. */
     owners: Record<string, AppOwnerAsk>;
 }
@@ -105,6 +137,46 @@ async function formerCallerApps(storage: Storage, name: string, holder: string, 
 }
 
 /**
+ * File one app owner's question, and write on `ask` what came of it: the request id and when it was
+ * asked, or when a filing was tried and refused (the owner's queue is full). Never throws.
+ */
+async function fileOwnerAsk(deps: Deps, change: CortexHolderChange, owner: string, ask: AppOwnerAsk): Promise<void> {
+    const { storage, config } = deps;
+    const principal = change.asker ?? accountGhii(change.holder, config.nodeId);
+    const apps = ask.apps;
+    const now = new Date().toISOString();
+    try {
+        const filed = await fileAsk({ storage, config }, owner, { principal, kind: askerKind(principal), sub: principal }, {
+            kind: 'cortex-holder',
+            target: { cortex: change.name, holder: change.holder, since: change.since, apps: apps.join(',') },
+            title: `the library ${change.name} from its new holder ${change.holder}`,
+            name: change.name,
+            change: { field: 'holder', from: 'an earlier account', to: change.holder },
+            approval: {
+                approver: 'owner',
+                asks: `let your apps ${apps.join(', ')} load the library ${change.name}, which now belongs to ${change.holder}`,
+                why: `The account that held the library ${change.name} is gone, and ${change.holder} installed a new library under the same name. `
+                    + `Your apps load it by that name, so they would run code by ${change.holder}. Until you allow it, they do not load it.`,
+                approve_scope: 'app:write',
+                i18n: { key: 'approval_cortex_holder', vars: { cortex: change.name, holder: change.holder, apps: apps.join(', ') } },
+            },
+        });
+        if (filed.ok) {
+            if (ask.request_id && ask.request_id !== filed.request.id) ask.earlier = [...(ask.earlier ?? []), ask.request_id].slice(-10);
+            ask.request_id = filed.request.id;
+            ask.asked_at = now;
+            delete ask.tried_at;
+            return;
+        }
+        ask.tried_at = now;
+        logger.warn('cortex holder change: an app owner could not be asked yet; the next load from the app tries again', { cortex: change.name, owner, error: filed.message });
+    } catch (err) {
+        ask.tried_at = now;
+        logger.warn('cortex holder change: an app owner could not be asked yet', { cortex: change.name, owner, error: String(err) });
+    }
+}
+
+/**
  * A new cortex record took a bare name the erasure or the settlement freed: ask each owner of an app
  * that loaded the earlier library. Asked before the install settles the released row. Never throws:
  * a failure is logged and the install goes on.
@@ -118,36 +190,56 @@ export async function noteCortexHolderChange(deps: Deps, record: Pick<CortexExte
         const byOwner = await formerCallerApps(storage, record.name, record.installedBy, released.releasedAt);
         // No app of another owner loaded it: nobody to ask, and an older record names another holder.
         if (byOwner.size === 0) return;
-        // The acting principal: an agent's GAII, or the account holder, whom the request store keeps as a GHII.
-        const principal = asker.includes('@') ? asker : `${asker}@${config.nodeId}`;
         await serialByKey(`cortex-holder:${record.name}`, async () => {
             const { row } = await readChange(storage, config, record.name);
             const change: CortexHolderChange = {
-                name: record.name, holder: record.installedBy, freedAt: released.releasedAt, since: record.installedAt, owners: {},
+                name: record.name, holder: record.installedBy, freedAt: released.releasedAt, since: record.installedAt,
+                // The acting principal: an agent's GAII, or the account holder, whom the request store keeps as a GHII.
+                asker: asker.includes('@') ? asker : accountGhii(asker, config.nodeId),
+                owners: {},
             };
             for (const [owner, apps] of byOwner) {
-                const filed = await fileAsk({ storage, config }, owner, { principal, kind: askerKind(principal), sub: principal }, {
-                    kind: 'cortex-holder',
-                    target: { cortex: record.name, holder: record.installedBy, since: record.installedAt, apps: apps.join(',') },
-                    title: `the library ${record.name} from its new holder ${record.installedBy}`,
-                    name: record.name,
-                    change: { field: 'holder', from: 'an earlier account', to: record.installedBy },
-                    approval: {
-                        approver: 'owner',
-                        asks: `let your apps ${apps.join(', ')} load the library ${record.name}, which now belongs to ${record.installedBy}`,
-                        why: `The account that held the library ${record.name} is gone, and ${record.installedBy} installed a new library under the same name. `
-                            + `Your apps load it by that name, so they would run code by ${record.installedBy}. Until you allow it, they do not load it.`,
-                        approve_scope: 'app:write',
-                        i18n: { key: 'approval_cortex_holder', vars: { cortex: record.name, holder: record.installedBy, apps: apps.join(', ') } },
-                    },
-                });
-                change.owners[owner] = { apps, request_id: filed.ok ? filed.request.id : null, allowed: false };
-                if (!filed.ok) logger.warn('cortex holder change: an app owner could not be asked; the apps stay held', { cortex: record.name, owner, error: filed.message });
+                const ask: AppOwnerAsk = { apps, request_id: null, allowed: false };
+                await fileOwnerAsk(deps, change, owner, ask);
+                change.owners[owner] = ask;
             }
             await writeChange(storage, config, change, row);
         });
     } catch (err) {
         logger.warn('cortex holder change: not recorded', { cortex: record.name, error: String(err) });
+    }
+}
+
+/**
+ * The app owner's apps are held and no question of theirs waits: file it again. Waiting means a
+ * question still awaiting the owner, or a declined one (Don't allow holds until the owner approves that
+ * same request). A question expired, gone out of date, never filed, or a record gone at the end of its
+ * lifetime is filed again, at most once a day; a refused filing is tried again at most once a minute.
+ * Never throws.
+ */
+export async function askAgainIfDue(deps: Deps, name: string, owner: string, now = Date.now()): Promise<void> {
+    const { storage, config } = deps;
+    try {
+        await serialByKey(`cortex-holder:${name}`, async () => {
+            const { row, change } = await readChange(storage, config, name);
+            const ask = change?.owners[owner];
+            if (!change || !ask || ask.allowed) return;
+            if (ask.request_id) {
+                const r = await readPublishRequest(storage, accountGhii(owner, config.nodeId), ask.request_id);
+                const state = r ? effectiveState(r, now) : null;
+                if (state === 'awaiting_owner' || state === 'declined' || state === 'approved') return;
+            }
+            const since = (t: string | undefined) => (t ? now - Date.parse(t) : Infinity);
+            if (since(ask.asked_at) < ASK_AGAIN_AFTER_MS || since(ask.tried_at) < RETRY_FULL_QUEUE_AFTER_MS) return;
+            // The holder may have installed the name again since; the question names the install that runs.
+            const live = await storage.getCortexExtension(name);
+            if (!live || live.installedBy !== change.holder) return;
+            change.since = live.installedAt;
+            await fileOwnerAsk(deps, change, owner, ask);
+            await writeChange(storage, config, change, row);
+        });
+    } catch (err) {
+        logger.warn('cortex holder change: the question could not be asked again', { cortex: name, owner, error: String(err) });
     }
 }
 
@@ -157,7 +249,8 @@ export async function allowHolderChange(deps: Deps, name: string, holder: string
     return serialByKey(`cortex-holder:${name}`, async () => {
         const { row, change } = await readChange(storage, config, name);
         const ask = change?.owners[owner];
-        if (!change || change.holder !== holder || !ask || ask.request_id !== requestId) return false;
+        if (!change || change.holder !== holder || !ask) return false;
+        if (ask.request_id !== requestId && !(ask.earlier ?? []).includes(requestId)) return false;
         ask.allowed = true;
         await writeChange(storage, config, change, row);
         emitChange('cortex');
@@ -190,6 +283,7 @@ export async function appRefOfRequest(
 /**
  * Is this lib request from an app whose owner has not allowed the cortex's new holder? A request from a
  * page costs one record read; the app is resolved only when the node holds a holder change for the name.
+ * A held app with no waiting question files it again (askAgainIfDue), without delaying the answer.
  */
 export async function heldForRequest(
     deps: Deps, name: string, headers: { origin?: string; referer?: string },
@@ -202,6 +296,8 @@ export async function heldForRequest(
     if ((await deps.storage.getCortexExtension(name))?.installedBy !== change.holder) return false;
     const ref = await appRefOfRequest(deps.config, deps.storage, headers);
     if (!ref) return false;
-    const ask = Object.values(change.owners).find(a => a.apps.includes(ref));
-    return !!ask && !ask.allowed;
+    const owner = Object.keys(change.owners).find(o => change.owners[o].apps.includes(ref));
+    if (!owner || change.owners[owner].allowed) return false;
+    void askAgainIfDue(deps, name, owner);
+    return true;
 }

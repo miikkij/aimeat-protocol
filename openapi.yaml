@@ -78399,7 +78399,9 @@ paths:
         changed) is not made public: 409 OUTDATED, and the request is settled outdated. A target whose
         classification no longer allows the level (its label's maxAudience) is not made public either:
         409 LABEL_CAPS_AUDIENCE, settled outdated with the reason; no approval passes the cap. A settled
-        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
+        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED, except that the owner may
+        approve a declined `cortex-holder` request later: Don't allow holds the apps back until the
+        owner changes it. Requires memory:write.
         A request may have parts (`parts` on it, `part_of` on each part): the picture of an AI image
         job asked public beside its answer's record. Approving the request also applies each part
         still waiting, checked as its own request; declining it, or its ending expired or outdated,
