@@ -40,6 +40,8 @@
  *   v1.2.0 — 2026-10-18 — runBatch moves the cursor on the version it read before processing the page
  *     (409 BATCH_BUSY to a second batch on the same cursor), puts it back when every message failed or
  *     the batch threw, and prepends to the runs list on its version (writeMemoryRecord expectedVersion).
+ *   v1.2.1 — 2026-10-29 — A PDF attachment is read under the node's PDF read limits; one whose text
+ *     was not read says so on its row (text_not_read) (secaudit2026oct26 round 8c, memory-b-09).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
@@ -53,6 +55,7 @@ import { decideForOwner } from '../decide/service.js';
 import { completeForOwner } from '../ai/completion.js';
 import { readCallFiles } from '../ai/call-files.js';
 import { extractFileText } from '../file-text/index.js';
+import { pdfReadLimits } from '../file-text/pdf-bounded.js';
 import { appendRows, readRow, type RowCaller } from '../workspace-rows/row-service.js';
 import { WorkspaceRowError } from '../workspace-rows/row-space.js';
 import { logger } from '../../utils/logger.js';
@@ -250,12 +253,17 @@ export async function readAttachments(ctx: Ctx, msg: MailMessage): Promise<{ tex
     out.stored.push(kept);
     if (!file) continue;
     const isPdf = /pdf/i.test(stored.mime_type) || /\.pdf$/i.test(att.filename);
-    const text = isPdf ? await extractFileText(file.data, stored.mime_type, att.filename) : null;
+    const text = isPdf ? await extractFileText(file.data, stored.mime_type, att.filename, { pdfLimits: pdfReadLimits(ctx.deps.config) }) : null;
     if (text && text.text.trim().length >= 40) {
       out.text += `\n--- ${att.filename} ---\n${text.text}`;
       // The text layer that went to the extraction, kept on the row when the definition asks for it.
       if (ctx.def.keepText) kept.text = text.text.slice(0, KEPT_TEXT_MAX);
-    } else out.fileKeys.push(stored.key);
+    } else {
+      // A PDF whose text read reached the node's limit: the row says so, and the file goes to the
+      // model whole like a scan (file-text/pdf-bounded.ts).
+      if (text?.limit && text.note) kept.text_not_read = text.note;
+      out.fileKeys.push(stored.key);
+    }
   }
   return out;
 }

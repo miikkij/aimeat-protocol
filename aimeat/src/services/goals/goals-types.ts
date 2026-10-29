@@ -15,6 +15,8 @@
  * @structure GoalRecord · GoalWork · GoalLogEntry · limits and caps · goalKey() · trackingCode() · parseTrackingCode()
  * @usage import { type GoalRecord, goalKey } from './goals-types.js';
  * @version-history
+ *   v1.3.0 — 2026-10-29 — GoalWork.spendAsk, GoalRecord.modelSpendAllowed and approvedAt: a model work
+ *     an agent without ai:use asked for waits for the owner's one press (secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — GoalWork.readAsk, readAllowed and readLeftOut: a model work waits for the
  *     owner's one press on a private record an agent without memory:read-as-owner named (secaudit2026oct26).
  *   v1.1.0 — 2026-10-25 — A work the node's model does (`runner: 'model'`, MODEL_TAKER, runKey,
@@ -121,6 +123,11 @@ export interface GoalWork {
    * these private records (services/goals/goals-model-reach.ts). The request id and the agent.
    */
   readAsk?: { requestId: string; agent: string; keys: string[] };
+  /**
+   * A model work that waits for the owner's one press: the agent that asked for it may not spend the
+   * owner's AI allowance itself (services/goals/goals-model-spend.ts). The request id and the agent.
+   */
+  spendAsk?: { requestId: string; agent: string };
   /** Records the owner allowed the model to read for this work, and records left out on a no. */
   readAllowed?: string[];
   readLeftOut?: string[];
@@ -275,6 +282,13 @@ export interface GoalRecord {
   roundNote?: { round: number; text: string };
   /** The coordinator's last wake: when, and the task that carried it. */
   wake?: { at: string; taskId?: string };
+  /** When the owner approved this goal as a proposal (goals-ops.ts goalActionOp 'approve'). */
+  approvedAt?: string;
+  /**
+   * Agents the owner allowed to have AIMEAT's model do this goal's works on the AI allowance, although
+   * they do not hold ai:use themselves (services/goals/goals-model-spend.ts), as GAIIs.
+   */
+  modelSpendAllowed?: string[];
   plannedBy: string;
   createdBy: string;
   createdAt: string;

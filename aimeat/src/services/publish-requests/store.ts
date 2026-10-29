@@ -35,6 +35,8 @@
  *   2026-10-29 — The kind `delegation-binding`: an app by another author publishing through a channel
  *     delegation that names its app by file name alone waits for the channel owner
  *     (services/connections/delegation-caller.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `goal-model-spend`: AIMEAT's model doing a goal's work on the AI allowance
+ *     for an agent without ai:use waits for the owner (services/goals/goals-model-spend.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — The kind `goal-model-read`: AIMEAT's model reading private records an agent without
  *     memory:read-as-owner named in a goal waits for the owner (services/goals/goals-model-reach.ts).
  *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
@@ -118,7 +120,9 @@ export type PublishKind =
   | 'refinery-definition'
   // An app by another author publishing through a delegation that names its app by file name alone
   // (services/connections/delegation-caller.ts).
-  | 'delegation-binding';
+  | 'delegation-binding'
+  // AIMEAT's model doing a goal's work on the AI allowance for an agent without ai:use (services/goals/goals-model-spend.ts).
+  | 'goal-model-spend';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

@@ -13,17 +13,23 @@
  *
  *   NOT MEASURED. An encrypted document's streams are ciphertext until pdf.js decrypts them with the
  *   empty user password; this scan does not decrypt, so what such a stream decodes to is counted only
- *   as far as its bytes decode as they are.
- * @structure PDF_DECODE_BUDGET · pdfDecodesWithin(bytes, budget)
- * @usage if (!(await pdfDecodesWithin(bytes))) return { note: 'too large to read' };
+ *   as far as its bytes decode as they are. pdfDecodeMeasure says so: such a document, and one with
+ *   a stream the scan could not count to its end, is `unmeasured`, and its text is read under a time
+ *   and a memory limit (pdf-bounded.ts) instead of in this process.
+ * @structure PDF_DECODE_BUDGET · PdfMeasure · pdfDecodeMeasure(bytes, budget) · pdfDecodesWithin(bytes, budget)
+ * @usage const m = await pdfDecodeMeasure(bytes);   // 'within' | 'over' | 'unmeasured'
  * @version-history
+ *   v1.2.0 — 2026-10-29 — pdfDecodeMeasure: within, over, or unmeasured (an encrypted document, a
+ *     filter name it does not know, a stream that did not decode to its end, a dictionary or filter
+ *     object it could not read). pdfDecodesWithin answers as before (secaudit2026oct26 round 8c,
+ *     memory-b-09).
  *   v1.1.0 — 2026-10-27 — Each stream's own dictionary is parsed (a nested dictionary after /Filter, an
  *     indirect /Filter, a filter array), every filter pdf.js decodes for text is counted (Flate, LZW,
  *     RunLength, ASCIIHex, ASCII85, Brotli, in chains), and CR alone after `stream` starts a stream
  *     (secaudit2026oct26, pdf-budget.ts:pdfDecodesWithin:filter-detection-bypass).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, pdf.js decoded size on arrival).
  */
-import { decodedLength, normaliseFilter, type PdfFilter } from './pdf-filters.js';
+import { decodeMeasure, normaliseFilter, type PdfFilter } from './pdf-filters.js';
 import { logger } from '../../utils/logger.js';
 
 /** What the text and metadata streams of one PDF may decode to in all. */
@@ -190,14 +196,33 @@ function filtersByText(bytes: Buffer, kw: number): PdfFilter[] {
   return names.map(normaliseFilter);
 }
 
-/** Whether the text and metadata streams of `bytes` decode to `budget` bytes or fewer in all. */
-export async function pdfDecodesWithin(bytes: Buffer, budget = PDF_DECODE_BUDGET): Promise<boolean> {
+/**
+ * What the budget can say about a PDF: its text and metadata streams decode `within` the budget, go
+ * `over` it, or are `unmeasured`: within as far as the scan counted, but the scan could not count
+ * all of it (an encrypted document, a filter name it does not know, a picture filter on a text
+ * stream, a stream that did not decode to its end, a dictionary or a filter object it could not
+ * read, a stream with no end). `why` names the first such stream for the log.
+ */
+export interface PdfMeasure { verdict: 'within' | 'over' | 'unmeasured'; why?: string }
+
+/** A trailer or cross-reference dictionary that names an encryption dictionary. */
+function encrypted(bytes: Buffer): boolean {
+  for (let at = bytes.indexOf('/Encrypt', 0, 'latin1'); at >= 0; at = bytes.indexOf('/Encrypt', at + 8, 'latin1')) {
+    if (/^\/Encrypt\s*(\d+\s+\d+\s+R|<<)/.test(bytes.toString('latin1', at, at + 40))) return true;
+  }
+  return false;
+}
+
+/** How the text and metadata streams of `bytes` stand against `budget` (PdfMeasure). */
+export async function pdfDecodeMeasure(bytes: Buffer, budget = PDF_DECODE_BUDGET): Promise<PdfMeasure> {
   let total = 0;
   let at = 0;
+  let why: string | undefined = encrypted(bytes) ? 'the document is encrypted' : undefined;
+  const answer = (): PdfMeasure => (why ? { verdict: 'unmeasured', why } : { verdict: 'within' });
   const objects = new Objects(bytes);
   for (;;) {
     const kw = bytes.indexOf('stream', at, 'latin1');
-    if (kw < 0) return true;
+    if (kw < 0) return answer();
     at = kw + 6;
     // `endstream` also contains the word; only a `stream` keyword right after a dictionary starts one.
     if (kw >= 3 && bytes.toString('latin1', kw - 3, kw) === 'end') continue;
@@ -209,7 +234,7 @@ export async function pdfDecodesWithin(bytes: Buffer, budget = PDF_DECODE_BUDGET
     const before = bytes.toString('latin1', Math.max(0, kw - 64), kw).trimEnd();
     if (!before.endsWith('>>')) continue;
     const end = bytes.indexOf('endstream', start, 'latin1');
-    if (end < 0) return true;
+    if (end < 0) { why ??= `a stream at byte ${kw} has no end`; return answer(); }
     at = end + 9;
     const dict = streamDict(bytes, kw);
     let filters: PdfFilter[];
@@ -218,13 +243,24 @@ export async function pdfDecodesWithin(bytes: Buffer, budget = PDF_DECODE_BUDGET
       // Pictures and attached files are not decoded to read text or metadata.
       if (nameOf(dict.dict.get('Subtype')) === 'Image' || nameOf(dict.dict.get('Type')) === 'EmbeddedFile') continue;
       ({ filters, earlyChange } = filtersOf(objects, dict));
+      const named = dict.dict.get('Filter') ?? dict.dict.get('F');
+      const count = named === undefined || named === null ? 0 : Array.isArray(named) ? named.length : 1;
+      if (count > 0 && filters.length < count) why ??= `a filter of the stream at byte ${kw} did not read`;
     } else {
       const head = bytes.toString('latin1', Math.max(0, kw - 4096), kw);
       if (/\/Subtype\s*\/Image\b|\/Type\s*\/EmbeddedFile\b/.test(head.slice(head.lastIndexOf('obj') + 1))) continue;
       filters = filtersByText(bytes, kw);
+      why ??= `the dictionary of the stream at byte ${kw} did not read`;
     }
     if (filters.length === 0) continue;
-    total += await decodedLength(bytes.subarray(start, end), filters, budget - total, earlyChange);
-    if (total > budget) return false;
+    const got = await decodeMeasure(bytes.subarray(start, end), filters, budget - total, earlyChange);
+    total += got.length;
+    if (total > budget) return { verdict: 'over' };
+    if (!got.complete) why ??= `the stream at byte ${kw} did not decode to its end`;
   }
+}
+
+/** Whether the text and metadata streams of `bytes` decode to `budget` bytes or fewer, as far as the scan counts. */
+export async function pdfDecodesWithin(bytes: Buffer, budget = PDF_DECODE_BUDGET): Promise<boolean> {
+  return (await pdfDecodeMeasure(bytes, budget)).verdict !== 'over';
 }

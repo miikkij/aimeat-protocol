@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.10.2 -- 2026-10-29 -- DELETE /v1/chat/threads/:id answers chat_tool_copy (kept or none) and, when
+ *     kept, a note that the chat tool's own store keeps the conversation text (secaudit2026oct26 round 8c).
  *   v1.10.1 -- 2026-10-27 -- DELETE /v1/chat/threads/:id ends the conversation's session MCP token
  *     (chat-session.ts endChatSession; secaudit2026oct26).
  *   v1.10.0 — 2026-10-02 — A turn takes `lang`, the language of the lines the node writes into it
@@ -51,7 +53,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
-    createThread, readThread, showThread, showThreads, deleteThread,
+    createThread, readThread, showThread, showThreads, deleteThread, chatToolCopy, CHAT_TOOL_COPY_NOTE,
 } from '../services/chat-threads.js';
 import { readerFor } from '../services/classification/reader.js';
 import { chatEnabled, chatPayer, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
@@ -161,14 +163,18 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
     router.delete('/v1/chat/threads/:id', requireAuth(), requireRole('owner'), async (req, res) => {
         const gaii = identity(req);
         const id = req.params.id as string;
-        if (!await readThread(storage, gaii, id)) {
+        const thread = await readThread(storage, gaii, id);
+        if (!thread) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such conversation.'));
             return;
         }
         // Its session's MCP token ends with it (secaudit2026oct26).
         await endChatSession({ storage, config }, gaii, id);
         await deleteThread(storage, gaii, id);
-        res.json(success(config.nodeId, { deleted: true }));
+        // The chat tool's own copy (goose's store) cannot be found and deleted with certainty, so the
+        // answer says whether one stays (chat-threads.ts chatToolCopy; secaudit2026oct26 round 8c).
+        const copy = chatToolCopy(thread);
+        res.json(success(config.nodeId, { deleted: true, chat_tool_copy: copy, ...(copy === 'kept' ? { note: CHAT_TOOL_COPY_NOTE } : {}) }));
     });
 
     // POST /v1/chat/threads/:id/reset — forget the agent session, keep the conversation.
