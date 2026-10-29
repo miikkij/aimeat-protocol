@@ -11,6 +11,8 @@
  *   - gaiiCache/peerFailures: in-memory resolution cache and consecutive-failure counters
  *
  * @version-history
+ *   2026-10-29 — Re-exports peerRegistry (peer-registry.ts), the peer map that knows its node's own id
+ *     (secaudit2026oct26 round 8c, federation-07).
  *   2026-10-24 — isPersonalNodeAgentOf; resolveGaii routes to a personal node only an entry that is
  *     the anchoring owner's own agent on that node (secaudit2026oct22,
  *     personal-anchor-agent-gaiis-claim-foreign-gaii).
@@ -61,6 +63,8 @@ import type { ServiceSummary } from '../utils/service-summary.js';
 import { logger } from '../utils/logger.js';
 import { forgetPeer } from './peer-origin.js';
 import { peerFetch, type PeerAnswer } from '../utils/peer-fetch.js';
+// The node's live peer map, made knowing the node's own id (peer-registry.ts).
+export { peerRegistry } from './peer-registry.js';
 
 /** Cache of resolved GAIIs to their hosting node URL. TTL: 5 minutes. Expiry used to be
  * checked only on read, so every GAII ever resolved kept a permanent entry (memory audit

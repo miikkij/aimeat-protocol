@@ -13,6 +13,8 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-10-29 — federationResolveMaxPeers (secaudit2026oct26 round 8c, federation-03).
+ *   2026-10-29 — federationPeeringRequestDays (secaudit2026oct26 round 8c, federation-06).
  *   v1.4.0 — 2026-10-27 — federationIntroductionsPerHour (secaudit2026oct26, unbounded pending peering requests).
  *   2026-10-27 — realtimeEchatMaxRooms and realtimeMaxDocsPerRoom (secaudit2026oct26,
  *     anonymous-room-cap-exhaustion and yjsSnapshots:unbounded).
@@ -67,6 +69,18 @@ export interface NodeLimitsConfig {
    */
   federationIntroductionsPerHour: number;
   /**
+   * Days a peering request another node left here (an introduction) waits for the operator's answer;
+   * past it the request expires and is deleted. AIMEAT_FEDERATION_PEERING_REQUEST_DAYS, default 30;
+   * 0 is never (secaudit2026oct26 round 8c).
+   */
+  federationPeeringRequestDays: number;
+  /**
+   * The most peers one GET /v1/federation/resolve/:gaii asks, for an identity that names no node this
+   * node knows (that route takes no sign-in). AIMEAT_FEDERATION_RESOLVE_MAX_PEERS, default 500, above
+   * any real peer count; 0 is no limit (secaudit2026oct26 round 8c).
+   */
+  federationResolveMaxPeers: number;
+  /**
    * The most rooms anonymous echat visitors may hold open together, inside realtime.max_rooms, so
    * visitors without an account cannot take every room the node's apps use.
    * AIMEAT_REALTIME_ECHAT_MAX_ROOMS, default 50; 0 is no separate limit.
@@ -100,6 +114,8 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     appHeldLabelDays: wholeOr(env.AIMEAT_APP_HELD_LABEL_DAYS, 90),
     appHeldLabelsPerOwner: wholeOr(env.AIMEAT_APP_HELD_LABELS_PER_OWNER, 20),
     federationIntroductionsPerHour: wholeOr(env.AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR, 30),
+    federationPeeringRequestDays: wholeOr(env.AIMEAT_FEDERATION_PEERING_REQUEST_DAYS, 30),
+    federationResolveMaxPeers: wholeOr(env.AIMEAT_FEDERATION_RESOLVE_MAX_PEERS, 500),
     realtimeEchatMaxRooms: wholeOr(env.AIMEAT_REALTIME_ECHAT_MAX_ROOMS, 50),
     realtimeMaxDocsPerRoom: wholeOr(env.AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, 64),
     appRendersAtOnce: wholeOr(env.AIMEAT_APP_RENDERS_AT_ONCE, 4),

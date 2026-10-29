@@ -8,9 +8,12 @@
  *   WHAT IT ASSERTS. Node H is the node under test, node P a real member peer of H, and F a stand-in
  *   peer on an ephemeral loopback port that counts the identity lookups it is asked.
  *     - Settlement: copies of one signed settlement that arrive together credit once (one 200, the
- *       rest 409 CONFLICT), and a single settlement credits once as before.
+ *       rest 409 CONFLICT), also when two node processes over one database take them, and a single
+ *       settlement credits once as before.
  *     - Resolve: an identity no node knows is asked of the peers once inside a short window, however
- *       many times it is resolved; a known identity and a node-hinted one resolve as before.
+ *       many times it is resolved; a known identity and a node-hinted one resolve as before. An
+ *       identity naming this node or a known unlisted peer asks nobody, and one with no known home
+ *       reaches at most federation.resolve_max_peers peers.
  *     - Deactivated account: a member peer that holds a person's sign-in consent lists and writes
  *       their records while the account is active, is refused (403 ACCOUNT_DISABLED) while it is
  *       deactivated, and works again after reactivation with the consent untouched.
@@ -21,6 +24,7 @@
  *       fresh node and an offline peer under its own key are admitted as before.
  *     - Introductions: a long message is stored bounded, a repeated introduction keeps one pending
  *       request, and the per-address hourly bound answers 429 with when to try again (0 is no limit).
+ *       A request unanswered for 30 days expires (federation.peering_request_days, 0 never).
  *     - Own node id: no introduction, key exchange, approval or direct add makes a peer of this
  *       node's own id.
  *     - Replicas: a replica dated in the future is stored with the time it was received, an existing
@@ -34,12 +38,25 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   v1.4.0 — 2026-10-29 — S3, S4: copies of one settlement taken by two settlement routers over one
+ *     database (two node processes) credit once, and a settlement for an unknown identity leaves no
+ *     ledger row (secaudit2026oct26 round 8c, federation-01).
+ *   v1.3.0 — 2026-10-29 — R4, R5: an identity that names this node or a known unlisted peer asks no
+ *     peer, and one with no known home reaches at most federation.resolve_max_peers peers
+ *     (secaudit2026oct26 round 8c, federation-03).
+ *   v1.2.0 — 2026-10-29 — E1, E2: a peering request unanswered for federation.peering_request_days
+ *     (30 by default, 0 never) is gone from the list, the decision and the status route
+ *     (secaudit2026oct26 round 8c, federation-06).
  *   v1.1.0 — 2026-10-27 — A plain invite for a held id waits for the operator's one-press answer
  *     (V2, V2b, V2c) instead of a 409 (the coordinator's ruling).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26, round 8, federation group).
  */
 import http, { type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
+import express from 'express';
+import { federationSettlementsRouter } from '../src/routes/federation-settlements.js';
+import { deriveTierFlags } from '../src/services/federation-tiers.js';
+import type { PeerInfo } from '../src/services/federation.js';
 import { generateKeyPair, sign } from '../src/auth/keypair.js';
 import { audienceProof, deliveryProof } from '../src/services/signed-node-request.js';
 import { buildHopSigningMessage } from '../src/types/route-manifest.js';
@@ -213,6 +230,62 @@ try {
         assert((await settlementRows(tc)).length === 1, 'one ledger row for the tracking code');
     });
 
+    await test('S3. REFUSED — copies of one settlement taken by two node processes over one database credit once: one 200, one 409', async () => {
+        // Two settlement routers over H's own database stand in for two node processes: each has its
+        // own in-process claim set, so only the database can tell the two copies apart. Both copies
+        // are held after their ledger lookup until the other has looked too, the interleaving two
+        // processes on PostgreSQL meet by chance.
+        const tc = `tc-twin-${stamp}`;
+        let looked = 0;
+        let bothLooked!: () => void;
+        const barrier = new Promise<void>(resolve => { bothLooked = resolve; });
+        const held = new Proxy(H.storage, {
+            get(target, prop) {
+                if (prop === 'findTransactionByTrackingCode') return async (gaii: string, code: string, type: string) => {
+                    const found = await target.findTransactionByTrackingCode(gaii, code, type);
+                    if (code === `settle:${tc}` && looked < 2) { looked++; if (looked === 2) bothLooked(); await barrier; }
+                    return found;
+                };
+                const value = Reflect.get(target, prop);
+                return typeof value === 'function' ? value.bind(target) : value;
+            },
+        });
+        const twinUrls: string[] = [];
+        for (let i = 0; i < 2; i++) {
+            const twinPeers = new Map<string, PeerInfo>([[P_ID, {
+                nodeId: P_ID, url: P.baseUrl, publicKey: P.nodeKey.publicKey, status: 'active', addedAt: new Date().toISOString(), lastSeen: new Date().toISOString(),
+                ...deriveTierFlags('member'), tier: 'member',
+            }]]);
+            const twinApp = express();
+            twinApp.use(express.json());
+            twinApp.use(federationSettlementsRouter(H.config, held, twinPeers));
+            const twin = await new Promise<Server>(resolve => { const s = twinApp.listen(0, '127.0.0.1', () => resolve(s)); });
+            servers.push(twin);
+            twinUrls.push(`http://127.0.0.1:${(twin.address() as AddressInfo).port}`);
+        }
+        const before = await balance();
+        const body = await settlementBody({ gaii: H.ownerGhii, amount: 30, tracking_code: tc });
+        const post = (base: string) => fetch(`${base}/v1/federation/settle`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body })
+            .then(async r => ({ status: r.status, code: ((await r.json()) as any)?.error?.code }));
+        const answers = await Promise.all(twinUrls.map(post));
+        const after = await balance();
+        assert(after === before + 30, `credited ${(after - before) / 30} times, answers ${JSON.stringify(answers)}`);
+        assert(answers.filter(a => a.status === 200).length === 1 && answers.filter(a => a.status === 409 && a.code === 'CONFLICT').length === 1,
+            `one 200 and one 409 CONFLICT: ${JSON.stringify(answers)}`);
+        assert((await settlementRows(tc)).length === 1, 'one ledger row for the tracking code');
+        const again = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 30, tracking_code: tc }) });
+        assert(again.status === 409 && again.body.error?.code === 'CONFLICT', `a later copy at H: ${again.status} ${JSON.stringify(again.body)}`);
+    });
+
+    await test('S4. KEPT — a settlement for an identity this node does not have answers 404 and leaves no ledger row; the same code then credits a real one', async () => {
+        const tc = `tc-nobody-${stamp}`;
+        const r = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: `nobody-${stamp}@${H_ID}`, amount: 5, tracking_code: tc }) });
+        assert(r.status === 404 && r.body.error?.code === 'NOT_FOUND', `unknown identity: ${r.status} ${JSON.stringify(r.body)}`);
+        const before = await balance();
+        const ok = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 5, tracking_code: tc }) });
+        assert(ok.status === 200 && await balance() === before + 5, `the owner's settlement with that code: ${ok.status} ${JSON.stringify(ok.body)}`);
+    });
+
     // ── 2. Resolve ──
     console.log('\nPhase 2 — an unknown identity is asked of the peers once');
 
@@ -240,6 +313,40 @@ try {
         assert(answers.every(a => a.status === 404), `all 404: ${JSON.stringify(answers.map(a => a.status))}`);
         const asked = fakeAsked.filter(a => a === who).length;
         assert(asked === 1, `F was asked ${asked} times for one identity looked up together`);
+    });
+
+    await test('R4. BOUNDED — an identity that names H, or a peer H knows but does not list, asks no peer', async () => {
+        const G_ID = `aimeat-bounds-g-${stamp}`;
+        await addPeer(H, G_ID, 'http://localhost:49963', (await generateKeyPair()).publicKey, { peer_mode: 'private' });
+        try {
+            const own = `ghost-own-${stamp}@${H_ID}`;
+            const hidden = `ghost-hidden-${stamp}@${G_ID}`;
+            const a = await H.json(`/v1/federation/resolve/${encodeURIComponent(own)}`);
+            const b = await H.json(`/v1/federation/resolve/${encodeURIComponent(hidden)}`);
+            assert(a.status === 404 && b.status === 404, `both 404: ${a.status} ${b.status}`);
+            assert(!JSON.stringify(b.body).includes('49963'), `the private peer's address is not given out: ${JSON.stringify(b.body)}`);
+            assert(!fakeAsked.includes(own) && !fakeAsked.includes(hidden), `F was asked: ${JSON.stringify(fakeAsked.filter(w => w === own || w === hidden))}`);
+        } finally {
+            await H.json(`/v1/federation/peers/${G_ID}`, { method: 'DELETE', headers: auth(H.ownerToken) });
+        }
+    });
+
+    await test('R5. BOUNDED — an identity with no known home reaches at most federation.resolve_max_peers peers; 0 is no limit', async () => {
+        const cfg = H.config as unknown as Record<string, unknown>;
+        const saved = cfg.federationResolveMaxPeers;
+        try {
+            // H lists P first and F second, so with 1 only P is asked.
+            cfg.federationResolveMaxPeers = 1;
+            const one = `ghost-capped-${stamp}`;
+            const r = await H.json(`/v1/federation/resolve/${encodeURIComponent(one)}`);
+            assert(r.status === 404, `capped: ${r.status} ${JSON.stringify(r.body)}`);
+            assert(!fakeAsked.includes(one), 'F, the second listed peer, is not asked with the limit at 1');
+            cfg.federationResolveMaxPeers = 0;
+            const known = await H.json(`/v1/federation/resolve/${encodeURIComponent(KNOWN_ON_F)}`);
+            assert(known.status === 200 && known.body.data?.node_id === F_ID, `0 is no limit, F answers: ${known.status} ${JSON.stringify(known.body)}`);
+        } finally {
+            cfg.federationResolveMaxPeers = saved;
+        }
     });
 
     // ── 3. A deactivated account ──
@@ -436,6 +543,47 @@ try {
             assert(c.status === 202, `0 is no limit: ${c.status} ${JSON.stringify(c.body)}`);
         } finally {
             cfg.federationIntroductionsPerHour = saved;
+        }
+    });
+
+    /** A pending request from `nodeId`, written as if it had arrived `daysAgo` days ago. */
+    async function agedRequest(nodeId: string, daysAgo: number): Promise<string> {
+        const at = new Date(Date.now() - daysAgo * 86_400_000).toISOString();
+        const id = `peer-req-aged-${nodeId}`;
+        await H.storage.createPeeringRequest({ id, fromNodeUrl: 'http://localhost:49964', fromNodeId: nodeId, toNodeId: H_ID, targetUrl: 'http://localhost:49964', publicKey: (await generateKeyPair()).publicKey, message: '', status: 'pending', createdAt: at, updatedAt: at });
+        return id;
+    }
+
+    await test('E1. EXPIRES — a peering request unanswered for 30 days is gone: not listed, not approvable, its status not found', async () => {
+        const oldId = await agedRequest(`aimeat-bounds-old-${stamp}`, 31);
+        const freshId = await agedRequest(`aimeat-bounds-new-${stamp}`, 29);
+        const list = await H.json('/v1/admin/peering/requests', { headers: auth(H.ownerToken) });
+        const ids = (list.body.data?.requests ?? []).map((q: any) => q.id);
+        assert(!ids.includes(oldId), `the 31-day-old request is not listed: ${JSON.stringify(ids)}`);
+        assert(ids.includes(freshId), 'a 29-day-old request is still listed');
+        const ap = await H.json(`/v1/admin/peering/requests/${oldId}/decision`, { method: 'POST', headers: auth(H.ownerToken), body: JSON.stringify({ decision: 'approve' }) });
+        assert(ap.status === 404, `approving it: ${ap.status} ${JSON.stringify(ap.body)}`);
+        const st = await H.json(`/v1/federation/peer/introduce/${oldId}/status`);
+        assert(st.status === 404, `its status: ${st.status} ${JSON.stringify(st.body)}`);
+        assert(!(await H.storage.getPeeringRequest(oldId)), 'the row is deleted');
+        const fresh = await H.json(`/v1/federation/peer/introduce/${freshId}/status`);
+        assert(fresh.status === 200 && fresh.body.data?.status === 'pending', `the fresh one: ${fresh.status} ${JSON.stringify(fresh.body)}`);
+    });
+
+    await test('E2. KEPT — federation.peering_request_days 0 keeps an old request', async () => {
+        // H runs on an in-memory database, where PUT /v1/admin/config answers READONLY_CONFIG, so the
+        // value is set on the live config as I3 does.
+        const cfg = H.config as unknown as Record<string, unknown>;
+        const saved = cfg.federationPeeringRequestDays;
+        cfg.federationPeeringRequestDays = 0;
+        try {
+            const oldId = await agedRequest(`aimeat-bounds-older-${stamp}`, 400);
+            const list = await H.json('/v1/admin/peering/requests', { headers: auth(H.ownerToken) });
+            assert((list.body.data?.requests ?? []).some((q: any) => q.id === oldId), 'with 0 a 400-day-old request stays');
+            const st = await H.json(`/v1/federation/peer/introduce/${oldId}/status`);
+            assert(st.status === 200 && st.body.data?.status === 'pending', `its status: ${st.status} ${JSON.stringify(st.body)}`);
+        } finally {
+            cfg.federationPeeringRequestDays = saved;
         }
     });
 

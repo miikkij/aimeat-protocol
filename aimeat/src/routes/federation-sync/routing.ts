@@ -5,6 +5,10 @@
  * @description Cross-node query routing — multi-hop relay with signed route manifest + routing-fee debit,
  *   GAII→node resolution, and cross-node work submission. Extracted from federation-sync.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 — GET /v1/federation/resolve/:gaii asks no peer for an identity that names this node or
+ *     a peer this node knows but does not list (404), and asks at most federation.resolve_max_peers
+ *     peers (default 500, 0 no limit) for an identity that names no known node (secaudit2026oct26
+ *     round 8c, federation-03).
  *   2026-10-27 — GET /v1/federation/resolve/:gaii remembers an identity no listed peer knew for 30
  *     seconds (at most 5000 identities), and lookups of one identity at the same moment share one
  *     round of questions, so an unknown identity repeated does not ask every peer each time
@@ -431,6 +435,14 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 }));
                 return;
             }
+            // The identity names its home node, and this node knows that node: itself, or a peer the
+            // directory does not list (private, or not active). No other peer is its home, so none is
+            // asked, and an unlisted peer's address is not given out (secaudit2026oct26 round 8c).
+            if (nodeHint === config.nodeId || peers.has(nodeHint)) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                    `Agent ${gaii} not found on this node or any active peer`));
+                return;
+            }
         }
 
         // Ask peers (broadcast resolve). An identity no peer knew is answered from memory for a short
@@ -464,9 +476,18 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
             `Agent ${gaii} not found on this node or any active peer`));
     });
 
-    /** Ask each listed peer in turn whether it hosts `gaii`; the first that does, or null. */
+    /**
+     * Ask each listed peer in turn whether it hosts `gaii`; the first that does, or null. At most
+     * federation.resolve_max_peers peers are asked (0 is no limit), in the order this node holds them.
+     */
     async function askPeers(gaii: string, listedPeers: PeerInfo[]): Promise<PeerInfo | null> {
+        const most = config.federationResolveMaxPeers;
+        let asked = 0;
         for (const peer of listedPeers) {
+            if (most > 0 && asked >= most) {
+                logger.info(`GET /v1/federation/resolve/:gaii asked ${asked} peers, the most federation.resolve_max_peers allows`, { gaii, listed: listedPeers.length });
+                break;
+            }
             try {
                 // SSRF validation: block requests to private/reserved IPs
                 const peerResolveCheck = await validateOutboundUrl(peer.url);
@@ -474,6 +495,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     logger.warn(`Blocked outbound resolve to peer ${peer.nodeId}: ${peerResolveCheck.reason}`);
                     continue;
                 }
+                asked++;
                 const resp = await peerFetch(`${peer.url}/v1/agents/${encodeURIComponent(gaii)}`, {}, { timeoutMs: 5_000 });
                 if (resp.ok && resp.status >= 200 && resp.status < 300) return peer;
             } catch (err) {
