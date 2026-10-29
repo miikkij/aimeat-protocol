@@ -16,7 +16,9 @@
  *     pnpmMismatches()      exactly the production set pnpm-lock.yaml pins, each with pnpm's integrity,
  *                           and each dependency resolving (Node's lookup upwards) to pnpm's version
  *   and npmOverridesFromPnpm() gives the npm `overrides` field that mirrors pnpm.overrides. npm()
- *   runs npm without a shell on every platform (moved here from pack-smoke.mjs).
+ *   runs npm without a shell on every platform (moved here from pack-smoke.mjs), and
+ *   serveLikeRegistry() lets pack-smoke install the tarball the way the registry serves it, the only
+ *   way npm follows the shrinkwrap.
  *
  *   The version ranges are a small semver subset (comparators, caret, tilde, x-ranges, `||`). A range
  *   outside it throws, so a new override written in another syntax fails loudly instead of passing.
@@ -24,8 +26,10 @@
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, operator-01).
  */
 
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { dirname, join } from 'node:path';
 
 export const NPM_REGISTRY = 'https://registry.npmjs.org/';
@@ -55,6 +59,65 @@ function npmCliOnWindows() {
 export function npm(args, opts) {
     if (process.platform !== 'win32') return execFileSync('npm', args, opts);
     return execFileSync(process.execPath, [npmCliOnWindows(), ...args], opts);
+}
+
+/** npm() without blocking this process, for a run that talks to a server in this process. */
+export function npmAsync(args, opts) {
+    const [cmd, argv] = process.platform === 'win32' ? [process.execPath, [npmCliOnWindows(), ...args]] : ['npm', args];
+    return new Promise((settle, reject) => {
+        const child = spawn(cmd, argv, opts);
+        child.once('error', reject);
+        child.once('exit', code => (code === 0 ? settle() : reject(new Error(`npm ${args.join(' ')} exited with ${code}`))));
+    });
+}
+
+// ── installing the packed tarball the way the registry serves it ──────────────────────────────
+
+/**
+ * A registry front on 127.0.0.1 for pack-smoke: it serves the packed tarball as `<name>@<version>`
+ * with the mark the npm registry puts on a published version that carries npm-shrinkwrap.json
+ * (`_hasShrinkwrap: true`), and redirects every other request to registry.npmjs.org.
+ *
+ * npm follows a dependency's shrinkwrap only when the registry's manifest carries that mark, and a
+ * tarball installed from disk has no registry manifest (npm also strips "_" fields from the
+ * tarball's own package.json), so `npm install ./aimeat.tgz` resolves every range fresh whatever the
+ * tarball holds. Installing `aimeat@<version>` through this front is the path `npx aimeat` takes.
+ * @param {{ manifest: Record<string, unknown>, tarball: Buffer }} pkg the package.json and the packed bytes
+ * @returns {Promise<{ url: string, requests: string[], close: () => Promise<void> }>}
+ */
+export async function serveLikeRegistry({ manifest, tarball }) {
+    const name = String(manifest.name);
+    const version = String(manifest.version);
+    const file = `${name.split('/').pop()}-${version}.tgz`;
+    const integrity = `sha512-${createHash('sha512').update(tarball).digest('base64')}`;
+    const shasum = createHash('sha1').update(tarball).digest('hex');
+    const requests = [];
+    const server = createServer((req, res) => {
+        const path = decodeURIComponent((req.url ?? '/').split('?')[0]);
+        requests.push(path);
+        if (path === `/${name}`) {
+            const base = `http://127.0.0.1:${server.address().port}`;
+            const doc = {
+                name,
+                'dist-tags': { latest: version },
+                versions: { [version]: { ...manifest, _id: `${name}@${version}`, _hasShrinkwrap: true, dist: { tarball: `${base}/${name}/-/${file}`, integrity, shasum } } },
+            };
+            res.writeHead(200, { 'content-type': 'application/json' });
+            res.end(JSON.stringify(doc));
+        } else if (path === `/${name}/-/${file}`) {
+            res.writeHead(200, { 'content-type': 'application/octet-stream', 'content-length': tarball.length });
+            res.end(tarball);
+        } else {
+            res.writeHead(302, { location: new URL((req.url ?? '/').replace(/^\//, ''), NPM_REGISTRY).href });
+            res.end();
+        }
+    });
+    await new Promise((settle, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', settle); });
+    return {
+        url: `http://127.0.0.1:${server.address().port}/`,
+        requests,
+        close: () => new Promise(settle => server.close(() => settle())),
+    };
 }
 
 // ── versions and ranges ───────────────────────────────────────────────────────────────────────

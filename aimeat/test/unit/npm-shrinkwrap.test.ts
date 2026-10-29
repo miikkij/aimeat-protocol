@@ -12,17 +12,18 @@
  * @version-history
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, operator-01).
  */
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
-    npmOverridesFromPnpm, overrideViolations, parseOverrides, pnpmMismatches, pnpmProduction, satisfies, shrinkwrapProblems, tarballUrl,
+    npmOverridesFromPnpm, overrideViolations, parseOverrides, pnpmMismatches, pnpmProduction, satisfies, serveLikeRegistry, shrinkwrapProblems, tarballUrl,
 } from '../../scripts/lib/npm-shrinkwrap.mjs';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const pkg = JSON.parse(readFileSync(join(AIMEAT, 'package.json'), 'utf8')) as {
-    name: string; version: string; scripts: Record<string, string>;
+    name: string; version: string; scripts: Record<string, string>; files: string[];
     overrides: Record<string, unknown>; pnpm: { overrides: Record<string, string> };
 };
 const OVERRIDES = pkg.pnpm.overrides;
@@ -177,6 +178,26 @@ describe('pnpmMismatches: the tree is the one pnpm-lock.yaml pins', () => {
     });
 });
 
+describe('serveLikeRegistry: pack-smoke installs the tarball the way the registry serves it', () => {
+    it('serves the packed version marked as carrying a shrinkwrap, the bytes behind it, and redirects the rest to npmjs.org', async () => {
+        const tarball = Buffer.from('not really a tarball');
+        const front = await serveLikeRegistry({ manifest: { name: 'aimeat', version: '9.9.9', dependencies: { yaml: '^2' } }, tarball });
+        try {
+            const doc = await (await fetch(`${front.url}aimeat`)).json() as { versions: Record<string, { _hasShrinkwrap: boolean; dist: { tarball: string; integrity: string } }> };
+            const v = doc.versions['9.9.9'];
+            expect(v._hasShrinkwrap).toBe(true);
+            expect(v.dist.integrity).toBe(`sha512-${createHash('sha512').update(tarball).digest('base64')}`);
+            expect(Buffer.from(await (await fetch(v.dist.tarball)).arrayBuffer())).toEqual(tarball);
+            const other = await fetch(`${front.url}@scope%2fname`, { redirect: 'manual' });
+            expect(other.status).toBe(302);
+            expect(other.headers.get('location')).toBe('https://registry.npmjs.org/@scope%2fname');
+            expect(front.requests).toEqual(['/aimeat', '/aimeat/-/aimeat-9.9.9.tgz', '/@scope/name']);
+        } finally {
+            await front.close();
+        }
+    });
+});
+
 describe('the package and its release paths', () => {
     it('the npm `overrides` field mirrors pnpm.overrides, so a plain npm install honours them too', () => {
         const { overrides, skipped } = npmOverridesFromPnpm(OVERRIDES);
@@ -191,6 +212,10 @@ describe('the package and its release paths', () => {
         expect(gen).toBeGreaterThan(steps.indexOf('pnpm build'));
         expect(gen).toBeLessThan(steps.indexOf('node scripts/pack-smoke.mjs'));
         expect(pkg.scripts['gen:shrinkwrap']).toBe('node scripts/gen-shrinkwrap.mjs');
+    });
+
+    it('`files` names the shrinkwrap: npm 11 packs it only when listed beside dist/', () => {
+        expect(pkg.files).toContain('npm-shrinkwrap.json');
     });
 
     it('the nightly pack-smoke job writes it too before packing', () => {

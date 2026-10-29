@@ -13,6 +13,7 @@
   "files": [
     "dist/",
     "!dist/public/lib/ffmpeg-core*/**",
+    "npm-shrinkwrap.json",
     "scripts/vendor-libs.mjs",
     "docs/AIMEAT_Help_Prompt.md",
     "docs/AIMEAT_Help_Prompt_Person.md",
