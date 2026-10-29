@@ -25,15 +25,17 @@
  *   `owner/filename` binds the delegation to exactly that app.
  *
  *   THE AUTHOR (round 8c). A label that is only a file name matches an app of that name by any author,
- *   so the delegation is bound to one author's app (services/connections/delegation-binding.ts): the
- *   channel owner's own app binds it at once; an app by another author waits for the channel owner's
- *   one-press answer the first time it publishes, and the caller is answered pending.
+ *   so the delegation is bound to one author's app (services/connections/delegation-binding.ts): a first
+ *   use by the channel owner's own app binds it at once; a first use by an app of another author waits
+ *   for the channel owner's one-press answer, also when the channel owner holds an app of that name,
+ *   and the caller is answered pending.
  * @structure namesDelegationApp · DelegationCallerDecision · delegationCallerDecision
  * @usage const d = await delegationCallerDecision({ storage, config }, req.auth!, appId, action);
  * @version-history
- *   2026-10-29 — A delegation whose label is a bare file name belongs to one author's app: the channel
- *     owner's own app binds it, another author's app asks the channel owner once and answers pending
- *     until then, and an app the delegation is not bound to is refused (secaudit2026oct26 round 8c,
+ *   2026-10-29 — A delegation whose label is a bare file name belongs to one author's app: a first use
+ *     by the channel owner's own app binds it, a first use by another author's app asks the channel
+ *     owner once (also when the owner holds an app of that name) and answers pending until then, and
+ *     an app the delegation is not bound to is refused (secaudit2026oct26 round 8c,
  *     delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-27 — Initial (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
  */
@@ -135,9 +137,11 @@ export async function delegationCallerDecision(
   return serialByKey(`delegation-app ${delegation.id}`, async () => {
     let bound = await readDelegationApp(storage, config.nodeId, delegation.id);
     if (!bound.app) {
-      // Positive evidence: the channel owner's own app of that file name.
+      // Positive evidence: the first use comes from the channel owner's own app of that file name.
+      // A first use by another author's app asks the channel owner below, even when they also hold an
+      // app of that name, so a campaign that works is never refused without a question.
       const own = await ownAppOf(storage, channelOwner, label);
-      if (own) {
+      if (own && apps.some(a => namesSignedApp(own, a))) {
         bound = await bindDelegationApp(storage, config.nodeId, delegation.id, own, 'own-app');
         if (bound.app === own) await tellBoundToOwnApp(storage, channelOwner, { label, action, app: own });
       }

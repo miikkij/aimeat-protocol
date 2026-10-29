@@ -67590,8 +67590,8 @@ paths:
           description: >
             Delegation created or replaced. `bound_app` is the one app (`owner/filename`) it belongs
             to: the app `app_id` names in full, or your own app of that file name. It is null when
-            neither exists yet; then your own app binds it at its first use, and an app by another
-            author asks you first.
+            neither exists yet; then a first use by your own app binds it to that app, and a first
+            use by an app of another author asks you first, also when you hold an app of that name.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
