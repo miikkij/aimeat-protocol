@@ -4,6 +4,7 @@
  *   accepts and refuses (services/app-plan.ts readPlanPatch, held to the node's own registries), and
  *   how the eight steps read a plan, a draft and a published app (services/app-structure.ts).
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A custom layout or nav with a note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { describe, it, expect } from 'vitest';
@@ -22,7 +23,7 @@ const state = (steps: ReturnType<typeof computeStructure>, id: string) => steps.
 describe('what a plan write accepts', () => {
   it('takes every look and every layout preset the node serves, so a new one is valid with no change', () => {
     expect(allowedChoiceValues('look')).toEqual(LOOKS.map((l) => l.id));
-    expect(allowedChoiceValues('layout')).toEqual(UI_LAYOUT_PRESETS.map((p) => p.id));
+    expect(allowedChoiceValues('layout')).toEqual([...UI_LAYOUT_PRESETS.map((p) => p.id), 'custom']);
     for (const l of LOOKS) expect(readPlanPatch({ choices: { look: { value: l.id } } }).ok, l.id).toBe(true);
   });
   it('refuses a value the node does not offer, naming the ones it does', () => {
@@ -42,6 +43,13 @@ describe('what a plan write accepts', () => {
     expect(readPlanPatch({ choices: { genre: 'nightfloor' } }).ok).toBe(true);
     expect(readPlanPatch({ choices: { genre: 'Not An Id!' } }).ok).toBe(false);
     expect(readPlanPatch({ data: { summary: 'x', personalData: 'maybe' } }).ok).toBe(false);
+  });
+  it('takes a custom layout or nav only with a note, and the refusal of an unknown one names custom', () => {
+    // Cold Opus runs of a 3D game reached for "single" and "agent-decides" and had no value to write.
+    const single = readPlanPatch({ choices: { layout: { value: 'single' } } });
+    expect(!single.ok && single.message).toContain('"custom"');
+    expect(readPlanPatch({ choices: { layout: { value: 'custom' } } }).ok).toBe(false);
+    expect(readPlanPatch({ choices: { nav: { value: 'custom', note: 'One screen; the cube turns by drag.' } } }).ok).toBe(true);
   });
 });
 

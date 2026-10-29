@@ -25005,6 +25005,8 @@
     "structure.prompt.genre": "Start from",
     "structure.prompt.visibility": "Visibility",
     "structure.prompt.tail": "Keep the data map and the other features as they are. Give me the whole HTML file.",
+    "structure.layout.custom.name": "A layout of its own",
+    "structure.nav.custom.name": "A way of its own",
     "structure.layout.cover.name": "Front page",
     "structure.layout.cover.line": "One large band at the top, a highlight beside the main list, and the rest as cards. For a showcase or a shop.",
     "structure.layout.cover.say": "\"A front page: a large band at the top, a highlight beside the list, cards under them.\"",

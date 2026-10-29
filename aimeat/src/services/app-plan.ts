@@ -22,7 +22,8 @@
  *   EVERY VALUE COMES FROM A REGISTRY THE NODE ALREADY HAS: layouts from the layout presets, the
  *   navigation from the mosaic's nav modes, looks from the look registry. A look or layout added
  *   there is valid here with no change to this file. A genre is a Design Book id, held to its form
- *   only, because the Design Book is data an operator edits.
+ *   only, because the Design Book is data an operator edits. Layout and navigation also take
+ *   `custom` with a note, for a screen no preset fits.
  *
  *   STORAGE: the platform namespace `app-plan`, keyed like the design spec by the app id, so the
  *   memory API cannot write it and the account erasure reaches it. A plan whose app was deleted is
@@ -33,6 +34,8 @@
  *   const plan = await readAppPlan(storage, 'alice/talkoot.html');
  *   const out = await writeAppPlan(storage, { appId, patch, by, principal, actor: 'owner' });
  * @version-history
+ *   v1.1.0 — 2026-10-29 — CUSTOM_CHOICE for layout and nav, with a note; the refusal names it and says
+ *     how to leave a choice to the AI (cold Opus runs of a 3D game hit "single" and "agent-decides").
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import type { Storage } from '../storage/interface.js';
@@ -82,7 +85,8 @@ export interface AppPlan {
   createdAt: string;
 }
 
-const LIMITS = { name: 120, purpose: 800, summary: 800, now: 200, note: 300 } as const;
+// note: 600, because a custom layout is described in it (cold runs wrote 300 to 400 characters).
+const LIMITS = { name: 120, purpose: 800, summary: 800, now: 200, note: 600 } as const;
 const GENRE_RE = /^[a-z0-9][a-z0-9-]{0,79}$/;
 
 export const appPlanKey = (appId: string) => `${PREFIX}${appKeySegment(appId)}`;
@@ -118,11 +122,18 @@ export async function listAppPlansOf(storage: Storage, account: string): Promise
   return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/**
+ * A layout or a navigation no preset fits (a game board, one tool on one screen), described in the
+ * choice's `note`. The first cold runs of a game reached for "single" and was refused, with no way
+ * to say what it had chosen.
+ */
+export const CUSTOM_CHOICE = 'custom';
+
 /** The values a choice may take, from the registries the node already keeps. */
 export function allowedChoiceValues(key: PlanChoiceKey): readonly string[] | null {
   switch (key) {
-    case 'layout': return UI_LAYOUT_PRESETS.map((p) => p.id);
-    case 'nav': return NAV_MODES;
+    case 'layout': return [...UI_LAYOUT_PRESETS.map((p) => p.id), CUSTOM_CHOICE];
+    case 'nav': return [...NAV_MODES, CUSTOM_CHOICE];
     case 'look': return LOOKS;
     case 'visibility': return PLAN_VISIBILITY;
     case 'genre': return null;
@@ -189,12 +200,14 @@ export function readPlanPatch(body: unknown): { ok: true; patch: PlanPatch } | {
           ok: false,
           message: allowed
             ? `"${value}" is not a ${k}. The ${k} values on this node are: ${allowed.join(', ')}.`
+              + (allowed.includes(CUSTOM_CHOICE) ? ` When none of them fits, write "${CUSTOM_CHOICE}" with a note of one sentence that describes it. While nobody has chosen, leave it unset: the page then says the AI decides.` : '')
             : `"${value}" is not a Design Book id. GET /v1/designbook lists them.`,
         };
       }
       const state = r.state;
       if (state !== undefined && state !== 'waiting' && state !== 'done') return { ok: false, message: `choices.${k}.state is "waiting" or "done".` };
       const note = r.note === undefined ? undefined : text(r.note, LIMITS.note);
+      if (value === CUSTOM_CHOICE && !note) return { ok: false, message: `A "${CUSTOM_CHOICE}" ${k} carries a note: one sentence that describes it, which the structure page shows.` };
       patch.choices[k] = { value, ...(state ? { state } : {}), ...(note ? { note } : {}) };
     }
   }

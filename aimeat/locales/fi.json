@@ -25167,6 +25167,8 @@
     "structure.prompt.genre": "Aloita pohjasta",
     "structure.prompt.visibility": "Näkyvyys",
     "structure.prompt.tail": "Pidä datakartta ja muut toiminnot ennallaan. Anna minulle koko HTML-tiedosto.",
+    "structure.layout.custom.name": "Oma asettelu",
+    "structure.nav.custom.name": "Oma tapa",
     "structure.layout.cover.name": "Etusivu",
     "structure.layout.cover.line": "Iso kaista ylhäällä, nosto päälistan vieressä ja loput kortteina. Esittelyyn ja kauppaan.",
     "structure.layout.cover.say": "\"Etusivu: iso kaista ylös, nosto ja lista vierekkäin, kortit niiden alle.\"",

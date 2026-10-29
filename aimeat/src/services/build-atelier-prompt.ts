@@ -28,6 +28,10 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.38.0 — 2026-10-29 — ADDITIVE: the interview starts the structure page before its first question
+ *     and points the look question there. The section itself is served in part `libraries`, which an
+ *     agent reads after the interview, so on innokas.aimeat.io the first real build never opened the
+ *     page and sent Design Book links instead (Jouni's test, 2026-10-29).
  *   v1.37.0 — 2026-10-29 — ADDITIVE: the structure page section after the data map step (build-structure-step.ts): start the app's plan, give the person the page, read their layout and look choices. Interview mode only; the body and its spec token are unchanged.
  *   v1.36.0 — 2026-10-17 — ADDITIVE: the data map step after the interview's five questions (unchanged) and its team branch at the end of "Data, in short" (build-data-map-step.ts, plan V7); the spec token moves with the body. To stay under 800 lines, "What the review always catches" moved verbatim to build-atelier-review.ts.
  *   v1.35.0 — 2026-10-17 — The mosaic section says block ids are a contract like source names: a renamed block needs ui_set in the same change.
@@ -752,7 +756,8 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '2. Who uses it — just you, or others too (shared data)?\n'
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
-    + '5. Anything it must NOT do?\n\n';
+    + '5. Anything it must NOT do?\n\n'
+    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: pick a filename, call `aimeat_app_manage` action `structure_set` with `filename`, `name` and `purpose` from the idea, and put `page_url` from its answer in the same message, in one sentence. On that page the person sees the steps and picks a layout and a look by seeing them, so for question 3 point there; it is optional, and "you decide" is an answer. After the answers, read action `structure` before you propose: a choice with `"state": "waiting"` is theirs. The section "The structure page" (part `libraries`) has the rest.\n\n';
   full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.

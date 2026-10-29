@@ -37679,7 +37679,7 @@ paths:
                         properties:
                           value: { type: string, maxLength: 80 }
                           state: { type: string, enum: [waiting, done] }
-                          note: { type: string, maxLength: 300 }
+                          note: { type: string, maxLength: 600, description: 'Why it was chosen; for a "custom" layout or nav, which every layout and nav takes besides the listed ids, the description of it (required then).' }
                 now: { type: [string, 'null'], maxLength: 200 }
                 expected_revision: { type: integer, minimum: 0 }
       responses:

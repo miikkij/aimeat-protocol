@@ -18,6 +18,7 @@
  * @structure ATELIER_STRUCTURE_HEADING · ATELIER_STRUCTURE_STEP
  * @usage full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
  * @version-history
+ *   v1.1.0 — 2026-10-29 — `custom` layout or nav with a note, and an unset choice means the AI decides.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 
@@ -29,4 +30,4 @@ export const ATELIER_STRUCTURE_STEP = `## ${ATELIER_STRUCTURE_HEADING}\n\n`
   + '- As soon as you know the app\'s name and purpose, call `aimeat_app_manage` action `structure_set` with `filename`, `name` and `purpose` (over HTTP: PUT /v1/apps/me/<filename>/structure). Give the person `page_url` from the answer in one sentence: they can follow the app there and choose a layout and a look if they want to.\n'
   + '- After the data map questions, write `data`: `{ "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }`. While you build, write `now`, one line on what you are doing; the page shows it live.\n'
   + '- Before you build the screens, and whenever the person says they chose something, read action `structure`. A choice with `"state": "waiting"` is the person\'s: build it, then write the same value with `"state": "done"`.\n'
-  + '- When the person leaves the choice to you, choose `layout` (a preset from `layouts`), `nav` (one of `nav_modes`) and `look` (one of `looks`) from GET /v1/apps/ui/catalogue, and write each with `note`, one sentence on why. A genre you fork from is `genre`, its Design Book id. When the person says who may see the app, write `visibility` (listed, community or unlisted).\n\n';
+  + '- When the person leaves the choice to you, choose `layout` (a preset from `layouts`), `nav` (one of `nav_modes`) and `look` (one of `looks`) from GET /v1/apps/ui/catalogue, and write each with `note`, one sentence on why. When no preset fits the screen (a game board, one tool on one screen), write `layout` or `nav` as `custom` with `note` describing it. Until a choice is made, leave it unset: the page then says the AI decides. A genre you fork from is `genre`, its Design Book id. When the person says who may see the app, write `visibility` (listed, community or unlisted).\n\n';

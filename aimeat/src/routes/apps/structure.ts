@@ -15,6 +15,7 @@
  *   GET /v1/apps/:owner/:filename/structure · PUT /v1/apps/:owner/:filename/structure · GET /v1/app-plans
  * @usage registerStructureRoutes(router, config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A choice's note takes 600 characters: a custom layout is described in it.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import type { Router, Request } from 'express';
@@ -42,7 +43,7 @@ const PlanWriteSchema = z.object({
     choices: z.record(z.string().max(40), z.union([
         z.null(),
         safeText(80),
-        z.object({ value: safeText(80), state: z.enum(['waiting', 'done']).optional(), note: safeText(300).optional() }),
+        z.object({ value: safeText(80), state: z.enum(['waiting', 'done']).optional(), note: safeText(600).optional() }),
     ])).optional(),
     now: safeText(200).nullable().optional(),
     expected_revision: z.number().int().min(0).nullable().optional(),

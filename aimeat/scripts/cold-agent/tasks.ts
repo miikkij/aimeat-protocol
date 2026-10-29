@@ -22,6 +22,8 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-10-29 — build-structure (by name): a new app's first message carries the structure page's
+ *     address, and its plan is on the node before any code.
  *   2026-10-02 — propose-agent (by name): a request for an agent over the person's own sales
  *     workspace passes only as a proposal on this node that names the workspace, with the approval
  *     address in the answer and no outside product named.
@@ -181,6 +183,32 @@ export const TASKS: Task[] = [
             const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
             const ok = onAtelier(quality);
             return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
+        },
+    },
+    {
+        // The structure page from the first message (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+        // A print-mode run ends at the interview, which waits for the person, so the pass is what a
+        // person sees in that first message: a plan on the node and the page's address, before code.
+        // Added 2026-10-29 after the first real build on innokas.aimeat.io never opened the page.
+        id: 'build-structure',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Haluan tehdä sovelluksen: 3D-ristinolla, jossa pelilauta on 3x3x3-kuutio. Pelimuotoja on kaksi: kaksi pelaajaa samalla laitteella ja pelaaja tietokonetta vastaan. Kuutiota pitää pystyä kääntämään. Sovelluksen nimi on "{marker}". En ole tehnyt sovelluksia ennen. Näytä ensin, missä vaiheessa ollaan ja mitä minun pitää päättää. Haluan itse valita ulkoasun, mutta layoutin saat päättää sinä.',
+        goodTools: ['aimeat_skill_get', 'aimeat_app_manage'],
+        verify: async (ctx) => {
+            const r = await api<{ plans: Array<{ filename: string; name?: string; page_url?: string }> }>(ctx.baseUrl, '/v1/app-plans', ctx.ownerToken);
+            const plans = r.data?.plans ?? [];
+            const plan = plans.find(p => JSON.stringify(p).includes(ctx.marker)) ?? plans.find(p => /ristinolla|tic|tac|kuutio|cube/i.test(JSON.stringify(p)));
+            const filename = plan?.filename ?? '';
+            const gaveLink = /\/v1\/appcat\/structure\?app=/.test(ctx.metrics.finalText);
+            const before = ctx.metrics.toolCalls.findIndex(c => c.name.endsWith('aimeat_app_manage') && JSON.stringify(c.input ?? {}).includes('structure_set'));
+            const published = ctx.metrics.toolCalls.findIndex(c => /aimeat_app_(publish|draft_save|draft_write)$/.test(c.name));
+            const ok = Boolean(plan) && gaveLink && (published < 0 || before < published);
+            return {
+                ok,
+                detail: ok ? 'a plan on the node and the structure page address in the first message' : `plan ${plan ? 'written' : 'MISSING'}, page address ${gaveLink ? 'given' : 'NOT given'}, structure_set ${before < 0 ? 'never called' : (published >= 0 && before > published ? 'after the code' : 'before the code')}`,
+                note: plan ? `plan ${filename}: ${plan.name ?? ''}` : undefined,
+            };
         },
     },
     {

@@ -13,6 +13,9 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.35.0 — 2026-10-29 — The interview starts the structure page before its first question and the look
+ *     question points there: the first real build on innokas.aimeat.io sent Design Book links instead,
+ *     because the page was named only inside the research step (Jouni's test, 2026-10-29).
  *   v1.34.0 — 2026-10-29 — Research names the app's structure page: structure_set when a new app starts
  *     and page_url to the person, structure before the screens (services/app-structure.ts).
  *   v1.33.1 — 2026-10-21 — A key is stored "for host X" (secaudit 2026-10, v58 and v59 follow-up).
@@ -205,6 +208,13 @@ moved under you says so.
 
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
+   **START THE STRUCTURE PAGE BEFORE THE FIRST QUESTION** on a new app: pick a filename, call
+   \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose }\` and put
+   \`page_url\` from the answer in your first message. There the person sees the steps and picks
+   a layout and a look by seeing them (the looks, the layouts and the Design Book genres), so the
+   look question points to the page; it is optional, and "you decide" is an answer. Read
+   \`{ action: "structure" }\` before you propose: a choice with \`"state": "waiting"\` is theirs,
+   and the genre links below are for a person who would rather choose in the chat.
    **THEN THE DATA MAP, AND A YES.** Three more questions, as the specification's interview asks
    them: who opens the app (just them, their organisation, anyone), whose each kind of data is
    (personal, shared by the team, public), and who may change the shared data. Then write back a
