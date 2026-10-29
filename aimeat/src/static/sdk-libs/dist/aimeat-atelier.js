@@ -1039,13 +1039,13 @@
         if (next.has(key)) return;
         if (row.parentNode === node) node.removeChild(row);
       });
-      let at2 = node.firstChild;
+      let at3 = node.firstChild;
       order.forEach(function(row) {
-        if (at2 === row) {
-          at2 = row.nextSibling;
+        if (at3 === row) {
+          at3 = row.nextSibling;
           return;
         }
-        node.insertBefore(row, at2);
+        node.insertBefore(row, at3);
       });
       kept.clear();
       next.forEach(function(row, key) {
@@ -1899,10 +1899,10 @@
     list3.forEach((el2, i) => {
       if (!el2.animate) return;
       const rest = getComputedStyle(el2).transform;
-      const at2 = rest && rest !== "none" ? rest + " " : "";
+      const at3 = rest && rest !== "none" ? rest + " " : "";
       el2.animate(
         [
-          { opacity: 0, transform: at2 + "translateY(24px) scale(0.96)" },
+          { opacity: 0, transform: at3 + "translateY(24px) scale(0.96)" },
           { opacity: 1, transform: rest === "none" ? "none" : rest }
         ],
         { duration: 380, delay: i * step, easing: easeOf2(el2), fill: "backwards" }
@@ -5565,9 +5565,9 @@
     if (prior) {
       const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
       if (typeof p === "number") {
-        const at2 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        const at3 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
         Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at2;
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at3;
         });
       }
       prior.cancel();
@@ -5580,10 +5580,10 @@
       } };
     }
     const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at2, i) {
+    const frames = sf.samples.map(function(at3, i) {
       const s = {};
       Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at2;
+        s[key] = from[key] + (dest[key] - from[key]) * at3;
       });
       return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
     });
@@ -5631,12 +5631,12 @@
     let timing = { duration: span, easing: ease, fill: "backwards" };
     if (o.spring) {
       const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at2, i) {
+      frames = sf.samples.map(function(at3, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at2 * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at2) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at2)).toFixed(2) + "px";
+          opacity: Math.min(1, at3 * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at3) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at3)).toFixed(2) + "px";
           })
         };
       });
@@ -5838,31 +5838,31 @@
   // src/static/sdk-libs/atelier/menu.js
   var GAP = 6;
   var EDGE = 8;
-  function placeAt(box, at2, o) {
+  function placeAt(box, at3, o) {
     const opts = o || {};
     const w = box.offsetWidth;
     const h = box.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at2.top - GAP - h : at2.bottom + GAP;
-    if (top + h > vh - EDGE && at2.top - GAP - h >= EDGE) top = at2.top - GAP - h;
-    if (top < EDGE && at2.bottom + GAP + h <= vh - EDGE) top = at2.bottom + GAP;
-    let left = opts.align === "end" ? at2.right - w : opts.align === "center" ? (at2.left + at2.right) / 2 - w / 2 : at2.left;
+    let top = opts.placement === "above" ? at3.top - GAP - h : at3.bottom + GAP;
+    if (top + h > vh - EDGE && at3.top - GAP - h >= EDGE) top = at3.top - GAP - h;
+    if (top < EDGE && at3.bottom + GAP + h <= vh - EDGE) top = at3.bottom + GAP;
+    let left = opts.align === "end" ? at3.right - w : opts.align === "center" ? (at3.left + at3.right) / 2 - w / 2 : at3.left;
     left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
     top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
     box.style.left = Math.round(left) + "px";
     box.style.top = Math.round(top) + "px";
-    const ox = Math.max(0, Math.min(w, (at2.left + at2.right) / 2 - left));
-    const oy = top >= at2.bottom ? 0 : top + h <= at2.top ? h : h / 2;
+    const ox = Math.max(0, Math.min(w, (at3.left + at3.right) / 2 - left));
+    const oy = top >= at3.bottom ? 0 : top + h <= at3.top ? h : h / 2;
     return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
   }
   function openMotion(box, origin) {
     box.style.transformOrigin = origin;
     if (motionOff(box) || typeof box.animate !== "function") return;
     const sf = springFrames({ el: box });
-    const frames = sf.samples.map(function(at2, i) {
-      const s = 0.9 + 0.1 * at2;
-      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at2 * 1.6) };
+    const frames = sf.samples.map(function(at3, i) {
+      const s = 0.9 + 0.1 * at3;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at3 * 1.6) };
     });
     box.animate(frames, { duration: sf.duration, easing: "linear" });
   }
@@ -6007,11 +6007,11 @@
       });
       return root;
     }
-    function open(at2, fromKeys) {
+    function open(at3, fromKeys) {
       if (box) return;
       box = build();
       document.body.appendChild(wearLook(box, anchor));
-      const r = at2 ? { left: at2.x, right: at2.x, top: at2.y, bottom: at2.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
       const origin = placeAt(box, r, { align: s.align });
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
       openMotion(box, origin);
@@ -6331,11 +6331,11 @@
       const sx = to.width / Math.max(from.width, 1);
       const sy = to.height / Math.max(from.height, 1);
       const sf = springFrames({ el: box });
-      const frames = sf.samples.map(function(at2, i) {
+      const frames = sf.samples.map(function(at3, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          transform: "translate(" + (dx * at2).toFixed(1) + "px, " + (dy * at2).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at2).toFixed(4) + ", " + (1 + (sy - 1) * at2).toFixed(4) + ")",
-          opacity: at2 > 0.85 ? 1 - (at2 - 0.85) / 0.15 : 1
+          transform: "translate(" + (dx * at3).toFixed(1) + "px, " + (dy * at3).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at3).toFixed(4) + ", " + (1 + (sy - 1) * at3).toFixed(4) + ")",
+          opacity: at3 > 0.85 ? 1 - (at3 - 0.85) / 0.15 : 1
         };
       });
       box.style.transformOrigin = "0 0";
@@ -6492,12 +6492,12 @@
     const dy = a.top - b.top;
     const sf = springFrames({ el: box });
     box.style.transformOrigin = "0 0";
-    box.animate(sf.samples.map(function(at2, i) {
-      const k = 1 - at2;
+    box.animate(sf.samples.map(function(at3, i) {
+      const k = 1 - at3;
       return {
         offset: i / (sf.samples.length - 1),
         transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
-        opacity: Math.min(1, 0.4 + at2)
+        opacity: Math.min(1, 0.4 + at3)
       };
     }), { duration: sf.duration, easing: "linear" });
   }
@@ -6525,17 +6525,17 @@
       if (s.onChange) s.onChange(pct);
     }
     let dragging = false;
-    function at2(e) {
+    function at3(e) {
       const r = root.getBoundingClientRect();
       set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
     }
     root.addEventListener("pointerdown", function(e) {
       dragging = true;
       root.setPointerCapture(e.pointerId);
-      at2(e);
+      at3(e);
     });
     root.addEventListener("pointermove", function(e) {
-      if (dragging) at2(e);
+      if (dragging) at3(e);
     });
     root.addEventListener("pointerup", function() {
       dragging = false;
@@ -6880,6 +6880,1222 @@
     return d.getDate() + "." + (d.getMonth() + 1) + ". " + pad(d.getHours()) + "." + pad(d.getMinutes());
   }
 
+  // src/static/sdk-libs/atelier/ornament-geo.js
+  function R(n) {
+    return Math.round(n * 10) / 10;
+  }
+  function pathOf(pts) {
+    if (!pts.length) return "";
+    let d = "M" + R(pts[0][0]) + " " + R(pts[0][1]);
+    for (let i = 1; i < pts.length; i++) d += "L" + R(pts[i][0]) + " " + R(pts[i][1]);
+    return d;
+  }
+  function lengthOf(pts) {
+    let l = 0;
+    for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return Math.ceil(l) + 2;
+  }
+  function turtle(x, y, h, len, kappa, ds) {
+    const step = ds || 1.5;
+    const n = Math.max(2, Math.ceil(len / step));
+    const pts = [[x, y]];
+    const hs = [h];
+    for (let i = 0; i < n; i++) {
+      h += kappa(i / n) * step;
+      x += Math.cos(h) * step;
+      y += Math.sin(h) * step;
+      pts.push([x, y]);
+      hs.push(h);
+    }
+    return { pts, hs, d: pathOf(pts), len: lengthOf(pts), end: { x, y, h } };
+  }
+  function at(t2, u) {
+    const i = Math.min(t2.pts.length - 1, Math.max(0, Math.round(u * (t2.pts.length - 1))));
+    return { x: t2.pts[i][0], y: t2.pts[i][1], h: t2.hs[i] };
+  }
+  function leafPath(s, wf) {
+    const w = s * (wf || 0.34);
+    return "M0 0C" + R(s * 0.18) + " " + R(-w) + " " + R(s * 0.62) + " " + R(-w * 0.8) + " " + R(s) + " 0C" + R(s * 0.62) + " " + R(w * 0.8) + " " + R(s * 0.18) + " " + R(w) + " 0 0Z";
+  }
+  function line(x0, y0, x1, y1, flip) {
+    const L = Math.max(1e-6, Math.hypot(x1 - x0, y1 - y0));
+    const tx = (x1 - x0) / L;
+    const ty = (y1 - y0) / L;
+    const nx = flip ? -ty : ty;
+    const ny = flip ? tx : -tx;
+    return { L, at: (s) => ({ x: x0 + tx * s, y: y0 + ty * s, tx, ty, nx, ny }) };
+  }
+  function arc(cx, cy, r, a0, a1) {
+    const dir = a1 > a0 ? 1 : -1;
+    return {
+      L: Math.abs(a1 - a0) * r,
+      at: (s) => {
+        const a = a0 + dir * s / r;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + r * c, y: cy + r * sn, tx: -sn * dir, ty: c * dir, nx: c, ny: sn };
+      }
+    };
+  }
+  function rrect(x, y, w, h, r) {
+    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+    const P = Math.PI;
+    const segs = [];
+    const edge = (x0, y0, tx, ty, len) => segs.push({ len, f: (t2) => ({ x: x0 + tx * t2, y: y0 + ty * t2, tx, ty, nx: ty, ny: -tx }) });
+    const bend = (cx, cy, a0) => segs.push({
+      len: P * rad / 2,
+      f: (t2) => {
+        const a = a0 + (rad > 0 ? t2 / rad : 0);
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + rad * c, y: cy + rad * sn, tx: -sn, ty: c, nx: c, ny: sn };
+      }
+    });
+    edge(x + rad, y, 1, 0, w - 2 * rad);
+    bend(x + w - rad, y + rad, -P / 2);
+    edge(x + w, y + rad, 0, 1, h - 2 * rad);
+    bend(x + w - rad, y + h - rad, 0);
+    edge(x + w - rad, y + h, -1, 0, w - 2 * rad);
+    bend(x + rad, y + h - rad, P / 2);
+    edge(x, y + h - rad, 0, -1, h - 2 * rad);
+    bend(x + rad, y + rad, P);
+    let L = 0;
+    for (const g of segs) L += g.len;
+    return {
+      L,
+      at: (s) => {
+        let rest = Math.max(0, Math.min(L, s));
+        for (let i = 0; i < segs.length - 1; i++) {
+          if (rest <= segs[i].len) return segs[i].f(rest);
+          rest -= segs[i].len;
+        }
+        const last = segs[segs.length - 1];
+        return last.f(Math.min(rest, last.len));
+      }
+    };
+  }
+  function roundedRectPath(x, y, w, h, r) {
+    const q = Math.max(0, Math.min(r, w / 2, h / 2));
+    const a = (ex, ey) => "A" + R(q) + " " + R(q) + " 0 0 1 " + R(ex) + " " + R(ey);
+    return "M" + R(x + q) + " " + R(y) + "H" + R(x + w - q) + a(x + w, y + q) + "V" + R(y + h - q) + a(x + w - q, y + h) + "H" + R(x + q) + a(x, y + h - q) + "V" + R(y + q) + a(x + q, y) + "Z";
+  }
+  function helix(base, L, amp, period, phase, ds) {
+    const step = ds || 2;
+    const k = 2 * Math.PI / period;
+    const n = Math.ceil(L / step);
+    const segs = [];
+    let cur = null;
+    for (let i = 0; i <= n; i++) {
+      const s = Math.min(L, i * step);
+      const b = base(s);
+      const th = k * s + phase;
+      const o = amp * Math.sin(th);
+      const front = Math.cos(th) >= 0;
+      const p = [b.x + b.nx * o, b.y + b.ny * o];
+      if (!cur || cur.front !== front) {
+        const last = cur ? cur.pts[cur.pts.length - 1] : null;
+        cur = { front, s0: last ? Math.max(0, s - step) : s, s1: s, pts: last ? [last] : [] };
+        segs.push(cur);
+      }
+      cur.pts.push(p);
+      cur.s1 = s;
+    }
+    return segs.filter((g) => g.pts.length > 1).map((g) => ({ front: g.front, s0: g.s0, s1: g.s1, d: pathOf(g.pts), len: lengthOf(g.pts) }));
+  }
+  function helixLeaves(base, L, amp, period, phase, opt) {
+    const k = 2 * Math.PI / period;
+    const a = opt.alpha || 0.9;
+    const every = Math.max(1, Math.round(opt.every || 1));
+    const from = opt.from || 0;
+    const endGap = opt.endGap || 0;
+    const cand = [];
+    for (let m = -1; m * period < L + period; m++) {
+      for (const t0 of [Math.PI / 3, 5 * Math.PI / 3]) {
+        const s = (t0 + 2 * Math.PI * m - phase) / k;
+        if (s >= from && s <= L - endGap) cand.push({ s, th: t0 });
+      }
+    }
+    cand.sort((p, q) => p.s - q.s);
+    const out = [];
+    cand.forEach((c, i) => {
+      if (i % every) return;
+      const b = base(c.s);
+      const o = amp * Math.sin(c.th);
+      const sg = o >= 0 ? 1 : -1;
+      const dx = b.tx * Math.cos(a) + b.nx * sg * Math.sin(a);
+      const dy = b.ty * Math.cos(a) + b.ny * sg * Math.sin(a);
+      out.push({ s: c.s, x: b.x + b.nx * o, y: b.y + b.ny * o, ang: Math.atan2(dy, dx), size: opt.size * (0.82 + 0.06 * (i * 5 % 4)) });
+    });
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/ornament-svg.js
+  var NS = "http://www.w3.org/2000/svg";
+  function svgEl2(tag, attrs, parent) {
+    const el2 = (
+      /** @type {SVGElement} */
+      document.createElementNS(NS, tag)
+    );
+    if (attrs) for (const k of Object.keys(attrs)) el2.setAttribute(k, String(attrs[k]));
+    if (parent) parent.appendChild(el2);
+    return el2;
+  }
+  var ROLE = {
+    ln: "ak-orn-ln",
+    dim: "ak-orn-dim",
+    hi: "ak-orn-hi",
+    vine: "ak-orn-vine",
+    vback: "ak-orn-vback",
+    gap: "ak-orn-gap",
+    gapc: "ak-orn-gapc",
+    band: "ak-orn-band",
+    hatch: "ak-orn-hatch",
+    leaf: "ak-orn-leaf",
+    rib: "ak-orn-rib",
+    petal: "ak-orn-petal",
+    prib: "ak-orn-prib",
+    dot: "ak-orn-dot",
+    vdot: "ak-orn-vdot",
+    card: "ak-orn-card",
+    solid: "ak-orn-solid",
+    tail: "ak-orn-tail",
+    crease: "ak-orn-crease",
+    ring: "ak-orn-ring"
+  };
+  function drawing(parent, w, h, opts) {
+    const o = opts || {};
+    const animate = o.animate !== false;
+    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
+    const base = Math.max(0, Number(o.delay) || 0);
+    const v = o.view || { x: 0, y: 0, w, h };
+    const svg6 = svgEl2("svg", {
+      viewBox: R(v.x) + " " + R(v.y) + " " + R(v.w) + " " + R(v.h),
+      "aria-hidden": "true",
+      focusable: "false",
+      class: "ak-orn-svg" + (o.cls ? " " + o.cls : "")
+    }, parent);
+    if (o.viewBox !== true) {
+      svg6.setAttribute("width", String(R(v.w)));
+      svg6.setAttribute("height", String(R(v.h)));
+    }
+    const sec = (t2) => ((base + t2) / speed).toFixed(2) + "s";
+    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
+    const group = (p, attrs) => svgEl2("g", attrs, p);
+    const stroke = (p, d, role, width, len, del, dur, lin, extra) => {
+      const el2 = svgEl2("path", { d, class: ROLE[role] + (extra && extra.butt ? " ak-orn-butt" : ""), "stroke-width": width }, p);
+      if (animate && len) {
+        el2.classList.add("ak-orn-grow");
+        if (lin) el2.classList.add("ak-orn-lin");
+        const s = (
+          /** @type {SVGElement & { style: CSSStyleDeclaration }} */
+          el2.style
+        );
+        s.strokeDasharray = String(len);
+        s.strokeDashoffset = String(len);
+        s.animationDelay = sec(del || 0);
+        s.animationDuration = span(dur || 1);
+      }
+      return el2;
+    };
+    const sprouting = (p, transform, del) => {
+      const outer = group(p, { transform });
+      const inner = group(outer);
+      if (animate) {
+        inner.classList.add("ak-orn-sprout");
+        inner.style.animationDelay = sec(del || 0);
+      }
+      return inner;
+    };
+    const leaf = (p, x, y, ang, size, del, wf, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ") rotate(" + R(ang * 180 / Math.PI) + ")", del);
+      svgEl2("path", { d: leafPath(size, wf), class: ROLE[role || "leaf"] }, g);
+      svgEl2("path", { d: "M" + R(size * 0.12) + " 0L" + R(size * 0.8) + " 0", class: ROLE[role === "petal" ? "prib" : "rib"] }, g);
+      return g;
+    };
+    const bead = (p, x, y, r, del, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ")", del);
+      svgEl2("circle", { r, class: ROLE[role || "dot"] }, g);
+      return g;
+    };
+    const rosette = (p, cx, cy, n, r0, size, ringR, del) => {
+      const g = sprouting(p, "translate(" + R(cx) + " " + R(cy) + ")", del);
+      if (ringR) svgEl2("circle", { r: ringR, class: ROLE.ln, "stroke-width": 1.4 }, g);
+      for (let i = 0; i < n; i++) {
+        svgEl2("path", { d: leafPath(size), class: ROLE.ln, "stroke-width": 0.8, transform: "rotate(" + R(360 * i / n) + ") translate(" + r0 + " 0)" }, g);
+      }
+      svgEl2("circle", { r: Math.max(1.6, r0 * 0.75), class: ROLE.dot }, g);
+      return g;
+    };
+    const fade = (el2, del) => {
+      if (animate) {
+        el2.classList.add("ak-orn-fade");
+        el2.style.animationDelay = sec(del || 0);
+      }
+      return el2;
+    };
+    const chain = (back, front, segs, L, t0, T, fronts, backRole, extra) => {
+      for (const g of segs) {
+        const del = t0 + T * g.s0 / L;
+        const dur = T * (g.s1 - g.s0) / L;
+        if (g.front) for (const [role, width] of fronts) stroke(front, g.d, role, width, g.len, del, dur, true, extra);
+        else if (backRole) stroke(back, g.d, backRole[0], backRole[1], g.len, del, dur, true, extra);
+      }
+    };
+    return { svg: svg6, group, stroke, leaf, bead, rosette, fade, chain, animate };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-frames.js
+  var PI = Math.PI;
+  function radiusOf(host, fallback) {
+    const r = host ? parseFloat(getComputedStyle(host).borderTopLeftRadius) : NaN;
+    return Number.isFinite(r) && r > 0 ? r : fallback;
+  }
+  function flower(d, parent, x, y, n, r0, size, del) {
+    for (let i = 0; i < n; i++) {
+      const a = 2 * PI * i / n;
+      d.leaf(parent, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, size, del + 0.04 * i);
+    }
+    d.bead(parent, x, y, Math.max(2, size * 0.32), del + 0.2);
+  }
+  function drawFrame(layers, w, h, _pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.55, Math.min(1, Math.min(w, h) / 420));
+    const rect = (i) => "M" + R(i) + " " + R(i) + "H" + R(w - i) + "V" + R(h - i) + "H" + R(i) + "Z";
+    const rlen = (i) => Math.ceil(2 * (w + h - 4 * i)) + 4;
+    let hatch = "";
+    const hs = 10 * k;
+    for (let x = 3 * k; x <= w - hs - 2; x += 5 * k) hatch += "M" + R(x) + " " + R(hs - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8) + "M" + R(x) + " " + R(h - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8);
+    for (let y = hs + 1; y <= h - 3; y += 5 * k) hatch += "M1 " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8) + "M" + R(w - hs + 1) + " " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8);
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 1.2);
+    d.stroke(d.svg, rect(0), "ln", 1, rlen(0), 0, 1.8);
+    d.stroke(d.svg, rect(10 * k), "ln", 1.6, rlen(10 * k), 0.15, 1.8);
+    d.stroke(d.svg, rect(15 * k), "ln", 0.8, rlen(15 * k), 0.3, 1.8);
+    const t0 = 1.2;
+    const T = 2;
+    const Lc = Math.max(50, Math.min(135, Math.min(w, h) / k * 0.27));
+    const m = turtle(46, 34, 0, Lc, (u) => -15e-4 + 0.27 * 135 / Lc * Math.pow(u, 4));
+    const pa = at(m, 0.42);
+    const b = turtle(pa.x, pa.y, pa.h + 0.8, 62 * Lc / 135, (u) => (0.012 + 0.32 * u * u) * 135 / Lc);
+    const lush = p.leaves;
+    const corner = (g) => {
+      d.stroke(g, "M15 58A43 43 0 0 0 58 15", "ln", 1.2, 72, 0.9, 0.8);
+      d.stroke(g, "M15 64A49 49 0 0 0 64 15", "ln", 0.8, 80, 1, 0.8);
+      for (const view of ["translate(0 0)", "matrix(0 1 1 0 0 0)"]) {
+        const v = d.group(g, { transform: view });
+        d.stroke(v, m.d, "ln", 1.6, m.len, t0, T);
+        d.stroke(v, b.d, "ln", 1.2, b.len, t0 + 0.85, 1.3);
+        if (lush > 0) {
+          const onM = [[0.14, -1, 10], [0.3, 1, 12], [0.56, -1, 9], [0.7, 1, 11]];
+          if (lush > 1.5) onM.push([0.44, -1, 8], [0.82, 1, 8]);
+          for (const [u, side, s] of onM) {
+            const q = at(m, u);
+            d.leaf(v, q.x, q.y, q.h + side * 0.95, s, t0 + T * u * 0.9 + 0.2);
+          }
+          const qb = at(b, 0.3);
+          d.leaf(v, qb.x, qb.y, qb.h - 0.95, 9, t0 + 1.05 + 1.3 * 0.3);
+        }
+        d.bead(v, m.end.x, m.end.y, 2.2, t0 + T);
+        d.bead(v, b.end.x, b.end.y, 1.8, t0 + 2.15);
+      }
+      d.rosette(g, 34, 34, 8, 4, 7.5, 12, 0.7);
+    };
+    for (const [x, y, sx, sy] of [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]]) {
+      corner(d.group(d.svg, { transform: "translate(" + R(x) + " " + R(y) + ") scale(" + R(sx * k * 100) / 100 + " " + R(sy * k * 100) / 100 + ")" }));
+    }
+    const mid = (tf, len, gain, s0) => {
+      const g = d.group(d.svg, { transform: tf });
+      for (const sx of [1, -1]) {
+        const s = turtle(sx * 4, 24, sx > 0 ? 0.35 : PI - 0.35, len, (u) => sx * (-0.02 + gain * u * u * u));
+        d.stroke(g, s.d, "ln", 1.4, s.len, s0, 1.6);
+        if (lush > 0) {
+          const p1 = at(s, 0.25);
+          const p2 = at(s, 0.5);
+          d.leaf(g, p1.x, p1.y, p1.h + sx * 0.95, 11, s0 + 0.5);
+          d.leaf(g, p2.x, p2.y, p2.h - sx * 0.95, 8, s0 + 0.9);
+        }
+        d.bead(g, s.end.x, s.end.y, 2, s0 + 1.6);
+      }
+      d.leaf(g, 0, 27, PI / 2, 20, s0 + 0.1);
+      d.bead(g, 0, 23, 3.2, s0);
+    };
+    const ks = R(k * 100) / 100;
+    if (w / k >= 2 * (46 + Lc) + 200) {
+      mid("translate(" + R(w / 2) + " 0) scale(" + ks + ")", 95, 0.28, 1.8);
+      mid("translate(" + R(w / 2) + " " + R(h) + ") scale(" + ks + " " + -ks + ")", 95, 0.28, 1.8);
+    }
+    if (h / k >= 2 * (46 + Lc) + 140) {
+      mid("translate(0 " + R(h / 2) + ") rotate(-90) scale(" + ks + ")", 64, 0.42, 1.9);
+      mid("translate(" + R(w) + " " + R(h / 2) + ") rotate(90) scale(" + ks + ")", 64, 0.42, 1.9);
+    }
+  }
+  function drawVineBorder(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const r = radiusOf(host, 18);
+    const x = pad.x;
+    const y = pad.y;
+    const base = rrect(x, y, w, h, r);
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 72));
+    const t0 = 1;
+    const T = Math.max(2.5, Math.min(6, L / 400));
+    d.fade(d.stroke(d.svg, roundedRectPath(x + 9, y + 9, w - 18, h - 18, Math.max(0, r - 9)), "dim", 0.8), 0.8);
+    const back = d.group(d.svg);
+    d.stroke(d.svg, roundedRectPath(x, y, w, h, r), "ln", 3, Math.ceil(L) + 4, 0, 1.2);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, L, 9, per, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    d.chain(back, front, helix(base.at, L, 7, per, PI, 2), L, t0 + 0.25, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      const every = p.leaves > 1.5 ? 1 : 2;
+      for (const q of helixLeaves(base.at, L, 9, per, 0, { size: 13, alpha: 0.9, every, from: 6 })) {
+        d.leaf(front, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1);
+      }
+    }
+    const s0 = base.at(0);
+    flower(d, front, s0.x, s0.y, 5, 3, 11, t0 + T + 0.2);
+  }
+  function drawRope(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const base = rrect(pad.x, pad.y, w, h, radiusOf(host, 14));
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 34));
+    const n = Math.round(p.strands);
+    const T = Math.max(2, Math.min(5, L / 400));
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    for (let j = 0; j < n; j++) {
+      d.chain(back, front, helix(base.at, L, 6, per, j * 2 * PI / n, 1.5), L, 0.3, T, [["gapc", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    }
+  }
+  function drawJugend(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.45, Math.min(1.4, h / 520));
+    const x0 = pad.x;
+    const yB = pad.y + h;
+    const ground = yB + 62 * k;
+    d.stroke(d.svg, roundedRectPath(x0, pad.y, w, h, 14 * k), "ln", 1.6, Math.ceil(2 * (w + h)) + 8, 0, 1.6);
+    d.stroke(d.svg, roundedRectPath(x0 + 8 * k, pad.y + 8 * k, w - 16 * k, h - 16 * k, 8 * k), "ln", 0.8, Math.ceil(2 * (w + h)) + 8, 0.15, 1.6);
+    d.fade(d.stroke(d.svg, "M" + R(x0 - 160 * k) + " " + R(ground) + "H" + R(x0 + w + 160 * k), "dim", 1), 0.2);
+    const UP = -PI / 2;
+    const TAU5 = 2 * PI;
+    const sx = x0 - 64 * k;
+    const stems = [
+      { dx: 0, h: UP, L: 540, t0: 0.6, k: (u) => 35e-4 * Math.cos(TAU5 * 1.2 * u) + 0.012 * Math.pow(u, 8), flower: "lily", lv: [[0.2, 1, 36], [0.34, -1, 30], [0.55, 1, 22], [0.7, -1, 16]] },
+      { dx: -14, h: UP - 0.12, L: 430, t0: 0.8, k: (u) => -4e-3 * Math.cos(TAU5 * u + 0.6) - 0.02 * Math.pow(u, 6), flower: "cup", lv: [[0.25, -1, 30], [0.5, 1, 22]] },
+      { dx: 4, h: UP + 0.02, L: 300, t0: 1, k: (u) => 6e-3 * Math.cos(TAU5 * 0.8 * u + 1) + 0.025 * Math.pow(u, 6), flower: "bud", lv: [[0.35, 1, 24]] }
+    ];
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      [[-0.38, 110], [-0.16, 88], [0.22, 96]].forEach(([a, s], i) => d.leaf(g, sx - 4 * k, ground, UP + a, s * k, 0.3 + i * 0.12, 0.13));
+      for (const st of stems) {
+        const dur = 2.6;
+        const t2 = turtle(sx + st.dx * k, ground, st.h, st.L * k, (u) => st.k(u) / k, 2);
+        const e = t2.end;
+        const bloom = st.t0 + dur + 0.1;
+        d.stroke(g, t2.d, "vine", 2, t2.len, st.t0, dur);
+        if (p.leaves > 0) {
+          for (const [u, side, s] of st.lv) {
+            const q = at(t2, u);
+            d.leaf(g, q.x, q.y, q.h + side * 0.45, s * k, st.t0 + dur * u * 0.85 + 0.1, 0.22);
+          }
+        }
+        if (st.flower === "lily") {
+          for (const a of [-1.5, 1.5]) d.leaf(g, e.x, e.y, e.h + a, 10 * k, bloom, 0.3, "petal");
+          for (const a of [-0.6, 0.6, 0]) d.leaf(g, e.x, e.y, e.h + a, 26 * k, bloom + 0.1, 0.42, "petal");
+          [-0.22, 0, 0.22].forEach((a, i) => {
+            const len = (30 + i % 2 * 6) * k;
+            const x2 = e.x + Math.cos(e.h + a) * len;
+            const y2 = e.y + Math.sin(e.h + a) * len;
+            d.stroke(g, "M" + R(e.x) + " " + R(e.y) + "L" + R(x2) + " " + R(y2), "ln", 1, Math.ceil(len) + 2, bloom + 0.5, 0.5);
+            d.bead(g, x2, y2, 2.2 * k, bloom + 0.9);
+          });
+        } else if (st.flower === "cup") {
+          const cx = e.x + Math.cos(e.h) * 9 * k;
+          const cy = e.y + Math.sin(e.h) * 9 * k;
+          for (let i = 0; i < 6; i++) d.leaf(g, cx, cy, e.h + i * TAU5 / 6, 15 * k, bloom + 0.05 * i, 0.5, "petal");
+          d.bead(g, cx, cy, 3.4 * k, bloom + 0.4);
+        } else {
+          for (const a of [-0.5, 0.5]) d.leaf(g, e.x, e.y, e.h + a, 9 * k, bloom, 0.3, "petal");
+          d.leaf(g, e.x, e.y, e.h, 17 * k, bloom + 0.1, 0.5, "petal");
+        }
+      }
+    }
+  }
+  function drawRibbon(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const u = h / 54;
+    const x0 = pad.x;
+    const x1 = pad.x + w;
+    const cx = pad.x + w / 2;
+    const y0 = pad.y;
+    const y1 = pad.y + h;
+    const a = Math.min(12 * u, h * 0.22);
+    const tails = d.group(d.svg);
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
+      const g = d.group(tails, { transform: tf });
+      const top = y0 + a + 20 * u;
+      const bot = y1 + a + 22 * u;
+      const inner = x1 - 14 * u;
+      const outer = x1 + 86 * u;
+      const tail = "M" + R(inner) + " " + R(top) + "H" + R(outer) + "L" + R(outer - 20 * u) + " " + R((top + bot) / 2) + "L" + R(outer) + " " + R(bot) + "H" + R(inner) + "Z";
+      d.stroke(g, tail, "tail", 1.2);
+      d.stroke(g, "M" + R(inner + 6 * u) + " " + R(top + 7 * u) + "H" + R(outer - 7 * u) + "M" + R(inner + 6 * u) + " " + R(bot - 7 * u) + "H" + R(outer - 7 * u), "dim", 0.8);
+      d.stroke(g, "M" + R(x1) + " " + R(y1 + a) + "L" + R(x1) + " " + R(bot) + "L" + R(inner) + " " + R(bot) + "Z", "crease", 1);
+    }
+    d.fade(tails, 0.7);
+    const band = d.group(d.svg);
+    if (d.animate) band.classList.add("ak-orn-unroll");
+    const q = (yc) => "Q" + R(cx) + " " + R(yc) + " ";
+    d.stroke(band, "M" + R(x0) + " " + R(y0 + a) + q(y0 - a) + R(x1) + " " + R(y0 + a) + "L" + R(x1) + " " + R(y1 + a) + q(y1 - a) + R(x0) + " " + R(y1 + a) + "Z", "solid", 1.4);
+    d.stroke(band, "M" + R(x0 + 7 * u) + " " + R(y0 + a + 6 * u) + q(y0 - a + 6 * u) + R(x1 - 7 * u) + " " + R(y0 + a + 6 * u) + "M" + R(x0 + 7 * u) + " " + R(y1 + a - 6 * u) + q(y1 - a - 6 * u) + R(x1 - 7 * u) + " " + R(y1 + a - 6 * u), "dim", 0.8);
+  }
+  var FRAME_FIGURES = {
+    frame: { params: ["leaves"], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawFrame } },
+    "vine-border": { params: ["leaves"], overlay: { pad: () => ({ x: 26, y: 26 }), draw: drawVineBorder } },
+    rope: { params: ["strands"], overlay: { pad: () => ({ x: 12, y: 12 }), draw: drawRope } },
+    jugend: {
+      params: ["leaves"],
+      overlay: {
+        pad: (_w, h) => {
+          const k = Math.max(0.45, Math.min(1.4, h / 520));
+          return { x: Math.ceil(200 * k), y: Math.ceil(76 * k) };
+        },
+        draw: drawJugend
+      }
+    },
+    ribbon: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 1.7 + 4), y: Math.ceil(h * 0.9) }), draw: drawRibbon } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-rounds.js
+  var PI2 = Math.PI;
+  var TAU3 = 2 * PI2;
+  var D = PI2 / 180;
+  function drawWreath(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const r = Math.min(w, h) / 2;
+    const k = r / 84;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const Rw = 118 * k;
+    const t0 = 1.1;
+    const T = 2.6;
+    d.stroke(d.svg, "M" + R(cx + r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx - r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx + r) + " " + R(cy), "ln", 1.6, Math.ceil(TAU3 * r) + 4, 0, 1.4);
+    const r2 = r - 7 * k;
+    d.stroke(d.svg, "M" + R(cx + r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx - r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx + r2) + " " + R(cy), "ln", 0.8, Math.ceil(TAU3 * r2) + 4, 0.15, 1.4);
+    let hatch = "";
+    for (let a = 0; a < 360; a += 4) {
+      const c = Math.cos(a * D);
+      const s = Math.sin(a * D);
+      hatch += "M" + R(cx + (r - 5.4 * k) * c) + " " + R(cy + (r - 5.4 * k) * s) + "L" + R(cx + (r - 1.6 * k) * c) + " " + R(cy + (r - 1.6 * k) * s);
+    }
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 0.8);
+    const back = d.group(d.svg);
+    const stems = d.group(d.svg);
+    const front = d.group(d.svg);
+    const leaves = d.group(d.svg);
+    [[95, 250, 1], [85, -70, -1]].forEach(([a0, a1, sx], bi) => {
+      const br = arc(cx, cy, Rw, a0 * D, a1 * D);
+      const pts = [];
+      for (let s = 0; s <= br.L; s += 2) {
+        const q = br.at(s);
+        pts.push([q.x, q.y]);
+      }
+      d.stroke(stems, pathOf(pts), "vine", 2 * Math.max(0.6, k), lengthOf(pts), t0, T, true);
+      d.chain(back, front, helix(br.at, br.L, 3.5 * k, 24 * k, 0, 1.5), br.L, t0 + 0.35, T, [["gap", 3], ["vine", 1]], ["vback", 0.8]);
+      if (p.leaves > 0) {
+        const step = (p.leaves > 1.5 ? 10 : 14) * k;
+        for (let i = 0, s2 = 12 * k; s2 < br.L - 8 * k; i++, s2 += step) {
+          const u = s2 / br.L;
+          const size = 16 * k * (1 - 0.45 * u);
+          const q2 = br.at(s2);
+          const q3 = br.at(Math.min(br.L, s2 + 6 * k));
+          const al = 0.8;
+          const del = t0 + T * u + 0.1;
+          d.leaf(leaves, q2.x, q2.y, Math.atan2(q2.ty * Math.cos(al) + q2.ny * Math.sin(al), q2.tx * Math.cos(al) + q2.nx * Math.sin(al)), size, del);
+          d.leaf(leaves, q3.x, q3.y, Math.atan2(q3.ty * Math.cos(al) - q3.ny * Math.sin(al), q3.tx * Math.cos(al) - q3.nx * Math.sin(al)), size * 0.9, del + 0.08);
+          if (i % 3 === 1) {
+            const qm = br.at(Math.min(br.L, s2 + 9 * k));
+            d.bead(leaves, qm.x + qm.nx * 7 * k, qm.y + qm.ny * 7 * k, 2.3 * k, del + 0.25, "vdot");
+            d.bead(leaves, qm.x + qm.nx * 11 * k + qm.tx * 3 * k, qm.y + qm.ny * 11 * k + qm.ty * 3 * k, 1.8 * k, del + 0.32, "vdot");
+          }
+        }
+      }
+      const e = br.at(br.L);
+      d.leaf(leaves, e.x, e.y, Math.atan2(e.ty, e.tx), 11 * k, t0 + T);
+      const s0 = br.at(0);
+      const tl = turtle(s0.x, s0.y, Math.atan2(-s0.ty, -s0.tx), 46 * k, () => sx * 0.028 / k);
+      const tp = tl.pts.slice().reverse();
+      if (bi === 1) d.stroke(stems, pathOf(tp), "gap", 6, tl.len, 0.6, 0.5);
+      d.stroke(stems, pathOf(tp), "vine", 2 * Math.max(0.6, k), tl.len, 0.6, 0.5);
+      d.bead(stems, tp[0][0], tp[0][1], 2.6 * k, 0.5);
+    });
+  }
+  function drawGuilloche(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const half = Math.min(w, h) / 2;
+    const k = half / 135;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const circle = (rr, width, del) => d.stroke(
+      d.svg,
+      "M" + R(cx + rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx - rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx + rr) + " " + R(cy),
+      "ln",
+      width,
+      Math.ceil(TAU3 * rr) + 4,
+      del,
+      1.5
+    );
+    circle(128 * k, 1.4, 0);
+    circle(133 * k, 0.8, 0.1);
+    circle(84 * k, 1, 0.5);
+    circle(88 * k, 0.6, 0.6);
+    const ring2 = (rb, amp, kk, n, t0, width) => {
+      for (let j = 0; j < n; j++) {
+        const ph = j * TAU3 / (kk * n);
+        const pts = [];
+        for (let i = 0; i <= 360; i++) {
+          const th = i * TAU3 / 360;
+          const rr = (rb + amp * Math.cos(kk * (th + ph))) * k;
+          pts.push([cx + rr * Math.cos(th), cy + rr * Math.sin(th)]);
+        }
+        d.stroke(d.svg, pathOf(pts), "ln", width, lengthOf(pts), t0 + j * 0.12, 2.4);
+      }
+    };
+    ring2(108, 14, 12, 8, 0.2, 0.7);
+    ring2(62, 10, 9, 6, 0.9, 0.7);
+    ring2(24, 12, 8, 5, 1.6, 0.8);
+    d.bead(d.svg, cx, cy, 3 * Math.max(0.6, k), 3.4);
+  }
+  function drawGuillocheBand(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const x0 = pad.x + 4;
+    const x1 = pad.x + w - 4;
+    const cy = pad.y + h / 2;
+    const half = h / 2 - 12;
+    d.stroke(d.svg, "M" + R(x0) + " " + R(pad.y + 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + 8) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 8) + "H" + R(x1), "ln", 0.8, Math.ceil(4 * (x1 - x0)) + 8, 0.3, 1.4);
+    if (half < 6) return;
+    const wl = Math.max(28, Math.min(72, half * 1.1));
+    for (let j = 0; j < 16; j++) {
+      const pts = [];
+      for (let x = x0; x <= x1; x += 2) {
+        const a = half * (0.72 + 0.28 * Math.cos(TAU3 * (x - (x0 + x1) / 2) / Math.max(120, (x1 - x0) / 2)));
+        pts.push([x, cy + a * Math.sin(TAU3 * (x - x0) / wl + j * PI2 / 8)]);
+      }
+      d.stroke(d.svg, pathOf(pts), "hatch", 0.6, lengthOf(pts), 0.6 + j * 0.06, 2.2);
+    }
+  }
+  function drawIvy(layers, w, h, pad, p) {
+    const back = layers.under;
+    const over = layers.over;
+    if (!back || !over) return;
+    const cx = pad.x + w / 2;
+    const amp = w / 2 + 4;
+    const period = Math.max(60, Math.min(160, w * 4));
+    const base = line(cx, pad.y + h - 2, cx, pad.y);
+    const L = base.L;
+    const t0 = 0.8;
+    const T = Math.max(2, Math.min(5, L / 140));
+    const size = Math.max(10, Math.min(20, w * 0.3));
+    const fronts = over.group(over.svg);
+    over.chain(back.svg, fronts, helix(base.at, L, amp, period, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    over.chain(back.svg, fronts, helix(base.at, L, amp - 1, period, 2.4, 2), L, t0 + 0.3, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      for (const q of helixLeaves(base.at, L, amp, period, 0, { size, alpha: 0.9, from: 12, endGap: 4 })) {
+        over.leaf(fronts, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1, 0.42);
+      }
+      const top = base.at(L);
+      [-2.2, -1.57, -0.9].forEach((a, i) => over.leaf(fronts, top.x, top.y + 2, a, size * 0.75 - i, t0 + T + 0.1 * i, 0.42));
+    }
+  }
+  function drawWrap(layers, w, h, pad) {
+    const back = layers.under;
+    const d = layers.over;
+    if (!back || !d) return;
+    const cy = pad.y + h / 2;
+    const rr = h / 2;
+    let hatch = "";
+    for (const deg of [48, 60, 70, 80]) {
+      for (const sg of [-1, 1]) hatch += "M" + R(pad.x + 4) + " " + R(cy + sg * rr * Math.sin(deg * D)) + "H" + R(pad.x + w - 4);
+    }
+    back.stroke(back.svg, hatch, "hatch", 0.6);
+    const x0 = pad.x + Math.min(w * 0.12, h * 1.5);
+    const x1 = pad.x + w - Math.min(w * 0.12, h * 1.5);
+    const base = line(x0, cy, x1, cy);
+    const bw = h * 0.46;
+    const front = d.group(d.svg);
+    d.chain(front, front, helix(base.at, base.L, rr, h * 1.07, 0, 1), base.L, 0.6, Math.max(1, base.L / 200), [["ln", bw + 3], ["band", bw]], null, { butt: true });
+    for (const x of [x0 - h * 0.36, x1]) {
+      d.fade(d.stroke(d.svg, "M" + R(x) + " " + R(cy - rr - 3) + "h" + R(h * 0.36) + "v" + R(h + 6) + "h" + R(-h * 0.36) + "Z", "solid", 1.4), 0.4);
+    }
+  }
+  function drawBrackets(layers, w, h, pad, p) {
+    const d = layers.over;
+    if (!d) return;
+    const k = h / 44;
+    const cxc = pad.x + w / 2;
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      const bx = pad.x - 12 * k;
+      const top = pad.y + 2;
+      const bot = pad.y + h - 2;
+      d.stroke(g, "M" + R(bx) + " " + R(top) + "Q" + R(bx - 16 * k) + " " + R((top + bot) / 2) + " " + R(bx) + " " + R(bot), "ln", 1.4, Math.ceil((bot - top) * 1.15) + 4, 0.2, 0.6);
+      const tc2 = turtle(bx, top, -0.6, 20 * k, (u) => (0.3 + 0.2 * u) / k);
+      const bc = turtle(bx, bot, 0.6, 20 * k, (u) => -(0.3 + 0.2 * u) / k);
+      d.stroke(g, tc2.d, "ln", 1.2, tc2.len, 0.7, 0.5);
+      d.stroke(g, bc.d, "ln", 1.2, bc.len, 0.7, 0.5);
+      if (p.leaves > 0) d.leaf(g, bx - 9 * k, (top + bot) / 2, PI2, 11 * k, 0.8);
+    }
+  }
+  var ROUND_FIGURES = {
+    wreath: { params: ["leaves"], overlay: { pad: (w, h) => {
+      const k = Math.min(w, h) / 168;
+      return { x: Math.ceil(72 * k), y: Math.ceil(84 * k) };
+    }, draw: drawWreath } },
+    guilloche: { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuilloche } },
+    "guilloche-band": { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuillocheBand } },
+    ivy: { params: ["leaves"], overlay: { pad: (w) => ({ x: Math.ceil(30 + Math.max(10, Math.min(20, w * 0.3))), y: 16 }), under: true, over: true, draw: drawIvy } },
+    wrap: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 0.5), y: 6 }), under: true, over: true, draw: drawWrap } },
+    brackets: { params: ["leaves"], overlay: { pad: (_w, h) => ({ x: Math.ceil(30 * h / 44), y: 4 }), under: false, over: true, draw: drawBrackets } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-lines.js
+  var PI3 = Math.PI;
+  var TAU4 = 2 * PI3;
+  function fillMount(host, height, cls, opts, draw) {
+    const box = document.createElement("span");
+    box.className = "ak-orn-strip " + cls;
+    box.setAttribute("aria-hidden", "true");
+    box.style.height = height + "px";
+    host.appendChild(box);
+    let lastW = -1;
+    let frame2 = 0;
+    const render = (animate) => {
+      const W7 = Math.round(box.getBoundingClientRect().width) || host.clientWidth || 0;
+      lastW = W7;
+      box.textContent = "";
+      if (W7 < 40) return;
+      draw(drawing(box, W7, height, { animate, speed: opts.speed, delay: opts.delay }), W7, height);
+    };
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(Math.round(box.getBoundingClientRect().width) - lastW) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(box);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        box.remove();
+      }
+    };
+  }
+  function mountVineBar(host, p, opts) {
+    let value = p.value;
+    let apply2 = null;
+    const strip = fillMount(host, 96, "ak-orn-strip--bar", opts, (d, W7) => {
+      const y = 48;
+      const base = line(0, y, W7, y);
+      const L = base.L;
+      const period = Math.max(70, Math.min(110, W7 / 6));
+      const amp = 21;
+      const k = TAU4 / period;
+      const x0 = 20;
+      const bw = W7 - 40;
+      const segs = [];
+      const back = d.group(d.svg);
+      const budBack = d.group(d.svg);
+      svgEl2("rect", { x: x0, y: y - 11, width: R(bw), height: 22, rx: 11, class: "ak-orn-track" }, d.svg);
+      let hatch = "";
+      for (let x = x0 + 12; x <= x0 + bw - 14; x += 6) hatch += "M" + R(x) + " " + (y + 7) + "l6 -14";
+      svgEl2("path", { d: hatch, class: "ak-orn-hatch", "stroke-width": 0.8 }, d.svg);
+      const fill2 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
+      const front = d.group(d.svg);
+      const add = (parent, gs, role, width) => {
+        for (const g of gs) {
+          const el2 = svgEl2("path", { d: g.d, class: "ak-orn-" + role + " ak-orn-dash", "stroke-width": width }, parent);
+          el2.style.strokeDasharray = String(g.len);
+          el2.style.strokeDashoffset = String(g.len);
+          segs.push({ el: el2, s0: g.s0, s1: g.s1, len: g.len });
+        }
+      };
+      for (const [a, ph, wf, wb, wg] of [[amp, 0, 2.4, 1.6, 6], [16, PI3, 1.2, 1, 4]]) {
+        const gs = helix(base.at, L, a, period, ph, 2);
+        add(back, gs.filter((g) => !g.front), "vback", wb);
+        const fr = gs.filter((g) => g.front);
+        add(front, fr, "gap", wg);
+        add(front, fr, "vine", wf);
+      }
+      const leaves = [];
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(base.at, L, amp, period, 0, { size: 13, alpha: 0.95, from: 10, endGap: 6 })) {
+          const outer = svgEl2("g", { transform: "translate(" + R(q.x) + " " + R(q.y) + ") rotate(" + R(q.ang * 180 / PI3) + ")" }, front);
+          const inner = svgEl2("g", { class: "ak-orn-pop" }, outer);
+          svgEl2("path", { d: leafPath(q.size), class: "ak-orn-leaf" }, inner);
+          svgEl2("path", { d: "M" + R(q.size * 0.12) + " 0L" + R(q.size * 0.8) + " 0", class: "ak-orn-rib" }, inner);
+          leaves.push({ el: inner, s: q.s });
+        }
+      }
+      const budFront = d.group(d.svg);
+      const buds = [budBack, budFront].map((g) => {
+        const bloom = svgEl2("g", { class: "ak-orn-bloom" }, g);
+        for (let i = 0; i < 5; i++) svgEl2("path", { d: leafPath(9), class: "ak-orn-leaf", transform: "rotate(" + 72 * i + ") translate(2.5 0)" }, bloom);
+        svgEl2("circle", { r: 3.2, class: "ak-orn-vdot" }, g);
+        return { g, bloom };
+      });
+      apply2 = (v) => {
+        const rv = 14 + v * (L - 14);
+        for (const s of segs) {
+          const f = Math.max(0, Math.min(1, (rv - s.s0) / Math.max(1, s.s1 - s.s0)));
+          s.el.style.strokeDashoffset = String(Math.round(s.len * (1 - f)));
+        }
+        for (const lf of leaves) lf.el.classList.toggle("ak-orn-open", lf.s <= rv - 4);
+        fill2.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
+        const b = base.at(rv);
+        const th = k * rv;
+        const o = amp * Math.sin(th);
+        const inFront = Math.cos(th) >= 0;
+        buds.forEach((bd, i) => {
+          bd.g.setAttribute("transform", "translate(" + R(b.x + b.nx * o) + " " + R(b.y + b.ny * o) + ")");
+          bd.g.style.display = i === 1 === inFront ? "" : "none";
+          bd.bloom.classList.toggle("ak-orn-open", v >= 0.995);
+        });
+      };
+      apply2(value);
+    });
+    const clamp3 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+    return {
+      render: (animate) => {
+        strip.render(animate);
+        if (!apply2) return;
+        if (animate) {
+          apply2(0);
+          requestAnimationFrame(() => requestAnimationFrame(() => apply2 && apply2(value)));
+        } else apply2(value);
+      },
+      set: (v) => {
+        value = clamp3(v);
+        if (apply2) apply2(value);
+      },
+      teardown: strip.teardown
+    };
+  }
+  function drawRail(d, W7) {
+    const y = 14;
+    const base = line(8, y, W7 - 8, y);
+    const T = Math.max(1.2, Math.min(3, W7 / 300));
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M8 " + y + "H" + R(W7 - 8), "ln", 1, Math.ceil(W7), 0, 0.8);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, base.L, 7, 44, 0, 1.5), base.L, 0.3, T, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+    d.chain(back, front, helix(base.at, base.L, 6, 44, PI3, 1.5), base.L, 0.45, T, [["gap", 4], ["vine", 1]], ["vback", 0.8]);
+    for (const q of helixLeaves(base.at, base.L, 7, 44, 0, { size: 7.5, alpha: 0.95, every: 2, from: 6, endGap: 6 })) d.leaf(front, q.x, q.y, q.ang, q.size, 0.3 + T * q.s / base.L);
+    d.bead(d.svg, 5, y, 3, 0.1);
+    d.bead(d.svg, W7 - 5, y, 3, 0.3 + T);
+  }
+  function drawDivider(d, W7, H4, leaves) {
+    const y = H4 / 2;
+    const c = W7 / 2;
+    const reach = Math.min(W7 / 2 - 40, 420);
+    const d0 = 0.4;
+    const T = Math.max(1.2, Math.min(2.4, reach / 180));
+    const ends = [c + reach, c - reach];
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M" + R(c + 14) + " " + R(y) + "H" + R(ends[0]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    d.stroke(d.svg, "M" + R(c - 14) + " " + R(y) + "H" + R(ends[1]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    const front = d.group(d.svg);
+    for (const bs of [line(c + 14, y, ends[0], y), line(c - 14, y, ends[1], y, true)]) {
+      d.chain(back, front, helix(bs.at, bs.L, 6, 42, 0, 1.5), bs.L, d0, T, [["gap", 4], ["vine", 1.6]], ["vback", 1]);
+      if (leaves > 0) {
+        for (const q of helixLeaves(bs.at, bs.L, 6, 42, 0, { size: 7.5, alpha: 0.95, every: leaves > 1.5 ? 1 : 2, from: 8, endGap: 10 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, d0 + T * q.s / bs.L + 0.1);
+        }
+      }
+    }
+    const cr = turtle(ends[0], y, 0, 40, (u) => -(0.02 + 0.42 * u * u));
+    const cl = turtle(ends[1], y, PI3, 40, (u) => 0.02 + 0.42 * u * u);
+    d.stroke(d.svg, cr.d, "ln", 1.2, cr.len, d0 + T - 0.2, 0.7);
+    d.stroke(d.svg, cl.d, "ln", 1.2, cl.len, d0 + T - 0.2, 0.7);
+    d.rosette(d.svg, c, y, 6, 3, 5, 9, 0.1);
+  }
+  function rope(d, back, front, base, n, amp, period, t0, T, fronts, backRole) {
+    for (let j = 0; j < n; j++) d.chain(back, front, helix(base.at, base.L, amp, period, j * TAU4 / n, 1.5), base.L, t0, T, fronts, backRole);
+  }
+  function drawBraid(d, W7, H4, strands) {
+    const y = H4 / 2;
+    const base = line(14, y, W7 - 14, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    rope(d, back, front, base, Math.round(strands), 6, 34, 0.4, Math.max(1.2, Math.min(3, W7 / 300)), [["gap", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    for (const x of [8, W7 - 8]) {
+      const g = d.bead(d.svg, x, y, 2.6, x < W7 / 2 ? 0.3 : 2.4);
+      g.insertBefore(svgEl2("circle", { r: 7, class: "ak-orn-ring" }), g.firstChild);
+    }
+  }
+  function drawCord(d, W7) {
+    const y = 16;
+    const base = line(18, y, W7 - 18, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    const T = Math.max(1, Math.min(2.4, W7 / 300));
+    rope(d, back, front, base, 2, 3.5, 20, 0.3, T, [["gap", 5], ["ln", 2.4], ["hi", 0.8]], ["dim", 1.6]);
+    let tassel = "";
+    for (let i = -3; i <= 3; i++) tassel += "M" + R(i * 1.6) + " 11L" + R(i * 2.6) + " 44";
+    for (const [x, del] of [[12, 0.3], [W7 - 12, 0.3 + T]]) {
+      const g = d.bead(d.svg, x, y, 4.5, del);
+      svgEl2("path", { d: tassel, class: "ak-orn-ln", "stroke-width": 1 }, g);
+      svgEl2("path", { d: "M-5 9H5", class: "ak-orn-ln", "stroke-width": 3 }, g);
+    }
+  }
+  function drawStrip(d, W7, H4) {
+    const y = H4 / 2;
+    d.stroke(d.svg, "M4 3H" + R(W7 - 4) + "M4 " + R(H4 - 3) + "H" + R(W7 - 4), "ln", 0.8, Math.ceil(2 * W7), 0, 1.2);
+    for (let m = 0; m < 8; m++) {
+      const pts = [];
+      for (let x = 4; x <= W7 - 4; x += 2) pts.push([x, y + 7 * Math.sin(TAU4 * (x - 4) / 28 + m * PI3 / 4)]);
+      d.stroke(d.svg, pathOf(pts), "ln", 0.6, lengthOf(pts), 0.3 + m * 0.08, 2.4);
+    }
+  }
+  var LINE_FIGURES = {
+    "vine-bar": { params: ["leaves", "value"], mount: mountVineBar },
+    "vine-rail": { params: [], mount: (host, _p, opts) => fillMount(host, 28, "ak-orn-strip--rail", opts, drawRail) },
+    divider: { params: ["leaves"], mount: (host, p, opts) => fillMount(host, 48, "ak-orn-strip--divider", opts, (d, W7, H4) => drawDivider(d, W7, H4, p.leaves)) },
+    braid: { params: ["strands"], mount: (host, p, opts) => fillMount(host, 32, "ak-orn-strip--braid", opts, (d, W7, H4) => drawBraid(d, W7, H4, p.strands)) },
+    cord: { params: [], mount: (host, _p, opts) => fillMount(host, 64, "ak-orn-strip--cord", opts, drawCord) },
+    "guilloche-strip": { params: [], mount: (host, _p, opts) => fillMount(host, 30, "ak-orn-strip--guilloche", opts, drawStrip) }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-text.js
+  var PI4 = Math.PI;
+  function owned(render, teardown) {
+    return { render, teardown };
+  }
+  function slot(cls) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+  function flourishInto(d, leaves) {
+    const t0 = 0.3;
+    const m = turtle(8, 58, 0, 200, (u) => -4e-3 + 0.3 * Math.pow(u, 5));
+    const pa = at(m, 0.38);
+    const b1 = turtle(pa.x, pa.y, pa.h + 0.9, 80, (u) => 0.012 + 0.3 * u * u * u);
+    const pb = at(m, 0.15);
+    const b2 = turtle(pb.x, pb.y, pb.h - 0.9, 55, (u) => -(0.012 + 0.34 * u * u * u));
+    d.stroke(d.svg, m.d, "ln", 1.8, m.len, t0, 1.8);
+    d.stroke(d.svg, b2.d, "ln", 1.2, b2.len, t0 + 0.3, 1);
+    d.stroke(d.svg, b1.d, "ln", 1.2, b1.len, t0 + 0.7, 1.3);
+    if (leaves > 0) {
+      const marks = [
+        { t: m, u: 0.26, side: 1, s: 12, start: t0, dur: 1.8 },
+        { t: m, u: 0.5, side: -1, s: 11, start: t0, dur: 1.8 },
+        { t: m, u: 0.64, side: 1, s: 10, start: t0, dur: 1.8 },
+        { t: b1, u: 0.3, side: -1, s: 9, start: t0 + 0.7, dur: 1.3 },
+        { t: b2, u: 0.35, side: 1, s: 8, start: t0 + 0.3, dur: 1 }
+      ];
+      for (const mk of marks) {
+        const q = at(mk.t, mk.u);
+        d.leaf(d.svg, q.x, q.y, q.h + mk.side * 0.95, mk.s, mk.start + mk.dur * mk.u + 0.15);
+      }
+    }
+    d.bead(d.svg, 8, 58, 3.4, 0.1);
+    d.bead(d.svg, m.end.x, m.end.y, 2.6, t0 + 1.8);
+    d.bead(d.svg, b1.end.x, b1.end.y, 2, t0 + 2);
+    d.bead(d.svg, b2.end.x, b2.end.y, 2, t0 + 1.3);
+  }
+  function mountFlourish(host, p, opts) {
+    const left = slot("ak-orn-flourish ak-orn-flourish--left");
+    const right = slot("ak-orn-flourish ak-orn-flourish--right");
+    host.classList.add("ak-orn-flourished");
+    host.insertBefore(left, host.firstChild);
+    host.appendChild(right);
+    return owned((animate) => {
+      for (const s of [left, right]) {
+        s.textContent = "";
+        flourishInto(drawing(s, 200, 110, { animate, speed: opts.speed, delay: opts.delay, viewBox: true }), p.leaves);
+      }
+    }, () => {
+      left.remove();
+      right.remove();
+      host.classList.remove("ak-orn-flourished");
+    });
+  }
+  function mountSwash(host, p, opts) {
+    const s = slot("ak-orn-swash");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 300, 72, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const sc = turtle(20, 26, PI4 + 0.1, 40, (u) => 0.3 * u * u);
+      const sm = turtle(20, 26, -0.1, 270, (u) => 7e-4 + 0.25 * Math.pow(u, 9));
+      d.stroke(d.svg, sc.d, "ln", 1.2, sc.len, 0.5, 0.5);
+      d.stroke(d.svg, sm.d, "ln", 1.6, sm.len, 0.6, 1.6);
+      if (p.leaves > 0) {
+        const q = at(sm, 0.55);
+        d.leaf(d.svg, q.x, q.y, q.h - 0.9, 9, 1.4);
+      }
+      d.bead(d.svg, sm.end.x, sm.end.y, 2, 2.2);
+    }, () => s.remove());
+  }
+  function firstLetter(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.nodeValue || "";
+      const i = text.search(/\S/);
+      if (i >= 0) return { node: (
+        /** @type {Text} */
+        n
+      ), index: i };
+    }
+    return null;
+  }
+  function mountDropcap(host, p, opts) {
+    const found = firstLetter(host);
+    if (!found) return owned(() => {
+    }, () => {
+    });
+    const { node, index } = found;
+    const text = node.nodeValue || "";
+    const letter = Array.from(text.slice(index))[0] || "";
+    const cap = document.createElement("span");
+    cap.className = "ak-orn-cap";
+    const art = slot("ak-orn-cap__art");
+    const glyph = document.createElement("span");
+    glyph.className = "ak-orn-cap__letter";
+    glyph.textContent = letter;
+    cap.appendChild(art);
+    cap.appendChild(glyph);
+    node.nodeValue = text.slice(index + letter.length);
+    const pre = text.slice(0, index);
+    node.parentNode.insertBefore(cap, node);
+    const preNode = pre ? node.parentNode.insertBefore(document.createTextNode(pre), cap) : null;
+    return owned((animate) => {
+      art.textContent = "";
+      const d = drawing(art, 124, 124, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const box = rrect(8, 8, 108, 108, 10);
+      const per = box.L / Math.round(box.L / 34);
+      d.fade(d.stroke(d.svg, roundedRectPath(14, 14, 96, 96, 5), "dim", 0.8), 1.4);
+      const back = d.group(d.svg);
+      d.stroke(d.svg, roundedRectPath(8, 8, 108, 108, 10), "ln", 2, 420, 0.4, 1.2);
+      const front = d.group(d.svg);
+      d.chain(back, front, helix(box.at, box.L, 5, per, 0, 1.5), box.L, 1, 3, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(box.at, box.L, 5, per, 0, { size: 6.5, alpha: 0.9, every: p.leaves > 1.5 ? 1 : 2 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, 1 + 3 * q.s / box.L + 0.1);
+        }
+      }
+      if (animate) d.fade(glyph, 0.6);
+    }, () => {
+      node.nodeValue = text;
+      cap.remove();
+      if (preNode) preNode.remove();
+    });
+  }
+  function mountFleuron(host, p, opts) {
+    const s = slot("ak-orn-fleuron");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 160, 64, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      for (const sx of [1, -1]) {
+        const c = turtle(80 + sx * 4, 38, sx > 0 ? 0.3 : PI4 - 0.3, 70, (u) => -sx * (0.01 + 0.34 * u * u * u));
+        d.stroke(d.svg, c.d, "ln", 1.4, c.len, 0.3, 1.3);
+        if (p.leaves > 0) {
+          const q = at(c, 0.35);
+          d.leaf(d.svg, q.x, q.y, q.h + sx * 0.95, 10, 0.8);
+        }
+        d.bead(d.svg, c.end.x, c.end.y, 1.8, 1.6);
+        d.bead(d.svg, 80 + sx * 14, 52, 1.6, 0.5);
+      }
+      d.leaf(d.svg, 80, 34, -PI4 / 2, 22, 0.2);
+      d.bead(d.svg, 80, 44, 2.4, 0.1);
+    }, () => s.remove());
+  }
+  function mountDinkus(host, _p, opts) {
+    const s = slot("ak-orn-dinkus");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 200, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      d.stroke(d.svg, "M20 12H64M136 12H180", "dim", 0.8, 120, 0.2, 0.8);
+      d.leaf(d.svg, 108, 12, 0, 14, 0.3);
+      d.leaf(d.svg, 92, 12, PI4, 14, 0.3);
+      d.bead(d.svg, 100, 12, 3.2, 0.2);
+      d.bead(d.svg, 128, 12, 1.6, 0.5);
+      d.bead(d.svg, 72, 12, 1.6, 0.5);
+    }, () => s.remove());
+  }
+  function mountBullets(host, _p, opts) {
+    host.classList.add("ak-orn-bullets");
+    const marks = [];
+    return owned((animate) => {
+      for (const m of marks) m.remove();
+      marks.length = 0;
+      Array.from(host.children).forEach((li, i) => {
+        if (li.tagName !== "LI") return;
+        const m = slot("ak-orn-bullet");
+        li.insertBefore(m, li.firstChild);
+        marks.push(m);
+        const d = drawing(m, 18, 18, { animate, speed: opts.speed, delay: opts.delay + i * 0.12, viewBox: true });
+        d.leaf(d.svg, 3, 15, -PI4 / 4, 16, 0, 0.36);
+      });
+    }, () => {
+      for (const m of marks) m.remove();
+      host.classList.remove("ak-orn-bullets");
+    });
+  }
+  var TEXT_FIGURES = {
+    flourish: { params: ["leaves"], mount: mountFlourish },
+    swash: { params: ["leaves"], mount: mountSwash },
+    dropcap: { params: ["leaves"], mount: mountDropcap },
+    fleuron: { params: ["leaves"], mount: mountFleuron },
+    dinkus: { params: [], mount: mountDinkus },
+    bullets: { params: [], mount: mountBullets }
+  };
+
+  // src/static/sdk-libs/atelier/ornament.js
+  var ORN_PARAMS = {
+    speed: { min: 0.25, max: 3, default: 1 },
+    delay: { min: 0, max: 5, default: 0 },
+    leaves: { min: 0, max: 2, default: 1 },
+    value: { min: 0, max: 1, default: 0.64 },
+    strands: { min: 2, max: 4, default: 3 }
+  };
+  var FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES };
+  var ORNAMENT_IDS = Object.keys(FIGURES);
+  function ornamentParams(id, given) {
+    const fig = FIGURES[id];
+    const g = given || {};
+    const out = {};
+    for (const name of Object.keys(ORN_PARAMS)) {
+      const b = ORN_PARAMS[
+        /** @type {keyof typeof ORN_PARAMS} */
+        name
+      ];
+      const takes = name === "speed" || name === "delay" || fig && fig.params.indexOf(name) >= 0;
+      const n = Number(g[name]);
+      out[name] = takes && Number.isFinite(n) ? Math.max(b.min, Math.min(b.max, n)) : b.default;
+    }
+    return (
+      /** @type {OrnParams} */
+      /** @type {unknown} */
+      out
+    );
+  }
+  function hostFor(el2) {
+    if (getComputedStyle(el2).position === "static") el2.classList.add("ak-orn-host");
+    else el2.classList.add("ak-orn-host--placed");
+  }
+  function mountOverlay(host, fig, p, animate) {
+    hostFor(host);
+    const spec = fig.overlay;
+    const make = (cls) => {
+      const box = document.createElement("span");
+      box.className = "ak-orn-layer " + cls;
+      box.setAttribute("aria-hidden", "true");
+      host.appendChild(box);
+      return box;
+    };
+    const under = spec.under !== false ? make("ak-orn-layer--under") : null;
+    const over = spec.over ? make("ak-orn-layer--over") : null;
+    let lastW = -1;
+    let lastH = -1;
+    const render = (grow) => {
+      const w = host.offsetWidth;
+      const h = host.offsetHeight;
+      lastW = w;
+      lastH = h;
+      if (w < 8 || h < 8) return;
+      const pad = spec.pad(w, h);
+      const W7 = w + 2 * pad.x;
+      const H4 = h + 2 * pad.y;
+      const opts = { animate: grow, speed: p.speed, delay: p.delay, view: { x: pad.x, y: pad.y, w, h } };
+      const layers = { under: null, over: null };
+      for (
+        const [key, box] of
+        /** @type {Array<['under' | 'over', HTMLElement | null]>} */
+        [["under", under], ["over", over]]
+      ) {
+        if (!box) continue;
+        box.textContent = "";
+        box.style.left = "0px";
+        box.style.top = "0px";
+        box.style.width = w + "px";
+        box.style.height = h + "px";
+        layers[key] = drawing(box, W7, H4, opts);
+      }
+      spec.draw(layers, w, h, pad, p, host);
+    };
+    render(animate);
+    let frame2 = 0;
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(host.offsetWidth - lastW) < 2 && Math.abs(host.offsetHeight - lastH) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(host);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        if (under) under.remove();
+        if (over) over.remove();
+        host.classList.remove("ak-orn-host", "ak-orn-host--placed");
+      }
+    };
+  }
+  function ornament(target, id, opts) {
+    const host = (
+      /** @type {HTMLElement | null} */
+      typeof target === "string" ? document.querySelector(target) : target
+    );
+    const fig = FIGURES[id];
+    if (!host || !fig) return null;
+    const prev = (
+      /** @type {any} */
+      host.__akOrnament
+    );
+    if (prev && typeof prev.destroy === "function") prev.destroy();
+    const p = ornamentParams(id, opts);
+    const animate = !(opts && opts.animate === false) && !reducedMotion();
+    const mounted = "overlay" in fig ? mountOverlay(host, fig, p, animate) : (
+      /** @type {InlineFigure} */
+      fig.mount(host, p, { speed: p.speed, delay: p.delay })
+    );
+    if (!("overlay" in fig)) mounted.render(animate);
+    host.setAttribute("data-ak-ornament", id);
+    const handle2 = {
+      id,
+      el: host,
+      replay: () => mounted.render(!reducedMotion()),
+      set: (v) => {
+        if (typeof /** @type {any} */
+        mounted.set === "function") mounted.set(v);
+      },
+      destroy: () => {
+        mounted.teardown();
+        host.removeAttribute("data-ak-ornament");
+        if (
+          /** @type {any} */
+          host.__akOrnament === handle2
+        ) delete /** @type {any} */
+        host.__akOrnament;
+      }
+    };
+    host.__akOrnament = handle2;
+    return handle2;
+  }
+
   // src/static/sdk-libs/_core/format.js
   function fmt() {
     const ns = typeof window !== "undefined" ? window.AIMEAT : null;
@@ -6995,12 +8211,12 @@
       if (!parts) return String(v);
       [y, m, d] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
     }
-    const at2 = new Date(Date.UTC(y, m, d, 12));
+    const at3 = new Date(Date.UTC(y, m, d, 12));
     const f = fmt();
     const withUtc = Object.assign({}, opts, { timeZone: "UTC" });
-    if (f && typeof f.date === "function") return f.date(at2, withUtc);
+    if (f && typeof f.date === "function") return f.date(at3, withUtc);
     try {
-      return at2.toLocaleDateString(void 0, withUtc);
+      return at3.toLocaleDateString(void 0, withUtc);
     } catch {
       return String(v);
     }
@@ -10232,7 +11448,7 @@ Known schemas:
     }
     return s;
   }
-  function at(value, path) {
+  function at2(value, path) {
     let v = (
       /** @type {any} */
       value
@@ -10331,7 +11547,7 @@ Known schemas:
         if (nested.indexOf(e) >= 0) continue;
         const path = segments(e.instanceLocation);
         const here = path.join(".");
-        const value = at(data, path);
+        const value = at2(data, path);
         if (kw === "required" || kw === "dependencies" && /does not have/.test(e.error)) {
           const names = quoted(e.error);
           const field = (here ? here + "." : "") + names[names.length - 1];
@@ -11296,20 +12512,20 @@ Known schemas:
     if (!slices.length) return ctx.empty();
     const total = slices.reduce((sum, s) => sum + s.value, 0);
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
-    const R = 88;
+    const R2 = 88;
     const STROKE = 26;
-    const C = 2 * Math.PI * R;
+    const C = 2 * Math.PI * R2;
     const GAP2 = 4;
     const wrap2 = el("div", { class: "ak-chart__donutwrap" });
     const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
-    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R, class: "ak-chart__ring", "stroke-width": STROKE }));
+    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R2, class: "ak-chart__ring", "stroke-width": STROKE }));
     let offset = 0;
     slices.forEach((s, i) => {
       const frac = s.value / total;
       const ring2 = svg("circle", {
         cx: 115,
         cy: 115,
-        r: R,
+        r: R2,
         class: "ak-chart__slice",
         style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
         "stroke-width": STROKE,
@@ -11697,13 +12913,13 @@ Known schemas:
     const H4 = 340;
     const CX = W7 / 2;
     const CY = H4 / 2 + 4;
-    const R = 118;
+    const R2 = 118;
     const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
-    const at2 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+    const at3 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (const frac of [0.25, 0.5, 0.75, 1]) {
       node.appendChild(svg("polygon", {
-        points: axes.map((a, i) => at2(i, R * frac)).join(" "),
+        points: axes.map((a, i) => at3(i, R2 * frac)).join(" "),
         class: "ak-chart__radarring"
       }));
     }
@@ -11711,12 +12927,12 @@ Known schemas:
       node.appendChild(svg("line", {
         x1: CX,
         y1: CY,
-        x2: CX + Math.cos(angle(i)) * R,
-        y2: CY + Math.sin(angle(i)) * R,
+        x2: CX + Math.cos(angle(i)) * R2,
+        y2: CY + Math.sin(angle(i)) * R2,
         class: "ak-chart__radarspoke"
       }));
-      const lx = CX + Math.cos(angle(i)) * (R + 16);
-      const ly = CY + Math.sin(angle(i)) * (R + 16);
+      const lx = CX + Math.cos(angle(i)) * (R2 + 16);
+      const ly = CY + Math.sin(angle(i)) * (R2 + 16);
       const cap = svg("text", {
         x: lx.toFixed(1),
         y: (ly + 4).toFixed(1),
@@ -11728,7 +12944,7 @@ Known schemas:
     });
     const still2 = ctx.still();
     series.forEach((s, si) => {
-      const points = axes.map((a, i) => at2(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
+      const points = axes.map((a, i) => at3(i, R2 * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
       const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
       shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
       shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
@@ -11760,12 +12976,12 @@ Known schemas:
     const lines = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__line"));
     const rest = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__area, .ak-chart__dot"));
     if (motionOff(root) || !lines.length) return;
-    lines.forEach(function(line) {
-      const len = typeof line.getTotalLength === "function" ? line.getTotalLength() : 0;
+    lines.forEach(function(line2) {
+      const len = typeof line2.getTotalLength === "function" ? line2.getTotalLength() : 0;
       if (!len) return;
-      line.setAttribute("stroke-dasharray", String(len));
-      line.setAttribute("stroke-dashoffset", String(len));
-      line.classList.add("ak-chart__line--enter");
+      line2.setAttribute("stroke-dasharray", String(len));
+      line2.setAttribute("stroke-dashoffset", String(len));
+      line2.classList.add("ak-chart__line--enter");
     });
     rest.forEach(function(n) {
       n.classList.add("ak-chart__late");
@@ -11779,8 +12995,8 @@ Known schemas:
       clearTimeout(late);
       if (watch3) watch3.destroy();
       requestAnimationFrame(function() {
-        lines.forEach(function(line) {
-          line.classList.add("ak-chart__line--drawn");
+        lines.forEach(function(line2) {
+          line2.classList.add("ak-chart__line--drawn");
         });
         rest.forEach(function(n) {
           n.classList.add("ak-chart__late--in");
@@ -11925,7 +13141,7 @@ Known schemas:
       const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
       const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
       const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
-      const slot = innerAlong / labels.length;
+      const slot2 = innerAlong / labels.length;
       const cross = (v) => horizontal ? pad.left + innerCross * ((v - min) / (max - min)) : pad.top + innerCross * (1 - (v - min) / (max - min));
       const node = svg("svg", { viewBox: `0 0 ${horizontal ? width : W} ${horizontal ? height : H}`, class: "ak-chart__svg", "aria-hidden": "true" });
       const defs = defsFor(node, series.length);
@@ -11937,7 +13153,7 @@ Known schemas:
         node.appendChild(tick);
       }
       labels.forEach((label, i) => {
-        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot2 / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot2 / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
         tx.textContent = String(label);
         node.appendChild(tx);
       });
@@ -11945,14 +13161,14 @@ Known schemas:
       for (const s of series) {
         if (s.kind !== "area" || horizontal) continue;
         const si = series.indexOf(s);
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
         const path = smoothPath(pts) + ` L ${pts[pts.length - 1].x} ${cross(0)} L ${pts[0].x} ${cross(0)} Z`;
         node.appendChild(svg("path", { d: path, class: "ak-chart__area", fill: defs.fade(si) }));
       }
-      const groupPad = slot * 0.16;
-      const radius = Math.min(7, Math.max(3, (slot - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
+      const groupPad = slot2 * 0.16;
+      const radius = Math.min(7, Math.max(3, (slot2 - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
       if (stacked) {
-        const stackW = Math.max(slot - groupPad * 2, 2);
+        const stackW = Math.max(slot2 - groupPad * 2, 2);
         for (let i = 0; i < labels.length; i++) {
           let acc = 0;
           bars.forEach((s, bi) => {
@@ -11970,7 +13186,7 @@ Known schemas:
           });
         }
       } else {
-        const barW = bars.length ? (slot - groupPad * 2) / bars.length : 0;
+        const barW = bars.length ? (slot2 - groupPad * 2) / bars.length : 0;
         bars.forEach((s, bi) => {
           const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
           s.values.slice(0, labels.length).forEach((v, i) => {
@@ -12006,9 +13222,9 @@ Known schemas:
       for (const s of lines) {
         if (horizontal) continue;
         const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
-        const line = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
-        node.appendChild(line);
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
+        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
+        node.appendChild(line2);
         const last = pts[pts.length - 1];
         node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
       }
@@ -12018,12 +13234,12 @@ Known schemas:
         const rig = hoverRig(root, node, {
           top: pad.top,
           bottom: H - pad.bottom,
-          x: (i) => along(i) + slot / 2,
+          x: (i) => along(i) + slot2 / 2,
           points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) }))
         });
-        wireTooltip(node, labels, series, along, slot, rig);
+        wireTooltip(node, labels, series, along, slot2, rig);
       }
-      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
+      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot2);
       if (!still2) drawWhenSeen(root, node);
     }
     function legendFor(series) {
@@ -12041,14 +13257,14 @@ Known schemas:
       });
       root.appendChild(legend);
     }
-    function wireTooltip(node, labels, series, along, slot, rig) {
+    function wireTooltip(node, labels, series, along, slot2, rig) {
       const tip = el("div", { class: "ak-chart__tip" });
       root.appendChild(tip);
       let shownAt = -1;
       node.addEventListener("pointermove", (ev) => {
         const box = node.getBoundingClientRect();
         const sx = (ev.clientX - box.left) * (W / box.width);
-        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot)));
+        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot2)));
         if (i !== shownAt) {
           shownAt = i;
           clear(tip);
@@ -12064,7 +13280,7 @@ Known schemas:
           });
         }
         const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
         tip.style.top = `${box.top - rootBox.top + 6}px`;
         rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
       });
@@ -12073,7 +13289,7 @@ Known schemas:
         rig.hide(tip);
       });
     }
-    function noteBubble(node, note, labels, along, slot) {
+    function noteBubble(node, note, labels, along, slot2) {
       const i = labels.indexOf(note.label);
       if (i < 0 || !note.text) return;
       const bubble = el("div", { class: "ak-chart__note" }, [
@@ -12084,7 +13300,7 @@ Known schemas:
       requestAnimationFrame(() => {
         const box = node.getBoundingClientRect();
         const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
         bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
         bubble.style.top = `${box.top - rootBox.top + 4}px`;
       });
@@ -12259,11 +13475,11 @@ Known schemas:
       root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
       const widths = /* @__PURE__ */ new Map();
       for (const item of nodes) widths.set(item.id, pillWidth(item.label));
-      const at2 = place(nodes, widths);
+      const at3 = place(nodes, widths);
       const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
       for (const edge of edges) {
-        const a = at2.get(edge.from);
-        const b = at2.get(edge.to);
+        const a = at3.get(edge.from);
+        const b = at3.get(edge.to);
         if (!a || !b) continue;
         node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
         if (edge.label) {
@@ -12278,7 +13494,7 @@ Known schemas:
         }
       }
       for (const item of nodes) {
-        const p = at2.get(item.id);
+        const p = at3.get(item.id);
         const width = widths.get(item.id);
         const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
         g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
@@ -12344,13 +13560,13 @@ Known schemas:
       root.setAttribute("aria-label", spec.title || t("empty"));
       const max = data && typeof data.max === "number" && data.max > 0 ? data.max : Math.max(...values, 1e-4);
       const node = svg3("svg", { viewBox: `0 0 ${W3} ${H3}`, class: "ak-waveform__svg", "aria-hidden": "true", preserveAspectRatio: "none" });
-      const slot = W3 / values.length;
-      const barW = Math.max(Math.min(slot * 0.62, 14), 1.5);
+      const slot2 = W3 / values.length;
+      const barW = Math.max(Math.min(slot2 * 0.62, 14), 1.5);
       values.forEach((v, i) => {
         const half = Math.max(Math.min(v / max, 1) * (H3 - 8) / 2, 1.2);
         const strength = Math.round(Math.min(v / max, 1) * 100);
         node.appendChild(svg3("rect", {
-          x: i * slot + (slot - barW) / 2,
+          x: i * slot2 + (slot2 - barW) / 2,
           y: H3 / 2 - half,
           width: barW,
           height: half * 2,
@@ -12641,24 +13857,24 @@ Known schemas:
         return;
       }
       if (kind === "globe") {
-        const R = 3;
+        const R2 = 3;
         const accentC = new THREE.Color(accent);
         const inkC = new THREE.Color(ink3);
         const surfaceC = new THREE.Color(surface);
         const ball = new THREE.Group();
         group.add(ball);
         ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R - 0.02, 48, 32),
+          new THREE.SphereGeometry(R2 - 0.02, 48, 32),
           new THREE.MeshStandardMaterial({ color: surfaceC.clone().lerp(inkC, 0.05), roughness: 0.9, metalness: 0.02 })
         ));
         ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R * 1.045, 48, 32),
+          new THREE.SphereGeometry(R2 * 1.045, 48, 32),
           new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
         ));
         const gratMat = new THREE.LineBasicMaterial({ color: inkC, transparent: true, opacity: 0.22 });
         const toV = function(lat, lon, r) {
           return new THREE.Vector3().setFromSphericalCoords(
-            r || R,
+            r || R2,
             THREE.MathUtils.degToRad(90 - lat),
             THREE.MathUtils.degToRad(lon + 180)
           );
@@ -12680,7 +13896,7 @@ Known schemas:
         const dotMat = new THREE.MeshBasicMaterial({ color: accentC });
         for (const p of points) {
           const dot = new THREE.Mesh(dotGeo, dotMat);
-          dot.position.copy(toV(p.lat, p.lon, R + 0.02));
+          dot.position.copy(toV(p.lat, p.lon, R2 + 0.02));
           ball.add(dot);
         }
         const routes = (data && Array.isArray(data.routes) ? data.routes : []).filter(function(r2) {
@@ -12688,11 +13904,11 @@ Known schemas:
         });
         const arcMat = new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.7 });
         for (const r2 of routes) {
-          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R + 0.02);
-          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R + 0.02);
+          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R2 + 0.02);
+          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R2 + 0.02);
           const sum = a.clone().add(b);
-          if (sum.lengthSq() < 1e-6) sum.set(0, R, 0);
-          const lift = R + 0.25 + a.distanceTo(b) * 0.3;
+          if (sum.lengthSq() < 1e-6) sum.set(0, R2, 0);
+          const lift = R2 + 0.25 + a.distanceTo(b) * 0.3;
           const mid = sum.normalize().multiplyScalar(lift);
           const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
           ball.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.025, 6, false), arcMat));
@@ -13233,11 +14449,11 @@ Known schemas:
     }
     let drag2 = null;
     viewport.addEventListener("pointerdown", function(ev) {
-      const at2 = (
+      const at3 = (
         /** @type {Element|null} */
         ev.target instanceof Element ? ev.target : null
       );
-      if (at2 && at2.closest(".ak-mosaic__tilecover")) return;
+      if (at3 && at3.closest(".ak-mosaic__tilecover")) return;
       drag2 = { x: ev.clientX, y: ev.clientY };
       viewport.setPointerCapture(ev.pointerId);
     });
@@ -13779,7 +14995,7 @@ Known schemas:
     const root = el("figure", { class: "ak-root ak-gauge", role: "img", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
-    const R = 96;
+    const R2 = 96;
     const CX = 120;
     const CY = 118;
     function pointAt(frac, radius) {
@@ -13816,16 +15032,16 @@ Known schemas:
       if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
       root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
       const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
-      node.appendChild(svg4("path", { d: arcPath(0, 1, R), class: "ak-gauge__track" }));
-      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R), class: "ak-gauge__value ak-gauge__value--" + tone });
+      node.appendChild(svg4("path", { d: arcPath(0, 1, R2), class: "ak-gauge__track" }));
+      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
       node.appendChild(value);
       for (const band of bands.slice(0, -1)) {
         const f = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
-        const [x1, y1] = pointAt(f, R - 12);
-        const [x2, y2] = pointAt(f, R + 12);
+        const [x1, y1] = pointAt(f, R2 - 12);
+        const [x2, y2] = pointAt(f, R2 + 12);
         node.appendChild(svg4("line", { x1, y1, x2, y2, class: "ak-gauge__tickmark" }));
       }
-      const [dx, dy] = pointAt(frac, R);
+      const [dx, dy] = pointAt(frac, R2);
       node.appendChild(svg4("circle", { cx: dx, cy: dy, r: 8, class: "ak-gauge__marker ak-gauge__marker--" + tone }));
       root.appendChild(node);
       if (!reducedMotion()) {
@@ -14096,7 +15312,7 @@ Known schemas:
         },
         onMove: function(dx, dy) {
           const all = rows();
-          const at2 = all.indexOf(row);
+          const at3 = all.indexOf(row);
           const others = all.filter(function(r) {
             return r !== row;
           });
@@ -14104,8 +15320,8 @@ Known schemas:
           const step = row.offsetHeight + gap();
           others.forEach(function(r, i) {
             let to = 0;
-            if (want > at2 && i >= at2 && i < want) to = -step;
-            else if (want < at2 && i >= want && i < at2) to = step;
+            if (want > at3 && i >= at3 && i < want) to = -step;
+            else if (want < at3 && i >= want && i < at3) to = step;
             if ((held.get(r) || 0) === to) return;
             held.set(r, to);
             spring(r, { y: to }, CARRY);
@@ -14114,11 +15330,11 @@ Known schemas:
         onEnd: function(dx, dy) {
           row.classList.remove("is-carried");
           const all = rows();
-          const at2 = all.indexOf(row);
+          const at3 = all.indexOf(row);
           const want = Math.max(0, Math.min(wanted(row, dy), all.length - 1));
           held.set(row, dy);
           place2(row, want);
-          if (want !== at2) tell();
+          if (want !== at3) tell();
         }
       }, { axis: "y", back: false });
     }
@@ -14452,11 +15668,11 @@ Known schemas:
     function toggle2(rec) {
       const facet = rec.facet;
       const list3 = picked[facet.id] ? picked[facet.id].slice() : [];
-      const at2 = list3.indexOf(rec.option.id);
+      const at3 = list3.indexOf(rec.option.id);
       if (facet.multi) {
-        if (at2 >= 0) list3.splice(at2, 1);
+        if (at3 >= 0) list3.splice(at3, 1);
         else list3.push(rec.option.id);
-      } else if (at2 >= 0) {
+      } else if (at3 >= 0) {
         list3.length = 0;
       } else {
         list3.length = 0;
@@ -14803,9 +16019,9 @@ Known schemas:
       });
       const today = data.today ? day(data.today) : /* @__PURE__ */ new Date();
       if (today && today.getTime() >= min.getTime() && today.getTime() <= max.getTime()) {
-        const line = el("span", { class: "ak-plan__today", title: t("today") });
-        line.style.left = X(today) + "%";
-        body.appendChild(line);
+        const line2 = el("span", { class: "ak-plan__today", title: t("today") });
+        line2.style.left = X(today) + "%";
+        body.appendChild(line2);
       }
       root.appendChild(body);
     }
@@ -14845,9 +16061,9 @@ Known schemas:
       const grid2 = el("div", { class: "ak-schedule__grid" });
       const hours = el("div", { class: "ak-schedule__hours" });
       for (let m = Math.ceil(open / 60) * 60; m <= close; m += 60) {
-        const line = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
-        line.style.top = Y(m) + "%";
-        hours.appendChild(line);
+        const line2 = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
+        line2.style.top = Y(m) + "%";
+        hours.appendChild(line2);
       }
       grid2.appendChild(hours);
       days.forEach((label, di) => {
@@ -14958,11 +16174,11 @@ Known schemas:
     function atTail() {
       return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
     }
-    function lineNode(line, entering) {
-      const tone = TONES7.indexOf(line.tone) >= 0 ? line.tone : "plain";
+    function lineNode(line2, entering) {
+      const tone = TONES7.indexOf(line2.tone) >= 0 ? line2.tone : "plain";
       const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
-        line.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line.ts) }) : null,
-        el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
+        line2.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line2.ts) }) : null,
+        el("span", { class: "ak-console__text", text: String(line2.text == null ? "" : line2.text) })
       ]);
       if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
       return node;
@@ -14982,7 +16198,7 @@ Known schemas:
         emptyCard = emptyState({ target: vane, tone: "quiet", title: e.title || t("consoleEmpty"), hint: e.hint || "" });
         return;
       }
-      for (const line of lines.slice(-cap)) vane.appendChild(lineNode(line, false));
+      for (const line2 of lines.slice(-cap)) vane.appendChild(lineNode(line2, false));
       vane.scrollTop = vane.scrollHeight;
     }
     render(spec.data);
@@ -14999,7 +16215,7 @@ Known schemas:
           emptyCard = null;
         }
         const follow = atTail();
-        for (const line of lines) vane.appendChild(lineNode(line, true));
+        for (const line2 of lines) vane.appendChild(lineNode(line2, true));
         trim();
         if (follow) vane.scrollTop = vane.scrollHeight;
       },
@@ -15261,8 +16477,8 @@ Known schemas:
     let s = String(principal || "");
     const hash = s.lastIndexOf("#");
     if (hash >= 0) s = s.slice(hash + 1);
-    const at2 = s.indexOf("@");
-    return at2 >= 0 ? s.slice(0, at2) : s;
+    const at3 = s.indexOf("@");
+    return at3 >= 0 ? s.slice(0, at3) : s;
   }
   function legalPath(ref) {
     return apiBase() + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/legal";
@@ -15503,13 +16719,13 @@ Known schemas:
       window.AIMEAT
     );
     if (!ns || !ns.rows) return Promise.reject(new Error("aimeat-rows.js is not loaded"));
-    const at2 = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
+    const at3 = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
     return ns.rows.append(
       ev.org,
       ev.ws,
       ev.space,
-      { app: ev.app, kind: ev.kind, actor: ev.actor, at: at2, detail: ev.detail == null ? null : ev.detail },
-      { rowId: ev.rowId, occurredAt: at2 }
+      { app: ev.app, kind: ev.kind, actor: ev.actor, at: at3, detail: ev.detail == null ? null : ev.detail },
+      { rowId: ev.rowId, occurredAt: at3 }
     );
   }
   function feedbackForm(spec) {
@@ -17227,31 +18443,31 @@ Known schemas:
     const root = el("div", { class: "ak-ws-follow", "data-ak-part": "follow" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let inner = null;
-    let at2 = "";
+    let at3 = "";
     let stopped = false;
-    function line(key) {
+    function line2(key) {
       clear(root);
       root.appendChild(el("section", { class: "ak-root ak-mem ak-ws", "data-ak-part": "root" }, [
         el("p", { class: "ak-mem__none", role: "status", "data-ak-part": key === "follow.wait" ? "wait" : "private" }, tw(key))
       ]));
     }
     function waiting() {
-      line("follow.wait");
+      line2("follow.wait");
     }
     function mount(c) {
       if (stopped || !c) return;
       if (c.private) {
-        if (at2 === "private") return;
-        at2 = "private";
+        if (at3 === "private") return;
+        at3 = "private";
         if (inner) inner.destroy();
         inner = null;
-        line("follow.private");
+        line2("follow.private");
         return;
       }
       if (!c.orgId || !c.wsId) return;
       const key = c.orgId + "/" + c.wsId;
-      if (key === at2) return;
-      at2 = key;
+      if (key === at3) return;
+      at3 = key;
       if (inner) inner.destroy();
       clear(root);
       inner = factory(Object.assign({}, spec, { target: root, org: c.orgId, ws: c.wsId }));
@@ -17273,7 +18489,7 @@ Known schemas:
       if (!o || typeof o.recall !== "function") return;
       try {
         const c = await o.recall(spec.app, { verify: true });
-        if (!at2 && c && c.orgId && c.wsId) mount(c);
+        if (!at3 && c && c.orgId && c.wsId) mount(c);
       } catch (e) {
         console.debug("aimeat-atelier: remembered workspace not read", e);
       }
@@ -17286,11 +18502,11 @@ Known schemas:
       recall();
     }
     const stopWatch = watch2(function() {
-      if (at2 === "private") {
-        line("follow.private");
+      if (at3 === "private") {
+        line2("follow.private");
         return;
       }
-      if (at2) return;
+      if (at3) return;
       waiting();
       recall();
     }, root);
@@ -17448,9 +18664,9 @@ Known schemas:
     function nameOf2(m) {
       return m.displayName || m.account;
     }
-    let drawing = 0;
+    let drawing2 = 0;
     async function render() {
-      const mine = ++drawing;
+      const mine = ++drawing2;
       clear(root);
       root.appendChild(el(
         "h3",
@@ -17485,11 +18701,11 @@ Known schemas:
           data = both[0];
           open = both[1];
         } catch (e) {
-          if (mine !== drawing) return;
+          if (mine !== drawing2) return;
           root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: refusal(e) || String(e) })));
           return;
         }
-        if (mine !== drawing) return;
+        if (mine !== drawing2) return;
       }
       const people = (data && data.members || []).filter(function(m) {
         return m && m.account;
@@ -19291,13 +20507,13 @@ Known schemas:
       }
       function tellByHand(url) {
         const whole = ti("intake.copyByHand", { url });
-        const at2 = whole.lastIndexOf(url);
+        const at3 = whole.lastIndexOf(url);
         clear(noticeEl);
         const link = el("span", { text: url });
-        if (at2 < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
-        else if (at2 > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at2)));
+        if (at3 < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
+        else if (at3 > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at3)));
         noticeEl.appendChild(link);
-        if (at2 >= 0 && at2 + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at2 + url.length)));
+        if (at3 >= 0 && at3 + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at3 + url.length)));
         noticeEl.hidden = false;
         selectForHand(link);
       }
@@ -20167,7 +21383,7 @@ Known schemas:
   }
   function sampleInputs() {
     const now2 = Date.now();
-    const at2 = function(hours) {
+    const at3 = function(hours) {
       return new Date(now2 + hours * 36e5).toISOString();
     };
     return [
@@ -20177,8 +21393,8 @@ Known schemas:
         stepId: "review",
         mode: "full-live",
         workflowTitle: twf("wf.sample.wf1"),
-        askedAt: at2(-2),
-        deadline: at2(22),
+        askedAt: at3(-2),
+        deadline: at3(22),
         question: {
           header: twf("wf.sample.header1"),
           prompt: twf("wf.sample.q1"),
@@ -20196,8 +21412,8 @@ Known schemas:
         stepId: "pick-suppliers",
         mode: "full-sandbox",
         workflowTitle: twf("wf.sample.wf2"),
-        askedAt: at2(-20),
-        deadline: at2(52),
+        askedAt: at3(-20),
+        deadline: at3(52),
         question: {
           prompt: twf("wf.sample.q2"),
           multiSelect: true,
@@ -20705,9 +21921,9 @@ Known schemas:
     }
     host.appendChild(el("div", { class: cls || "ak-aitask__text" }, text));
   }
-  function madeWhen(at2) {
-    if (at2 == null || at2 === "") return "";
-    const d = new Date(at2);
+  function madeWhen(at3) {
+    if (at3 == null || at3 === "") return "";
+    const d = new Date(at3);
     if (!isFinite(d.getTime())) return "";
     return dateTime(d.toISOString(), { dateStyle: "medium", timeStyle: "short" });
   }
@@ -22101,13 +23317,13 @@ Known schemas:
     return { result, thresholds };
   }
   function reviewedWords(rev) {
-    const at2 = day2(rev.at);
+    const at3 = day2(rev.at);
     let words;
-    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at: at2 });
-    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at: at2 });
+    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at: at3 });
+    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at: at3 });
     else {
       const v = rev.override === true ? td("decision.yes") : rev.override === false ? td("decision.no") : String(rev.override);
-      words = td("decision.reviewed.overriddenTo", { at: at2, v });
+      words = td("decision.reviewed.overriddenTo", { at: at3, v });
     }
     return rev.note ? words + " " + td("decision.reviewed.note", { note: rev.note }) : words;
   }
@@ -22460,7 +23676,7 @@ Known schemas:
           const box = el("div", { class: "ak-dec__step", "data-ak-part": "step", "data-step": String(i + 1) });
           box.appendChild(el("p", { class: "ak-dec__step-title", "data-ak-part": "stepTitle" }, td("decision.round", { n: i + 1 })));
           box.appendChild(answerList(r, i, ownWord));
-          for (const line of facts(r)) box.appendChild(line);
+          for (const line2 of facts(r)) box.appendChild(line2);
           body.appendChild(box);
         });
       } else body.appendChild(answerList(result, 0, ownWord));
@@ -22471,7 +23687,7 @@ Known schemas:
         /** @type {HTMLElement} */
         drawPerson()
       );
-      if (!rounds2) for (const line of facts(result)) body.appendChild(line);
+      if (!rounds2) for (const line2 of facts(result)) body.appendChild(line2);
       if (!sample && !storedId && !noState(state)) {
         const again = el("button", { type: "button", class: "ak-btn ak-btn--ghost", "data-ak-part": "again" }, td("decision.again"));
         again.addEventListener("click", function() {
@@ -23609,21 +24825,21 @@ Known schemas:
     };
   }
   var STATUS_KEYS = { sent: "threadSent", read: "threadRead", failed: "threadFailed" };
-  function dateOf(at2) {
-    if (!at2) return null;
-    const d = new Date(at2);
+  function dateOf(at3) {
+    if (!at3) return null;
+    const d = new Date(at3);
     return Number.isNaN(d.getTime()) ? null : d;
   }
-  function dayKeyOf(at2) {
-    const d = dateOf(at2);
+  function dayKeyOf(at3) {
+    const d = dateOf(at3);
     if (!d) return "unknown";
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
-  function dayLabelOf(at2) {
-    const d = dateOf(at2);
+  function dayLabelOf(at3) {
+    const d = dateOf(at3);
     if (!d) return t("earlier");
     const now2 = /* @__PURE__ */ new Date();
-    const key = dayKeyOf(at2);
+    const key = dayKeyOf(at3);
     if (key === dayKeyOf(now2)) return t("today");
     const back = new Date(now2.getTime() - 864e5);
     if (key === dayKeyOf(back)) return t("yesterday");
@@ -23632,8 +24848,8 @@ Known schemas:
     }
     return d.toDateString();
   }
-  function timeLabelOf(at2) {
-    const d = dateOf(at2);
+  function timeLabelOf(at3) {
+    const d = dateOf(at3);
     if (!d) return "";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
       return time(d, { hour: "2-digit", minute: "2-digit" });
@@ -25889,8 +27105,8 @@ Known schemas:
           const host2 = resolve(opts.target);
           const panel = el("div", { class: "ak-root ak-explain" }, [
             el("h3", { class: "ak-section__title", text: t("explainTitle") }),
-            el("ul", { class: "ak-explain__list" }, lines.map(function(line) {
-              return el("li", { text: line });
+            el("ul", { class: "ak-explain__list" }, lines.map(function(line2) {
+              return el("li", { text: line2 });
             }))
           ]);
           host2.appendChild(panel);
@@ -27738,9 +28954,9 @@ Known schemas:
     return m ? m[0] : null;
   }
   function splitTarget(target, selfOwner) {
-    const at2 = String(target || "").trim();
-    const cut = at2.indexOf("/");
-    return cut < 0 ? { gaii: selfOwner || "", key: at2 } : { gaii: at2.slice(0, cut), key: at2.slice(cut + 1) };
+    const at3 = String(target || "").trim();
+    const cut = at3.indexOf("/");
+    return cut < 0 ? { gaii: selfOwner || "", key: at3 } : { gaii: at3.slice(0, cut), key: at3.slice(cut + 1) };
   }
   function verbs(spec) {
     const root = (
@@ -28324,8 +29540,8 @@ Known schemas:
     let shape = null;
     let mu = false;
     let emptyCard = null;
-    function each(line) {
-      return readAmount(line, "price", shape);
+    function each(line2) {
+      return readAmount(line2, "price", shape);
     }
     function totalOf() {
       return current2.reduce(function(n, l) {
@@ -28335,28 +29551,28 @@ Known schemas:
     function rollTotal() {
       odometer(totalValue, money6(totalOf(), unit, mu));
     }
-    function subOf(line, qty) {
-      const own = line.sub != null && line.sub !== "" ? String(line.sub) : "";
-      const unitPrice = qty > 1 ? qty + " × " + money6(each(line), unit, mu) : "";
+    function subOf(line2, qty) {
+      const own = line2.sub != null && line2.sub !== "" ? String(line2.sub) : "";
+      const unitPrice = qty > 1 ? qty + " × " + money6(each(line2), unit, mu) : "";
       return own && unitPrice ? own + " · " + unitPrice : own || unitPrice;
     }
-    function paintSub(rec, line, qty) {
-      const text = subOf(line, qty);
+    function paintSub(rec, line2, qty) {
+      const text = subOf(line2, qty);
       rec.sub.textContent = text;
       rec.sub.hidden = !text;
     }
-    function setQty(line, next) {
+    function setQty(line2, next) {
       const q = Math.max(1, Math.round(Number(next) || 1));
-      if (q === Number(line.qty)) return;
-      line.qty = q;
-      const rec = shown.get(String(line.id));
+      if (q === Number(line2.qty)) return;
+      line2.qty = q;
+      const rec = shown.get(String(line2.id));
       if (rec) {
         rec.count.textContent = String(q);
-        rec.price.textContent = money6(each(line) * q, unit, mu);
-        paintSub(rec, line, q);
+        rec.price.textContent = money6(each(line2) * q, unit, mu);
+        paintSub(rec, line2, q);
       }
       rollTotal();
-      if (s.onChange) s.onChange(line.id, q);
+      if (s.onChange) s.onChange(line2.id, q);
     }
     function collapse(node, after) {
       const done = function() {
@@ -28376,8 +29592,8 @@ Known schemas:
       anim.addEventListener("finish", done);
       anim.addEventListener("cancel", done);
     }
-    function remove(line) {
-      const id = String(line.id);
+    function remove(line2) {
+      const id = String(line2.id);
       const rec = shown.get(id);
       current2 = current2.filter(function(l) {
         return String(l.id) !== id;
@@ -28387,15 +29603,15 @@ Known schemas:
         render({ lines: [], currency: unit, note: "" });
       });
       rollTotal();
-      if (s.onRemove) s.onRemove(line.id);
+      if (s.onRemove) s.onRemove(line2.id);
     }
-    function buildLine(line) {
-      const picture = pictureOf(line.image);
+    function buildLine(line2) {
+      const picture = pictureOf(line2.image);
       const rec = (
         /** @type {any} */
         {
           node: null,
-          line,
+          line: line2,
           art: el("span", {
             class: "ak-cart__art" + (picture ? " ak-cart__art--image" : ""),
             "aria-hidden": "true",
@@ -28412,7 +29628,7 @@ Known schemas:
           setQty(rec.line, (Number(rec.line.qty) || 1) + by);
         };
       };
-      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line.id) }, [
+      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line2.id) }, [
         rec.art,
         el("span", { class: "ak-cart__body" }, [rec.title, rec.sub]),
         el("span", { class: "ak-cart__qty" }, [
@@ -28430,18 +29646,18 @@ Known schemas:
           } }
         }, null)
       ]);
-      fillLine(rec, line);
+      fillLine(rec, line2);
       return rec;
     }
-    function fillLine(rec, line) {
-      rec.line = line;
-      const qty = Math.max(1, Math.round(Number(line.qty) || 1));
-      rec.title.textContent = String(line.title || line.id);
-      paintSub(rec, line, qty);
+    function fillLine(rec, line2) {
+      rec.line = line2;
+      const qty = Math.max(1, Math.round(Number(line2.qty) || 1));
+      rec.title.textContent = String(line2.title || line2.id);
+      paintSub(rec, line2, qty);
       rec.count.textContent = String(qty);
-      rec.price.textContent = money6(each(line) * qty, unit, mu);
+      rec.price.textContent = money6(each(line2) * qty, unit, mu);
       const mono = rec.art.querySelector(".ak-cart__monogram");
-      if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
+      if (mono) mono.textContent = (Array.from(String(line2.title || "?"))[0] || "?").toUpperCase();
     }
     function render(data) {
       const list3 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
@@ -28484,14 +29700,14 @@ Known schemas:
         shown.delete(id);
         if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
       });
-      list3.forEach(function(line) {
-        const id = String(line.id);
+      list3.forEach(function(line2) {
+        const id = String(line2.id);
         let rec = shown.get(id);
         if (!rec) {
-          rec = buildLine(line);
+          rec = buildLine(line2);
           shown.set(id, rec);
         } else {
-          fillLine(rec, line);
+          fillLine(rec, line2);
         }
         lines.appendChild(rec.node);
       });
@@ -29217,7 +30433,7 @@ Known schemas:
       };
     });
     const fill2 = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
-    const line = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
+    const line2 = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
     const links = items.map(function(it) {
       return el("a", {
         class: "ak-reading__link",
@@ -29236,7 +30452,7 @@ Known schemas:
     const nav = el("nav", {
       class: "ak-reading" + (s.target ? " ak-reading--inset" : ""),
       "aria-label": "Contents"
-    }, [line, list3]);
+    }, [line2, list3]);
     const parent = (
       /** @type {HTMLElement} */
       s.target ? resolve(s.target) : document.body
@@ -29280,11 +30496,11 @@ Known schemas:
       const through = clamp012((v.top - r.top) / Math.max(1, r.height - v.h));
       fill2.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
       const edge = v.top + v.h / READ_LINE;
-      let at2 = 0;
+      let at3 = 0;
       items.forEach(function(it, i) {
-        if (it.head.getBoundingClientRect().top <= edge) at2 = i;
+        if (it.head.getBoundingClientRect().top <= edge) at3 = i;
       });
-      mark(items.length ? at2 : -1);
+      mark(items.length ? at3 : -1);
     };
     let rafId = 0;
     const onScroll = function() {
@@ -29542,8 +30758,8 @@ Known schemas:
       });
     }
     function progress(p) {
-      const at2 = Math.max(0, Math.min(1, Number(p) || 0));
-      setDraw("0 " + at2);
+      const at3 = Math.max(0, Math.min(1, Number(p) || 0));
+      setDraw("0 " + at3);
     }
     function reset() {
       setDraw("0 0");
@@ -29706,17 +30922,17 @@ Known schemas:
   }
   function settle2(node, props) {
     let moved = false;
-    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at3 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS.forEach(function(key) {
       const end = endOf(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at2[key] = parseFloat(String(end)) || 0;
+      else at3[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
+      node.style.transform = "translate(" + at3.x + "px, " + at3.y + "px) scale(" + (props.scale === void 0 ? 1 : at3.scale) + ") rotate(" + at3.rotate + "deg)";
     }
   }
   function sequence(steps2, opts) {
@@ -29885,9 +31101,9 @@ Known schemas:
        * @param {number} p
        */
       seek: function(p) {
-        const at2 = Math.max(0, Math.min(1, Number(p) || 0));
+        const at3 = Math.max(0, Math.min(1, Number(p) || 0));
         runs.forEach(function(run) {
-          run.seek(at2 * duration2);
+          run.seek(at3 * duration2);
         });
       },
       destroy: function() {
@@ -29993,17 +31209,17 @@ Known schemas:
   }
   function settle3(node, props) {
     let moved = false;
-    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at3 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS2.forEach(function(key) {
       const end = endOf2(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at2[key] = parseFloat(String(end)) || 0;
+      else at3[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
+      node.style.transform = "translate(" + at3.x + "px, " + at3.y + "px) scale(" + (props.scale === void 0 ? 1 : at3.scale) + ") rotate(" + at3.rotate + "deg)";
     }
   }
   var MORPHABLE = "path, polygon, polyline";
@@ -30042,13 +31258,13 @@ Known schemas:
       });
     }
     const names = Object.keys(spares);
-    let at2 = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
+    let at3 = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
     warmAnime3();
     function to(name) {
       const spare = spares[name];
       if (!shown || !spare) return Promise.resolve();
       const prop = geometryProp(shown);
-      at2 = name;
+      at3 = name;
       return new Promise(function(done) {
         const swap = function() {
           shown.setAttribute(prop, spare.getAttribute(prop) || "");
@@ -30073,7 +31289,7 @@ Known schemas:
     }
     function cycle() {
       if (!names.length) return Promise.resolve();
-      const i = at2 === null ? 0 : (names.indexOf(at2) + 1) % names.length;
+      const i = at3 === null ? 0 : (names.indexOf(at3) + 1) % names.length;
       return to(names[i]);
     }
     return {
@@ -30082,7 +31298,7 @@ Known schemas:
       cycle,
       /** The name of the shape on the screen, or null while the author's own shape is showing. */
       current: function() {
-        return at2;
+        return at3;
       },
       /** Every name this call can reach, in the order `cycle` walks them. */
       names: function() {
@@ -30165,7 +31381,7 @@ Known schemas:
     }
     function build(a) {
       if (gone || dg || held) return;
-      const at2 = { x: seat.x, y: seat.y };
+      const at3 = { x: seat.x, y: seat.y };
       if (floor) {
         floor.destroy();
         floor = null;
@@ -30204,9 +31420,9 @@ Known schemas:
         params.minVelocity = 0;
       }
       dg = a.createDraggable(node, params);
-      if (at2.x || at2.y) {
-        dg.setX(at2.x, true);
-        dg.setY(at2.y, true);
+      if (at3.x || at3.y) {
+        dg.setX(at3.x, true);
+        dg.setY(at3.y, true);
       }
     }
     function handover() {
@@ -30277,12 +31493,12 @@ Known schemas:
     const distance = o.distance || 140;
     const duration2 = o.duration || 1100;
     const box = host.getBoundingClientRect();
-    const at2 = o.from || { x: box.width / 2, y: box.height / 2 };
+    const at3 = o.from || { x: box.width / 2, y: box.height / 2 };
     const lend = getComputedStyle(host).position === "static";
     if (lend) host.classList.add("ak-burst-host");
     const layer = el("div", { class: "ak-burst", "aria-hidden": "true" });
-    layer.style.setProperty("--ak-burst-x", (Number(at2.x) || 0) + "px");
-    layer.style.setProperty("--ak-burst-y", (Number(at2.y) || 0) + "px");
+    layer.style.setProperty("--ak-burst-x", (Number(at3.x) || 0) + "px");
+    layer.style.setProperty("--ak-burst-y", (Number(at3.y) || 0) + "px");
     host.appendChild(layer);
     const clean = function() {
       layer.remove();
@@ -30605,8 +31821,8 @@ Known schemas:
       return k == null ? kid : k;
     }
     function drop(ghost) {
-      const at2 = ghosts.indexOf(ghost);
-      if (at2 >= 0) ghosts.splice(at2, 1);
+      const at3 = ghosts.indexOf(ghost);
+      if (at3 >= 0) ghosts.splice(at3, 1);
       if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
     }
     function ghostOf(kid, box) {
@@ -30954,7 +32170,7 @@ Known schemas:
     nodes.forEach(function(n) {
       n.classList.add.apply(n.classList, classes);
     });
-    const owned = classes.filter(function(c) {
+    const owned2 = classes.filter(function(c) {
       return c !== "ak-micro" && c !== "ak-micro--glow";
     });
     function bind2(M) {
@@ -30962,7 +32178,7 @@ Known schemas:
       const hoverMove = hoverKind && hoverKind !== "glow" ? MOVES[hoverKind] : null;
       const pressMove = pressKind ? MOVES[pressKind] : null;
       nodes.forEach(function(n) {
-        owned.forEach(function(c) {
+        owned2.forEach(function(c) {
           n.classList.remove(c);
         });
         if (hoverMove) {
@@ -30983,7 +32199,7 @@ Known schemas:
         }
       });
     }
-    if (owned.length) {
+    if (owned2.length) {
       ensureMotion2().then(function(M) {
         if (dead || reducedMotion() || !M || typeof M.hover !== "function") return;
         bind2(M);
@@ -31456,7 +32672,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.66.2",
+    version: "0.67.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -31498,6 +32714,10 @@ Known schemas:
     margins,
     marginsOf,
     MARGINS,
+    // Animated SVG ornaments that grow round an element (ornament*.js, ornaments.css).
+    ornament,
+    ornamentParams,
+    ORNAMENT_IDS,
     // ── The stored layout, rendered ──
     mosaic,
     appRef,

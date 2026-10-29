@@ -8,6 +8,7 @@
  * @structure proposeChecksFor(input)
  * @usage bench: { checks: proposeChecksFor(input), passed_at: now }
  * @version-history
+ *   v1.1.0 — 2026-10-29 — `ornament-valid` for the ornament kind.
  *   v1.0.0 — 2026-10-19 — Moved from service.ts (pure extraction); `avatar-valid` for the avatar kind.
  */
 import type { PartInput } from './validate.js';
@@ -19,6 +20,8 @@ export function proposeChecksFor(input: PartInput): string[] {
   if (input.kind === 'illustration') return ['style-valid'];
   // One SVG the agent-avatar reader accepts (avatar.ts).
   if (input.kind === 'avatar') return ['avatar-valid'];
+  // A figure the kit draws, its knobs inside the registry's bounds, a look this node ships (ornament.ts).
+  if (input.kind === 'ornament') return ['ornament-valid'];
   // Markup against the allowlist, the stylesheet under its own prefix, every colour a token.
   if (input.kind === 'component') return ['markup-allowlist', 'styles-scoped', 'colours-are-tokens', 'no-script', 'judgement-given'];
   // A genre that grew out of an app is the proposer's own page; what earns it the shelf is its

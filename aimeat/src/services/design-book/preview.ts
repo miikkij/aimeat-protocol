@@ -19,6 +19,8 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.8.0 — 2026-10-29 — An ornament part previews as its figure on the element it was drawn for
+ *     (ornament.ts), with a control that grows it again.
  *   v1.7.0 — 2026-10-19 — An avatar part previews as its picture at three sizes (avatar.ts).
  *   v1.6.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.6.0 — 2026-10-01 — A part with a block that draws markdown (doc, aiTask) loads
@@ -57,6 +59,7 @@ import { LOOKS } from '../../data/atelier-looks.js';
 import type { DesignBookPart } from './service.js';
 import { componentPreviewHtml, type ComponentBody } from './component.js';
 import { avatarPreviewHtml } from './avatar.js';
+import { ornamentPreviewHtml } from './ornament.js';
 import { lookStage, layerStage, wornStage, lookForShape } from './preview-stages.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 
@@ -99,6 +102,8 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   if (part.kind === 'component') {
     return { __page: componentPreviewHtml(part.body as unknown as ComponentBody) };
   }
+  // An ornament is a page of its own as well: the figure on the element it was drawn for.
+  if (part.kind === 'ornament') return { __page: ornamentPreviewHtml(part) };
   // A LOOK (or a motion recipe) is worn by a page whose content fits its character, chosen from
   // the part's own words (preview-stages.ts), and no longer by one arrangement called "Bench".
   if (part.kind === 'look' || part.kind === 'motion') {
@@ -357,6 +362,7 @@ export function partPreviewHtml(part: DesignBookPart, opts: { theme?: 'light' | 
   // A component wears the page it lands in, so its preview is asked for in the reader's theme.
   // The bench keeps measuring the light page (renderableBodyFor), which is what its stamp says.
   if (part.kind === 'component' && opts.theme) return componentPreviewHtml(part.body as unknown as ComponentBody, opts.theme);
+  if (part.kind === 'ornament' && opts.theme) return ornamentPreviewHtml(part, opts.theme);
   const renderable = renderableBodyFor(part);
   if (renderable === null) return null;
   // Every kit page may be asked for in the reader's theme; the bench measures the light one.
