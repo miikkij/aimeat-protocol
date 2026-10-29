@@ -21,6 +21,7 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-29 — structure_set: layout and nav take "custom" with a note, and a note takes 600 characters.
  *   2026-10-29 — The app's structure and plan from the first moment of building: structure,
  *     structure_set and plans over the structure routes, and the purpose, data, choices and now
  *     fields (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -166,7 +167,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // the app's structure and plan (routes/apps/structure.ts)
     purpose: { type: 'string', description: 'For structure_set: who the app is for and the one job it does for them, in the person\'s words, at most 800 characters. An empty string clears it.', zod: z.string().max(800) },
     data: { type: 'object', description: 'For structure_set: the data in short, before the data map can be written: { "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }. Write it once the person has confirmed the data map questions.', zod: z.object({ summary: z.string().max(800), personalData: z.enum(['yes', 'no', 'unstated']).optional() }) },
-    choices: { type: 'object', description: 'For structure_set: the choices made, keyed by layout (a layout preset id), nav (a navigation mode), look (an Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted), each { "value": "<id>", "state": "waiting" | "done", "note": "why" }, or null to clear it. The ids are the ones GET /v1/apps/ui/catalogue lists. A choice you make yourself is built at once (state done); a choice the person made on the structure page waits for you, so build it and write the same value with state "done". Leave out the choices you are not changing.', zod: z.record(z.string(), z.union([z.object({ value: z.string().max(80), state: z.enum(['waiting', 'done']).optional(), note: z.string().max(300).optional() }), z.null()])) },
+    choices: { type: 'object', description: 'For structure_set: the choices made, keyed by layout (a layout preset id), nav (a navigation mode), look (an Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted), each { "value": "<id>", "state": "waiting" | "done", "note": "why" }, or null to clear it. The ids are the ones GET /v1/apps/ui/catalogue lists; layout and nav also take "custom" with a note describing a screen no preset fits. A choice nobody made stays unset, and the page says the AI decides. A choice you make yourself is built at once (state done); a choice the person made on the structure page waits for you, so build it and write the same value with state "done". Leave out the choices you are not changing.', zod: z.record(z.string(), z.union([z.object({ value: z.string().max(80), state: z.enum(['waiting', 'done']).optional(), note: z.string().max(600).optional() }), z.null()])) },
     now: { type: 'string', description: 'For structure_set: what you are doing now, one line the structure page shows the person live, such as "Building the sign-up view". An empty string clears it.', zod: z.string().max(200) },
 };
 

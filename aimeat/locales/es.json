@@ -13216,7 +13216,6 @@
   },
   "home": {
     "welcome": "Te damos la bienvenida a tu nuevo hogar.",
-    "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
     "buyerWelcome": {
       "title": "Te damos la bienvenida, {name}",
       "bought": "Compraste AIMEAT {plan}.",
@@ -13230,6 +13229,7 @@
       "sayField": "Dilo en una frase",
       "sayGo": "Muéstrame el agente"
     },
+    "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
     "signInTitle": "Entra en tu hogar",
     "signInDesc": "Inicia sesión para ver dónde te quedaste.",
     "signIn": "Iniciar sesión",
@@ -22810,6 +22810,8 @@
     "structure.prompt.genre": "Empezar desde",
     "structure.prompt.visibility": "Visibilidad",
     "structure.prompt.tail": "Mantén el mapa de datos y las demás funciones como están. Dame el archivo HTML completo.",
+    "structure.layout.custom.name": "Una disposición propia",
+    "structure.nav.custom.name": "Una forma propia",
     "structure.layout.cover.name": "Portada",
     "structure.layout.cover.line": "Una banda grande arriba, un destacado junto a la lista principal y el resto en tarjetas. Para una presentación o una tienda.",
     "structure.layout.cover.say": "\"Una portada: una banda grande arriba, el destacado y la lista lado a lado, tarjetas debajo.\"",

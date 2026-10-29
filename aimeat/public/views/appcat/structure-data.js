@@ -12,6 +12,7 @@
  *   choiceName(kind, id) · aiPrompt(structure, picks) · appRefFromAddress()
  * @usage const s = await readStructure('alice', 'talkoot.html');
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A `custom` layout or nav reads as its name and the AI's note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { apiGet, apiPut } from '/js/api.js';
@@ -91,7 +92,10 @@ export function stepLine(step) {
       const ka = step.id === 'layout' ? 'layout' : 'look';
       const kb = step.id === 'layout' ? 'nav' : 'genre';
       if (!a && !b) return x('structure.line.choiceNone');
-      const names = [a && choiceName(ka, a.value), b && choiceName(kb, b.value)].filter(Boolean).join(' · ');
+      // A custom layout or nav is described only by its note.
+      // Its closing full stop goes, because the line around it ends with one.
+      const named = (k, c) => c && (c.value === 'custom' && c.note ? `${choiceName(k, c.value)}: ${c.note.replace(/[.!?]\s*$/, '')}` : choiceName(k, c.value));
+      const names = [named(ka, a), named(kb, b)].filter(Boolean).join(' · ');
       const waiting = [a, b].some((c) => c && c.state === 'waiting');
       return waiting ? x('structure.line.choiceWaiting', { names }) : x('structure.line.choiceDone', { names, by: by(a || b) });
     }

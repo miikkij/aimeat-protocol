@@ -8,6 +8,7 @@
  *   node's MCP server.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-structure
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A custom nav with a 340-character description, and custom without one refused.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import * as ed from '@noble/ed25519';
@@ -156,6 +157,17 @@ await test('FAILURE: a layout the node does not offer is refused, and the refusa
     const r = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { layout: { value: 'carousel-of-doom' } } }) });
     assert(r.status === 400, `expected 400, got ${r.status}`);
     assert(String(r.body?.error?.message).includes('dashboard'), `the refusal names the layouts: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('a screen no preset fits is written as custom with its description, and custom without one is refused', async () => {
+    const bare = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'custom' } } }) });
+    assert(bare.status === 400, `custom with no note: expected 400, got ${bare.status}`);
+    const note = 'One screen: the cube in the middle turns by drag, and the three layers sit beside it. '.repeat(4).trim();
+    const r = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'custom', note } } }) });
+    assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.plan.choices.nav.note === note, 'the description is kept whole');
+    const back = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'bottom-bar' } } }) });
+    assert(back.status === 200, `restoring the nav: ${back.status}`);
 });
 
 await test('FAILURE: an unknown choice key is refused before anything is written', async () => {

@@ -24,6 +24,7 @@
  * @structure STEP_IDS · structurePageUrl · computeStructure · readStructureFor · writePlanFor · listPlansFor
  * @usage const out = await readStructureFor(storage, config, req.auth!, { owner, filename });
  * @version-history
+ *   v1.1.0 — 2026-10-29 — A layout, nav, look or genre step carries the choice's note, which describes a custom one.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import type { AimeatConfig } from '../config.js';
@@ -65,7 +66,8 @@ function choiceState(choices: Array<AppPlanChoice | undefined>): StepState {
   return made.length ? 'fine' : 'optional';
 }
 
-const choiceDetail = (c: AppPlanChoice | undefined) => (c ? { value: c.value, by: c.by, state: c.state } : null);
+// The note goes along: a custom layout or nav is described only there.
+const choiceDetail = (c: AppPlanChoice | undefined) => (c ? { value: c.value, by: c.by, state: c.state, ...(c.note ? { note: c.note } : {}) } : null);
 
 /** The eight steps, from what was read. Pure, so a unit test holds the rules. */
 export function computeStructure(input: {
