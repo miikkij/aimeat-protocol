@@ -16,8 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
- *   2026-10-29: The phone suggestion and the install suggestion wait until the person has had a
- *     conversation here (UX review D).
+ *   2026-10-29: The phone suggestion and the install suggestion are not shown in the person's first
+ *     conversation, and in a later one only after the AI has answered (UX review D; Jouni, 2026-10-30).
  *   2026-10-29: When the AI allowance is spent, the refusal shows the ways on: buy more, your own
  *     key, or the free model, which turns on the routing rule and sends the question again (A1).
  *   2026-10-29: A turn the node refused before the agent started shows the node's sentence in the
@@ -488,9 +488,11 @@ export default function ChatView() {
     const onDesktop = typeof window !== 'undefined'
         && window.matchMedia?.('(pointer: fine)').matches
         && (navigator.maxTouchPoints ?? 0) === 0;
-    // Not the first thing a newcomer reads (UX review 2026-10-29, D): the phone and the install
-    // suggestion wait until the person has had a conversation here.
-    const hasTalked = (thread?.turns?.length ?? 0) > 0 || threads.length > 1;
+    // Not in the person's first conversation (Jouni, 2026-10-30: "Älä näytä puhelinsovelluksen
+    // banneria ensimmäisessä keskustelussa"): the phone and the install suggestion wait for a second
+    // conversation, and in it for the AI's answer. A refused turn is not an answer (measured on
+    // crew26, where the nudge showed above a refused first turn).
+    const hasTalked = threads.length > 1 && (thread?.turns ?? []).some((turn) => turn.role === 'agent' && turn.text);
     const showMobileNudge = hasTalked && !nudgeDismissed && onDesktop && status && status.push_devices === 0;
 
     const dismissNudge = useCallback(() => {

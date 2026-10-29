@@ -14,6 +14,8 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.2.0 — 2026-10-29 — .agent-footer[hidden] is hidden: its own display had overridden the
+ *     attribute a customer's node sets (UX review 2026-10-29, C).
  *   v1.1.0 — 2026-10-28 — On paper html, body, #app and .page-content grow to their content: the
  *     one-viewport shell cut every printout to one sheet.
  *   v1.0.0 — 2026-09-24 — Moved unchanged from css/theme.css (lines 515-635, 1627-1631, 1652-1656, 1782-1796), so theme.css
@@ -178,5 +180,7 @@ a { color: inherit; text-decoration: none; }
   padding: var(--space-6, 1.5rem) var(--space-4, 1rem);
   font-size: var(--font-size-sm, 0.875rem);
 }
+/* A customer's node keeps the links in the markup and hides them from the buyer (portal-spa.ts). */
+.agent-footer[hidden] { display: none; }
 .agent-footer a { color: var(--text-dim); text-decoration: none; }
 .agent-footer a:hover { color: var(--accent); text-decoration: underline; }
