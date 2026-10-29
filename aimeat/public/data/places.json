@@ -203,6 +203,11 @@
           { "id": "dw-class", "num": "05", "labelKey": "dwpage.cls.title" },
           { "id": "dw-roads", "num": "06", "labelKey": "dwpage.secRoads" }
         ] },
+        { "id": "storage", "labelKey": "profile.tabs.storage", "sections": [
+          { "id": "fs-rule", "num": "01", "labelKey": "profile.storage.rule.title" },
+          { "id": "fs-store", "num": "02", "labelKey": "profile.storage.store.title" },
+          { "id": "fs-connect", "num": "03", "labelKey": "profile.storage.connect.title" }
+        ] },
         { "id": "access", "labelKey": "profile.tabs.access", "sections": [
           { "id": "ac-signin", "num": "01", "labelKey": "accesspage.secSignIn" },
           { "id": "ac-keys", "num": "02", "labelKey": "accesspage.secKeys" },
@@ -245,6 +250,7 @@
         { "id": "subdomains", "labelKey": "admin.subdomains.title" },
         { "id": "stats", "labelKey": "dashboard.stats" },
         { "id": "database", "labelKey": "dashboard.database" },
+        { "id": "file-stores", "labelKey": "admin.fileStores.title" },
         { "id": "metrics", "labelKey": "dashboard.metrics" },
         { "id": "usage", "labelKey": "dashboard.usage" },
         { "id": "prompts", "labelKey": "dashboard.promptsTab" }

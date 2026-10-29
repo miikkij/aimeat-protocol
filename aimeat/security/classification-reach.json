@@ -1882,6 +1882,19 @@
       },
       "why": "Reviewed 2026-10-15 (feature-list audit #64), the node's own read: the registry of conversation forms in the system namespace, each conversation form's config records found once on the first run, and the thread records of a form (keys, form_id and the last visitor turn's time) to find the conversations past the form's keeping time and delete them with every version. Nothing read here is returned to any caller; the scheduled job and the visitor's forget route only delete."
     },
+    "src/services/file-store/owner-file-store-actions.ts": {
+      "reads": {
+        "listStorageFilesForOwners": 1
+      },
+      "why": "Written 2026-10-29, the node's own read: the file metadata (no bytes) of one person and their agents, to count how many are in the person's own storage and to choose which to move. The person asking is the owner of every file read; only counts and the moved file names go back."
+    },
+    "src/services/file-store/owner-file-store.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listAllMemory": 1
+      },
+      "why": "Written 2026-10-29, the node's own read: the record of a person's own file storage (target, folder, encrypted key) and the operators' approvals, both under system@<node> (the scan keeps only that owner's rows). Read to decide where a new file goes and to list the stores for the operators. No content of anyone's is shown from here."
+    },
     "src/services/internet-opening/opening-store.ts": {
       "reads": {
         "getMemory": 2,
@@ -2540,10 +2553,9 @@
     },
     "src/services/storage-file-write.ts": {
       "reads": {
-        "getStorageFile": 2,
-        "getStorageFileMeta": 1
+        "getStorageFileMeta": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete. 2026-10-26: the second getStorageFile is the same check under the account's own extension file key, and the getStorageFileMeta decides which key a visibility change names; neither hands content to a caller."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: File existence and ownership check before delete. 2026-10-26: the second read is the same check under the account's own extension file key, and the third decides which key a visibility change names; none hands content to a caller. 2026-10-30: the delete check reads metadata, not the bytes."
     },
     "src/services/structure-overview.ts": {
       "reads": {

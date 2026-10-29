@@ -6,6 +6,7 @@
  *   reads as an array and `allowed.includes(origin)` became a substring test.
  * @usage pnpm test -- config-list-settings
  * @version-history
+ *   v1.1.2 — 2026-10-29 — file_store.owner_private_origins, a list row of the file stores.
  *   v1.1.1 — 2026-10-25 — email.company_smtp_private_hosts, the list row W2b added (secaudit2026oct22).
  *   v1.1.0 — 2026-10-25 — The list rows that came with the rest of the settings' rows, and the one
  *     immutable list row (ai.provider_allowlist).
@@ -25,6 +26,8 @@ const LIST_PATHS = [
     'scopes.default_eco_scopes', 'scopes.max_eco_scopes', 'ai.cop_sections', 'features.capability_webhook_domain_allowlist',
     // The private mail hosts companies may send through (config-schema-node-limits.ts, secaudit2026oct22).
     'email.company_smtp_private_hosts',
+    // The private addresses a person's own file storage may be at (config-schema-file-store.ts).
+    'file_store.owner_private_origins',
 ];
 /** List rows that are set in the environment only: a stored key is sent only to these hosts. */
 const IMMUTABLE_LIST_PATHS = ['ai.provider_allowlist'];

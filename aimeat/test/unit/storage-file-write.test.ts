@@ -8,6 +8,8 @@
  * @structure Three describes: writeStorageFile(), mintStorageUploadUrl() and removeStorageFile().
  * @usage cd aimeat && pnpm exec vitest run test/unit/storage-file-write.test.ts
  * @version-history
+ *   v1.1.1 — 2026-10-29 — The fake storage answers getMemory: the quota now asks whether the owner keeps
+ *     files in storage of their own (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.1.0 — 2026-09-24 — A7-2: the write and the mint refuse an app's icon and screenshot keys;
  *     removing a file under them still works.
  *   v1.0.0 — 2026-08-11 — Initial, with services/storage-file-write.ts (August 2026 audit step 8).
@@ -45,8 +47,11 @@ const getGHIIByOwner = vi.fn(async () => ({ morselBalance: 0 }));
 const debitBalance = vi.fn(async () => undefined);
 const addTransaction = vi.fn(async () => undefined);
 
+// The quota asks whether the owner keeps files in storage of their own (services/file-store/): none here.
+const getMemory = vi.fn(async () => null);
+
 const storage = {
-    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction,
+    createStorageFile, listStorageFiles, getGHIIByOwner, debitBalance, addTransaction, getMemory,
 } as unknown as Storage;
 
 const deps = { storage, config };
@@ -194,10 +199,26 @@ describe('removeStorageFile', () => {
         const key = 'apps/icons/demo.html';
         const file = { key, ownerGaii: OWNER, size: 3, mimeType: 'text/html', visibility: 'public' } as StorageFileRecord;
         const own = {
-            getStorageFile: vi.fn(async () => file),
+            getStorageFileMeta: vi.fn(async () => file),
             deleteStorageFile: vi.fn(async () => true),
         } as unknown as Storage;
         const out = await removeStorageFile({ storage: own, config }, OWNER, key);
         expect(out).toMatchObject({ ok: true, key });
+    });
+
+    // A delete reads the row, never the bytes: a file kept in an object store whose object has gone
+    // (a store moved without its objects) is still removed rather than answering 404 for ever.
+    it('removes a file without reading its bytes', async () => {
+        const key = 'notes/gone.txt';
+        const file = { key, ownerGaii: OWNER, size: 3, mimeType: 'text/plain', visibility: 'private' } as StorageFileRecord;
+        const getStorageFile = vi.fn(async () => null);
+        const own = {
+            getStorageFile,
+            getStorageFileMeta: vi.fn(async () => file),
+            deleteStorageFile: vi.fn(async () => true),
+        } as unknown as Storage;
+        const out = await removeStorageFile({ storage: own, config }, OWNER, key);
+        expect(out).toMatchObject({ ok: true, key });
+        expect(getStorageFile).not.toHaveBeenCalled();
     });
 });

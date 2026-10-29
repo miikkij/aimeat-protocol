@@ -9,6 +9,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   v1.4.0 — 2026-10-29 — The storage quota leaves out the files kept in storage their owner connected,
+ *     and a file that goes there passes the check (services/file-store/).
  *   v1.3.0 — 2026-10-25 — enforceExtensionMemoryLimits() refuses a new key past the operator's total
  *     per extension namespace (extensions.namespace_max_mb, no limit by default); an update of an
  *     existing key is not refused (secaudit2026oct22, lead 750).
@@ -25,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { localAccountOf } from '../utils/gaii.js';
 import { checkMemoryQuotaAlarm } from './quota-alarm.js';
+import { writesToOwnStore } from './file-store/file-store-resolver.js';
 
 /**
  * The account whose balance pays an overage: the one on this node behind the principal, or none. An
@@ -43,11 +46,13 @@ export async function getMemoryTotalBytes(storage: Storage, gaii: string): Promi
     return storage.sumMemoryBytes(gaii);
 }
 
-/** Calculate total storage file size for an agent (sum of file.size). */
+/** Calculate total storage file size for an agent (sum of file.size). A file kept in the storage its
+ *  owner connected (`owner:` reference) is kept at their expense and is not counted. */
 export async function getStorageTotalBytes(storage: Storage, gaii: string): Promise<number> {
     const files = await storage.listStorageFiles(gaii);
     let total = 0;
     for (const f of files) {
+        if (f.blobRef?.startsWith('owner:')) continue;
         total += f.size;
     }
     return total;
@@ -166,6 +171,10 @@ export async function checkStorageQuota(
     additionalBytes: number,
 ): Promise<QuotaCheckResult> {
     const currentBytes = await getStorageTotalBytes(storage, gaii);
+    // A file that goes to the storage its owner connected uses none of the node's.
+    if (additionalBytes > 0 && await writesToOwnStore({ storage, config }, gaii)) {
+        return { allowed: true, currentBytes, quotaBytes: config.storageQuotaMb * 1024 * 1024, overageBytes: 0, overageMorsels: 0 };
+    }
     const projectedBytes = currentBytes + additionalBytes;
     const quotaBytes = config.storageQuotaMb * 1024 * 1024;
 
