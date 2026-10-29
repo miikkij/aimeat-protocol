@@ -105,14 +105,14 @@ Components AIMEAT changed rather than copied verbatim: **world-atlas (Natural Ea
 
 ## Production dependencies
 
-The 462 npm packages that travel inside the `aimeat` package. Build and test
+The 460 npm packages that travel inside the `aimeat` package. Build and test
 tools are not listed: they do not ship, so they carry no obligation for you.
 
 | Package | Version | Licence |
 |---|---|---|
 | [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.3.0 | Apache-2.0 |
 | [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.3 | MIT |
-| [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 2.0.1 | Apache-2.0 |
+| [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 2.1.0 | Apache-2.0 |
 | [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.86 | Apache-2.0 |
 | [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.122 | Apache-2.0 |
 | [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.70 | Apache-2.0 |
@@ -144,16 +144,16 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@jitl/quickjs-wasmfile-release-sync](https://github.com/justjake/quickjs-emscripten#readme) | 0.32.0 | MIT |
 | [@js-temporal/polyfill](https://github.com/js-temporal/temporal-polyfill#readme) | 0.5.1 | ISC |
 | [@levischuck/tiny-cbor](https://github.com/levischuck/tiny-cbor#readme) | 0.2.11 | MIT |
-| [@modelcontextprotocol/client](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
-| [@modelcontextprotocol/core](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
-| [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 2.0.3 | MIT |
-| [@modelcontextprotocol/node](https://modelcontextprotocol.io) | 2.1.1 | Apache-2.0 |
-| [@modelcontextprotocol/server](https://modelcontextprotocol.io) | 2.3.1 | Apache-2.0 |
+| [@modelcontextprotocol/client](https://modelcontextprotocol.io) | 2.4.0 | Apache-2.0 |
+| [@modelcontextprotocol/core](https://modelcontextprotocol.io) | 2.4.0 | Apache-2.0 |
+| [@modelcontextprotocol/ext-apps](https://github.com/modelcontextprotocol/ext-apps) | 2.0.4 | MIT |
+| [@modelcontextprotocol/node](https://modelcontextprotocol.io) | 2.1.2 | Apache-2.0 |
+| [@modelcontextprotocol/server](https://modelcontextprotocol.io) | 2.4.0 | Apache-2.0 |
 | [@noble/ciphers](https://paulmillr.com/noble/) | 1.3.0 | MIT |
 | [@noble/ed25519](https://paulmillr.com/noble/) | 3.2.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 1.8.0 | MIT |
 | [@noble/hashes](https://paulmillr.com/noble/) | 2.4.0 | MIT |
-| [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.1.0 | MIT |
+| [@node-saml/node-saml](https://github.com/node-saml/node-saml#readme) | 5.2.0 | MIT |
 | [@openrouter/ai-sdk-provider](https://github.com/OpenRouterTeam/ai-sdk-provider) | 3.1.0 | Apache-2.0 |
 | [@opentelemetry/api](https://github.com/open-telemetry/opentelemetry-js/tree/main/api) | 1.10.0 | Apache-2.0 |
 | [@owf/identity-common](https://github.com/openwallet-foundation-labs/identity-common-ts/tree/main/packages/identity-common) | 0.5.0 | Apache-2.0 |
@@ -182,9 +182,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@standard-schema/spec](https://standardschema.dev) | 1.1.0 | MIT |
 | [@swc/helpers](https://swc.rs) | 0.5.23 | Apache-2.0 |
 | [@trustnxt/c2pa-ts](https://github.com/TrustNXT/c2pa-ts#readme) | 0.14.1 | Apache-2.0 |
-| [@types/debug](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/debug) | 4.1.13 | MIT |
 | [@types/minimatch](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/minimatch) | 3.0.5 | MIT |
-| [@types/ms](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/ms) | 2.1.0 | MIT |
 | [@types/node](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) | 24.19.2 | MIT |
 | [@types/qs](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/qs) | 6.15.1 | MIT |
 | [@types/triple-beam](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/triple-beam) | 1.3.5 | MIT |
@@ -372,7 +370,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [isexe](https://github.com/isaacs/isexe#readme) | 2.0.0 | ISC |
 | [javascript-obfuscator](https://obfuscator.io/) | 5.9.0 | BSD-2-Clause |
 | [jose](https://github.com/panva/jose) | 5.10.0 | MIT |
-| [jose](https://github.com/panva/jose) | 6.2.13 | MIT |
+| [jose](https://github.com/panva/jose) | 6.2.14 | MIT |
 | [js-string-escape](https://github.com/joliss/js-string-escape#readme) | 1.0.1 | MIT |
 | [jsbi](https://github.com/GoogleChromeLabs/jsbi#readme) | 4.3.2 | Apache-2.0 |
 | [json-schema-traverse](https://github.com/epoberezkin/json-schema-traverse#readme) | 1.0.0 | MIT |
@@ -407,7 +405,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 0.6.4 | MIT |
 | [negotiator](https://github.com/jshttp/negotiator#readme) | 1.1.0 | MIT |
 | [node-addon-api](https://github.com/nodejs/node-addon-api) | 8.9.2 | MIT |
-| [nodemailer](https://nodemailer.com/) | 10.2.1 | MIT-0 |
+| [nodemailer](https://nodemailer.com/) | 10.3.1 | MIT-0 |
 | [normalize-path](https://github.com/jonschlinkert/normalize-path) | 3.0.0 | MIT |
 | [npm-run-path](https://github.com/sindresorhus/npm-run-path#readme) | 4.0.1 | MIT |
 | [oauth4webapi](https://github.com/panva/oauth4webapi) | 3.8.8 | MIT |
@@ -563,7 +561,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [xmlbuilder](http://github.com/oozcitak/xmlbuilder-js) | 15.1.1 | MIT |
 | [xpath](https://github.com/goto100/xpath#readme) | 0.0.32 | MIT |
 | [xpath](https://github.com/goto100/xpath#readme) | 0.0.33 | MIT |
-| [xpath](https://github.com/goto100/xpath#readme) | 0.0.34 | MIT |
+| [xpath](https://github.com/goto100/xpath#readme) | 0.0.35 | MIT |
 | [xtend](https://github.com/Raynos/xtend) | 4.0.2 | MIT |
 | [y18n](https://github.com/yargs/y18n) | 4.0.3 | ISC |
 | [yaml](https://eemeli.org/yaml/) | 2.9.1 | ISC |
@@ -604,7 +602,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @agentclientprotocol/sdk 2.0.1
+### @agentclientprotocol/sdk 2.1.0
 
 ```text
 Apache License
@@ -1137,7 +1135,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 ```
 
-### @modelcontextprotocol/client 2.3.1, @modelcontextprotocol/core 2.3.1, @modelcontextprotocol/ext-apps 2.0.3, @modelcontextprotocol/node 2.1.1, @modelcontextprotocol/server 2.3.1
+### @modelcontextprotocol/client 2.4.0, @modelcontextprotocol/core 2.4.0, @modelcontextprotocol/ext-apps 2.0.4, @modelcontextprotocol/node 2.1.2, @modelcontextprotocol/server 2.4.0
 
 ```text
 The MCP project is undergoing a licensing transition from the MIT License to the Apache License, Version 2.0 ("Apache-2.0"). All new code and specification contributions to the project are licensed under Apache-2.0. Documentation contributions (excluding specifications) are licensed under CC-BY-4.0.
@@ -1437,7 +1435,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### @node-saml/node-saml 5.1.0
+### @node-saml/node-saml 5.2.0
 
 ```text
 Copyright (c) 2012 Henri Bergius
@@ -2082,7 +2080,7 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-### @types/debug 4.1.13, @types/minimatch 3.0.5, @types/ms 2.1.0, @types/node 24.19.2, @types/qs 6.15.1, @types/triple-beam 1.3.5, @types/validator 13.15.10, @types/xml-encryption 1.2.4, @types/xml2js 0.4.14
+### @types/minimatch 3.0.5, @types/node 24.19.2, @types/qs 6.15.1, @types/triple-beam 1.3.5, @types/validator 13.15.10, @types/xml-encryption 1.2.4, @types/xml2js 0.4.14
 
 ```text
 MIT License
@@ -7303,7 +7301,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### jose 5.10.0, jose 6.2.13
+### jose 5.10.0, jose 6.2.14
 
 ```text
 The MIT License (MIT)
@@ -8531,7 +8529,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### nodemailer 10.2.1
+### nodemailer 10.3.1
 
 ```text
 Copyright (c) 2011-2023 Andris Reinman
@@ -12152,7 +12150,7 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 ```
 
-### xpath 0.0.32, xpath 0.0.33, xpath 0.0.34
+### xpath 0.0.32, xpath 0.0.33, xpath 0.0.35
 
 ```text
 MIT License 
