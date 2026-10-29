@@ -9,6 +9,9 @@
  *   the daily cap is. Every policy row carries a sentence about what it does.
  * @structure EconomyTab — strip · morsels · trade · money · grant form
  * @version-history
+ *   v3.2.0 — 2026-10-29 — Under the money section, the beneficiary payouts whose settlement did not
+ *     answer, each with a reference field and Mark as arrived (economy-tab.payouts.js; secaudit2026oct26
+ *     round 8c).
  *   v3.1.0 — 2026-10-11 — The morsel row of the trade section is the pacing volume (pacing_volume_today /
  *     _all_time, the deprecated sales_volume_* as fallback), headed as pacing and not as sales; the
  *     section is "Pacing", in morsels (ruling "morseli on tahdistus, ei hinta").
@@ -40,6 +43,7 @@ import { Loud } from '/components/Action.js';
 import { Columns } from '/components/Layout.js';
 import { Fields, FormActions } from '/components/Field.js';
 import { TextField } from '/components/TextField.js';
+import { PossiblePayoutsSection } from './economy-tab.payouts.js';
 
 /** Format a { EUR: 15000000, USD: 9000000 } micro-units map as "15.00 EUR · 9.00 USD". */
 function fmtMoneyMap(m) {
@@ -139,7 +143,8 @@ export default function EconomyTab({ data, reload }) {
           <div><${Readings} rows=${[row('volume', t('dashboard.commerceMoneyVolume'), null, fmtMoneyMap(c.money_volume) || '—')]} /></div>
           <div><${Readings} rows=${[row('moneyfees', t('dashboard.commerceMoneyFees'), null, fmtMoneyMap(c.operator_money_fees) || '—')]} /></div>
         <//>
-      <//>`}
+      <//>
+      <${PossiblePayoutsSection} />`}
 
     <${Section} num="04" title=${t('dashboard.mintMorsels')}>
       <${Note} kind="lead">${t('dashboard.ecoMintIntro', { cap: num(e.max_operator_mint_per_day) })}<//>

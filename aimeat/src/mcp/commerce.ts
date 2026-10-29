@@ -20,6 +20,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks one
+ *     arrived with a reference (secaudit2026oct26 round 8c).
  *   2026-10-27 — aimeat_commerce_beneficiary_payout takes possible_payment_not_arrived and shows the open
  *     possible payouts in the quote (secaudit2026oct26, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  *   2026-10-25 — aimeat_commerce_beneficiary_splits withdraws a split on the owner's own extension by its short name too (withdrawSplit, secaudit2026oct22).
@@ -115,6 +117,7 @@ import { declareSplit, withdrawSplit } from '../commerce/beneficiary-split-decla
 import { listBeneficiaryEntries, listBeneficiaryObligations, totalsOf } from '../commerce/beneficiary-book.js';
 import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
+import { listOpenPayoutHoldsOnNode, markPayoutHoldArrived, possiblePayoutView } from '../commerce/beneficiary-payout-hold.js';
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { writeMemoryRecord } from '../services/memory-write.js';
@@ -709,6 +712,32 @@ export function registerCommerceTools(
                 entries: r.entries, tx_hash: r.txHash, pay_to: r.payTo,
                 note: 'Settled onchain from your address into theirs. The node held nothing; the '
                     + 'transaction hash is the proof and those entries now read `paid`.',
+            });
+        },
+    );
+
+    mcp.registerTool(
+        'aimeat_admin_possible_payouts',
+        {
+            description: descriptionFor('aimeat_admin_possible_payouts'),
+            inputSchema: zodShapeFor('aimeat_admin_possible_payouts'),
+            annotations: annotationsFor('aimeat_admin_possible_payouts'),
+        },
+        async ({ provider, nonce, reference }) => {
+            // The operator's question, as on GET /v1/commerce/beneficiary/possible-payouts (requireOperator).
+            if ((await resolveOperatorAgentName(storage, agentGaii, sessionScopes)) === null) {
+                return fail('FORBIDDEN: the possible payouts are read and closed by an operator of this node');
+            }
+            if (provider === undefined && nonce === undefined && reference === undefined) {
+                const holds = await listOpenPayoutHoldsOnNode(storage);
+                return ok({ possible_payouts: holds.map(possiblePayoutView), count: holds.length });
+            }
+            if (!provider || !nonce || !reference) return fail('INVALID_INPUT: marking a payout arrived takes provider, nonce and reference');
+            const r = await markPayoutHoldArrived(storage, { providerGhii: provider, nonce, reference, by: agentGaii });
+            if (!r.ok) return fail(`${r.code}: ${r.message}`);
+            return ok({
+                arrived: true, ...possiblePayoutView(r.hold), entries_paid: r.entries,
+                note: 'The entries are recorded as paid with your reference. The beneficiary and the provider were told.',
             });
         },
     );
