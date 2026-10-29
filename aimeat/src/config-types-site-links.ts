@@ -9,6 +9,9 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.4.0 — 2026-10-29 — storeTopup: a customer node's own top-up page in the store (UX review
+ *     2026-10-29, A1). defaultLocale: the node's own language before the browser's (C). storeOrders,
+ *     purchasePlan and purchasePackage: the customer's orders page and what they bought (B, D).
  *   v1.3.0 — 2026-10-06 — storeSoonCode: the shared discount code "Opens soon" shows when pressed.
  *   v1.2.0 — 2026-10-06 — storeStatus ('open' | 'soon') and the per-language storeNote*: the front
  *     page can show the store and its prices while the store does not take orders yet.
@@ -92,6 +95,26 @@ export interface SiteLinksConfig {
    * Empty keeps "Opens soon" a label with nothing to press.
    */
   storeSoonCode: string;
+  /**
+   * Where this node's owner buys more AI allowance: the store's top-up page for this node, set by
+   * the fleet service that made it. The node adds `lang`. Empty: the notice that the allowance is
+   * spent offers no purchase.
+   */
+  storeTopup: string;
+  /** The owner's orders and invoices in the store, set by the fleet service. The node adds `lang`. Empty hides the link. */
+  storeOrders: string;
+  /**
+   * What the owner bought, set by the fleet service on a node it made: the plan's name (Solo, Team)
+   * and the package's visible name, or empty. A plan makes this a customer's node: the pages show
+   * the customer's view (the welcome, the shorter menu, no node maintenance in the top bar).
+   */
+  purchasePlan: string;
+  purchasePackage: string;
+  /**
+   * The language this node's pages use before a visitor chooses one, ahead of the browser's: a node
+   * bought from the store speaks its buyer's language. One of the shipped locales, or empty.
+   */
+  defaultLocale: string;
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
   /**

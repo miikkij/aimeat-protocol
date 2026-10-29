@@ -13,6 +13,9 @@
  * @usage cd aimeat && pnpm exec vitest run test/unit/boot-migration-races.test.ts
  *   cd aimeat && node --env-file=.env.test.postgres-kysely --import tsx node_modules/vitest/vitest.mjs run test/unit/boot-migration-races.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-29 — The keep-working step is asserted per half: of two processes one may claim the
+ *     principals' half and the other the apps' half, so both answered ran and CI on main went red
+ *     (run 40938881139, "expected 2 to be 1"). The setup no longer matched what the step promises.
  *   v1.0.0 — 2026-10-18 — Initial (check:atomic-writes, the boot migration sites).
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
@@ -126,9 +129,11 @@ describe.each(names)('%s: once-only boot steps beside a second node process', na
     expect(ran(await Promise.all([migrateToolScopeWordsOnce(s, w.nodeId), migrateToolScopeWordsOnce(s, w.nodeId)]))).toBe(1);
     expect(ran(await Promise.all([migrateOperatorAdminOnce(s, w.config), migrateOperatorAdminOnce(s, w.config)]))).toBe(1);
     const keep = { version: '4.0.3', existedBefore: new Date().toISOString() };
-    expect(ran(await Promise.all([
+    // Two halves, each claimed on its own record: each runs once, in either process.
+    const kept = await Promise.all([
       migrateRestScopeKeepWorkingOnce(s, w.config, keep), migrateRestScopeKeepWorkingOnce(s, w.config, keep),
-    ]))).toBe(1);
+    ]);
+    expect(kept.flatMap(r => r.halves).sort()).toEqual(['apps', 'principals']);
     // The vocabulary's agent half answers how many agents it widened; the process that stands down widens none.
     const [a, b] = await Promise.all([migrateScopeVocabulary(s, w.nodeId), migrateScopeVocabulary(s, w.nodeId)]);
     expect(Math.max(a.agents, b.agents)).toBeGreaterThan(0);
