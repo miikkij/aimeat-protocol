@@ -12,6 +12,8 @@
  * @structure registerAdminSecurityTools(mcp, storage, config, getAgentGaii, scopes) — two operator tools.
  * @usage registerAdminSecurityTools(mcp, storage, config, () => agentGaii, scopes);
  * @version-history
+ *   2026-10-29 -- The refusal of a malformed decision names "uncount", the action of a record of the
+ *     platform-fee incident (secaudit2026oct26 round 8c).
  *   2026-10-27 -- The refusal of a malformed decision names "app_only", the action of an address of the
  *     subdomain incident (Jouni, 2026-10-27).
  *   2026-10-25 -- aimeat_admin_incident_resolve decides an entry of an incident that names records to
@@ -71,7 +73,7 @@ export function registerAdminSecurityTools(
     async ({ id, name, resolution }) => {
       if (!(await operatorName())) return refuse(OPERATOR_AGENT_REFUSAL);
       if (name !== undefined || resolution !== undefined) {
-        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete" or "app_only") or "keep" for an entry.');
+        if (!name || !resolution) return toolError('INVALID_INPUT', 'Deciding a case takes "name" and "resolution": "holder" or "previous" for a held name, "apply" or "keep" for an offered cap, the entry\'s action ("clear", "delete", "app_only" or "uncount") or "keep" for an entry.');
         const decided = await decideIncidentCase(config, storage, { incidentId: id, name, resolution, by: { principal: agentGaii, kind: 'ai' } });
         if (!decided.ok) return toolError(decided.code, decided.message);
         return text({ id, ...decided.data });
