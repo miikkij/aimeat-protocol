@@ -55,6 +55,16 @@ import {
 } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
 import { listOpenPayoutHoldsOnNode, markPayoutHoldArrived, possiblePayoutView } from '../commerce/beneficiary-payout-hold.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
+
+/** POST /v1/commerce/beneficiary/possible-payouts/arrived: the payout from the list, and what shows it arrived. */
+const PossiblePayoutArrivedSchema = z.object({
+  provider: z.string().trim().min(3).max(INPUT_LIMITS.id),
+  nonce: z.string().trim().min(1).max(INPUT_LIMITS.id),
+  reference: z.string().trim().min(1).max(300),
+});
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
@@ -371,15 +381,12 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
    * Body { provider, nonce, reference }. The covered entries are marked paid with the reference, the
    * record closes, and the beneficiary and the provider are told. OPERATOR ONLY.
    */
-  router.post('/v1/commerce/beneficiary/possible-payouts/arrived', requireAuth(), requireOperator(storage), async (req: Request, res: Response) => {
-    const body = (req.body ?? {}) as Record<string, unknown>;
-    const provider = typeof body.provider === 'string' ? body.provider.trim() : '';
-    const nonce = typeof body.nonce === 'string' ? body.nonce.trim() : '';
-    const reference = typeof body.reference === 'string' ? body.reference : '';
-    if (!provider || !nonce) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Send `provider`, `nonce` and `reference` from GET /v1/commerce/beneficiary/possible-payouts'));
-    }
-    const r = await markPayoutHoldArrived(storage, { providerGhii: provider, nonce, reference, by: resolveIdentity(req.auth!, config.nodeId) });
+  router.post('/v1/commerce/beneficiary/possible-payouts/arrived', requireAuth(), requireOperator(storage), validateBody(PossiblePayoutArrivedSchema, config.nodeId), async (req: Request, res: Response) => {
+    // validateBody checked the shape: three bounded, non-empty strings.
+    const { provider, nonce, reference } = req.body as z.infer<typeof PossiblePayoutArrivedSchema>;
+    const r = await markPayoutHoldArrived(storage, {
+      providerGhii: provider.trim(), nonce: nonce.trim(), reference, by: resolveIdentity(req.auth!, config.nodeId),
+    });
     if (!r.ok) {
       const status = r.code === 'NOT_FOUND' ? 404 : r.code === 'CONFLICT' ? 409 : 400;
       return res.status(status).json(error(config.nodeId, r.code, r.message));
