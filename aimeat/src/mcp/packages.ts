@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-29 — aimeat_package_install names each extension component installed switched off and
+ *     waiting for an operator, `extension_code_awaiting_operator` (secaudit2026oct26 round 8c).
  *   2026-10-27 — The grant tool passes config.securityProfile to the node link (secaudit2026oct26,
  *     linkPackagePeer-no-peerUrlRefusal).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -421,6 +423,8 @@ export function registerPackageTools(
                     ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
                     // The owner's grant recorded for each app, when the install approved them.
                     ...(out.appGrants ? { app_grants: out.appGrants } : {}),
+                    // Extension components installed switched off, each waiting for an operator's one press.
+                    ...(out.awaitingOperator ? { extension_code_awaiting_operator: out.awaitingOperator } : {}),
                 }, null, 2),
             }],
         };

@@ -50717,6 +50717,9 @@ paths:
       description: |
         Start the extension runtime and register its action routes.
         Requires owner role. Owners can only activate extensions they installed; operators can activate any.
+        An extension whose code a package brought into an account that may not install extension code
+        (extensions.install_role "operator") answers 409 AWAITING_OPERATOR until an operator allows it;
+        an operator's activate is that approval.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -50745,6 +50748,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: AWAITING_OPERATOR, the extension's code waits for an operator's approval (error.details.request_id).
 
   /v1/extensions/{name}/config:
     patch:
@@ -56193,7 +56198,7 @@ paths:
               properties:
                 label: { type: string }
                 version: { type: string, description: 'Specific version to install; defaults to latest published.' }
-                dry_run: { type: boolean, description: 'Report what would be registered and register nothing.' }
+                dry_run: { type: boolean, description: 'Report what would be registered and register nothing. With install role operator the preview lists in extension_code_awaits_operator the extension components a real install would store switched off, waiting for an operator.' }
                 mode:
                   type: string
                   enum: [managed, editable]
@@ -56245,6 +56250,21 @@ paths:
                                 type: array
                                 items: { type: string }
                                 description: A skill left out because the owner has one of that name of their own. Absent when none.
+                              extension_code_awaiting_operator:
+                                type: array
+                                description: >-
+                                  With extensions.install_role "operator" and an installer whose account may not
+                                  install extension code: each extension component, installed switched off. Its
+                                  code waits for an operator's one press (a request of kind `extension-code`,
+                                  readable at GET /v1/publish-requests/{id}); the rest of the package is installed.
+                                  Allow switches it on, Don't allow leaves it off, and the installer hears both.
+                                  Absent when nothing waits.
+                                items:
+                                  type: object
+                                  properties:
+                                    component: { type: string }
+                                    extension: { type: string, description: The extension's stored name. }
+                                    request_id: { type: string, nullable: true }
         '202':
           description: The install waits for the owner. Nothing was registered.
           content:
@@ -56797,7 +56817,10 @@ paths:
         by an agent or an app grant costs the words POST /v1/memory asks for a write into the owner's
         namespace (see installPackage). Without them, and with every other check passed, the answer is
         202 and a request for the owner carrying these actions; nothing is deleted or written until it
-        is approved.
+        is approved. With extensions.install_role "operator" and an account that may not install
+        extension code, an extension the migration writes is stored switched off and its code waits for
+        an operator's one press; the answer lists each in `awaitingOperator` ({ component, extension,
+        request_id }).
       tags: [Instances]
       security:
         - BearerAuth: []

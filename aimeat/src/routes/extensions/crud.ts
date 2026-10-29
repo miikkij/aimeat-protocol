@@ -6,6 +6,9 @@
  *   inspect, action-script get/patch, uninstall (DELETE), activate/deactivate. Extracted from
  *   src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 — Activate answers 409 AWAITING_OPERATOR for an extension whose code a package brought in
+ *     under install role operator, until an operator allows it; an operator's activate is that approval
+ *     (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   2026-10-26 — The owner is additive: an install keeps its bare name, PUT and POST meet another
  *     account's record as before, and every answer keeps `name` and adds `owner` and `full_name`
  *     (Jouni, 2026-10-26; services/component-address.ts).
@@ -89,6 +92,7 @@ import { buildExtensionRecordFromManifest } from '../../services/extension-manif
 import { managedChangeRefusal } from '../../services/packages/install/package-managed.js';
 import { hasExtWritePermission, mayManageInstalledExt, extWriteRefusalText, codeWriteRefusalText } from './permissions.js';
 import { isOperatorCaller } from '../../services/operator-override.js';
+import { codeHoldRefusal, takeHoldOff } from '../../services/extension-code-hold.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { workspaceDeclarationOf } from '../../services/extension-workspace-declaration.js';
@@ -671,10 +675,19 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         return;
       }
 
+      // Code a package brought in under install role operator waits for an operator; an operator
+      // switching it on is that approval (services/extension-code-hold.ts).
+      const isOperator = await isOperatorCaller(storage, req.auth);
+      const held = codeHoldRefusal(ext, isOperator);
+      if (held) {
+        res.status(held.status).json(error(config.nodeId, held.code, held.message, held.status, { request_id: held.request_id }));
+        return;
+      }
+
       // Status, the schedules the manifest declares, and the @activate jobs — one implementation
       // (services/extension-lifecycle.ts), because aimeat_extension_activate wrote only the status
       // and left the extension switched on with its clock never started.
-      const updated = await activateExtension({ storage, config, scheduler }, ext, req.auth!.sub);
+      const updated = await activateExtension({ storage, config, scheduler }, isOperator ? await takeHoldOff(storage, ext) : ext, req.auth!.sub);
 
       logger.info(`Extension activated: ${name}`, { by: req.auth!.sub });
 
