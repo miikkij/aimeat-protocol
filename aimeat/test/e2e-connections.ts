@@ -19,6 +19,10 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   2026-10-29 — Phase 11c: a delegation named by file name alone belongs to one author's app: the
+ *     channel owner's own app binds it (at creation, or at an older one's first use with one notice),
+ *     another author's app waits for the channel owner's Allow, and a look-alike of the same file name
+ *     by anyone else is refused (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  *   v1.6.4 — 2026-10-27 — Phase 11b: a campaign app's users (through its grant), one user's agent and
  *     the channel owner publish through a delegation; another account, its agent and another app's
  *     grant that only name the app in the body are refused (secaudit2026oct26, delegated-publish).
@@ -1160,6 +1164,144 @@ async function main(): Promise<void> {
           `${who}'s refusal does not name the app to use: ${r.data?.error?.message}`);
       }
       assert(provider.stats.publishes === before, 'a refused caller reached the provider');
+    });
+
+    /**
+     * Phase 11c. A label that is only a file name names an app of that name by any author. The
+     * delegation belongs to one author's app: the channel owner's own app binds it (when it is made,
+     * or at the first use of an older one, with one notice), and an app by another author asks the
+     * channel owner once with Allow and Don't allow while the publish answers pending
+     * (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
+     */
+    console.log('\nPhase 11c — Which author\'s app a delegation belongs to');
+    const appHtml = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="connections:use"></head><body>c</body></html>';
+    const publishApp = async (bearer: string, filename: string) => {
+      const r = await api('/v1/apps', { bearer, body: { filename, content: Buffer.from(appHtml, 'utf8').toString('base64'), name: filename, description: 'delegation author probe', category: 'tool' } });
+      assert(r.status === 201, `publish ${filename}: ${r.status} ${r.data?.error?.message}`);
+    };
+    const delegate = async (label: string) => {
+      const r = await api(`/v1/connections/${sharedId}/delegations`, { bearer: jwtA, body: { app_id: label, action: 'publish-video', moderation: 'auto' } });
+      assert(r.status === 201, `delegation ${label}: ${r.status} ${r.data?.error?.message}`);
+      return r.data.data.delegation as { id: string; bound_app: string | null };
+    };
+    const through = (bearer: string, label: string, caption: string) => api('/v1/connections/publish', {
+      bearer, body: { app_id: label, action: 'publish-video', caption: `${caption}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}` },
+    });
+    const boundOf = async (label: string) => {
+      const r = await api(`/v1/connections/${sharedId}/delegations`, { method: 'GET', bearer: jwtA });
+      return (r.data.data.delegations as Array<{ appId: string; bound_app: string | null }>).find(d => d.appId === label)?.bound_app ?? null;
+    };
+    const notes = async (bearer: string) => ((await api('/v1/notifications?limit=200', { method: 'GET', bearer })).data?.data?.notifications ?? []) as Array<{ type: string; title: string }>;
+
+    await test('a delegation made for the channel owner\'s own app is bound to it, and the same file name by another author does not publish', async () => {
+      await publishApp(jwtE, campaignFile);
+      const lookalike = await signInToApp(jwtC, `${userE}/${campaignFile}`, ['connections:use']);
+      const before = provider.stats.publishes;
+      const r = await through(lookalike, campaignLabel, 'lookalike');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER',
+        `an app of the same file name by another author published through the channel: ${r.status} ${r.data?.error?.code ?? ''} ${r.data?.data?.attempt?.status ?? ''}`);
+      assert(provider.stats.publishes === before, 'the look-alike app reached the provider');
+      const still = await through(appTokC, campaignLabel, 'campaign-again');
+      assert(still.status === 200 && still.data?.data?.attempt?.status === 'done', `the campaign app stopped working: ${still.status} ${still.data?.error?.code}`);
+      assert(await boundOf(campaignLabel) === `${userA}/${campaignFile}`, `campaign delegation bound to ${await boundOf(campaignLabel)}`);
+    });
+
+    const lateFile = `late${stamp % 100000}.html`;
+    const lateLabel = `app:${lateFile.replace(/\.html$/, '')}`;
+    await test('an older delegation binds itself to the channel owner\'s own app at its first use, and the channel owner is told once', async () => {
+      const d = await delegate(lateLabel);
+      assert(d.bound_app === null, `a delegation for an app nobody has yet should be unbound: ${d.bound_app}`);
+      await publishApp(jwtA, lateFile);
+      const tok = await signInToApp(jwtC, `${userA}/${lateFile}`, ['connections:use']);
+      for (const n of [1, 2]) {
+        const r = await through(tok, lateLabel, `late-${n}`);
+        assert(r.status === 200 && r.data?.data?.attempt?.status === 'done', `the channel owner's own app could not publish (${n}): ${r.status} ${r.data?.error?.code}`);
+      }
+      assert(await boundOf(lateLabel) === `${userA}/${lateFile}`, `not bound to the owner's app: ${await boundOf(lateLabel)}`);
+      const told = (await notes(jwtA)).filter(n => n.type === 'delegation_bound' && n.title.includes(lateLabel));
+      assert(told.length === 1, `the channel owner should be told once, was told ${told.length} times`);
+      await publishApp(jwtE, lateFile);
+      const lookalike = await signInToApp(jwtE, `${userE}/${lateFile}`, ['connections:use']);
+      const r = await through(lookalike, lateLabel, 'late-lookalike');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER', `the look-alike passed: ${r.status} ${r.data?.error?.code ?? ''}`);
+    });
+
+    const otherFile = `bapp${stamp % 100000}.html`;
+    const otherLabel = `app:${otherFile.replace(/\.html$/, '')}`;
+    await test('an app by another author asks the channel owner once; it publishes after Allow, and its look-alike does not', async () => {
+      await delegate(otherLabel);
+      await publishApp(jwtB, otherFile);
+      const tokC = await signInToApp(jwtC, `${userB}/${otherFile}`, ['connections:use']);
+      const tokE = await signInToApp(jwtE, `${userB}/${otherFile}`, ['connections:use']);
+      const before = provider.stats.publishes;
+      const first = await through(tokC, otherLabel, 'b-first');
+      const ask = first.data?.data?.approval_request;
+      assert(first.status === 202 && ask?.status === 'awaiting_owner' && ask?.waiting_for === 'channel_owner' && ask?.already_waiting === false,
+        `the first publish should wait for the channel owner: ${first.status} ${JSON.stringify(first.data?.data ?? first.data?.error)}`);
+      const second = await through(tokE, otherLabel, 'b-second');
+      assert(second.status === 202 && second.data?.data?.approval_request?.request_id === ask.request_id && second.data.data.approval_request.already_waiting === true,
+        `a second user should see the same question: ${second.status} ${JSON.stringify(second.data?.data ?? second.data?.error)}`);
+      assert(provider.stats.publishes === before, 'something was published while the question waited');
+      const questions = (await notes(jwtA)).filter(n => n.type === 'approval_request' && n.title.includes(otherFile));
+      assert(questions.length === 1, `the channel owner should get one question, got ${questions.length}`);
+      const seen = await api(`/v1/publish-requests/${ask.request_id}`, { method: 'GET', bearer: jwtA });
+      assert(seen.status === 200 && seen.data.data.request.kind === 'delegation-binding' && seen.data.data.request.state === 'awaiting_owner', `the channel owner's view: ${seen.status} ${JSON.stringify(seen.data?.data?.request?.state)}`);
+      const yes = await api(`/v1/publish-requests/${ask.request_id}/decision`, { bearer: jwtA, body: { decision: 'approve' } });
+      assert(yes.status === 200, `allow: ${yes.status} ${yes.data?.error?.message}`);
+      assert(await boundOf(otherLabel) === `${userB}/${otherFile}`, `not bound to B's app: ${await boundOf(otherLabel)}`);
+      assert((await notes(jwtC)).some(n => n.type === 'approval_answer'), 'the one who asked was not told the answer');
+      for (const [who, tok] of [['C', tokC], ['E', tokE]] as const) {
+        const r = await through(tok, otherLabel, `b-after-${who}`);
+        assert(r.status === 200 && r.data?.data?.attempt?.status === 'done', `${who} could not publish after Allow: ${r.status} ${r.data?.error?.code}`);
+      }
+      await publishApp(jwtE, otherFile);
+      const lookalike = await signInToApp(jwtE, `${userE}/${otherFile}`, ['connections:use']);
+      const r = await through(lookalike, otherLabel, 'b-lookalike');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER', `the look-alike passed after Allow: ${r.status} ${r.data?.error?.code ?? ''}`);
+    });
+
+    await test('Don\'t allow keeps that app out, and the channel owner is not asked again', async () => {
+      const file = `bdeny${stamp % 100000}.html`;
+      const label = `app:${file.replace(/\.html$/, '')}`;
+      await delegate(label);
+      await publishApp(jwtB, file);
+      const tok = await signInToApp(jwtC, `${userB}/${file}`, ['connections:use']);
+      const first = await through(tok, label, 'deny-first');
+      assert(first.status === 202, `the first publish should wait: ${first.status}`);
+      const no = await api(`/v1/publish-requests/${first.data.data.approval_request.request_id}/decision`, { bearer: jwtA, body: { decision: 'decline' } });
+      assert(no.status === 200, `don't allow: ${no.status} ${no.data?.error?.message}`);
+      const before = (await notes(jwtA)).filter(n => n.type === 'approval_request').length;
+      const r = await through(tok, label, 'deny-again');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER', `a declined app published: ${r.status} ${r.data?.error?.code ?? ''}`);
+      assert((await notes(jwtA)).filter(n => n.type === 'approval_request').length === before, 'the channel owner was asked again');
+      assert(await boundOf(label) === null, 'a declined app bound the delegation');
+    });
+
+    await test('the channel owner holds an app of the same name, and another author\'s app uses the older delegation first: a question, not a refusal', async () => {
+      const file = `bdual${stamp % 100000}.html`;
+      const label = `app:${file.replace(/\.html$/, '')}`;
+      // Made before anyone had the app, so it is unbound, as a delegation from before the binding.
+      const d = await delegate(label);
+      assert(d.bound_app === null, `should start unbound: ${d.bound_app}`);
+      await publishApp(jwtA, file);
+      await publishApp(jwtB, file);
+      const tokB = await signInToApp(jwtC, `${userB}/${file}`, ['connections:use']);
+      const before = provider.stats.publishes;
+      const first = await through(tokB, label, 'dual-first');
+      const ask = first.data?.data?.approval_request;
+      assert(first.status === 202 && ask?.status === 'awaiting_owner',
+        `another author's app was not asked about: ${first.status} ${first.data?.error?.code ?? ''} ${JSON.stringify(first.data?.data ?? '')}`);
+      assert(provider.stats.publishes === before, 'something was published while the question waited');
+      assert(await boundOf(label) === null, `bound to ${await boundOf(label)} before the channel owner answered`);
+      const yes = await api(`/v1/publish-requests/${ask.request_id}/decision`, { bearer: jwtA, body: { decision: 'approve' } });
+      assert(yes.status === 200, `allow: ${yes.status} ${yes.data?.error?.message}`);
+      assert(await boundOf(label) === `${userB}/${file}`, `not bound to B's app: ${await boundOf(label)}`);
+      const after = await through(tokB, label, 'dual-after');
+      assert(after.status === 200 && after.data?.data?.attempt?.status === 'done', `B's app could not publish after Allow: ${after.status} ${after.data?.error?.code}`);
+      await publishApp(jwtE, file);
+      const third = await signInToApp(jwtE, `${userE}/${file}`, ['connections:use']);
+      const r = await through(third, label, 'dual-third');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER', `a third author's app passed after binding: ${r.status} ${r.data?.error?.code ?? ''}`);
     });
 
     await test('a missing file is refused BEFORE an attempt is opened', async () => {

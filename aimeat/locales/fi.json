@@ -4970,7 +4970,8 @@
       "review": "Tarkistettavana",
       "draft": "Luonnos",
       "expired": "Korvattu",
-      "ended": "Päättynyt"
+      "ended": "Päättynyt",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "event": {
       "created": "Luonnos tehty",
@@ -4989,7 +4990,8 @@
       "objection": "Muutosta vastustettu",
       "breach-notice": "Loukkausilmoitus lähetetty",
       "ended": "Sopimus päättyi",
-      "deletion-done": "Tiedot poistettu tai palautettu"
+      "deletion-done": "Tiedot poistettu tai palautettu",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "next": {
       "deletion": "Poista tai palauta tiedot {date} mennessä",
@@ -4999,7 +5001,9 @@
       "objected": "Muutosta on vastustettu, eikä se tule voimaan",
       "notice": "Muutos tulee voimaan {date}, jos sitä ei vastusteta",
       "waitingCp": "Odottaa vastapuolen allekirjoitusta",
-      "signCp": "Odottaa sinun allekirjoitustasi"
+      "signCp": "Odottaa sinun allekirjoitustasi",
+      "testSigned": "Sopimus allekirjoitettiin testilompakolla, joten se ei ole voimassa. Tee uusi versio ja lähetä se allekirjoitettavaksi",
+      "testSignedCp": "Allekirjoituksesi oli testiallekirjoitus, jolla ei ole oikeusvaikutusta. Saat tiedon, kun uusi versio odottaa allekirjoitustasi"
     },
     "colStep": "Vaihe",
     "colWhen": "Milloin",
@@ -5181,7 +5185,8 @@
       "next": {
         "draft": "Lähetä allekirjoitettavaksi",
         "review": "Päätä allekirjoitetusta kopiosta",
-        "waitingCp": "Odottaa vastapuolta"
+        "waitingCp": "Odottaa vastapuolta",
+        "test-signed": "Allekirjoitettu vain testissä: tee uusi versio"
       }
     },
     "gap": {
@@ -10580,6 +10585,10 @@
   "notiftext.approval_goal_model_read.body": "{agent} tarvitsee merkinnät {records} tehtävään ”{work}” tavoitteessasi ”{goal}”. {agent} ei saa lukea yksityisiä merkintöjäsi, mutta se näkee tekoälyn vastauksen. Jos sallit, tekoäly käyttää näitä merkintöjä tehtävässä. Jos et salli, tehtävä tehdään ilman niitä.",
   "notiftext.approval_schedule_instruction.title": "{who} muutti ajastusta ”{schedule}”, ja muutos odottaa hyväksyntääsi",
   "notiftext.approval_schedule_instruction.body": "Ajastuksen teki {maker}, joten se lukee tietojasi samoilla oikeuksilla kuin {maker}. {who} muutti sen ohjeita, mutta {who} ei saa lukea kaikkea, mitä {maker} saa. Siksi muutos odottaa hyväksyntääsi. Jos sallit, ajastus käyttää uusia ohjeita. Jos et salli, se palaa vanhoihin ohjeisiin.",
+  "notiftext.approval_delegation_binding.title": "{who} julkaisee kanavallesi {channel} sovelluksella {app}, jonka teki {author}",
+  "notiftext.approval_delegation_binding.body": "Annoit sovellukselle \"{label}\" luvan julkaista kanavallasi (\"{action}\"), mutta nimesit sovelluksen vain tiedostonimellä. Tämän samannimisen sovelluksen teki {author}, et sinä. Jos sallit, lupaa voi tästä eteenpäin käyttää vain käyttäjän {author} sovellus. Muiden tekemät samannimiset sovellukset eivät voi. Jos et salli, tämä sovellus ei voi julkaista kanavallasi. {who} saa tiedon vastauksestasi kummassakin tapauksessa.",
+  "notiftext.delegation_bound.title": "Vain oma sovelluksesi {app} voi nyt julkaista kanavallasi nimellä \"{label}\"",
+  "notiftext.delegation_bound.body": "Annoit sovellukselle \"{label}\" luvan julkaista kanavallasi (\"{action}\") ja nimesit sen vain tiedostonimellä. Siksi joku muu olisi voinut käyttää lupaa samannimisellä sovelluksella. Tästä eteenpäin lupaa voi käyttää vain oma sovelluksesi {app}. Sen käyttäjät julkaisevat sillä kuten ennenkin.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
   "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
