@@ -32,6 +32,9 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   v3.9.0 -- 2026-10-29 -- The `file_store` section (where stored files keep their bytes, and whether a
+ *     person may connect a storage of their own) sits under limits right after the quota section, the
+ *     storage quota's neighbour (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v3.8.0 -- 2026-10-25 -- A secret the operator may replace (the API's `set_path`) shows whether it
  *     is set and a hidden field for a new value (TextField `unmanaged`, the key field's look); the change
  *     is sent on its set_path and never written out, in the list of changes or a refusal. The `usage`
@@ -137,7 +140,7 @@ const DOMAINS = [
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
-  { id: 'limits', groups: ['quota', 'rate_limits', 'boards', 'extensions', 'realtime'] },
+  { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
   { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'visibility', 'geo'] },
 ];

@@ -299,6 +299,9 @@ export interface StorageFileRecord {
    *  publicly resolvable, as a public memory row does. A new write under the same key carries its
    *  own id or none: new bytes are a new statement. */
   aiProvenanceId?: string;
+  /** Where the bytes are when they are not in the row: `<storeId>|<objectKey>` (storage/blob/blob-types.ts).
+   *  Absent for a file whose bytes the database holds. Set by the file-store wrapper, never by a route. */
+  blobRef?: string;
 }
 
 export interface ChunkedUploadRecord {

@@ -13,6 +13,7 @@
  * @version-history
  *   2026-10-28 — Seed core:compliance-ask-makers (daily 08:15): the makers of AI apps with EU AI Act questions open are asked.
  *   2026-10-25 — Seed core:held-label-release (daily 05:41; secaudit2026oct22, app-label-recycled-after-delete).
+ *   2026-10-29 — Seed core:file-store-sweep (daily 03:37).
  *   2026-10-25 — Seed core:mcp-client-cleanup (daily 04:53; secaudit2026oct22, dcr-unbounded-client-records).
  *   2026-10-25 — Seed core:internet-opening-sweep (hourly at :12).
  *   2026-10-18 — Seed core:subscription-renewals (daily 05:19; Comicland v3 A-5).
@@ -126,6 +127,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   jobs.push({ id: 'core:device-auth-cleanup', name: 'Device Authorization Cleanup', coreHandler: 'device-auth-cleanup', cron: '*/5 * * * *' });
   // MCP client registrations no sign-in used, past mcp.unused_client_days (mcp-client-cleanup.ts). Daily at 04:53.
   jobs.push({ id: 'core:mcp-client-cleanup', name: 'MCP Client Registration Cleanup', coreHandler: 'mcp-client-cleanup', cron: '53 4 * * *' });
+  // The objects in a file store that no stored file names (file-store/file-store-sweep.ts). Daily at 03:37.
+  jobs.push({ id: 'core:file-store-sweep', name: 'File Store Sweep', coreHandler: 'file-store-sweep', cron: '37 3 * * *' });
   // The own addresses of removed apps, held and then released (held-app-labels.ts). Daily at 05:41.
   jobs.push({ id: 'core:held-label-release', name: 'Held App Address Release', coreHandler: 'held-label-release', cron: '41 5 * * *' });
 

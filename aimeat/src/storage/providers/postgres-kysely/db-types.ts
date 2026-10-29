@@ -2195,6 +2195,7 @@ export interface StorageStatsSnapshot {
 
 export interface StorageFile {
   aiProvenanceId: string | null;
+  blobRef: string | null;
   createdAt: Generated<Timestamp>;
   data: Buffer;
   federate: Generated<boolean>;

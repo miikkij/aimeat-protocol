@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.48.0 -- 2026-10-29 -- Your owner's files in their own storage: the four aimeat_file_store_* tools.
  *   v1.47.0 -- 2026-10-29 -- Another agent's permissions: taken away with agent:permissions, added with
  *     agent:permissions-add from your own (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   v1.46.0 -- 2026-10-26 -- Reactions: aimeat_dm_react, the palette record and the dm.reaction wake-up.
@@ -128,6 +129,15 @@ takes a \`reason\` (who it is for, what they do there) and \`days\`; it opens at
 may, and otherwise waits for an operator, who decides. \`aimeat_app_internet_opening_get\` says which,
 and \`aimeat_app_internet_close\` closes it. Ask your owner before you open anything, and tell them
 whether it is open now or waits, and until when.
+
+**Your owner's files in their own storage.** Your owner may keep their files in an S3 bucket or an
+Azure Blob container of their own, so they do not use the node's space. \`aimeat_file_store_get\` says
+whether the node lets them, where their files are now and how many are in their own storage.
+\`aimeat_file_store_set\` connects it (it takes their keys, so it needs secrets:manage, and the node
+tests the storage before saving anything); suggest they type the keys on their own profile page if
+they would rather not paste them into the chat. \`aimeat_file_store_move\` moves their files in
+("own") or back ("home"), and \`aimeat_file_store_remove\` disconnects it once nothing is left in it.
+Ask your owner before you connect or disconnect anything.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is
