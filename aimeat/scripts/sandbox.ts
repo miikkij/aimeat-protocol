@@ -49,6 +49,8 @@
  *   cd aimeat && pnpm sandbox --stop       # stop the node, keep the data
  *   cd aimeat && pnpm sandbox --status      # is it up, on which port, with what in it
  * @version-history
+ *   v1.9.0 — 2026-10-29 — AIMEAT_SANDBOX_FREE_MODEL names the free model, so a spent AI allowance can
+ *     be seen (the stand-in's POST /sandbox/ai-key spends its key).
  *   v1.8.0 — 2026-10-25 — The node and the test mailbox stop themselves after 6 hours without a
  *     request (AIMEAT_SANDBOX_IDLE_HOURS, scripts/lib/sandbox-idle.mjs). Nothing ran `--stop` when a
  *     session ended, and 13 nodes and 14 mail servers were found running, the oldest six days old.
@@ -252,7 +254,9 @@ function sandboxEnv(port: number, dbPath: string): Record<string, string> {
         // A model name the catalogue does not know, so a files call is not refused for a model that
         // cannot read PDFs (openrouter/free, the default, cannot).
         AIMEAT_MODEL_DEFAULT_CHAT: 'sandbox/refinery-model', AIMEAT_MODEL_DEFAULT_EXECUTION: 'sandbox/refinery-model',
-        AIMEAT_MODEL_DEFAULT_VISION: 'sandbox/refinery-model', AIMEAT_MODEL_FREE_FALLBACK: 'sandbox/refinery-model',
+        // AIMEAT_SANDBOX_FREE_MODEL=openrouter/free makes the free model differ from the default, so
+        // a spent AI allowance (POST /sandbox/ai-key on the stand-in) shows its notice.
+        AIMEAT_MODEL_DEFAULT_VISION: 'sandbox/refinery-model', AIMEAT_MODEL_FREE_FALLBACK: process.env.AIMEAT_SANDBOX_FREE_MODEL || 'sandbox/refinery-model',
         // Speech to text goes to the same server's stand-in, which answers every recording with one
         // short meeting note (scripts/lib/fake-mail-server.ts SANDBOX_TRANSCRIPT).
         AIMEAT_MODEL_DEFAULT_STT: 'sandbox/stt-model',

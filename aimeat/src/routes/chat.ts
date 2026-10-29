@@ -15,6 +15,8 @@
  *   - chatRouter(config, storage) — GET/POST/DELETE threads, POST .../turn (SSE), GET /v1/chat/status
  * @usage mounted in server-bootstrap/routes-loader.ts
  * @version-history
+ *   v1.11.0 — 2026-10-29 — GET /v1/chat/status: allowance_remaining_usd is the node's key's own limit
+ *     when that is smaller, and allowance_low says it is below a tenth (UX review A1).
  *   v1.10.1 -- 2026-10-27 -- DELETE /v1/chat/threads/:id ends the conversation's session MCP token
  *     (chat-session.ts endChatSession; secaudit2026oct26).
  *   v1.10.0 — 2026-10-02 — A turn takes `lang`, the language of the lines the node writes into it
@@ -57,6 +59,7 @@ import { readerFor } from '../services/classification/reader.js';
 import { chatEnabled, chatPayer, runChatTurn, resetChatSession, endChatSession } from '../services/chat-session.js';
 import { ensureChatAgent } from '../services/chat-agent.js';
 import { readAllowance, remainingOf } from '../services/ai-allowance.js';
+import { allowanceShown } from '../services/ai/node-key-balance.js';
 import { ownKeyCoverage } from '../services/own-key-coverage.js';
 import { recordFirstChatTurn } from '../services/onboarding-funnel.js';
 import { logger } from '../utils/logger.js';
@@ -92,10 +95,14 @@ export function chatRouter(config: AimeatConfig, storage: Storage): Router {
                     return 1;
                 }),
         ]);
+        // What is left as the person is told it: the node's key's own limit when that is smaller
+        // (a customer node's balance, ai/node-key-balance.ts), and whether it is low.
+        const shown = await allowanceShown(config, remainingOf(allowance));
         res.json(success(config.nodeId, {
             enabled,
             agent_name: `chat#${owner(req)}@${config.nodeId}`,
-            allowance_remaining_usd: remainingOf(allowance),
+            allowance_remaining_usd: shown.remainingUsd,
+            allowance_low: shown.low,
             has_own_key: ownKey.set,
             // WHAT THE OWN KEY REACHES ON THIS NODE (services/own-key-coverage.ts). `has_own_key`
             // beside `pays: "node"` read as "my key is in use" while the node's key paid: on the

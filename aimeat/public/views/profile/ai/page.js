@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
  *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
  *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
  *   v1.30.0 -- 2026-10-02 -- The crews' row follows own_key.agents: the key pays when every agent's crew thinks through this server; when only some do, the row names them; otherwise none do.
@@ -126,7 +127,9 @@ function mast(ctx) {
   const keyed = ctx.keyed;
   const marks = !s ? [] : keyed
     ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
-    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null, { label: x('provider.openrouter') }];
+    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null,
+      // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
+      ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null, { label: x('provider.openrouter') }];
   const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x('descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
   const loud = keyed
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`

@@ -31,6 +31,10 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.10.0 — 2026-10-29 — The node's key at its own spending limit (nodeKeyStanding 'node-key-spent')
+ *     refuses with AI_BALANCE_SPENT, and the free model takes over only when the account itself
+ *     turned it on (rules.freeModelLastResort true), never on the node's default: the person chooses
+ *     it on the notice (UX review 2026-10-29, A1).
  *   v1.9.1 -- 2026-10-27 -- A node-key call is priced by everything it sends (estimate.inputTokens: tools,
  *     pictures, files), not only its prompt; the owner's own ceiling reads promptTokens as before.
  *     A node-key text call on a model the catalogue does not price is priced by the
@@ -446,11 +450,19 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
         const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
         // The free model is the last resort, and the account's rule (or the node's default) may
         // switch it off (Jouni, 2026-10-25).
-        const lastResortOn = rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false);
+        // When the money the owner bought is spent, the free model is the owner's own choice, made on
+        // the notice that tells them (Jouni, 2026-10-29): the node's default does not make it for them.
+        const keySpent = allowance.reason === 'node-key-spent';
+        const lastResortOn = keySpent ? rules.freeModelLastResort === true
+          : rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false);
         if (freeAllowed && !input.requested && lastResortOn) {
           model = free; degradedToFree = true;
         } else if (!(freeAllowed && model === free)) {
           const spent = tooCostly ? tooCostlyMessage(unpriced ?? est!, room) : allowance.message;
+          if (keySpent && !tooCostly) {
+            reject(p, 'allowance-spent', spent!, { error: new AiCompletionError('AI_BALANCE_SPENT', 402, spent!) });
+            continue;
+          }
           const message = input.op === 'text' && free && !input.requested && !freeAllowed
             ? `${spent ?? 'Your allowance on this node is used up.'} Your model policy does not allow the free model either.`
             : input.op === 'text' && free && !input.requested && !lastResortOn
