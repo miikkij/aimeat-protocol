@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-29 -- e2e-agent-scope-add.ts joins the list (not the guard tier): agent:permissions-add (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-28 -- The round-8 suites' fixed ports follow main's move to 28000-29999 (down 12000).
  *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
  *   2026-10-27 -- e2e-admin-restore-trail.ts joins the list (not the guard tier): POST /v1/admin/restore writes the operator trail and bounds the clearance an operator's agent restores (secaudit2026oct26).
@@ -1043,6 +1044,9 @@ const ALL_SUITES = [
     'test/e2e-classification-containers.ts',
     // An agent's clearance: what ranks above it is hidden on every read, and who may set it (plan doc-mvdipuyqraas, L2).
     'test/e2e-classification-clearance.ts',
+    // agent:permissions-add: an agent adds the permissions it holds to another of the owner's agents,
+    // and the owner reads each addition on the feed and in the bell (services/agent-scope-add.ts).
+    'test/e2e-agent-scope-add.ts',
     // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
     // refused, who may set it, the onboarding step and the Design Book templates.
     'test/e2e-agent-avatar.ts',

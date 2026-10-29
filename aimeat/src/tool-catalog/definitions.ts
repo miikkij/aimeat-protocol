@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-10-29 -- definitions/operator-config.ts: the two operator propose-then-confirm tools, moved out of capabilities-groups-skills.ts, in the same place in the order.
  *   v1.x -- 2026-10-26 -- definitions/dm-reactions.ts: aimeat_dm_react (a mark on one message).
  *   v1.x -- 2026-10-25 -- definitions/internet-opening.ts: an app opened to the internet on a closed node (six tools).
  *   v1.x -- 2026-10-25 -- definitions/goals.ts: aimeat_goal_get, _set, _work and _answer (agent goals).
@@ -75,6 +76,7 @@ import { voiceTools } from './definitions/ai-voice.js';
 import { aiModelTools } from './definitions/ai-models.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
+import { operatorConfigTools } from './definitions/operator-config.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
 import { appManageTools } from './definitions/app-manage.js';
 import { extensionsCortexTools } from './definitions/extensions-cortex.js';
@@ -115,6 +117,7 @@ const CATALOG = [
     ...aiModelTools,
     ...discoveryWorkBoardsTools,
     ...capabilitiesGroupsSkillsTools,
+    ...operatorConfigTools,
     ...organismsWorkspacesAppsTools,
     ...appManageTools,
     // Extensions, the per-app IAM door and the cortex packs. They used to sit inside the slice

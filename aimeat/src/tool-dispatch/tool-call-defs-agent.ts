@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 -- The aimeat_operator_agent_configure comment names agent:permissions-add, which PATCH scopes now asks for an addition.
  *   2026-10-18 -- aimeat_operator_agent_configure forwards `clearance` to PATCH /v1/agents/:name/clearance (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-17 -- aimeat_dm_send_as_owner posts to POST /v1/messages/as-owner: it sends in the owner's
  *     name, as the node MCP tool does, where it sent as the agent through POST /v1/messages.
@@ -742,8 +743,9 @@ export const agentTools: ConnectCliToolDefinition[] = [
         // Operator config-enactment. The server MCP tool runs propose-then-confirm with no single REST
         // route; the shell path APPLIES DIRECTLY through the per-field routes that exist —
         // PATCH /v1/agents/:name/{mode,tags,scopes,clearance}. Those routes carry the real authz: scopes admits the
-        // owner, or an agent holding agent:permissions + agent:write that only narrows (the node MCP
-        // tool's rule); mode/tags are same-owner with agent:write. display_name/description have no
+        // owner, or an agent holding agent:permissions + agent:write that narrows, and adds only with
+        // agent:permissions-add from its own words (the node MCP tool's rule,
+        // services/agent-scope-add.ts); mode/tags are same-owner with agent:write. display_name/description have no
         // route (shell-unsupported).
         name: 'aimeat_operator_agent_configure',
         handler: async ({ client }, input) => {

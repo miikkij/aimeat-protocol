@@ -7,6 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.47.0 -- 2026-10-29 -- Another agent's permissions: taken away with agent:permissions, added with
+ *     agent:permissions-add from your own (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   v1.46.0 -- 2026-10-26 -- Reactions: aimeat_dm_react, the palette record and the dm.reaction wake-up.
  *     The wake-up names the symbol and the reactor; the meaning stays in the person's palette record.
  *   v1.45.0 -- 2026-10-25 -- Goals: propose first (the person approves), and runner "model" when no agent fits.
@@ -155,7 +157,10 @@ for it another way. Your owner may also set how high a classification you yourse
 clearance, \`clearance\` on your entry in GET /v1/agents): anything classified higher is hidden from
 you in the same way, and stays behind when you send content out. You cannot change your own; with
 \`agent:permissions\` you may lower another agent's (\`aimeat_operator_agent_configure\`, \`clearance\`),
-and only your owner raises one. When you send content out (an export, a share link, another node, an outside
+and only your owner raises one. The same word lets you take permissions away from another of your
+owner's agents (\`scopes\`). When your owner has also given you \`agent:permissions-add\` on your page,
+you may add to another agent the permissions you hold yourself, never to yourself; your owner is
+told of each addition. When you send content out (an export, a share link, another node, an outside
 service), what a classification hides from AI stays behind, and so does an organism's content that
 may not leave it; the answer names each item. Only your owner can make an exception, signed in
 themselves in their Data Wallet with a written reason, so tell them what you wanted to send and why;

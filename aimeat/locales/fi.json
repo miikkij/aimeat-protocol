@@ -10592,6 +10592,9 @@
   "notiftext.agent_permission_ask_page.body": "{agent} yritti tehdä puolestasi jotain, mitä et ole sallinut. Tämän oikeuden annat agentin sivulla, jos haluat. Avaa sivu, niin näet, mistä on kyse.",
   "notiftext.agent_permission_ask_page.open": "Avaa agentin sivu",
   "notiftext.agent_permission_ask_page.deny": "Älä salli",
+  "notiftext.agent_permissions_added.title": "{by} antoi agentille {agent} uusia oikeuksia",
+  "notiftext.agent_permissions_added.body": "{by} lisäsi agentille {agent} nämä oikeudet: {words}. Voit poistaa ne agentin {agent} sivulla. Agentin {by} sivulla voit myös estää sitä lisäämästä oikeuksia.",
+  "notiftext.agent_permissions_added.open": "Avaa agentin {agent} sivu",
   "notiftext.secret_use_ask.title": "Laajennus {extension} pyytää lupaa käyttää salaisuuttasi {secret}",
   "notiftext.secret_use_ask.body": "{extension} (asentaja: {installer}) tarvitsee salaisuuttasi {secret} palvelussa {host}. Salaisuutesi ei ole mennyt tähän osoitteeseen ennen, joten sinulta kysytään ensin. Mitään ei lähetetty. Avaa ilmoitus, niin näet miksi, tai vastaa tästä.",
   "notiftext.secret_use_ask.allow": "Salli",
@@ -15606,6 +15609,7 @@
       "operatorAdminGrantedOne": "{name} sai oikeuden ylläpitää tätä asennusta, koska sillä oli täysi pääsy. Voit poistaa oikeuden agentin asetuksista.",
       "operatorAdminGrantedMany": "{names} saivat oikeuden ylläpitää tätä asennusta, koska niillä oli täysi pääsy. Voit poistaa oikeuden kunkin agentin asetuksista.",
       "scopeWordsKeptOne": "{name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se sai oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne agentin asetuksista.",
+      "agentPermissionsAdded": "{by} antoi agentille {name} uusia oikeuksia: {words}. Voit poistaa ne agentin {name} sivulla.",
       "scopeWordsKeptMany": "{names} toimivat AIMEATin päivityksen jälkeen kuten ennenkin: ne saivat oikeudet, joita päivitys nyt vaatii ({words}). Voit poistaa ne kunkin asetuksista.",
       "appScopeWordsKeptOne": "Sovelluksesi {name} toimii AIMEATin päivityksen jälkeen kuten ennenkin: se säilytti oikeudet, joita sen koodi käyttää ({words}). Sovelluksen muutosloki Sovellukset-sivulla kertoo syyn. Voit poistaa oikeuden tekoälysi avulla.",
       "appScopeWordsKeptMany": "Sovelluksesi {names} toimivat AIMEATin päivityksen jälkeen kuten ennenkin: ne säilyttivät oikeudet, joita niiden koodi käyttää ({words}). Kunkin sovelluksen muutosloki Sovellukset-sivulla kertoo syyn. Voit poistaa oikeuden tekoälysi avulla.",
@@ -19042,7 +19046,8 @@
           "agent": {
             "read": "Katso agenttiesi lista: niiden nimet, asetukset ja oikeudet sekä se, pääseekö kukin kirjautumaan.",
             "write": "Muuta muiden agenttiesi asetuksia: missä tilassa ne toimivat ja millä tunnisteilla.",
-            "permissions": "Muuta mitä muut agenttisi saavat tehdä. Eri asia kuin niiden asetukset: tämä on itse lupalista.",
+            "permissions": "Poista oikeuksia muilta agenteiltasi. Eri asia kuin niiden asetukset: tämä on itse lupalista.",
+            "permissions-add": "Anna muille agenteillesi oikeuksia, jotka tällä agentilla itsellään on. Itselleen se ei anna mitään, ja saat tiedon jokaisesta lisäyksestä. Vain sinä voit antaa tämän.",
             "delete": "Poista itse luomansa agentit, eikä muita. Ajoympäristölle joka rakentaa sinulle agentteja ja joutuu myös siivoamaan ne pois."
           },
           "app": {
