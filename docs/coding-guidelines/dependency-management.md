@@ -266,6 +266,9 @@ When adding new overrides:
 2. Test that the override doesn't break functionality
 3. Plan to remove once the direct dependency updates
 4. Keep the range inside the major the dependents asked for (`^2.1.4`, never `>=2.1.4`); see `docs/pitfalls.md` §59
+5. Add the same rule to the npm `overrides` field beside it (a parent rule `a>b` becomes `"a": { "b": … }`). npm reads neither the `pnpm` block nor `pnpm-lock.yaml`, and `aimeat/test/unit/npm-shrinkwrap.test.ts` refuses the two lists when they differ. A removal (`"-"`) has no npm form and stays only in `pnpm.overrides`.
+
+The published npm package carries `aimeat/npm-shrinkwrap.json`, so `npx aimeat` and `npm install -g aimeat` install the versions `pnpm-lock.yaml` pins, with pnpm's integrity hashes and every override applied, removals included. `pnpm gen:shrinkwrap` writes it from `pnpm-lock.yaml` (prepublishOnly and the nightly pack-smoke run it; the file is not tracked) and refuses to write one that breaks an override or resolves differently from the lock. `aimeat/scripts/pack-smoke.mjs` installs the packed tarball with npm and checks the installed tree against both.
 
 ---
 
