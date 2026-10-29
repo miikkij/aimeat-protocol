@@ -686,6 +686,20 @@ async function run(): Promise<void> {
         assert(again.at(-1)!.kind === 'done', `the kept conversation still runs, got ${JSON.stringify(again.at(-1))}`);
     });
 
+    await test('deleting a conversation says whether the chat tool keeps its own copy (secaudit2026oct26 round 8c)', async () => {
+        const talked = await newThread('copy-kept');
+        const t1 = await turn(talked, { text: 'words the chat tool has seen' });
+        assert(t1.at(-1)!.kind === 'done', `the turn ran, got ${JSON.stringify(t1.at(-1))}`);
+        const del = await json(`/v1/chat/threads/${talked}`, authed({ method: 'DELETE' }));
+        assert(del.status === 200 && del.body.data.deleted === true, `delete ${del.status}`);
+        assert(del.body.data.chat_tool_copy === 'kept', `the answer says the chat tool keeps its copy: ${JSON.stringify(del.body.data)}`);
+        assert(/chat tool/.test(del.body.data.note ?? ''), `and says it in words: ${del.body.data.note}`);
+        const silent = await newThread('copy-none');
+        const del2 = await json(`/v1/chat/threads/${silent}`, authed({ method: 'DELETE' }));
+        assert(del2.status === 200 && del2.body.data.deleted === true, `delete ${del2.status}`);
+        assert(del2.body.data.chat_tool_copy === 'none' && !del2.body.data.note, `a conversation the chat tool never saw leaves no copy: ${JSON.stringify(del2.body.data)}`);
+    });
+
     await test('a thread is its owner\'s: no credential is 401, another owner cannot read it', async () => {
         const anonymous = await json(`/v1/chat/threads/${threadId}`);
         assert(anonymous.status === 401, `no credential: ${anonymous.status}`);

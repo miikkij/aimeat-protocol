@@ -22788,6 +22788,7 @@
   "chat.youLabel": "You",
   "chat.agentLabel": "Agent",
   "chat.jumpLatest": "Jump to the latest",
+  "chat.deletedCopyKept": "The conversation is deleted here. The chat tool that answered in it keeps its own copy of the text on this server, and AIMEAT cannot delete that copy. The operator of this service can remove it.",
   "chat.starterPage": "Make my welcome page",
   "chat.starterPageAsk": "Put up my welcome page. Keep it simple, and tell me the address when it is live.",
   "chat.starterCompany": "Set up my company",

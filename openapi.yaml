@@ -13885,10 +13885,26 @@ paths:
       description: |
         Delete one conversation and its turns. The conversation is looked up first, so a caller who
         cannot see it is told nothing exists rather than being told a deletion happened. Owner
-        sessions only.
+        sessions only. The chat tool that answered in the conversation (goose) keeps its own copy in
+        its own store on the server, which the node cannot delete with certainty: `chat_tool_copy` is
+        `kept` for a conversation the chat tool has seen, with a `note` saying so, and `none` for one
+        it never saw. The conversation's session credential ends with the delete.
       responses:
         '200':
-          description: '`{ deleted: true }`'
+          description: '`{ deleted: true, chat_tool_copy: "kept" | "none", note? }`'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    required: [deleted, chat_tool_copy]
+                    properties:
+                      deleted: { type: boolean }
+                      chat_tool_copy: { type: string, enum: [kept, none] }
+                      note: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
