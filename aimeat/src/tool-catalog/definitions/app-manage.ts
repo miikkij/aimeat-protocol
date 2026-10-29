@@ -21,6 +21,9 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-10-29 — The app's structure and plan from the first moment of building: structure,
+ *     structure_set and plans over the structure routes, and the purpose, data, choices and now
+ *     fields (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — subdomain_list and subdomain_delete say what a held address is and that deleting it
  *     releases it (secaudit2026oct22, app-label-recycled-after-delete).
@@ -112,7 +115,7 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     note: { type: 'string', description: 'For ui_set: one line on what this change was for. For member_set and builder_set: the owner\'s own note on the decision (at most 400 characters; the person does not see it). For member_request: your message to the owner, who sees it with the request.' },
     version: { type: 'number', description: 'For ui_restore: the layout version to put back (ui_set answers with the one it replaced).', zod: z.number().int().min(1) },
     // settings
-    name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version.' },
+    name: { type: 'string', description: 'For settings: the app\'s display name. Changes it without a new version. For structure_set: the app\'s name while it is not published yet.' },
     descriptions: { type: 'object', description: 'For settings: the description per language, { "fi": "…", "es": "…" }.', zod: z.record(z.string(), z.string().max(INPUT_LIMITS.description)) },
     listing: { type: 'string', enum: ['listed', 'community', 'unlisted'], description: 'For settings: where the app is listed. listed: everywhere, including search and other nodes. community: only in the community list of people signed in to this node, nowhere public. unlisted: only in your own list. A link opens the app in all three.' },
     parked: { type: 'boolean', description: 'For settings: the older two-state switch. true is listing "unlisted", false is listing "listed". Prefer listing.' },
@@ -159,7 +162,12 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
     words: { type: 'array', description: 'For scope_allowance_remove: the permission words to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
-    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). When the stored revision differs the write is refused with REVISION_MISMATCH and the current document, so read again and write from that. Omit it to replace whatever is there.', zod: z.number().int().min(0) },
+    expected_revision: { type: 'number', description: 'For spec_set: the revision you read (spec answers it). For structure_set: plan.revision from structure. When the stored revision differs the write is refused with REVISION_MISMATCH and what is stored, so read again and write from that. Omit it to write over whatever is there.', zod: z.number().int().min(0) },
+    // the app's structure and plan (routes/apps/structure.ts)
+    purpose: { type: 'string', description: 'For structure_set: who the app is for and the one job it does for them, in the person\'s words, at most 800 characters. An empty string clears it.', zod: z.string().max(800) },
+    data: { type: 'object', description: 'For structure_set: the data in short, before the data map can be written: { "summary": "what the app keeps and whose it is", "personalData": "yes" | "no" | "unstated" }. Write it once the person has confirmed the data map questions.', zod: z.object({ summary: z.string().max(800), personalData: z.enum(['yes', 'no', 'unstated']).optional() }) },
+    choices: { type: 'object', description: 'For structure_set: the choices made, keyed by layout (a layout preset id), nav (a navigation mode), look (an Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted), each { "value": "<id>", "state": "waiting" | "done", "note": "why" }, or null to clear it. The ids are the ones GET /v1/apps/ui/catalogue lists. A choice you make yourself is built at once (state done); a choice the person made on the structure page waits for you, so build it and write the same value with state "done". Leave out the choices you are not changing.', zod: z.record(z.string(), z.union([z.object({ value: z.string().max(80), state: z.enum(['waiting', 'done']).optional(), note: z.string().max(300).optional() }), z.null()])) },
+    now: { type: 'string', description: 'For structure_set: what you are doing now, one line the structure page shows the person live, such as "Building the sign-up view". An empty string clears it.', zod: z.string().max(200) },
 };
 
 /** One action: its fields (true = required), its permission word (null = none), and one line. */
@@ -245,6 +253,20 @@ const SPEC_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'take kept permissions away from the app: they leave every live grant of the app and stay removed. Owner only. Declaring the word in the app\'s aimeat-scopes is the other way to end the need for the list' },
 };
 
+/**
+ * The app's structure and plan (services/app-structure.ts, services/app-plan.ts): the eight steps the
+ * structure page shows, from the first moment of building, before any code or publish. Over the
+ * route like the spec actions, which decides who is inside the build.
+ */
+const STRUCTURE_ACTION_SPECS: Record<string, AppManageAction> = {
+    structure: { fields: F(['filename'], ['owner']), scope: 'app:write',
+        summary: 'the app\'s structure and status: eight steps (purpose, data, layout, look, build, builders, visibility, requirements), each with its state and one sentence on what to do, the plan with the choices the person made on the structure page, and page_url, the page to give the person. Read it before you build and after the person says they chose something. Works before the app is published' },
+    structure_set: { fields: F(['filename'], ['owner', 'name', 'purpose', 'data', 'choices', 'now', 'expected_revision']), oneOf: ['name', 'purpose', 'data', 'choices', 'now'], scope: 'app:write',
+        summary: 'write the app\'s plan; the fields you leave out stay. Call it FIRST when you start a new app, with name and purpose, and give the person page_url from the answer: the page shows them the steps and lets them pick a layout and a look if they want to. Then write data after the data map questions, now while you build, and a choice when you make one or have built the person\'s. The owner and everybody who may build the app' },
+    plans: { fields: F([], []), scope: 'app:write',
+        summary: 'the apps you have started, published or not, each with its step count and page_url' },
+};
+
 export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     settings: { fields: F(['filename'], ['owner', ...SETTINGS_FIELDS]), oneOf: SETTINGS_FIELDS, scope: 'app:write',
         summary: 'change name, description, per-language descriptions, listing (listed, community for signed-in members only, or unlisted), who may open it (anyone, signed-in, or one organism\'s members), forkable, access code or copy protection, without a new version. When the node asks the owner before making something public, a change that would make the app public (listed, no code, open to anyone) is applied without that one field and answers with publish_request' },
@@ -299,6 +321,7 @@ export const APP_MANAGE_ACTIONS: Record<string, AppManageAction> = {
     ...MEMBER_ACTION_SPECS,
     ...BUILDER_ACTION_SPECS,
     ...SPEC_ACTION_SPECS,
+    ...STRUCTURE_ACTION_SPECS,
     grants: { fields: F([], []), scope: 'consent:manage',
         summary: 'the apps your owner has granted permissions to, with their permissions and spend; revoking one is the owner\'s own act on the Access page' },
     backup_export: { fields: F([], []), scope: 'app:write',

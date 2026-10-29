@@ -8,6 +8,8 @@
  * @structure FIELD_ENTRIES
  * @usage import { FIELD_ENTRIES } from './entries-fields.js';
  * @version-history
+ *   v1.4.0 — 2026-10-29 — Choice's picture (an option's `pic`), and the entries layout-sketch and
+ *     look-sample, the pictures of the app structure page's pickers.
  *   v1.3.0 — 2026-09-27 — The options appcat added: Fields plain, beside, chapter, ruled, spaced, column,
  *     narrow (field, form-fields with their classes); TextField size glyph and mark, TextArea prompt,
  *     page, source, script (text-field); Select line; FileDrop ink, mark, browseLabel, chosen.
@@ -188,6 +190,7 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
             { name: 'three columns', class: 'choice--cols-3', prop: 'boxed cols={3}', when: 'three boxes side by side (a schedule\'s kinds), two under 1100px' },
             { name: 'four columns', class: 'choice--cols-4', prop: 'boxed cols={4}', when: 'four boxes side by side (a new agent\'s shape), two under 1100px' },
             { name: 'with a dot', class: 'choice-dot', prop: 'boxed dot', when: 'a boxed answer that shows its radio dot, as a calibration\'s options do' },
+            { name: 'with a picture', class: 'choice-pic', prop: 'boxed, an option\'s pic', when: 'an answer a person judges by seeing it: a layout as a LayoutSketch, a look as a LookSample (the app structure page)' },
         ],
         example: { label: 'Lifetime', value: '168', options: [['72', '3 days'], ['168', '7 days'], ['720', '30 days']] },
         note: 'Its tab rows are the page family\'s Tabs (components/Tabs.js, kind choice or toggle; their look is tab-row.css and poster.css .poster-tab), so a row of answers has one keyboard and one look wherever it stands. Its boxed answers wear the Choice tile shape of poster.css (.poster-choice, entry choice-shape), which stays as it is; choice.css holds only their grid and the dot\'s layout. It replaces the .pf-tabs rows used as a setting, the og-choice group, and the agp-choices, sc-choices and cal-opts grids (Jouni\'s decisions "Choice" and "Question box").',
@@ -349,5 +352,50 @@ export const FIELD_ENTRIES: UiEntryWritten[] = [
         ],
         example: { value: 'anthropic/claude-sonnet-4.5', models: [{ id: 'anthropic/claude-sonnet-4.5', name: 'Claude Sonnet 4.5' }, { id: 'mistralai/mistral-small-3.2', name: 'Mistral Small 3.2' }] },
         note: 'Moved on 2026-09-25 from the AI page (ai-pick) and the calibrator (cal-pick), which drew it one way. On 2026-09-26 the three pickers of Settings became components/ModelPicker.js with the rows as data: ModelList for the AI page\'s roles and a calibration\'s models, ModelPicker for the classic AI settings (it replaces views/profile/openrouter/model-picker.js, deleted), whose chosen-value line, link column and own-id row keep their layout in this sheet.',
+    },
+    // The two pictures of the app structure page's pickers (2026-10-29), drawn in a Choice's boxed
+    // answers as an option's `pic`.
+    {
+        id: 'layout-sketch', name: 'LayoutSketch', kind: 'component', status: 'active',
+        summary: 'A small wireframe of a screen: rows of framed blocks, each as wide as its share of the row and named in small typewriter words, the top bar in ink and the part the shape is about on the sun, so a person sees the shape of a layout before anything is built.',
+        module: '/components/LayoutSketch.js', sheet: '/css/components/layout-sketch.css',
+        data: {
+            shape: 'LayoutSketch({ rows: [{ height, cells: [{ w, label, tone }] }], label })',
+            fields: {
+                rows: 'the sketch top to bottom',
+                height: '\'s\' a thin strip, \'m\' a band, \'l\' the rest of the sketch',
+                w: '\'full\', \'main\' (two shares), \'side\' (one share), \'half\' or \'tiny\' (a fixed narrow strip)',
+                label: 'the block\'s name in small typewriter words; on the sketch, its name for a screen reader',
+                tone: '\'ink\' the bar or band at the top, \'sun\' the part the shape is about',
+            },
+        },
+        useFor: ['A layout or a way of moving between views, judged by seeing its shape: the app structure page draws one for every layout preset (from the preset\'s own blocks) and every navigation mode the node offers.'],
+        variants: [
+            { name: 'a layout', prop: 'rows from a preset\'s blocks', when: 'a main view: the blocks a preset places' },
+            { name: 'a way of moving', prop: 'rows of bars', when: 'tabs, a bottom bar, a side menu, one step at a time' },
+            { name: 'ink and sun', class: 'layout-sketch-cell--ink', prop: 'tone', when: 'the bar at the top in ink, the part the shape is about on the sun' },
+        ],
+        example: { label: 'Dashboard', rows: [{ height: 's', cells: [{ w: 'full', tone: 'ink' }] }, { height: 'm', cells: [{ w: 'side', label: 'numbers' }, { w: 'side', label: 'numbers' }] }, { height: 'l', cells: [{ w: 'main', label: 'list' }, { w: 'side', label: 'history' }] }] },
+    },
+    {
+        id: 'look-sample', name: 'LookSample', kind: 'component', status: 'active',
+        summary: 'One Atelier look drawn by the kit itself: a small framed page (/look-sample.html) that loads the kit\'s stylesheet and sets the look, with the person\'s own app name in it, so the sample is the look\'s own colours, faces, corners and shadows and never a copy.',
+        module: '/components/LookSample.js', sheet: '/css/components/look-sample.css',
+        data: {
+            shape: 'LookSample({ look, title, theme, label })',
+            fields: {
+                look: 'the look id, one of the kit\'s looks',
+                title: 'the words the sample shows: the app\'s name when known',
+                theme: '\'light\' or \'dark\': the page\'s own theme, so a dark page shows each look\'s dark side',
+                label: 'the frame\'s name',
+            },
+        },
+        useFor: ['A look judged by seeing it: the app structure page draws one for every look the node serves, so a look added to the kit shows there with no change.'],
+        variants: [
+            { name: 'light', prop: 'theme="light"', when: 'the page is light' },
+            { name: 'dark', prop: 'theme="dark"', when: 'the page is dark' },
+        ],
+        example: { look: 'editorial', title: 'Talkoolista', theme: 'light', label: 'editorial' },
+        note: 'The frame is lazy and takes no pointer, so a page of twenty looks loads the ones in view and a press lands on the answer around it. The page it frames is public/look-sample.html with its sheet css/look-sample-page.css, which draws only with the kit\'s --ak-* tokens.',
     },
 ];

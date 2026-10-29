@@ -1,0 +1,14 @@
+/**
+ * @file look-sample.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The LookSample's frame (components/LookSample.js): the box's full width, a fixed
+ *   height, a 1px line, and no pointer, so a press lands on the answer around it. What is inside is
+ *   the kit's own look (/look-sample.html). Reads only the theme's tokens and the shape values.
+ *   Drawn by components/LookSample.js; a page never writes these.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+ */
+
+.look-sample { display: block; width: 100%; height: 8rem; border: 1px solid var(--border); border-radius: var(--shape-corner); background: var(--bg); pointer-events: none; }

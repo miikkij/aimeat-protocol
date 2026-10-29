@@ -40,6 +40,8 @@
  *   const out = await forkApp(storage, config, { source, callerOwner, callerGhii, callerGaii, newFilename });
  *   if ('refusal' in out) { res.status(out.refusal.status).json(error(...)); return; }
  * @version-history
+ *   v1.10.5 — 2026-10-29 — deleteOwnedApp removes the app's plan with the whole app
+ *     (services/app-plan.ts), so the structure page does not list a deleted app as one being built.
  *   v1.10.4 — 2026-10-27 — A fork into another account keeps only the intake forms the forker manages
  *     (secaudit2026oct26, forkApp/manifest-spread-carries-intake-forms).
  *   v1.10.3 — 2026-10-27 — publishAppDraft passes `publishingApp`, the app whose grant publishes
@@ -131,6 +133,7 @@ import { gateFirstPublishExposure, capFirstPublishExposure, fileAppPublishAsk, t
 import type { PublishAsk } from './publish-requests/ask.js';
 import { removeComplianceDocs } from './compliance-docs.js';
 import { holdAppLabels } from './held-app-labels.js';
+import { deleteAppPlan } from './app-plan.js';
 import { managedIntakeForms } from './app-intake-forms.js';
 export { resolveAppOwnerScope, type AppOwnerScope } from './app-owner-scope.js';
 
@@ -710,6 +713,9 @@ export async function deleteOwnedApp(
     // (services/held-app-labels.ts; secaudit2026oct22). The daily sweep starts it if this fails.
     await holdAppLabels(storage, ownerName, filename)
       .catch(err => logger.warn('deleteOwnedApp: address not marked held', { filename, error: String(err) }));
+    // Its plan goes too, or the structure page would list a deleted app as one being built.
+    await deleteAppPlan(storage, `${ownerName}/${filename}`)
+      .catch(err => logger.warn('deleteOwnedApp: app plan not removed', { filename, error: String(err) }));
   } else {
     // Single-version case: try the buckets in order, delete from the one that has it.
     let app = await storage.getApp(ownerGhii, filename, version);
