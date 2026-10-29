@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.13.0 — 2026-10-29 — An older accountant grant the client allowed is confirmed, and one the client
+ *     did not allow is removed (PUBLISH_DECLINERS) (apply-accountant-grant.ts; secaudit2026oct26 round 8c).
  *   v1.12.0 — 2026-10-27 — AIMEAT's model reading private records an agent named in a goal, allowed by
  *     the owner (apply-goal-model-read.ts; secaudit2026oct26).
  *   v1.11.0 — 2026-10-27 — A sibling agent's instruction to another agent's ai schedule, allowed by the
@@ -37,7 +39,9 @@
  *   v1.1.0 — 2026-10-18 — Stored files (apply-file.ts; plan doc-mvcn6c7e4e5q, V4).
  *   v1.0.0 — 2026-10-18 — Initial: memory records (plan doc-mvcn6c7e4e5q, V4.3).
  */
-import type { PublishApplier, PublishKind } from './store.js';
+import type { PublishApplier, PublishKind, PublishRequest, PublishStoreCtx } from './store.js';
+import { applyAccountantGrant } from './apply-accountant-grant.js';
+import { declineAccountantGrant } from '../finance/accountant-grant-ask.js';
 import { applyMemoryPublish } from './apply-memory.js';
 import { applyFilePublish } from './apply-file.js';
 import { applyPackagePublish } from './apply-package.js';
@@ -85,4 +89,14 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'schedule-instruction': applyScheduleInstruction,
   'goal-model-read': applyGoalModelRead,
   'refinery-definition': applyRefineryDefinition,
+  'accountant-grant': applyAccountantGrant,
+};
+
+/**
+ * What a declined request does, for the kinds where "Don't allow" changes something rather than
+ * leaving it as it was: an older accountant grant the client did not allow is removed
+ * (finance/accountant-grant-ask.ts). decide.ts runs it after the request is settled declined.
+ */
+export const PUBLISH_DECLINERS: Partial<Record<PublishKind, (ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest) => Promise<void>>> = {
+  'accountant-grant': declineAccountantGrant,
 };
