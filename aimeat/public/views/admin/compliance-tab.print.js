@@ -39,6 +39,9 @@
  *   - PrintableReport (default export) — the print-only document
  * @usage rendered unconditionally by compliance-tab.js; the print sheet shows it only on paper
  * @version-history
+ *   v3.3.0 — 2026-10-29 — An entry's purpose, apps and reasons for counting as AI use print one per
+ *     line; the reason column only when an answer has a reason. Innokas Outreach's fourteen uses
+ *     read as one sentence, beside a column of dashes.
  *   v3.2.0 — 2026-10-28 — Each answer prints with its reason (`answerNotes`) in a column of its own,
  *     and an answer the app's maker gave is marked as the maker's.
  *   v3.1.0 — 2026-10-28 — Laid out for its readers (the data protection officer, the management, an
@@ -163,6 +166,18 @@ function proposedClass(questionnaire, u) {
 }
 
 /**
+ * A purpose written as a run of uses ("planning campaigns …; collecting signals …; and reporting …")
+ * as one use per line. Fewer than three parts stays the sentence it was written as.
+ */
+function purposeItems(s) {
+  if (typeof s !== 'string') return s;
+  const parts = s.split(/;\s+/).map(p => p.trim()).filter(Boolean);
+  if (parts.length < 3) return s;
+  parts[parts.length - 1] = parts[parts.length - 1].replace(/^(and|ja|sekä|y|e)\s+/i, '').replace(/\.$/, '');
+  return parts.map(p => p.charAt(0).toUpperCase() + p.slice(1));
+}
+
+/**
  * One AI use as the document's data. `saved` says whether it is in the stored register; one that is
  * not is the system's finding, and the tag says so before anything else.
  */
@@ -177,18 +192,23 @@ function printableUseCase(u, questionnaire, { saved, why = {} }) {
     : P('statusFound') + (proposed ? P('statusProposed', { cls: classWord(questionnaire, proposed) }) : '');
   const answered = questions.filter(q => answerText(q, answers[q.id]) !== null);
   const proposals = Object.values(why);
+  const notes = u.answerNotes || {};
+  // The reason column only when an answer has one: a column of dashes is noise on every entry.
+  const withNotes = answered.some(q => notes[q.id]);
   return {
     id: anchorOf(u),
     title: u.title || u.id,
     tag,
     desc: u.description,
-    answersHead: [P('colQuestion'), P('colAnswer'), P('colReason'), P('colWho')],
+    answersHead: withNotes
+      ? [P('colQuestion'), P('colAnswer'), P('colReason'), P('colWho')]
+      : [P('colQuestion'), P('colAnswer'), P('colWho')],
     fields: [
       { key: 'account', label: P('fOwner'), value: u.ownerGhii },
-      { key: 'purpose', label: C('ucPurpose'), value: u.purpose },
-      { key: 'apps', label: C('ucApps'), value: u.apps },
+      { key: 'purpose', label: C('ucPurpose'), value: purposeItems(u.purpose), list: true },
+      { key: 'apps', label: C('ucApps'), value: u.apps, list: true },
       { key: 'models', label: C('ucModels'), value: (u.models || []).length ? u.models : P('modelsNone') },
-      { key: 'why', label: P('fWhyAi'), value: (u.systems || []).map(evidenceText) },
+      { key: 'why', label: P('fWhyAi'), value: (u.systems || []).map(evidenceText), list: true },
       { key: 'subjects', label: C('ucSubjects'), value: subjectsText(u.dataSubjects) },
       ...proposals.map((p, i) => ({ key: 'proposal' + i, label: P('fProposal'), value: `${answerText(questions.find(q => q.id === p.question) || {}, p.value) || p.value}: ${proposalWhy(p)}` })),
       { key: 'open', label: P('fOpen'), value: P('openCount', { n: String(questions.length - answered.length), total: String(questions.length) }) },
@@ -199,7 +219,7 @@ function printableUseCase(u, questionnaire, { saved, why = {} }) {
       const src = sources[q.id];
       return {
         key: q.id, question: questionText(q), answer: answerText(q, answers[q.id]),
-        note: (u.answerNotes || {})[q.id] || '—', source: src ? t(SOURCE_LABEL[src]) : null,
+        note: notes[q.id] || '—', source: src ? t(SOURCE_LABEL[src]) : null,
       };
     }),
     reasons: (risk?.reasons || []).map((r) => {

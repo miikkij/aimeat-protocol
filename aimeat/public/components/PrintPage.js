@@ -24,9 +24,9 @@
  *   - PrintHead({ title, line }): its heading and the stamp line under it (where, when, which version).
  *   - PrintHeading({ children }): a part's heading.
  *   - PrintEntry({ title, tag, desc, fields, answers, reasons, reasonsLabel, emptyAnswer }): one entry
- *     of a register: its title with its tag (a class) beside it, a description, the fields that
- *     have a value (`fields` [{ key, label, value }], a list value joined with commas, an empty one
- *     left out), the answers as two columns (`answers` [{ key, question, answer, source }]: an empty
+ *     of a register: its title with its tag (a class) beside it as a mark, a description, the fields
+ *     that have a value (`fields` [{ key, label, value, list }], a list value joined with commas, or
+ *     one item per line with `list`, an empty one left out), the answers as two columns (`answers` [{ key, question, answer, source }]: an empty
  *     answer says `emptyAnswer` in italics, a source stands in brackets after the answer) and the
  *     reasons under `reasonsLabel` as a bulleted list; it is kept on one sheet.
  *   - PrintList({ items }): a numbered list [{ key, text, help }], the help on its own line in grey.
@@ -43,6 +43,8 @@
  *          <${PrintOnly}><${PrintHead} title=${t('x.printTitle')} line=${stamp} />…<//>
  *        <//>`
  * @version-history
+ *   v1.2.0 — 2026-10-29 — A field marked `list` prints one item per line; the tag is a mark beside the
+ *     title and the description a quoted lead. An app's purpose of fourteen uses read as one sentence.
  *   v1.1.0 — 2026-10-28 — PrintToc and PrintTable; PrintHeading takes an id and a number; PrintEntry
  *     prints its fields as a table and its answers with a head row. The Compliance report's 15
  *     pages read as one run of lines on innokas.aimeat.io.
@@ -105,18 +107,24 @@ export function PrintTable({ head = [], rows = [], lead = false }) {
 }
 
 /**
- * @param {{ id?: string, title: any, tag?: any, desc?: any, fields?: Array<{ key?: any, label: any, value: any }>,
+ * @param {{ id?: string, title: any, tag?: any, desc?: any, fields?: Array<{ key?: any, label: any, value: any, list?: boolean }>,
  *   answers?: Array<{ key?: any, question: any, answer?: any, note?: any, source?: any }>, answersHead?: Array<any>,
  *   reasons?: Array<any>, reasonsLabel?: any, emptyAnswer?: any }} props
  */
 export function PrintEntry({ id, title, tag, desc, fields = [], answers = [], answersHead, reasons = [], reasonsLabel, emptyAnswer }) {
-  const shownFields = (fields || []).map((f) => ({ ...f, text: Array.isArray(f.value) ? f.value.join(', ') : f.value })).filter((f) => has(f.text));
+  const shownFields = (fields || [])
+    .map((f) => ({ ...f, items: Array.isArray(f.value) ? f.value.filter(has) : null }))
+    .filter((f) => (f.items ? f.items.length > 0 : has(f.value)));
+  // A list field with more than one item prints one item per line; a single item prints as text.
+  const fieldValue = (f) => (!f.items ? f.value
+    : f.list && f.items.length > 1 ? html`<ul class="print-entry-list">${f.items.map((x, i) => html`<li key=${i}>${x}</li>`)}</ul>`
+    : f.items.join(', '));
   return html`
     <article class="print-entry" id=${id}>
       <h4>${title}${has(tag) ? html`<span class="print-entry-tag">${tag}</span>` : null}</h4>
       ${has(desc) ? html`<p class="print-entry-desc">${desc}</p>` : null}
       ${shownFields.length ? html`<table class="print-entry-fields"><tbody>
-        ${shownFields.map((f, i) => html`<tr key=${f.key ?? i}><th>${f.label}</th><td>${f.text}</td></tr>`)}
+        ${shownFields.map((f, i) => html`<tr key=${f.key ?? i}><th>${f.label}</th><td>${fieldValue(f)}</td></tr>`)}
       </tbody></table>` : null}
       ${(answers || []).length ? html`<table class="print-entry-answers">
         ${answersHead && answersHead.length ? html`<thead><tr>${answersHead.map((h, i) => html`<th key=${i}>${h}</th>`)}</tr></thead>` : null}

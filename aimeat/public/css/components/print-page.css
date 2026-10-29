@@ -10,6 +10,8 @@
  *   component's own names.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.3.0 — 2026-10-29 — An entry's tag is a mark, its description a quoted lead, a list field one
+ *     item per line (print-entry-list), and entries are divided by a darker rule.
  *   v1.2.0 — 2026-10-28 — The frames that hold the page grow to their content on paper: with the
  *     app shell (page-base.css) they cut the printout to one sheet (innokas.aimeat.io). An answer
  *     wraps in its own column instead of squeezing the question. The contents (print-toc), tables
@@ -26,11 +28,15 @@
 .print-head { margin-bottom: 1rem; }
 .print-head h2 { margin: 0 0 .2rem; }
 .print-head p { margin: 0; color: var(--muted); font-size: .85rem; }
-.print-entry { margin: .9rem 0 1.2rem; padding-bottom: .6rem; border-bottom: 1px solid var(--border); }
-.print-entry h4 { margin: 0 0 .25rem; font-size: .95rem; }
-.print-entry-tag { margin-left: .5rem; font-weight: 500; color: var(--muted); }
-.print-entry-desc { margin: 0 0 .35rem; }
-.print-entry-desc { font-size: .85rem; }
+.print-entry { margin: 1rem 0 1.6rem; padding-bottom: .8rem; border-bottom: 1.5px solid var(--text); }
+.print-entry h4 { margin: 0 0 .45rem; font-size: 1.05rem; }
+/* The tag is a status mark, not part of the name: in grey after the title it read as the title's
+   second half ("Innokas Outreach järjestelmän löytämä, ei tallennettu"). */
+.print-entry-tag { display: inline-block; margin-left: .6rem; padding: .05rem .45rem; border: 1px solid var(--border); border-radius: 3px; font-size: .72rem; font-weight: 500; color: var(--muted); vertical-align: middle; }
+/* The app's own description, in its maker's words: a quoted lead, set apart from the node's fields. */
+.print-entry-desc { margin: 0 0 .4rem; padding-left: .6rem; border-left: 3px solid var(--border); font-size: .8rem; color: var(--muted); }
+.print-entry-list { margin: 0; padding-left: 1rem; }
+.print-entry-list li { margin: 0 0 .1rem; }
 /* Fields and answers are tables: on 2026-10-28 they were runs of "Label value" lines, and a reader
    could not see where a label ended and its value began. */
 .print-entry-fields, .print-entry-answers, .print-table { width: 100%; border-collapse: collapse; margin-top: .5rem; font-size: .8rem; }
