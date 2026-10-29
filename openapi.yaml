@@ -31581,6 +31581,10 @@ paths:
     get:
       operationId: listPeeringRequests
       summary: List pending peering requests
+      description: >-
+        A request another node left here that nobody answered in `federation.peering_request_days` (30
+        by default, 0 for never) has expired; it is deleted before the list is read and is not in it.
+        Requests this node sent are kept.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -31645,6 +31649,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           description: SELF_NODE_ID — the request names this node's own id, so approving it would make a peer of this node itself; reject it instead
+        '404':
+          description: NOT_FOUND — no such request, or it expired (nobody answered it in `federation.peering_request_days`) and was deleted
         '409':
           description: PEER_KEY_REQUIRED — the request carries no key; INVITE_NOT_OPEN — a replacement request whose invite was used, revoked or ran out meanwhile, so nothing was replaced
 
@@ -31679,7 +31685,7 @@ paths:
         '400':
           description: SELF_NODE_ID — the request names this node's own id
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: NOT_FOUND — no such request, or it expired and was deleted, as on the PUT
         '409':
           description: PEER_KEY_REQUIRED or INVITE_NOT_OPEN, as on the PUT
 
@@ -54026,6 +54032,10 @@ paths:
     get:
       operationId: getIntroductionStatus
       summary: Check introduction status
+      description: >-
+        404 NOT_FOUND also when the request expired: nobody answered it in this node's
+        `federation.peering_request_days` (30 by default), so it was deleted and the node can introduce
+        itself again.
       tags: [Federation]
       parameters:
         - name: id
