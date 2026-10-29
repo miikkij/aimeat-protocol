@@ -1867,13 +1867,14 @@
                 /llms.txt and /AGENTS.md are served documents rather than SPA routes: opened in
                 the same tab, the router's /v1/ interceptor would match none of them and land
                 the reader on the landing page instead. */''}
-          <div class="site-footer-row site-footer-machine">
+          ${/* A buyer on their own node reads these as developer material (UX review 2026-10-29, C). */''}
+          ${!customerNode() && html`<div class="site-footer-row site-footer-machine">
             <a href="/v1/glossary" onClick=${(e) => go(e, '/v1/glossary')}>${tr('footer.glossary', 'Glossary')}</a>
             <a href="/sitemap.md" target="_blank" rel="noopener">${tr('footer.sitemap', 'Site map')}</a>
             <a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a>
             <a href="/AGENTS.md" target="_blank" rel="noopener">AGENTS.md</a>
             <a href="/v1/spec" target="_blank" rel="noopener">${tr('footer.apiContract', 'API contract')}</a>
-          </div>
+          </div>`}
         </footer>
       `;
     }
