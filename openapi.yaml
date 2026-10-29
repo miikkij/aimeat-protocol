@@ -54138,6 +54138,12 @@ paths:
         given out. An identity no listed peer knows is remembered as unknown for 30 seconds, and
         lookups of one identity made at the same time share one round of questions, so the same
         unknown identity asked again in that time answers 404 without asking the peers again.
+
+        An identity that names its home node (`alice@node-id`) is answered from what this node knows
+        when that node is this node or a peer it knows: a listed peer is named without being asked, and
+        this node or an unlisted peer answers 404 with no peer asked. Only an identity that names no
+        known node is asked of the listed peers, one at a time and at most
+        `federation.resolve_max_peers` of them (500 by default, 0 for no limit).
       tags: [Federation]
       parameters:
         - name: gaii
