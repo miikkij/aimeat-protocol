@@ -19,6 +19,9 @@
  *   resolveFinanceOwner · removeAccountantEverywhere
  * @usage const owner = await resolveFinanceOwner(config, storage, req);
  * @version-history
+ *   v1.3.0 — 2026-10-29 — uncertainAccountantEntries names the entries without a grant time whose holder
+ *     the estimate cannot place, and confirmAccountantEntry dates one and records it as confirmed
+ *     (`confirmedAt`) when the client allows it (accountant-grant-ask.ts; secaudit2026oct26 round 8c).
  *   v1.2.0 — 2026-10-27 — The list keeps when each entry was granted (grantedAt). An account registered
  *     after its entry was granted is a later holder of a released name and reads nothing; the account
  *     erasure takes the erased person off every list (removeAccountantEverywhere) (secaudit2026oct26,
@@ -34,6 +37,7 @@ import { FinanceError } from './errors.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { heldSince } from '../account-instance.js';
 import { listAllMemoryPages } from '../../storage/memory-pages.js';
+import { localAccountOf } from '../../utils/gaii.js';
 
 const ACCOUNTANTS_KEY = 'finance.accountants';
 const CLIENTS_KEY = 'finance.clients';
@@ -54,9 +58,10 @@ const listOf = (v: unknown): string[] => {
  * list, or null to write nothing. Answers the list as stored.
  */
 async function editList(
-  storage: Storage, ownerGhii: string, key: string, edit: (list: string[]) => string[] | null, stamp?: { add?: string; at: string },
+  storage: Storage, ownerGhii: string, key: string, edit: (list: string[]) => string[] | null, stamp?: { add?: string; at: string; confirmed?: boolean },
 ): Promise<string[]> {
-  const parse = (v: unknown): { list: string[]; grantedAt?: Record<string, string> } => ({ list: listOf(v), grantedAt: grantedAtOf(v) });
+  const parse = (v: unknown): { list: string[]; grantedAt?: Record<string, string>; confirmedAt?: Record<string, string> } =>
+    ({ list: listOf(v), grantedAt: grantedAtOf(v), confirmedAt: datesOf(v, 'confirmedAt') });
   const stored = await updateRecord(storage, ownerGhii, key, parse, (cur) => {
     const next = edit([...cur.list]);
     if (!next && !stamp?.add) return UNCHANGED;
@@ -64,9 +69,53 @@ async function editList(
     // When each entry was granted, so a later holder of a released name is told apart (grantedToCurrentHolder).
     const grantedAt = Object.fromEntries(Object.entries(cur.grantedAt ?? {}).filter(([g]) => list.includes(g)));
     if (stamp?.add && list.includes(stamp.add)) grantedAt[stamp.add] = stamp.at;
-    return Object.keys(grantedAt).length ? { list, grantedAt } : { list };
+    // When the client confirmed an entry older than grant times (accountant-grant-ask.ts).
+    const confirmedAt = Object.fromEntries(Object.entries(cur.confirmedAt ?? {}).filter(([g]) => list.includes(g)));
+    if (stamp?.add && stamp.confirmed && list.includes(stamp.add)) confirmedAt[stamp.add] = stamp.at;
+    return { list, ...(Object.keys(grantedAt).length ? { grantedAt } : {}), ...(Object.keys(confirmedAt).length ? { confirmedAt } : {}) };
   }, { tag: 'finance' });
   return stored.list;
+}
+
+const datesOf = (v: unknown, field: string): Record<string, string> => {
+  const g = (v as Record<string, unknown> | undefined)?.[field];
+  return g && typeof g === 'object' && !Array.isArray(g)
+    ? Object.fromEntries(Object.entries(g as Record<string, unknown>).filter(([, at]) => typeof at === 'string')) as Record<string, string>
+    : {};
+};
+
+/**
+ * The entries of a client's list that hold no grant time and whose current holder the estimate cannot
+ * place: the account was registered after the list was first written and no later than its last write,
+ * so the grant may have been made to it or to an earlier holder of the name. An account registered
+ * after the last write reads nothing (an earlier holder's grant, grantedToCurrentHolder); one registered
+ * when the list began holds every entry. Each answer carries the holder's registration time.
+ */
+export async function uncertainAccountantEntries(
+  storage: Storage, rec: { value: unknown; createdAt: string; updatedAt: string },
+): Promise<Array<{ accountant: string; registeredAt: string }>> {
+  const granted = grantedAtOf(rec.value);
+  const begun = Date.parse(rec.createdAt);
+  const last = Date.parse(rec.updatedAt);
+  const out: Array<{ accountant: string; registeredAt: string }> = [];
+  for (const accountant of listOf(rec.value)) {
+    if (granted[accountant]) continue;
+    const name = localAccountOf(accountant);
+    const owner = name ? await storage.getOwner(name) : null;
+    const registered = Date.parse(owner?.createdAt ?? '');
+    if (!owner || !Number.isFinite(registered) || !Number.isFinite(begun) || !Number.isFinite(last)) continue;
+    if (registered > begun && registered <= last) out.push({ accountant, registeredAt: owner.createdAt });
+  }
+  return out;
+}
+
+/**
+ * The client allowed an entry the estimate could not place: it is dated now and recorded as confirmed,
+ * so the account that holds the name now reads the books from here on. False when the entry is gone.
+ */
+export async function confirmAccountantEntry(storage: Storage, clientGhii: string, accountantGhii: string): Promise<boolean> {
+  const list = await editList(storage, clientGhii, ACCOUNTANTS_KEY, () => null, { add: accountantGhii, at: new Date().toISOString(), confirmed: true });
+  return list.includes(accountantGhii);
 }
 
 const grantedAtOf = (v: unknown): Record<string, string> => {

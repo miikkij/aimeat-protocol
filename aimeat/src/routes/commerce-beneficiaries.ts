@@ -18,9 +18,13 @@
  *   reaches across an account boundary.
  * @structure commerceBeneficiariesRouter — POST/GET/DELETE /v1/commerce/beneficiary-splits ·
  *   GET /v1/commerce/beneficiary/earnings · GET /v1/commerce/beneficiary/obligations ·
- *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals
+ *   POST /v1/commerce/beneficiary/release · GET+POST /v1/commerce/beneficiary/approvals ·
+ *   GET /v1/commerce/beneficiary/possible-payouts · POST /v1/commerce/beneficiary/possible-payouts/arrived
  * @usage app.use(commerceBeneficiariesRouter(config, storage));
  * @version-history
+ *   2026-10-29 — GET /v1/commerce/beneficiary/possible-payouts and POST .../possible-payouts/arrived: the
+ *     operator lists the open possible payouts and marks one arrived with a reference (secaudit2026oct26
+ *     round 8c, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  *   2026-10-27 — POST /v1/commerce/beneficiary/payout answers 502 X402_SETTLE_UNKNOWN when the settle did
  *     not answer and takes possible_payment_not_arrived; the quote lists possible_payments
  *     (secaudit2026oct26, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
@@ -50,6 +54,17 @@ import {
   readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare,
 } from '../commerce/beneficiary-release.js';
 import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
+import { listOpenPayoutHoldsOnNode, markPayoutHoldArrived, possiblePayoutView } from '../commerce/beneficiary-payout-hold.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
+
+/** POST /v1/commerce/beneficiary/possible-payouts/arrived: the payout from the list, and what shows it arrived. */
+const PossiblePayoutArrivedSchema = z.object({
+  provider: z.string().trim().min(3).max(INPUT_LIMITS.id),
+  nonce: z.string().trim().min(1).max(INPUT_LIMITS.id),
+  reference: z.string().trim().min(1).max(300),
+});
 import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { requireRestScope } from '../auth/rest-scope-gate.js';
@@ -347,6 +362,38 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
       entries: r.entries, tx_hash: r.txHash, pay_to: r.payTo,
       note: 'Settled onchain from your address into theirs. The node held nothing at any point; the '
         + 'transaction hash is the proof, and those entries now read `paid`.',
+    }));
+  });
+
+  // ── The operator's side: payouts whose settlement did not answer ─────────────
+
+  /**
+   * GET /v1/commerce/beneficiary/possible-payouts — every open possible payout on the node
+   * (commerce/beneficiary-payout-hold.ts), for the operator to check against the chain. OPERATOR ONLY.
+   */
+  router.get('/v1/commerce/beneficiary/possible-payouts', requireAuth(), requireOperator(storage), async (_req: Request, res: Response) => {
+    const holds = await listOpenPayoutHoldsOnNode(storage);
+    return res.json(success(config.nodeId, { possible_payouts: holds.map(possiblePayoutView), count: holds.length }));
+  });
+
+  /**
+   * POST /v1/commerce/beneficiary/possible-payouts/arrived — the operator saw the transfer arrive.
+   * Body { provider, nonce, reference }. The covered entries are marked paid with the reference, the
+   * record closes, and the beneficiary and the provider are told. OPERATOR ONLY.
+   */
+  router.post('/v1/commerce/beneficiary/possible-payouts/arrived', requireAuth(), requireOperator(storage), validateBody(PossiblePayoutArrivedSchema, config.nodeId), async (req: Request, res: Response) => {
+    // validateBody checked the shape: three bounded, non-empty strings.
+    const { provider, nonce, reference } = req.body as z.infer<typeof PossiblePayoutArrivedSchema>;
+    const r = await markPayoutHoldArrived(storage, {
+      providerGhii: provider.trim(), nonce: nonce.trim(), reference, by: resolveIdentity(req.auth!, config.nodeId),
+    });
+    if (!r.ok) {
+      const status = r.code === 'NOT_FOUND' ? 404 : r.code === 'CONFLICT' ? 409 : 400;
+      return res.status(status).json(error(config.nodeId, r.code, r.message));
+    }
+    return res.json(success(config.nodeId, {
+      arrived: true, ...possiblePayoutView(r.hold), entries_paid: r.entries,
+      note: 'The entries are recorded as paid with your reference. The beneficiary and the provider were told.',
     }));
   });
 

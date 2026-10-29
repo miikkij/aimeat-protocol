@@ -11,6 +11,8 @@
  * @usage
  *   await recordMoneyPlatformFee(storage, config, { fee, currency, sellerGhii, buyerGhii, trackingCode, handler });
  * @version-history
+ *   2026-10-29 — sumPlatformFees leaves out a record marked `notCounted` (commerce/platform-fee-writers.ts;
+ *     secaudit2026oct26 round 8c).
  *   2026-10-27 — sumPlatformFees: the dashboard's total counts only records this module writes, in a
  *     person's namespace with a positive numeric fee (secaudit2026oct26).
  *   v1.0.0 — 2026-10-11 — Moved from commerce/session-service.ts, unchanged.
@@ -57,7 +59,9 @@ export function sumPlatformFees(records: ReadonlyArray<{ ownerGaii: string; valu
   const out: Record<string, number> = {};
   for (const r of records) {
     if (!isValidGHII(r.ownerGaii)) continue;
-    const v = r.value as { fee?: unknown; currency?: unknown } | null | undefined;
+    const v = r.value as { fee?: unknown; currency?: unknown; notCounted?: unknown } | null | undefined;
+    // Marked by the start step or the operator: another writer than the node wrote it (platform-fee-writers.ts).
+    if (v?.notCounted) continue;
     if (typeof v?.currency !== 'string' || !v.currency) continue;
     if (typeof v.fee !== 'number' || !Number.isFinite(v.fee) || v.fee <= 0) continue;
     out[v.currency] = (out[v.currency] ?? 0) + v.fee;

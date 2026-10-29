@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.25.0 -- 2026-10-29 -- The platform-fee incident's records are entries decided with "uncount" or
+ *     "keep" (secaudit2026oct26 round 8c).
  *   v1.24.0 -- 2026-10-27 -- The subdomain incident's addresses are entries decided with "app_only" or
  *     "keep" (Jouni, 2026-10-27).
  *   v1.23.0 -- 2026-10-26 -- The incident that names capabilities with an unknown visibility word
@@ -277,14 +279,16 @@ account is deactivated, its schedules, workflow triggers and unattended extensio
 with a log line that names the deactivation; nothing is deleted, and they run again after enable.
 
 **Security incidents that name records (operator).** Some incidents list \`entries\`, each with an
-\`id\`, an \`action\` ("clear", "delete" or "app_only") and a status: the records the shared anonymous agent wrote
+\`id\`, an \`action\` ("clear", "delete", "app_only" or "uncount") and a status: the records the shared anonymous agent wrote
 before its token was refused there (type \`anonymous_principal_records\`: its webhook, tags and
 capabilities, and the skills and data packages it published), the schedules that account
 erasures before 2026-10-25 left (type \`erasure_leftover_schedules\`, the entry id is the schedule id:
 its account is gone, or was registered again by someone else after the schedule was made), and the
 subdomain addresses the start step could not tell apart as the operator's own site or a label a
 publish gave an app (type \`subdomain_site_origin\`, the entry id is the label: "app_only" serves it only
-at its app address, "keep" leaves it at both addresses). Read them with
+at its app address, "keep" leaves it at both addresses), and the money platform-fee records outside an
+operator's account whose writer the start step could not tell (type \`platform_fee_records\`, the entry id
+is \`<owner>/<key>\`: "uncount" leaves it out of the dashboard's money fees, "keep" counts it). Read them with
 \`aimeat_admin_security_overview\`, tell the operator what each one is, and decide each with
 \`aimeat_admin_incident_resolve\` (\`name\`: the entry id, \`resolution\`: its action or "keep") only as
 the operator says. The incident is resolved with the last entry.

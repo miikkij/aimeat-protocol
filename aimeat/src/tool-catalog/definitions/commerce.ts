@@ -11,6 +11,8 @@
  *   never a price; the two never mix.
  * @usage import { commerceTools } from './definitions/commerce.js';
  * @version-history
+ *   2026-10-29 — aimeat_admin_possible_payouts: the operator lists the open possible payouts and marks
+ *     one arrived (secaudit2026oct26 round 8c).
  *   2026-10-27 — aimeat_commerce_beneficiary_payout: possible_payment_not_arrived (secaudit2026oct26).
  *   2026-10-16 — aimeat_commerce_invoice_set: the chat path for PUT /v1/commerce/payout/invoice
  *     (commerce:sell, on all three interfaces).
@@ -194,6 +196,21 @@ export const commerceTools = [
             currency: { type: 'string', required: false, description: 'Defaults to EUR.', zod: z.string().max(10) },
             payment: { type: 'object', required: false, description: 'The signed x402 exact-scheme payload. Omit to quote.' },
             possible_payment_not_arrived: { type: 'string', required: false, description: 'The nonce of an earlier payout whose settlement did not answer, when your wallet shows the transfer did not arrive. Its entries are quoted again.', zod: z.string().min(1).max(200) },
+        },
+    },
+    {
+        name: 'aimeat_admin_possible_payouts',
+        description: 'Operator-only. The beneficiary payouts whose x402 settlement did not answer, so the transfer from the provider to the beneficiary may or may not have gone out. Call with nothing to LIST the open ones (provider, beneficiary, nonce, amount, payer and payout address, network): look each nonce up on the chain. When the transfer arrived, call again with `provider`, `nonce` and `reference` (the transaction hash or your own case number): the covered entries are recorded as paid with that reference, the possible payout closes, and the beneficiary and the provider are told. The same as GET /v1/commerce/beneficiary/possible-payouts and POST /v1/commerce/beneficiary/possible-payouts/arrived. A transfer that did not arrive is closed by the provider (aimeat_commerce_beneficiary_payout with possible_payment_not_arrived). Returns NOT_FOUND for an unknown nonce, CONFLICT for one already closed or one whose amount the beneficiary\'s book does not show, and an operator-role error for non-operators.',
+        caller: 'operator',
+        // On the connector a thin proxy over /v1/commerce/beneficiary/possible-payouts (tool-dispatch/tool-call-defs-beneficiaries.ts).
+        visibility: agentEverywhere,
+        annotations: { title: 'Admin: Possible Beneficiary Payouts', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'operator:admin',
+        surfaces: ['admin', 'commerce'],
+        input: {
+            provider: { type: 'string', required: false, description: 'The provider GHII, from the list. With nonce and reference: mark that payout arrived.', zod: z.string().min(3).max(200) },
+            nonce: { type: 'string', required: false, description: 'The payout\'s nonce, from the list.', zod: z.string().min(1).max(200) },
+            reference: { type: 'string', required: false, description: 'What shows the transfer arrived: the transaction hash or your own case number.', zod: z.string().min(1).max(300) },
         },
     },
     {

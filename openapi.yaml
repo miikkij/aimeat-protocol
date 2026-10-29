@@ -25135,6 +25135,49 @@ paths:
         '422': { $ref: '#/components/responses/AimeatError' }
         '502': { $ref: '#/components/responses/AimeatError' }
 
+  /v1/commerce/beneficiary/possible-payouts:
+    get:
+      operationId: commerceListPossiblePayouts
+      summary: The beneficiary payouts whose settlement did not answer (OPERATOR ONLY)
+      description: >
+        Every open possible payout on the node: an x402 settle of a provider-to-beneficiary payout that
+        timed out or failed, so the transfer may or may not have gone out. The operator looks each
+        nonce up on the chain. Returns `{ possible_payouts: [{ provider, beneficiary, nonce, amount,
+        currency, payer, pay_to, network, entries, reason, status, created_at, closed_at, reference }],
+        count }`. The MCP tool aimeat_admin_possible_payouts does the same.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/possible-payouts/arrived:
+    post:
+      operationId: commerceMarkPossiblePayoutArrived
+      summary: Mark a possible payout as arrived, with a reference (OPERATOR ONLY)
+      description: >
+        The operator saw the transfer arrive. The entries the payout covered are recorded as paid with
+        `reference` (the transaction hash or a case number), the possible payout closes as `arrived`,
+        and the beneficiary and the provider get a notice. 404 NOT_FOUND for an unknown provider and
+        nonce; 409 CONFLICT for one already closed, or one whose amount the beneficiary's book does not
+        show (nothing is marked paid). Returns the closed payout with `arrived` and `entries_paid`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [provider, nonce, reference], properties: {
+          provider: { type: string, description: 'The provider GHII, from the list.' },
+          nonce: { type: string, description: 'The payout nonce, from the list.' },
+          reference: { type: string, maxLength: 300, description: 'What shows the transfer arrived: the transaction hash or a case number.' } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+
   /v1/commerce/beneficiary/approvals:
     post:
       operationId: commerceSetBeneficiaryApproval
@@ -70283,13 +70326,16 @@ paths:
         account no one holds now, or an account registered after the schedule was made; the entry id
         is the schedule id. The start step of type `subdomain_site_origin` names the subdomain
         addresses it could not tell apart as the operator's own site or a label a publish gave an app;
-        the entry id is the label. With
+        the entry id is the label. The start step of type `platform_fee_records` names the money
+        platform-fee records outside an operator's account whose writer it could not tell; the entry
+        id is `<owner>/<key>`. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
         none), `delete` (the skill or the data package is deleted with its files, the schedule is
-        removed from the scheduler and from storage) or `app_only` (the address is served only at its
-        app address, origin `publisher`), or `keep`
-        (nothing changes; an address stays served at both addresses). Deciding an entry again answers 409. The incident resolves itself with its
+        removed from the scheduler and from storage), `app_only` (the address is served only at its
+        app address, origin `publisher`) or `uncount` (the fee record is marked `notCounted` and left
+        out of the dashboard's money fees; nothing is deleted), or `keep`
+        (nothing changes; an address stays served at both addresses, a fee record keeps counting). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
@@ -70307,7 +70353,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete or app_only, or keep.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only or uncount, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -70325,7 +70371,7 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: With a name. }
                           entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object

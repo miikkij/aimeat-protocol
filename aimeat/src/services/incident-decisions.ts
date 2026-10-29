@@ -12,6 +12,8 @@
  * @structure IncidentCaseResult · decideIncidentCase()
  * @usage const r = await decideIncidentCase(config, storage, { incidentId, name, resolution, by });
  * @version-history
+ *   v1.6.0 -- 2026-10-29 -- And of the platform-fee incident: 'uncount' leaves a record out of the
+ *     dashboard's money fees (commerce/platform-fee-writers.ts; secaudit2026oct26 round 8c).
  *   v1.5.0 -- 2026-10-27 -- And of the subdomain incident: 'app_only' serves the address only at its app
  *     address (services/subdomain-site-origin-keep.ts; Jouni, 2026-10-27).
  *   v1.4.0 -- 2026-10-27 -- The capability incident is gone: the step sets an unknown word to private and
@@ -34,6 +36,7 @@ import { decideIncidentEntry } from './incident-entries.js';
 import { ANONYMOUS_RECORDS_INCIDENT_TYPE, clearAnonymousRecord } from './anonymous-principal-records.js';
 import { ERASURE_LEFTOVER_INCIDENT_TYPE, deleteLeftoverSchedule } from './erasure-leftover-schedules.js';
 import { SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE, serveAtAppAddressOnly } from './subdomain-site-origin-keep.js';
+import { PLATFORM_FEE_INCIDENT_TYPE, uncountPlatformFeeRecord } from '../commerce/platform-fee-writers.js';
 
 export type IncidentCaseResult =
   | { ok: true; data: Record<string, unknown> }
@@ -49,7 +52,8 @@ export async function decideIncidentCase(
   // An incident that names records to act on: the kind supplies what its action does.
   const actor = type === ANONYMOUS_RECORDS_INCIDENT_TYPE ? clearAnonymousRecord
     : type === ERASURE_LEFTOVER_INCIDENT_TYPE ? deleteLeftoverSchedule
-    : type === SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE ? serveAtAppAddressOnly : null;
+    : type === SUBDOMAIN_SITE_ORIGIN_INCIDENT_TYPE ? serveAtAppAddressOnly
+    : type === PLATFORM_FEE_INCIDENT_TYPE ? uncountPlatformFeeRecord : null;
   if (actor) return decideIncidentEntry(config, storage, input, actor);
   if (type === DEFAULT_CAPS_INCIDENT_TYPE) {
     const r = await decideDefaultCap(config, storage, input);

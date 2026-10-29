@@ -13,6 +13,7 @@
  *   - federation/peering helpers: cross-node peer management
  *
  * @version-history
+ *   2026-10-29 — getPossiblePayouts and markPossiblePayoutArrived (secaudit2026oct26 round 8c).
  *   2026-10-15 — unsubscribePush(endpoint) removes that one device; it sent no endpoint and the route
  *     removed every device of the account (feature-list audit #132).
  *   v1.13.0 — 2026-09-30 — getNodeUpdate: GET /v1/admin/node-update, for the header's new-version notice.
@@ -152,6 +153,10 @@ export const deleteHook      = (name)   => apiDelete(`/v1/admin/hooks/${encodeUR
 
 // ── Economy ──
 export const mintMorsels     = (gaii, amount) => apiPost('/v1/admin/mint', { gaii, amount });
+// Beneficiary payouts whose settlement did not answer (commerce/beneficiary-payout-hold.ts).
+export const getPossiblePayouts = () => apiGet('/v1/commerce/beneficiary/possible-payouts');
+export const markPossiblePayoutArrived = (provider, nonce, reference) =>
+  apiPost('/v1/commerce/beneficiary/possible-payouts/arrived', { provider, nonce, reference });
 
 // ── Applications (moderation) ──
 export const getAdminApps    = ()       => apiGet('/v1/admin/apps');
