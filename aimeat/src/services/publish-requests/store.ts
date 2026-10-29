@@ -32,6 +32,9 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-29 — The kind `delegation-binding`: an app by another author publishing through a channel
+ *     delegation that names its app by file name alone waits for the channel owner
+ *     (services/connections/delegation-caller.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — The kind `goal-model-read`: AIMEAT's model reading private records an agent without
  *     memory:read-as-owner named in a goal waits for the owner (services/goals/goals-model-reach.ts).
  *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
@@ -112,7 +115,10 @@ export type PublishKind =
   // AIMEAT's model reading private records an agent named in a goal (services/goals/goals-model-reach.ts).
   | 'goal-model-read'
   // Where a mail refinery reads and files mail, changed by a writer that may not run it (refinery/definition-ask.ts).
-  | 'refinery-definition';
+  | 'refinery-definition'
+  // An app by another author publishing through a delegation that names its app by file name alone
+  // (services/connections/delegation-caller.ts).
+  | 'delegation-binding';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

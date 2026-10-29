@@ -29,6 +29,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-29 — A delegation is bound to one author's app (bound_app on its view); an app by another author on one named by file name alone answers 202 with the channel owner's pending question (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-27 — A delegated publish passes only for the delegation's app (its signed grant or eco id), a person who uses that app or their agents, and the channel owner; any other caller is 403 DELEGATION_NOT_FOR_CALLER naming the app to use (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-25 — An (app id, action) belongs to one channel: a delegation for a pair another channel holds is 409 DELEGATION_IN_USE, the 201 reads its own row back, and a delegated publish of a pair held on two channels is 409 DELEGATION_AMBIGUOUS (secaudit2026oct22, h50/connections-delegation-lookup-unscoped).
  *   2026-10-16 — POST /v1/connections/:id/read/:resource answers 403 READ_AS_OWNER_REQUIRED, with the MCP
@@ -79,7 +80,7 @@ import { success, error } from '../middleware/envelope.js';
 import { refuseClassified } from '../middleware/refusals.js';
 import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { explainReadThrough } from './connections-read-through.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { ownerGhiiOf, resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { buildOutboundProviders, listProviderMeta, findProvider } from '../services/connections/providers.js';
 import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
@@ -93,7 +94,8 @@ import { readResource } from '../services/connections/read.js';
 import { answerStoredAttachment } from './connections-attachment.js';
 import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus, openPublish } from '../services/connections/publish-gate.js';
-import { delegationCallerRefusal } from '../services/connections/delegation-caller.js';
+import { delegationCallerDecision } from '../services/connections/delegation-caller.js';
+import { bindOnSave, delegationView } from '../services/connections/delegation-binding.js';
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import { runOwnPublish } from '../services/connections/publish-run.js';
@@ -530,11 +532,13 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     }
     // The body's app id names the delegation; the signed token says whether the caller is that app,
     // one of its users, or the channel owner (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
-    const notYours = await delegationCallerRefusal(storage, config.nodeId, req.auth!, appId, action);
-    if (notYours) {
-      res.status(403).json(error(config.nodeId, notYours.code, notYours.reason));
+    const caller = await delegationCallerDecision({ storage, config }, req.auth!, appId, action);
+    if (caller.kind === 'refuse') {
+      res.status(403).json(error(config.nodeId, caller.refusal.code, caller.refusal.reason));
       return;
     }
+    // An app by another author on a delegation named by file name alone waits for the channel owner (round 8c).
+    if (caller.kind === 'pending') return void res.status(202).json(success(config.nodeId, { approval_request: caller.pending }));
     let file: { bytes: Buffer; mimeType: string; name: string } | null = null;
     if (storageKey) {
       const stored = await storage.getStorageFile(principal, storageKey);
@@ -673,7 +677,9 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     });
     // Read back from THIS channel's rows, never by the pair alone.
     const stored = (await storage.listDelegations(id)).find(d => d.appId === appId && d.action === action);
-    res.status(201).json(success(config.nodeId, { delegation: stored }));
+    // Bound to one author's app when it is made (secaudit2026oct26 round 8c, services/connections/delegation-binding.ts).
+    if (stored) await bindOnSave(storage, config.nodeId, ownerGhiiOf(conn.principal), stored);
+    res.status(201).json(success(config.nodeId, { delegation: stored && await delegationView(storage, config.nodeId, stored) }));
   });
 
   // ── GET /v1/connections/:id/delegations ──
@@ -685,7 +691,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such connection'));
       return;
     }
-    res.json(success(config.nodeId, { delegations: await storage.listDelegations(id) }));
+    res.json(success(config.nodeId, { delegations: await Promise.all((await storage.listDelegations(id)).map(d => delegationView(storage, config.nodeId, d))) }));
   });
 
   // ── PATCH /v1/connections/delegations/:did ── the one-gesture stop.

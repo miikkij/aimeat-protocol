@@ -2738,6 +2738,15 @@
      "plain": "Outside accounts your agents connect When an agent, a CLI or your AI starts connecting an outside account or signing in to an attached MCP server, the sign-in waits for you: you open the node's page, see what it connects and for whom, and confirm it signed in yourself. A sign-in you start on the node's own page is bound to your browser. The Access page lists the outside accounts your agents connected, with no credential shown, and you revoke one there; deleting the agent removes them all. Limits: listing and revoking an agent's connection is yours in person, so there is no MCP tool for it. /v1/oauth-round?state=, POST /v1/oauth-rounds/{state}/approve, GET /v1/connections/agents, DELETE /v1/connections/agents/{id}, Account › Access"
     },
     {
+     "slug": "g-12-an-app-that-publishes-on-your-channel",
+     "cells": [
+      "<strong>An app that publishes on your channel</strong>",
+      "You can let one app publish one kind of post on an outside account you share, for a campaign where many people post through one app. The permission belongs to one app by one author: your own app of that name, or the app the name gives in full (<code>owner/file</code>). When an app of that name by someone else publishes through it first, you are asked once, in the bell, with Allow and Don't allow, and nothing is published until you answer; Allow lets that author's app and its users publish, Don't allow keeps it out without asking again, and an app of the same name by anyone else is refused. A permission given before this binds itself to your own app of that name the first time it is used, and you are told once.",
+      "<code>POST</code>/<code>GET /v1/connections/{id}/delegations</code> (<code>bound_app</code>), <code>POST /v1/connections/publish</code> (202 <code>approval_request</code>), notifications <code>approval_request</code> and <code>delegation_bound</code>"
+     ],
+     "plain": "An app that publishes on your channel You can let one app publish one kind of post on an outside account you share, for a campaign where many people post through one app. The permission belongs to one app by one author: your own app of that name, or the app the name gives in full (owner/file). When an app of that name by someone else publishes through it first, you are asked once, in the bell, with Allow and Don't allow, and nothing is published until you answer; Allow lets that author's app and its users publish, Don't allow keeps it out without asking again, and an app of the same name by anyone else is refused. A permission given before this binds itself to your own app of that name the first time it is used, and you are told once. POST/GET /v1/connections/{id}/delegations (bound_app), POST /v1/connections/publish (202 approval_request), notifications approval_request and delegation_bound"
+    },
+    {
      "slug": "g-12-outbound-email",
      "cells": [
       "<strong>Outbound email</strong>",
@@ -4442,6 +4451,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 450
+  "rows": 451
  }
 }
