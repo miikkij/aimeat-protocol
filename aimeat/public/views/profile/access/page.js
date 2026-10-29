@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.32.0 -- 2026-10-29 -- On a customer's node the password reads as the one the store set, which the buyer signing in by email link does not need (UX review 2026-10-29, D).
  *   v1.31.0 -- 2026-10-25 -- Section 05 carries the switch "Ask me before my secret is sent to a new
  *     address for the first time" (secaudit2026oct22, Jouni 2026-10-25).
  *   v1.30.0 -- 2026-10-21 -- The add form takes the address a secret may be sent to (optional).
@@ -89,6 +90,7 @@ import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { PageStart } from '/components/PageStart.js';
 import { Section } from '/components/Section.js';
@@ -201,10 +203,17 @@ function strip(ctx) {
     { key: 'apps', n: n(ov.appGrants.total), label: x('stripApps'), sub: ov.appGrants.total ? x('stripAppsSub', { day, unused: x('unusedN', { n: unused, days: 30 }), base: ctx.baseHolders }) : x('stripAppsNone') },
     { key: 'tokens', n: n(ov.accessTokens.total), label: x('stripTokens'), sub: tokenSub },
     secretTile(ctx),
-    { key: 'twoStep', n: s.two_factor.enabled ? x('twoStep.onWord') : x('twoStep.offWord'), tone: s.two_factor.enabled ? 'fine' : 'notice', label: x('stripTwoStep'), sub: x('stripTwoStepSub', { passkeys: s.passkeys.count, password: s.has_password ? x('passwordSet') : x('passwordNone') }) },
+    { key: 'twoStep', n: s.two_factor.enabled ? x('twoStep.onWord') : x('twoStep.offWord'), tone: s.two_factor.enabled ? 'fine' : 'notice', label: x('stripTwoStep'), sub: x('stripTwoStepSub', { passkeys: s.passkeys.count, password: x('password' + passwordWords(s)) }) },
     { key: 'sessions', n: n(s.sessions.mine.total), label: x('stripSessions'), sub: x('stripSessionsSub', { devices: s.sessions.mine.by_device.length, agents: s.sessions.agents.total }) },
   ]} />`;
 }
+
+/**
+ * Which password words fit: on a customer's node the store set a password when it made the account,
+ * and the buyer, who signs in with an email link, never chose one (UX review 2026-10-29: "salasana
+ * käytössä" read as wrong). 'Store', 'Set' or 'None', the suffix of the locale keys.
+ */
+const passwordWords = (s) => (!s.has_password ? 'None' : customerNode() ? 'Store' : 'Set');
 
 /** The strip's third figure: how many secrets are kept, and how many of them anything names. */
 function secretTile(ctx) {
@@ -219,7 +228,7 @@ function secSignIn(ctx) {
   const ov = ctx.ov;
   const s = ov.sign_in;
   const tf = s.two_factor;
-  const sub = [s.has_password ? x('passwordSet') : x('passwordNone'), tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort'), x('passkeysN', { n: s.passkeys.count })].join(' · ');
+  const sub = [x('password' + passwordWords(s)), tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort'), x('passkeysN', { n: s.passkeys.count })].join(' · ');
   // One list of sign-in rows. A panel or a block that belongs to a row stands under it (Row below),
   // so the row and its panel read as one thing and the rule falls under the panel.
   const row = (key, name, subText, doors, below) => html`
@@ -230,7 +239,7 @@ function secSignIn(ctx) {
       <${Note} kind="lead">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}<//>
       ${s.managed_by ? html`<${Box}><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}<//>` : null}
       <${List} cols="name-state">
-        ${row('password', x('row.password'), s.has_password ? x('row.passwordSet') : x('row.passwordNone'), state(s.has_password, s.has_password ? x('inUse') : x('none')))}
+        ${row('password', x('row.password'), x('row.password' + passwordWords(s)), state(s.has_password, passwordWords(s) === 'Store' ? x('byStore') : s.has_password ? x('inUse') : x('none')))}
         ${!s.managed_by && s.passkeys.available
           ? row('passkeys', x('row.passkeys'), s.passkeys.count ? x('row.passkeysN', { n: s.passkeys.count }) : x('row.passkeysNone'), state(s.passkeys.count, x('devicesN', { n: s.passkeys.count })),
             html`<${PasskeysSection} inRow showToast=${ctx.showToast} />`)

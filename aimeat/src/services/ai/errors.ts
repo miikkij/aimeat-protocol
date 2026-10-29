@@ -16,10 +16,14 @@
  *   Until 2026-10-08 each path had its own copy, and six of seven answered a permanent 4xx (a model that
  *   does not make mp3, a voice it does not have) as 502 PROVIDER_ERROR "try again shortly", so a
  *   caller repeated a call that could never work (aiprov plan, A1-A3).
- * @structure PROVIDER_KEY_REFUSED_STATUS · AiCompletionError · CONTENT_REFUSAL · redactKeyShaped ·
- *   providerReasonFromText · providerReason · retryAfterHeader · providerStatusError · providerFailureOf ·
- *   nodeFailureOf
+ * @structure PROVIDER_KEY_REFUSED_STATUS · AiCompletionError · CONTENT_REFUSAL · KEY_LIMIT ·
+ *   isNoCreditFailure · redactKeyShaped · providerReasonFromText · providerReason · retryAfterHeader ·
+ *   providerStatusError · providerFailureOf · nodeFailureOf
  * @version-history
+ *   v1.5.0 -- 2026-10-29 -- A 403 in OpenRouter's key-limit words is PROVIDER_NO_CREDIT, as a 402 is,
+ *     not INVALID_API_KEY: a key at its spending limit is spent, not refused (KEY_LIMIT,
+ *     isNoCreditFailure). The message leaves out the provider's words, which name the key's
+ *     management address; they stay in details.provider_message (UX review 2026-10-29, A1).
  *   v1.4.0 -- 2026-10-09 -- redactKeyShaped moved to utils/redact-credentials.ts and re-exported here,
  *     so the node logger applies the same rules without importing a service (secrets audit d1).
  *   v1.3.0 -- 2026-10-08 -- providerStatusError, providerFailureOf, providerReason(FromText) and
@@ -67,6 +71,27 @@ export class AiCompletionError extends Error {
 
 /** The words a provider uses when it refuses the CONTENT rather than the request or the key. */
 export const CONTENT_REFUSAL = /moderation|flagged|content[ _-]?policy|content_filter|safety system|responsible ai/i;
+
+/**
+ * OpenRouter's words when a key has reached the spending limit set on it. It answers 403 with them
+ * (metadata.limit_source "openrouter_key_limit"), not 402, so without this a spent key read as a
+ * refused one. Measured by aimeat-commercial on 2026-10-29 with a key capped at $0.01: "Key limit
+ * exceeded (total limit). Manage it using https://openrouter.ai/workspaces/…"
+ */
+export const KEY_LIMIT = /key limit exceeded|openrouter_key_limit/i;
+
+/**
+ * Whether a failed provider call says the key that pays has no money left: 402, or a 403 in
+ * KEY_LIMIT's words. Reads a raw transport error (`status`, `providerMessage`) or a refusal already
+ * mapped (PROVIDER_NO_CREDIT, or details.provider_status and provider_message).
+ */
+export function isNoCreditFailure(e: unknown): boolean {
+  const err = (e ?? {}) as { code?: unknown; status?: unknown; message?: unknown; providerMessage?: unknown; details?: { provider_status?: unknown; provider_message?: unknown } };
+  if (err.code === 'PROVIDER_NO_CREDIT') return true;
+  const status = typeof err.details?.provider_status === 'number' ? err.details.provider_status : err.status;
+  const said = [err.providerMessage, err.details?.provider_message, err.message].filter(s => typeof s === 'string').join(' ');
+  return status === 402 || (status === 403 && KEY_LIMIT.test(said));
+}
 
 /** How much of a provider's reason reaches a message, a log line or `details.provider_message`. */
 export const PROVIDER_REASON_MAX_CHARS = 300;
@@ -158,9 +183,9 @@ export interface ProviderStatusOptions {
 
 /**
  * A provider's HTTP status as the node's refusal. The one table every AI path uses:
- *   401, and 403 without moderation words → INVALID_API_KEY at 424 (PROVIDER_KEY_REFUSED_STATUS)
+ *   401, and other 403                     → INVALID_API_KEY at 424 (PROVIDER_KEY_REFUSED_STATUS)
  *   any 4xx with moderation words          → CONTENT_REFUSED 422
- *   402                                    → PROVIDER_NO_CREDIT 402
+ *   402, and 403 in KEY_LIMIT's words      → PROVIDER_NO_CREDIT 402
  *   429                                    → RATE_LIMITED 429, details.retry_after_sec from the provider
  *   other 4xx (400, 404, 413, 415, 422...) → PROVIDER_REJECTED 422: the same call fails again
  *   408, 5xx and anything else             → PROVIDER_ERROR 502
@@ -174,10 +199,13 @@ export function providerStatusError(status: number, reason: string, opts: Provid
   const clientSide = status >= 400 && status < 500;
   if (clientSide && status !== 402 && status !== 408 && status !== 429 && CONTENT_REFUSAL.test(reason)) {
     e = new AiCompletionError('CONTENT_REFUSED', 422, `The provider refused the content (HTTP ${status})${said}${end}`, details);
+  } else if (status === 402 || (status === 403 && KEY_LIMIT.test(reason))) {
+    // A key at its spending limit: the reason carries a management address, so it stays in details.
+    e = new AiCompletionError('PROVIDER_NO_CREDIT', 402, status === 402
+      ? `The provider says the key that pays has no credit left (HTTP 402)${said}${end}`
+      : 'The provider says the key that pays has reached its spending limit (HTTP 403).', details);
   } else if (status === 401 || status === 403) {
     e = new AiCompletionError('INVALID_API_KEY', PROVIDER_KEY_REFUSED_STATUS, `The provider refused the key (HTTP ${status})${said}${end}`, details);
-  } else if (status === 402) {
-    e = new AiCompletionError('PROVIDER_NO_CREDIT', 402, `The provider says the key that pays has no credit left (HTTP 402)${said}${end}`, details);
   } else if (status === 429) {
     if (opts.retryAfter !== undefined) details.retry_after_sec = opts.retryAfter;
     e = new AiCompletionError('RATE_LIMITED', 429, `The provider is limiting requests right now (HTTP 429)${said}${end}`, details);

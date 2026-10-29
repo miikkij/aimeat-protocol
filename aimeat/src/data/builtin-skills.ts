@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-29 -- diagnose-a-workflow, step 7: a 402 AI_BALANCE_SPENT is the node's key at the limit
+ *     it was bought with, with the three choices (UX review A1).
  *   2026-10-27 -- diagnose-a-workflow: a deactivated account's run in flight and goals wait, and an ai
  *     schedule waiting for the owner's answer on another agent's instruction (secaudit2026oct26).
  *   2026-10-27 -- The device-authorization guide names the v2 return proof (with the node id), which counts once; v1 is still accepted. aimeat-node-guide: a request a same-host proxy or tunnel passes on is asked for the setup code (secaudit2026oct26).
@@ -664,6 +666,10 @@ metadata:
    own key, more allowance, or a shorter answer or a cheaper model for the last case, is the fix.
    A step that named no model is answered by the free model instead only when the free model as the
    last resort is on for the owner (\`free_model\` on \`GET /v1/ai/routing\`); off, it gets this 402 too.
+   A 402 \`AI_BALANCE_SPENT\` means the node's own key has reached the limit it was bought with (a
+   node from the store keeps its owner's AI allowance as that limit). Its details carry \`choices\`:
+   buy more in the store, the owner's own key, or the free model, which only the owner's own rule
+   turns on here (\`freeModelLastResort: true\`). A top-up is seen within a minute.
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.
