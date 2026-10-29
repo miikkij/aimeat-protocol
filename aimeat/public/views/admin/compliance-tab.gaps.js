@@ -15,11 +15,13 @@
  *   answers without a source before sources existed, and a person at the form is the only thing
  *   that could have written them. The node's draft marks "evidence" and an agent marks "ai", so
  *   a missing mark is the one case left.
- * @structure groupGaps · answersOf · answerStats · classCounts · orderUsecases · filterUsecases ·
- *   impliesSummary · modelsShort
+ * @structure groupGaps · askedQuestions · questionsFor · answersOf · answerStats · classCounts ·
+ *   orderUsecases · filterUsecases · impliesSummary · modelsShort
  * @usage imported by compliance-tab.js and compliance-tab.register.js; tested by
  *   test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.4.0 — 2026-10-29 — askedQuestions and questionsFor: an entry is asked only the questions whose
+ *     `askedWhen` its answers meet, and answersOf counts those (outside an Annex III area, three).
  *   v1.3.0 — 2026-10-28 — An answer marked `maker` (the app's maker answered it in the data map) is
  *     counted on its own, never as the operator's.
  *   v1.2.0 — 2026-10-28 — The sixth kind, app-uses-ai-not-in-register, grouped with the Annex III
@@ -92,18 +94,62 @@ export function groupGaps(gaps) {
   return g;
 }
 
+/** How an answer is keyed into `implies` and `askedWhen`: booleans as the strings the set uses. */
+const answerKey = (v) => (typeof v === 'boolean' ? (v ? 'true' : 'false')
+  : (typeof v === 'string' && v.length) ? v : typeof v === 'number' ? String(v) : null);
+
 /**
- * Who answered what on one entry.
+ * Which questions one entry is asked, from each question's `askedWhen` and the entry's answers:
+ * 'asked', 'not-asked' (the condition's answer rules it out) or 'waiting' (its condition is open).
+ * The page's copy of askedQuestions in services/compliance-register.ts, so the form updates as a
+ * person answers; test/unit/compliance-tab-gaps.test.ts holds the two to the same answers.
+ *
+ * @param {Array<{id: string, askedWhen?: {question: string, in?: string[], notIn?: string[]}}>} questions
+ * @param {Record<string, unknown>} answers
+ * @returns {Map<string, 'asked'|'not-asked'|'waiting'>}
+ */
+export function askedQuestions(questions, answers) {
+  const byId = new Map((questions || []).map(q => [q.id, q]));
+  const out = new Map();
+  const stateOf = (id, depth) => {
+    if (out.has(id)) return out.get(id);
+    const cond = byId.get(id) && byId.get(id).askedWhen;
+    let state = 'asked';
+    if (cond && byId.has(cond.question) && depth < byId.size) {
+      const parent = stateOf(cond.question, depth + 1);
+      const key = answerKey((answers || {})[cond.question]);
+      if (parent === 'not-asked') state = 'not-asked';
+      else if (key === null) state = 'waiting';
+      else if (cond.in) state = cond.in.includes(key) ? 'asked' : 'not-asked';
+      else if (cond.notIn) state = cond.notIn.includes(key) ? 'not-asked' : 'asked';
+    }
+    out.set(id, state);
+    return state;
+  };
+  for (const q of questions || []) stateOf(q.id, 0);
+  return out;
+}
+
+/** The questions an entry is asked now, and the ones it answered anyway, in the set's order. */
+export function questionsFor(u, questions) {
+  const answers = (u && u.answers) || {};
+  const state = askedQuestions(questions, answers);
+  return (questions || []).filter(q => state.get(q.id) === 'asked' || answerKey(answers[q.id]) !== null);
+}
+
+/**
+ * Who answered what on one entry, of the questions it is asked (`askedWhen`).
  *
  * @param {object} u — a register entry
  * @param {Array<{id: string}>} questions
  * @returns {{ total: number, answered: number, unanswered: number, ai: number, human: number, evidence: number, proposed: number, maker: number }}
  */
 export function answersOf(u, questions) {
-  const r = { total: questions.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0, maker: 0 };
+  const shown = questionsFor(u, questions);
+  const r = { total: shown.length, answered: 0, unanswered: 0, ai: 0, human: 0, evidence: 0, proposed: 0, maker: 0 };
   const answers = (u && u.answers) || {};
   const sources = (u && u.answerSources) || {};
-  for (const q of questions) {
+  for (const q of shown) {
     const v = answers[q.id];
     if (v === undefined || v === null || v === '') { r.unanswered++; continue; }
     r.answered++;

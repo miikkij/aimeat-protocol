@@ -18212,7 +18212,10 @@ paths:
         `ai_act`, for an app that uses AI (its map, its `ai:use` permission or a declared
         generation): the node's EU AI Act questions without their class rules (`questions`: id, text,
         help, type, options), the ids still exactly as shipped (`built_in`, which a page shows in its
-        reader's language), and the ids the map's `aiAct` leaves `unanswered`. The maker answers them
+        reader's language), the ids the answers so far make the node ask (`asked`: a question with
+        an `askedWhen` condition waits for, or is ruled out by, another question's answer, so outside
+        an Annex III area only the area and the two transparency questions are asked), and the asked
+        ids the map's `aiAct` leaves `unanswered`. The maker answers them
         in the map: `aiAct: { answers: { <question id>: true | false | <option value> }, notes:
         { <question id>: <why> } }`, written with PUT on this address like the rest of the map. The
         node's administrator approves them in the register draft (GET /v1/admin/compliance/draft),
@@ -22777,6 +22780,23 @@ paths:
         content published without a label; an app that says it generates content while the publish
         check recorded a disclosure gap.
 
+        Each use case's `risk` is its verdict: `class`, `reasons`, `unanswered` (asked and open),
+        and `notAsked`, the questions whose `askedWhen` condition its answers rule out.
+
+        The node-wide report's `processing.apps` lists every app as `{ app, owner, title, reach,
+        personal, has_map, uses_ai, annex3, tells_ai, domains, rows }`, and `processing.apps_by_reach`
+        counts them; `rows` are the key families someone other than the app's user can see, each
+        `{ what, reach, personal }`, and `domains` the regulated data its personal data falls in.
+        `reach` is who can see the app's personal data, read from its data map: `none` (not kept on
+        the node), `self` (only its user and their agents), `shared` (named people or an
+        organism's members), `exposed` (anyone, the app's maker or a service outside the node) or
+        `unknown` (no map, or words the node does not know). Only `shared`, `exposed` and `unknown`
+        apps, and an app that keeps regulated data (employment, health, children and the rest)
+        whoever sees it, get a record of processing and a privacy notice of their own; what a
+        person keeps through any other `self` app is in the node's record `node-user-content`. `tells_ai` says whether
+        the publish check found that an app that uses AI shows people an AI label (null: nothing
+        recorded, or no AI).
+
         `not_covered` states what the report does NOT cover, and it is part of the measurement
         rather than a disclaimer - content with no provenance record, anything published off this
         node, the register being unverified, the consent-audit retention window, and the usage
@@ -22929,8 +22949,11 @@ paths:
         not publicly served), and, for one that publishes, whether a person was recorded reviewing
         it. When an app uses AI on data its map places in the `employment` or `biometric-genetic`
         domain, stated on the row or read from the map's words, the Annex III area is filled and
-        marked `proposed`, with the reason in `proposals`. Every other answer is left empty rather
-        than guessed. An answer that reads as considered when nobody considered it is the failure
+        marked `proposed`, with the reason in `proposals`; when the map holds neither, `none` is
+        proposed for the area, with `basis: null`, so only the area and the transparency questions
+        are asked (each question's `askedWhen`). Each entry carries its verdict as `risk`, with
+        `notAsked`, and `counts.leftToAnswer` counts the open questions each entry is asked. Every
+        other answer is left empty rather than guessed. An answer that reads as considered when nobody considered it is the failure
         this whole surface exists to prevent, so filling those is a person's job, or a model's
         working for them, and the register records which.
 
@@ -23172,6 +23195,19 @@ paths:
                           choice question keys on the option value. An answer with no entry implies
                           nothing, which is how a question can be asked for the record without
                           moving the class.
+                      askedWhen:
+                        type: object
+                        required: [question]
+                        description: >
+                          When the question is asked: only when the named question's answer is
+                          `in` the list, or not `notIn` it, keyed as `implies` keys them. A question
+                          whose condition is not met is not asked (the verdict's `notAsked`), and
+                          one whose condition question is open waits. Absent: asked of every use.
+                          A stored set takes the shipped conditions for questions it holds as shipped.
+                        properties:
+                          question: { type: string, maxLength: 120 }
+                          in: { type: array, maxItems: 50, items: { type: string, maxLength: 120 } }
+                          notIn: { type: array, maxItems: 50, items: { type: string, maxLength: 120 } }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -23437,8 +23473,10 @@ paths:
         Each gap names its kind, one sentence a person can act on, and its evidence: a register with
         no legal basis, retention or review; a container below its data domain's classification; a
         missing or old impact assessment; a request or a breach notification past its deadline; an
-        unanswered framework; an app whose data map holds personal data with no register or no
-        privacy notice; and for the node, a processor with no agreement, country or transfer basis,
+        unanswered framework; an app whose data map holds personal data that someone other than its
+        user can read, with no register or no privacy notice (an app whose data only its user sees
+        needs neither); an app whose data map says where data is kept or who reads it in words the
+        node does not know (`app-data-map-unreadable`); and for the node, a processor with no agreement, country or transfer basis,
         and a label pack whose top classes are on. The same scope parameters and readers as GET
         /v1/compliance/docs/{kind}. The operator's node-wide report carries every scope's gaps.
       security:
