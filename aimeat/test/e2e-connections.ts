@@ -1277,6 +1277,33 @@ async function main(): Promise<void> {
       assert(await boundOf(label) === null, 'a declined app bound the delegation');
     });
 
+    await test('the channel owner holds an app of the same name, and another author\'s app uses the older delegation first: a question, not a refusal', async () => {
+      const file = `bdual${stamp % 100000}.html`;
+      const label = `app:${file.replace(/\.html$/, '')}`;
+      // Made before anyone had the app, so it is unbound, as a delegation from before the binding.
+      const d = await delegate(label);
+      assert(d.bound_app === null, `should start unbound: ${d.bound_app}`);
+      await publishApp(jwtA, file);
+      await publishApp(jwtB, file);
+      const tokB = await signInToApp(jwtC, `${userB}/${file}`, ['connections:use']);
+      const before = provider.stats.publishes;
+      const first = await through(tokB, label, 'dual-first');
+      const ask = first.data?.data?.approval_request;
+      assert(first.status === 202 && ask?.status === 'awaiting_owner',
+        `another author's app was not asked about: ${first.status} ${first.data?.error?.code ?? ''} ${JSON.stringify(first.data?.data ?? '')}`);
+      assert(provider.stats.publishes === before, 'something was published while the question waited');
+      assert(await boundOf(label) === null, `bound to ${await boundOf(label)} before the channel owner answered`);
+      const yes = await api(`/v1/publish-requests/${ask.request_id}/decision`, { bearer: jwtA, body: { decision: 'approve' } });
+      assert(yes.status === 200, `allow: ${yes.status} ${yes.data?.error?.message}`);
+      assert(await boundOf(label) === `${userB}/${file}`, `not bound to B's app: ${await boundOf(label)}`);
+      const after = await through(tokB, label, 'dual-after');
+      assert(after.status === 200 && after.data?.data?.attempt?.status === 'done', `B's app could not publish after Allow: ${after.status} ${after.data?.error?.code}`);
+      await publishApp(jwtE, file);
+      const third = await signInToApp(jwtE, `${userE}/${file}`, ['connections:use']);
+      const r = await through(third, label, 'dual-third');
+      assert(r.status === 403 && r.data?.error?.code === 'DELEGATION_NOT_FOR_CALLER', `a third author's app passed after binding: ${r.status} ${r.data?.error?.code ?? ''}`);
+    });
+
     await test('a missing file is refused BEFORE an attempt is opened', async () => {
       const r = await api('/v1/connections/publish', {
         bearer: jwtA,

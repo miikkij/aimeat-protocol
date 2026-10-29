@@ -15,10 +15,12 @@
  *     - a new delegation is bound when it is made: to the app its label names in full (`owner/file`),
  *       or to the channel owner's own app of that file name;
  *     - an older delegation with a bare file name binds itself to the channel owner's own app of that
- *       file name the first time it is used (positive evidence), and the channel owner is told once;
- *     - otherwise, the first time an app by another author uses it, the channel owner gets ONE
- *       question with Allow and Don't allow (services/approval-standard.ts). Allow binds it to that
- *       author's app; Don't allow keeps that app out. Nothing is published while the question waits.
+ *       file name when its first use comes from that app (positive evidence), and the channel owner is
+ *       told once;
+ *     - when its first use comes from an app by another author, also when the channel owner holds an
+ *       app of that name, the channel owner gets ONE question with Allow and Don't allow
+ *       (services/approval-standard.ts). Allow binds it to that author's app; Don't allow keeps that
+ *       app out. Nothing is published while the question waits.
  *
  *   WHERE. One record per delegation, `connections.delegation-app.<delegation id>`, under
  *   `system@<node>`, which no owner-scoped principal can address: the node reads it to decide who may
