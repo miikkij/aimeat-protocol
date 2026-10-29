@@ -26,6 +26,9 @@
  *   import { DisplayPrefsFields } from '/components/DisplayPrefsFields.js';
  *   html`<${DisplayPrefsFields} region=${r} timezone=${z} onChange=${(k, v) => set(k, v)} />`
  * @version-history
+ *   v1.1.2 — 2026-10-29 — The time zone search is kept out of password managers (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
+ *     owner's sign-in name into a find field.
  *   v1.1.1 — 2026-09-27 — The fields draw their own class names, their look in
  *     css/components/display-prefs-fields.css: .pf-edit-label → .display-prefs-field, .pf-edit-input
  *     → .display-prefs-search; .pf-edit-select and .pf-edit-readonly go, as no sheet had a rule for
@@ -177,6 +180,7 @@ export function DisplayPrefsFields({ region, timezone, onChange }) {
     <label class="display-prefs-field">
       <span class="poster-label">${tr('profile.prefs.timezone', 'Your time zone')}</span>
       <input type="search" class="og-input display-prefs-search" value=${zoneQuery}
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${tr('profile.prefs.zoneSearch', 'Search for a city: Helsinki, Madrid, Tokyo…')}
         onInput=${(e) => setZoneQuery(e.target.value)} />
       <select class="select-field" value=${timezone || ''} size="1"
