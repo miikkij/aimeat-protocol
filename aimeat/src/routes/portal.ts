@@ -86,6 +86,8 @@
  *     beside the old /app-catalog.html, which stays as it is.
  *   v1.19.0 — 2026-10-09 — /v1/use-with-ai/:owner/:filename serves the SPA with a head built for the
  *     app: the guide the served app's "Use with your AI" mark links to.
+ *   v1.20.0 — 2026-10-29 — /v1/appcat/structure serves the SPA: one app's structure and status, from
+ *     the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -570,6 +572,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     // appcat, the app catalogue on the component library (2026-09-27). Registered here AND in
     // spa.html's ROUTES; the old /app-catalog.html stays as it is.
     '/v1/appcat',
+    // One app's structure and status (views/appcat/structure.js, 2026-10-29). Here AND in spa.html.
+    '/v1/appcat/structure',
     // The design lab's preview page, which the lab shows in frames. Registered here AND in
     // spa.html's ROUTES.
     '/v1/design-lab/frame',

@@ -2,6 +2,51 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-29",
+      "kind": "feature",
+      "id": "2026-10-29-files-in-s3-or-azure-blob-storage",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Files in S3 or Azure Blob storage",
+        "fi": "Tiedostot S3- tai Azure Blob -tallennustilaan"
+      },
+      "summary": {
+        "en": "Your own S3 bucket or Azure container can hold your files, outside the node's quota.",
+        "fi": "Oma S3-bucket tai Azure-säilö voi pitää tiedostosi, eikä se kuluta noden kiintiötä."
+      },
+      "body": {
+        "en": "An operator can keep the node's files in one S3 bucket or Azure container, and people can connect storage of their own that does not count toward the node's quota.",
+        "fi": "Operaattori voi pitää noden tiedostot yhdessä S3-säilössä tai Azure-säilössä, ja jokainen voi liittää oman tallennustilansa, joka ei kuluta noden kiintiötä."
+      }
+    },
+    {
+      "date": "2026-10-29",
+      "kind": "feature",
+      "id": "2026-10-29-your-apps-structure-from-the-first-moment",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your app's structure, from the first moment",
+        "fi": "Sovelluksesi rakenne heti alusta"
+      },
+      "summary": {
+        "en": "Your AI gives you a page with your app's steps; pick a layout and a look by seeing them.",
+        "fi": "Tekoälysi antaa sivun sovelluksesi vaiheista; valitse asettelu ja ulkoasu näkemällä ne."
+      },
+      "body": {
+        "en": "When your AI starts an app, it gives you a page that shows the app's steps, what is done and what is open. You can pick a layout and a look by seeing them, or let your AI decide.",
+        "fi": "Kun tekoälysi aloittaa sovelluksen, se antaa sinulle sivun, joka näyttää sovelluksen vaiheet, valmiit kohdat ja avoimet kohdat. Voit valita asettelun ja ulkoasun näkemällä ne, tai antaa tekoälysi päättää."
+      }
+    },
+    {
       "date": "2026-10-27",
       "kind": "feature",
       "id": "2026-10-27-long-tool-calls-no-longer-time-out",

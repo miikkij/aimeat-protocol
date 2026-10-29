@@ -11,6 +11,7 @@
  *   The usage case: every glob shape saved workflows, recipes and offers use matches as before,
  *   compared one by one with the old RegExp.
  * @version-history
+ *   v1.1.0 — 2026-10-29 — The length bounds (code scanning 1768, 1769).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
@@ -29,6 +30,14 @@ describe('globToRegExp', () => {
     expect(globToRegExp(`${'*'.repeat(60)}X`).test('a'.repeat(400))).toBe(false);
     expect(globToRegExp(`a*${'*a'.repeat(100)}X`).test('a'.repeat(400))).toBe(false);
     expect(Date.now() - t).toBeLessThan(250);
+  });
+
+  it('a glob longer than a key, or a string longer than a text, matches nothing; one at the limit still matches', () => {
+    expect(globToRegExp('*'.repeat(1025)).test('a')).toBe(false);
+    expect(globToRegExp('*').test('a'.repeat(100_001))).toBe(false);
+    expect(globToRegExp(`${'a'.repeat(1023)}*`).test('a'.repeat(1024))).toBe(true);
+    expect(globToRegExp('a*').test('a'.repeat(100_000))).toBe(true);
+    expect(globToRegExp({ length: 5 } as unknown as string).test('a')).toBe(false);
   });
 
   it('usage: answers what the old RegExp answered for the globs workflows, recipes and offers use', () => {

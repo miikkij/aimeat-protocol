@@ -33,6 +33,9 @@
  *   import { COMPLIANCE_QUESTIONNAIRE_SEED } from '../data/compliance-questionnaire.js';
  *   await seedComplianceQuestionnaire(storage, config.nodeId);   // writes only when absent
  * @version-history
+ *   v1.2.0 — 2026-10-29 — Conditions (`askedWhen`): Article 5 and the decision question only in an
+ *     Annex III area, the rest of Article 50(4) only for a use that publishes. A use outside those
+ *     areas is asked three questions instead of twelve.
  *   v1.1.0 — 2026-10-28 — builtInQuestionIds(): which stored questions are still the seed's, so a
  *     page can show those in the reader's language.
  *   v1.0.0 — 2026-08-23 — BR-02. Structured on the Act's own lists because no first customer has
@@ -41,7 +44,16 @@
 import type { ComplianceQuestionnaire } from '../services/compliance-register.js';
 
 /** Bumped when the questions below change. The stored record carries its own, which may differ. */
-export const QUESTIONNAIRE_SEED_VERSION = '2026-08-23';
+export const QUESTIONNAIRE_SEED_VERSION = '2026-10-29';
+
+/**
+ * The full survey is asked only of a use in an Annex III area (Jouni, 2026-10-29): Article 5 and the
+ * decision question wait for the area question, and "none of these" rules them out. Every use is
+ * asked the area and the two Article 50 questions: does a person deal with it, and does it publish.
+ */
+const IN_AN_ANNEX3_AREA = { question: 'q-annex3-area', notIn: ['none'] };
+/** The rest of Article 50(4) follows only a use that publishes. */
+const WHEN_IT_PUBLISHES = { question: 'q-publishes-publicly', in: ['true'] };
 
 /**
  * Served with every classification, and shown beside the class in the report and the tab.
@@ -110,6 +122,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'manipulative still counts if that is what it does.',
       type: 'boolean',
       implies: { true: 'prohibited' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
     {
       id: 'q-social-scoring',
@@ -119,6 +132,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'assessment.',
       type: 'boolean',
       implies: { true: 'prohibited' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
     {
       id: 'q-emotion-workplace-education',
@@ -127,6 +141,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'score credentials, not natural persons.',
       type: 'boolean',
       implies: { true: 'prohibited' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
     {
       id: 'q-biometric-categorisation-sensitive',
@@ -134,6 +149,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'membership, religion, sex life or sexual orientation?',
       type: 'boolean',
       implies: { true: 'prohibited' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
     {
       id: 'q-untargeted-face-scraping',
@@ -141,6 +157,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'internet or CCTV without a target?',
       type: 'boolean',
       implies: { true: 'prohibited' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
 
     // ── Annex III: the areas where a system is high risk by where it is used ──
@@ -180,6 +197,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'system whose score is copied into a decision is, whoever pastes it.',
       type: 'boolean',
       implies: { true: 'high' },
+      askedWhen: IN_AN_ANNEX3_AREA,
     },
 
     // ── Article 50: the transparency duties, which attach on top of any class above ──
@@ -207,6 +225,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'carve-out only helps where a person actually reviewed the substance.',
       type: 'boolean',
       implies: { true: 'limited' },
+      askedWhen: WHEN_IT_PUBLISHES,
     },
     {
       id: 'q-resembles-real-people',
@@ -215,6 +234,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'photograph of an identifiable person is.',
       type: 'boolean',
       implies: { true: 'limited' },
+      askedWhen: WHEN_IT_PUBLISHES,
     },
     {
       id: 'q-human-reviews-before-publish',
@@ -224,6 +244,7 @@ export const COMPLIANCE_QUESTIONNAIRE_SEED: ComplianceQuestionnaire = {
         + 'because a "no" beside public-interest publishing is the pair worth looking at.',
       type: 'boolean',
       implies: {},
+      askedWhen: WHEN_IT_PUBLISHES,
     },
   ],
 };

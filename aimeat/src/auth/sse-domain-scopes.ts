@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.8.0 — 2026-10-29 — `app-plans` passes for a principal holding app:write: an app's plan changed,
+ *     so its structure page re-reads (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  *   v1.7.0 — 2026-10-22 — `realtime-rooms` passes for a principal holding social:read: a realtime
  *     room appeared, closed, or a player came or went, so a lobby on screen re-reads the public room
  *     list instead of waiting for a Refresh (Band Jam). `realtime` itself stays infra: the
@@ -70,6 +72,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Public discovery surfaces
   catalogue: 'catalogue:read',
   apps: 'catalogue:read',
+  // An app's plan changed: a choice on its structure page, or a line from the AI building it
+  // (services/app-structure.ts). The word the plan's own read and write ask.
+  'app-plans': 'app:write',
   'app-store': 'catalogue:read',
   site: 'catalogue:read',
 

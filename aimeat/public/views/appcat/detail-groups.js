@@ -21,6 +21,8 @@
  * @structure GROUPS · SECTION_IDS · attentionOf(d, flags)
  * @usage const att = attentionOf(d, kunto(row, bound)); att.spec → ['…'] or undefined
  * @version-history
+ *   v1.3.0 — 2026-10-29 — "Structure" (structure) after About in What this is: the app's steps and the
+ *     way to its structure page.
  *   v1.2.0 — 2026-10-28 — "EU AI Act questions" (aiact) after the AI labels in Publishing and visibility.
  *   v1.1.0 — 2026-10-25 — "Open to the internet" (internet) after Manage in Publishing and visibility.
  *   v1.0.0 — 2026-10-04 — Initial (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
@@ -30,7 +32,7 @@ import { x } from '/views/appcat/i18n.js';
 /** The groups in page order; each names its sections in page order. */
 export const GROUPS = [
   { id: 'edit', title: 'detail.groupEdit', ids: ['work', 'ai', 'history', 'versions', 'actions'] },
-  { id: 'what', title: 'detail.groupWhat', ids: ['about', 'spec', 'datamap', 'needs', 'skills'] },
+  { id: 'what', title: 'detail.groupWhat', ids: ['about', 'structure', 'spec', 'datamap', 'needs', 'skills'] },
   { id: 'together', title: 'detail.groupTogether', ids: ['roadmap', 'builders', 'audit'] },
   { id: 'publish', title: 'detail.groupPublish', ids: ['manage', 'internet', 'visitors', 'search', 'marks', 'aiact', 'legal', 'promote'] },
   { id: 'money', title: 'detail.groupMoney', ids: ['odps', 'monetize', 'cost', 'agents'] },

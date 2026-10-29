@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-10-29 — agent:permissions-add, outside every wildcard: adding permissions it holds to another
+ *     of the owner's agents (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-18 — publish:public, outside every wildcard: making something public without a request to
  *     the owner (plan doc-mvcn6c7e4e5q, V4.1).
  *   2026-10-17 — The standard preset holds messages:send (Jouni: "otetaan oletusoikeudet käyttöön").
@@ -193,6 +195,10 @@ export const NOT_IN_WILDCARD = [
   // agent's attempt becomes a request the owner approves. Showing data to the whole internet costs
   // its own tick (plan doc-mvcn6c7e4e5q, V4.1).
   'publish:public',
+  // ── Added 2026-10-29 ─────────────────────────────────────────────────────────────────────────
+  // Adding permissions to another of the owner's agents, from the ones this agent holds itself
+  // (src/services/agent-scope-add.ts). Only the owner gives it, here, because no agent may pass it on.
+  'agent:permissions-add',
 ];
 
 /**
@@ -344,7 +350,9 @@ export const SCOPE_DOMAINS = [
   //   because the caller that needs it is a fleet concierge cleaning up what it created. The route
   //   adds a second condition the box cannot express: an agent may only delete an agent whose
   //   registration it authorized itself.
-  { key: 'agent',      permissions: ['read', 'write', 'permissions', 'delete'] },
+  // agent:permissions-add — add to another agent the permissions this agent holds itself, never to
+  //   itself. Outside every wildcard; each addition reaches the owner's feed and bell (2026-10-29).
+  { key: 'agent',      permissions: ['read', 'write', 'permissions', 'permissions-add', 'delete'] },
   { key: 'app',        permissions: ['write', 'manage'] },
   { key: 'capability', permissions: ['write'] },
 

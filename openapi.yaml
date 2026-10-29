@@ -13794,8 +13794,11 @@ paths:
       responses:
         '200':
           description: |
-            `{ enabled, agent_name, allowance_remaining_usd, has_own_key, own_key, pays, model, push_devices, note? }`.
+            `{ enabled, agent_name, allowance_remaining_usd, allowance_low, has_own_key, own_key, pays, model, push_devices, note? }`.
             `note` is present only when `enabled` is false, and names what an operator has to set.
+            `allowance_remaining_usd` is the node's own OpenRouter key's remaining limit when that is
+            smaller than the person's allowance (a customer node keeps the balance its owner bought as
+            that limit), and `allowance_low` is true below a tenth of the limit.
             `has_own_key` is true when the owner has a key of their own (the OpenRouter key or a key on
             one of their AI providers). `own_key` is what that key reaches on this node:
             `{ set, covers, not_covered: [{ part, reason }] }`. A part is `node_ai` (apps, scheduled
@@ -13944,6 +13947,14 @@ paths:
         starts and finishes, `{ kind: 'done', stopReason, tokens }` at the end, and
         `{ kind: 'error', message }` when the turn could not run — a node with no agent configured
         answers with exactly that rather than hanging. `:keepalive` comments arrive every 15 s.
+        When the AI gate would refuse the turn (no key, no allowance left, no model), the turn ends
+        before the agent starts with `{ kind: 'error', code, message, settingsUrl }`: `message` is
+        the sentence for the person in their language, and `settingsUrl` opens their AI settings.
+        When the AI allowance the owner bought is spent (code AI_BALANCE_SPENT), it also carries
+        `choices`, the ways on: `{ kind: 'buy', url }` (the store's top-up page, site.store_topup_url),
+        `{ kind: 'own_key', url }`, and `{ kind: 'free_model' }`, which the person takes with
+        PUT /v1/ai/routing `{ routing: { rules: { freeModelLastResort: true } } }`. A turn whose agent
+        met that refusal midway ends with the same event.
 
         The node adds two of its own. `{ kind: 'progress', step, text }` says what the agent is
         doing before it says so itself: `start` within 1.5 s when no words have come, then
@@ -14706,8 +14717,13 @@ paths:
       description: >-
         Update the default scopes for an agent. The owner in person sets any list the node allows. The
         owner's agent holding `agent:permissions` and `agent:write` (the words of
-        aimeat_operator_agent_configure) may only narrow another agent's list: a word the target does not
-        already hold is refused with 403 SCOPE_ADDITION_REFUSED. An app grant and an ecosystem app are refused.
+        aimeat_operator_agent_configure) narrows another agent's list. It adds a word the target does not
+        already hold only when it also holds `agent:permissions-add` (outside every wildcard, given by the
+        owner in person), on its token and on its agent record, and then only words it holds itself:
+        without that word 403 SCOPE_ADDITION_REFUSED, to itself 403 SCOPE_ADDITION_REFUSED, a word it does
+        not hold 403 SCOPE_NOT_HELD (details.not_held), and `agent:permissions-add` itself 403
+        PERSON_REQUIRED. Each addition an agent makes is written to the owner's account feed
+        (`agent_permissions_added`) and bell. An app grant and an ecosystem app are refused.
       tags: [Identity]
       security:
         - BearerAuth: []
@@ -14753,7 +14769,7 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
         '403':
-          description: The caller is not the owner or their agent, lacks a word, or (an agent) asked to add a permission (SCOPE_ADDITION_REFUSED, details.added).
+          description: The caller is not the owner or their agent, lacks a word, or (an agent) asked to add a permission it may not add (SCOPE_ADDITION_REFUSED, SCOPE_NOT_HELD or PERSON_REQUIRED, details.added).
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -18223,7 +18239,10 @@ paths:
         `ai_act`, for an app that uses AI (its map, its `ai:use` permission or a declared
         generation): the node's EU AI Act questions without their class rules (`questions`: id, text,
         help, type, options), the ids still exactly as shipped (`built_in`, which a page shows in its
-        reader's language), and the ids the map's `aiAct` leaves `unanswered`. The maker answers them
+        reader's language), the ids the answers so far make the node ask (`asked`: a question with
+        an `askedWhen` condition waits for, or is ruled out by, another question's answer, so outside
+        an Annex III area only the area and the two transparency questions are asked), and the asked
+        ids the map's `aiAct` leaves `unanswered`. The maker answers them
         in the map: `aiAct: { answers: { <question id>: true | false | <option value> }, notes:
         { <question id>: <why> } }`, written with PUT on this address like the rest of the map. The
         node's administrator approves them in the register draft (GET /v1/admin/compliance/draft),
@@ -22788,6 +22807,23 @@ paths:
         content published without a label; an app that says it generates content while the publish
         check recorded a disclosure gap.
 
+        Each use case's `risk` is its verdict: `class`, `reasons`, `unanswered` (asked and open),
+        and `notAsked`, the questions whose `askedWhen` condition its answers rule out.
+
+        The node-wide report's `processing.apps` lists every app as `{ app, owner, title, reach,
+        personal, has_map, uses_ai, annex3, tells_ai, domains, rows }`, and `processing.apps_by_reach`
+        counts them; `rows` are the key families someone other than the app's user can see, each
+        `{ what, reach, personal }`, and `domains` the regulated data its personal data falls in.
+        `reach` is who can see the app's personal data, read from its data map: `none` (not kept on
+        the node), `self` (only its user and their agents), `shared` (named people or an
+        organism's members), `exposed` (anyone, the app's maker or a service outside the node) or
+        `unknown` (no map, or words the node does not know). Only `shared`, `exposed` and `unknown`
+        apps, and an app that keeps regulated data (employment, health, children and the rest)
+        whoever sees it, get a record of processing and a privacy notice of their own; what a
+        person keeps through any other `self` app is in the node's record `node-user-content`. `tells_ai` says whether
+        the publish check found that an app that uses AI shows people an AI label (null: nothing
+        recorded, or no AI).
+
         `not_covered` states what the report does NOT cover, and it is part of the measurement
         rather than a disclaimer - content with no provenance record, anything published off this
         node, the register being unverified, the consent-audit retention window, and the usage
@@ -22940,8 +22976,11 @@ paths:
         not publicly served), and, for one that publishes, whether a person was recorded reviewing
         it. When an app uses AI on data its map places in the `employment` or `biometric-genetic`
         domain, stated on the row or read from the map's words, the Annex III area is filled and
-        marked `proposed`, with the reason in `proposals`. Every other answer is left empty rather
-        than guessed. An answer that reads as considered when nobody considered it is the failure
+        marked `proposed`, with the reason in `proposals`; when the map holds neither, `none` is
+        proposed for the area, with `basis: null`, so only the area and the transparency questions
+        are asked (each question's `askedWhen`). Each entry carries its verdict as `risk`, with
+        `notAsked`, and `counts.leftToAnswer` counts the open questions each entry is asked. Every
+        other answer is left empty rather than guessed. An answer that reads as considered when nobody considered it is the failure
         this whole surface exists to prevent, so filling those is a person's job, or a model's
         working for them, and the register records which.
 
@@ -23183,6 +23222,19 @@ paths:
                           choice question keys on the option value. An answer with no entry implies
                           nothing, which is how a question can be asked for the record without
                           moving the class.
+                      askedWhen:
+                        type: object
+                        required: [question]
+                        description: >
+                          When the question is asked: only when the named question's answer is
+                          `in` the list, or not `notIn` it, keyed as `implies` keys them. A question
+                          whose condition is not met is not asked (the verdict's `notAsked`), and
+                          one whose condition question is open waits. Absent: asked of every use.
+                          A stored set takes the shipped conditions for questions it holds as shipped.
+                        properties:
+                          question: { type: string, maxLength: 120 }
+                          in: { type: array, maxItems: 50, items: { type: string, maxLength: 120 } }
+                          notIn: { type: array, maxItems: 50, items: { type: string, maxLength: 120 } }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
@@ -23448,8 +23500,10 @@ paths:
         Each gap names its kind, one sentence a person can act on, and its evidence: a register with
         no legal basis, retention or review; a container below its data domain's classification; a
         missing or old impact assessment; a request or a breach notification past its deadline; an
-        unanswered framework; an app whose data map holds personal data with no register or no
-        privacy notice; and for the node, a processor with no agreement, country or transfer basis,
+        unanswered framework; an app whose data map holds personal data that someone other than its
+        user can read, with no register or no privacy notice (an app whose data only its user sees
+        needs neither); an app whose data map says where data is kept or who reads it in words the
+        node does not know (`app-data-map-unreadable`); and for the node, a processor with no agreement, country or transfer basis,
         and a label pack whose top classes are on. The same scope parameters and readers as GET
         /v1/compliance/docs/{kind}. The operator's node-wide report carries every scope's gaps.
       security:
@@ -35852,6 +35906,180 @@ paths:
         '200': { description: Closed }
         '403': { description: Not the owner and not an operator }
         '409': { description: Not open and nothing waits }
+  /v1/file-store:
+    get:
+      operationId: getOwnFileStore
+      summary: Where the caller's files keep their bytes, and their own storage
+      description: >-
+        `mode` is the node's rule on storage of one's own (self, operator, off), `approval` the
+        operator's answer on an operator node, `store` the connected S3 bucket or Azure container
+        (null when none), `taking_new_files` whether a new file goes there now, and `files` the count
+        and bytes in it and elsewhere. Files in one's own storage do not count toward the node's
+        storage quota. Needs `storage:read`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The view }
+        '403': { description: A session from another node }
+    put:
+      operationId: connectOwnFileStore
+      summary: Connect storage of one's own for one's files (S3 or Azure Blob)
+      description: >-
+        The node tests the storage (write, read, read part, list, remove under the folder) before it
+        saves anything, then sends every new file of the person and their agents there. The keys are
+        kept encrypted under the node key and never returned. On a node where operators approve, the
+        answer is 202 with `outcome` waiting_for_operator and files keep going to the node until
+        approved. Needs the person in person, or an agent with `secrets:manage`. 400 INVALID_INPUT names
+        what is missing; 403 OWNER_FILE_STORES_OFF; 409 FILES_IN_STORE when a store holding files would
+        be replaced by a different bucket; 422 STORE_TEST_FAILED names the failing step; 503
+        NO_ENCRYPTION_KEY.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [s3, azure] }
+                endpoint: { type: string, description: 'S3: https address of the service; empty for Amazon S3.' }
+                region: { type: string }
+                bucket: { type: string }
+                addressing: { type: string, enum: [auto, path, host] }
+                access_key_id: { type: string }
+                secret_access_key: { type: string }
+                account: { type: string }
+                container: { type: string }
+                credential: { type: string, description: 'Azure: account key, connection string or container SAS URL.' }
+                prefix: { type: string, description: 'The folder inside the bucket or container.' }
+                reason: { type: string, description: 'For the operators, on a node where they approve.' }
+      responses:
+        '200': { description: Connected }
+        '202': { description: Saved; waits for an operator's approval }
+        '400': { description: Missing or not valid input }
+        '403': { description: Not allowed on this node, or not in person and no secrets:manage }
+        '409': { description: Files are in the current storage }
+        '422': { description: The storage did not pass the test }
+        '503': { description: The node has no encryption key }
+    delete:
+      operationId: disconnectOwnFileStore
+      summary: Disconnect one's own storage
+      description: >-
+        Refused with 409 FILES_IN_STORE while files are in it; move them home first. Needs the person in
+        person, or an agent with `secrets:manage`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: Disconnected }
+        '404': { description: No storage connected }
+        '409': { description: Files are still in it }
+  /v1/file-store/move:
+    post:
+      operationId: moveOwnFiles
+      summary: Move one's files into one's own storage, or back to the node
+      description: >-
+        `direction` own moves the person's other files (theirs and their agents') into their storage;
+        home moves the files in it to where the node keeps files. Up to `limit` (1 to 200, default 50)
+        per call; call again while `remaining` is above 0. Needs `storage:write`.
+      tags: [Storage]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [direction]
+              properties:
+                direction: { type: string, enum: [own, home] }
+                limit: { type: integer, minimum: 1, maximum: 200 }
+      responses:
+        '200': { description: 'moved, skipped, failed, remaining' }
+        '409': { description: Own storage is not taking files }
+  /v1/admin/file-store:
+    get:
+      operationId: getNodeFileStore
+      summary: Where this node keeps the bytes of stored files
+      description: >-
+        `kind` (database, s3, azure), `ready` and `missing` (settings or environment variables still
+        needed), `where`, `prefix`, `files` (count and bytes in the database, the node's store and
+        people's own storage) and `owner_stores` (the rule, each person's storage, the requests that
+        wait). Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: The status }
+  /v1/admin/file-store/test:
+    post:
+      operationId: testNodeFileStore
+      summary: Test the node's file store
+      description: >-
+        Writes, reads, reads part of, lists and removes one small object under the store's folder, and
+        answers each step. 409 NO_FILE_STORE when files are kept in the database, 409
+        FILE_STORE_INCOMPLETE with the missing settings. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { description: 'where, ok and the steps' }
+        '409': { description: No store, or its settings are incomplete }
+  /v1/admin/file-store/move:
+    post:
+      operationId: moveFilesOutOfDatabase
+      summary: Move files from the database to where new files go
+      description: >-
+        Up to `limit` (1 to 500, default 100) files whose bytes are in the database move to their
+        owner's own storage when the node lets them use it, else to the node's store. Answers moved,
+        skipped, failed, moved_bytes_mb, remaining and `next`; pass `next` back as `after` to go on past
+        files that failed. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, maximum: 500 }
+                after: { type: string }
+      responses:
+        '200': { description: The batch result }
+        '409': { description: No store set up }
+  /v1/admin/file-store/owners/{owner}/decision:
+    post:
+      operationId: decideOwnFileStore
+      summary: Approve, decline or revoke a person's own storage
+      description: >-
+        On a node where operators approve. Approve lets the person's storage take their new files;
+        decline answers a request; revoke takes an approval back and new files go to the node again.
+        Decline and revoke need `note`. The person is told. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [approve, decline, revoke] }
+                note: { type: string }
+      responses:
+        '200': { description: Decided }
+        '400': { description: No decision, or a decline or revoke without a note }
   /v1/admin/internet-openings:
     get:
       operationId: listInternetOpenings
@@ -37624,6 +37852,122 @@ paths:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/structure:
+    get:
+      operationId: appStructureGet
+      summary: The app's structure and status, from the first moment of building
+      description: >
+        Eight steps in the order a person meets them (purpose, data, layout, look, build, builders,
+        visibility, requirements), each `{ id, state, detail, said }`: `state` is fine, progress,
+        optional, not_needed, missing or later, `detail` carries the facts, and `said` says the same
+        in one sentence for an AI. Before a publish the steps read the app's plan and its draft; after
+        it, the design spec, the data map, the listing, the development rights, the legal pages and
+        the EU AI Act questions. Returns `{ app, name, published, has_draft, plan, steps, fine, total,
+        next, page_url }`: `plan` holds the choices made on the structure page (layout, nav, look,
+        genre, visibility), each with who chose it and whether it is built; `page_url` is the page
+        that shows all of it. 404 when there is no app, draft or plan by that name. For the owner, the
+        owner's agents and everybody holding a development right. Needs `app:write`. MCP:
+        `aimeat_app_manage` action `structure`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: appStructureWrite
+      summary: Write the app's plan
+      description: >
+        The first write starts the plan, and the structure page exists from then on, before any code.
+        Every field is optional and a field left out stays as it is; null or an empty string clears
+        one. `choices` is keyed by layout (a layout preset id), nav (a navigation mode), look (an
+        Atelier look id), genre (a Design Book id) or visibility (listed, community, unlisted); the
+        ids are those GET /v1/apps/ui/catalogue lists, so a new look or layout on the node is valid
+        here at once. A person writing in person makes a choice that waits for the AI (`state:
+        waiting`); the AI writing its own choice makes it `done`, and the AI writing the same value
+        as the person's with `state: done` keeps it the person's. With `expected_revision` the write
+        is refused (409 `REVISION_MISMATCH`, the stored plan in `details.plan`) when another write came
+        first. Answers the structure as GET does, 201 for the first write. Sends the `app-plans` live
+        event to the owner. Needs `app:write`. MCP: `aimeat_app_manage` action `structure_set`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: [string, 'null'], maxLength: 120 }
+                purpose: { type: [string, 'null'], maxLength: 800 }
+                data:
+                  type: [object, 'null']
+                  properties:
+                    summary: { type: string, maxLength: 800 }
+                    personalData: { type: string, enum: ['yes', 'no', 'unstated'] }
+                choices:
+                  type: object
+                  additionalProperties:
+                    oneOf:
+                      - type: 'null'
+                      - type: object
+                        required: [value]
+                        properties:
+                          value: { type: string, maxLength: 80 }
+                          state: { type: string, enum: [waiting, done] }
+                          note: { type: string, maxLength: 300 }
+                now: { type: [string, 'null'], maxLength: 200 }
+                expected_revision: { type: integer, minimum: 0 }
+      responses:
+        '200':
+          description: Written. The structure, as GET answers it.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '201':
+          description: Created. The first write of this app's plan.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409':
+          description: >
+            `REVISION_MISMATCH`: the caller named a revision that is not the stored one. `details.plan`
+            is the plan as it stands; read it and write from that.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/app-plans:
+    get:
+      operationId: appPlanList
+      summary: The apps the caller has started, published or not
+      description: >
+        One row per app plan of the caller's own account: `{ app, filename, name, published,
+        has_draft, fine, total, next, updated_at, page_url }`, the apps not yet published first. This
+        is how a person finds an app that exists only as a plan or a draft, which the catalogue does
+        not list. Needs `app:write`. MCP: `aimeat_app_manage` action `plans`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
   /v1/apps/{owner}/{filename}/scope-allowance:
     get:
       operationId: appScopeAllowanceGet

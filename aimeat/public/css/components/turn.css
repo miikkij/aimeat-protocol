@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.5.0 — 2026-10-29 — The ways on from a spent AI allowance (.poster-turn-choices), one per row
+ *     with its note.
  *   v1.4.1 — 2026-10-28 — .poster-turn-body keeps to the turn's width (max-width: 100%): your own message
  *     no longer grows past the left edge of a phone screen.
  *   v1.4.0 — 2026-09-27 — Your turn's Markdown parts, quote, table lines and tags take the turn's own
@@ -131,6 +133,21 @@
   flex: 1 1 240px;
   font-size: var(--text-body-sm);
   font-weight: var(--weight-semibold);
+  line-height: 1.5;
+}
+/* The ways on from a spent AI allowance: one per row, each action with its note under it. */
+.poster-turn-choices {
+  flex: 1 1 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.poster-turn-choice-note {
+  margin: 4px 0 0;
+  font-size: var(--text-body-sm);
   line-height: 1.5;
 }
 .poster-turn-images { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }

@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.36.0 — 2026-10-29 — fileStoreDefaults() (config-file-store.ts): where stored files keep their bytes; the x402 lines move to config-x402.ts unchanged (max-file-lines).
  *   v1.35.0 -- 2026-10-27 -- The default profile comes from defaultSecurityProfile (config-private-host.ts): never local when AIMEAT_BIND_HOST is beyond this computer (secaudit2026oct26).
  *   v1.34.0 — 2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
  *   v1.33.1 — 2026-10-25 — casdoorLinkDomains, entraLinkDomains and refreshCookieLegacyUntil read from the environment (secaudit2026oct22).
@@ -107,6 +108,8 @@ import { visibilityDefaults } from './config-visibility.js';
 import { turnDefaults } from './config-turn.js';
 import { pagesDefaults } from './config-pages.js';
 import { nodeLimitsDefaults } from './config-node-limits.js';
+import { fileStoreDefaults } from './config-file-store.js';
+import { x402Defaults } from './config-x402.js';
 import { aiLabelPublicFromEnv, aiProvenanceFromEnv } from './config-ai-label.js';
 import { docsignDefaults } from './config-docsign.js';
 import { dataAccessDefaults } from './config-data-access.js';
@@ -296,6 +299,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     ...pagesDefaults(),
     ...runtimeConfigFromEnv(),
     ...nodeLimitsDefaults(),
+    ...fileStoreDefaults(),
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     // Settings the party who STARTED this node nominated as read-only, for a node one party
@@ -487,18 +491,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
     // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
     mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
-    // x402 stablecoin settlement (TARGET-042): NON-CUSTODIAL USDC handler for money (USD) sessions.
-    // USDC is a payment METHOD for a USD price (model 2), never a currency of its own. Network +
-    // facilitator are parameters so Solana / another facilitator drops in without a core change. OFF
-    // by default (registers only when enabled) so a node advertises the exact scheme only when it can
-    // settle it. Base Sepolia + the public x402.org facilitator are the safe testnet defaults.
-    x402Enabled: process.env.AIMEAT_X402_ENABLED === 'true',
-    x402Network: process.env.AIMEAT_X402_NETWORK ?? 'base-sepolia',
-    x402FacilitatorUrl: process.env.AIMEAT_X402_FACILITATOR_URL ?? 'https://x402.org/facilitator',
-    // OPTIONAL read-only RPC used to check that a seller's payout address is an account and not a
-    // contract. Unset = the check is skipped (a save never depends on a third party being up).
-    x402RpcUrl: process.env.AIMEAT_X402_RPC_URL ?? '',
-    x402TestFacilitator: process.env.AIMEAT_X402_TEST_FACILITATOR === 'true',
+    // x402 stablecoin settlement (TARGET-042), config-x402.ts.
+    ...x402Defaults(),
     // Web Bot Auth (RFC 9421): sign the node's outbound safeFetch traffic with the node Ed25519
     // key so peers/CDNs can verify AIMEAT's agent traffic against the key directory at
     // /.well-known/http-message-signatures-directory. OFF by default: it stamps identifying

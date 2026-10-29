@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<!--
+  @file public/look-sample.html
+  @author Jouni Miikki
+  SPDX-License-Identifier: MIT
+  @description One Atelier look on a small page, framed by components/LookSample.js on the app
+    structure page. The kit's own stylesheet draws it; /js/look-sample.js reads the look, the theme
+    and the title from the address's hash and sets them, so nothing here names a colour.
+  @version-history
+    v1.0.0 - 2026-10-29 - Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="robots" content="noindex" />
+  <title>Look sample</title>
+  <link rel="stylesheet" href="/lib/aimeat-atelier.css" />
+  <link rel="stylesheet" href="/css/look-sample-page.css" />
+  <script src="/js/look-sample.js" defer></script>
+</head>
+<body>
+  <div class="ls-hero"><span class="ls-title" id="ls-title">Aa</span></div>
+  <div class="ls-card"><span class="ls-line"></span><span class="ls-action">OK</span></div>
+  <div class="ls-card ls-card--quiet"><span class="ls-line ls-line--short"></span></div>
+</body>
+</html>

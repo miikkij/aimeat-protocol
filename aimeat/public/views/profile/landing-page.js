@@ -17,6 +17,10 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.21.0 — 2026-10-29 — On a customer's node (site.js customerNode()) the menu before "Show all
+ *     tools" is the eight Jouni chose, with no default pins; a "Your purchase" group links the
+ *     store's orders and invoices and support; the node's maintenance is a link in the operator's
+ *     group, since it left the top bar (UX review 2026-10-29, C and D).
  *   v3.20.0 — 2026-10-16 — The menu find also finds the person's own things by name (agents, shared
  *     places and workspaces, apps, schedules, workflows, companies, contacts, skills, extensions),
  *     first, and opens the page at the thing (js/services/your-things.js, js/open-item.js).
@@ -128,7 +132,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
-import { t, tOr } from "/js/i18n.js";
+import { t, tOr, getLocale } from "/js/i18n.js";
 import { listApps } from "/js/services/apps.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { getMemory, createMemory } from "/js/services/memory.js";
@@ -145,8 +149,12 @@ import { loadYourThings, openYourThing } from '/js/services/your-things.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
-  SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS, BASIC_TAB_IDS,
+  SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS, BASIC_TAB_IDS, CUSTOMER_TAB_IDS,
 } from "./landing-page.cards.js";
+import { customerNode, storeOrdersHref, contactHref } from '/js/site.js';
+
+/** The menu before "Show all tools": the customer's eight on a node the store made, else the basic one. */
+const basicTabs = () => (customerNode() ? CUSTOMER_TAB_IDS : BASIC_TAB_IDS);
 
 /* ───── Tier heuristic ───── */
 
@@ -229,7 +237,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     } catch { /* fall through to the heuristic */ }
     try {
       const saved = JSON.parse(sessionStorage.getItem('aimeat-profile-tab') || 'null');
-      return !!(saved && saved.tabId && !BASIC_TAB_IDS.has(saved.tabId));
+      return !!(saved && saved.tabId && !basicTabs().has(saved.tabId));
     // eslint-disable-next-line aimeat/no-silent-catch -- no remembered tab means start basic
     } catch { return false; }
   });
@@ -321,7 +329,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       key: g.titleKey, title: t(g.titleKey),
       items: g.items.map(it => ({
         id: it.id, label: t(it.labelKey), words: placeWords('settings', it.id, it.labelKey),
-        hidden: !showAllTools && !BASIC_TAB_IDS.has(it.id), sections: sectionsOf(placesIndex, 'settings', it.id),
+        hidden: !showAllTools && !basicTabs().has(it.id), sections: sectionsOf(placesIndex, 'settings', it.id),
       })),
     })),
   ];
@@ -343,7 +351,8 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
   /* ── Pinned items: 3–5 favourites under Home, persisted per user (memory key
      `sidebar.pins`, same pattern as organisms.ui). Defaults for new users. ── */
-  const [pins, setPins] = useState(DEFAULT_PINS);
+  // A customer's menu is already the eight; default pins would only repeat four of them.
+  const [pins, setPins] = useState(customerNode() ? [] : DEFAULT_PINS);
   // A toggle saves the whole list, so it waits for the stored list: built on the defaults after a
   // failed read, it would replace the person's own pins.
   const [pinsLoaded, setPinsLoaded] = useState(false);
@@ -485,15 +494,29 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
             ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
               const collapsed = collapsedGroups.has(g.titleKey);
               // Basic view: only the everyday items. The rest are one toggle away, never gone.
-              const items = showAllTools ? g.items : g.items.filter(it => BASIC_TAB_IDS.has(it.id));
-              if (items.length === 0) return null;
+              const items = showAllTools ? g.items : g.items.filter(it => basicTabs().has(it.id));
+              // On a customer's node the node's maintenance left the top bar (Jouni, 2026-10-29) and
+              // lives here, with the operator's other tools, behind "Show all tools".
+              const adminLink = g.adminOnly && customerNode() && showAllTools;
+              if (items.length === 0 && !adminLink) return null;
               return html`
                 <${SideMenuGroup} key=${g.titleKey} title=${t(g.titleKey)} collapsed=${collapsed}
                   onToggle=${() => toggleGroup(g.titleKey)}>
                   ${items.map(it => renderItem(it, false))}
+                  ${adminLink && html`<${SideMenuItem} key="admin" onClick=${() => { window.location.href = '/v1/admin'; }}>${t('nav.admin')}<//>`}
                 <//>
               `;
             })}
+            ${customerNode() && html`
+              <${SideMenuGroup} title=${t('profile.landing.menuCustomer')}>
+                ${storeOrdersHref(getLocale()) && html`
+                  <${SideMenuItem} onClick=${() => window.open(storeOrdersHref(getLocale()), '_blank', 'noopener')}>
+                    ${t('profile.landing.ordersInvoices')}
+                  <//>`}
+                <${SideMenuItem} onClick=${() => { window.location.href = contactHref(t('profile.landing.supportSubject')) || '/v1/help'; }}>
+                  ${t('profile.landing.contactSupport')}
+                <//>
+              <//>`}
             <${SideMenuMore} onClick=${() => setShowAllTools(v => {
               const next = !v;
               // eslint-disable-next-line aimeat/no-silent-catch -- a blocked store only costs the remembered choice

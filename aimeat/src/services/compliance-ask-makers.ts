@@ -25,13 +25,19 @@
  *   stops being asked.
  * @structure REASK_DAYS · unansweredApps() · askMakersForAiAct()
  * @usage scheduler core handler 'compliance-ask-makers' (core-jobs.ts), daily
+ *   THE DATA MAP TOO (2026-10-29). Who can see an app's data is read from its data map
+ *   (compliance-app-reach.ts), so an app with no map, a map in words the node does not know, or
+ *   unsaid personal data that others can read is asked about in the same message, AI or not.
  * @version-history
+ *   v1.1.0 — 2026-10-29 — Only the questions the node asks of an app count as open (askedWhen); an
+ *     app whose data map cannot say who sees its data is asked to fix it in the same message.
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appAiSignals } from './compliance-app-signals.js';
-import { effectiveQuestionnaire, readUseCases, systemGhiiFor } from './compliance-register.js';
+import { appReach } from './compliance-app-reach.js';
+import { askedQuestions, effectiveQuestionnaire, readUseCases, systemGhiiFor } from './compliance-register.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { findOperatorGhii } from './operators.js';
 import { sendDirectMessage } from './message-send.js';
@@ -50,11 +56,21 @@ export interface UnansweredApp {
   ref: string;
   owner: string;
   title: string;
-  /** How many of the node's questions are still open for it. */
+  /** How many of the questions the node asks of it are still open; 0 for an app that uses no AI. */
   open: number;
+  /** It has no data map, so nobody can say who sees its data. */
+  noMap: boolean;
+  /** Key families whose location or readers are words the node does not know. */
+  unreadable: string[];
+  /** Key families others can read whose map does not say whether they hold personal data. */
+  unstated: string[];
 }
 
-/** Every app that uses AI with a question neither its maker nor the stored register has answered. */
+/**
+ * Every app with something only its maker can fill in: an AI Act question the node asks of it that
+ * neither its maker nor the stored register has answered, or a data map that cannot say who sees the
+ * app's data (none, words the node does not know, or unsaid personal data that others can read).
+ */
 export async function unansweredApps(storage: Storage, config: AimeatConfig): Promise<UnansweredApp[]> {
   const [apps, questionnaire, stored] = await Promise.all([
     storage.listApps({ adminView: true, limit: APP_SCAN }),
@@ -68,18 +84,27 @@ export async function unansweredApps(storage: Storage, config: AimeatConfig): Pr
     const owner = localAccountName(app.ownerName ?? app.ownerGaii ?? '');
     if (!owner) continue;
     const map = await readAppDataMap(storage, `${owner}@${config.nodeId}`, app.filename.replace(/\.html$/i, ''));
-    if (!appAiSignals(map, app.manifest?.aiPosture).usesAi) continue;
     const ref = `${owner}/${app.filename}`;
-    const saved = savedFor.get(ref.toLowerCase()) ?? {};
-    const byMaker = map?.aiAct?.answers ?? {};
-    const open = questionnaire.questions.filter(q => !(q.id in byMaker) && saved[q.id] === undefined).length;
-    if (open > 0) out.push({ ref, owner, title: app.manifest?.name || app.filename.replace(/\.html$/i, ''), open });
+    let open = 0;
+    if (appAiSignals(map, app.manifest?.aiPosture).usesAi) {
+      // The saved answers win, the maker's fill the rest; only the questions those make the node ask
+      // (askedWhen) count: outside an Annex III area that is three, not twelve.
+      const answers = { ...(map?.aiAct?.answers ?? {}), ...savedFor.get(ref.toLowerCase()) };
+      const asked = askedQuestions(questionnaire, answers);
+      open = questionnaire.questions.filter(q => asked.get(q.id) === 'asked' && answers[q.id] === undefined).length;
+    }
+    const reach = appReach(map);
+    const row: UnansweredApp = {
+      ref, owner, title: app.manifest?.name || app.filename.replace(/\.html$/i, ''), open,
+      noMap: !reach.hasMap, unreadable: reach.unreadable.map(r => r.what), unstated: reach.personalUnstated,
+    };
+    if (row.open > 0 || row.noMap || row.unreadable.length || row.unstated.length) out.push(row);
   }
   return out;
 }
 
 /** The prompt a maker pastes into their own AI. English, like every prompt here; the AI answers in the person's language. */
-function makerPrompt(nodeUrl: string, refs: string[]): string {
+function makerPrompt(nodeUrl: string, refs: string[], withMaps: boolean): string {
   return [
     `On my AIMEAT node ${nodeUrl}, answer the EU AI Act questions for my app${refs.length > 1 ? 's' : ''} ${refs.join(', ')}.`,
     'For each app: call aimeat_datamap_get with the app; its `ai_act` lists the questions and which are unanswered.',
@@ -87,7 +112,23 @@ function makerPrompt(nodeUrl: string, refs: string[]): string {
     'Show me the answers and wait for my yes. Then write them into the app\'s data map as',
     '`aiAct`: { "answers": { "<question id>": true | false | "<option value>" }, "notes": { "<question id>": "why" } }',
     'with aimeat_datamap_set, sending the whole map back with `aiAct` added.',
+    ...(withMaps ? [
+      'Some of these apps have no data map, or a map that does not say who can see their data. For each of those, read the app,',
+      'write the map with aimeat_datamap_set, with `where`, `readers` and `personalData` in the words',
+      'aimeat_handbook_get { tier: "build-app/data-map" } lists, and show me the map before you write it.',
+    ] : []),
   ].join('\n');
+}
+
+/** One app's line in the message: what is open for it, in the maker's language. */
+function appLineOf(t: ReturnType<typeof createT>, a: UnansweredApp, url: string): string {
+  const parts = [
+    ...(a.open ? [t('admin.compliance.ask.partOpen', { open: a.open })] : []),
+    ...(a.noMap ? [t('admin.compliance.ask.partNoMap')] : []),
+    ...(a.unreadable.length ? [t('admin.compliance.ask.partWords', { rows: a.unreadable.slice(0, 5).join(', ') })] : []),
+    ...(a.unstated.length ? [t('admin.compliance.ask.partPersonal', { rows: a.unstated.slice(0, 5).join(', ') })] : []),
+  ];
+  return t('admin.compliance.ask.line', { title: a.title, parts: parts.join('; '), url });
 }
 
 /**
@@ -118,24 +159,26 @@ export async function askMakersForAiAct(
     const recipient = `${owner}@${config.nodeId}`;
     try {
       const t = createT(toLocale((await storage.getGHII(recipient))?.locale));
-      const lines = list.map(a => t('admin.compliance.ask.appLine', { title: a.title, open: a.open, url: `${nodeUrl}/v1/appcat?app=${a.ref}` }));
+      const lines = list.map(a => appLineOf(t, a, `${nodeUrl}/v1/appcat?app=${a.ref}`));
+      // A message about the AI questions alone reads as before; one that also asks for data maps says so.
+      const maps = list.some(a => a.noMap || a.unreadable.length || a.unstated.length);
       const body = [
-        t('admin.compliance.ask.intro', { n: list.length }),
+        maps ? t('admin.compliance.ask.introMaps', { n: list.length }) : t('admin.compliance.ask.intro', { n: list.length }),
         '',
         ...lines,
         '',
         t('admin.compliance.ask.how'),
         '',
         '```',
-        makerPrompt(nodeUrl, list.map(a => a.ref)),
+        makerPrompt(nodeUrl, list.map(a => a.ref), maps),
         '```',
         '',
-        t('admin.compliance.ask.after'),
+        maps ? t('admin.compliance.ask.afterMaps') : t('admin.compliance.ask.after'),
       ].join('\n');
       const r = await sendDirectMessage({ storage, config, peers: new Map() }, {
         senderGhii: operator,
         recipientGhii: recipient,
-        subject: t('admin.compliance.ask.subject', { n: list.length }),
+        subject: maps ? t('admin.compliance.ask.subjectMaps', { n: list.length }) : t('admin.compliance.ask.subject', { n: list.length }),
         body,
         skipContactGate: true,
         // The node writes this on the administrator's behalf: a day's reminders must not use up,

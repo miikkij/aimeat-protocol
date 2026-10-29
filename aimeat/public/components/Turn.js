@@ -6,9 +6,13 @@
  *   it was said; the live turn while an answer is still being written; and a turn that could not
  *   run. Its look is css/components/turn.css; the catalogue entry is `turn`.
  * @structure Turn({ turn, id }) · LiveTurn({ text, thought, tools, cards, busy }) ·
- *   TurnError({ message, onRetry })
+ *   TurnError({ message, onRetry, fixHref, choices, onFreeModel })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.4.0 — 2026-10-29 — TurnError takes `choices`: when the AI allowance is spent, the ways on
+ *     (buy more, your own key, the free model) in place of Try again (UX review A1).
+ *   v1.3.0 — 2026-10-29 — TurnError takes `fixHref`: a refusal the node can name a fix for links to
+ *     the AI settings, beside Try again, in the same action link.
  *   v1.2.0 — 2026-10-02 — LiveTurn shows the node's progress line before the agent's first words, in
  *     the place and look the thought fragment had, and in the status line after them.
  *   v1.1.0 — 2026-09-24 — Try again is the underlined action link (Jouni's decision "Panel action").
@@ -169,12 +173,35 @@ function LiveStatus({ tools, hasText, progress }) {
     `;
 }
 
+/** One way on from a spent AI allowance: a link to the store or the AI settings, or the free model. */
+function choiceOf(c, onFreeModel) {
+    if (c.kind === 'buy') return html`
+        <a class="poster-action" href=${c.url} target="_blank" rel="noopener">${tr('chat.balanceBuy', 'Buy more allowance')}</a>`;
+    if (c.kind === 'own_key') return html`
+        <a class="poster-action" href=${c.url}>${tr('chat.balanceOwnKey', 'Use your own key')}</a>
+        <p class="poster-turn-choice-note">${tr('chat.balanceOwnKeyNote', 'You get a key from an AI provider such as OpenRouter, OpenAI or Anthropic. You add it in your AI settings.')}</p>`;
+    if (c.kind === 'free_model' && onFreeModel) return html`
+        <button type="button" class="poster-action" onClick=${onFreeModel}>${tr('chat.balanceFree', 'Switch to the free model')}</button>
+        <p class="poster-turn-choice-note">${tr('chat.balanceFreeNote', 'The free model answers less well than a paid one.')}</p>`;
+    return null;
+}
+
 /** A turn that could not run, with the reason and a way to try again. */
-export function TurnError({ message, onRetry }) {
+export function TurnError({ message, onRetry, fixHref, choices, onFreeModel }) {
     if (!message) return null;
+    if (choices?.length) return html`
+        <div class="poster-turn-error" role="alert">
+            <p class="poster-turn-error-msg">${message}</p>
+            <ul class="poster-turn-choices">
+                ${choices.map((c) => html`<li key=${c.kind}>${choiceOf(c, onFreeModel)}</li>`)}
+            </ul>
+        </div>
+    `;
     return html`
         <div class="poster-turn-error" role="alert">
             <p class="poster-turn-error-msg">${message}</p>
+            ${fixHref && html`
+                <a class="poster-action" href=${fixHref}>${tr('chat.openAiSettings', 'Open AI settings')}</a>`}
             ${onRetry && html`
                 <button type="button" class="poster-action" onClick=${onRetry}>
                     ${tr('chat.retry', 'Try again')}

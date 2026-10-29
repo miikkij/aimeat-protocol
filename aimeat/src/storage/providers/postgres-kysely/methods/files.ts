@@ -7,6 +7,11 @@
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,
  *   listStorageFiles omits the bytes.
  * @version-history
+ *   2026-10-29 — `blobRef` is written and read on every path (migration 0121): a row whose bytes are an
+ *     object in an S3 or Azure Blob store holds an empty `data`. createStorageFile keeps the UTF-8
+ *     verdict the caller settled for such a row, because the bytes it would measure are not here.
+ *     setStorageFileBlobRef, storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore. The record mapping
+ *     is one function (toRecord) instead of five copies.
  *   2026-10-16 — The chunked-upload methods go through the shared ChunkedUploadStore: an expired session reads
  *     as gone and is swept, which this backend never did (QA audit F05b-02).
  *   v1.0.0 — 2026-07-15 — Phase 5: storage files on Postgres+Kysely.
@@ -69,15 +74,40 @@ async function readInSlices(self: PostgresKyselyStorage, ownerGaii: string, key:
   return Buffer.concat(parts, got);
 }
 
+/** Every column except the bytes: what a metadata read, a listing and a range reply select. */
+const META_COLUMNS = ['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'blobRef', 'createdAt'] as const;
+
+interface FileRow {
+  key: string; ownerGaii: string; visibility: string; groupId: string | null; workspaceRef: string | null;
+  mimeType: string; size: number; tags: string[] | null; federate: boolean | null; utf8Verified?: boolean | null;
+  aiProvenanceId: string | null; blobRef: string | null; createdAt: Date | string;
+}
+
+/** One row shape, one record shape: `data` is passed in because only the caller knows whether it read the bytes. */
+function toRecord(r: FileRow, data: Buffer): StorageFileRecord {
+  return {
+    key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
+    groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
+    size: r.size, data, tags: r.tags || [], federate: r.federate ?? false,
+    aiProvenanceId: r.aiProvenanceId ?? undefined,
+    blobRef: r.blobRef ?? undefined,
+    utf8Verified: r.utf8Verified ?? undefined,
+    createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
+  };
+}
+
 export const fileMethods = {
   async createStorageFile(this: PostgresKyselyStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
-    const utf8Verified = utf8VerdictFor(file);
+    // A row whose bytes are an object elsewhere arrives with an empty `data` and the verdict the
+    // file-store wrapper settled from the real bytes; measuring the empty buffer would say "valid".
+    const utf8Verified = file.blobRef ? (file.utf8Verified ?? null) : utf8VerdictFor(file);
     const shared = {
       visibility: file.visibility, mimeType: file.mimeType, size: file.size, data: file.data,
       tags: file.tags || [], federate: file.federate ?? false, groupId: file.groupId ?? null,
       workspaceRef: file.workspaceRef ?? null, createdAt: new Date(file.createdAt), utf8Verified,
       // A re-upload under the same key replaces the record too: new bytes, new statement or none.
       aiProvenanceId: file.aiProvenanceId ?? null,
+      blobRef: file.blobRef ?? null,
     };
     // THE BYTES ARE BOUND ONCE. The update half names the row the insert proposed (`excluded`)
     // instead of repeating the values. Repeating them bound `data` as two parameters of one
@@ -90,7 +120,7 @@ export const fileMethods = {
         data: eb.ref('excluded.data'), tags: eb.ref('excluded.tags'), federate: eb.ref('excluded.federate'),
         groupId: eb.ref('excluded.groupId'), workspaceRef: eb.ref('excluded.workspaceRef'),
         createdAt: eb.ref('excluded.createdAt'), utf8Verified: eb.ref('excluded.utf8Verified'),
-        aiProvenanceId: eb.ref('excluded.aiProvenanceId'),
+        aiProvenanceId: eb.ref('excluded.aiProvenanceId'), blobRef: eb.ref('excluded.blobRef'),
       }))).execute();
     return { ...file, utf8Verified: utf8Verified ?? undefined };
   },
@@ -100,7 +130,7 @@ export const fileMethods = {
     // and is read in slices below; BYTEA_SLICE_BYTES says why. `octet_length` reads the length from
     // the value's header, so it does not fetch the value.
     const r = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'createdAt'])
+      .select(META_COLUMNS)
       .select(sql<number>`octet_length("data")`.as('bytes'))
       .select(sql<Buffer | null>`CASE WHEN octet_length("data") <= ${BYTEA_SLICE_BYTES} THEN "data" END`.as('data'))
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
@@ -108,29 +138,14 @@ export const fileMethods = {
     const data = r.data ? Buffer.from(r.data) : await readInSlices(this, ownerGaii, key, 0, Number(r.bytes));
     // Null only when the row was deleted between the two reads.
     if (!data) return null;
-    return {
-      key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
-      groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
-      size: r.size, data, tags: r.tags || [], federate: r.federate ?? false,
-      aiProvenanceId: r.aiProvenanceId ?? undefined,
-      utf8Verified: r.utf8Verified ?? undefined,
-      createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
-    };
+    return toRecord(r, data);
   },
 
   async getStorageFileMeta(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<StorageFileRecord | null> {
     const r = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'utf8Verified', 'aiProvenanceId', 'createdAt'])
+      .select(META_COLUMNS)
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
-    if (!r) return null;
-    return {
-      key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
-      groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
-      size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
-      aiProvenanceId: r.aiProvenanceId ?? undefined,
-      utf8Verified: r.utf8Verified ?? undefined,
-      createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
-    };
+    return r ? toRecord(r, Buffer.alloc(0)) : null;
   },
 
   async readStorageFileRange(this: PostgresKyselyStorage, ownerGaii: string, key: string, start: number, length: number): Promise<Buffer | null> {
@@ -143,15 +158,9 @@ export const fileMethods = {
 
   async listStorageFiles(this: PostgresKyselyStorage, ownerGaii: string): Promise<StorageFileRecord[]> {
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt'])
+      .select(META_COLUMNS)
       .where('ownerGaii', '=', ownerGaii).execute();
-    return rows.map(r => ({
-      key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
-      groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
-      size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
-      aiProvenanceId: r.aiProvenanceId ?? undefined,
-      createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
-    }));
+    return rows.map(r => toRecord(r, Buffer.alloc(0)));
   },
 
   async listStorageFilesForOwners(this: PostgresKyselyStorage, ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>> {
@@ -159,17 +168,9 @@ export const fileMethods = {
     for (const g of ownerGaiis) out[g] = [];
     if (ownerGaiis.length === 0) return out;
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt'])
+      .select(META_COLUMNS)
       .where('ownerGaii', 'in', ownerGaiis).execute();
-    for (const r of rows) {
-      (out[r.ownerGaii] ??= []).push({
-        key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
-        groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
-        size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
-        aiProvenanceId: r.aiProvenanceId ?? undefined,
-        createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
-      });
-    }
+    for (const r of rows) (out[r.ownerGaii] ??= []).push(toRecord(r, Buffer.alloc(0)));
     return out;
   },
 
@@ -185,20 +186,15 @@ export const fileMethods = {
     // One statement: the rows and, by a window count, how many matched. `data` is not selected, so
     // no bytea is read. The test for a font is the SQLite provider's (methods/files.ts).
     const rows = await this.db.selectFrom('StorageFile')
-      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'aiProvenanceId', 'createdAt', sql<string>`count(*) over ()`.as('total')])
+      .select(META_COLUMNS)
+      .select(sql<string>`count(*) over ()`.as('total'))
       .where('ownerGaii', '!=', opts.excludeOwner ?? '')
       .where(sql<boolean>`(lower("mimeType") like 'font/%' or lower("mimeType") like 'application/font%' or lower("mimeType") like 'application/x-font%'
         or lower("key") like '%.woff2' or lower("key") like '%.woff' or lower("key") like '%.ttf' or lower("key") like '%.otf')`)
       .orderBy('createdAt', 'desc').limit(Math.max(0, Math.floor(opts.limit))).execute();
     return {
       total: rows.length ? Number(rows[0].total) : 0,
-      items: rows.map(r => ({
-        key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
-        groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
-        size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
-        aiProvenanceId: r.aiProvenanceId ?? undefined,
-        createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
-      })),
+      items: rows.map(r => toRecord(r, Buffer.alloc(0))),
     };
   },
 
@@ -224,6 +220,41 @@ export const fileMethods = {
     const r = await this.db.updateTable('StorageFile').set({ aiProvenanceId })
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  async setStorageFileBlobRef(this: PostgresKyselyStorage, ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean> {
+    const r = await this.db.updateTable('StorageFile').set({ blobRef, data: Buffer.alloc(0) })
+      .where('ownerGaii', '=', ownerGaii).where('key', '=', key)
+      .where('blobRef', 'is', null).where('size', '=', size).executeTakeFirst();
+    return Number(r.numUpdatedRows ?? 0) > 0;
+  },
+
+  async storageFileBlobRefsIn(this: PostgresKyselyStorage, refs: string[]): Promise<string[]> {
+    if (refs.length === 0) return [];
+    const rows = await this.db.selectFrom('StorageFile').select('blobRef').where('blobRef', 'in', refs).execute();
+    return rows.map(r => r.blobRef).filter((x): x is string => !!x);
+  },
+
+  async listStorageFilesInDatabase(this: PostgresKyselyStorage, opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
+    if (opts.owners && opts.owners.length === 0) return [];
+    let q = this.db.selectFrom('StorageFile').select(META_COLUMNS).where('blobRef', 'is', null);
+    if (opts.owners) q = q.where('ownerGaii', 'in', opts.owners);
+    if (opts.after) {
+      const a = opts.after;
+      q = q.where(eb => eb.or([eb('ownerGaii', '>', a.ownerGaii), eb.and([eb('ownerGaii', '=', a.ownerGaii), eb('key', '>', a.key)])]));
+    }
+    const rows = await q.orderBy('ownerGaii').orderBy('key').limit(Math.max(1, Math.floor(opts.limit))).execute();
+    return rows.map(r => toRecord(r, Buffer.alloc(0)));
+  },
+
+  async countStorageFilesByStore(this: PostgresKyselyStorage): Promise<{ store: string; count: number; bytes: number }[]> {
+    const rows = await this.db.selectFrom('StorageFile')
+      .select([
+        sql<string>`coalesce(split_part("blobRef", '|', 1), 'database')`.as('store'),
+        sql<number>`count(*)`.as('count'), sql<number>`coalesce(sum(size), 0)`.as('bytes'),
+      ])
+      .groupBy(sql`coalesce(split_part("blobRef", '|', 1), 'database')`).execute();
+    return rows.map(r => ({ store: r.store, count: Number(r.count), bytes: Number(r.bytes) }));
   },
 
   // ── Chunked uploads (transient, in-memory — matches the other backends) ──

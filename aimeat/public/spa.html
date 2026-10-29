@@ -325,6 +325,8 @@
   <link rel="stylesheet" href="/css/components/field.css">
   <link rel="stylesheet" href="/css/components/text-field.css">
   <link rel="stylesheet" href="/css/components/choice.css">
+  <link rel="stylesheet" href="/css/components/layout-sketch.css">
+  <link rel="stylesheet" href="/css/components/look-sample.css">
   <link rel="stylesheet" href="/css/components/key-name.css">
   <link rel="stylesheet" href="/css/components/job-prompt.css">
   <link rel="stylesheet" href="/css/components/sub-heading.css">
@@ -573,6 +575,7 @@
       "/js/services/audio-recorder.js": "/js/services/audio-recorder.js",
       "/js/services/ecosystem.js": "/js/services/ecosystem.js",
       "/js/services/internet-opening.js": "/js/services/internet-opening.js",
+      "/js/services/file-store.js": "/js/services/file-store.js",
       "/js/services/apps.js": "/js/services/apps.js",
       "/js/services/auth.js": "/js/services/auth.js",
       "/js/use-session.js": "/js/use-session.js",
@@ -634,6 +637,8 @@
       "/components/Select.js": "/components/Select.js",
       "/components/Check.js": "/components/Check.js",
       "/components/Choice.js": "/components/Choice.js",
+      "/components/LayoutSketch.js": "/components/LayoutSketch.js",
+      "/components/LookSample.js": "/components/LookSample.js",
       "/components/TagInput.js": "/components/TagInput.js",
       "/components/ModelPicker.js": "/components/ModelPicker.js",
       "/components/FileDrop.js": "/components/FileDrop.js",
@@ -975,6 +980,11 @@
       "/views/appcat/rows.js": "/views/appcat/rows.js",
       "/views/appcat/lists.js": "/views/appcat/lists.js",
       "/views/appcat/detail.js": "/views/appcat/detail.js",
+      "/views/appcat/structure.js": "/views/appcat/structure.js",
+      "/views/appcat/structure-data.js": "/views/appcat/structure-data.js",
+      "/views/appcat/structure-pick.js": "/views/appcat/structure-pick.js",
+      "/views/appcat/started.js": "/views/appcat/started.js",
+      "/views/appcat/sections/structure.js": "/views/appcat/sections/structure.js",
       "/views/appcat/viewer.js": "/views/appcat/viewer.js",
       "/views/appcat/dialogs/app-io.js": "/views/appcat/dialogs/app-io.js",
       "/views/appcat/detail-state.js": "/views/appcat/detail-state.js",
@@ -1068,7 +1078,7 @@
     // trip in front of every date on the screen.
     import { loadDisplayPrefs } from '/js/display-prefs.js';
     import { initThemeSystem, setTheme } from '/js/theme.js';
-    import { siteLink, signInFirst, signedInOnly } from '/js/site.js';
+    import { siteLink, signInFirst, signedInOnly, customerNode } from '/js/site.js';
     import { getSession } from '/js/services/auth.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
@@ -1193,6 +1203,9 @@
       // appcat: the app catalogue on the component library, beside the old /app-catalog.html
       // (Jouni, 2026-09-27). A spaRoute in routes/portal.ts too.
       '/v1/appcat':      () => import('/views/appcat.js' + B),
+      // One app's structure and status, from the first moment of building (2026-10-29). A spaRoute
+      // in routes/portal.ts too.
+      '/v1/appcat/structure': () => import('/views/appcat/structure.js' + B),
       '/v1/help':       () => import('/views/help.js' + B),
       '/v1/publicknowledgeviewer': () => import('/views/public-knowledge-viewer.js' + B),
       '/v1/publicworkspaceviewer': () => import('/views/public-workspace-viewer.js' + B),
@@ -1694,7 +1707,8 @@
             <a href=${brandPath} class="topnav-brand" onClick=${(e) => handleNav(e, brandPath)}>
               AIME<span class="heart">\u2665</span><span class="brand-at">AT</span>
             </a>
-            ${morsels !== null && html`<span class="brand-morsels" style="display:inline-flex">${morsels}</span>`}
+            ${/* A bare number by the logo says nothing to a buyer who never met the pacer (UX review 2026-10-29). */''}
+            ${morsels !== null && !customerNode() && html`<span class="brand-morsels" style="display:inline-flex">${morsels}</span>`}
           </div>
 
           <div class="topnav-right">
@@ -1742,7 +1756,9 @@
                   onClick=${(e) => { handleNav(e, '/v1/appcat'); setMenuOpen(false); }}>${t('nav.apps') || 'Apps'}</a>
                 <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}"
                   onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>${t('nav.profile')}</a>
-                ${session.roles && session.roles.includes('operator') && html`
+                ${/* On a customer's node the maintenance is in Settings, behind "Show all tools"
+                      (Jouni, 2026-10-29): the buyer is its operator, and the top bar is theirs. */''}
+                ${session.roles && session.roles.includes('operator') && !customerNode() && html`
                   <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}"
                     onClick=${(e) => { handleNav(e, '/v1/admin'); setMenuOpen(false); }}>${t('nav.admin')}</a>
                 `}

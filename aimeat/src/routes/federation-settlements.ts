@@ -12,7 +12,7 @@
  *
  * @version-history
  *   2026-10-29 — The ledger row is written before the credit, in one transaction with it, and the
- *     database holds one federation_settlement row per identity and tracking code (migration 0121): a
+ *     database holds one federation_settlement row per identity and tracking code (migration 0122): a
  *     copy taken by another node process at the same moment answers 409 CONFLICT and credits nothing.
  *     An identity this node does not have answers 404 as before and leaves no row (secaudit2026oct26
  *     round 8c, federation-01).
@@ -218,7 +218,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
         }
 
         // Record the settlement, then credit, in one transaction. The ledger row goes first: the
-        // database holds one federation_settlement row per identity and tracking code (Postgres 0121,
+        // database holds one federation_settlement row per identity and tracking code (Postgres 0122,
         // SQLite schema-settlement-once.ts), so a copy another node process took at the same moment
         // fails here and credits nothing. An identity this node does not have rolls the row back.
         try {

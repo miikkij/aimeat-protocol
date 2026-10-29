@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The database holds one federation_settlement ledger row per identity and tracking code,
  *   on both providers, so two node processes over one database cannot both record (and credit) one
- *   signed settlement (secaudit2026oct26 round 8c, federation-01; Postgres migration 0121, SQLite
+ *   signed settlement (secaudit2026oct26 round 8c, federation-01; Postgres migration 0122, SQLite
  *   schema-settlement-once.ts). Every other ledger row is as before: the same tracking code under
  *   another type or another identity is taken. On SQLite, rows that already repeat a key are left as
  *   they are, and the index still refuses a new copy.

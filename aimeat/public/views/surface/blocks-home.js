@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-29: NameplateBlock leaves out the full identity on a customer's node: it carries the
+ *     node's id, which a buyer never needs to read (UX review 2026-10-29, C).
  *   2026-10-25: YourTurnBlock passes each thread's last message time and the person's window
  *     (home.prefs.turnDays), and writes the window when it is changed.
  *   2026-10-10: AgentsBlock, the band where a person makes an agent from one sentence and sees the
@@ -61,7 +63,7 @@ import { InstallCta } from '/components/InstallCta.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
-import { storeHref, storeOpensSoon, storeSoonCode } from '/js/site.js';
+import { storeHref, storeOpensSoon, storeSoonCode, customerNode } from '/js/site.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
 
@@ -79,7 +81,7 @@ export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, an
   return html`<${HomeHeader}
     name=${state.displayName}
     owner=${state.owner}
-    identity=${identityOf(ctx?.session) ?? state.ghii}
+    identity=${customerNode() ? '' : identityOf(ctx?.session) ?? state.ghii}
     onOpenSettings=${ctx?.openSettings} />`;
 }
 

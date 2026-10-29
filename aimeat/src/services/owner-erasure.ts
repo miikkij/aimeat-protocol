@@ -23,6 +23,7 @@
  * @structure eraseOwner(storage, nodeId, name) → { agentsDeleted, deletionLog }
  * @usage const { deletionLog } = await eraseOwner(storage, config.nodeId, name);
  * @version-history
+ *   2026-10-29 — The app_builder_records step erases the app plans too (services/app-plan.ts).
  *   2026-10-27 — The app_builder_records step erases the design specs and roadmaps of the person's apps,
  *     keyed by the reusable app id (secaudit2026oct26, app-builder-records-keyed-by-reusable-name-survive).
  *   2026-10-27 — Step name_bound_grants: the operator's beneficiary approval of the person, the accountant
@@ -85,6 +86,7 @@ import { purgeClassificationAudit, flushClassificationAudit } from './classifica
 import { purgeExceptions } from './classification/exceptions.js';
 import { eraseAppMembership } from './app-member-erasure.js';
 import { eraseAppDesignSpecsOf } from './app-design-spec.js';
+import { eraseAppPlansOf } from './app-plan.js';
 import { eraseAppRoadmapsOf } from './app-roadmap.js';
 import { revokeEntitlementsOfAccount } from './entitlement-erasure.js';
 import { uninstallExtension } from './extension-lifecycle.js';
@@ -376,7 +378,8 @@ export async function eraseOwner(storage: Storage, nodeId: string, name: string)
     // app id `<name>/<filename>`, which the cascade never sees and the next holder of the name reuses
     // (secaudit2026oct26, owner-erasure:app-builder-records-keyed-by-reusable-name-survive).
     await step('app_builder_records', async () => {
-      const n = await eraseAppDesignSpecsOf(storage, name) + await eraseAppRoadmapsOf(storage, name);
+      const n = await eraseAppDesignSpecsOf(storage, name) + await eraseAppRoadmapsOf(storage, name)
+        + await eraseAppPlansOf(storage, name);
       return n ? `app_builder_records:${n}` : null;
     }, deletionLog, storage);
 

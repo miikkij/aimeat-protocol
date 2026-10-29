@@ -6,6 +6,9 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.15.0 — 2026-10-29 — The page "File storage" (file-stores) after Database: where stored files
+ *     keep their bytes, moving older files out of the database, and people's own storage
+ *     (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.14.0 — 2026-10-25 — The page "Open to the internet" (internet-openings) after Security: the apps
  *     a closed node opens to everyone, and the requests waiting for an operator.
  *   v1.13.1 — 2026-10-24 — The live stream reaches the tabs: each change is relayed as the window
@@ -65,6 +68,7 @@ import PortalTab       from './admin/portal-tab.js';
 import DiscoveryTab    from './admin/discovery-tab.js';
 import StatsTab        from './admin/stats-tab.js';
 import DatabaseTab     from './admin/database-tab.js';
+import FileStoresTab   from './admin/file-stores-tab.js';
 import MetricsTab      from './admin/metrics-tab.js';
 import UsageTab        from './admin/usage-tab.js';
 import OwnersTab       from './admin/owners-tab.js';
@@ -124,6 +128,7 @@ const NAV_GROUPS = [
     { id: 'subdomains',   key: 'admin.subdomains.title', component: SubdomainsAdminTab },
     { id: 'stats',        key: 'dashboard.stats',      component: StatsTab },
     { id: 'database',     key: 'dashboard.database',   component: DatabaseTab },
+    { id: 'file-stores',  key: 'admin.fileStores.title', component: FileStoresTab },
     { id: 'metrics',      key: 'dashboard.metrics',    component: MetricsTab },
     { id: 'usage',        key: 'dashboard.usage',      component: UsageTab },
     { id: 'prompts',      key: 'dashboard.promptsTab', component: PromptsTab },

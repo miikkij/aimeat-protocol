@@ -1,4 +1,4 @@
--- 0121_settlement_once.sql
+-- 0122_settlement_once.sql
 --
 -- One federation settlement is recorded once (secaudit2026oct26 round 8c, federation-01,
 -- settle:duplicate-check-not-atomic-with-credit).
@@ -31,7 +31,7 @@ BEGIN
   IF repeated IS NULL THEN
     EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS "Transaction_settlement_once_key" ON "Transaction" ("gaii", "trackingCode") WHERE "type" = ''federation_settlement''';
   ELSE
-    RAISE WARNING '0121_settlement_once: federation settlement rows that repeat a tracking code are kept out of the new unique index: %', repeated;
+    RAISE WARNING '0122_settlement_once: federation settlement rows that repeat a tracking code are kept out of the new unique index: %', repeated;
     EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS "Transaction_settlement_once_key" ON "Transaction" ("gaii", "trackingCode") WHERE "type" = ''federation_settlement'' AND "id" NOT IN (' || repeated || ')';
   END IF;
 END $$;

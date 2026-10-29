@@ -12,6 +12,8 @@
  * @structure readProgramMap · stateProgramMap · putProgramMap · handsOnKey · splitAppRef
  * @usage import { readProgramMap } from './data-map-access.js';
  * @version-history
+ *   2026-10-29 — The AI Act questions answer `asked` too: the ones the maker's answers so far make the
+ *     node ask (askedWhen), and `unanswered` is of those.
  *   2026-10-28 — The map carries the maker's optional `aiAct` answers through a write (readAiAct), and
  *     readProgramMap answers an app that uses AI with the node's EU AI Act questions and which of
  *     them the map leaves unanswered, so the maker's AI reads the questions where it writes the answers.
@@ -41,7 +43,7 @@ import { readAppDataMap, writeAppDataMap } from './data-map-store.js';
 import { checkMap, stampFor, type MapCheck } from './data-map-check.js';
 import { DATA_MAP_SPEC, type AiActStatement, type DataMap, type DataMapStamp, type InvitesStatement } from './data-map-types.js';
 import { appAiSignals } from '../compliance-app-signals.js';
-import { effectiveQuestionnaire, type ComplianceQuestion } from '../compliance-register.js';
+import { askedQuestions, effectiveQuestionnaire, type ComplianceQuestion } from '../compliance-register.js';
 import { builtInQuestionIds } from '../../data/compliance-questionnaire.js';
 import { parseAppScopes } from '../protected-resource.js';
 import type { CallerContext } from '../caller-context.js';
@@ -76,7 +78,7 @@ export interface ProgramMapResult {
    * (a page shows those in its reader's language), and which the map's `aiAct` has not answered.
    * The maker answers them in the map. Read only; absent for an app that does not use AI.
    */
-  aiAct?: { questions: Array<Omit<ComplianceQuestion, 'implies'>>; builtIn: string[]; unanswered: string[] };
+  aiAct?: { questions: Array<Omit<ComplianceQuestion, 'implies'>>; builtIn: string[]; asked: string[]; unanswered: string[] };
 }
 
 /** Who is asking, in the terms every door already resolves. */
@@ -184,10 +186,15 @@ async function aiActQuestions(
   if (!appAiSignals(map, record.manifest?.aiPosture).usesAi) return null;
   const set = await effectiveQuestionnaire(storage, config.nodeId);
   const answered = map?.aiAct?.answers ?? {};
+  // Only what the maker's answers so far make it ask (askedWhen): outside an Annex III area the area
+  // and the two transparency questions, not twelve (Jouni, 2026-10-29).
+  const state = askedQuestions(set, answered);
+  const asked = set.questions.filter(q => state.get(q.id) === 'asked').map(q => q.id);
   return {
     questions: set.questions.map(({ implies: _implies, ...q }) => q),
     builtIn: builtInQuestionIds(set),
-    unanswered: set.questions.filter(q => !(q.id in answered)).map(q => q.id),
+    asked,
+    unanswered: asked.filter(id => !(id in answered)),
   };
 }
 

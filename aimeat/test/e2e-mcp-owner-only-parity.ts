@@ -30,6 +30,8 @@
  *   - Phase 5: payout status and the payment secret · Phase 6: the AI budget · Phase 7: scope narrowing
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-owner-only-parity
  * @version-history
+ *   v1.1.1 — 2026-10-29 — 7b reads the refusal's code, SCOPE_ADDITION_REFUSED, and the word it names:
+ *     the sentence changed when agent:permissions-add arrived; the refusal did not.
  *   v1.1.0 — 2026-10-17 — 2c, 3b, 3e, 5b: the bare agent is missing only a one-press word, so the
  *     tool stays listed (permission ask, mcp/permission-ask-gate.ts) and the node MCP refusal is
  *     SCOPE_DENIED with the allow address instead of "not offered"; REST still answers 403.
@@ -386,7 +388,7 @@ await test('7a. agent configure: the agent holding agent:permissions and agent:w
 
 await test('7b. agent configure: widening is refused on both surfaces, an agent without the words is refused, and the owner may widen', async () => {
     const mcp = await callTool(workerMcp, 'aimeat_operator_agent_configure', { agent_name: sibling.name, scopes: ['memory:read', 'task:write'] });
-    assert(mcp.isError && /Scope additions are not allowed/.test(mcp.text), `node MCP widening: ${mcp.text.slice(0, 300)}`);
+    assert(mcp.isError && /^SCOPE_ADDITION_REFUSED: /.test(mcp.text) && mcp.text.includes('task:write'), `node MCP widening: ${mcp.text.slice(0, 300)}`);
     const viaRest = await rest('PATCH', `/v1/agents/${encodeURIComponent(sibling.name)}/scopes`, worker.token, { scopes: ['memory:read', 'task:write'] });
     assert(viaRest.status === 403 && viaRest.body.error?.code === 'SCOPE_ADDITION_REFUSED', `REST widening: ${viaRest.status} ${short(viaRest.body.error)}`);
     const mcpBare = await callTool(bareMcp, 'aimeat_operator_agent_configure', { agent_name: sibling.name, scopes: ['memory:read'] });

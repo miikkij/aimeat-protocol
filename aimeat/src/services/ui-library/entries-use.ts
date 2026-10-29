@@ -10,6 +10,7 @@
  * @structure USE_OF — { [entryId]: UiUse[] }
  * @usage import { USE_OF } from './entries-use.js';
  * @version-history
+ *   v1.79.0 — 2026-10-29 — LayoutSketch and LookSample: view, pick.
  *   v1.78.0 — 2026-10-19 — AgentAvatar: view, list.
  *   v1.77.0 — 2026-10-18 — ClassificationBadge: status, explain.
  *   v1.76.0 — 2026-10-18 — AudienceBadge: status, explain.
@@ -176,6 +177,7 @@ export const USE_OF: Record<string, UiUse[]> = {
     roads: ['pick', 'act', 'copy'], figure: ['count', 'status'],
     // FIELDS (Field, TextField, Choice)
     field: ['edit', 'layout'], 'text-field': ['edit', 'search'], choice: ['pick', 'edit'],
+    'layout-sketch': ['view', 'pick'], 'look-sample': ['view', 'pick'],
     // PAGE KIT (SettingsPage, Section, Folds, Tabs, Layout, ContentsTree)
     'settings-page': ['layout', 'navigate'], 'section-component': ['layout', 'open'], folds: ['list', 'open'],
     'tab-row': ['pick', 'navigate'], layout: ['layout'], 'contents-tree': ['navigate', 'count'],

@@ -5,6 +5,8 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   2026-10-29 — 34 and 34b read the refusal's code, SCOPE_ADDITION_REFUSED, and the word it names: the
+ *     sentence changed when agent:permissions-add arrived; the refusal did not.
  *   2026-10-26 — Agent Skills standard (wish-agent-skills-standardin-t-ysi-tuki-skill-rekisteriss): test 6
  *     asserted that a file outside scripts/, references/ and assets/ is refused, which was the contract
  *     until Jouni ruled the registry follows the standard (any file in the folder), so it now asserts
@@ -1268,7 +1270,7 @@ await test('34. scope WIDENING is refused at propose time: a narrow sibling aske
     }, 116);
     const text = body?.result?.content?.[0]?.text ?? '';
     assert(body?.result?.isError === true, `a widening must be refused, got: ${text.slice(0, 150)}`);
-    assert(text.includes('Scope additions are not allowed') && text.includes('memory:write'), `refusal names the added word: ${text.slice(0, 150)}`);
+    assert(text.startsWith('SCOPE_ADDITION_REFUSED: ') && text.includes('memory:write'), `refusal names the added word: ${text.slice(0, 150)}`);
 
     const after = await mcpRpc('tools/call', { name: 'aimeat_operator_agent_configure', arguments: { agent_name: narrowAgentName } }, 1160);
     const scopes = toolText(after.body).current?.scopes;
@@ -1283,7 +1285,7 @@ await test('34b. a \'*\' agent asked for a word no wildcard carries is refused t
         arguments: { agent_name: agentName, scopes: ['*', 'agent:permissions', 'memory:write-reserved', 'memory:write-as-owner', 'commerce:psp'] },
     }, 117);
     const text = body?.result?.content?.[0]?.text ?? '';
-    assert(body?.result?.isError === true && text.includes('Scope additions are not allowed') && text.includes('commerce:psp'),
+    assert(body?.result?.isError === true && text.startsWith('SCOPE_ADDITION_REFUSED: ') && text.includes('commerce:psp'),
         `a '*' target must still be refused a word '*' does not carry, got: ${text.slice(0, 150)}`);
 });
 

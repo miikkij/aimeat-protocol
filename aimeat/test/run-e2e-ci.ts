@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-29 -- e2e-app-structure.ts joins the list (not the guard tier): the app's structure and plan from the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+ *   2026-10-29 -- e2e-agent-scope-add.ts joins the list (not the guard tier): agent:permissions-add (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-28 -- The round-8 suites' fixed ports follow main's move to 28000-29999 (down 12000).
  *   2026-10-27 -- e2e-federation-peer-bounds.ts joins the list (not the guard tier): one signed settlement credits once, an unknown identity is asked of the peers once, a deactivated account is not acted for, an invite replaces a held peer only when it names it, introductions are stored bounded, no peer under the node's own id, and a replica's life is this node's clock, in port blocks 30300 and 30400 (secaudit2026oct26).
  *   2026-10-27 -- e2e-admin-restore-trail.ts joins the list (not the guard tier): POST /v1/admin/restore writes the operator trail and bounds the clearance an operator's agent restores (secaudit2026oct26).
@@ -37,6 +39,7 @@
  *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 28991 (secaudit2026oct22).
  *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 28458 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
+ *   2026-10-29 -- e2e-file-store.ts joins the list (not the guard tier): stored files in an S3 store, the node's and a person's own.
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
  *   2026-10-24 -- e2e-cortex-board-ownership.ts joins the list (not the guard tier): a cortex activation answers 409 for a board id another account holds, and a deactivation deletes only the installing account's boards (secaudit2026oct22).
@@ -566,6 +569,9 @@ const ALL_SUITES = [
     'test/e2e-content-access-browser.ts',
     // Self-spawns its own signed-in-only node: one app and its forms opened to the internet, watched.
     'test/e2e-app-internet-opening.ts',
+    // Self-spawns its own node (block 30500) with its file bytes in an S3 store inside the test
+    // process (block 30900): the node's store, a person's own, the approval rule and the sweep.
+    'test/e2e-file-store.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.
@@ -595,6 +601,7 @@ const ALL_SUITES = [
     'test/e2e-app-dev-grant.ts',
     'test/e2e-app-roadmap.ts',
     'test/e2e-app-design-spec.ts',
+    'test/e2e-app-structure.ts',
     'test/e2e-app-silent.ts',
     // Self-spawns with the app origin OFF on a fresh database: one owner first, then a second, which
     // is the moment every app moves into the isolated frame (audit A7-1).
@@ -1043,6 +1050,9 @@ const ALL_SUITES = [
     'test/e2e-classification-containers.ts',
     // An agent's clearance: what ranks above it is hidden on every read, and who may set it (plan doc-mvdipuyqraas, L2).
     'test/e2e-classification-clearance.ts',
+    // agent:permissions-add: an agent adds the permissions it holds to another of the owner's agents,
+    // and the owner reads each addition on the feed and in the bell (services/agent-scope-add.ts).
+    'test/e2e-agent-scope-add.ts',
     // An agent's own picture at agent.avatar: the list and profile field, the picture address, what is
     // refused, who may set it, the onboarding step and the Design Book templates.
     'test/e2e-agent-avatar.ts',

@@ -7,6 +7,7 @@
  * @structure FIELD_DEMOS — { [id]: { variants: [{ name, render() }] } }
  * @usage import { FIELD_DEMOS } from './demos-fields.js';
  * @version-history
+ *   v1.4.0 — 2026-10-29 — Choice boxed with a picture, and the demos of layout-sketch and look-sample.
  *   v1.3.0 — 2026-09-27 — The options appcat added: Fields plain, beside, chapter, ruled, spaced, column
  *     and narrow; TextField size glyph and mark; TextArea prompt, page, source and script; Select line;
  *     FileDrop ink, mark, browseLabel and chosen; Check pill, ruled and strong (the catalogue pass).
@@ -22,6 +23,8 @@ import { SettingsRoot } from '/components/SettingsFrame.js';
 import { Field, Fields, FormActions } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Choice } from '/components/Choice.js';
+import { LayoutSketch } from '/components/LayoutSketch.js';
+import { LookSample } from '/components/LookSample.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
 import { TagInput } from '/components/TagInput.js';
@@ -38,6 +41,9 @@ const root = (children) => html`<${SettingsRoot}>${children}<//>`;
 
 const LONG_HINT = 'Shown to everyone you invite to Harbour Studio, and to the agents that act for them, so a name that says what the studio does helps them find it again.';
 const LIFETIMES = [['72', '3 days'], ['168', '7 days'], ['720', '30 days'], ['never', 'Never']];
+const SKETCH_DASHBOARD = [{ height: 's', cells: [{ w: 'full', tone: 'ink' }] }, { height: 'm', cells: [{ w: 'side', label: 'numbers' }, { w: 'side', label: 'numbers' }] },
+  { height: 'l', cells: [{ w: 'main', label: 'list' }, { w: 'side', label: 'history' }] }];
+const SKETCH_BROWSE = [{ height: 's', cells: [{ w: 'full', label: 'search' }] }, { height: 'l', cells: [{ w: 'side', label: 'filters' }, { w: 'main', label: 'cards' }] }];
 const SHAPES = [
   { value: 'assistant', label: 'Assistant', hint: 'Answers when you ask, in your chat.' },
   { value: 'worker', label: 'Worker', hint: 'Takes tasks from a queue and reports back.' },
@@ -191,6 +197,10 @@ export const FIELD_DEMOS = {
     { name: 'boxed, two columns', render: () => root(html`<${Choice} boxed cols=${2} ariaLabel="Template" value=${null} options=${SHAPES.slice(0, 2)} onChange=${noop} />`) },
     { name: 'boxed with a dot', render: () => root(html`<${Choice} boxed dot cols=${3} name="dl-choice-dot" label="Runs" value="3" options=${[
       { value: '1', label: 'Once', hint: 'A quick look.' }, { value: '3', label: 'Three times', hint: 'Enough to see a spread.' }, { value: '5', label: 'Five times', hint: 'Slower, steadier.' }]} onChange=${noop} />`) },
+    { name: 'boxed with a picture', render: () => root(html`<${Choice} boxed cols=${3} ariaLabel="Main view" value="dashboard" options=${[
+      { value: 'dashboard', label: 'Dashboard', hint: 'Numbers at the top, the details under them.', pic: html`<${LayoutSketch} label="Dashboard" rows=${SKETCH_DASHBOARD} />` },
+      { value: 'browse', label: 'Browse', hint: 'A search over cards, the filters beside it.', pic: html`<${LayoutSketch} label="Browse" rows=${SKETCH_BROWSE} />` },
+      { value: 'editorial', label: 'editorial', hint: 'A magazine look.', pic: html`<${LookSample} look="editorial" title="Talkoolista" label="editorial" />` }]} onChange=${noop} />`) },
     { name: 'invalid, with a message', render: () => root(html`<${Choice} label="Lifetime" value="" options=${LIFETIMES} message="Pick how long the key lives." error onChange=${noop} />`) },
     { name: 'disabled', render: () => root(html`<${Choice} label="Lifetime" value="168" disabled options=${LIFETIMES} onChange=${noop} />`) },
     { name: 'long', render: () => root(html`<${Choice} label="When an agent asks to write to shared memory" hint=${LONG_HINT} value="ask"
@@ -295,5 +305,14 @@ export const FIELD_DEMOS = {
       actions=${html`<${Action} small onClick=${noop}>Install<//>`} />`) },
     { name: 'long', render: () => root(html`<${TextField} box ariaLabel="Base address" value="https://llm.harbour-studio.example/v1/openai-compatible/chat/completions" onInput=${noop}
       actions=${html`<${Action} small onClick=${noop}>Save the address<//>`} />`) },
+  ] },
+  'layout-sketch': { variants: [
+    { name: 'a layout', render: () => root(html`<${LayoutSketch} label="Dashboard" rows=${SKETCH_DASHBOARD} />`) },
+    { name: 'a way of moving', render: () => root(html`<${LayoutSketch} label="Bottom bar" rows=${[{ height: 'l', cells: [{ w: 'full' }] }, { height: 's', cells: [{ w: 'side', tone: 'ink' }, { w: 'side' }, { w: 'side' }, { w: 'side' }] }]} />`) },
+    { name: 'ink and sun', render: () => root(html`<${LayoutSketch} label="Work queue" rows=${[{ height: 'm', cells: [{ w: 'side', label: 'today' }, { w: 'side', label: 'open' }] }, { height: 'l', cells: [{ w: 'main', label: 'queue', tone: 'sun' }, { w: 'side', label: 'history' }] }]} />`) },
+  ] },
+  'look-sample': { variants: [
+    { name: 'light', render: () => root(html`<${LookSample} look="editorial" title="Talkoolista" theme="light" label="editorial" />`) },
+    { name: 'dark', render: () => root(html`<${LookSample} look="terminal" title="Talkoolista" theme="dark" label="terminal" />`) },
   ] },
 };

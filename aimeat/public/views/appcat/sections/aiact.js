@@ -19,6 +19,8 @@
  * @structure meta · questionWords(q, builtIn) · AiActSection({ d })
  * @usage const mod = await import('./sections/aiact.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   v1.1.0 — 2026-10-29 — Only the questions the answers so far make the node ask (`askedWhen`);
+ *     outside an Annex III area that is the area and the two transparency questions.
  *   v1.0.0 — 2026-10-28 — Initial.
  */
 import { h } from 'preact';
@@ -36,6 +38,7 @@ import { Action, Actions } from '/components/Action.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Space } from '/components/Layout.js';
 import { SubHeading } from '/components/SubHeading.js';
+import { askedQuestions } from '../../admin/compliance-tab.gaps.js';
 
 const html = htm.bind(h);
 const A = (key, vars) => t('appcat.aiAct.' + key, vars);
@@ -92,8 +95,12 @@ export default function AiActSection({ d }) {
   if (!state.aiAct) return html`<${Note} kind="quiet">${A('notAi')}<//>`;
   const ref = `${d.owner}/${d.filename}`;
   const builtIn = new Set(state.aiAct.built_in || []);
-  const questions = state.aiAct.questions || [];
-  const open = questions.filter((q) => answers[q.id] === undefined).length;
+  const all = state.aiAct.questions || [];
+  // Only what the answers so far make the node ask (askedWhen): an area of "none of these" leaves the
+  // area and the two transparency questions, and naming an area brings the rest back as it is picked.
+  const asked = askedQuestions(all, answers);
+  const questions = all.filter((q) => asked.get(q.id) === 'asked' || answers[q.id] !== undefined);
+  const open = questions.filter((q) => asked.get(q.id) === 'asked' && answers[q.id] === undefined).length;
 
   const save = async () => {
     setBusy(true);

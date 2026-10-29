@@ -36,6 +36,8 @@
  * @structure Detail({ app, onClose }) · SECTION_IDS
  * @usage html`<${Detail} app=${cat.detail} onClose=${closeDetail} />`
  * @version-history
+ *   v1.8.0 — 2026-10-29 — The section "Structure" after About (sections/structure.js): how many of the
+ *     app's steps are done and the way to its structure page.
  *   v1.7.0 — 2026-10-28 — The section "EU AI Act questions" after the AI labels (sections/aiact.js),
  *     where the owner of an app that uses AI answers the node's questions with a reason each.
  *   v1.6.0 — 2026-10-25 — The section "Open to the internet" after Manage (sections/internet.js), on a
@@ -96,6 +98,7 @@ const SECTION_LOADERS = {
   ai: () => import('/views/appcat/sections/ai.js'),
   about: () => import('/views/appcat/sections/about.js'),
   spec: () => import('/views/appcat/sections/spec.js'),
+  structure: () => import('/views/appcat/sections/structure.js'),
   datamap: () => import('/views/appcat/sections/datamap.js'),
   needs: () => import('/views/appcat/sections/needs.js'),
   history: () => import('/views/appcat/sections/history.js'),

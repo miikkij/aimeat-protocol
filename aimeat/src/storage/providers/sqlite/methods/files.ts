@@ -8,6 +8,9 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   2026-10-29 — `blobRef` written and read on every path (Postgres 0121), the caller's UTF-8 verdict
+ *     kept for a row whose bytes are an object elsewhere, and setStorageFileBlobRef,
+ *     storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   2026-10-16 — The chunked-upload methods go through the shared ChunkedUploadStore (QA audit F05b-02).
  *   v1.1.0 — 2026-10-08 — aiProvenanceId is written, read on every path, and set alone by
  *     setStorageFileProvenance (AI provenance for stored files; Postgres 0096).
@@ -41,12 +44,13 @@ function fileRowToRecord(r: Record<string, unknown>, data: Buffer): StorageFileR
   // rather than collapsing into false, which would claim we had checked.
   if (r.utf8Verified !== null && r.utf8Verified !== undefined) record.utf8Verified = r.utf8Verified === 1;
   if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId as string;
+  if (r.blobRef) record.blobRef = r.blobRef as string;
   return record;
 }
 
 /** Everything except the bytes — the columns a metadata read, a listing and a range reply all need. */
 const META_COLUMNS =
-  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, aiProvenanceId, createdAt';
+  'key, ownerGaii, visibility, mimeType, size, tags, groupId, workspaceRef, federate, utf8Verified, aiProvenanceId, blobRef, createdAt';
 
 /** What a font file is, by its name or by its type. The same test on Postgres (methods/files.ts). */
 const FONT_FILE_WHERE =
@@ -85,7 +89,9 @@ export const fileMethods = {
   async createStorageFile(this: SqliteStorage, file: StorageFileRecord): Promise<StorageFileRecord> {
     // Settled here, in the provider, because it is the one door every write goes through: sixteen
     // call sites create files and not one of them should have to know this rule exists.
-    const utf8Verified = utf8VerdictFor(file);
+    // A row whose bytes are an object elsewhere keeps the verdict the file-store wrapper settled from
+    // the real bytes; the empty `data` it arrives with would measure as valid.
+    const utf8Verified = file.blobRef ? (file.utf8Verified ?? null) : utf8VerdictFor(file);
     this.db.prepare(
       // The `accessCode` column stays in the table and is written by nobody. It was on
       // StorageFileRecord, stored here and absent from Postgres entirely, and no route on either
@@ -93,8 +99,8 @@ export const fileMethods = {
       // which have their own field and their own doors. Removed from the record on 2026-09-06
       // (review item 5.7) rather than mirrored into Postgres: a field nothing keeps is the same
       // false promise that hid the two real ones beside it, and the column is always NULL.
-      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified, aiProvenanceId)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT OR REPLACE INTO storage_files (ownerGaii, key, visibility, groupId, workspaceRef, mimeType, size, data, tags, createdAt, federate, utf8Verified, aiProvenanceId, blobRef)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       file.ownerGaii, file.key, file.visibility, file.groupId ?? null, file.workspaceRef ?? null,
       file.mimeType, file.size, file.data,
@@ -102,6 +108,7 @@ export const fileMethods = {
       file.federate ? 1 : 0,
       utf8Verified === null ? null : (utf8Verified ? 1 : 0),
       file.aiProvenanceId ?? null,
+      file.blobRef ?? null,
     );
     return { ...file, utf8Verified: utf8Verified ?? undefined };
   },
@@ -199,5 +206,47 @@ export const fileMethods = {
       'UPDATE storage_files SET aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?',
     ).run(aiProvenanceId, ownerGaii, key);
     return result.changes > 0;
+  },
+
+  async setStorageFileBlobRef(this: SqliteStorage, ownerGaii: string, key: string, blobRef: string, size: number): Promise<boolean> {
+    const result = this.db.prepare(
+      "UPDATE storage_files SET blobRef = ?, data = X'' WHERE ownerGaii = ? AND key = ? AND blobRef IS NULL AND size = ?",
+    ).run(blobRef, ownerGaii, key, size);
+    return result.changes > 0;
+  },
+
+  async storageFileBlobRefsIn(this: SqliteStorage, refs: string[]): Promise<string[]> {
+    if (refs.length === 0) return [];
+    const out: string[] = [];
+    // SQLite caps bound parameters per statement; a listing page is 1000 objects, so ask in parts.
+    for (let i = 0; i < refs.length; i += 500) {
+      const part = refs.slice(i, i + 500);
+      const rows = this.db.prepare(
+        `SELECT blobRef FROM storage_files WHERE blobRef IN (${part.map(() => '?').join(',')})`,
+      ).all(...part) as { blobRef: string }[];
+      for (const r of rows) out.push(r.blobRef);
+    }
+    return out;
+  },
+
+  async listStorageFilesInDatabase(this: SqliteStorage, opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
+    if (opts.owners && opts.owners.length === 0) return [];
+    const where: string[] = ['blobRef IS NULL'];
+    const args: unknown[] = [];
+    if (opts.owners) { where.push(`ownerGaii IN (${opts.owners.map(() => '?').join(',')})`); args.push(...opts.owners); }
+    if (opts.after) { where.push('(ownerGaii > ? OR (ownerGaii = ? AND key > ?))'); args.push(opts.after.ownerGaii, opts.after.ownerGaii, opts.after.key); }
+    const rows = this.db.prepare(
+      `SELECT ${META_COLUMNS} FROM storage_files WHERE ${where.join(' AND ')} ORDER BY ownerGaii, key LIMIT ?`,
+    ).all(...args, Math.max(1, Math.floor(opts.limit))) as Record<string, unknown>[];
+    return rows.map(r => fileRowToRecord(r, Buffer.alloc(0)));
+  },
+
+  async countStorageFilesByStore(this: SqliteStorage): Promise<{ store: string; count: number; bytes: number }[]> {
+    const rows = this.db.prepare(
+      `SELECT CASE WHEN blobRef IS NULL THEN 'database' ELSE substr(blobRef, 1, instr(blobRef, '|') - 1) END AS store,
+              COUNT(*) AS count, COALESCE(SUM(size), 0) AS bytes
+       FROM storage_files GROUP BY store`,
+    ).all() as { store: string; count: number; bytes: number }[];
+    return rows.map(r => ({ store: r.store, count: Number(r.count), bytes: Number(r.bytes) }));
   },
 };

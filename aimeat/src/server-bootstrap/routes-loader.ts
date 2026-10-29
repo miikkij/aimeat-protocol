@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-10-29 — fileStoreRouter (routes/file-store.ts): where stored files keep their bytes, the node's and a person's own.
  *   2026-10-25 — internetOpeningRouter (routes/internet-opening.ts): one app opened to the internet on a closed node.
  *   2026-10-25 — goalsRouter: agent goals (session cc-jouni-goals).
  *   2026-10-24 — complianceAgreementsRouter: data processing agreements, their signing and notices (plan doc-mvmr4i2wdk0p).
@@ -130,6 +131,7 @@ import { memoryHandsRouter } from '../routes/memory-hands.js';
 import { dataMapRouter } from '../routes/data-map.js';
 import { exposureRouter } from '../routes/exposure.js';
 import { internetOpeningRouter } from '../routes/internet-opening.js';
+import { fileStoreRouter } from '../routes/file-store.js';
 import { classificationRouter } from '../routes/classification.js';
 import { librarianRouter } from '../routes/librarian.js';
 import { discoverRouter } from '../routes/discover.js';
@@ -584,7 +586,7 @@ export async function mountRoutes(
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));
-  app.use(storageFilesRouter(config, storage));
+  app.use(storageFilesRouter(config, storage), fileStoreRouter(config, storage));
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
   // address of a package is the /v1/pub storage URL these routes hand back; this is where a
   // producer writes one and where "the newest version" gets resolved.

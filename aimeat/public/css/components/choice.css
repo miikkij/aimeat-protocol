@@ -8,6 +8,7 @@
  *   Drawn by components/Choice.js; a page never writes these.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-10-29 — .choice-pic, a boxed answer's picture over its name.
  *   v1.0.0 — 2026-09-26 — Initial. The boxed grid has the values of .agp-choices, .sc-choices and
  *     .cal-opts (.7rem apart; two columns under 1100px, one under 700px); a boxed answer with its
  *     radio dot the layout of .cal-opt (component plan C5).
@@ -17,6 +18,9 @@
 .choice--cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .choice--cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .choice--cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+/* A boxed answer's picture (an option's `pic`): over the name, the box's full width. */
+.choice-pic { display: block; margin-bottom: .6rem; }
 
 /* A boxed answer with its radio dot: the dot level with the name, the line under the name. */
 .choice-dot { display: flex; gap: .6rem; align-items: flex-start; }

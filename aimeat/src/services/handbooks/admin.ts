@@ -6,8 +6,11 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
- *   v1.25.0 -- 2026-10-29 -- The platform-fee incident's records are entries decided with "uncount" or
+ *   v1.27.0 -- 2026-10-29 -- The platform-fee incident's records are entries decided with "uncount" or
  *     "keep" (secaudit2026oct26 round 8c).
+ *   v1.26.0 -- 2026-10-29 -- Where stored files keep their bytes: the node's S3 or Azure Blob store, people's own, the four admin tools.
+ *   v1.25.0 -- 2026-10-29 -- Records of processing: an app gets a register only when others see its
+ *     personal data or it keeps regulated data; every app's reach is in the report's processing.apps.
  *   v1.24.0 -- 2026-10-27 -- The subdomain incident's addresses are entries decided with "app_only" or
  *     "keep" (Jouni, 2026-10-27).
  *   v1.23.0 -- 2026-10-26 -- The incident that names capabilities with an unknown visibility word
@@ -178,6 +181,18 @@ owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimea
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 
+**Where stored files keep their bytes (operator).** By default the node's database holds them. The
+operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any
+S3-compatible service) or one Azure Blob container: \`file_store.kind\` and the address settings with
+\`aimeat_admin_config_set\`, the keys in the environment only (AIMEAT_FILE_STORE_S3_ACCESS_KEY_ID and
+_SECRET_ACCESS_KEY, or AIMEAT_FILE_STORE_AZURE_CREDENTIAL). \`aimeat_admin_file_store\` says where files go,
+what is missing and how many files each place holds; \`aimeat_admin_file_store_test\` writes, reads,
+lists and removes one test object; \`aimeat_admin_file_store_move\` moves older files out of the
+database in batches (call it again while \`remaining\` is above 0). People may connect storage of their
+own as \`file_store.owner_stores\` allows (self, operator, off; auto is operator on a signed-in-only
+node); on an operator node \`aimeat_admin_file_store_decide\` approves, declines or revokes, as the
+operator says. A daily sweep removes, inside the store's folder only, objects no file names any more.
+
 **Security classes (operator).** \`aimeat_classification\` with \`action: "pack_list"\` shows the two
 label packs, the Finnish security classes (TL IV to TL I) and the NATO classes (NATO RESTRICTED to
 COSMIC TOP SECRET), and \`pack_set\` (\`pack\`, \`on\`, \`up_to\`) switches one on up to a class. The
@@ -195,7 +210,11 @@ The same tools keep \`processors\` (add the contract date, country and transfer 
 \`scope: "organism"\` and \`organism_id\`, or \`scope: "app"\`, \`app\` and \`app_owner\`, to read an
 organism's or an app's; you read every one and write only the node's. \`scope: "all"\` reads one
 part across every place at once, each place named. To change one entry (a register reviewed, a
-request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`.
+request done, a breach reported), pass \`item_id\` and \`set\` instead of \`value\`. An app gets a
+register of its own only when someone other than its user sees its personal data, or it keeps
+regulated data: \`aimeat_compliance_report\` with \`scope: "node"\` lists every app's \`reach\` in
+\`processing.apps\`, and what a person keeps through an app only they see is in the node's record
+\`node-user-content\`.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:

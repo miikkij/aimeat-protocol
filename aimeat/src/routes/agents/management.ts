@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Agent lifecycle management routes (export, import, rekey, port, scopes, read-through, federate, delete, CORS). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-29 -- PATCH /v1/agents/:name/scopes lets the owner's agent holding agent:permissions-add add
+ *     words it holds itself to a sibling, and tells the owner on the account feed and in the bell
+ *     (services/agent-scope-add.ts; wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-28 -- POST /v1/agents/:name/scope-narrowing is the owner's decision alone: the node no longer narrows by itself.
  *   2026-10-27 -- DELETE /v1/agents/:name answers `standing_work` (the schedules and saved workflows
  *     the agent made) and tells the owner they stop until a new agent of that name runs them
@@ -87,7 +90,8 @@ import { buildGAII, ownerGhiiOf } from '../../utils/gaii.js';
 import { standingWorkOf, noticeStandingWork } from '../../services/agent-standing-work.js';
 import { writeMemoryRecord } from '../../services/memory-write.js';
 import { callerOf } from '../../middleware/caller.js';
-import { scopeIsCovered, exceedsCeiling, uncoveredScopes } from '../../utils/scope-coverage.js';
+import { scopeIsCovered, exceedsCeiling } from '../../utils/scope-coverage.js';
+import { checkScopeAddition, recordScopeAddition } from '../../services/agent-scope-add.js';
 import { forgetAgentAccess } from '../../services/agent-refusals.js';
 import { READ_THROUGH_SCOPE } from '../../services/app-grant-scopes.js';
 import { calculateTrustScore } from '../../services/trust.js';
@@ -412,9 +416,10 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
   // PATCH /v1/agents/:name/scopes — update agent scopes.
   // WHO. The owner in person sets any list the node's ceiling allows. Their agent holding the words
   // aimeat_operator_agent_configure declares (agent:permissions, outside every wildcard, and
-  // agent:write) may only NARROW a sibling's list: every word it sends must already be covered by
-  // the target agent's current list, the rule the MCP tool and POST /scope-narrowing apply. The connector's copy
-  // of the tool calls this route, so an owner-only gate refused there what the node MCP allowed.
+  // agent:write) NARROWS a sibling's list. It ADDS only when it also holds agent:permissions-add,
+  // and then only words it holds itself, never that word, never to itself; each addition goes to
+  // the owner's account feed and bell (services/agent-scope-add.ts). The connector's copy of the
+  // tool calls this route, so an owner-only gate refused there what the node MCP allowed.
   // requireRole('agent') keeps an app grant and an ecosystem app out (QA audit D2-02).
   router.patch('/v1/agents/:name/scopes', requireAuth(), requireRole('agent'), requireScope('agent:permissions', 'agent:write'), async (req, res) => {
     const agentName = req.params.name as string;
@@ -447,15 +452,14 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
-    // An agent narrows only: adding a permission stays the owner's approval in person.
-    if (!callerOf(req, config.nodeId, storage).inPerson) {
-      const added = uncoveredScopes(agent.defaultScopes ?? [], scopes as string[]);
-      if (added.length > 0) {
-        res.status(403).json(error(config.nodeId, 'SCOPE_ADDITION_REFUSED',
-          "An agent can only take permissions away from another agent. Ask your owner to add the permission on that agent's page.",
-          403, { added }));
-        return;
-      }
+    // An agent narrows, and adds only with agent:permissions-add and only words it holds itself
+    // (services/agent-scope-add.ts, the rule the MCP tool asks as well).
+    const caller = callerOf(req, config.nodeId, storage);
+    const check = checkScopeAddition(
+      { gaii: caller.principal, scopes: caller.scopes, inPerson: caller.inPerson }, agent, scopes as string[]);
+    if (!check.ok) {
+      res.status(403).json(error(config.nodeId, check.code, check.message, 403, check.details));
+      return;
     }
 
     const updated = await storage.updateAgent(agent.gaii, { defaultScopes: scopes });
@@ -465,6 +469,8 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
     }
 
     announceScopes(updated.gaii);
+    // The owner reads every addition an agent made on the account feed and in the bell.
+    if (!caller.inPerson) await recordScopeAddition({ storage, config }, caller.principal, updated, check.added);
 
     res.json(success(config.nodeId, {
       gaii: updated.gaii,

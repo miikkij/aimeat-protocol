@@ -15,6 +15,8 @@
  * @usage
  *   import type { AccountEventInput } from '../storage/interface.js';
  * @version-history
+ *   v1.12.0 — 2026-10-29 — agent_permissions_added: one of your agents added permissions to another
+ *     (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   v1.11.0 — 2026-10-25 — agent_device_takeover: an existing agent approved for a device that did not
  *     prove it is the agent coming back (secaudit2026oct22).
  *   v1.10.0 — 2026-10-13 — app_scope_words_kept: the owner's published apps that kept permissions on the
@@ -167,6 +169,10 @@ export type AccountEventKind =
   // `app_scope_words_kept` is the same start's line for the owner's published apps whose code calls
   // a route their aimeat-scopes declaration does not name (services/app-scope-allowance.ts).
   | 'app_scope_words_kept'
+  // One of the owner's agents, holding agent:permissions-add, added permissions to another
+  // (services/agent-scope-add.ts): `data.by` the agent that added, `data.name` the agent that got
+  // them, `data.words` the words. The actor is the adding agent's GAII.
+  | 'agent_permissions_added'
   | 'consent_granted'
   | 'consent_revoked'
   | 'app_granted'

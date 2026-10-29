@@ -100,6 +100,9 @@
  *          <//>`)}
  *        <//>`
  * @version-history
+ *   v1.18.1 — 2026-10-29 — SearchLine's field is kept out of password managers (autocomplete off,
+ *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
+ *     owner's sign-in name into a find field.
  *   v1.18.0 — 2026-10-19 — Name `flag` ('new' | 'error', with `flagTitle`): a short line under the
  *     mark before the name (or under the name), in place of the dot that pushed the row's start right;
  *     Group `apart`: air over the heading; Lead `bare` passes to the Avatar. Additive, the Agents list
@@ -532,7 +535,8 @@ export function SearchLine({ value, onInput, onEnter, onClear, placeholder, labe
   return html`<div class=${cx('search-line', beside && 'search-line--beside', big && 'search-line--big')}>
     ${find ? html`<svg class="search-line-glass" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" /><path d="M20 20l-4.3-4.3" /></svg>` : null}
     <input class="og-input" id=${id} type=${text ? 'text' : 'search'} value=${value} placeholder=${placeholder} aria-label=${label || placeholder}
-      autocomplete=${big ? 'off' : undefined} spellcheck=${big ? false : undefined}
+      autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
+      spellcheck=${big ? false : undefined}
       autofocus=${autofocus} onInput=${onInput} onKeyDown=${onEnter ? (e) => { if (e.key === 'Enter') onEnter(e); } : undefined} />
     ${onClear && value ? html`<button type="button" class="poster-icon poster-icon--small" title=${clearLabel} aria-label=${clearLabel} onClick=${onClear}>✕</button>` : null}
     ${children}

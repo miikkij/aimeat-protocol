@@ -122,6 +122,7 @@
     "0118_direct_message_reactions.sql": "4523a5a708ec0dcb8fdef8eced6d336413f049009012fa3c988630c3a419785b",
     "0119_subdomain_site_held_since.sql": "3510bb889100a92a121b015e77270429a7992cf63cd74a8c575156f92286b1e0",
     "0120_released_component_names.sql": "f28afbc14de44fcc1cd96e49d6987cc7ca5ebf5d645a8435780c41a0435590a1",
-    "0121_settlement_once.sql": "86948c76f098667bd24c4cfbbbc69d08efd85d42abdfa139aa1173ce765d6937"
+    "0121_storage_file_blob_ref.sql": "4485731364abb435b5902cb2c900247b94144526b3e3c74d56cf1ff640bb1edd",
+    "0122_settlement_once.sql": "84f54bd490dfb3ad17126167d94e6cc10b724662cb1fecf6ceaa95784a626f85"
   }
 }

@@ -13,6 +13,8 @@
  * @structure ProcessingSummary · PROCESSING_LIMITS · buildProcessingSummary()
  * @usage const p = await buildProcessingSummary({ storage, config });   // { summary, gaps, limits }
  * @version-history
+ *   v1.2.0 — 2026-10-29 — `apps` and `apps_by_reach`: every app in one line, with who can see its
+ *     personal data and its AI use (compliance-apps-overview.ts), for the report's app table.
  *   v1.1.0 — 2026-10-26 — registers.drafts counts the registers the node can draft where none is
  *     stored, so a node that stored none shows what it holds rather than 0.
  *   v1.0.1 — 2026-10-25 — The limit app-scan-listed-only is gone: the scan reads every app now.
@@ -27,6 +29,8 @@ import { derivedProcessors, frameworkVerdicts, processorsView, transfersOf } fro
 import { nodeWideScopeGaps, type ScopeGap } from './compliance-scope-gaps.js';
 import { registerDrafts } from './compliance-register-drafts.js';
 import type { ComplianceRegister } from './compliance-docs-schemas.js';
+import { appsOverview, type ComplianceAppRow } from './compliance-apps-overview.js';
+import type { AppReach } from './compliance-app-reach.js';
 
 export interface ProcessingSummary {
   registers: {
@@ -42,6 +46,10 @@ export interface ProcessingSummary {
   processors: ReturnType<typeof processorsView>;
   transfers: ReturnType<typeof transfersOf>;
   packs: PackStatus[];
+  /** Every app in one line: who can see its personal data, and its AI use (compliance-apps-overview.ts). */
+  apps: ComplianceAppRow[];
+  /** How many apps in each reach. */
+  apps_by_reach: Record<AppReach, number>;
 }
 
 export const PROCESSING_LIMITS = [
@@ -96,6 +104,7 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
   const requests = reqDocs.flatMap(d => d.doc.items);
   const breaches = breachDocs.flatMap(d => d.doc.items);
   const processors = processorsView(derivedProcessors(config), storedProcessors.items);
+  const overview = await appsOverview(deps);
   return {
     summary: {
       registers: { total, personal, by_scope: byScope, drafts }, domains,
@@ -104,6 +113,7 @@ export async function buildProcessingSummary(deps: { storage: Storage; config: A
       dpias: dpiaDocs.reduce((n, d) => n + d.doc.items.length, 0),
       frameworks: frameworkVerdicts(nodeFw, 'node'),
       processors, transfers: transfersOf(processors), packs: packStatus(policy),
+      apps: overview.apps, apps_by_reach: overview.by_reach,
     },
     gaps: await nodeWideScopeGaps(deps),
     limits: PROCESSING_LIMITS,

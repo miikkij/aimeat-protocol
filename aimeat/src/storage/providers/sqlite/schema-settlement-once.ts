@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description One federation settlement is recorded once: a unique index on the federation_settlement
  *   rows of wallet_transactions, keyed on the identity the row is filed under and the tracking code.
- *   Mirrors Postgres migration 0121_settlement_once.sql, where the reason is written in full
+ *   Mirrors Postgres migration 0122_settlement_once.sql, where the reason is written in full
  *   (secaudit2026oct26 round 8c, federation-01).
  *
  *   Rows that already repeat a key are left as they are and kept out of the index by id, every one but

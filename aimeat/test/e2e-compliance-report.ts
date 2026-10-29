@@ -23,6 +23,11 @@
  *   inspection.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-report
  * @version-history
+ *   v1.3.0 — 2026-10-29 — Who sees an app's data: an app only its user sees has no register or notice
+ *     gap and the node record covers it, one that shows personal data to anyone needs both, a map in
+ *     words the node does not know is its own gap, a condition on a missing question is refused, and
+ *     the maker is asked only the area and the transparency questions until an area is named (the
+ *     "every question is open" assertion changed with it: setup, by design).
  *   v1.2.0 — 2026-10-28 — The maker answers for their own app: the questions on the map read, the
  *     finding, another account refused, the draft marking the answers `maker` with their reasons,
  *     a saved entry receiving only its open answers, and the daily job asking once.
@@ -698,6 +703,68 @@ await test('A use case that names the app closes the gap', async () => {
     await json(USECASES, { method: 'PUT', headers: auth(op.token), body: JSON.stringify({ usecases: kept }) });
 });
 
+// ─── Who sees an app's data (Jouni, 2026-10-29) ───
+// On aimeat.io every app that kept anything got a register with its maker as the controller, a
+// "no register" gap and a "no privacy notice" gap, and read as unlawful. The data map says where
+// each key family lives and who reads it; an app whose data only its user sees needs neither.
+
+const mapWith = (what: string, row: Record<string, unknown>) => ({
+    spec: 'aimeat.datamap/2', what: 'A small tool.', usedFor: 'Keeping things.', form: 'one-person', arrangement: '',
+    machinery: [], leaves: [], elsewhere: [],
+    held: [{
+        what, holds: 'what the person keeps', kind: 'user-written', usedFor: 'user-returns-to-read', where: 'owner-memory-private',
+        owner: 'person', readers: 'owner-only', writers: ['person-in-the-ui'], shape: 'one-record', keptFor: 'until-deleted',
+        lossRisk: 'only-copy', personalData: 'yes', why: 'the person keeps it', domains: [], ...row,
+    }],
+});
+const appQuery = (ref: string) => `scope=app&app=${encodeURIComponent(ref.split('/')[1])}&app_owner=${ref.split('/')[0]}`;
+const appLine = async (ref: string) => {
+    const r = await json(REPORT, { headers: auth(op.token) });
+    return (r.body.data.processing?.apps as any[] ?? []).find(a => a.app === ref);
+};
+const appGapKinds = async (ref: string): Promise<string[]> => {
+    const g = await json(`/v1/compliance/gaps?${appQuery(ref)}`, { headers: auth(op.token) });
+    assert(g.status === 200, `app gaps ${g.status}`);
+    return (g.body.data.gaps as any[]).map(x => x.kind);
+};
+
+await test('An app whose personal data only its user sees has no register and no notice gap, and the node record covers it', async () => {
+    const ref = await publishApp(plain, `notes${Date.now()}.html`, mapWith('notes.v1', {}));
+    const d = await json(`/v1/compliance/draft?${appQuery(ref)}`, { headers: auth(op.token) });
+    assert(d.status === 200 && (d.body.data.items ?? []).length === 0, `no register of its own: ${JSON.stringify(d.body.data.items)}`);
+    const kinds = await appGapKinds(ref);
+    assert(!kinds.includes('app-personal-data-without-register') && !kinds.includes('app-register-without-privacy-notice'),
+        `no register or notice gap: ${JSON.stringify(kinds)}`);
+    assert((await appLine(ref))?.reach === 'self', 'it reads as only its user');
+    const node = await json('/v1/compliance/draft?scope=node', { headers: auth(op.token) });
+    assert((node.body.data.items as any[]).some(i => i.id === 'node-user-content'), 'the node keeps one record for such content');
+});
+
+await test('An app that shows personal data to anyone needs a register and a notice, and reads as exposed', async () => {
+    const ref = await publishApp(plain, `board${Date.now()}.html`, mapWith('board.scores', { where: 'owner-memory-public', readers: 'anyone' }));
+    const kinds = await appGapKinds(ref);
+    assert(kinds.includes('app-personal-data-without-register') && kinds.includes('app-register-without-privacy-notice'),
+        `both gaps: ${JSON.stringify(kinds)}`);
+    const line = await appLine(ref);
+    assert(line?.reach === 'exposed' && line.rows.some((r: any) => r.what === 'board.scores'), `exposed, naming the row: ${JSON.stringify(line)}`);
+});
+
+await test('A data map in words the node does not know is a gap of its own, and nobody guesses who sees the data', async () => {
+    const ref = await publishApp(plain, `odd${Date.now()}.html`, mapWith('campaign.queue', { where: 'the campaign queue', readers: 'the DPO and the sellers' }));
+    const g = await json(`/v1/compliance/gaps?${appQuery(ref)}`, { headers: auth(op.token) });
+    const gap = (g.body.data.gaps as any[]).find(x => x.kind === 'app-data-map-unreadable');
+    assert(gap?.evidence?.families?.includes('campaign.queue'), `the gap names the row: ${JSON.stringify(g.body.data.gaps)}`);
+    assert((await appLine(ref))?.reach === 'unknown', 'it reads as unknown');
+});
+
+await test('A question whose condition names a question the set does not have is refused', async () => {
+    const r = await json(QUESTIONS, {
+        method: 'PUT', headers: auth(op.token),
+        body: JSON.stringify({ ...questionnaire, questions: [{ id: 'x', text: 'x', type: 'boolean', implies: {}, askedWhen: { question: 'q-missing', in: ['true'] } }] }),
+    });
+    assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
 // ─── The maker answers for their own app (Jouni, 2026-10-28) ───
 // The node finds the AI apps by itself, but only the maker knows what one does to people. The maker
 // answers the questions in the app's data map, with a reason each; the administrator approves them;
@@ -711,7 +778,14 @@ await test('The maker reads the questions on the map read, and an unanswered AI 
     const act = r.body.data.ai_act;
     assert(Array.isArray(act?.questions) && act.questions.length > 0, `the questions are served: ${JSON.stringify(act)}`);
     assert(act.questions.every((q: any) => q.implies === undefined), 'without their class rules');
-    assert(act.unanswered.length === act.questions.length, 'every question is open');
+    // Setup, by design (Jouni, 2026-10-29): until the area is answered only the area and the two
+    // transparency questions are asked; the rest wait for an Annex III area. It was every question.
+    for (const id of ['q-annex3-area', 'q-interacts-with-people', 'q-publishes-publicly']) {
+        assert(act.asked.includes(id) && act.unanswered.includes(id), `${id} is asked and open: ${JSON.stringify(act.asked)}`);
+    }
+    assert(!act.asked.includes('q-social-scoring') && !act.asked.includes('q-decides-about-a-person'),
+        `the full survey waits for an area: ${JSON.stringify(act.asked)}`);
+    assert(act.unanswered.every((id: string) => act.asked.includes(id)), 'only asked questions are open');
     assert(act.built_in.includes('q-annex3-area'), 'the shipped questions are named, so a page can translate them');
     assert((r.body.data.findings as any[]).some(f => f.code === 'DATAMAP_AI_ACT_UNANSWERED'), `the finding: ${JSON.stringify(r.body.data.findings)}`);
 });
@@ -746,6 +820,7 @@ await test('The maker answers in the map, and the draft takes the answers as the
     assert(!(w.body.data.findings as any[]).some(f => f.code === 'DATAMAP_AI_ACT_UNANSWERED'), 'the finding is gone');
     const r = await json(MAP_OF(talentRef), { headers: auth(plain.token) });
     assert(!r.body.data.ai_act.unanswered.includes('q-annex3-area'), 'an answered question is not open');
+    assert(!r.body.data.ai_act.asked.includes('q-social-scoring'), '"none of these" leaves the full survey unasked');
 
     const d = await json(DRAFT, { headers: auth(op.token) });
     const uc = (d.body.data.usecases as any[]).find(u => (u.apps ?? []).includes(talentRef));

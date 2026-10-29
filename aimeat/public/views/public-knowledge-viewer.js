@@ -10,6 +10,7 @@
  *   origin in the rail. Reads the public endpoints; the Art. 50(4) label stays under the headline.
  * @structure PublicKnowledgeViewer · BrowseView · DetailView · entryToMarkdown · buildFullMarkdown
  * @version-history
+ *   v2.5.2 -- 2026-10-29 -- The search field is kept out of password managers (autocomplete off, data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's sign-in name into a find field.
  *   v2.5.1 -- 2026-10-27 -- Its text fields stop at the server's input limits (js/input-limits.js; wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v2.5.0 -- 2026-10-16 -- Each entry shows the AI label its own record says it owes (the export's
  *     entry_provenance), beside the package's.
@@ -203,7 +204,8 @@ function BrowseView({ onSelect }) {
       </div></div>
     </div>
     <div class="kp-desk poster-row--thing">
-      <input type="search" class="kp-field" maxLength=${INPUT_LIMITS.line} value=${search} placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
+      <input type="search" class="kp-field" maxLength=${INPUT_LIMITS.line} value=${search}
+        autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other" placeholder=${c('pubSearch')} onInput=${(e) => onSearch(e.target.value)} />
       <div class="og-choice">
         <button type="button" class=${`og-choice-btn ${contentType === '' ? 'on' : ''}`} onClick=${() => setContentType('')}>${c('pubAll')}</button>
         ${typesPresent.map(ct => html`<button type="button" key=${ct} class=${`og-choice-btn ${contentType === ct ? 'on' : ''}`} onClick=${() => setContentType(contentType === ct ? '' : ct)}>${ctWord(ct)}</button>`)}
