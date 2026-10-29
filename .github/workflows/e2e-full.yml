@@ -240,6 +240,12 @@ jobs:
         working-directory: aimeat
         run: pnpm build
 
+      # The lock the npm package carries (npm reads neither pnpm-lock.yaml nor pnpm.overrides);
+      # prepublishOnly writes it the same way (secaudit2026oct26 round 8c, operator-01).
+      - name: Write npm-shrinkwrap.json from pnpm-lock.yaml
+        working-directory: aimeat
+        run: pnpm gen:shrinkwrap
+
       - name: Pack, install with production dependencies only, start and probe
         working-directory: aimeat
         run: node scripts/pack-smoke.mjs
