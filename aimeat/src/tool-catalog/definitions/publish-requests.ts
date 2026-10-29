@@ -9,6 +9,8 @@
  * @structure publishRequestTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.1.1 — 2026-10-29 — `account` also lets the one who asked read its own request in the account it
+ *     asked (secaudit2026oct26 round 8c).
  *   v1.1.0 — 2026-10-25 — The requests that make nothing public, `awaiting_operator` and `account` (secaudit2026oct22, the approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
  */
@@ -29,7 +31,7 @@ export const publishRequestTools = [
         input: {
             request_id: { type: 'string', description: 'One request. Omit to list them all.' },
             decision: { type: 'string', enum: ['approve', 'decline'], description: 'Decide the request named by request_id.' },
-            account: { type: 'string', description: 'Operators only: the account (name or GHII) whose request waiting for the operators you read or answer. Omit for your own account.' },
+            account: { type: 'string', description: 'The account (name or GHII) where the request lives: an operator reads or answers a request waiting for the operators there, and the one who asked reads its own request there. Omit for your own account.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

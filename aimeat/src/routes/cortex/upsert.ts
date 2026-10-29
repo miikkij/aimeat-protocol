@@ -9,6 +9,8 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.7.3 — 2026-10-29 — The create branch under a bare name an erasure or the held-name settlement
+ *     freed asks the earlier library's callers first (services/cortex-holder-change.ts; round 8c).
  *   v1.7.2 — 2026-10-29 — The create branch refuses a new name that starts with aimeat- to anyone but an
  *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   v1.7.1 — 2026-10-26 — The owner is additive: a bare name is the bare record as before (403 for
@@ -69,6 +71,7 @@ import {
   findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
 } from '../../services/component-address.js';
 import { nodePrefixRefusal } from '../../services/component-name-prefix.js';
+import { noteCortexHolderChange } from '../../services/cortex-holder-change.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
@@ -217,6 +220,8 @@ export async function upsertCortex(
       }
       throw e;
     }
+    // A name an erasure or a settlement freed asks the earlier library's callers first (cortex-holder-change.ts).
+    await noteCortexHolderChange(deps, record, caller.gaii);
     await settleReclaimed(storage, 'cortex', record.name);
     for (const [filename, content] of Object.entries(newLibs)) {
       await storage.setCortexLibFile(name, filename, content);

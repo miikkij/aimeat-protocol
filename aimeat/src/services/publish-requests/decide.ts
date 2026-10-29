@@ -19,6 +19,8 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.4.0 — 2026-10-29 — The one who asked reads its own request in the account it asked (`account`),
+ *     so a principal of another account sees its question pending (secaudit2026oct26 round 8c).
  *   v1.3.0 — 2026-10-25 — A request that makes nothing public is answered under
  *     approvalDecisionRefusal, and an operator reads and answers the operators' question of another
  *     account by naming it (`account`) (secaudit2026oct22, the developer's approval standard).
@@ -85,13 +87,26 @@ async function accountFor(ctx: PublishStoreCtx, viewer: PublishViewer, account: 
   return (await viewer.caller.operator()) ? { ghii: named, foreign: true } : null;
 }
 
+/** Did this viewer ask it: its principal, its GHII in person, or its token's subject? */
+function askedBy(v: PublishViewer, r: PublishRequest): boolean {
+  const me = [v.caller.principal, v.caller.auth.sub, ...(v.caller.inPerson ? [v.caller.ownerGhii] : [])];
+  return me.includes(r.requested_by.principal) || me.includes(r.requested_by.sub);
+}
+
 /** A request in another account is visible to an operator only when the operators answer it. */
 const operatorsQuestion = (r: PublishRequest) => r.approval?.approver === 'operators';
 
 export async function readPublishRequestFor(ctx: PublishStoreCtx, viewer: PublishViewer, id: string, account?: unknown) {
   if (outside(viewer)) return fail(403, 'ACCESS_DENIED', NO_REQUESTS_HERE);
   const where = await accountFor(ctx, viewer, account);
-  if (!where) return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  if (!where) {
+    // The one who asked reads its own question in the account it asked, as pending until it is
+    // answered (the approval standard, rule 3; secaudit2026oct26 round 8c, a cortex's new holder).
+    const asked = typeof account === 'string' && account.trim()
+      ? await readPublishRequest(ctx.storage, accountGhii(account.trim(), ctx.config.nodeId), id) : null;
+    if (asked && askedBy(viewer, asked)) return { ok: true as const, request: summarizePublishRequest(asked) };
+    return fail(404, 'NOT_FOUND', 'No such request on this account.');
+  }
   const r = await readPublishRequest(ctx.storage, where.ghii, id);
   if (!r || (where.foreign ? !operatorsQuestion(r) : !visibleTo(ctx, viewer, r))) return fail(404, 'NOT_FOUND', 'No such request on this account.');
   return { ok: true as const, request: summarizePublishRequest(r) };

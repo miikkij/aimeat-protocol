@@ -10,6 +10,9 @@
  * @structure deleteInstalledCortexes(db, name, ghiis, opts)
  * @usage deleteInstalledCortexes(this.db, name, ghiiRows.map(r => r.ghii));
  * @version-history
+ *   v1.2.0 — 2026-10-29 — Each bare cortex name deleted is written down as freed (`freed:<pseudonym>`):
+ *     free for the next install, and the apps that loaded it ask their owner first (secaudit2026oct26
+ *     round 8c, services/cortex-holder-change.ts).
  *   v1.1.1 — 2026-10-05 — deleteOwner is in methods/identity.ts now (secaudit 2026-10, M8).
  *   v1.1.0 — 2026-09-26 — `names`, for the operator's decision on a held name (repos/held-names.ts);
  *     the start step and that decision call this same function.
@@ -17,9 +20,10 @@
  *     2026-09, R4 "found": the cortex record).
  */
 import type Database from 'better-sqlite3';
-import { partyIdentities } from '../../../erased-party.js';
+import { partyIdentities, erasedPartyPseudonym } from '../../../erased-party.js';
 import { erasedCortexParts } from '../../../erased-cortex.js';
 import { invalidateSchemaLockCache } from '../../../schema-lock-cache.js';
+import { FREED_RELEASE_PREFIX } from '../../../types/component-versions.js';
 
 /**
  * Take the cortexes an erased account installed off the node, with what their activation made.
@@ -89,6 +93,17 @@ export function deleteInstalledCortexes(
   const drop = db.prepare('DELETE FROM cortex_extensions WHERE installedBy = ? AND name = ?');
   let removed = 0;
   for (const row of rows) removed += drop.run(name, row.name).changes;
+  // Each bare name is written down as freed, under a pseudonym no account matches: it stays free for
+  // the next install, and the apps that loaded this library ask their owner before they load the next
+  // holder's (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+  const bare = rows.map(r => r.name).filter(n => !n.includes('/'));
+  if (bare.length) {
+    const holder = `${FREED_RELEASE_PREFIX}${erasedPartyPseudonym()}`;
+    const releasedAt = new Date().toISOString();
+    const release = db.prepare(`INSERT INTO released_component_names (kind, name, holder, releasedAt) VALUES ('cortex', ?, ?, ?)
+       ON CONFLICT (kind, name) DO UPDATE SET holder = excluded.holder, releasedAt = excluded.releasedAt`);
+    for (const n of bare) release.run(n, holder, releasedAt);
+  }
   // Every memory write reads the schema locks from a process cache, which a delete refreshes.
   if (locks > 0) invalidateSchemaLockCache();
   return removed;
