@@ -9,6 +9,9 @@
  *   was opened before the node kept them. Stripe is answered by a stand-in for safeFetch.
  * @usage cd aimeat && pnpm exec vitest run test/unit/stripe-webhook-card-page.test.ts
  * @version-history
+ *   2026-10-30 -- The node's own page on a seller's (not an operator's) Stripe account waits for the
+ *     buyer's confirmation before the adult check is recorded; one assertion changed with Jouni's
+ *     approval (secaudit2026oct26 round 8c, commerce-07).
  *   2026-10-27 -- Initial (secaudit2026oct26, commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -31,6 +34,9 @@ import { completeFromStripeCheckout } from '../../src/commerce/stripe-checkout-c
 import { rememberCardPage } from '../../src/commerce/session-claim.js';
 import { getSession } from '../../src/commerce/session-service.js';
 import { readAdult } from '../../src/services/adult-assurance.js';
+import { listPublishRequests } from '../../src/services/publish-requests/store.js';
+import { decidePublishRequest } from '../../src/services/publish-requests/decide.js';
+import { callerFromAuth } from '../../src/services/caller-context.js';
 
 registerSellableResolver({
   kind: 'unit-card',
@@ -74,6 +80,8 @@ beforeEach(async () => {
   config = { ...loadConfig().config, nodeId: NODE, baseUrl: 'https://node.test', encryptionKey: null } as AimeatConfig;
   registerPaymentHandler(stripeCheckoutHandler(config));
   const now = new Date().toISOString();
+  // The buyer has an account here, so the node can ask them to confirm the card (commerce-07).
+  await storage.createOwner({ name: 'reader', displayName: 'reader', publicKey: 'pk', roles: ['owner'], createdAt: now } as never);
   await storage.setMemory({
     key: 'commerce.psp', ownerGaii: SELLER, value: { provider: 'stripe', secretKey: 'sk_test_stand_in' }, visibility: 'private',
     tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
@@ -100,6 +108,14 @@ describe('the Stripe webhook completes a checkout only from a card page the node
     answer = paid('cs_node_page', 'chk_two');
     await completeFromStripeCheckout(storage, config, SELLER, delivery('cs_node_page', 'chk_two'));
     expect(sent.some(u => u.includes('checkout/sessions/cs_node_page'))).toBe(true);
+    // Changed 2026-10-30 (secaudit2026oct26 round 8c, commerce-07, approved by Jouni): this asserted
+    // the hole being closed, an adult recorded on the seller's own Stripe account's word. It now waits
+    // for the buyer's confirmation, and after the buyer confirms the adult is recorded.
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+    const asked = (await listPublishRequests(storage, BUYER)).find(r => r.kind === 'card-adult-confirm' && r.state === 'awaiting_owner');
+    const confirmed = await decidePublishRequest({ storage, config },
+      { caller: callerFromAuth({ sub: 'reader', owner: 'reader', roles: ['owner'], scopes: [] }, NODE, storage) }, asked!.id, 'approve');
+    expect(confirmed.ok).toBe(true);
     expect(await readAdult(storage, BUYER)).toMatchObject({ verified: true, method: 'credit-card' });
   });
 
