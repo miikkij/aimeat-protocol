@@ -20,7 +20,11 @@
  *   The operator (the suite's first account) turns classification on for every owner and off at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-compliance-records
  * @version-history
- *   2026-10-27 — An app register naming an organism its writer does not manage leaves the label alone
+ *   2026-10-30 — Setup no longer matched production after 162b2c687 (Jouni, 2026-10-29): the node's
+ *     draft holds five registers (node-user-content), and an app whose data only its owner reads gets
+ *     no register of its own. The two app maps name readers other than the owner (named people, a
+ *     group's members), which is the case these tests are about.
+ *   2026-10-27 —An app register naming an organism its writer does not manage leaves the label alone
  *     (not-in-scope); naming the writer's own organism raises it (secaudit2026oct26).
  *   v1.1.0 — 2026-10-24 — Every place at once (scope all) and one entry changed in place (PATCH), with
  *     their refusals (C7.7); an app's map read carries its registers (C1.7).
@@ -113,7 +117,7 @@ await test('NODE: the operator\'s draft names the node\'s own registers; a perso
     const d = await call('GET', '/v1/compliance/draft', op.token);
     assert(d.status === 200 && (d.body.data.items as Body[]).some(i => i.id === 'node-accounts'), `draft: ${d.status} ${JSON.stringify(d.body?.data ?? d.body?.error)}`);
     const w = await call('PUT', '/v1/compliance/docs/registers', op.token, { items: d.body.data.items });
-    assert(w.status === 200 && w.body.data.stored === true && w.body.data.items.length === 4, `write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+    assert(w.status === 200 && w.body.data.stored === true && w.body.data.items.length === 5, `write: ${w.status} ${JSON.stringify(w.body?.data?.items?.length ?? w.body?.error)}`);
     const denied = await call('GET', '/v1/compliance/docs/registers', alice.token);
     assert(denied.status === 403 && denied.body.error.code === 'NOT_ALLOWED', `alice, the node's: ${denied.status} ${JSON.stringify(denied.body?.error)}`);
     const draftDenied = await call('GET', '/v1/compliance/draft', alice.token);
@@ -126,7 +130,7 @@ await test('NODE: a duplicate id is refused (400) and a dry run stores nothing',
     const dry = await call('PUT', '/v1/compliance/docs/registers?dry_run=true', op.token, { items: [{ id: 'only', title: 'Only', type: 'none' }] });
     assert(dry.status === 200 && dry.body.data.stored === false, `dry run: ${dry.status} ${JSON.stringify(dry.body?.data ?? dry.body?.error)}`);
     const after = await call('GET', '/v1/compliance/docs/registers', op.token);
-    assert(after.body.data.items.length === 4, `POSITIVE CONTROL, still four: ${after.body.data.items.length}`);
+    assert(after.body.data.items.length === 5, `POSITIVE CONTROL, still five: ${after.body.data.items.length}`);
 });
 
 // ─── An organism's documents, and a data domain raising a workspace ───
@@ -175,8 +179,10 @@ await test('ORGANISM GAPS: a health register needs its art. 9 ground and an impa
 await test('APP: the data map says personal data, the draft makes a register of it, and the gaps follow; another owner gets 404', async () => {
     const map = {
         spec: 'aimeat.datamap/2', what: 'A customer list.', usedFor: 'Keeping in touch with customers.', form: 'one-person',
-        arrangement: 'One record in the owner\'s memory.', machinery: [], leaves: [], elsewhere: [],
-        held: [{ what: 'crm.customers', holds: 'names and e-mail addresses', kind: 'register', usedFor: 'user-returns-to-read', where: 'owner-memory-private', owner: 'person', readers: 'owner-only', writers: ['person-in-the-ui'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', personalData: 'yes', why: 'The owner keeps their own customers.' }],
+        arrangement: 'One record in the owner\'s memory, shared with named colleagues.', machinery: [], leaves: [], elsewhere: [],
+        // Named people read it, so the app's data reaches others and the app keeps a register. Read
+        // by its owner alone, it would be the person's own content under node-user-content.
+        held: [{ what: 'crm.customers', holds: 'names and e-mail addresses', kind: 'register', usedFor: 'user-returns-to-read', where: 'owner-memory-private', owner: 'person', readers: 'named-people', writers: ['person-in-the-ui'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', personalData: 'yes', why: 'The owner keeps customers with colleagues.' }],
     };
     const m = await call('PUT', `/v1/datamap/apps/${alice.name}/${APP}`, alice.token, map);
     assert(m.status === 200, `data map: ${m.status} ${JSON.stringify(m.body?.error)}`);
@@ -275,8 +281,9 @@ await test('WHOLE NODE: a parked app with no map, a map row with no personal-dat
     }
     const park = await call('PATCH', `/v1/apps/${PARKED}`, carol.token, { parked: true });
     assert(park.status === 200, `park: ${park.status} ${JSON.stringify(park.body?.error)}`);
-    // The shape a builder's AI wrote on a live node: rows that say what they are (isA) and never say personalData.
-    const row = (what: string, extra: Record<string, unknown>) => ({ what, holds: 'x', kind: 'register', usedFor: 'user-returns-to-read', where: 'extension-namespace', owner: 'extension', readers: 'the-app-itself', writers: ['an-extension-server-side'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', why: 'Here.', ...extra });
+    // The shape a builder's AI wrote on a live node: rows that say what they are (isA) and never say
+    // personalData. The team's members read them, so the data reaches people other than its owner.
+    const row = (what: string, extra: Record<string, unknown>) => ({ what, holds: 'x', kind: 'register', usedFor: 'user-returns-to-read', where: 'extension-namespace', owner: 'extension', readers: 'organism-members', writers: ['an-extension-server-side'], shape: 'collection-under-one-key', keptFor: 'until-deleted', lossRisk: 'only-copy', why: 'Here.', ...extra });
     const m = await call('PUT', `/v1/datamap/apps/${carol.name}/${MAPPED}`, carol.token, {
         spec: 'aimeat.datamap/2', what: 'Team contacts.', usedFor: 'Reaching colleagues.', form: 'group', arrangement: 'One extension.', machinery: [], leaves: ['A reminder goes to the colleague by email.'], elsewhere: [],
         held: [row('team.people', { isA: 'schema:Person' }), row('team.notes', {})],
@@ -319,7 +326,7 @@ await test('ALL: the operator reads every place that keeps registers, each named
     const node = places.find(p => p.place.scope === 'node');
     const org = places.find(p => p.place.scope === 'organism' && p.place.organism_id === orgId);
     const app = places.find(p => p.place.scope === 'app' && p.place.owner === alice.name);
-    assert(node && node.may_write === true && node.items.length === 4, `the node: ${JSON.stringify(node?.place)} ${node?.may_write} ${node?.items?.length}`);
+    assert(node && node.may_write === true && node.items.length === 5,`the node: ${JSON.stringify(node?.place)} ${node?.may_write} ${node?.items?.length}`);
     assert(org && org.place.name === `Cmp Records ${stamp}` && org.may_write === false && org.items[0]?.id === 'patients', `the organism: ${JSON.stringify(org?.place)} ${org?.may_write}`);
     assert(app && app.place.app === APP && app.may_write === false && app.items.length === 1, `the app, by its filename: ${JSON.stringify(app?.place)}`);
     const bobAll = await call('GET', '/v1/compliance/docs/registers?scope=all', bob.token);
