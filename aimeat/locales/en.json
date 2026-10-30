@@ -10598,6 +10598,11 @@
   "notiftext.approval_change.agent_page": "Change it on the agent's page",
   "notiftext.approval_change.scheduler": "Change it on the Scheduler tab",
   "notiftext.approval_change.accountants": "Change it under Who may read your books on the Profit & loss page",
+  "notiftext.approval_change.portfolio_page": "Change the page on the Welcome page tab",
+  "notiftext.approval_portfolio_memory_read.title": "{who} wrote your welcome page. May the page read your entries when you open it?",
+  "notiftext.approval_portfolio_memory_read.body": "{who} may not read your entries itself. When you open your welcome page while signed in, the page could read your entries and send them elsewhere. If you allow it, the page reads your entries as before. If you do not, the page is shown without your private entries. {who} hears the answer either way.",
+  "notiftext.approval_portfolio_memory_read_changed.title": "Your welcome page changed. May the page read your entries when you open it?",
+  "notiftext.approval_portfolio_memory_read_changed.body": "Your welcome page was changed outside the page editor, so the server does not know who wrote it. When you open the page while signed in, the page could read your entries and send them elsewhere. If you allow it, the page reads your entries as before. If you do not, the page is shown without your private entries.",
   "notiftext.approval_accountant_grant.title": "Does {name} still get to read your books?",
   "notiftext.approval_accountant_grant.body": "You gave {name} the right to read your books before the server kept the date of each right. The account named {name} was created after you began giving rights, and a deleted account's name can be registered again by someone else, so the server cannot tell whether this is the person you meant. Until you answer, {name} reads your books as before. If you allow it, {name} keeps the right. If you do not, the right is removed.",
   "notiftext.approval_card_adult.title": "Did you pay with your own card?",
@@ -26787,6 +26792,17 @@
         "high": "The task is done without these entries.",
         "tipLabel": "When to allow",
         "tip": "Allow if it is fine with you that the agent knows what these entries say. If the agent may read all your entries, you can give it that permission on the agent's page, and then it no longer asks."
+      },
+      "approval_portfolio_memory_read": {
+        "title": "May your welcome page read your entries?",
+        "short": "The page was written by someone who may not read your entries, and it could read them through you.",
+        "what": "Your agents and apps may write your welcome page. When you open the page while signed in, the page can read your entries, because you may read them. A page written by an agent or app that may not read your entries could read them this way and send them elsewhere. That is why you are asked once for each new page.",
+        "lowLabel": "If you allow",
+        "low": "The page reads your entries when you open it, as before.",
+        "highLabel": "If you do not allow",
+        "high": "The page is shown, but without your private entries. Other people see it as before.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you know who wrote the page and trust it. If an agent writes your page often, give it the permission to read your entries on the agent's page, and then its pages no longer ask."
       },
       "approval_goal_model_spend": {
         "title": "An agent asks the AI to do a task at your cost",

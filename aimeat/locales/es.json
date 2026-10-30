@@ -9491,6 +9491,11 @@
   "notiftext.approval_change.agent_page": "Cámbialo en la página del agente",
   "notiftext.approval_change.scheduler": "Cámbialo en la pestaña Programador",
   "notiftext.approval_change.accountants": "Cámbialo en Quién puede leer tu contabilidad, en la página Pérdidas y ganancias",
+  "notiftext.approval_change.portfolio_page": "Cambia la página en la pestaña Página de bienvenida",
+  "notiftext.approval_portfolio_memory_read.title": "{who} escribió tu página de bienvenida. ¿Puede la página leer tus entradas cuando la abres?",
+  "notiftext.approval_portfolio_memory_read.body": "{who} no puede leer tus entradas. Cuando abres tu página de bienvenida con tu sesión iniciada, la página podría leer tus entradas y enviarlas a otro lugar. Si lo permites, la página lee tus entradas como antes. Si no lo permites, la página se muestra sin tus entradas privadas. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_portfolio_memory_read_changed.title": "Tu página de bienvenida cambió. ¿Puede la página leer tus entradas cuando la abres?",
+  "notiftext.approval_portfolio_memory_read_changed.body": "Tu página de bienvenida se cambió fuera del editor de páginas, así que el servidor no sabe quién la escribió. Cuando abres la página con tu sesión iniciada, la página podría leer tus entradas y enviarlas a otro lugar. Si lo permites, la página lee tus entradas como antes. Si no lo permites, la página se muestra sin tus entradas privadas.",
   "notiftext.approval_accountant_grant.title": "¿{name} todavía puede leer tu contabilidad?",
   "notiftext.approval_accountant_grant.body": "Le diste a {name} el derecho de leer tu contabilidad antes de que el servidor guardara la fecha de cada derecho. La cuenta llamada {name} se creó después de que empezaste a dar derechos, y otra persona puede registrar el nombre de una cuenta eliminada, así que el servidor no sabe si es la persona a la que le diste el derecho. Hasta que respondas, {name} lee tu contabilidad como antes. Si lo permites, {name} conserva el derecho. Si no, el derecho se quita.",
   "notiftext.approval_card_adult.title": "¿Pagaste con tu propia tarjeta?",
@@ -24591,6 +24596,17 @@
         "high": "La tarea se hace sin estas entradas.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si no te molesta que el agente sepa lo que dicen estas entradas. Si el agente puede leer todas tus entradas, puedes darle ese permiso en la página del agente, y así ya no pregunta."
+      },
+      "approval_portfolio_memory_read": {
+        "title": "¿Puede tu página de bienvenida leer tus entradas?",
+        "short": "La página la escribió alguien que no puede leer tus entradas, y la página podría leerlas a través de ti.",
+        "what": "Tus agentes y aplicaciones pueden escribir tu página de bienvenida. Cuando abres la página con tu sesión iniciada, la página puede leer tus entradas, porque tú puedes leerlas. Una página escrita por un agente o una aplicación que no puede leer tus entradas podría leerlas así y enviarlas a otro lugar. Por eso se te pregunta una vez por cada página nueva.",
+        "lowLabel": "Si lo permites",
+        "low": "La página lee tus entradas cuando la abres, como antes.",
+        "highLabel": "Si no lo permites",
+        "high": "La página se muestra, pero sin tus entradas privadas. Las demás personas la ven como antes.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si sabes quién escribió la página y confías en ese agente o aplicación. Si un agente escribe tu página a menudo, dale el permiso de leer tus entradas en la página del agente, y así sus páginas ya no preguntan."
       },
       "approval_goal_model_spend": {
         "title": "Un agente pide a la IA que haga una tarea a tu costo",

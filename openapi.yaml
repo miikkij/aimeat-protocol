@@ -9416,6 +9416,13 @@ paths:
         A version the owner or the owner's agent published, and one the owner's own app published
         through its own grant, keeps signing in silently, new scopes included.
 
+        **The owner's own welcome page** (`<owner>.portfolio.<apex>`) gets its memory:read token
+        silently only while the page served now was written by a writer that holds memory:read, or the
+        owner allowed it. A page written by an agent or app without memory:read, or changed outside the
+        page's own routes, answers `consent_required` with `reason: portfolio_read_waits` and
+        `request_id`, the publish request (kind `portfolio-memory-read`) that asks the owner; the page
+        is served as before and reads nothing through the owner until they allow it.
+
         **By name (`app`).** A page of the node that holds app code in an opaque-origin frame asks
         with `app=owner/filename` instead of `origin`, because the frame has no address of its own
         to be bound by: the isolated frame's page on a node several people share with no app origin
@@ -9449,7 +9456,8 @@ paths:
         (a refresh never widens scopes on its own). A revoked grant yields `401`, and so does a
         grant whose account is gone, deactivated, or was made after the grant because the name was
         registered again. The access JWT counts from the grant's creation: it is refused in the
-        same cases.
+        same cases. A refresh for a welcome page origin answers `403 PORTFOLIO_READ_WAITS` while the
+        page served now waits for its owner (see the silent bridge).
       tags: [Auth]
       requestBody:
         required: true
@@ -9468,6 +9476,7 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 
   /v1/app-grants:
     get:
@@ -73859,6 +73868,14 @@ paths:
                               Only on a JSON upload (the agent's way in): whether the page is
                               public now. False means it is stored and the address shows nothing
                               yet, because `enable` was not sent or the owner switched the page off.
+                          memory_read:
+                            type: object
+                            additionalProperties: true
+                            description: >-
+                              Present when the writer does not hold memory:read: `publish_request`, the
+                              question (kind `portfolio-memory-read`) whether the page may read the
+                              owner's memory when the owner opens it. Until the owner allows it, the page
+                              is served as before and reads nothing through the owner.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -73931,6 +73948,16 @@ paths:
                               company origins serve the page with the same record's marks.
                           viewer_authenticated: { type: boolean }
                           viewer_is_owner: { type: boolean }
+                          viewer_reads_memory:
+                            type: boolean
+                            description: >-
+                              Only for the owner: whether the viewer's fetch bridge reads records for the
+                              page with the owner's session. False while a page a writer without
+                              memory:read wrote waits for the owner.
+                          memory_read_request:
+                            type: string
+                            nullable: true
+                            description: Only for the owner, with viewer_reads_memory false; the publish request that asks.
                           owner_gaiis: { type: array, items: { type: string } }
                           standalone_url: { type: string, nullable: true }
         '401':

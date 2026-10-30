@@ -3294,10 +3294,10 @@
      "slug": "g-16-portfolio",
      "cells": [
       "<strong>Portfolio</strong>",
-      "Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes. You choose who may open it: anyone, people signed in to this node, or the members of one organism (see Who may open an app).",
-      "<code>/v1/portfolio/*</code>, <code>aimeat_portfolio_publish</code> (<code>enable</code>, <code>access</code>)"
+      "Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes. You choose who may open it: anyone, people signed in to this node, or the members of one organism (see Who may open an app). When an agent or app that may not read your entries writes the page, you are asked once whether the page may read them when you open it signed in; until you allow it, the page is shown without your private entries.",
+      "<code>/v1/portfolio/*</code>, <code>aimeat_portfolio_publish</code> (<code>enable</code>, <code>access</code>), <code>aimeat_publish_requests</code>"
      ],
-     "plain": "Portfolio Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes. You choose who may open it: anyone, people signed in to this node, or the members of one organism (see Who may open an app). /v1/portfolio/*, aimeat_portfolio_publish (enable, access)"
+     "plain": "Portfolio Publish your own public page, built with your AI in the house style or your own. It is your profile's business card: made from the interview, readable by other AIs, and switched on by your AI once you say yes. You choose who may open it: anyone, people signed in to this node, or the members of one organism (see Who may open an app). When an agent or app that may not read your entries writes the page, you are asked once whether the page may read them when you open it signed in; until you allow it, the page is shown without your private entries. /v1/portfolio/*, aimeat_portfolio_publish (enable, access), aimeat_publish_requests"
     },
     {
      "slug": "g-16-install-the-node-as-an-app",

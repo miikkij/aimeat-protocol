@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-31 — The owner's own portfolio origin gets its memory:read token, on the silent bridge and on refresh, only while the page served now was written by a writer with memory:read or allowed by the owner; otherwise consent_required with reason portfolio_read_waits and the request id, and 403 PORTFOLIO_READ_WAITS on refresh (services/portfolio-read-hold.ts; audit H-9, f-2026aug-h-9).
  *   2026-10-27 — A version another author's app published through its grant (`manifest.publishedByApp`) asks like one another account published: the silent bridge adds `published_by_app`, and `published_by_other` names that app (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — The owner's own app asks the owner for the words the grant lacks when another account published the live version or the owner narrowed the grant by hand: the silent bridge answers consent_required (reason app_updated, `why`, `added`, `published_by`) and the request answers `published_by_other` so the consent page shows the screen (services/own-app-consent.ts; secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). The portfolio ceiling moved unchanged to services/app-grant-portfolio.ts (line limit).
  *   2026-10-25 — The silent bridge reads the refresh cookie by the node's config (`__Host-aimeat_rt` on https; secaudit2026oct22, refresh-cookie-unprefixed-first-match).
@@ -148,6 +149,7 @@ import { ownerRefuses, recordIssuedAt } from '../auth/credential-age.js';
 import { readRefreshCookie, checkRefreshSession } from '../services/owner-session.js';
 import { appOriginHostFamily, resolveAppOriginTarget, resolveFrameAppTarget, draftBaseLabel } from '../services/app-origin-target.js';
 import { PORTFOLIO_GRANT_SCOPES, isPortfolioTarget, capPortfolioScopes } from '../services/app-grant-portfolio.js';
+import { portfolioReadHold } from '../services/portfolio-read-hold.js';
 import { ownAppConsentNeed } from '../services/own-app-consent.js';
 import { byAnotherAuthorsApp } from '../services/app-published-by-app.js';
 import { accountOf } from '../services/app-members.js';
@@ -609,6 +611,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // below decides whether to approve it — including the own-app branch, which asks the page what
     // it wants and believes the answer. See capPortfolioScopes for what this does and does not fix.
     const requested = isPortfolioTarget(grantTarget) ? capPortfolioScopes(asked) : asked;
+    // AUDIT H-9: the owner's own page reads their memory only when the page served now was written by a
+    // writer with memory:read or allowed by the owner (services/portfolio-read-hold.ts); else it waits.
+    const readHeld = isPortfolioTarget(grantTarget) && owner === grantOwner ? await portfolioReadHold({ storage, config }, owner) : null;
+    if (readHeld) return reply({ ok: false, error: 'consent_required', reason: 'portfolio_read_waits', app: grantTarget, app_name: grantName, request_id: readHeld.request_id });
 
     // Policy: a live grant is answered from what the app asks for TODAY, not from what it asked for
     // the day the grant was made.
@@ -740,6 +746,11 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       if (!grant || grant.revoked || !grant.refreshTokenHash || await grantGivenToEarlierAuthor(storage, grant)
         || ownerRefuses(await storage.getOwner(grant.owner), recordIssuedAt(grant.createdAt))) {
         return res.status(401).json(error(config.nodeId, 'INVALID_GRANT', 'Grant revoked or refresh token invalid'));
+      }
+      // AUDIT H-9: a page that waits for the owner does not refresh its way into a memory:read token.
+      if (isPortfolioTarget(grant.app) && await portfolioReadHold({ storage, config }, grant.app.slice(grant.app.indexOf(':') + 1))) {
+        return res.status(403).json(error(config.nodeId, 'PORTFOLIO_READ_WAITS',
+          'The welcome page served now waits for its owner before it reads their memory. The owner allows it with the request the node filed (GET /v1/publish-requests).'));
       }
       // Rotate the refresh token (one-time use).
       const newRaw = randomBytes(32).toString('hex');

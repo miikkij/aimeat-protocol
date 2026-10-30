@@ -24,6 +24,9 @@
  *     a money sale, which the admin dashboard totals (commerce/platform-fee.ts is its one writer, straight
  *     to storage). An account and its agents wrote one through the memory API and moved the operator's
  *     money figure (secaudit2026oct26, routes/admin.ts:dashboard:any-namespace-platform-fee-records).
+ *   2026-10-31 -- `portfolio-read-hold.` is service-owned: whether the owner's welcome page may read
+ *     their memory, by the digest of the page (services/portfolio-read-hold.ts; audit H-9). A new
+ *     prefix, so nothing wrote it through the memory API before.
  *   v1.31.0 -- 2026-10-26 -- `mcp.tasks.` is service-owned: an MCP task and the tool result it hands
  *     back on tasks/get (services/mcp-tasks.ts; wish-mcp-tasks-laajennus-pitkille-ty-kalukutsuille).
  *   v1.30.0 -- 2026-10-25 -- `agent-device-return.` is service-owned: an existing agent's proven
@@ -406,7 +409,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * straight to storage; a record any account or agent wrote through a memory route raised, lowered or
  * broke the operator's figure. The account holder in person still removes one of their own.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -424,6 +427,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['agent-device-return.', 'the mark that an agent proved it is coming back, and only the device authorization writes it.'],
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
   ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
+  ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
 ];
 
 /**

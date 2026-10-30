@@ -5,6 +5,9 @@
  * @description Portfolio view — builder (select content, generate AI prompt,
  *   upload HTML) and public viewer (sandboxed iframe render).
  * @version-history
+ *   v1.7.2 — 2026-10-31 — The fetch bridge reads for the page without the owner's session while the node
+ *     says viewer_reads_memory false: a page a writer without memory:read wrote waits for the owner
+ *     (services/portfolio-read-hold.ts; audit H-9).
  *   v1.7.1 — 2026-10-18 — The viewer reads the page with the visitor's session, so a page whose owner
  *     opened it for signed-in people or one organism shows for them (plan doc-mvcn6c7e4e5q, V3.10).
  *   v1.7.0 — 2026-10-16 — The page shows the AI label its record says it owes above the frame; the
@@ -109,7 +112,9 @@ function PortfolioViewer({ username, navigate }) {
         reply(false, null);
         return;
       }
-      const s = getSession();
+      // The owner's own page reads with the owner's session only when the node says it may: a page a
+      // writer without memory:read wrote waits for the owner first (audit H-9), and reads signed out.
+      const s = data.viewer_reads_memory === false ? null : getSession();
       try {
         const resp = await fetch(`/v1/memory/${encodeURIComponent(d.gaii)}/${encodeURIComponent(d.key)}`,
           s ? { headers: { Authorization: 'Bearer ' + s.jwt } } : undefined);
