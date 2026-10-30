@@ -14,6 +14,9 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.36.3 — 2026-10-29 — The portfolio origin and a company origin's served page set the owner cookie
+ *     too, so the origin clears its storage once when its holder changed (erasure and name reuse,
+ *     company deletion and slug reuse; secaudit2026oct26 round 8c, origin-handed-to-next-name-holder).
  *   v1.36.2 — 2026-10-27 — A label's page sets the owner cookie and clears the origin's storage once
  *     when the label passed to another owner (routes/origin-owner-cookie.ts; secaudit2026oct26).
  *   v1.36.1 — 2026-10-25 — ensureAppSubdomain clears the held mark of its own target's label: the owner
@@ -536,6 +539,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         res.setHeader('X-Robots-Tag', 'noindex, nofollow');
       }
       countVisit(storage, config, { ownerGaii: `${sub}@${config.nodeId}`, target: 'portfolio', ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
+      // The label is the account name, which an erased account releases: the origin clears its
+      // visitors' storage once when its holder changed (routes/origin-owner-cookie.ts; secaudit2026oct26 round 8c).
+      await markOriginOwner(req, res, storage, config, { ownerName: sub });
       servePortfolio(res, ownerTagsIntoHtml(resolved.html, await ownerTagsFor(storage, config, `${sub}@${config.nodeId}`)), resolved.portfolioConfig.showBadge !== false && servedBadgeOn(config), csp, await portfolioMarks(storage, config, resolved.aiProvenanceId, req.headers['accept-language']));
       return;
     }
@@ -561,6 +567,9 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       // Who may open the front page, whatever it serves (routes/page-open.ts). 'none' stays the 404 below.
       if (company.frontPage.kind !== 'none'
         && await pageOriginRefused(req, res, config, { kind: 'company', id: company.id }, company.frontPageAccess, companyNotFound)) return;
+      // A deleted company's slug is free for any account: a served page clears the origin's visitor
+      // storage once when its holder changed (routes/origin-owner-cookie.ts; secaudit2026oct26 round 8c).
+      const markCompanyOwner = () => markOriginOwner(req, res, storage, config, { ownerName: localAccountName(company.ownerGhii) });
 
       if (company.frontPage.kind === 'redirect' && company.frontPage.target) {
         res.redirect(301, company.frontPage.target);
@@ -572,6 +581,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         const page = await readCompanyPortfolioPage(storage, company);
         if (!page) return companyNotFound();
         countVisit(storage, config, { ownerGaii: company.ownerGhii, target: `company:${sub}`, ...visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) });
+        await markCompanyOwner();
         servePortfolio(res, ownerTagsIntoHtml(page.html, await ownerTagsFor(storage, config, company.ownerGhii)), servedBadgeOn(config), csp, await portfolioMarks(storage, config, page.aiProvenanceId, req.headers['accept-language']));
         return;
       }
@@ -583,6 +593,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (!companyApp || appIsRestricted(config, companyApp)) return companyNotFound();
       // The front page is an app, so it is served through the app path unchanged: same CSP,
       // same serve-time marks, same download accounting.
+      await markCompanyOwner();
       await serveApp(res, storage, companyApp, csp, apexOrigin,
         { config, viewer: req.auth ? resolveIdentity(req.auth, config.nodeId) : 'anon', anonymous: !!req.auth?.anonymous, userAgent: req.get('user-agent'), geo: geoFromHeaders(config.geoHeaders, (n) => req.get(n)), visit: visitSignals((n) => req.get(n), req.query.utm_source, req.hostname, config.baseUrl) },
         { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },

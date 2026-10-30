@@ -7,6 +7,9 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   2026-10-29 — 32, 33: a company address that keeps its holder clears nothing; the first visit after a
+ *     deleted company's address passed to another account clears the old storage once (secaudit2026oct26
+ *     round 8c, origin-handed-to-next-name-holder).
  *   2026-10-25 — 15b: a private-network SMTP host is refused with the setting named and accepted once
  *     the operator lists its network; 18b: a non-SMTP first line from the server is not passed back
  *     (secaudit2026oct22, sendAsCompany:smtp-host-address-class).
@@ -700,6 +703,55 @@ await test('31. removing the front page takes the sign-in door with it', async (
   assert(r.status === 400 && r.message.includes('not bound to this app'),
     `an address with no app must refuse the binding, got ${r.status} ${r.message}`);
   await json(`/v1/companies/${signinCompanyId}`, { method: 'DELETE', headers: authed(A.token) });
+});
+
+// secaudit2026oct26 round 8c (routes/subdomains.ts:ensureAppSubdomain:origin-handed-to-next-name-holder).
+// A deleted company's address can be claimed by another account at once, and visitors' browsers still
+// hold what the old front page stored on that origin. The first visit after the holder changed clears
+// it once, as an app origin does; an address that keeps its holder clears nothing.
+async function coVisit(s: string, cookie?: string): Promise<{ status: number; clear: string | null; cookie?: string }> {
+  const res = await hostRequest(BASE, '/', `${s}.${CO_HOST}:${PORT}`, {
+    headers: { 'x-co-origin': '1', 'x-subdomain': s, Accept: 'text/html', ...(cookie ? { Cookie: cookie } : {}) },
+  });
+  const set = /aimeat_origin_owner=[^;]*/.exec(res.header('set-cookie') ?? '')?.[0];
+  return { status: res.status, clear: res.header('clear-site-data'), cookie: set ?? cookie };
+}
+async function companyWithFront(token: string, owner: string, file: string, wantSlug?: string): Promise<{ id: string; slug: string }> {
+  const r = await json('/v1/companies', {
+    method: 'POST', headers: authed(token),
+    body: JSON.stringify({ name: `Vaihtuva Oy ${Date.now().toString(36).slice(-5)}`, ...(wantSlug ? { slug: wantSlug } : {}) }),
+  });
+  assert(r.status === 201, `register failed: ${r.status} ${JSON.stringify(r.body)}`);
+  const set = await json(`/v1/companies/${r.body.data.company.id}/front-page`, {
+    method: 'PUT', headers: authed(token), body: JSON.stringify({ kind: 'app', target: `${owner}/${file}` }),
+  });
+  assert(set.status === 200, `front page failed: ${set.status} ${JSON.stringify(set.body)}`);
+  return { id: r.body.data.company.id, slug: r.body.data.company.slug };
+}
+
+await test('32. usage: a company address that keeps its holder keeps its visitors\' storage across visits', async () => {
+  const c = await companyWithFront(A.token, A.owner, APP_FILE);
+  const first = await coVisit(c.slug);
+  const second = await coVisit(c.slug, first.cookie);
+  const third = await coVisit(c.slug, second.cookie);
+  assert(first.status === 200 && second.status === 200 && third.status === 200, `served: ${first.status} ${second.status} ${third.status}`);
+  assert(!first.clear && !second.clear && !third.clear, `an unchanged origin cleared its storage: ${first.clear} ${second.clear} ${third.clear}`);
+  await json(`/v1/companies/${c.id}`, { method: 'DELETE', headers: authed(A.token) });
+});
+
+await test('33. the first visit after a deleted company\'s address passed to another account clears the old storage, once', async () => {
+  const c = await companyWithFront(A.token, A.owner, APP_FILE);
+  const before = await coVisit(c.slug);
+  assert(before.status === 200 && !before.clear && !!before.cookie, `the first visit marks the origin's holder: ${JSON.stringify(before)}`);
+  const del = await json(`/v1/companies/${c.id}`, { method: 'DELETE', headers: authed(A.token) });
+  assert(del.status === 200, `delete failed: ${del.status}`);
+  const next = await companyWithFront(B.token, B.owner, `other-${APP_FILE}`, c.slug);
+  assert(next.slug === c.slug, `the address was not taken again: ${next.slug}`);
+  const after = await coVisit(c.slug, before.cookie);
+  assert(after.status === 200 && /"storage"/.test(after.clear ?? ''), `the old company's storage stays readable to the next holder: ${JSON.stringify(after)}`);
+  const again = await coVisit(c.slug, after.cookie);
+  assert(again.status === 200 && !again.clear, `cleared again on the next visit: ${again.clear}`);
+  await json(`/v1/companies/${next.id}`, { method: 'DELETE', headers: authed(B.token) });
 });
 
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);

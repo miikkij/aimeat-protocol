@@ -1455,10 +1455,12 @@
           "classification_default_caps": "Limits on who may see classified content",
           "anonymous_principal_records": "What the shared anonymous agent wrote",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
-          "subdomain_site_origin": "Other people's apps at addresses on your own domain"
+          "subdomain_site_origin": "Other people's apps at addresses on your own domain",
+          "platform_fee_records": "Money fee records whose writer is not known"
         },
         "detail": {
-          "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose."
+          "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose.",
+          "platform_fee_records": "These money fee records ({count}) look like the ones a sale writes, but nothing shows whether a sale or the account itself wrote them. They count in your money fees as before until you choose."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1488,7 +1490,8 @@
           "lead": {
             "anonymous_principal_records": "Anyone who held the anonymous sign-in could have written these, because they all act as one shared agent. Check each one. Clear or delete what you do not want, and keep the rest. Nothing changes until you decide, and the incident is resolved with your last decision.",
             "erasure_leftover_schedules": "These scheduled tasks belong to accounts that were deleted before 25 October 2026. Deleting an account then removed the person's own scheduled tasks, but not the ones their agents and apps had made. If someone else registers the same username, or already has, they see these tasks, and the tasks can run in their name. Delete each task that nobody needs. Nothing changes until you choose.",
-            "subdomain_site_origin": "An app that another person published also opens at an address on your own domain. For each address, choose where the app opens from now on. Until you choose, everything works as before."
+            "subdomain_site_origin": "An app that another person published also opens at an address on your own domain. For each address, choose where the app opens from now on. Until you choose, everything works as before.",
+            "platform_fee_records": "Before 27 October 2026, any account could write a money fee record into its own memory, and the Economy page counted it in the fees owed to you. For each record below, choose whether it counts. Nothing is deleted, and until you choose, every record counts as before."
           },
           "subdomain": {
             "appOnly": "Only the app's own address (recommended)",
@@ -1498,13 +1501,16 @@
             "choose": "Choose"
           },
           "action": {
-            "subdomain": "App only"
+            "subdomain": "App only",
+            "platform_fee": "Do not count"
           },
           "keepAction": {
-            "subdomain": "My own site"
+            "subdomain": "My own site",
+            "platform_fee": "Count"
           },
           "confirm": {
-            "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before."
+            "subdomain": "Make this an app address only? {line} A visitor who opens it at your own domain is taken to the app's own address, where the app works as before.",
+            "platform_fee": "Leave this record out of your money fees? {line} The record stays, and the Economy page no longer counts it."
           },
           "rowResolved": "Every record is decided.",
           "clear": "Clear",
@@ -1522,7 +1528,8 @@
             "skill": "The skill {name}, with its files",
             "datapackage": "The data package {name}, with its files",
             "schedule": "The scheduled task \"{label}\", made by {maker} for the account {owner} (runs: {cron})",
-            "subdomain": "{label}: the app {app}, published by {owner}"
+            "subdomain": "{label}: the app {app}, published by {owner}",
+            "platform_fee": "{amount} in the memory of {owner} ({key}), seller {seller}, buyer {buyer}"
           }
         },
         "source": {
@@ -5179,18 +5186,21 @@
     "publicWho": "Anyone, signed in or not. It can show up in lists and searches."
   },
   "agreements": {
-    "status": { "signed": "In force", "sent": "Waiting for signature", "review": "Being checked", "draft": "Draft", "expired": "Replaced", "ended": "Ended" },
+    "status": { "signed": "In force", "sent": "Waiting for signature", "review": "Being checked", "draft": "Draft", "expired": "Replaced", "ended": "Ended", "test-signed": "Signed in test, not in force" },
     "event": {
       "created": "Draft made", "edited": "Draft changed", "version": "New version drafted", "sent": "Sent for signature", "reminder": "Reminder sent",
       "signed": "Signed", "copy-received": "Signed copy received", "copy-accepted": "Signed copy accepted", "copy-rejected": "Signed copy rejected",
       "in-force": "In force", "notice": "Change announced", "notice-reminder": "Change reminder sent", "notice-lapsed": "New version in force",
-      "objection": "Objection to the change", "breach-notice": "Breach notice sent", "ended": "Agreement ended", "deletion-done": "Data deleted or returned"
+      "objection": "Objection to the change", "breach-notice": "Breach notice sent", "ended": "Agreement ended", "deletion-done": "Data deleted or returned",
+      "test-signed": "Signed in test, not in force"
     },
     "next": {
       "deletion": "Delete or return the data by {date}", "sendDraft": "Version {n} is a draft: send it for signature",
       "review": "A signed copy waits for your decision", "reviewCp": "Your signed copy is being checked",
       "objected": "The change was objected to and does not take effect", "notice": "The change takes effect on {date} unless objected to",
-      "waitingCp": "Waiting for the counterparty's signature", "signCp": "Waiting for your signature"
+      "waitingCp": "Waiting for the counterparty's signature", "signCp": "Waiting for your signature",
+      "testSigned": "A test wallet signed it, so it is not in force. Make a new version and send it for signature",
+      "testSignedCp": "Your signature was a test signature with no legal effect. You get word when a new version waits for your signature"
     },
     "colStep": "Step", "colWhen": "When", "colWith": "With", "colSubject": "What it covers", "colState": "State", "colNext": "Next step",
     "noSteps": "Nothing has happened yet.", "waits": "waits",
@@ -5256,7 +5266,7 @@
       "ended": "The agreement ended.", "deletionDone": "Mark the data deleted", "deletionRecorded": "The deletion was recorded.",
       "empty": "No agreements yet. Make the first one, or ask your AI to.", "copyForAi": "Copy for your AI", "copied": "Copied. Paste it into your own AI chat.",
       "aiPrompt": "Use aimeat_compliance_agreement. Make a data processing agreement for my customer: action \"create\" with dry_run first, input { counterparty: { name, businessId, address, contactName, contactEmail, signerName, signerRole }, product, language }. Show me the missing_measures and ask me for them, write them with action \"update\", and send it with action \"send\" when I say yes.",
-      "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty" }
+      "next": { "draft": "Send for signature", "review": "Decide the signed copy", "waitingCp": "Waiting for the counterparty", "test-signed": "Signed in test only: make a new version" }
     },
     "gap": {
       "agreement-review-waiting": "{who}: a signed copy waits for your decision.", "subprocessor-change-unannounced": "{who}: a new sub-processor has not been announced.",
@@ -10420,6 +10430,10 @@
   "notiftext.docsign_request.body": "Document {document}. Open the signing request, or ask your AI to show it to you.",
   "notiftext.app_published_by_app.title": "{publisher} made a new version of your app {app}",
   "notiftext.app_published_by_app.body": "You gave {publisher} permission to publish apps for you, and it published version {version}. The next time you open {app}, you see what the new version wants to do, and you choose whether to allow it.",
+  "notiftext.content_pdf_text_not_read_time.title": "The text of your PDF {key} was not read",
+  "notiftext.content_pdf_text_not_read_time.body": "The file is stored as it was. Reading its text took longer than the limit of {limit} on this AIMEAT. The limit applies to a PDF whose size cannot be checked before it is read. Your Data Wallet page says the same about this file.",
+  "notiftext.content_pdf_text_not_read_memory.title": "The text of your PDF {key} was not read",
+  "notiftext.content_pdf_text_not_read_memory.body": "The file is stored as it was. Reading its text needed more memory than the limit of {limit} on this AIMEAT. The limit applies to a PDF whose size cannot be checked before it is read. Your Data Wallet page says the same about this file.",
   "notiftext.agreement_sent_cp.title": "{operator} asks you to sign a data processing agreement",
   "notiftext.agreement_sent_cp.body": "Read the summary and choose how you sign. Agreement {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Your signed copy could not be accepted",
@@ -10565,6 +10579,10 @@
   "notiftext.payment_possible.body": "The payment service did not answer when a buyer paid you, so it is not known whether the money arrived. Check your payout address for a transfer from {payer}. If it arrived, deliver the order or return the payment. Reference: {reference}.",
   "notiftext.payout_possible.title": "You may have received {amount}",
   "notiftext.payout_possible.body": "{provider} sent you {amount}, but the payment network did not confirm that the transfer went through. Check your payout address for a transfer from {payer}. Reference: {reference}.",
+  "notiftext.payout_arrived.title": "The payment of {amount} arrived",
+  "notiftext.payout_arrived.body": "The people who run this server checked that the payment of {amount} from {provider} arrived. It is now recorded as paid. Reference: {reference}.",
+  "notiftext.payout_arrived_provider.title": "Your payment of {amount} arrived",
+  "notiftext.payout_arrived_provider.body": "The people who run this server checked that your payment of {amount} to {beneficiary} arrived. It is now recorded as paid, and you do not need to pay it again. Reference: {reference}.",
   "notiftext.package_sale_request_approved.title": "Your request for {name} was approved",
   "notiftext.package_sale_request_approved.body": "The seller approved it. Open your Packages page to see what comes next.",
   "notiftext.package_sale_request_refused.title": "Your request for {name} was not approved",
@@ -10599,6 +10617,13 @@
   "notiftext.approval_change.ecosystem": "Change it on the Outside apps page",
   "notiftext.approval_change.agent_page": "Change it on the agent's page",
   "notiftext.approval_change.scheduler": "Change it on the Scheduler tab",
+  "notiftext.approval_change.accountants": "Change it under Who may read your books on the Profit & loss page",
+  "notiftext.approval_accountant_grant.title": "Does {name} still get to read your books?",
+  "notiftext.approval_accountant_grant.body": "You gave {name} the right to read your books before the server kept the date of each right. The account named {name} was created after you began giving rights, and a deleted account's name can be registered again by someone else, so the server cannot tell whether this is the person you meant. Until you answer, {name} reads your books as before. If you allow it, {name} keeps the right. If you do not, the right is removed.",
+  "notiftext.approval_card_adult.title": "Did you pay with your own card?",
+  "notiftext.approval_card_adult.body": "You paid {seller} with a credit card. The payment went through the seller's own card payment account, and only that account says the card was a credit card. If you confirm that you paid with your own card, this server records you as a verified adult, and apps can then show you content meant for adults. If you do not confirm, your adult status stays as it was. Your answer does not change your purchase.",
+  "notiftext.approval_card_adult.allow": "I paid with my own card",
+  "notiftext.approval_card_adult.deny": "Leave it as it is",
   "notiftext.approval_request.allow": "Allow",
   "notiftext.approval_request.deny": "Don't allow",
   "notiftext.approval_answer_allowed.title": "Allowed: {what}",
@@ -10627,6 +10652,12 @@
   "notiftext.approval_email_policy_sent.body": "An operator of this server decides it. Until then the extension emails only the addresses the normal rules allow. You hear the answer here.",
   "notiftext.approval_email_policy_code_sent.title": "The code of {extension} changed: an operator confirms its email permission",
   "notiftext.approval_email_policy_code_sent.body": "{who} changed the code. Until an operator confirms the permission to email any address for the new code, the extension emails only the addresses the normal rules allow. You hear the answer here.",
+  "notiftext.approval_extension_code.title": "{who} installed the package {package}: allow the code of its extension {extension}?",
+  "notiftext.approval_extension_code.body": "The extension came with the package into the account {account}. On this server only the operator's account installs extension code, so the extension is switched off until an operator allows it. If you allow it, it is switched on at once. If you do not, it stays switched off, and the rest of the package stays installed. {who} hears the answer either way.",
+  "notiftext.approval_extension_code_sent.title": "The extension {extension} from the package {package} waits for an operator",
+  "notiftext.approval_extension_code_sent.body": "On this server only the operator's account installs extension code. The rest of the package is installed, and the extension stays switched off until an operator allows it. You hear the answer here.",
+  "notiftext.approval_cortex_holder.title": "The library {cortex} that your apps load now belongs to {holder}",
+  "notiftext.approval_cortex_holder.body": "The account that held the library {cortex} is gone, and {holder} installed a new library under the same name. Your apps {apps} load it by that name, so they would run code that {holder} wrote. If you allow it, your apps load the new library at once. If you do not, they do not load it, and the parts of the apps that need it do not work. {who} hears the answer either way.",
   "notiftext.approval_secret_host_ask_off.title": "{who} asks that your agents may send your passwords and keys to new addresses without asking you",
   "notiftext.approval_secret_host_ask_off.body": "Now you are asked before your agents send a saved password or key to an address it has not gone to before. If you allow this, they can send them to new addresses without asking you. If you do not, you are still asked.",
   "notiftext.approval_crew_model.title": "{who} asks to point your agent {agent} at the model address {host}",
@@ -10637,6 +10668,12 @@
   "notiftext.approval_goal_model_read.body": "{agent} needs {records} for the task \"{work}\" in your goal \"{goal}\". {agent} may not read your private entries, but it sees what the AI answers. If you allow it, the AI uses these entries in the task. If you do not, the task is done without them.",
   "notiftext.approval_schedule_instruction.title": "{who} changed the scheduled task \"{schedule}\", and the change waits for your approval",
   "notiftext.approval_schedule_instruction.body": "{maker} made this scheduled task, so it reads your data with the permissions of {maker}. {who} changed its instructions, but {who} may not read everything that {maker} can. So the change waits for your approval. If you allow it, the task uses the new instructions. If you do not, it goes back to the old ones.",
+  "notiftext.approval_delegation_binding.title": "{who} publishes on your channel {channel} with the app {app} by {author}",
+  "notiftext.approval_delegation_binding.body": "You let the app \"{label}\" publish \"{action}\" on your channel, but you named it only by its file name. This app of that name was made by {author}, not by you. If you allow it, only {author}'s app may use the permission from now on, and an app of the same name by anyone else may not. If you do not, this app may not publish on your channel. {who} hears the answer either way.",
+  "notiftext.delegation_bound.title": "Only your own app {app} may now publish as \"{label}\" on your channel",
+  "notiftext.delegation_bound.body": "You let the app \"{label}\" publish \"{action}\" on your channel and named it only by its file name, so an app of the same name by someone else could have used the permission. From now on only your own app {app} may use it. Its users publish through it as before.",
+  "notiftext.approval_goal_model_spend.title": "{who} asks AIMEAT's AI to do the task \"{work}\" at your cost",
+  "notiftext.approval_goal_model_spend.body": "{agent} added the task \"{work}\" to your goal \"{goal}\" for AIMEAT's AI. {agent} may not use your AI itself, so the cost of the task waits for you. If you allow it, the AI does this task and the AI tasks {agent} adds to this goal later. If you do not, this task is not done.",
   "notiftext.approval_refinery_definition.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
   "notiftext.approval_refinery_definition.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
   "notiftext.approval_refinery_definition_text.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
@@ -12188,6 +12225,21 @@
     "ecoMoneySub": "its own rails",
     "ecoMoneyIntro": "Money travels on payment rails (Stripe and its peers) and never through morsels. This shows only what money has moved through the sales made here.",
     "ecoMintIntro": "A grant lands on the agent’s owner’s balance and shows in their wallet. The daily cap is {cap} morsels.",
+    "possiblePayouts": {
+      "title": "Payouts that may have gone out",
+      "count": "{n} to check",
+      "lead": "When these sellers paid someone their share of the revenue, the x402 payment service did not answer, so nobody knows whether the transfer went out. Look up each nonce on the chain. If the transfer is there, write its transaction hash or your own case number and press Mark as arrived: the share is recorded as paid, and both parties get a notice. If the transfer is not there, do nothing: the seller closes it from their own payout.",
+      "colWho": "Who paid whom",
+      "colWhen": "Started",
+      "colAmount": "Amount",
+      "who": "{provider} → {beneficiary}",
+      "nonce": "nonce {nonce}",
+      "payer": "From {payer} to {to}, on {network}",
+      "reference": "Reference",
+      "referenceNote": "The transaction hash, or your own case number.",
+      "markArrived": "Mark as arrived",
+      "referenceRequired": "Write the reference first."
+    },
     "cfgSearch": "Find a setting by name, key or description…",
     "cfgOnlyChanged": "Only changed ({n})",
     "cfgAll": "All",
@@ -12313,6 +12365,8 @@
     "cfg_federation_open_join": "Open join",
     "cfg_federation_book_listed": "Listed in the federation book",
     "cfg_federation_introductions_per_hour": "Peering requests from one address per hour",
+    "cfg_federation_peering_request_days": "Days a peering request waits",
+    "cfg_federation_resolve_max_peers": "Peers asked in one identity lookup",
     "cfg_federation_audience_required": "Refuse a message that does not name this server",
     "cfg_quota_memory_max_value_size_kb": "Memory value size cap",
     "cfg_quota_memory_max_keys_per_agent": "Memory keys cap",
@@ -12626,6 +12680,8 @@
     "cfgDesc_federation_open_join": "Open join: a signed introduce self-admits as a low-trust visiting peer (no manual approval)",
     "cfgDesc_federation_book_listed": "List this instance (operators + resources) in the federation book; off = privacy opt-out",
     "cfgDesc_federation_introductions_per_hour": "How many peering requests one address can leave for you in an hour. A server that introduces itself again with the same key keeps one waiting request. Past the limit the server is told when to try again. 0: no limit.",
+    "cfgDesc_federation_peering_request_days": "How many days a peering request from another server waits for your answer. After that it expires and is deleted, and the server can introduce itself again. Requests this server sent are kept. 0: never expires.",
+    "cfgDesc_federation_resolve_max_peers": "Anyone can ask this server which server an identity lives on. When the identity names a server you know, only that server is asked, or none. When it names no server you know, this server asks its peers one at a time, at most this many. 0: no limit.",
     "cfgDesc_federation_audience_required": "A message from another server names the server it is for, so it cannot be passed on to a third server. A server on an older version names none. Off: this server still takes such a message. On: it refuses the message. From version 3.27.0 it is on by default. A message that names another server is refused either way. The older message format, which names no server, is removed in version 4.0.0.",
     "cfgDesc_security_login_rate_limit_max": "Max login attempts per minute per IP",
     "cfgDesc_security_login_rate_limit_window_ms": "Login rate limit window in ms",
@@ -13374,6 +13430,10 @@
     "cfgDesc_content_class_mode": "On: each owner decides. Reading what a file says about itself runs for everyone, and every step that calls an AI model stays off until the owner turns it on on their Data Wallet page. Off: nothing is read, and the content class routes and tools answer 404.",
     "cfgDesc_content_class_ffprobe_path": "The ffprobe program that reads a video's length, size and codecs: a name on PATH or a full path. Without it, a video gets only the details every file gets.",
     "cfgDesc_content_class_ffmpeg_path": "The ffmpeg program that takes still pictures and the sound out of a video for its description: a name on PATH or a full path.",
+    "cfg_content_class_pdf_text_seconds": "PDF text: time limit (s)",
+    "cfg_content_class_pdf_text_memory_mb": "PDF text: memory limit (MB)",
+    "cfgDesc_content_class_pdf_text_seconds": "How long the server may read the text of a PDF whose decoded size it cannot check first, such as an encrypted PDF. Past the limit the file stays stored, its text is not read, and the uploader and the file's details say so. Applies to chat attachments, mail attachments and what is known about a file. 0 = no limit.",
+    "cfgDesc_content_class_pdf_text_memory_mb": "How much memory the server may use to read the text of such a PDF. Past the limit the file stays stored, its text is not read, and the uploader and the file's details say so. 0 = no limit.",
     "cfgGroup_packages": "Packages",
     "cfgGroup_themes": "Themes",
     "cfgGroup_agents": "Agent migration",
@@ -23287,6 +23347,7 @@
   "chat.youLabel": "You",
   "chat.agentLabel": "Agent",
   "chat.jumpLatest": "Jump to the latest",
+  "chat.deletedCopyKept": "The conversation is deleted here. The chat tool that answered in it keeps its own copy of the text on this server, and AIMEAT cannot delete that copy. The operator of this service can remove it.",
   "chat.starterPage": "Make my welcome page",
   "chat.starterPageAsk": "Put up my welcome page. Keep it simple, and tell me the address when it is live.",
   "chat.starterCompany": "Set up my company",
@@ -26818,6 +26879,17 @@
         "high": "The task is done without these entries.",
         "tipLabel": "When to allow",
         "tip": "Allow if it is fine with you that the agent knows what these entries say. If the agent may read all your entries, you can give it that permission on the agent's page, and then it no longer asks."
+      },
+      "approval_goal_model_spend": {
+        "title": "An agent asks the AI to do a task at your cost",
+        "short": "AIMEAT's AI would do a task of your goal, paid from your own key or your AI allowance.",
+        "what": "In a goal, an agent can give a task to AIMEAT's AI. The AI then works on your account and you pay for it, from your own key or from your AI allowance. This agent does not have the permission to use your AI, so it cannot spend your money alone. That is why you are asked.",
+        "lowLabel": "If you allow",
+        "low": "The AI does this task, and the AI tasks this agent adds to this goal later, at your cost.",
+        "highLabel": "If you do not allow",
+        "high": "This task is not done. Nothing is spent.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you want the goal to go on with this task. If the agent may always use your AI, give it that permission on the agent's page, and then it no longer asks."
       },
       "approval_schedule_instruction": {
         "title": "Someone changed a scheduled task",

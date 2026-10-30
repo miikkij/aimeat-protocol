@@ -15,6 +15,9 @@
  *   Each case has its own record file outside the folder (AIMEAT_COMMAND_TRUST_FILE). "The update
  *   was earlier" is a record whose firstRunAt lies before the folder's files were written.
  * @version-history
+ *   v2.1.0 -- 2026-10-30 -- Case 2 dates the install's config before any release that keeps a record
+ *     (the date moved, the assertions did not), and 2b: a fresh install after that release adopts
+ *     nothing it did not write (secaudit2026oct26 round 8c, connector-04; Jouni, 2026-10-30, option A).
  *   v2.0.1 -- 2026-10-27 -- Case 2 dates the install's config an hour back, as an existing install's is:
  *     written in the first-start millisecond it was not adopted, and the nightly 4.0.0 run went red.
  *   v2.0.0 -- 2026-10-25 -- No question and no `aimeat connect trust`: connecting is the approval,
@@ -28,7 +31,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { stringify } from 'yaml';
 import { loadAllAgents, loadPerAgentConfig, saveConnectedAgentConfig } from '../../src/cli/connect/config.js';
-import { heldNotices } from '../../src/cli/connect/command-trust.js';
+import { heldNotices, adoptExistingCommands, heldBackCommands } from '../../src/cli/connect/command-trust.js';
 import { isRunner } from '../../src/cli/connect/task-runner.js';
 import { buildRegistry } from '../../src/cli/connect/agent-registry.js';
 
@@ -41,6 +44,8 @@ const setEnv = (k: string, v: string) => { saved[k] = process.env[k]; process.en
 const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const fakeToken = (sub: string) => `${b64({ alg: 'none' })}.${b64({ sub })}.x`;
 const RUNNER = { command: 'node', args: ['./marker.js'] };
+/** A time before any release that keeps a trust record: npm's 4.1.2, the last without one, is 2026-10-20. */
+const BEFORE_RECORD_KEEPING_RELEASE = '2026-10-01T00:00:00.000Z';
 
 /** A folder whose `.aimeat` names a runner and a wake command under the bare-name legacy path. */
 function folderWithCommands(dir: string): void {
@@ -106,8 +111,11 @@ describe('2. an install that already had a runner at the first start after this 
     // An existing install's config was written before this start. Written in the same millisecond
     // as the first-start stamp, the file reads as newer by its sub-millisecond mtime and is not
     // adopted, which turned this test red whenever the two calls shared a millisecond.
-    const anHourAgo = new Date(Date.now() - 3_600_000);
-    utimesSync(join(home, 'agents', 'assistant', 'config.yaml'), anHourAgo, anHourAgo);
+    // The fixture date is before any release that keeps a record (ADOPTION_CUTOFF), as an install
+    // from before that release is (secaudit2026oct26 round 8c, connector-04: the date moved, the
+    // assertions did not).
+    const beforeRelease = new Date(BEFORE_RECORD_KEEPING_RELEASE);
+    utimesSync(join(home, 'agents', 'assistant', 'config.yaml'), beforeRelease, beforeRelease);
     // No record yet: this start is the first one after the update.
     const registry = buildRegistry(await loadAllAgents());
     const entry = registry.list()[0]!;
@@ -127,5 +135,41 @@ describe('2. an install that already had a runner at the first start after this 
     const record = JSON.parse(readFileSync(trustFile, 'utf-8')) as { firstRunAt: string };
     expect(Date.parse(record.firstRunAt)).toBeLessThanOrEqual(Date.now());
     expect(isRunner(later)).toBe(false);
+  });
+});
+
+describe('2b. a fresh install after the first release that keeps a record (secaudit2026oct26 round 8c, connector-04)', () => {
+  const CUTOFF = '2026-10-15T00:00:00.000Z';
+  const cfg = () => join(home, 'agents', 'assistant', 'config.yaml');
+  const held = () => heldBackCommands({ runner: RUNNER, wake: { command: 'node ./wake.js' } }, home, process.env, home).held;
+
+  it('adopts nothing that arrived after the release, even before its first start: the command is held', () => {
+    folderWithCommands(home);
+    const afterRelease = new Date('2026-10-20T00:00:00.000Z');
+    utimesSync(cfg(), afterRelease, afterRelease);
+    // No record: this is the machine's first start, and the folder is older than it.
+    adoptExistingCommands(home, process.env, home, CUTOFF);
+    expect(held()).not.toBeNull();
+    expect(heldNotices([{ agent: 'assistant', owner: 'me', heldCommands: held() }]).join('\n')).toContain('aimeat connect');
+  });
+
+  it('designed use: an install from before that release keeps running what it ran, with no question', () => {
+    folderWithCommands(home);
+    const beforeRelease = new Date('2026-10-10T00:00:00.000Z');
+    utimesSync(cfg(), beforeRelease, beforeRelease);
+    adoptExistingCommands(home, process.env, home, CUTOFF);
+    expect(held()).toBeNull();
+  });
+
+  it('designed use: connecting in the folder takes the held command into use', async () => {
+    folderWithCommands(home);
+    const afterRelease = new Date('2026-10-20T00:00:00.000Z');
+    utimesSync(cfg(), afterRelease, afterRelease);
+    adoptExistingCommands(home, process.env, home, CUTOFF);
+    expect(held()).not.toBeNull();
+    // What `aimeat connect` does (auth.ts): keep the runner and wake the folder's config names.
+    const existing = loadPerAgentConfig('assistant', 'me');
+    saveConnectedAgentConfig('assistant', 'me', { node_url: 'https://aimeat.io', wake: existing?.wake, runner: existing?.runner });
+    expect(isRunner((await loadAllAgents())[0]!)).toBe(true);
   });
 });

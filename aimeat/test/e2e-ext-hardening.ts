@@ -26,6 +26,9 @@
  *        capability down.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ext-hardening
  * @version-history
+ *   2026-10-29 — With install role operator, a package's extension code waits switched off for an
+ *     operator's one press while the rest of the package installs; a migration waits again; the default
+ *     role changes nothing (secaudit2026oct26 round 8c, extensions-08).
  *   2026-10-25 — 7 reworked to the developer's ruling: an agent of the operator without
  *     operator:admin ASKS for emailPolicy 'unrestricted' (202, pending for the operators, answered
  *     back on Don't allow and Allow), and a script it writes holds the grant back until an operator
@@ -531,6 +534,79 @@ async function run() {
     });
     assert(yes.status === 200, `the owner approves: ${yes.status} ${JSON.stringify(yes.body?.error ?? yes.body?.data)}`);
     assert((await scriptOf()).includes('agent-written'), 'the owner\'s Allow applied the agent\'s code');
+  });
+
+  // secaudit2026oct26 round 8c: the install role applies to a package's extension code too. With install
+  // role operator the rest of the package installs, the extension waits switched off for an operator's
+  // one press, the installer sees it pending, and the operator's answer is told back. With the default
+  // role nothing changes for the installer.
+  await test('with install role operator, a package\'s extension code waits for an operator and the rest of the package installs', async () => {
+    const setRole = (value: string) => json('/v1/admin/config', {
+      method: 'PUT', headers: auth(seed.token), body: JSON.stringify({ changes: [{ path: 'extensions.install_role', value }] }),
+    });
+    const pkgs = await json('/v1/packages');
+    const withExt = (pkgs.body.data.packages ?? []).find((p: Record<string, unknown>) =>
+      ((p.components ?? []) as Array<{ type?: string }>).some(c => c.type === 'extension'));
+    assert(!!withExt, 'this test needs a published package carrying an extension component');
+    const extComp = (withExt.components as Array<{ id: string; type: string }>).find(c => c.type === 'extension')!;
+    const installAs = (token: string, label: string) => json(`/v1/packages/${encodeURIComponent(withExt.packageGroupId)}/install`, {
+      method: 'POST', headers: auth(token), body: JSON.stringify({ label }),
+    });
+    const extOf = async (token: string, inst: { body: any }) => {
+      const reg = ((inst.body.data.installedComponents ?? []) as Array<{ componentId: string; registeredAs: string }>)
+        .find(c => c.componentId === extComp.id)!.registeredAs;
+      const got = await json(`/v1/extensions/${encodeURIComponent(reg)}`, { headers: auth(token) });
+      return { reg, ext: got.body.data?.extension as { status?: string; config?: Record<string, unknown> } | undefined };
+    };
+
+    // The use that stays: with the default role the installer's extension is on at once.
+    const plain = await installAs(ownerB.token, `role owner ${Date.now()}`);
+    assert(plain.status === 201 && !plain.body.data.extension_code_awaiting_operator, `default role: ${plain.status} ${JSON.stringify(plain.body?.error ?? plain.body?.data?.extension_code_awaiting_operator)}`);
+    assert((await extOf(ownerB.token, plain)).ext?.status === 'active', 'with the default role the package extension is on at once');
+
+    const set = await setRole('operator');
+    assert(set.status === 200, `install role operator: ${set.status} ${JSON.stringify(set.body?.error)}`);
+    try {
+      const held = await installAs(ownerB.token, `role operator ${Date.now()}`);
+      assert(held.status === 201, `the rest of the package installs: ${held.status} ${JSON.stringify(held.body?.error)}`);
+      const { reg, ext } = await extOf(ownerB.token, held);
+      assert(ext?.status === 'inactive', `the extension code waits for an operator: status ${ext?.status}`);
+      const waiting = held.body.data.extension_code_awaiting_operator?.[0];
+      assert(waiting?.extension === reg && typeof waiting.request_id === 'string', `the answer names it: ${JSON.stringify(held.body.data.extension_code_awaiting_operator)}`);
+      const seen = await json(`/v1/publish-requests/${waiting.request_id}`, { headers: auth(ownerB.token) });
+      assert(seen.status === 200 && seen.body.data.request.state === 'awaiting_operator', `the installer sees it pending: ${seen.status} ${JSON.stringify(seen.body?.data?.request?.state ?? seen.body?.error)}`);
+      const asked = ((await json('/v1/notifications', { headers: auth(seed.token) })).body?.data?.notifications ?? [])
+        .some((x: any) => x.type === 'approval_request' && x.i18n?.vars?.extension === reg);
+      assert(asked, 'the operator got the question with Allow and Don\'t allow');
+      const on = await json(`/v1/extensions/${encodeURIComponent(reg)}/activate`, { method: 'POST', headers: auth(ownerB.token) });
+      assert(on.status === 409 && on.body.error?.code === 'AWAITING_OPERATOR', `the installer cannot switch it on first: ${on.status} ${JSON.stringify(on.body?.error)}`);
+
+      const yes = await json(`/v1/publish-requests/${waiting.request_id}/decision`, {
+        method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'approve', account: ownerB.name }),
+      });
+      assert(yes.status === 200, `the operator allows it: ${yes.status} ${JSON.stringify(yes.body?.error)}`);
+      const after = await extOf(ownerB.token, held);
+      assert(after.ext?.status === 'active' && after.ext.config?.__awaitingOperator === undefined, `allowed: ${JSON.stringify(after.ext?.status)}`);
+      const told = ((await json('/v1/notifications', { headers: auth(ownerB.token) })).body?.data?.notifications ?? [])
+        .some((x: any) => x.type === 'approval_answer' && String(x.i18n?.vars?.what ?? '').includes(reg));
+      assert(told, 'the installer heard the Allow');
+
+      // A migration that writes the extension code again waits again; Don't allow leaves it switched off.
+      const mig = await json(`/v1/instances/${held.body.data.id}/apply-migration`, {
+        method: 'POST', headers: auth(ownerB.token),
+        body: JSON.stringify({ targetVersion: withExt.version, components: [{ componentId: extComp.id, action: 'replace' }] }),
+      });
+      const again = mig.body.data?.awaitingOperator?.[0];
+      assert(mig.status === 200 && again?.extension === reg && typeof again.request_id === 'string', `the migration names the held code: ${mig.status} ${JSON.stringify(mig.body?.error ?? mig.body?.data)}`);
+      assert((await extOf(ownerB.token, held)).ext?.status === 'inactive', 'the migrated code waits switched off');
+      const no = await json(`/v1/publish-requests/${again.request_id}/decision`, {
+        method: 'POST', headers: auth(seed.token), body: JSON.stringify({ decision: 'decline', account: ownerB.name }),
+      });
+      assert(no.status === 200, `the operator does not allow it: ${no.status} ${JSON.stringify(no.body?.error)}`);
+      assert((await extOf(ownerB.token, held)).ext?.status === 'inactive', 'Don\'t allow leaves it switched off');
+    } finally {
+      await setRole('owner');
+    }
   });
 
   // ── 3d. Gating somebody else's app ─────────────────────────────────────────────────────────

@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 — 2026-10-29 — GET /v1/admin/peering/requests deletes the requests that expired before it
+ *     lists, and a decision on an expired request answers 404 and deletes it
+ *     (federation.peering_request_days; secaudit2026oct26 round 8c, federation-06).
  *   v1.12.0 — 2026-10-27 — POST /v1/admin/peering/requests/:id/decision, the same decision as the PUT,
  *     for a notice's Allow and Don't allow. A request that asks to replace a peer held under another
  *     key is decided by services/peer-replace-ask.ts (secaudit2026oct26).
@@ -69,10 +72,12 @@ import { promotionMetrics } from './promotion.js';
 import { describePeerOrigins } from '../../services/peer-origin-view.js';
 import { pendingRegistrationView } from '../../services/peer-origin.js';
 import { peerUrlRefusal } from '../../services/peer-url-policy.js';
+import { sweepExpiredPeeringRequests, peeringRequestExpired, expiredRequestMessage } from '../../services/peering-request-expiry.js';
 
 export function registerPeersRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/admin/peering/requests — list pending peering requests (operator)
     router.get('/v1/admin/peering/requests', requireAuth(), requireOperator(storage), async (_req, res) => {
+        await sweepExpiredPeeringRequests(storage, config);
         const requests = await storage.listPeeringRequests();
 
         res.json(success(config.nodeId, {
@@ -98,6 +103,13 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
         const request = await storage.getPeeringRequest(id);
         if (!request) {
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Peering request not found: ${id}`));
+            return;
+        }
+        // Unanswered past federation.peering_request_days: it expired, and is not approved or rejected now.
+        if (peeringRequestExpired(request, config)) {
+            await storage.deletePeeringRequest(id);
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', expiredRequestMessage(id, config.federationPeeringRequestDays)));
+            emitChange('federation');
             return;
         }
 

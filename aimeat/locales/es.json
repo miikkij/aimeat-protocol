@@ -554,10 +554,12 @@
           "classification_default_caps": "Límites de quién puede ver el contenido clasificado",
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
           "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
-          "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio"
+          "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio",
+          "platform_fee_records": "Registros de comisiones en dinero sin autor conocido"
         },
         "detail": {
-          "subdomain_site_origin": "Estas direcciones ({count}) muestran una aplicación que publicó otra persona y también funcionan en tu dominio: {labels}. Funcionan como antes hasta que elijas."
+          "subdomain_site_origin": "Estas direcciones ({count}) muestran una aplicación que publicó otra persona y también funcionan en tu dominio: {labels}. Funcionan como antes hasta que elijas.",
+          "platform_fee_records": "Estos registros de comisiones en dinero ({count}) se parecen a los que escribe una venta, pero nada indica si los escribió una venta o la propia cuenta. Se cuentan en tus comisiones como antes hasta que elijas."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -587,7 +589,8 @@
           "lead": {
             "anonymous_principal_records": "Cualquiera que tuviera el acceso anónimo pudo escribir esto, porque todos actúan como un único agente compartido. Revisa cada uno. Vacía o elimina lo que no quieras y deja el resto. Nada cambia hasta que decidas, y el incidente se resuelve con tu última decisión.",
             "erasure_leftover_schedules": "Estas programaciones son de cuentas que se eliminaron antes del 25 de octubre de 2026. En ese entonces, eliminar una cuenta quitaba las programaciones de la persona, pero no las que habían hecho sus agentes y sus aplicaciones. Si otra persona registra el mismo nombre de usuario, o ya lo registró, ve estas programaciones, y pueden ejecutarse a su nombre. Elimina cada programación que nadie necesite. Nada cambia hasta que elijas.",
-            "subdomain_site_origin": "Una aplicación que publicó otra persona también se abre en una dirección de tu dominio. Elige para cada dirección dónde se abre la aplicación de ahora en adelante. Hasta que elijas, todo funciona como antes."
+            "subdomain_site_origin": "Una aplicación que publicó otra persona también se abre en una dirección de tu dominio. Elige para cada dirección dónde se abre la aplicación de ahora en adelante. Hasta que elijas, todo funciona como antes.",
+            "platform_fee_records": "Antes del 27 de octubre de 2026, cualquier cuenta podía escribir un registro de comisión en dinero en su propia memoria, y la página Economía lo contaba en las comisiones que te corresponden. Elige para cada registro de abajo si se cuenta. No se elimina nada y, hasta que elijas, cada registro se cuenta como antes."
           },
           "subdomain": {
             "appOnly": "Solo la dirección propia de la aplicación (recomendado)",
@@ -597,13 +600,16 @@
             "choose": "Elegir"
           },
           "action": {
-            "subdomain": "Solo aplicación"
+            "subdomain": "Solo aplicación",
+            "platform_fee": "No contar"
           },
           "keepAction": {
-            "subdomain": "Mi propio sitio"
+            "subdomain": "Mi propio sitio",
+            "platform_fee": "Contar"
           },
           "confirm": {
-            "subdomain": "¿Quieres que esta sea solo una dirección de la aplicación? {line} Quien la abra en tu dominio irá a la dirección propia de la aplicación, donde la aplicación funciona como antes."
+            "subdomain": "¿Quieres que esta sea solo una dirección de la aplicación? {line} Quien la abra en tu dominio irá a la dirección propia de la aplicación, donde la aplicación funciona como antes.",
+            "platform_fee": "¿Dejar este registro fuera de tus comisiones en dinero? {line} El registro se conserva, pero la página Economía ya no lo cuenta."
           },
           "rowResolved": "Todos los registros están decididos.",
           "clear": "Vaciar",
@@ -621,7 +627,8 @@
             "skill": "La habilidad {name}, con sus archivos",
             "datapackage": "El paquete de datos {name}, con sus archivos",
             "schedule": "La programación «{label}», que {maker} hizo para la cuenta {owner} (se ejecuta: {cron})",
-            "subdomain": "{label}: la aplicación {app}, publicada por {owner}"
+            "subdomain": "{label}: la aplicación {app}, publicada por {owner}",
+            "platform_fee": "{amount} en la memoria de {owner} ({key}), vendedor {seller}, comprador {buyer}"
           }
         },
         "source": {
@@ -4134,7 +4141,8 @@
       "review": "En revisión",
       "draft": "Borrador",
       "expired": "Sustituido",
-      "ended": "Terminado"
+      "ended": "Terminado",
+      "test-signed": "Firmado en prueba, sin vigor"
     },
     "next": {
       "deletion": "Borra o devuelve los datos antes del {date}",
@@ -4142,7 +4150,8 @@
       "objected": "Te has opuesto al cambio y no entra en vigor",
       "notice": "El cambio entra en vigor el {date} si nadie se opone",
       "waitingCp": "Pendiente de la firma de la otra parte",
-      "signCp": "Pendiente de tu firma"
+      "signCp": "Pendiente de tu firma",
+      "testSignedCp": "Tu firma fue una firma de prueba sin efecto legal. Te avisamos cuando una nueva versión esté pendiente de tu firma"
     },
     "colStep": "Paso",
     "colWhen": "Cuándo",
@@ -9314,6 +9323,10 @@
   "notiftext.docsign_request.body": "Documento {document}. Abre la solicitud de firma o pide a tu IA que te la muestre.",
   "notiftext.app_published_by_app.title": "{publisher} hizo una nueva versión de tu aplicación {app}",
   "notiftext.app_published_by_app.body": "Le diste permiso a {publisher} para publicar aplicaciones por ti, y publicó la versión {version}. La próxima vez que abras {app}, verás qué quiere hacer la nueva versión, y tú eliges si lo permites.",
+  "notiftext.content_pdf_text_not_read_time.title": "No se leyó el texto de tu PDF {key}",
+  "notiftext.content_pdf_text_not_read_time.body": "El archivo quedó guardado tal como estaba. Leer su texto habría tardado más que el límite de {limit} de este AIMEAT. El límite se aplica a un PDF cuyo tamaño no se puede comprobar antes de leerlo. Tu página Cartera de datos dice lo mismo sobre este archivo.",
+  "notiftext.content_pdf_text_not_read_memory.title": "No se leyó el texto de tu PDF {key}",
+  "notiftext.content_pdf_text_not_read_memory.body": "El archivo quedó guardado tal como estaba. Leer su texto habría necesitado más memoria que el límite de {limit} de este AIMEAT. El límite se aplica a un PDF cuyo tamaño no se puede comprobar antes de leerlo. Tu página Cartera de datos dice lo mismo sobre este archivo.",
   "notiftext.agreement_sent_cp.title": "{operator} te pide que firmes un contrato de encargo del tratamiento",
   "notiftext.agreement_sent_cp.body": "Lee el resumen y elige cómo firmas. Contrato {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "No se pudo aceptar tu copia firmada",
@@ -9459,6 +9472,10 @@
   "notiftext.payment_possible.body": "El servicio de pagos no respondió cuando un comprador te pagó, así que no se sabe si el dinero llegó. Mira si tu dirección de cobro recibió una transferencia desde {payer}. Si llegó, entrega el pedido o devuelve el pago. Referencia: {reference}.",
   "notiftext.payout_possible.title": "Puede que hayas recibido {amount}",
   "notiftext.payout_possible.body": "{provider} te envió {amount}, pero la red de pagos no confirmó que la transferencia se completara. Revisa si a tu dirección de cobro llegó una transferencia desde {payer}. Referencia: {reference}.",
+  "notiftext.payout_arrived.title": "Llegó el pago de {amount}",
+  "notiftext.payout_arrived.body": "Las personas que administran este servidor comprobaron que llegó el pago de {amount} de {provider}. Ya quedó registrado como pagado. Referencia: {reference}.",
+  "notiftext.payout_arrived_provider.title": "Llegó tu pago de {amount}",
+  "notiftext.payout_arrived_provider.body": "Las personas que administran este servidor comprobaron que llegó tu pago de {amount} a {beneficiary}. Ya quedó registrado como pagado y no tienes que pagarlo de nuevo. Referencia: {reference}.",
   "notiftext.package_sale_request_approved.title": "Se aprobó tu solicitud de {name}",
   "notiftext.package_sale_request_approved.body": "El vendedor la aprobó. Abre tu página de Paquetes para ver qué sigue.",
   "notiftext.package_sale_request_refused.title": "No se aprobó tu solicitud de {name}",
@@ -9493,6 +9510,13 @@
   "notiftext.approval_change.ecosystem": "Cámbialo en la página Aplicaciones externas",
   "notiftext.approval_change.agent_page": "Cámbialo en la página del agente",
   "notiftext.approval_change.scheduler": "Cámbialo en la pestaña Programador",
+  "notiftext.approval_change.accountants": "Cámbialo en Quién puede leer tu contabilidad, en la página Pérdidas y ganancias",
+  "notiftext.approval_accountant_grant.title": "¿{name} todavía puede leer tu contabilidad?",
+  "notiftext.approval_accountant_grant.body": "Le diste a {name} el derecho de leer tu contabilidad antes de que el servidor guardara la fecha de cada derecho. La cuenta llamada {name} se creó después de que empezaste a dar derechos, y otra persona puede registrar el nombre de una cuenta eliminada, así que el servidor no sabe si es la persona a la que le diste el derecho. Hasta que respondas, {name} lee tu contabilidad como antes. Si lo permites, {name} conserva el derecho. Si no, el derecho se quita.",
+  "notiftext.approval_card_adult.title": "¿Pagaste con tu propia tarjeta?",
+  "notiftext.approval_card_adult.body": "Le pagaste a {seller} con tarjeta de crédito. El pago pasó por la cuenta de pagos con tarjeta del propio vendedor, y solo esa cuenta dice que la tarjeta era de crédito. Si confirmas que pagaste con tu propia tarjeta, este servidor registra como verificado que eres mayor de edad, y las aplicaciones pueden mostrarte contenido para adultos. Si no lo confirmas, lo que el servidor tiene registrado sobre tu edad queda como estaba. Tu respuesta no cambia tu compra.",
+  "notiftext.approval_card_adult.allow": "Pagué con mi propia tarjeta",
+  "notiftext.approval_card_adult.deny": "Dejar como está",
   "notiftext.approval_request.allow": "Permitir",
   "notiftext.approval_request.deny": "No permitir",
   "notiftext.approval_answer_allowed.title": "Permitido: {what}",
@@ -9521,6 +9545,12 @@
   "notiftext.approval_email_policy_sent.body": "Lo decide un operador de este servidor. Hasta entonces, la extensión solo envía correo a las direcciones que permiten las reglas normales. Recibirás la respuesta aquí.",
   "notiftext.approval_email_policy_code_sent.title": "El código de {extension} cambió: un operador confirma su permiso de correo",
   "notiftext.approval_email_policy_code_sent.body": "{who} cambió el código. Hasta que un operador confirme el permiso para enviar correo a cualquier dirección con el código nuevo, la extensión solo envía correo a las direcciones que permiten las reglas normales. Recibirás la respuesta aquí.",
+  "notiftext.approval_extension_code.title": "{who} instaló el paquete {package}: ¿permites el código de su extensión {extension}?",
+  "notiftext.approval_extension_code.body": "La extensión llegó con el paquete a la cuenta {account}. En este servidor solo la cuenta del operador instala código de extensiones, así que la extensión está desactivada hasta que un operador la permita. Si la permites, se activa en el acto. Si no, sigue desactivada y el resto del paquete sigue instalado. {who} recibe la respuesta en ambos casos.",
+  "notiftext.approval_extension_code_sent.title": "La extensión {extension} del paquete {package} espera a un operador",
+  "notiftext.approval_extension_code_sent.body": "En este servidor solo la cuenta del operador instala código de extensiones. El resto del paquete está instalado y la extensión sigue desactivada hasta que un operador la permita. Recibirás la respuesta aquí.",
+  "notiftext.approval_cortex_holder.title": "La biblioteca {cortex} que cargan tus apps ahora pertenece a {holder}",
+  "notiftext.approval_cortex_holder.body": "La cuenta que tenía la biblioteca {cortex} ya no existe, y {holder} instaló una biblioteca nueva con el mismo nombre. Tus apps {apps} la cargan por ese nombre, así que ejecutarían código escrito por {holder}. Si lo permites, tus apps cargan la biblioteca nueva en el acto. Si no, no la cargan y las partes de las apps que la necesitan no funcionan. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_secret_host_ask_off.title": "{who} pide que tus agentes puedan enviar tus contraseñas y claves a direcciones nuevas sin preguntarte",
   "notiftext.approval_secret_host_ask_off.body": "Ahora se te pregunta antes de que tus agentes envíen una contraseña o una clave guardada a una dirección a la que nunca ha ido. Si lo permites, podrán enviarlas a direcciones nuevas sin preguntarte. Si no lo permites, se te sigue preguntando.",
   "notiftext.approval_crew_model.title": "{who} pide que tu agente {agent} use la dirección de modelo {host}",
@@ -9529,8 +9559,14 @@
   "notiftext.approval_crew_model_default.body": "Cuando los equipos de tus agentes llaman a su modelo, envían tu clave del proveedor ({key}) a esa dirección. La dirección la puso una app, así que la confirmas tú primero. Si lo permites, los equipos la usan desde su próxima ejecución. Si no, siguen con el modelo que tienen. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_goal_model_read.title": "{who} pide que la IA de AIMEAT lea tus entradas privadas {records}",
   "notiftext.approval_goal_model_read.body": "{agent} necesita {records} para la tarea «{work}» de tu objetivo «{goal}». {agent} no puede leer tus entradas privadas, pero ve lo que responde la IA. Si lo permites, la IA usa estas entradas en la tarea. Si no lo permites, la tarea se hace sin ellas.",
+  "notiftext.approval_goal_model_spend.title": "{who} pide que la IA de AIMEAT haga la tarea «{work}» a tu costo",
+  "notiftext.approval_goal_model_spend.body": "{agent} agregó la tarea «{work}» a tu objetivo «{goal}» para la IA de AIMEAT. {agent} no puede usar tu IA por sí mismo, así que el costo de la tarea espera tu respuesta. Si lo permites, la IA hace esta tarea y las tareas de IA que {agent} agregue a este objetivo más adelante. Si no lo permites, esta tarea no se hace.",
   "notiftext.approval_schedule_instruction.title": "{who} cambió la programación «{schedule}», y el cambio espera tu aprobación",
   "notiftext.approval_schedule_instruction.body": "{maker} hizo esta programación, así que lee tus datos con los permisos de {maker}. {who} cambió sus instrucciones, pero {who} no puede leer todo lo que {maker} puede leer. Por eso el cambio espera tu aprobación. Si lo permites, la programación usa las nuevas instrucciones. Si no lo permites, vuelve a las anteriores.",
+  "notiftext.approval_delegation_binding.title": "{who} publica en tu canal {channel} con la aplicación {app} de {author}",
+  "notiftext.approval_delegation_binding.body": "Diste a la aplicación \"{label}\" permiso para publicar en tu canal (\"{action}\"), pero la nombraste solo por su nombre de archivo. Esta aplicación con ese nombre la hizo {author}, no tú. Si lo permites, a partir de ahora solo la aplicación de {author} puede usar el permiso, y una aplicación con el mismo nombre de otra persona no puede. Si no lo permites, esta aplicación no puede publicar en tu canal. {who} recibe tu respuesta en ambos casos.",
+  "notiftext.delegation_bound.title": "Ahora solo tu propia aplicación {app} puede publicar como \"{label}\" en tu canal",
+  "notiftext.delegation_bound.body": "Diste a la aplicación \"{label}\" permiso para publicar en tu canal (\"{action}\") y la nombraste solo por su nombre de archivo, así que otra persona podría haber usado el permiso con una aplicación del mismo nombre. A partir de ahora solo tu propia aplicación {app} puede usarlo. Sus usuarios publican con ella como antes.",
   "notiftext.approval_refinery_definition.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
   "notiftext.approval_refinery_definition.body": "El procesador de correo toma tu correo y guarda los mensajes en un espacio de trabajo. Después del cambio, lee el buzón {mailbox} y guarda cada mensaje en el espacio de trabajo {workspace}. {who} no puede hacer este cambio por su cuenta, así que el cambio espera tu aprobación. Si no lo permites, nada cambia.",
   "notiftext.approval_refinery_definition_text.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
@@ -10751,6 +10787,21 @@
     "ecoMoneySub": "sus propios raíles",
     "ecoMoneyIntro": "El dinero viaja por los raíles de pago (Stripe y similares) y nunca a través de los morsels. Aquí solo se ve el dinero que ha pasado por las ventas hechas aquí.",
     "ecoMintIntro": "La concesión se acredita al saldo del propietario del agente y aparece en su cartera. El límite diario es de {cap} morsels.",
+    "possiblePayouts": {
+      "title": "Pagos que quizá ya llegaron",
+      "count": "{n} por revisar",
+      "lead": "Cuando estos vendedores le pagaron a alguien su parte de los ingresos, el servicio de pagos x402 no respondió, así que nadie sabe si la transferencia salió. Busca cada nonce en la cadena. Si la transferencia está, escribe su hash de transacción o tu propio número de caso y presiona Marcar como recibido: la parte queda registrada como pagada y las dos partes reciben un aviso. Si la transferencia no está, no hagas nada: el vendedor lo cierra desde su propio pago.",
+      "colWho": "Quién le pagó a quién",
+      "colWhen": "Inicio",
+      "colAmount": "Monto",
+      "who": "{provider} → {beneficiary}",
+      "nonce": "nonce {nonce}",
+      "payer": "De {payer} a {to}, en {network}",
+      "reference": "Referencia",
+      "referenceNote": "El hash de la transacción o tu propio número de caso.",
+      "markArrived": "Marcar como recibido",
+      "referenceRequired": "Primero escribe la referencia."
+    },
     "cfgSearch": "Busca un ajuste por nombre, clave o descripción…",
     "cfgOnlyChanged": "Solo los cambiados ({n})",
     "cfgAll": "Todos",
@@ -10876,6 +10927,8 @@
     "cfg_federation_open_join": "Unión abierta",
     "cfg_federation_book_listed": "Listado en el libro de federación",
     "cfg_federation_introductions_per_hour": "Solicitudes de emparejamiento desde una dirección por hora",
+    "cfg_federation_peering_request_days": "Días que espera una solicitud de emparejamiento",
+    "cfg_federation_resolve_max_peers": "Pares consultados en una búsqueda de identidad",
     "cfg_federation_audience_required": "Rechazar un mensaje que no nombra este servidor",
     "cfg_quota_memory_max_value_size_kb": "Tamaño máximo de un valor de memoria",
     "cfg_quota_memory_max_keys_per_agent": "Máximo de claves de memoria",
@@ -11189,6 +11242,8 @@
     "cfgDesc_federation_open_join": "Unión abierta: una presentación firmada entra como par visitante de baja confianza, sin aprobación manual.",
     "cfgDesc_federation_book_listed": "Listar esta instancia (operadores + recursos) en el libro de federación; apagado = opción de privacidad.",
     "cfgDesc_federation_introductions_per_hour": "Cuántas solicitudes de emparejamiento puede dejarte una sola dirección en una hora. Si un servidor se presenta otra vez con la misma clave, sigue teniendo una sola solicitud en espera. Al pasar el límite, el servidor recibe cuándo puede volver a intentarlo. 0: sin límite.",
+    "cfgDesc_federation_peering_request_days": "Cuántos días espera tu respuesta una solicitud de emparejamiento de otro servidor. Después caduca y se elimina, y el servidor puede volver a presentarse. Las solicitudes que envió este servidor se conservan. 0: no caduca nunca.",
+    "cfgDesc_federation_resolve_max_peers": "Cualquiera puede preguntar a este servidor en qué servidor está una identidad. Si la identidad nombra un servidor que conoces, solo se pregunta a ese servidor, o a ninguno. Si no nombra ningún servidor conocido, este servidor pregunta a sus pares de uno en uno, como máximo a este número. 0: sin límite.",
     "cfgDesc_federation_audience_required": "Un mensaje de otro servidor nombra el servidor al que va dirigido, así que no se puede reenviar a un tercer servidor. Un servidor con una versión anterior no nombra ninguno. Apagado: este servidor sigue recibiendo sus mensajes. Encendido: los rechaza. Desde la versión 3.27.0 está encendido de forma predeterminada. Un mensaje que nombra otro servidor se rechaza siempre. El formato antiguo de mensaje, que no nombra ningún servidor, se elimina en la versión 4.0.0.",
     "cfgDesc_security_login_rate_limit_max": "Máximo de intentos de inicio por minuto por IP.",
     "cfgDesc_security_login_rate_limit_window_ms": "Ventana del límite de inicios, en ms.",
@@ -11937,6 +11992,10 @@
     "cfgDesc_content_class_mode": "Activado: cada propietario decide. La lectura de lo que un archivo dice de sí mismo funciona para todos, y cada paso que llama a un modelo de IA queda desactivado hasta que el propietario lo activa en su página Cartera de datos. Desactivado: no se lee nada, y las rutas y herramientas de clases de contenido responden 404.",
     "cfgDesc_content_class_ffprobe_path": "El programa ffprobe, que lee la duración, el tamaño y los códecs de un video: un nombre en el PATH o una ruta completa. Sin él, un video solo recibe los datos que recibe cualquier archivo.",
     "cfgDesc_content_class_ffmpeg_path": "El programa ffmpeg, que saca imágenes fijas y el sonido de un video para su descripción: un nombre en el PATH o una ruta completa.",
+    "cfg_content_class_pdf_text_seconds": "Texto de PDF: límite de tiempo (s)",
+    "cfg_content_class_pdf_text_memory_mb": "Texto de PDF: límite de memoria (MB)",
+    "cfgDesc_content_class_pdf_text_seconds": "Cuánto tiempo puede el servidor leer el texto de un PDF cuyo tamaño descomprimido no puede comprobar antes, como un PDF cifrado. Al pasar el límite, el archivo sigue guardado, su texto no se lee, y quien lo subió y los datos del archivo lo dicen. Se aplica a los adjuntos del chat, a los adjuntos de correo y a lo que se sabe de un archivo. 0 = sin límite.",
+    "cfgDesc_content_class_pdf_text_memory_mb": "Cuánta memoria puede usar el servidor para leer el texto de un PDF así. Al pasar el límite, el archivo sigue guardado, su texto no se lee, y quien lo subió y los datos del archivo lo dicen. 0 = sin límite.",
     "cfgGroup_packages": "Paquetes",
     "cfgGroup_themes": "Temas",
     "cfgGroup_agents": "Migración de agentes",
@@ -21360,6 +21419,7 @@
   "chat.youLabel": "Tú",
   "chat.agentLabel": "Agente",
   "chat.jumpLatest": "Ir a lo último",
+  "chat.deletedCopyKept": "La conversación se eliminó aquí. La herramienta de chat que respondió en ella guarda su propia copia del texto en este servidor, y AIMEAT no puede eliminar esa copia. El operador de este servicio puede quitarla.",
   "chat.starterPage": "Crea mi página de bienvenida",
   "chat.starterPageAsk": "Publica mi página de bienvenida. Que sea sencilla, y dime la dirección cuando esté en línea.",
   "chat.starterCompany": "Poner en marcha mi empresa",
@@ -24623,6 +24683,17 @@
         "high": "La tarea se hace sin estas entradas.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si no te molesta que el agente sepa lo que dicen estas entradas. Si el agente puede leer todas tus entradas, puedes darle ese permiso en la página del agente, y así ya no pregunta."
+      },
+      "approval_goal_model_spend": {
+        "title": "Un agente pide a la IA que haga una tarea a tu costo",
+        "short": "La IA de AIMEAT haría una tarea de tu objetivo, pagada con tu propia clave o con tu saldo de IA.",
+        "what": "En un objetivo, un agente puede darle una tarea a la IA de AIMEAT. La IA trabaja en tu cuenta y tú la pagas, con tu propia clave o con tu saldo de IA. Este agente no tiene permiso para usar tu IA, así que no puede gastar tu dinero por su cuenta. Por eso se te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "La IA hace esta tarea y las tareas de IA que este agente agregue a este objetivo más adelante, a tu costo.",
+        "highLabel": "Si no lo permites",
+        "high": "Esta tarea no se hace. No se gasta nada.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si quieres que el objetivo siga con esta tarea. Si el agente siempre puede usar tu IA, dale ese permiso en la página del agente, y así ya no pregunta."
       },
       "approval_schedule_instruction": {
         "title": "Alguien cambió una programación",

@@ -6,6 +6,8 @@
  *   itself (dry_run validation, component registration, @activate-cron firing, rollback on failure)
  *   lives in the service, so this door and the MCP tool run the same code.
  * @version-history
+ *   v1.13.0 — 2026-10-29 — The answer names each extension component installed switched off and waiting
+ *     for an operator, `extension_code_awaiting_operator` (secaudit2026oct26 round 8c).
  *   v1.12.1 — 2026-10-10 — An INSTALL_FAILED answer keeps its sentence past the 500 filter, with
  *     key-shaped text taken out (secrets audit 2026-10-09, d4).
  *   v1.12.0 — 2026-10-04 — The body takes `grant_apps` and the 201 answer carries `app_grants`: the
@@ -140,6 +142,8 @@ export function registerInstallRoutes(
       ...(out.agentsProposed?.length ? { agents_proposed: out.agentsProposed } : {}),
       // The owner's grant recorded for each app the install registered, when the install approved them.
       ...(out.appGrants ? { app_grants: out.appGrants } : {}),
+      // Extension components installed switched off, each waiting for an operator's one press (install role operator).
+      ...(out.awaitingOperator ? { extension_code_awaiting_operator: out.awaitingOperator } : {}),
     }, [
       { description: 'View instance', method: 'GET', url: `/v1/instances/${out.instance.id}` },
       { description: 'Check component status', method: 'GET', url: `/v1/instances/${out.instance.id}/status` },

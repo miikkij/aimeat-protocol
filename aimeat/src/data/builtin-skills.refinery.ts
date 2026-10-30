@@ -16,6 +16,9 @@
  * @structure REFINERY_SKILL_ENTRY
  * @usage import { REFINERY_SKILL_ENTRY } from './builtin-skills.refinery.js';
  * @version-history
+ *   v1.2.4 — 2026-10-29 — "How it works": a PDF whose text read passed the node's limit goes to the
+ *     model whole and its attachment carries `text_not_read` (secaudit2026oct26 round 8c). Added,
+ *     nothing else changed.
  *   v1.2.3 — 2026-10-27 — "The definition": a change of the mailbox, the workspace, the spaces or
  *     keepText by an app or an agent without the four run permissions waits for the person's one-press
  *     answer (secaudit2026oct26). Added, nothing else changed.
@@ -57,7 +60,9 @@ workspace. For each message it:
 
 1. asks the decision model which **kind** it is (a learned rule answers first, when one matches);
 2. for a kind that is processed, reads the kind's **fields** from the text and the PDF attachments: a
-   PDF with a text layer is read on the node, and a scanned PDF goes to the model whole;
+   PDF with a text layer is read on the node, and a scanned PDF goes to the model whole; a PDF
+   whose size the node cannot check before reading it, and whose text read passes the node's time or
+   memory limit, also goes to the model whole, and its attachment says so in \`text_not_read\`;
 3. files it in a **queue** and writes a log row beside it.
 
 It **never sends** anything. Approving a record and sending it on is the person's act, in their app.

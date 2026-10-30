@@ -21,11 +21,18 @@
  *   name, and two such accounts make the bare name answer 409 AMBIGUOUS_NAME naming both.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-component-namespaces
  * @version-history
+ *   v1.3.1 — 2026-10-30 — The app owner's Don't allow holds the app back, and approving the same request
+ *     later releases it (secaudit2026oct26 round 8c, no dead end).
+ *   v1.3.0 — 2026-10-29 — A cortex name an account erasure freed stays free for a new holder, and an app
+ *     that loaded it loads the new holder's library only after its owner's one-press Allow
+ *     (secaudit2026oct26 round 8c, memory-b-08).
+ *   v1.2.0 — 2026-10-29 — An account does not install a new extension or cortex under a name that
+ *     starts with aimeat- (secaudit2026oct26 round 8c, extensions-02).
  *   v1.1.0 — 2026-10-26 — The owner is added, nothing else changes (Jouni, 2026-10-26: "piti lisätä
  *     omistaja johonkin tohon ja pitää toi formaatti mahdollisimman samana").
  *   v1.0.0 — 2026-10-25 — Initial (owner namespaces wish, secaudit2026oct22).
  */
-import { registerOwner } from './helpers/owner-login.js';
+import { registerOwner, tokenRoles } from './helpers/owner-login.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const stamp = Date.now().toString(36).slice(-6);
@@ -178,6 +185,77 @@ await test('what the node ships keeps its bare name, and `system/<name>` reaches
     const extSys = await json(`/v1/extensions/${encodeURIComponent('system/vocab-finto')}`);
     assert(ext.status === extSys.status, `the shipped extension answers alike under both names: ${ext.status} / ${extSys.status}`);
     if (ext.status === 200) assert(extSys.body.data.extension.name === 'vocab-finto', `the alias is the bare record: ${short(extSys.body)}`);
+});
+
+await test('an account does not install a new extension or cortex under a name that starts with aimeat- (secaudit2026oct26 round 8c)', async () => {
+    // The first account a fresh node registers is its operator, who may; bob never is.
+    assert(!tokenRoles(bob.token).includes('operator'), 'bob is not an operator');
+    const PRE = `aimeat-nsx${stamp}`;
+    const post = await install(bob.token, 'bob', PRE);
+    assert(post.status === 409 && post.body.error?.code === 'NAME_RESERVED' && said(post).includes(`${bob.name}-nsx${stamp}`), `POST /v1/extensions: ${post.status} ${short(post.body)}`);
+    const put = await json(`/v1/extensions/${PRE}`, as(bob.token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest(PRE), scripts: extScripts('bob') }) }));
+    assert(put.status === 409 && put.body.error?.code === 'NAME_RESERVED', `PUT create: ${put.status} ${short(put.body)}`);
+    const putFull = await json(`/v1/extensions/${encodeURIComponent(`${bob.name}/${PRE}`)}`, as(bob.token, { method: 'PUT', body: JSON.stringify({ manifest: extManifest(PRE), scripts: extScripts('bob') }) }));
+    assert(putFull.status === 409 && putFull.body.error?.code === 'NAME_RESERVED', `PUT create in his own namespace: ${putFull.status} ${short(putFull.body)}`);
+    const cx = await json('/v1/cortex', as(bob.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', PRE), libs: cxLib('bob') }) }));
+    assert(cx.status === 409 && cx.body.error?.code === 'NAME_RESERVED', `POST /v1/cortex: ${cx.status} ${short(cx.body)}`);
+    const listed = await json('/v1/extensions', as(bob.token));
+    assert(!said(listed).includes(PRE), `nothing was written under the name: ${short(listed.body)}`);
+    // The account's own names install as before.
+    const own = await install(bob.token, 'bob', `nsown${stamp}`);
+    assert(own.status === 201, `his own name: ${own.status} ${short(own.body)}`);
+    await json(`/v1/extensions/nsown${stamp}`, as(bob.token, { method: 'DELETE' }));
+});
+
+await test('a cortex name an account erasure freed stays free; an app that loaded it loads the new holder\'s library only after its owner allows it (secaudit2026oct26 round 8c)', async () => {
+    const CX3 = `nscxh${stamp}`;
+    const appFile = `nsuse${stamp}.html`;
+    const dave = await registerOwner(BASE, `nsdave${stamp}`);
+    const d = await json('/v1/cortex', as(dave.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', CX3), libs: cxLib('dave') }) }));
+    assert(d.status === 201, `dave's cortex: ${d.status} ${short(d.body)}`);
+    await json(`/v1/cortex/${CX3}/activate`, as(dave.token, { method: 'POST' }));
+    // carol's app loads dave's library by its bare name; the page's address is what its browser sends.
+    const html = `<!DOCTYPE html><html><head><title>uses</title><script src="/v1/cortex/${CX3}/libs/v.js"></script></head><body>uses</body></html>`;
+    const pub = await json('/v1/apps', as(carol.token, { method: 'POST', body: JSON.stringify({ filename: appFile, content: Buffer.from(html).toString('base64'), name: 'Uses a library', description: 'namespace e2e', category: 'utility' }) }));
+    assert(pub.status === 201, `carol's app: ${pub.status} ${short(pub.body)}`);
+    const fromApp = async () => {
+        const res = await fetch(`${BASE}/v1/cortex/${CX3}/libs/v.js`, { headers: { Referer: `${BASE}/v1/apps/${carol.name}/${appFile}?mode=inline` } });
+        return { status: res.status, text: await res.text() };
+    };
+    const before = await fromApp();
+    assert(before.status === 200 && before.text.includes("'dave'"), `carol's app loads dave's library: ${before.status}`);
+
+    const gone = await json(`/v1/owners/${dave.name}`, as(dave.token, { method: 'DELETE' }));
+    assert(gone.status === 200, `dave's account erasure: ${gone.status} ${short(gone.body)}`);
+    const erin = await registerOwner(BASE, `nserin${stamp}`);
+    const e = await json('/v1/cortex', as(erin.token, { method: 'POST', body: JSON.stringify({ manifest: cxManifest('1.0.0', CX3), libs: cxLib('erin') }) }));
+    assert(e.status === 201, `erin installs the freed name: ${e.status} ${short(e.body)}`);
+    const on = await json(`/v1/cortex/${CX3}/activate`, as(erin.token, { method: 'POST' }));
+    assert(on.status === 200, `erin activates it by the bare name: ${on.status} ${short(on.body)}`);
+    const plain = await raw(`/v1/cortex/${CX3}/libs/v.js`);
+    assert(plain.status === 200 && plain.text.includes("'erin'"), `the name stayed free: the bare address serves erin's: ${plain.status}`);
+
+    const held = await fromApp();
+    assert(held.status === 404, `carol's app runs erin's library before carol allowed it: ${held.status} ${held.text.slice(0, 80)}`);
+    const list = await json('/v1/publish-requests', as(carol.token));
+    const ask = (list.body.data?.requests ?? []).find((r: any) => r.kind === 'cortex-holder' && r.name === CX3);
+    assert(ask && ask.state === 'awaiting_owner', `carol has the question: ${short(list.body)}`);
+    const pending = await json(`/v1/publish-requests/${ask.id}?account=${carol.name}`, as(erin.token));
+    assert(pending.status === 200 && pending.body.data.request.state === 'awaiting_owner', `erin sees it pending: ${pending.status} ${short(pending.body)}`);
+    // Don't allow holds the app back, and carol can change her mind on the same request later.
+    const no = await json(`/v1/publish-requests/${ask.id}/decision`, as(carol.token, { method: 'POST', body: JSON.stringify({ decision: 'decline' }) }));
+    assert(no.status === 200, `carol does not allow it: ${no.status} ${short(no.body)}`);
+    const stillHeld = await fromApp();
+    assert(stillHeld.status === 404, `Don't allow holds carol's app back: ${stillHeld.status}`);
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, as(carol.token, { method: 'POST', body: JSON.stringify({ decision: 'approve' }) }));
+    assert(yes.status === 200, `carol allows it later on the same request: ${yes.status} ${short(yes.body)}`);
+    const after = await fromApp();
+    assert(after.status === 200 && after.text.includes("'erin'"), `carol's app loads erin's library after the Allow: ${after.status}`);
+    const told = ((await json('/v1/notifications', as(erin.token))).body?.data?.notifications ?? [])
+        .some((n: any) => n.type === 'approval_answer');
+    assert(told, 'erin heard the answer');
+    await json(`/v1/cortex/${CX3}`, as(erin.token, { method: 'DELETE' }));
+    await json(`/v1/apps/${carol.name}/${appFile}`, as(carol.token, { method: 'DELETE' }));
 });
 
 console.log('\nCleanup');

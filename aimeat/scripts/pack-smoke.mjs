@@ -14,6 +14,9 @@
  *   files, packaged nodes answered /v1/spec with 404 and served empty catalogues for months (QA
  *   audit 2026-10-16, P6-04).
  *
+ *   WHAT IT CHECKS BEFORE STARTING, each a refusal when wrong:
+ *     npm-shrinkwrap.json     exists, matches today's pnpm-lock.yaml and pnpm.overrides, and is in the tarball
+ *     the installed tree      npm installed exactly the versions it pins, with every override held
  *   WHAT IT PROBES, each a refusal when wrong:
  *     /v1/health              the node is up
  *     /v1/build               its stamp names the commit that was packed (the HEAD of this checkout)
@@ -22,8 +25,9 @@
  *     /lib/aimeat-boot.js      a served browser library answers
  *   It runs in prepublishOnly (after the build) and nightly in e2e-full.yml.
  * @usage
- *   cd aimeat && pnpm build && node scripts/pack-smoke.mjs [--keep]   # --keep leaves the directory
+ *   cd aimeat && pnpm build && pnpm gen:shrinkwrap && node scripts/pack-smoke.mjs [--keep]   # --keep leaves the directory
  * @version-history
+ *   v1.1.0 -- 2026-10-29 -- The package carries npm-shrinkwrap.json: refused when it is missing, stale or not in the tarball, the tarball is installed as aimeat@<version> through a registry front on 127.0.0.1 (npm follows a dependency's shrinkwrap only for a registry version marked as carrying one), and the install (now with npm's own lock) is checked against it and pnpm.overrides (secaudit2026oct26 round 8c, operator-01). npm() moved to scripts/lib/npm-shrinkwrap.mjs.
  *   v1.0.1 -- 2026-10-19 -- npm runs without a shell on Windows too: node.exe runs npm-cli.js with an argument array (CodeQL 1747, 1748).
  *   v1.0.0 -- 2026-10-16 -- Initial (QA audit W08, P6-04).
  */
@@ -34,33 +38,27 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomBytes } from 'node:crypto';
+import { parse as parseYaml } from 'yaml';
+import { npm, npmAsync, overrideViolations, pnpmMismatches, pnpmProduction, serveLikeRegistry, shrinkwrapProblems } from './lib/npm-shrinkwrap.mjs';
 
 const AIMEAT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const KEEP = process.argv.includes('--keep');
 const READY_MS = 180_000;
-/**
- * npm's own entry script on Windows, where `npm` is npm.cmd and Node starts a .cmd only through a
- * shell. The candidates are the two npm.cmd itself picks from: a global npm in the default prefix
- * (%APPDATA%\npm) first, then the npm installed beside node.exe.
- */
-function npmCliOnWindows() {
-    const candidates = [
-        ...(process.env.APPDATA ? [join(process.env.APPDATA, 'npm', 'node_modules', 'npm', 'bin', 'npm-cli.js')] : []),
-        join(dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js'),
-    ];
-    const found = candidates.find(p => existsSync(p));
-    if (!found) throw new Error(`pack-smoke: npm-cli.js not found (looked in ${candidates.join(', ')}).`);
-    return found;
-}
 
 /**
- * Run npm with an argument array and no shell, so a file name (the packed tarball, a temp path with
- * a space) is one argument and never part of a command line. On Windows that means node.exe running
- * npm-cli.js directly instead of npm.cmd.
+ * The installed tree as the package itself sees it: npm-shrinkwrap.json lays the package's
+ * dependencies out under node_modules/aimeat/, so the install's package-lock.json entries there are
+ * re-rooted at the package. An entry npm placed beside the package instead is returned in `outside`.
  */
-function npm(args, opts) {
-    if (process.platform !== 'win32') return execFileSync('npm', args, opts);
-    return execFileSync(process.execPath, [npmCliOnWindows(), ...args], opts);
+function installedTree(installLock) {
+    const prefix = 'node_modules/aimeat/';
+    const packages = { '': installLock.packages?.['node_modules/aimeat'] ?? {} };
+    const outside = [];
+    for (const [path, e] of Object.entries(installLock.packages ?? {})) {
+        if (path.startsWith(prefix)) packages[path.slice(prefix.length)] = e;
+        else if (path && path !== 'node_modules/aimeat') outside.push(`${path} ${e.version}`);
+    }
+    return { packages, outside };
 }
 
 function fail(message, logFile) {
@@ -103,25 +101,56 @@ async function main() {
     const stamp = JSON.parse(readFileSync(stampFile, 'utf8'));
     if (stamp.commit !== head) return fail(`dist/ was built from ${String(stamp.commit).slice(0, 9)}, and HEAD is ${head.slice(0, 9)}. Run \`pnpm build\` first.`);
 
+    // 0. The lock the package carries, checked against today's pnpm-lock.yaml and pnpm.overrides
+    //    before anything is packed: a file left over from an older lock is refused here.
+    const shrinkwrapFile = join(AIMEAT, 'npm-shrinkwrap.json');
+    if (!existsSync(shrinkwrapFile)) return fail('aimeat/npm-shrinkwrap.json does not exist. Run `pnpm gen:shrinkwrap` first; npm installs the package from it.');
+    const pkg = JSON.parse(readFileSync(join(AIMEAT, 'package.json'), 'utf8'));
+    const lock = parseYaml(readFileSync(join(AIMEAT, 'pnpm-lock.yaml'), 'utf8'));
+    const shrinkwrap = JSON.parse(readFileSync(shrinkwrapFile, 'utf8'));
+    const swProblems = shrinkwrapProblems(shrinkwrap, pkg, lock);
+    if (swProblems.length > 0) return fail(`aimeat/npm-shrinkwrap.json does not match pnpm-lock.yaml. Run \`pnpm gen:shrinkwrap\`.\n  ${swProblems.join('\n  ')}`);
+    console.log(`  ✓ npm-shrinkwrap.json pins ${Object.keys(shrinkwrap.packages).length - 1} packages, as pnpm-lock.yaml does`);
+
     const work = mkdtempSync(join(tmpdir(), 'aimeat-pack-smoke-'));
     const logFile = join(work, 'node.log');
     let child = null;
+    let registry = null;
     try {
         // 1. Pack exactly what `npm publish` would upload. --ignore-scripts: the build already ran,
         //    and prepare (the git-hooks switch) has nothing to do with the artefact.
         console.log('pack-smoke: packing…');
-        npm(['pack', '--ignore-scripts', '--pack-destination', work], { cwd: AIMEAT, stdio: ['ignore', 'pipe', 'inherit'] });
+        const packed = JSON.parse(npm(['pack', '--ignore-scripts', '--json', '--pack-destination', work], { cwd: AIMEAT, stdio: ['ignore', 'pipe', 'inherit'], encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 }));
         const tarball = readdirSync(work).find(f => f.endsWith('.tgz'));
         if (!tarball) return fail('npm pack produced no tarball.');
+        if (!packed?.[0]?.files?.some(f => f.path === 'npm-shrinkwrap.json')) return fail('the tarball holds no npm-shrinkwrap.json, so npm would resolve every dependency fresh.');
+        console.log('  ✓ the tarball carries npm-shrinkwrap.json');
 
-        // 2. Install it the way an operator does: an empty directory, production dependencies only,
-        //    the package's own postinstall included.
-        console.log(`pack-smoke: installing ${tarball} with production dependencies only…`);
+        // 2. Install it the way an operator does: `aimeat@<version>` from a registry, into an empty
+        //    directory, production dependencies only, the package's own postinstall included. npm
+        //    follows a dependency's shrinkwrap only when the registry marks the version as carrying
+        //    one, and a tarball installed from disk has no registry entry, so the tarball is served
+        //    by a registry front on 127.0.0.1 that marks it as npmjs.org does and redirects every
+        //    other request there. npm writes the install's package-lock.json, which step 2b reads.
+        console.log(`pack-smoke: installing ${pkg.name}@${pkg.version} (the packed ${tarball}) with production dependencies only…`);
         const install = join(work, 'install');
         mkdirSync(install);
         writeFileSync(join(install, 'package.json'), JSON.stringify({ name: 'aimeat-pack-smoke', private: true }));
-        npm(['install', '--omit=dev', '--no-audit', '--no-fund', '--no-package-lock', join(work, tarball)],
+        registry = await serveLikeRegistry({ manifest: pkg, tarball: readFileSync(join(work, tarball)) });
+        await npmAsync(['install', '--omit=dev', '--no-audit', '--no-fund', `--registry=${registry.url}`, `${pkg.name}@${pkg.version}`],
             { cwd: install, stdio: ['ignore', 'inherit', 'inherit'], env: cleanEnv({}) });
+        if (!registry.requests.includes(`/${pkg.name}`)) return fail(`npm did not ask the registry front for ${pkg.name}; the install is not the one checked.`);
+
+        // 2b. What npm installed is what the shrinkwrap pins: every version pnpm-lock.yaml pins, with
+        //     its integrity, resolving as pnpm resolves it, and every pnpm.overrides rule held.
+        const { packages: tree, outside } = installedTree(JSON.parse(readFileSync(join(install, 'package-lock.json'), 'utf8')));
+        const treeProblems = [
+            ...outside.map(p => `${p} was installed beside the package, outside the tree its shrinkwrap pins`),
+            ...pnpmMismatches(tree, pnpmProduction(lock)),
+            ...overrideViolations(tree, pkg.pnpm?.overrides ?? {}),
+        ];
+        if (treeProblems.length > 0) return fail(`npm installed another dependency tree than npm-shrinkwrap.json pins:\n  ${treeProblems.join('\n  ')}`);
+        console.log(`  ✓ npm installed the ${Object.keys(tree).length - 1} packages the shrinkwrap pins, and every override holds`);
 
         // 3. Start the installed node on SQLite in that directory, with a throwaway key.
         const port = await freePort();
@@ -168,6 +197,7 @@ async function main() {
         if (problems.length > 0) return fail(problems.join('\n  '), logFile);
         console.log('pack-smoke: the packed node installs, starts and answers.');
     } finally {
+        if (registry) await registry.close();
         if (child && child.exitCode === null) {
             child.kill('SIGTERM');
             await new Promise(r => { const t = setTimeout(r, 5000); child.once('exit', () => { clearTimeout(t); r(); }); });

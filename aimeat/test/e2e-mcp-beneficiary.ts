@@ -10,6 +10,8 @@
  *   declares a split against somebody else's revenue.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-mcp-beneficiary
  * @version-history
+ *   2026-10-29 — aimeat_admin_possible_payouts: the operator's agent lists, and an unknown nonce answers
+ *     NOT_FOUND (secaudit2026oct26 round 8c).
  *   2026-10-17 — The narrow agent is listed the three selling tools (permission ask,
  *     mcp/permission-ask-gate.ts: exchange:beneficiary is one-press), and each call is refused
  *     SCOPE_DENIED with the allow address.
@@ -415,6 +417,13 @@ await test('MCP: the payout tool quotes what is owed, and refuses without an add
   const r = await provAgent.session.call('aimeat_commerce_beneficiary_payout', { beneficiary: benef.ghii });
   assert(r.isError, `no payout address is configured, so a quote must refuse: ${r.text}`);
   assert(/BENEFICIARY_NO_ADDRESS|NOTHING_OWED/.test(r.text), `expected a named reason, got ${r.text}`);
+});
+
+await test('MCP: the operator lists the possible payouts; marking an unknown one answers NOT_FOUND (round 8c)', async () => {
+  const list = await opAgent.session.call('aimeat_admin_possible_payouts', {});
+  assert(!list.isError && Array.isArray(list.data.possible_payouts), `operator list: ${list.text}`);
+  const unknown = await opAgent.session.call('aimeat_admin_possible_payouts', { provider: provider.ghii, nonce: '0xnone', reference: 'r' });
+  assert(unknown.isError && /NOT_FOUND/.test(unknown.text), `expected NOT_FOUND, got ${unknown.text}`);
 });
 
 console.log(`\n=== MCP BENEFICIARY E2E: ${passed} passed, ${failed} failed ===\n`);

@@ -32,6 +32,22 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-30 — The kind `card-adult-confirm`: a credit card payment only the seller's own Stripe
+ *     account attests is confirmed by the buyer before it records them as an adult
+ *     (commerce/card-adult-ask.ts). An approval may say that only the owner in person allows it
+ *     (`in_person`) and name its buttons (`labels`), and an applier is told who pressed approve
+ *     (PublishDecidedBy) (secaudit2026oct26 round 8c, commerce-07).
+ *   2026-10-29 — The kind `accountant-grant`: an older accountant grant whose holder the node cannot
+ *     place is asked of the client (finance/accountant-grant-ask.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `delegation-binding`: an app by another author publishing through a channel
+ *     delegation that names its app by file name alone waits for the channel owner
+ *     (services/connections/delegation-caller.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `goal-model-spend`: AIMEAT's model doing a goal's work on the AI allowance
+ *     for an agent without ai:use waits for the owner (services/goals/goals-model-spend.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `cortex-holder`: apps that loaded a cortex library load it from its new holder
+ *     after their owner allows it (services/cortex-holder-change.ts; secaudit2026oct26 round 8c).
+ *   2026-10-29 — The kind `extension-code`: extension code a package brought into an account that may not
+ *     install extension code waits for an operator (services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — The kind `goal-model-read`: AIMEAT's model reading private records an agent without
  *     memory:read-as-owner named in a goal waits for the owner (services/goals/goals-model-reach.ts).
  *   2026-10-27 — The kind `schedule-instruction`: a sibling agent's new instruction to another agent's
@@ -112,7 +128,20 @@ export type PublishKind =
   // AIMEAT's model reading private records an agent named in a goal (services/goals/goals-model-reach.ts).
   | 'goal-model-read'
   // Where a mail refinery reads and files mail, changed by a writer that may not run it (refinery/definition-ask.ts).
-  | 'refinery-definition';
+  | 'refinery-definition'
+  // An app by another author publishing through a delegation that names its app by file name alone
+  // (services/connections/delegation-caller.ts).
+  | 'delegation-binding'
+  // AIMEAT's model doing a goal's work on the AI allowance for an agent without ai:use (services/goals/goals-model-spend.ts).
+  | 'goal-model-spend'
+  // Extension code a package brought into an account that may not install extension code (services/extension-code-hold.ts).
+  | 'extension-code'
+  // A cortex name's new holder, allowed by the owner of an app that loaded the earlier library (services/cortex-holder-change.ts).
+  | 'cortex-holder'
+  // An older accountant grant whose holder the node cannot place, asked of the client (finance/accountant-grant-ask.ts).
+  | 'accountant-grant'
+  // A credit card payment only the seller's own Stripe account attests, confirmed by the buyer in person (commerce/card-adult-ask.ts).
+  | 'card-adult-confirm';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
@@ -139,6 +168,10 @@ export interface ApprovalAsk {
   why: string;
   /** The word an agent of the owner must hold to approve it. Absent: being the owner's agent is enough. */
   approve_scope?: string;
+  /** Only the owner signed in themselves allows it, never an agent or an app: it confirms a fact about the owner (policy.ts). */
+  in_person?: boolean;
+  /** The two buttons' own words, when Allow and Don't allow do not say what they do: English, and the locale key under `notiftext.` whose `.allow` and `.deny` say them. */
+  labels?: { allow: string; deny: string; key: string };
   /** Where the person changes it later, shown on the answered notice: a page and its locale key under `notiftext.`. */
   change?: { link: string; key: string };
   /** The approver notice's locale key under `notiftext.` and its variables (names, never sentences). */
@@ -186,8 +219,11 @@ export type PublishRequestFail = { ok: false; status: number; code: string; mess
 /** What an applier answers: done (with the public address when there is one), or why not. */
 export type PublishApplyResult = { ok: true; url?: string } | { ok: false; reason: string };
 
+/** Who pressed approve: their account in person, or the agent's principal, and whether a person or an AI (decide.ts). */
+export interface PublishDecidedBy { by: string; kind: 'ai' | 'human' }
+
 /** Makes one approved request's target public as the owner (appliers.ts, apply-<kind>.ts). */
-export type PublishApplier = (ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest) => Promise<PublishApplyResult>;
+export type PublishApplier = (ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, decided?: PublishDecidedBy) => Promise<PublishApplyResult>;
 const fail = (status: number, code: string, message: string): PublishRequestFail => ({ ok: false, status, code, message });
 
 export interface PublishStoreCtx { storage: Storage; config: AimeatConfig }
@@ -490,6 +526,8 @@ async function announceApproval(ctx: PublishStoreCtx, ownerGhii: string, request
   const door = `/v1/publish-requests/${request.id}/decision`;
   const account = words.approver === 'operators' ? { account: ownerGhii } : {};
   const vars = { who, ...words.i18n.vars };
+  const allow = words.labels ? { label: words.labels.allow, key: `${words.labels.key}.allow` } : { label: 'Allow', key: 'approval_request.allow' };
+  const deny = words.labels ? { label: words.labels.deny, key: `${words.labels.key}.deny` } : { label: 'Don\'t allow', key: 'approval_request.deny' };
   for (const ghii of to) {
     await notify(storage, ghii, {
       type: 'approval_request',
@@ -499,8 +537,8 @@ async function announceApproval(ctx: PublishStoreCtx, ownerGhii: string, request
       i18n: { key: words.i18n.key, vars },
       ref: questionRef(request.id),
       actions: [
-        { id: 'deny', label: 'Don\'t allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline', ...account }, style: 'default', i18n: { key: 'approval_request.deny' } },
-        { id: 'allow', label: 'Allow', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve', ...account }, style: 'primary', i18n: { key: 'approval_request.allow' } },
+        { id: 'deny', label: deny.label, kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline', ...account }, style: 'default', i18n: { key: deny.key } },
+        { id: 'allow', label: allow.label, kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve', ...account }, style: 'primary', i18n: { key: allow.key } },
       ],
     });
     emitChange('notifications', ghii);

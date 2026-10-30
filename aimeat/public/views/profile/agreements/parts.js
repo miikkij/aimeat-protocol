@@ -18,6 +18,8 @@
  * @structure STATUS_TONE · StatusMark · stepRows · Steps · Annexes · Obligations · Summary · newestOf · inForceOf · dateOf
  * @usage html`<${Steps} agreement=${a} operator />`
  * @version-history
+ *   2026-10-29 — A version signed only in test (`test-signed`, production settings) shows its state, its
+ *     step and what comes next (secaudit2026oct26 round 8c).
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
  */
 import { h } from 'preact';
@@ -36,7 +38,7 @@ const html = htm.bind(h);
 export const A = (key, vars) => t(`agreements.${key}`, vars);
 
 /** The tone each state is drawn in: in force green, waiting on the sun, drafts and the ended grey. */
-export const STATUS_TONE = { signed: 'fine', sent: 'attention', review: 'attention', draft: 'off', expired: 'off', ended: 'off' };
+export const STATUS_TONE = { signed: 'fine', sent: 'attention', review: 'attention', draft: 'off', expired: 'off', ended: 'off', 'test-signed': 'attention' };
 
 export const dateOf = (iso) => (iso ? date(iso) : '');
 export const newestOf = (a) => a.versions[a.versions.length - 1];
@@ -48,7 +50,7 @@ export function StatusMark({ status }) {
 
 /** The events the history records, as the person reads them. Anything else keeps its own word. */
 const EVENTS = new Set(['created', 'edited', 'version', 'sent', 'reminder', 'signed', 'copy-received', 'copy-accepted', 'copy-rejected',
-  'in-force', 'notice', 'notice-reminder', 'notice-lapsed', 'objection', 'breach-notice', 'ended', 'deletion-done']);
+  'in-force', 'notice', 'notice-reminder', 'notice-lapsed', 'objection', 'breach-notice', 'ended', 'deletion-done', 'test-signed']);
 
 /** The events whose stored detail a person wrote (a reason, a note); every other detail is the
  *  English audit line, which stays in the record and in the MCP answer and is not drawn here. */
@@ -67,6 +69,7 @@ export function stepRows(a, operator) {
   if (a.endedAt) next = a.deletion && !a.deletion.doneAt ? { title: A('next.deletion', { date: dateOf(a.deletion.dueAt) }) } : null;
   else if (v.status === 'draft') next = { title: operator ? A('next.sendDraft', { n: v.n }) : null };
   else if (v.status === 'review') next = { title: operator ? A('next.review') : A('next.reviewCp') };
+  else if (v.status === 'test-signed') next = { title: operator ? A('next.testSigned') : A('next.testSignedCp') };
   else if (v.status === 'sent' && v.notice) next = { title: v.notice.objectedAt ? A('next.objected') : A('next.notice', { date: dateOf(v.notice.objectionUntil) }) };
   else if (v.status === 'sent') next = { title: operator ? A('next.waitingCp') : A('next.signCp') };
   return next?.title ? [...done, { key: 'next', state: 'next', ...next }] : done;

@@ -9,6 +9,10 @@
  * @structure CortexUpsertResult · upsertCortex(deps, caller, input, mayReplaceOthers)
  * @usage const out = await upsertCortex({ storage, config }, caller, { name, manifest, libs });
  * @version-history
+ *   v1.7.3 — 2026-10-29 — The create branch under a bare name an erasure or the held-name settlement
+ *     freed asks the earlier library's callers first (services/cortex-holder-change.ts; round 8c).
+ *   v1.7.2 — 2026-10-29 — The create branch refuses a new name that starts with aimeat- to anyone but an
+ *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   v1.7.1 — 2026-10-26 — The owner is additive: a bare name is the bare record as before (403 for
  *     another account's), a new cortex keeps its bare name (Jouni, 2026-10-26).
  *   v1.7.0 — 2026-10-25 — Names live in the owner's namespace (services/component-address.ts): the
@@ -66,6 +70,8 @@ import { logger } from '../../utils/logger.js';
 import {
   findCortex, ownComponent, placeCortexInstall, settleReclaimed, splitComponentAddress, shortNameOf,
 } from '../../services/component-address.js';
+import { nodePrefixRefusal } from '../../services/component-name-prefix.js';
+import { noteCortexHolderChange } from '../../services/cortex-holder-change.js';
 
 /** What an upsert did. `record` carries what the answer and lib_urls are built from. */
 export type CortexUpsertResult =
@@ -189,6 +195,9 @@ export async function upsertCortex(
   if (!existing) {
     const reserved = reservedNameRefusal(name, caller);
     if (reserved) return { ok: false, refusal: reserved };
+    // A name with the node's prefix is kept for what the node ships next (component-name-prefix.ts).
+    const prefixed = await nodePrefixRefusal(storage, 'cortex', name, caller);
+    if (prefixed) return { ok: false, refusal: prefixed };
     const overQuota = await cortexInstallRefusal({ storage, config }, true);
     if (overQuota) return upsertRefusal(overQuota.status, overQuota.code, overQuota.message);
     // A lib component with no bytes is refused before anything is written, as installCortex does:
@@ -211,6 +220,8 @@ export async function upsertCortex(
       }
       throw e;
     }
+    // A name an erasure or a settlement freed asks the earlier library's callers first (cortex-holder-change.ts).
+    await noteCortexHolderChange(deps, record, caller.gaii);
     await settleReclaimed(storage, 'cortex', record.name);
     for (const [filename, content] of Object.entries(newLibs)) {
       await storage.setCortexLibFile(name, filename, content);

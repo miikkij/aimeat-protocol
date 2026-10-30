@@ -9,11 +9,16 @@
  *   pdf.js reads it), RunLength, ASCIIHex and ASCII85 are decoded here. A filter for pictures (DCT,
  *   JPX, CCITT, JBIG2) is not decoded to read text and ends the chain at nothing; Crypt passes the
  *   bytes on as they are. A filter pdf.js does not know decodes nothing there either.
+ *   decodeMeasure also says whether the count is the whole stream: a zlib error, a picture filter or
+ *   a filter name this module does not know leaves it incomplete, and the caller then knows the
+ *   stream is not measured.
  *   Written for services/file-text/pdf-budget.ts (secaudit2026oct26,
  *   pdf-budget.ts:pdfDecodesWithin:filter-detection-bypass).
- * @structure PdfFilter · normaliseFilter(name) · decodedLength(data, filters, limit)
- * @usage const n = await decodedLength(data, ['ASCIIHexDecode', 'FlateDecode'], budgetLeft);
+ * @structure PdfFilter · normaliseFilter(name) · decodeMeasure(data, filters, limit) · decodedLength(data, filters, limit)
+ * @usage const { length, complete } = await decodeMeasure(data, ['hex', 'flate'], budgetLeft);
  * @version-history
+ *   v1.1.0 — 2026-10-29 — decodeMeasure: the count and whether it covers the whole stream
+ *     (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { createInflate, createBrotliDecompress, constants } from 'node:zlib';
@@ -38,17 +43,20 @@ export function normaliseFilter(name: string): PdfFilter {
 /** Receives decoded bytes; answers false to stop the decoder. */
 type Sink = (chunk: Buffer) => boolean;
 
-/** A zlib stream (inflate or brotli) fed `data`, its output handed to `sink` until it says stop. */
-function zlibInto(kind: 'flate' | 'brotli', data: Buffer, sink: Sink): Promise<void> {
+/**
+ * A zlib stream (inflate or brotli) fed `data`, its output handed to `sink` until it says stop.
+ * Answers false when zlib stopped at an error, so the count is not the whole stream.
+ */
+function zlibInto(kind: 'flate' | 'brotli', data: Buffer, sink: Sink): Promise<boolean> {
   return new Promise((resolve) => {
     let done = false;
     const z = kind === 'flate' ? createInflate({ finishFlush: constants.Z_SYNC_FLUSH }) : createBrotliDecompress();
-    const finish = () => { if (!done) { done = true; resolve(); } };
-    z.on('data', (c: Buffer) => { if (!done && !sink(c)) { z.destroy(); finish(); } });
-    z.on('end', finish);
+    const finish = (complete: boolean) => { if (!done) { done = true; resolve(complete); } };
+    z.on('data', (c: Buffer) => { if (!done && !sink(c)) { z.destroy(); finish(true); } });
+    z.on('end', () => finish(true));
     // A stream zlib cannot read is pdf.js's to report; what decoded before the error is counted.
-    z.on('error', finish);
-    z.on('close', finish);
+    z.on('error', () => finish(false));
+    z.on('close', () => finish(true));
     z.end(data);
   });
 }
@@ -149,36 +157,51 @@ function a85Into(data: Buffer, sink: Sink): void {
   sink(Buffer.from(out));
 }
 
-/** The output of one filter, held up to `limit` bytes (the caller sees `over` past it). */
-async function decodeOne(kind: PdfFilter, data: Buffer, limit: number, earlyChange: number, keep: boolean): Promise<{ length: number; data: Buffer | null }> {
-  if (kind === 'crypt') return { length: data.length, data };
-  if (kind === 'picture' || kind === 'unknown') return { length: 0, data: null };
+/**
+ * The output of one filter, held up to `limit` bytes (the caller sees `over` past it). `complete` is
+ * false when the count is not what the filter decodes in pdf.js: a picture filter, a name this module
+ * does not know, or a zlib error.
+ */
+async function decodeOne(kind: PdfFilter, data: Buffer, limit: number, earlyChange: number, keep: boolean): Promise<{ length: number; data: Buffer | null; complete: boolean }> {
+  if (kind === 'crypt') return { length: data.length, data, complete: true };
+  if (kind === 'picture' || kind === 'unknown') return { length: 0, data: null, complete: false };
   let length = 0;
+  let complete = true;
   const parts: Buffer[] = [];
   const sink: Sink = (chunk) => {
     length += chunk.length;
     if (keep && length <= limit) parts.push(chunk);
     return length <= limit;
   };
-  if (kind === 'flate' || kind === 'brotli') await zlibInto(kind, data, sink);
+  if (kind === 'flate' || kind === 'brotli') complete = await zlibInto(kind, data, sink);
   else if (kind === 'lzw') lzwInto(data, earlyChange, sink);
   else if (kind === 'runlength') runLengthInto(data, sink);
   else if (kind === 'hex') hexInto(data, sink);
   else a85Into(data, sink);
-  return { length, data: keep && length <= limit ? Buffer.concat(parts) : null };
+  return { length, data: keep && length <= limit ? Buffer.concat(parts) : null, complete };
 }
 
 /**
- * How many bytes `data` decodes to through `filters` in order, or the first count past `limit`.
- * `earlyChange` is the LZW parameter of the stream (1 unless its DecodeParms say 0).
+ * How many bytes `data` decodes to through `filters` in order, or the first count past `limit`, and
+ * whether that count covers the whole chain. `earlyChange` is the LZW parameter of the stream (1
+ * unless its DecodeParms say 0).
  */
-export async function decodedLength(data: Buffer, filters: readonly PdfFilter[], limit: number, earlyChange = 1): Promise<number> {
+export async function decodeMeasure(data: Buffer, filters: readonly PdfFilter[], limit: number, earlyChange = 1): Promise<{ length: number; complete: boolean }> {
   let current = data;
+  let complete = true;
   for (let i = 0; i < filters.length; i++) {
     const last = i === filters.length - 1;
     const step = await decodeOne(filters[i]!, current, limit, earlyChange, !last);
-    if (last || step.length > limit || !step.data) return step.length;
+    // Past the limit is an answer whatever the rest of the chain would do.
+    if (step.length > limit) return { length: step.length, complete: true };
+    complete &&= step.complete;
+    if (last || !step.data) return { length: step.length, complete };
     current = step.data;
   }
-  return current.length;
+  return { length: current.length, complete };
+}
+
+/** decodeMeasure's count alone. */
+export async function decodedLength(data: Buffer, filters: readonly PdfFilter[], limit: number, earlyChange = 1): Promise<number> {
+  return (await decodeMeasure(data, filters, limit, earlyChange)).length;
 }

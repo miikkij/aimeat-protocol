@@ -18,6 +18,7 @@
  * @structure Strip · Waiting · ReviewBox · NewAgreement · Detail · AgreementsSection (default)
  * @usage html`<${AgreementsSection} num="11" onMessage=${(kind, text) => …} />`
  * @version-history
+ *   2026-10-29 — A version signed only in test offers "Make a new version" (secaudit2026oct26 round 8c).
  *   2026-10-27 — The decision on a returned copy names the copy shown (uploadedAt), secaudit2026oct26.
  *   v1.0.0 — 2026-10-24 — Initial (plan doc-mvmr4i2wdk0p, D5).
  */
@@ -155,7 +156,7 @@ function Detail({ agreement, busy, onAct, confirm }) {
         <${canNotice ? Action : Loud} control small disabled=${busy} onClick=${() => onAct(() => sendAgreement(id), A('op.sent'))}>${A('op.send')}<//>
         <${Action} small onClick=${() => pdf(v.n)}>${A('op.previewPdf')}<//>
       <//>` : null}
-    ${agreement.status === 'signed' && v.status !== 'draft' ? html`
+    ${(agreement.status === 'signed' && v.status !== 'draft') || v.status === 'test-signed' ? html`
       <${Actions}>
         <${Action} small disabled=${busy} onClick=${() => onAct(() => newVersion(id), A('op.versionMade'))}>${A('op.newVersion')}<//>
       <//>` : null}

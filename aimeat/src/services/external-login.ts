@@ -11,7 +11,9 @@
  *   1. Returning user — the provider's stable subject in externalIdentities.
  *   2. Adoption keys (SAML only) — the SAME subject under a sibling key, e.g. a SCIM-provisioned
  *      account whose externalId equals the SAML NameID. Linking writes the provider key so step 1
- *      answers next time. Without this, SCIM-first-then-SAML would mint a duplicate account.
+ *      answers next time. Without this, SCIM-first-then-SAML would mint a duplicate account. When
+ *      the caller's adoptionAsksCode says so (an adopted account with two-step sign-in, first
+ *      organisation sign-in), the answer is `second_factor` and nothing is linked until the code.
  *   3. Link by verified email — only when the IdP vouches for the address AND the local account
  *      verified it too (anti-takeover), AND — when the caller restricts it — the address is in the
  *      organisation's own domains. An unverified local match becomes a `link_existing` pending so
@@ -24,6 +26,9 @@
  *   mapExternalIdentity; finalizeExternalSignup. (safeRedirectPath is utils/same-origin-path.ts.)
  * @usage const mapped = await mapExternalIdentity(storage, { providerId: 'google', … });
  * @version-history
+ *   2026-10-29 — Step 2 answers `second_factor` when the caller's adoptionAsksCode says the first
+ *     organisation sign-in into an adopted account asks its code (secaudit2026oct26 round 8c,
+ *     adoption-skips-second-factor).
  *   2026-10-27 — The account an identity provider's sign-in makes reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — mapExternalIdentity answers `adoptedNow` when step 2 linked the provider through the
  *     adoption key, so the SAML ACS can tell the person (secaudit2026oct26, adoption-skips-second-factor).
@@ -345,7 +350,8 @@ export type ExternalMapResult =
   /** `adoptedNow`: this sign-in linked the provider through the adoption key (step 2). */
   | { outcome: 'login'; ghii: GHIIRecord; adoptedNow?: boolean }
   | { outcome: 'pending'; pending: PendingSignup }
-  /** Step 3 matched an account with two-step sign-in armed: nothing is linked yet. The caller starts
+  /** Step 3 matched an account with two-step sign-in armed, or step 2 matched an adopted account
+   *  whose first organisation sign-in asks the code: nothing is linked yet. The caller starts
    *  the code step (routes/ghii/login-link-second-factor.ts startLinkSecondFactor) with `link`, and
    *  the code step saves the link only after a correct code. */
   | { outcome: 'second_factor'; ghii: GHIIRecord; link: PendingExternalLink };
@@ -366,6 +372,9 @@ export async function mapExternalIdentity(
     /** Sibling externalIdentities keys that count as "already this organisation's account" —
      *  SAML passes its connection's `scim:<id>` so a provisioned account is adopted, not duplicated. */
     adoptProviderKeys?: string[];
+    /** Whether a step-2 match asks the account's two-step code before the link is saved (SAML passes
+     *  services/sso-adoption-notice.ts adoptionAsksCode). Absent = never. */
+    adoptionAsksCode?: (account: GHIIRecord) => Promise<boolean>;
     /** Restrict step 3 (link by verified email) to these domains (BR-04 R5). Null/absent = any. */
     emailLinkDomains?: string[] | null;
   },
@@ -376,13 +385,17 @@ export async function mapExternalIdentity(
   let ghiiRecord = await storage.getGHIIByExternalId(providerId, sub);
 
   // 2) Adoption: the same subject under a sibling key (a SCIM externalId equal to the SAML
-  //    NameID). Link the provider key so step 1 answers directly next time. The organisation's
-  //    directory vouches for the account here, so no second factor is asked; the caller tells the
-  //    person when the account has one (secaudit2026oct26).
+  //    NameID). Link the provider key so step 1 answers directly next time. When the caller says
+  //    this first sign-in into the adopted account asks the account's code, nothing is linked yet
+  //    and the code step saves the link (secaudit2026oct26 round 8c). Otherwise the organisation's
+  //    directory vouches for the account and the caller tells the person when it has two-step sign-in.
   let adoptedNow = false;
   if (!ghiiRecord && opts.adoptProviderKeys?.length) {
     for (const key of opts.adoptProviderKeys) {
       const adopted = await storage.getGHIIByExternalId(key, sub);
+      if (adopted && opts.adoptionAsksCode && await opts.adoptionAsksCode(adopted)) {
+        return { outcome: 'second_factor', ghii: adopted, link: { providerId, sub } };
+      }
       if (adopted) {
         ghiiRecord = await storage.updateGHII(adopted.ghii, externalIdUpdate(adopted, providerId, sub));
         adoptedNow = !!ghiiRecord;

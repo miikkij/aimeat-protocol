@@ -18,9 +18,16 @@
  *
  *   A scan has no text layer; `hasTextLayer` is true only when the text is at least 40 characters
  *   after trimming, so a page number or a stamp alone does not count as a text layer.
- * @structure readPdfFacts · pdfDateToIso · mapSignatures
+ *
+ *   A PDF WHOSE DECODE COST THE BUDGET CANNOT MEASURE (file-text/pdf-budget.ts 'unmeasured') is read
+ *   in one worker, metadata and text, under the node's time and memory limits
+ *   (file-text/pdf-bounded.ts). Past one, the file is left as it is, its text is not read, and
+ *   `textNotRead` and `errors.pdfText` say which limit.
+ * @structure readPdfFacts · pdfDateToIso · mapSignatures · applyMeta · readBounded
  * @usage const { facts, text, errors } = await readPdfFacts(config, bytes, { online: false });
  * @version-history
+ *   v1.2.0 — 2026-10-29 — A PDF the budget cannot measure is read under the time and memory limits;
+ *     past one, facts.textNotRead says which (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.0.0 — 2026-10-20 — Initial.
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: a PDF whose text and metadata streams decode past
  *     256 MB is not handed to pdf.js (file-text/pdf-budget.ts); errors.pdfMeta says why.
@@ -28,8 +35,9 @@
 import { getDocumentProxy } from 'unpdf';
 import type { AimeatConfig } from '../../config.js';
 import { logger } from '../../utils/logger.js';
-import { extractFileText } from '../file-text/index.js';
-import { pdfDecodesWithin } from '../file-text/pdf-budget.js';
+import { extractFileText, pdfTextResult } from '../file-text/index.js';
+import { pdfDecodeMeasure } from '../file-text/pdf-budget.js';
+import { PdfLimitReached, limitsActive, pdfReadLimits, readPdfBounded, type PdfReadLimits } from '../file-text/pdf-bounded.js';
 import { validatePdf, type ValidationReport } from '../docsign/validate.js';
 import type { PdfFacts } from './types.js';
 
@@ -105,6 +113,58 @@ function xmpGet(meta: Meta, name: string): unknown {
   return meta.get(name) ?? meta.get(name.toLowerCase()) ?? undefined;
 }
 
+/** The XMP names applyMeta reads. */
+const XMP_NAMES = ['dc:title', 'dc:creator', 'dc:description', 'pdf:Keywords', 'xmp:CreatorTool', 'pdf:Producer', 'xmp:CreateDate', 'xmp:ModifyDate'] as const;
+
+/** The Info dictionary and the XMP packet into the facts, XMP first. */
+function applyMeta(facts: PdfFacts, info: Record<string, unknown>, metadata: Meta): void {
+  if (typeof info.PDFFormatVersion === 'string') facts.pdfVersion = info.PDFFormatVersion;
+  facts.encrypted = !!info.EncryptFilterName;
+  const pick = (xmpName: string, infoName: string): string | undefined =>
+    textOf(xmpGet(metadata, xmpName)) ?? textOf(info[infoName]);
+  const title = pick('dc:title', 'Title');
+  const author = pick('dc:creator', 'Author');
+  const subject = pick('dc:description', 'Subject');
+  const keywords = pick('pdf:Keywords', 'Keywords');
+  const creator = pick('xmp:CreatorTool', 'Creator');
+  const producer = pick('pdf:Producer', 'Producer');
+  const createdAt = pdfDateToIso(textOf(xmpGet(metadata, 'xmp:CreateDate')) ?? info.CreationDate);
+  const modifiedAt = pdfDateToIso(textOf(xmpGet(metadata, 'xmp:ModifyDate')) ?? info.ModDate);
+  Object.assign(facts, Object.fromEntries(Object.entries({ title, author, subject, keywords, creator, producer, createdAt, modifiedAt })
+    .filter(([, v]) => v !== undefined)));
+}
+
+/** A metadata read that failed: a password error marks the PDF encrypted, the message is kept. */
+function metaFailed(facts: PdfFacts, errors: Record<string, string>, err: unknown): void {
+  const msg = (err as Error)?.message || String(err);
+  if ((err as Error)?.name === 'PasswordException' || /password/i.test(msg)) facts.encrypted = true;
+  errors.pdfMeta = msg.slice(0, 300);
+}
+
+/**
+ * A PDF the budget cannot measure: its metadata and text in one worker under `limits`. At a limit
+ * the file is left as it is, its text is not read, and the facts say which limit (textNotRead).
+ */
+async function readBounded(bytes: Buffer, limits: PdfReadLimits, facts: PdfFacts, errors: Record<string, string>): Promise<string | null> {
+  try {
+    const got = await readPdfBounded(bytes, limits, { text: true, meta: XMP_NAMES });
+    if (typeof got.pages === 'number') facts.pages = got.pages;
+    const xmp = got.xmp ?? {};
+    applyMeta(facts, got.info ?? {}, { get: (name: string) => xmp[name] });
+    const text = pdfTextResult(got.text ?? '').text;
+    return text || null;
+  } catch (err) {
+    if (err instanceof PdfLimitReached) {
+      facts.textNotRead = { reason: err.limit, limit: err.limit === 'time' ? err.value / 1000 : err.value };
+      errors.pdfText = `The text of this PDF was not read: ${err.message}. The file is stored as it was.`;
+      return null;
+    }
+    metaFailed(facts, errors, err);
+    logger.debug(`[content] a PDF read in the worker failed: ${errors.pdfMeta}`);
+    return null;
+  }
+}
+
 /**
  * The facts of a PDF, its text layer and the readers that failed.
  * @param {AimeatConfig} config - Reads `docsignEnabled` (and, inside validatePdf, the docsign settings).
@@ -126,49 +186,41 @@ export async function readPdfFacts(config: AimeatConfig, bytes: Buffer, opts: { 
 
   // pdf.js inflates every stream it reads with no size limit, in this process. A PDF whose text and
   // metadata streams decode past the budget is not handed to it: the facts say why, and the
-  // signature check, which reads the raw bytes, still runs.
-  const withinBudget = await pdfDecodesWithin(bytes);
+  // signature check, which reads the raw bytes, still runs. One whose decode cost the budget cannot
+  // measure is read in a worker under the node's time and memory limits (file-text/pdf-bounded.ts).
+  const measure = await pdfDecodeMeasure(bytes);
+  const withinBudget = measure.verdict !== 'over';
+  const limits = pdfReadLimits(config);
+  const bounded = measure.verdict === 'unmeasured' && limitsActive(limits);
+  let text: string | null = null;
   if (!withinBudget) {
     errors.pdfMeta = 'The PDF was not read: its content decodes to more than 256 MB.';
-  } else try {
-    const doc = await getDocumentProxy(new Uint8Array(bytes));
+  } else if (bounded) {
+    text = await readBounded(bytes, limits, facts, errors);
+  } else {
     try {
-      facts.pages = doc.numPages;
-      const { info, metadata } = await doc.getMetadata() as unknown as { info: Record<string, unknown>; metadata: Meta };
-      if (typeof info.PDFFormatVersion === 'string') facts.pdfVersion = info.PDFFormatVersion;
-      facts.encrypted = !!info.EncryptFilterName;
-      const pick = (xmpName: string, infoName: string): string | undefined =>
-        textOf(xmpGet(metadata, xmpName)) ?? textOf(info[infoName]);
-      const title = pick('dc:title', 'Title');
-      const author = pick('dc:creator', 'Author');
-      const subject = pick('dc:description', 'Subject');
-      const keywords = pick('pdf:Keywords', 'Keywords');
-      const creator = pick('xmp:CreatorTool', 'Creator');
-      const producer = pick('pdf:Producer', 'Producer');
-      const createdAt = pdfDateToIso(textOf(xmpGet(metadata, 'xmp:CreateDate')) ?? info.CreationDate);
-      const modifiedAt = pdfDateToIso(textOf(xmpGet(metadata, 'xmp:ModifyDate')) ?? info.ModDate);
-      Object.assign(facts, Object.fromEntries(Object.entries({ title, author, subject, keywords, creator, producer, createdAt, modifiedAt })
-        .filter(([, v]) => v !== undefined)));
-    } finally {
-      // Frees pdf.js's worker-side document; a failure here loses no facts, so it is only logged.
-      await doc.loadingTask.destroy().catch((err: unknown) => {
-        logger.debug(`[content] pdf.js destroy failed: ${(err as Error)?.message || String(err)}`);
-      });
+      const doc = await getDocumentProxy(new Uint8Array(bytes));
+      try {
+        facts.pages = doc.numPages;
+        const { info, metadata } = await doc.getMetadata() as unknown as { info: Record<string, unknown>; metadata: Meta };
+        applyMeta(facts, info, metadata);
+      } finally {
+        // Frees pdf.js's worker-side document; a failure here loses no facts, so it is only logged.
+        await doc.loadingTask.destroy().catch((err: unknown) => {
+          logger.debug(`[content] pdf.js destroy failed: ${(err as Error)?.message || String(err)}`);
+        });
+      }
+    } catch (err) {
+      metaFailed(facts, errors, err);
     }
-  } catch (err) {
-    const msg = (err as Error)?.message || String(err);
-    if ((err as Error)?.name === 'PasswordException' || /password/i.test(msg)) facts.encrypted = true;
-    errors.pdfMeta = msg.slice(0, 300);
-  }
-
-  let text: string | null = null;
-  if (withinBudget) try {
-    const got = await extractFileText(bytes, 'application/pdf', 'file.pdf');
-    // An empty text with a note is a scan (no text layer) or a read failure; the second one also
-    // fails getDocumentProxy above, so errors.pdfMeta already carries it.
-    text = got?.text ? got.text : null;
-  } catch (err) {
-    errors.pdfText = ((err as Error)?.message || String(err)).slice(0, 300);
+    try {
+      const got = await extractFileText(bytes, 'application/pdf', 'file.pdf', { pdfLimits: limits });
+      // An empty text with a note is a scan (no text layer) or a read failure; the second one also
+      // fails getDocumentProxy above, so errors.pdfMeta already carries it.
+      text = got?.text ? got.text : null;
+    } catch (err) {
+      errors.pdfText = ((err as Error)?.message || String(err)).slice(0, 300);
+    }
   }
   facts.hasTextLayer = (text?.trim().length ?? 0) >= MIN_TEXT_LAYER_CHARS;
   if (text !== null && !text.trim()) text = null;

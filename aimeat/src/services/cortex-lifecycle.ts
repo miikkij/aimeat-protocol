@@ -45,6 +45,11 @@
  *   const out = await installCortex({ storage, config }, caller, { manifest, libs });
  *   if (!out.ok) { res.status(out.refusal.status).json(error(nodeId, out.refusal.code, out.refusal.message)); return; }
  * @version-history
+ *   2026-10-29 — installCortex under a bare name an account erasure or the held-name settlement freed
+ *     asks each owner of an app that loaded the earlier library first (cortex-holder-change.ts;
+ *     secaudit2026oct26 round 8c).
+ *   2026-10-29 — installCortex refuses a new name that starts with aimeat- to anyone but an operator,
+ *     409 NAME_RESERVED (component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   2026-10-26 — The owner is additive: installCortex keeps the bare name and refuses another account's name 403 as before (Jouni, 2026-10-26).
  *   2026-10-25 — Names live in the owner's namespace (services/component-address.ts): installCortex
  *     stores `<owner>/<name>` (or the owner's released bare name), a manifest name with another
@@ -111,6 +116,8 @@ import { accountGhii } from './publish-requests/ask.js';
 import { settleRequestsForRemovedTarget } from './publish-requests/store.js';
 import { bundledCortexNames } from './cortex-seeder.js';
 import { placeCortexInstall, releaseBareName, settleReclaimed, findCortex } from './component-address.js';
+import { nodePrefixRefusal } from './component-name-prefix.js';
+import { noteCortexHolderChange } from './cortex-holder-change.js';
 
 export interface CortexDeps {
     storage: Storage;
@@ -353,6 +360,9 @@ export async function installCortex(
     // A name the node ships is the node's own even while it has no record (secaudit2026oct22).
     const reserved = reservedNameRefusal(ext.name, caller);
     if (reserved) return { ok: false, refusal: reserved };
+    // A name with the node's prefix is kept for what the node ships next (component-name-prefix.ts).
+    const prefixed = await nodePrefixRefusal(storage, 'cortex', ext.name, caller);
+    if (prefixed) return { ok: false, refusal: prefixed };
 
     // Every lib component must arrive WITH its bytes. This read only `libs`, so a request that spelled
     // it `lib`, or a ZIP with the file outside libs/, answered 201 and recorded a component with
@@ -390,6 +400,9 @@ export async function installCortex(
         throw e;
     }
 
+    // A name an erasure or a settlement freed: the apps that loaded the earlier holder's library ask
+    // their owner first (cortex-holder-change.ts), then the released row is settled.
+    await noteCortexHolderChange(deps, record, caller.gaii);
     await settleReclaimed(storage, 'cortex', record.name);
     for (const [filename, content] of Object.entries(libs)) {
         await storage.setCortexLibFile(ext.name, filename, content);

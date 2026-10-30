@@ -13888,10 +13888,26 @@ paths:
       description: |
         Delete one conversation and its turns. The conversation is looked up first, so a caller who
         cannot see it is told nothing exists rather than being told a deletion happened. Owner
-        sessions only.
+        sessions only. The chat tool that answered in the conversation (goose) keeps its own copy in
+        its own store on the server, which the node cannot delete with certainty: `chat_tool_copy` is
+        `kept` for a conversation the chat tool has seen, with a `note` saying so, and `none` for one
+        it never saw. The conversation's session credential ends with the delete.
       responses:
         '200':
-          description: '`{ deleted: true }`'
+          description: '`{ deleted: true, chat_tool_copy: "kept" | "none", note? }`'
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success: { type: boolean }
+                  data:
+                    type: object
+                    required: [deleted, chat_tool_copy]
+                    properties:
+                      deleted: { type: boolean }
+                      chat_tool_copy: { type: string, enum: [kept, none] }
+                      note: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -23514,8 +23530,11 @@ paths:
       tags: [Compliance]
       description: >
         Every data processing agreement (GDPR art. 28) the operator keeps, each with its status
-        (draft, sent, review, signed, expired, ended), the version in force, what it waits for and an
-        announced change. Operator only; something acting for the operator needs `compliance:read`.
+        (draft, sent, review, signed, expired, ended, test-signed), the version in force, what it waits
+        for and an announced change. `test-signed` is a version both parties signed where a signature
+        is a test wallet signature with no legal effect, on a node running production settings: it is
+        not in force, and the version in force before it stays in force (the agreement then reads
+        `signed`). On a node in test or development settings such a version comes into force as before. Operator only; something acting for the operator needs `compliance:read`.
         A fleet manager reads the agreement status per customer from here (`external_ref`).
       security:
         - BearerAuth: []
@@ -24031,6 +24050,12 @@ paths:
         a `reason`, and `read_request` { request_id, records, agent }: the owner's one-press question
         (kind `goal-model-read`, readable at GET /v1/publish-requests/{id}). Allow: the work runs with
         the records. Don't allow: it runs without them, or stops when none of its records remain.
+        A model work an agent without `ai:use` asked for (the work's creator, or the goal's creator for
+        a work the goal's plan made, unless the owner approved the goal as a proposal) has status
+        `waiting`, a `reason`, and `spend_request` { request_id, agent }: the owner's one-press
+        question (kind `goal-model-spend`) whether AIMEAT's model may do it on the owner's AI. Allow:
+        the work runs, and that agent's later model works in the goal run without asking. Don't
+        allow: the work stops with the reason.
       security:
         - BearerAuth: []
       responses:
@@ -25163,6 +25188,49 @@ paths:
         '409': { $ref: '#/components/responses/AimeatError' }
         '422': { $ref: '#/components/responses/AimeatError' }
         '502': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/possible-payouts:
+    get:
+      operationId: commerceListPossiblePayouts
+      summary: The beneficiary payouts whose settlement did not answer (OPERATOR ONLY)
+      description: >
+        Every open possible payout on the node: an x402 settle of a provider-to-beneficiary payout that
+        timed out or failed, so the transfer may or may not have gone out. The operator looks each
+        nonce up on the chain. Returns `{ possible_payouts: [{ provider, beneficiary, nonce, amount,
+        currency, payer, pay_to, network, entries, reason, status, created_at, closed_at, reference }],
+        count }`. The MCP tool aimeat_admin_possible_payouts does the same.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/possible-payouts/arrived:
+    post:
+      operationId: commerceMarkPossiblePayoutArrived
+      summary: Mark a possible payout as arrived, with a reference (OPERATOR ONLY)
+      description: >
+        The operator saw the transfer arrive. The entries the payout covered are recorded as paid with
+        `reference` (the transaction hash or a case number), the possible payout closes as `arrived`,
+        and the beneficiary and the provider get a notice. 404 NOT_FOUND for an unknown provider and
+        nonce; 409 CONFLICT for one already closed, or one whose amount the beneficiary's book does not
+        show (nothing is marked paid). Returns the closed payout with `arrived` and `entries_paid`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [provider, nonce, reference], properties: {
+          provider: { type: string, description: 'The provider GHII, from the list.' },
+          nonce: { type: string, description: 'The payout nonce, from the list.' },
+          reference: { type: string, maxLength: 300, description: 'What shows the transfer arrived: the transaction hash or a case number.' } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
 
   /v1/commerce/beneficiary/approvals:
     post:
@@ -31653,6 +31721,10 @@ paths:
     get:
       operationId: listPeeringRequests
       summary: List pending peering requests
+      description: >-
+        A request another node left here that nobody answered in `federation.peering_request_days` (30
+        by default, 0 for never) has expired; it is deleted before the list is read and is not in it.
+        Requests this node sent are kept.
       tags: [Federation]
       security:
         - BearerAuth: []
@@ -31717,6 +31789,8 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           description: SELF_NODE_ID — the request names this node's own id, so approving it would make a peer of this node itself; reject it instead
+        '404':
+          description: NOT_FOUND — no such request, or it expired (nobody answered it in `federation.peering_request_days`) and was deleted
         '409':
           description: PEER_KEY_REQUIRED — the request carries no key; INVITE_NOT_OPEN — a replacement request whose invite was used, revoked or ran out meanwhile, so nothing was replaced
 
@@ -31751,7 +31825,7 @@ paths:
         '400':
           description: SELF_NODE_ID — the request names this node's own id
         '404':
-          $ref: '#/components/responses/NotFound'
+          description: NOT_FOUND — no such request, or it expired and was deleted, as on the PUT
         '409':
           description: PEER_KEY_REQUIRED or INVITE_NOT_OPEN, as on the PUT
 
@@ -51158,7 +51232,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: >-
+            ALREADY_EXISTS, an extension of that name is already installed; or NAME_RESERVED, the name
+            starts with aimeat-, which is kept for what this node ships, and only an operator may
+            install a new extension under it.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
 
@@ -51246,7 +51323,10 @@ paths:
         '403':
           $ref: '#/components/responses/Forbidden'
         '409':
-          description: Install limit exceeded, or VERSION_EXISTS, this version is already kept with other code.
+          description: >-
+            Install limit exceeded; VERSION_EXISTS, this version is already kept with other code; or
+            NAME_RESERVED, a new extension under a name that starts with aimeat-, which only an
+            operator may create.
         '422':
           $ref: '#/components/responses/OdpsFieldTooLong'
         '429':
@@ -51285,6 +51365,9 @@ paths:
       description: |
         Start the extension runtime and register its action routes.
         Requires owner role. Owners can only activate extensions they installed; operators can activate any.
+        An extension whose code a package brought into an account that may not install extension code
+        (extensions.install_role "operator") answers 409 AWAITING_OPERATOR until an operator allows it;
+        an operator's activate is that approval.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -51313,6 +51396,8 @@ paths:
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '409':
+          description: AWAITING_OPERATOR, the extension's code waits for an operator's approval (error.details.request_id).
 
   /v1/extensions/{name}/config:
     patch:
@@ -53045,7 +53130,7 @@ paths:
         '409':
           description: >-
             CONFLICT, a cortex of that name is already installed; or NAME_RESERVED, the name is a
-            library this node ships and only an operator may install it.
+            library this node ships, or starts with aimeat-, and only an operator may install it.
 
   /v1/cortex/{name}:
     get:
@@ -53130,7 +53215,8 @@ paths:
             VERSION_EXISTS, this version is already kept with other lib bytes; BOARD_ID_TAKEN, the
             redeploy of an active cortex would make a board whose id is a board of another account;
             CONFLICT, another install took the free name first, and nothing was written; or
-            NAME_RESERVED, the name is a library this node ships and only an operator may create it.
+            NAME_RESERVED, the name is a library this node ships, or starts with aimeat-, and only an
+            operator may create it.
         '413':
           description: Manifest, lib, or quota limit exceeded.
     delete:
@@ -53347,7 +53433,10 @@ paths:
         pinned (`name@1.2.0`). `<owner>/<name>` is the exact address: write it as one encoded
         segment (`alice%2Fui`) here, or use GET /v1/cortex/{owner}/{name}/libs/{libFile}. A bare name
         serves the bare record, else the one account's `<owner>/<name>`; a name its holder removed
-        serves nobody else's bytes. `system/<name>` serves a shipped one too.
+        serves nobody else's bytes. `system/<name>` serves a shipped one too. A name an account
+        erasure or the held-name settlement freed stays free for a new holder; a request from the page
+        of an app that loaded the earlier holder's library (its Origin or Referer) answers 404 until
+        the app's owner allows the new holder with one press (a request of kind `cortex-holder`).
       tags: [Cortex]
       parameters:
         - name: name
@@ -54600,6 +54689,10 @@ paths:
     get:
       operationId: getIntroductionStatus
       summary: Check introduction status
+      description: >-
+        404 NOT_FOUND also when the request expired: nobody answered it in this node's
+        `federation.peering_request_days` (30 by default), so it was deleted and the node can introduce
+        itself again.
       tags: [Federation]
       parameters:
         - name: id
@@ -54702,6 +54795,12 @@ paths:
         given out. An identity no listed peer knows is remembered as unknown for 30 seconds, and
         lookups of one identity made at the same time share one round of questions, so the same
         unknown identity asked again in that time answers 404 without asking the peers again.
+
+        An identity that names its home node (`alice@node-id`) is answered from what this node knows
+        when that node is this node or a peer it knows: a listed peer is named without being asked, and
+        this node or an unlisted peer answers 404 with no peer asked. Only an identity that names no
+        known node is asked of the listed peers, one at a time and at most
+        `federation.resolve_max_peers` of them (500 by default, 0 for no limit).
       tags: [Federation]
       parameters:
         - name: gaii
@@ -55279,7 +55378,8 @@ paths:
         ({ url, public_key }) registers a node this repository does not know yet as a packages-only peer,
         once the node's own /.well-known/aimeat answers with the same node id and key (409
         PEER_ID_MISMATCH or PEER_KEY_MISMATCH when it does not, 400 INVALID_URL for an address this node
-        may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). Without
+        may not reach, 503 PEER_UNREACHABLE when nothing answers; nothing is written then). This node's
+        own id answers 400 SELF_NODE_ID and nothing is written. Without
         `node` the node must already be an active peer (409 PEER_UNKNOWN). A peer of that id under another
         key answers 409 PEER_KEY_MISMATCH. 404 NOT_A_REPOSITORY when the repository role is off; 403
         NOT_AN_AUTHOR when the caller has no package here. Requires packages:write.
@@ -56760,7 +56860,7 @@ paths:
               properties:
                 label: { type: string }
                 version: { type: string, description: 'Specific version to install; defaults to latest published.' }
-                dry_run: { type: boolean, description: 'Report what would be registered and register nothing.' }
+                dry_run: { type: boolean, description: 'Report what would be registered and register nothing. With install role operator the preview lists in extension_code_awaits_operator the extension components a real install would store switched off, waiting for an operator.' }
                 mode:
                   type: string
                   enum: [managed, editable]
@@ -56812,6 +56912,21 @@ paths:
                                 type: array
                                 items: { type: string }
                                 description: A skill left out because the owner has one of that name of their own. Absent when none.
+                              extension_code_awaiting_operator:
+                                type: array
+                                description: >-
+                                  With extensions.install_role "operator" and an installer whose account may not
+                                  install extension code: each extension component, installed switched off. Its
+                                  code waits for an operator's one press (a request of kind `extension-code`,
+                                  readable at GET /v1/publish-requests/{id}); the rest of the package is installed.
+                                  Allow switches it on, Don't allow leaves it off, and the installer hears both.
+                                  Absent when nothing waits.
+                                items:
+                                  type: object
+                                  properties:
+                                    component: { type: string }
+                                    extension: { type: string, description: The extension's stored name. }
+                                    request_id: { type: string, nullable: true }
         '202':
           description: The install waits for the owner. Nothing was registered.
           content:
@@ -57204,7 +57319,8 @@ paths:
                   description: >-
                     `{ spec: "aimeat.install-set/1", bundle: { group_id, node_id?, version? }, repository?: {
                     node_id, url, public_key } (links a repository this node does not know yet as an active
-                    peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key), owner: { name,
+                    peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key; 400
+                    SELF_NODE_ID when it names this node itself), owner: { name,
                     email, display_name? }, members?: [{ email, name?, display_name?, join: invite|account,
                     memberships: [{ organism, role: admin|member, workspaces: [key | { key, role:
                     viewer|contributor }] }] }], organism_names?: { <key>: name }, config?: { <group id>: {
@@ -57364,7 +57480,10 @@ paths:
         by an agent or an app grant costs the words POST /v1/memory asks for a write into the owner's
         namespace (see installPackage). Without them, and with every other check passed, the answer is
         202 and a request for the owner carrying these actions; nothing is deleted or written until it
-        is approved.
+        is approved. With extensions.install_role "operator" and an account that may not install
+        extension code, an extension the migration writes is stored switched off and its code waits for
+        an operator's one press; the answer lists each in `awaitingOperator` ({ component, extension,
+        request_id }).
       tags: [Instances]
       security:
         - BearerAuth: []
@@ -67115,6 +67234,9 @@ paths:
                     delegation is used by the app it names (its own grant token, any user's), by a
                     person who uses that app (a live grant for it) in person or through their agents,
                     and by the channel owner. Any other caller is 403 DELEGATION_NOT_FOR_CALLER.
+                    A delegation belongs to one author's app (`bound_app` on the delegation): an app
+                    of the same file name by another author is 403, and on a delegation not yet bound
+                    an app by another author waits for the channel owner's answer (202).
                 action:
                   type: string
                   example: publish-video
@@ -67164,6 +67286,47 @@ paths:
                               error:
                                 type: string
                                 nullable: true
+        '202':
+          description: >
+            Nothing was published. The delegation names its app by file name alone and is not yet
+            bound to one author's app, and this app was made by someone other than the channel
+            owner. The channel owner was asked once, with Allow and Don't allow; every user of the
+            app gets this same answer until they decide, and the first one to ask hears the answer
+            in their notifications. After Allow the delegation takes only this author's app; after
+            Don't allow this app is 403 DELEGATION_NOT_FOR_CALLER and the channel owner is not asked
+            again.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          approval_request:
+                            type: object
+                            properties:
+                              request_id:
+                                type: string
+                              status:
+                                type: string
+                                enum: [awaiting_owner]
+                              waiting_for:
+                                type: string
+                                enum: [channel_owner]
+                              asks:
+                                type: string
+                              why:
+                                type: string
+                              expires_at:
+                                type: string
+                                format: date-time
+                              already_waiting:
+                                type: boolean
+                              next_step:
+                                type: string
         '400':
           description: >
             The gate refused: no delegation, the delegation is disabled, a per-publisher cap is
@@ -68114,7 +68277,11 @@ paths:
                   default: true
       responses:
         '201':
-          description: Delegation created or replaced
+          description: >
+            Delegation created or replaced. `bound_app` is the one app (`owner/filename`) it belongs
+            to: the app `app_id` names in full, or your own app of that file name. It is null when
+            neither exists yet; then a first use by your own app binds it to that app, and a first
+            use by an app of another author asks you first, also when you hold an app of that name.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':
@@ -68137,7 +68304,9 @@ paths:
             type: string
       responses:
         '200':
-          description: Delegations over this connection
+          description: >
+            Delegations over this connection, each with `bound_app`: the one app (`owner/filename`)
+            it belongs to, or null while it is not bound.
         '401':
           $ref: '#/components/responses/Unauthorized'
         '404':
@@ -70731,13 +70900,16 @@ paths:
         account no one holds now, or an account registered after the schedule was made; the entry id
         is the schedule id. The start step of type `subdomain_site_origin` names the subdomain
         addresses it could not tell apart as the operator's own site or a label a publish gave an app;
-        the entry id is the label. With
+        the entry id is the label. The start step of type `platform_fee_records` names the money
+        platform-fee records outside an operator's account whose writer it could not tell; the entry
+        id is `<owner>/<key>`. With
         `{ name: <entry id>, resolution }` this endpoint decides one
         entry: its `action`, `clear` (the shared agent's webhook, tags or capabilities are set back to
         none), `delete` (the skill or the data package is deleted with its files, the schedule is
-        removed from the scheduler and from storage) or `app_only` (the address is served only at its
-        app address, origin `publisher`), or `keep`
-        (nothing changes; an address stays served at both addresses). Deciding an entry again answers 409. The incident resolves itself with its
+        removed from the scheduler and from storage), `app_only` (the address is served only at its
+        app address, origin `publisher`) or `uncount` (the fee record is marked `notCounted` and left
+        out of the dashboard's money fees; nothing is deleted), or `keep`
+        (nothing changes; an address stays served at both addresses, a fee record keeps counting). Deciding an entry again answers 409. The incident resolves itself with its
         last entry; resolving or deleting it earlier is allowed and keeps the open entries as they are.
         Requires the `operator` role. Returns 404 if the incident, or the name in it, does not exist.
       security:
@@ -70755,7 +70927,7 @@ paths:
               type: object
               properties:
                 name: { type: string, description: 'An account name from the incident''s `names`, a classification id from the incident''s `caps`, or an entry id from the incident''s `entries`.' }
-                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete or app_only, or keep.' }
+                resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: 'For a name: holder (the rows, cortexes, ecosystem apps, app grants and access tokens are the account''s that holds the name now) or previous (they were a previous holder''s). For an offered cap: apply (the classification gets the limit) or keep (it stays without one). For an entry: its action, clear, delete, app_only or uncount, or keep.' }
       responses:
         '200':
           description: Incident resolved, or one case of it decided
@@ -70773,7 +70945,7 @@ paths:
                           id: { type: string }
                           resolved_at: { type: string, format: date-time, description: Without a body. }
                           name: { type: string, description: With a name. }
-                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only], description: With a name. }
+                          resolution: { type: string, enum: [holder, previous, apply, keep, clear, delete, app_only, uncount], description: With a name. }
                           entry_done: { type: string, description: 'With an entry: what the decision did, in one line.' }
                           done:
                             type: object
@@ -78915,11 +79087,11 @@ paths:
       operationId: readPublishRequest
       tags: [Memory]
       summary: One request to make something public
-      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`.'
+      description: 'One request of the account, as the list shows it. 404 for a request of another account, or of another app. Requires memory:write. An operator caller reads a question the operators answer in another account by naming that account in `account`, and the one who asked reads its own question in the account it asked the same way.'
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
-        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads. Omit for your own.' }
+        - { name: account, in: query, required: false, schema: { type: string }, description: 'The account (name or GHII) whose question an operator reads, or where the one who asked asked it. Omit for your own.' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
@@ -78940,7 +79112,9 @@ paths:
         changed) is not made public: 409 OUTDATED, and the request is settled outdated. A target whose
         classification no longer allows the level (its label's maxAudience) is not made public either:
         409 LABEL_CAPS_AUDIENCE, settled outdated with the reason; no approval passes the cap. A settled
-        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED. Requires memory:write.
+        request answers 409 ALREADY_DECIDED, an expired one 410 EXPIRED, except that the owner may
+        approve a declined `cortex-holder` request later: Don't allow holds the apps back until the
+        owner changes it. Requires memory:write.
         A request may have parts (`parts` on it, `part_of` on each part): the picture of an AI image
         job asked public beside its answer's record. Approving the request also applies each part
         still waiting, checked as its own request; declining it, or its ending expired or outdated,
@@ -78953,6 +79127,11 @@ paths:
         OPERATOR_DECIDES), naming the account in `account` when it is another account's. The one who
         asked hears the answer either way: an agent as a message with the request id, a person and an
         app's account in the bell.
+        A request that confirms a fact about the owner is allowed only by the owner signed in
+        themselves (403 OWNER_IN_PERSON for an agent or an app); an agent of the owner may still
+        decline it. Kind `card-adult-confirm` is one: "I paid with my own card", asked after a credit
+        card payment that only the seller's own Stripe account attests, and allowing it records the
+        owner as a verified adult (409 OUTDATED when another check recorded that since).
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
