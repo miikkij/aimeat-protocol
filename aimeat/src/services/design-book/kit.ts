@@ -23,11 +23,14 @@
  *   TAKEN LIKE A COMPONENT. A kit lives in the app's own code, so taking one writes nothing and
  *   answers what to build with: the genre to fork, the head stylesheet with the tokens, the app()
  *   line with the look and the logo, and the ornamentSet() line.
- * @structure KIT_PROMPT_PARAGRAPH · KIT_REACHES · KitBody · isKitPart · kitReach · validateKitBody · kitReadable · kitVisibility · kitStatusOnPropose · kitSnippet
+ * @structure KIT_PROMPT_PARAGRAPH · KIT_REACHES · KitBody · isKitPart · kitReach · validateKitBody · kitReadable · kitVisibility · kitStatusOnPropose · kitPreviewHtml · kitSnippet
  * @usage
  *   const body = validateKitBody({ reach: 'own', look: 'editorial', tokens: { '--ak-accent': '#1d4ed8/#93c5fd' } });
  *   if (!(await kitReadable(storage, nodeId, part, readerOwnerGhii))) throw notFound;
  * @version-history
+ *   v1.1.0 — 2026-10-30 — kitPreviewHtml: a kit previews as a page of its own (its bar and logo, and the
+ *     five-figure screen in its look, tokens and ornament set). The generic look page made two kits on
+ *     one look read as the same kit (Jouni, 2026-10-30).
  *   v1.0.0 — 2026-10-30 — Initial (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -38,6 +41,8 @@ import { validateSignatureTokens, AppUiError } from '../app-ui/validate.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { systemGhiiFor } from '../compliance-register.js';
 import { DesignBookError } from './errors.js';
+import { escapeHtml } from '../../utils/html-escape.js';
+import { SET_STAGE, STAGE_CSS } from './ornament.js';
 
 /** Who reads a kit: its proposer alone, one organism's members, or everyone once it is published. */
 export const KIT_REACHES = ['own', 'organism', 'node'] as const;
@@ -209,6 +214,79 @@ function kitCss(tokens: Record<string, string>): string {
   }
   return [`:root { ${plain.join(' ')} }`, pair].filter(Boolean).join('\n');
 }
+
+/**
+ * The kit's own values for its preview page, on the root and on the body that wears the look: a
+ * look's sheet is `[data-ak-look='…']` on the body, so `body[data-ak-look]` outranks it there.
+ */
+function kitPreviewCss(tokens: Record<string, string>): string {
+  const plain: string[] = [];
+  let dark = '';
+  for (const [name, value] of Object.entries(tokens)) {
+    if (name === '--ak-accent' && value.includes('/')) {
+      const [l, d] = value.split('/').map(s => s.trim());
+      plain.push(`--ak-accent: ${l};`);
+      dark = `:root[data-theme="dark"], :root[data-theme="dark"] body[data-ak-look] { --ak-accent: ${d || l}; }`;
+    } else {
+      plain.push(`${name}: ${value};`);
+    }
+  }
+  return [`:root, body[data-ak-look] { ${plain.join(' ')} }`, dark].filter(Boolean).join('\n');
+}
+
+/**
+ * The preview page for one kit: what makes it this kit, on one screen. Its look, with its own
+ * colours, faces and corners on top; its logo and name in a bar; and the five-figure screen (a
+ * card, a heading with its rule, a bar, a list, a foot strip) wearing its ornament set. Two kits
+ * on the same look still differ here by everything they set, which a generic demo page hid.
+ */
+export function kitPreviewHtml(part: { title: string; summary: string; body: unknown }, theme: 'light' | 'dark' = 'light'): string {
+  const body = part.body as KitBody;
+  const css = body.tokens && Object.keys(body.tokens).length ? kitPreviewCss(body.tokens) : '';
+  const set = body.ornament?.set;
+  const spec = JSON.stringify({ set: set ?? null, palette: body.ornament?.palette ?? 'set' }).replace(/</g, '\\u003c');
+  const facts = [`look ${body.look}`, body.genre ? `starts from ${body.genre}` : '', set ? `ornaments ${set}` : ''].filter(Boolean).join(' · ');
+  return [
+    `<!DOCTYPE html><html lang="en" data-theme="${theme === 'dark' ? 'dark' : 'light'}"><head><meta charset="utf-8">`,
+    '<meta name="viewport" content="width=device-width, initial-scale=1.0">',
+    '<link rel="stylesheet" href="/lib/aimeat-atelier.css">',
+    `<style>${STAGE_CSS}\n${KIT_STAGE_CSS}\n${css}</style></head><body data-ak-look="${escapeHtml(body.look)}">`,
+    '<main>',
+    '<header class="kit-bar">',
+    body.logo ? `<img class="kit-bar__logo" src="${escapeHtml(body.logo)}" alt="">` : `<span class="kit-bar__logo kit-bar__logo--none" aria-hidden="true">${escapeHtml(part.title.slice(0, 1).toUpperCase())}</span>`,
+    `<span class="kit-bar__name">${escapeHtml(part.title)}</span>`,
+    '</header>',
+    `<header class="orn-head"><h1>${escapeHtml(part.title)}</h1><p>${escapeHtml(part.summary)}</p><p class="kit-facts">${escapeHtml(facts)}</p></header>`,
+    `<section class="orn-stage">${SET_STAGE}</section>`,
+    '</main>',
+    '<script src="/v1/libs/aimeat-atelier.js"></scr' + 'ipt>',
+    '<script>',
+    `var SPEC = ${spec};`,
+    'if (SPEC.set && window.AIMEAT && AIMEAT.atelier && AIMEAT.atelier.ornamentSet) {',
+    '  var targets = {};',
+    '  ["frame", "rule", "bar", "bullets", "strip"].forEach(function (r) { targets[r] = document.querySelector("[data-orn-role=" + r + "]"); });',
+    '  AIMEAT.atelier.ornamentSet(SPEC.set, targets, SPEC.palette === "look" ? { palette: "look" } : {});',
+    '}',
+    '</scr' + 'ipt></body></html>',
+  ].join('\n');
+}
+
+/** The kit page's own pieces: the bar with the logo, and the line of what the kit carries. */
+const KIT_STAGE_CSS = [
+  // The ground carries the kit's accent, so a shelf of kits on one look still reads as different kits.
+  'body { background: color-mix(in srgb, var(--ak-accent) 10%, var(--ak-bg)); font-family: var(--ak-font, system-ui, sans-serif); }',
+  'main { max-width: 1080px; padding-top: 24px; }',
+  '.kit-bar { display: flex; align-items: center; gap: 14px; padding: 14px 20px; background: var(--ak-accent); border-radius: var(--ak-radius, 12px); }',
+  '.kit-bar__logo { width: 44px; height: 44px; border-radius: var(--ak-radius-sm, 8px); object-fit: cover; }',
+  '.kit-bar__logo--none { display: grid; place-items: center; background: var(--ak-surface); color: var(--ak-accent); font: var(--ak-weight-display, 700) 22px/1 var(--ak-font-display, Georgia, serif); }',
+  '.kit-bar__name { font: var(--ak-weight-display, 600) 1.5rem/1.2 var(--ak-font-display, Georgia, serif); color: var(--ak-surface); }',
+  '.orn-head h1 { font-size: clamp(2rem, 5vw, 3.2rem) !important; color: var(--ak-accent); }',
+  '.orn-head p { font-size: 1.15rem !important; }',
+  '.kit-facts { margin-top: 10px !important; font-family: var(--ak-font-mono, monospace); font-size: 0.9rem !important; }',
+  '.orn-set .orn-card, .kit-bar { border-radius: var(--ak-radius, 4px); }',
+  '.orn-set .orn-card h2, .orn-set__title { font-size: 1.8rem; color: var(--ak-accent); }',
+  '.orn-set p, .orn-set ul { font-size: 1.15rem; }',
+].join('\n');
 
 /** What taking a kit answers: what to fork, what to put in the head, and the two lines to call. */
 export function kitSnippet(body: KitBody, title: string): {

@@ -95,7 +95,10 @@ await test('Its proposer lists it, previews it through the list\'s address and t
   assert(row && String(row.preview_url).includes('?t='), `listed with a token: ${JSON.stringify(row)}`);
   assert(row.reach === 'own' && row.organism === undefined, `the row says its reach: ${JSON.stringify(row)}`);
   const prev = await fetch(`${BASE}${row.preview_url}`);
-  assert(prev.status === 200 && (await prev.text()).includes('data-ak-look'), `preview ${prev.status}`);
+  const page = await prev.text();
+  assert(prev.status === 200 && page.includes('data-ak-look="editorial"'), `preview ${prev.status}`);
+  // The kit's own page: its bar, its values on the body that wears the look, and its ornament set.
+  assert(page.includes('class="kit-bar"') && page.includes('body[data-ak-look] { --ak-accent: #1d4ed8;') && page.includes('"set":"art-deco"'), 'the preview is the kit\'s own page');
   const adopt = await json(`/v1/designbook/${OWN}/adopt`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ filename: 'new-app.html' }) });
   const kit = adopt.body.data?.kit;
   assert(adopt.status === 200 && kit, `adopt ${adopt.status}: ${JSON.stringify(adopt.body?.error)}`);
