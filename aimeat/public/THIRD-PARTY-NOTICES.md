@@ -113,14 +113,14 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [@a2a-js/sdk](https://github.com/a2aproject/a2a-js#readme) | 1.3.0 | Apache-2.0 |
 | [@ag-ui/core](https://github.com/ag-ui-protocol/ag-ui#readme) | 1.0.3 | MIT |
 | [@agentclientprotocol/sdk](https://github.com/agentclientprotocol/typescript-sdk#readme) | 2.1.0 | Apache-2.0 |
-| [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.86 | Apache-2.0 |
-| [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.122 | Apache-2.0 |
-| [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.70 | Apache-2.0 |
-| [@ai-sdk/openai-compatible](https://ai-sdk.dev/docs) | 3.0.76 | Apache-2.0 |
-| [@ai-sdk/openai](https://ai-sdk.dev/docs) | 4.0.100 | Apache-2.0 |
-| [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.66 | Apache-2.0 |
-| [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.32 | Apache-2.0 |
-| [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.28 | Apache-2.0 |
+| [@ai-sdk/anthropic](https://ai-sdk.dev/docs) | 4.0.92 | Apache-2.0 |
+| [@ai-sdk/gateway](https://ai-sdk.dev/docs) | 4.0.130 | Apache-2.0 |
+| [@ai-sdk/mistral](https://ai-sdk.dev/docs) | 4.0.75 | Apache-2.0 |
+| [@ai-sdk/openai-compatible](https://ai-sdk.dev/docs) | 3.0.81 | Apache-2.0 |
+| [@ai-sdk/openai](https://ai-sdk.dev/docs) | 4.0.105 | Apache-2.0 |
+| [@ai-sdk/provider-utils](https://ai-sdk.dev/docs) | 5.0.71 | Apache-2.0 |
+| [@ai-sdk/provider](https://ai-sdk.dev/docs) | 4.0.34 | Apache-2.0 |
+| [@ai-sdk/xai](https://ai-sdk.dev/docs) | 5.0.33 | Apache-2.0 |
 | [@cfworker/json-schema](https://github.com/cfworker/cfworker/tree/master/packages/json-schema/README.md) | 4.1.1 | MIT |
 | [@clack/core](https://github.com/bombshell-dev/clack/tree/main/packages/core#readme) | 1.5.1 | MIT |
 | [@clack/prompts](https://github.com/bombshell-dev/clack/tree/main/packages/prompts#readme) | 1.8.1 | MIT |
@@ -203,7 +203,7 @@ tools are not listed: they do not ship, so they carry no obligation for you.
 | [acorn-import-attributes](https://github.com/xtuc/acorn-import-attributes#readme) | 1.9.5 | MIT |
 | [acorn](https://github.com/acornjs/acorn) | 8.15.0 | MIT |
 | [agent-base](https://github.com/TooTallNate/proxy-agents#readme) | 7.1.4 | MIT |
-| [ai](https://ai-sdk.dev/docs) | 7.0.149 | Apache-2.0 |
+| [ai](https://ai-sdk.dev/docs) | 7.0.157 | Apache-2.0 |
 | [ajv-formats](https://github.com/ajv-validator/ajv-formats#readme) | 3.0.1 | MIT |
 | [ajv](https://ajv.js.org) | 8.20.0 | MIT |
 | [ansi-regex](https://github.com/chalk/ansi-regex#readme) | 5.0.1 | MIT |
@@ -797,7 +797,7 @@ Apache License
    limitations under the License.
 ```
 
-### @ai-sdk/anthropic 4.0.86, @ai-sdk/gateway 4.0.122, @ai-sdk/mistral 4.0.70, @ai-sdk/openai-compatible 3.0.76, @ai-sdk/openai 4.0.100, @ai-sdk/provider 4.0.32, @ai-sdk/xai 5.0.28, ai 7.0.149
+### @ai-sdk/anthropic 4.0.92, @ai-sdk/gateway 4.0.130, @ai-sdk/mistral 4.0.75, @ai-sdk/openai-compatible 3.0.81, @ai-sdk/openai 4.0.105, @ai-sdk/provider 4.0.34, @ai-sdk/xai 5.0.33, ai 7.0.157
 
 ```text
 Copyright 2023 Vercel, Inc.

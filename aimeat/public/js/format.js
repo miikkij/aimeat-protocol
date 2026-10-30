@@ -34,6 +34,8 @@
  *   morsels(625)                 → "625 morsels" — never a currency symbol
  *   priceAndPacing(offer, t)     → "Free · pacing 5 morsels" / "1,00 € · pacing 5 morsels"
  * @version-history
+ *   v2.8.0 — 2026-10-29 — A reader with no region of their own gets the format of the node's own
+ *     language (site.default_locale) before the browser's: the reader's answer still beats both.
  *   v2.7.0 — 2026-10-11 — An item has two values (ruling "morseli on tahdistus, ei hinta"): an optional
  *     money price and a pacing amount in morsels. pacingOf() reads tollMorsels / toll_morsels with
  *     the 3.x morsel-price fields as fallback, moneyPriceOf() the money price, priceAndPacing() says
@@ -74,9 +76,17 @@
 import { getRegion, getTimeZone } from '/js/display-prefs.js';
 import { swallowed } from '/js/swallowed.js';
 
-/** The tag to format with: the reader's own, or undefined, which IS the browser default. */
+/** The format of a node that names its own language (site.default_locale), for a reader who chose none. */
+const NODE_REGION = { fi: 'fi-FI', es: 'es-ES', en: 'en-GB' };   // all three on a 24-hour clock (Jouni, 2026-10-30)
+
+/**
+ * The tag to format with: the reader's own; else the format of the node's own language, when the
+ * node names one (a node bought from the store showed "11:41 PM" on a Finnish page to a buyer
+ * whose browser was English, UX review 2026-10-29); else undefined, which IS the browser default.
+ */
 function tag() {
-  return getRegion() || undefined;
+  const nodeLang = typeof window !== 'undefined' ? /** @type {any} */ (window).__SITE?.defaultLocale : undefined;
+  return getRegion() || NODE_REGION[nodeLang] || undefined;
 }
 
 /**

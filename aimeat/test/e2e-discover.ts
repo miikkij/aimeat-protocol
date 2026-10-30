@@ -7,6 +7,9 @@
  *   → 401, scope=shared → 501); and the ratified agent read-scope rule (§11.3) — an agent WITHOUT
  *   `memory:read` does NOT see the owner's private content, an agent WITH it does.
  * @version-history
+ *   v0.4.1 — 2026-10-30 — The public-scope isolation test finds A's public note and package and misses
+ *     the private note by their words: the 23 seeded ornaments landed after them and filled the
+ *     no-query listing.
  *   2026-10-25 — scope=shared asks organism:read of an agent on REST and MCP; an agent holding it or
  *     '*' still sees the shared record (secaudit2026oct22, discover-shared-scope-skips-organism-read).
  *   v0.4.0 — 2026-10-20 — The own scope asks the organism read rule: an agent that a 'listed' organism
@@ -298,8 +301,15 @@ const hasId = (entries: any[], id: string) => entries.some((e: any) => e.id === 
         const r = await discover('scope=public&per_page=100', b.token);
         assert(r.status === 200, `status ${r.status}`);
         const e = r.body.data.entries;
-        assert(hasId(e, K_PUB), 'A\'s public note visible');
-        assert(hasId(e, K_PKG), 'A\'s public package visible');
+        // The memory records are asked for by their words: with no query the public listing takes the
+        // newest records node-wide, and the node seeds its Design Book shelf (past 70 public parts)
+        // while this suite runs, so those land after A's note and fill that listing first.
+        const note = await discover('scope=public&q=announcement&per_page=100', b.token);
+        assert(hasId(note.body.data.entries, K_PUB), 'A\'s public note visible');
+        const pkg = await discover('scope=public&q=Market&per_page=100', b.token);
+        assert(hasId(pkg.body.data.entries, K_PKG), 'A\'s public package visible');
+        const secret = await discover('scope=public&q=Secret&per_page=100', b.token);
+        assert(!hasId(secret.body.data.entries, K_PRIV), 'A\'s private secret NOT found by its words');
         assert(hasId(e, CAP_ID), 'A\'s public capability visible');
         assert(hasId(e, APP_ID), 'A\'s published app visible');
         assert(!hasId(e, K_PRIV), 'A\'s private secret NOT leaked');

@@ -1,0 +1,128 @@
+/*
+ * @file aimeat-atelier/ornaments.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE ORNAMENTS' PAINT: every colour the ornament figures (atelier/ornament*.js) use,
+ *   as roles over the look's own tokens, plus how the figures sit on the page and how they grow.
+ *   The script writes geometry and timing only; this sheet decides what an engraved line, a vine,
+ *   a leaf or a gap looks like in whichever look the app wears.
+ *
+ *   SIX TOKENS A LOOK MAY SET, each with a default mixed from the look's own colours:
+ *   --ak-orn-line (the engraved metal: rules, scrolls, rope), --ak-orn-dim (hatching, fine rules),
+ *   --ak-orn-hi (the highlight along a rope strand), --ak-orn-vine (living stems and strands),
+ *   --ak-orn-leaf (a leaf's fill), --ak-orn-gap (the cut that shows one strand passing over
+ *   another, the ground colour by default).
+ *
+ *   FINITE MOTION: strokes draw themselves by their dash offset, leaves and beads scale up from
+ *   where they sit, fills fade in, a ribbon unrolls from its middle. Nothing loops. Reduced motion
+ *   and data-ak-motion="less" take every animation and transition away, so the figure stands
+ *   settled.
+ * @structure tokens · roles · host and layers · strips · text figures · growth · reduced motion
+ * @usage  Loaded with aimeat-atelier.css; AIMEAT.atelier.ornament(el, id) puts the classes on.
+ * @version-history
+ *   v0.1.0 — 2026-10-29 — Initial (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
+ */
+
+/* ── Tokens: resolved on the drawing itself, so the nearest look's colours win. ── */
+.ak-orn-svg {
+  --_orn-line: var(--ak-orn-line, var(--ak-accent, #9a7a35));
+  --_orn-dim: var(--ak-orn-dim, color-mix(in oklab, var(--_orn-line) 45%, var(--ak-bg, #f3f5f8)));
+  --_orn-hi: var(--ak-orn-hi, color-mix(in oklab, var(--_orn-line) 55%, var(--ak-surface, #ffffff)));
+  --_orn-vine: var(--ak-orn-vine, color-mix(in oklab, var(--ak-ink-dim, #4a5560) 70%, var(--_orn-line)));
+  --_orn-vback: color-mix(in oklab, var(--_orn-vine) 45%, var(--ak-bg, #f3f5f8));
+  --_orn-leaf: var(--ak-orn-leaf, color-mix(in oklab, var(--_orn-vine) 26%, var(--ak-surface, #ffffff)));
+  --_orn-gap: var(--ak-orn-gap, var(--ak-bg, #f3f5f8));
+  display: block;
+  overflow: visible;
+}
+
+/* ── Roles ── */
+.ak-orn-ln, .ak-orn-dim, .ak-orn-hi, .ak-orn-vine, .ak-orn-vback, .ak-orn-gap, .ak-orn-gapc,
+.ak-orn-band, .ak-orn-hatch, .ak-orn-rib, .ak-orn-prib {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ak-orn-ln { stroke: var(--_orn-line); }
+.ak-orn-dim, .ak-orn-hatch { stroke: var(--_orn-dim); }
+.ak-orn-hi { stroke: var(--_orn-hi); }
+.ak-orn-vine { stroke: var(--_orn-vine); }
+.ak-orn-vback { stroke: var(--_orn-vback); }
+.ak-orn-gap { stroke: var(--_orn-gap); }
+.ak-orn-gapc, .ak-orn-band { stroke: var(--ak-surface, #ffffff); }
+.ak-orn-butt { stroke-linecap: butt; }
+.ak-orn-leaf { fill: var(--_orn-leaf); stroke: var(--_orn-vine); stroke-width: 1.1; stroke-linejoin: round; }
+.ak-orn-rib { stroke: var(--_orn-vine); stroke-width: 0.8; }
+.ak-orn-petal { fill: var(--ak-surface, #ffffff); stroke: var(--_orn-line); stroke-width: 1.2; stroke-linejoin: round; }
+.ak-orn-prib { stroke: var(--_orn-line); stroke-width: 0.7; }
+.ak-orn-dot { fill: var(--_orn-line); }
+.ak-orn-vdot { fill: var(--_orn-vine); }
+.ak-orn-solid, .ak-orn-track { fill: var(--ak-surface, #ffffff); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-track { stroke-width: 1.4; }
+.ak-orn-fill { fill: var(--_orn-line); }
+.ak-orn-tail { fill: color-mix(in oklab, var(--ak-surface, #ffffff) 74%, var(--_orn-line)); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-crease { fill: var(--_orn-dim); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-ring { fill: var(--ak-bg, #f3f5f8); stroke: var(--_orn-line); stroke-width: 1.6; }
+
+/* ── The element an overlay figure sits on, and its two layers ── */
+.ak-orn-host { position: relative; isolation: isolate; }
+.ak-orn-host--placed { isolation: isolate; }
+.ak-orn-layer { position: absolute; display: block; pointer-events: none; }
+.ak-orn-layer--under { z-index: -1; }
+.ak-orn-layer--over { z-index: 1; }
+
+/* Room for a frame's corners when the app has not given the element padding of its own. */
+:where([data-ak-ornament='frame']) { padding: clamp(40px, 8vw, 72px); }
+:where([data-ak-ornament='jugend']) { padding: clamp(28px, 5vw, 48px); }
+:where([data-ak-ornament='vine-border'], [data-ak-ornament='rope']) { padding: clamp(24px, 5vw, 40px); }
+:where([data-ak-ornament='ribbon']) { padding: 0.35em 1.2em; text-align: center; }
+
+/* ── Strips that run the width of their element ── */
+.ak-orn-strip { display: block; width: 100%; pointer-events: none; }
+.ak-orn-strip > .ak-orn-svg { width: 100%; }
+
+/* ── Text figures, sized in the type's own units ── */
+.ak-orn-flourished { display: flex; align-items: center; justify-content: center; gap: 0.35em; }
+.ak-orn-flourish { display: block; flex: 0 1 auto; min-width: 0; width: clamp(36px, 14vw, 200px); pointer-events: none; }
+.ak-orn-flourish > .ak-orn-svg { width: 100%; height: auto; }
+.ak-orn-flourish--left > .ak-orn-svg { transform: scaleX(-1); }
+.ak-orn-swash { display: block; width: min(100%, 18em); margin: 0.1em auto 0; pointer-events: none; }
+.ak-orn-swash > .ak-orn-svg, .ak-orn-fleuron > .ak-orn-svg, .ak-orn-dinkus > .ak-orn-svg,
+.ak-orn-bullet > .ak-orn-svg, .ak-orn-cap__art > .ak-orn-svg { width: 100%; height: auto; }
+.ak-orn-fleuron { display: block; width: min(100%, 160px); margin: 0 auto; }
+.ak-orn-dinkus { display: block; width: min(100%, 200px); margin: 0 auto; }
+.ak-orn-cap { float: left; position: relative; width: 4.6em; height: 4.6em; margin: 0.25em 0.9em 0.1em 0; }
+.ak-orn-cap__art { position: absolute; inset: 0; pointer-events: none; }
+.ak-orn-cap__letter {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--ak-font-display, Georgia, serif); font-weight: var(--ak-weight-display, 600);
+  font-size: 2.6em; line-height: 1; color: var(--ak-orn-line, var(--ak-accent, #9a7a35));
+}
+.ak-orn-bullets { list-style: none; padding-left: 0; }
+.ak-orn-bullets > li { display: flex; align-items: baseline; gap: 0.7em; }
+.ak-orn-bullet { flex: 0 0 auto; width: 1em; height: 1em; align-self: center; }
+
+/* ── Growth ── */
+.ak-orn-grow { animation-name: ak-orn-draw; animation-fill-mode: forwards; animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1); }
+.ak-orn-lin { animation-timing-function: linear; }
+@keyframes ak-orn-draw { to { stroke-dashoffset: 0; } }
+.ak-orn-sprout { transform: scale(0); animation: ak-orn-sprout 0.9s cubic-bezier(0.3, 1.5, 0.55, 1) forwards; }
+@keyframes ak-orn-sprout { to { transform: scale(1); } }
+.ak-orn-fade { opacity: 0; animation: ak-orn-fade 1.2s ease forwards; }
+@keyframes ak-orn-fade { to { opacity: 1; } }
+.ak-orn-unroll { transform-box: fill-box; transform-origin: center; transform: scaleX(0); animation: ak-orn-unroll 1s cubic-bezier(0.3, 0.9, 0.4, 1) forwards; }
+@keyframes ak-orn-unroll { to { transform: scaleX(1); } }
+.ak-orn-dash { transition: stroke-dashoffset 0.16s linear; }
+.ak-orn-pop, .ak-orn-bloom { transform: scale(0); transition: transform 0.5s cubic-bezier(0.3, 1.5, 0.55, 1); }
+.ak-orn-pop.ak-orn-open, .ak-orn-bloom.ak-orn-open { transform: scale(1); }
+.ak-orn-fill { transition: width 0.16s linear; }
+
+/* ── Less motion: the figure stands settled ── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-orn-grow { animation: none; stroke-dashoffset: 0 !important; }
+  .ak-orn-sprout, .ak-orn-fade, .ak-orn-unroll { animation: none; transform: none; opacity: 1; }
+  .ak-orn-dash, .ak-orn-pop, .ak-orn-bloom, .ak-orn-fill { transition: none; }
+}
+[data-ak-motion='less'] .ak-orn-grow { animation: none; stroke-dashoffset: 0 !important; }
+[data-ak-motion='less'] .ak-orn-sprout, [data-ak-motion='less'] .ak-orn-fade, [data-ak-motion='less'] .ak-orn-unroll { animation: none; transform: none; opacity: 1; }
+[data-ak-motion='less'] .ak-orn-dash, [data-ak-motion='less'] .ak-orn-pop, [data-ak-motion='less'] .ak-orn-bloom, [data-ak-motion='less'] .ak-orn-fill { transition: none; }
