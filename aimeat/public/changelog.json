@@ -4,6 +4,28 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-your-own-look-for-every-new-app",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your own look for every new app",
+        "fi": "Oma ilme jokaiseen uuteen sovellukseen"
+      },
+      "summary": {
+        "en": "Save an app's style as a kit, and your next apps, or your whole organism's, start in it.",
+        "fi": "Tallenna sovelluksen tyyli pohjaksi. Seuraavat sovelluksesi tai koko organisaatiosi sovellukset alkavat siitä."
+      },
+      "body": {
+        "en": "Tell your AI to save an app's style as your kit: its colours, faces, corners, the page it starts from, its ornaments and its logo. Your next apps start in it. An organism's owners choose one kit for every member's new apps, and only the members see it. A kit can also be shared with everyone on the node. It is a starting point, so you can still ask for another look.",
+        "fi": "Pyydä tekoälyä tallentamaan sovelluksen tyyli pohjaksesi: värit, fontit, kulmat, sivupohja, koristeet ja logo. Seuraavat sovelluksesi alkavat siitä. Organisaation omistajat valitsevat yhden pohjan kaikkien jäsenten uusille sovelluksille, ja vain jäsenet näkevät sen. Pohjan voi myös jakaa kaikille noden käyttäjille. Pohja on lähtökohta, joten voit silti pyytää toisenlaista ilmettä."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-your-ai-draws-layouts-for-your-app",
       "highlight": false,
       "audience": [
