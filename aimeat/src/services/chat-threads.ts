@@ -16,12 +16,16 @@
  * @structure
  *   - ChatThread / ChatTurn — the record
  *   - createThread() · appendTurn() · readThread() · listThreads() · archiveOverflow()
+ *   - chatToolCopy() · CHAT_TOOL_COPY_NOTE — whether goose keeps its own copy after a delete
  *   - showThread() · showThreads() — the same reads for a caller, through the classification check
  * @usage
  *   const thread = await createThread(storage, config, gaii, 'Pong');
  *   await appendTurn(storage, config, gaii, thread.id, { role: 'user', text: 'build me pong' });
  *   const shown = await showThreads(storage, readerFor({ storage, config }, req.auth));
  * @version-history
+ *   v1.3.0 — 2026-10-29 — chatToolCopy(): a deleted conversation the chat tool has seen leaves its copy
+ *     in goose's own store, which the node cannot delete with certainty, and the delete answer says so
+ *     (secaudit2026oct26 round 8c, goose-chat-config.goose-root-retains-conversations-and-live-mcp-tokens).
  *   v1.2.0 — 2026-10-19 — archiveOverflow appends to the month record on its version (updateRecord),
  *     and a conversation already in it is not added again (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.1.0 — 2026-09-29 — TARGET-082 V4: showThread and showThreads, which pass the conversation
@@ -193,6 +197,22 @@ export async function appendTurn(
 export async function deleteThread(storage: Storage, gaii: string, id: string): Promise<void> {
     await storage.deleteMemory(gaii, liveKey(id));
 }
+
+/**
+ * Whether the chat tool (goose) keeps its own copy of a conversation after the node deletes it.
+ *
+ * goose stores its sessions and logs under its own root (services/goose-chat-config.ts), in a format
+ * that is goose's and that this node has no call to delete from. A thread only knows its current
+ * goose session, not the ones a reset or a restart left behind, and goose's logs carry what was sent.
+ * So the node cannot find and delete that copy with certainty, and says so: `kept` for a conversation
+ * the chat tool has seen (a turn, or a goose session), `none` for one it never saw.
+ */
+export function chatToolCopy(thread: Pick<ChatThread, 'turns' | 'gooseSessionId'>): 'kept' | 'none' {
+    return thread.turns.length > 0 || !!thread.gooseSessionId ? 'kept' : 'none';
+}
+
+/** What the delete answer says when the chat tool keeps its copy. */
+export const CHAT_TOOL_COPY_NOTE = 'The conversation is deleted from this node. The chat tool that answered in it keeps its own copy of the conversation text in its own store on this server, which the node cannot delete; the operator of this node can remove it there.';
 
 /**
  * Roll the oldest conversations into the month they belong to, once there are more open than the

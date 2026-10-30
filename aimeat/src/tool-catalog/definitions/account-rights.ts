@@ -11,6 +11,8 @@
  * @structure accountRightsTools
  * @usage imported by tool-catalog/definitions.ts
  * @version-history
+ *   v1.0.1 — 2026-10-30 — aimeat_adult_status says that a card payment to a seller who does not run the
+ *     node is confirmed by the owner in person (secaudit2026oct26 round 8c, commerce-07).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-3, A-5, A-8).
  */
 import { z } from 'zod';
@@ -19,7 +21,7 @@ import { agentEverywhere, type AimeatToolDefinition } from './types.js';
 export const accountRightsTools = [
     {
         name: 'aimeat_adult_status',
-        description: 'Whether your owner is a verified adult: verified true or false, the method (eudiw, ftn or credit-card) and when, never a birth date. Ask it before buying or opening adult content for them. When it is false, tell them they can verify with a bank identification or by paying with a credit card; a debit or prepaid card does not count.',
+        description: 'Whether your owner is a verified adult: verified true or false, the method (eudiw, ftn or credit-card) and when, never a birth date. Ask it before buying or opening adult content for them. When it is false, tell them they can verify with a bank identification or by paying with a credit card; a debit or prepaid card does not count. After a card payment to a seller who does not run this node, they confirm it themselves with one press in their notifications ("I paid with my own card"); you cannot press it for them.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Verified Adult', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },

@@ -31,6 +31,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.13.1 -- 2026-10-29 -- Attachments are read under the node's PDF read limits
+ *     (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.13.0 — 2026-10-29 — A refusal carries `choices` when the allowance the owner bought is spent,
  *     and a turn whose agent met a refusal midway ends with the same notice when the gate now
  *     refuses (UX review 2026-10-29, A1).
@@ -100,6 +102,7 @@ import type { BalanceChoice } from './ai/ai-fix-words.js';
 import { appendTurn, readThread, setGooseSession, type ChatTurn } from './chat-threads.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { readAttachments, MAX_ATTACHMENTS_PER_TURN } from './chat-attachments.js';
+import { pdfReadLimits } from './file-text/pdf-bounded.js';
 import { systemReader } from './classification/reader.js';
 import { logger } from '../utils/logger.js';
 
@@ -393,7 +396,7 @@ export async function* runChatTurn(
     // format negotiation nobody asked for. Anything else is left out of the prompt and said out
     // loud — a file the model never saw is worse than one it was told about.
     // The attached files go to the chat's model: the classification reader's useForAi decides (TARGET-082).
-    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys);
+    const { images, quoted, notes, skipped } = await readAttachments(storage, systemReader({ storage, config }, gaii), gaii, attachmentKeys, { pdfLimits: pdfReadLimits(config) });
 
     const prompt = [
         text,

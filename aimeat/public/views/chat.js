@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
+ *     keeps its own copy of the text (secaudit2026oct26 round 8c).
  *   2026-10-29: The phone suggestion and the install suggestion are not shown in the person's first
  *     conversation, and in a later one only after the AI has answered (UX review D; Jouni, 2026-10-30).
  *   2026-10-29: When the AI allowance is spent, the refusal shows the ways on: buy more, your own
@@ -102,6 +104,7 @@ import {
     ConversationCopy,
 } from '/components/ConversationFrame.js';
 import { InstallCta } from '/components/InstallCta.js';
+import { Alert } from '/components/Alert.js';
 import { storeHref, storeOpensSoon } from '/js/site.js';
 import { useJourney } from './home/journey-steps.js';
 import { trackVisualViewport } from '/js/visual-viewport.js';
@@ -213,6 +216,7 @@ export default function ChatView() {
     const [draft, setDraft] = useState('');
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState({ text: '', thought: '', progress: '', tools: [], cards: [] });
+    const [deleteNote, setDeleteNote] = useState('');
     // A sentence, or { message, href, choices } when the node named a fix for the refusal: the AI
     // settings address that makes it (A2), and the ways on when the AI allowance is spent (A1,
     // 2026-10-29). One state, so a later failure never carries an earlier one's link.
@@ -607,7 +611,12 @@ export default function ChatView() {
     }, []);
 
     const removeThread = useCallback(async (id) => {
-        await chat.deleteThread(id);
+        const gone = await chat.deleteThread(id);
+        // The chat tool keeps its own copy of a conversation it has seen, and the node cannot delete
+        // that copy, so the person is told (secaudit2026oct26 round 8c).
+        setDeleteNote(gone?.data?.chat_tool_copy === 'kept'
+            ? tr('chat.deletedCopyKept', 'The conversation is deleted here. The chat tool that answered in it keeps its own copy of the text on this server, and AIMEAT cannot delete that copy. The operator of this service can remove it.')
+            : '');
         if (thread?.id === id) setThread(null);
         await loadThreads();
     }, [thread, loadThreads]);
@@ -646,6 +655,7 @@ export default function ChatView() {
                 onNew=${startThread}
                 onDelete=${removeThread}
                 onClose=${() => setListOpen(false)}>
+                <${Alert} type="info" message=${deleteNote} onDismiss=${() => setDeleteNote('')} />
                 ${/* Everything about THIS conversation that is not the conversation: its name, who
                       answers and on whose money, and the two actions. In the rail on a desktop, in
                       the drawer on a phone, so the column keeps its height for the words. */''}

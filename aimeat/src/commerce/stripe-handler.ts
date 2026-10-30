@@ -20,6 +20,11 @@
  * @structure STRIPE_HANDLER_ID · stripeIdempotencyKey · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler(config));
  * @version-history
+ *   2026-10-30 — A credit card payment on a seller's own Stripe account, which only that seller
+ *     attests, no longer records the buyer as an adult by itself: the buyer confirms it with one press
+ *     (recordCreditCardAdult → commerce/card-adult-ask.ts). A payment on an operator's own account
+ *     records it at once, as before (secaudit2026oct26 round 8c, commerce-07,
+ *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
  *   2026-10-25 — collect puts `attempt` into the charge's Idempotency-Key, so a retry after a refunded
  *     attempt is a new charge (secaudit2026oct22).
  *   2026-10-25 — A test-mode payment (livemode false) records no adult check (isStripeTestMode;
@@ -48,7 +53,8 @@
  *     platform path: every seller charges on their own credentials (single edition, no fork).
  */
 import { createHash } from 'node:crypto';
-import type { PaymentHandler } from './types.js';
+import type { PaymentHandler, PaymentContext } from './types.js';
+import { sellerIsOperator, askBuyerCardAdult, type CardPaymentFacts } from './card-adult-ask.js';
 import { openPspSecret } from './psp-secrets.js';
 import { PaymentError } from './payment-handlers.js';
 import { bookPayable } from './payable-book.js';
@@ -56,7 +62,6 @@ import { safeFetch } from '../utils/url-validator.js';
 import { logger } from '../utils/logger.js';
 import { redactKeyShaped } from '../utils/redact-credentials.js';
 import { MONEY_CURRENCIES, microsToStripeMinor } from './money.js';
-import type { Storage } from '../storage/interface.js';
 import { recordAdult } from '../services/adult-assurance.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
 
@@ -168,13 +173,18 @@ export function isStripeTestMode(...objects: Array<Record<string, unknown> | nul
 /**
  * A CREDIT card payment shows the buyer is an adult (Jouni's ruling, Comicland v3 A-4); a debit or a
  * prepaid card does not, because a minor can hold one. A test-mode payment does not either: no real
- * card and no card holder took part (secaudit2026oct22). Never fails the payment it follows: the money
- * has moved, and a bookkeeping failure is logged.
+ * card and no card holder took part (secaudit2026oct22). On an operator's own Stripe account it is
+ * recorded at once; on another seller's account, which only that seller attests, the buyer confirms it
+ * with one press first (commerce/card-adult-ask.ts; secaudit2026oct26 round 8c, commerce-07). Never
+ * fails the payment it follows: the money has moved, and a bookkeeping failure is logged.
  */
-export async function recordCreditCardAdult(storage: Storage, buyerGhii: string, funding: string | null, testMode = false): Promise<void> {
+export async function recordCreditCardAdult(
+  ctx: PaymentContext, buyerGhii: string, funding: string | null, testMode: boolean, paid: CardPaymentFacts,
+): Promise<void> {
   if (funding !== 'credit' || testMode) return;
   try {
-    await recordAdult(storage, ownerGhiiOf(buyerGhii), 'credit-card');
+    if (await sellerIsOperator(ctx.storage, paid.seller)) await recordAdult(ctx.storage, ownerGhiiOf(buyerGhii), 'credit-card');
+    else await askBuyerCardAdult(ctx, buyerGhii, paid);
   } catch (err) {
     logger.error('[stripe] the credit card payment was not recorded as an adult check', { buyer: buyerGhii, error: String(err) });
   }
@@ -242,7 +252,7 @@ export function stripePaymentHandler(config: EncryptionConfig): PaymentHandler {
       if (intent.status !== 'succeeded') {
         throw new PaymentError('PAYMENT_NOT_CAPTURED', 402, `Stripe payment intent status: ${String(intent.status)}`);
       }
-      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent), isStripeTestMode(intent));
+      await recordCreditCardAdult(ctx, buyerGhii, cardFundingOf(intent), isStripeTestMode(intent), { seller, checkout: reference, payment: String(intent.id) });
       return { trackingCode: String(intent.id), ...(customer ? { saved: { customer, payment_method: instrument } } : {}) };
     },
 

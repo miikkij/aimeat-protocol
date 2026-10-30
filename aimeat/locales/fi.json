@@ -1454,10 +1454,12 @@
           "classification_default_caps": "Rajat sille, ketkä luokitellun sisällön näkevät",
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
-          "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa"
+          "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
+          "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä"
         },
         "detail": {
-          "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset."
+          "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset.",
+          "platform_fee_records": "Nämä rahamaksujen tietueet ({count}) näyttävät samalta kuin ne, jotka kauppa kirjoittaa, mutta mikään ei kerro, kirjoittiko ne kauppa vai tili itse. Ne lasketaan rahamaksuihisi kuten ennenkin, kunnes valitset."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -1487,7 +1489,8 @@
           "lead": {
             "anonymous_principal_records": "Kuka tahansa anonyymisti kirjautunut on voinut kirjoittaa nämä, koska he kaikki toimivat yhtenä jaettuna agenttina. Tarkista jokainen. Tyhjennä tai poista se, mitä et halua, ja pidä loput. Mikään ei muutu ennen kuin päätät, ja tapahtuma on hoidettu, kun teet viimeisen päätöksen.",
             "erasure_leftover_schedules": "Nämä ajastukset kuuluvat tileille, jotka poistettiin ennen 25.10.2026. Siihen aikaan tilin poistaminen vei vain henkilön omat ajastukset, ei hänen agenttiensa ja sovellustensa tekemiä. Jos joku muu rekisteröi saman käyttäjänimen tai on jo rekisteröinyt sen, hän näkee nämä ajastukset, ja ne voivat käynnistyä hänen nimissään. Poista jokainen ajastus, jota kukaan ei tarvitse. Mikään ei muutu, ennen kuin valitset.",
-            "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen."
+            "subdomain_site_origin": "Toisen ihmisen julkaisema sovellus avautuu myös oman verkkotunnuksesi osoitteesta. Valitse jokaiselle osoitteelle, mistä sovellus avautuu jatkossa. Siihen asti kaikki toimii kuten ennen.",
+            "platform_fee_records": "Ennen 27.10.2026 mikä tahansa tili pystyi kirjoittamaan rahamaksun tietueen omaan muistiinsa, ja Talous-sivu laski sen sinulle kuuluviin maksuihin. Valitse jokaisesta alla olevasta tietueesta, lasketaanko se. Mitään ei poisteta, ja kunnes valitset, jokainen tietue lasketaan kuten ennenkin."
           },
           "subdomain": {
             "appOnly": "Vain sovelluksen oma osoite (suositus)",
@@ -1497,13 +1500,16 @@
             "choose": "Valitse"
           },
           "action": {
-            "subdomain": "Vain sovellus"
+            "subdomain": "Vain sovellus",
+            "platform_fee": "Älä laske"
           },
           "keepAction": {
-            "subdomain": "Oma sivusto"
+            "subdomain": "Oma sivusto",
+            "platform_fee": "Laske"
           },
           "confirm": {
-            "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin."
+            "subdomain": "Teetkö tästä pelkän sovellusosoitteen? {line} Kun joku avaa osoitteen omassa verkkotunnuksessasi, hänet ohjataan sovelluksen omaan osoitteeseen. Siellä sovellus toimii kuten ennenkin.",
+            "platform_fee": "Jätetäänkö tämä tietue pois rahamaksuistasi? {line} Tietue säilyy, mutta Talous-sivu ei enää laske sitä."
           },
           "rowResolved": "Olet päättänyt jokaisesta tietueesta.",
           "clear": "Tyhjennä",
@@ -1521,7 +1527,8 @@
             "skill": "Taito {name} tiedostoineen",
             "datapackage": "Datapaketti {name} tiedostoineen",
             "schedule": "Ajastus ”{label}”, jonka {maker} teki tilille {owner} (käynnistyy: {cron})",
-            "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}"
+            "subdomain": "{label}: sovellus {app}, jonka julkaisi {owner}",
+            "platform_fee": "{amount} tilin {owner} muistissa ({key}), myyjä {seller}, ostaja {buyer}"
           }
         },
         "source": {
@@ -5189,7 +5196,8 @@
       "review": "Tarkistettavana",
       "draft": "Luonnos",
       "expired": "Korvattu",
-      "ended": "Päättynyt"
+      "ended": "Päättynyt",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "event": {
       "created": "Luonnos tehty",
@@ -5208,7 +5216,8 @@
       "objection": "Muutosta vastustettu",
       "breach-notice": "Loukkausilmoitus lähetetty",
       "ended": "Sopimus päättyi",
-      "deletion-done": "Tiedot poistettu tai palautettu"
+      "deletion-done": "Tiedot poistettu tai palautettu",
+      "test-signed": "Allekirjoitettu testissä, ei voimassa"
     },
     "next": {
       "deletion": "Poista tai palauta tiedot {date} mennessä",
@@ -5218,7 +5227,9 @@
       "objected": "Muutosta on vastustettu, eikä se tule voimaan",
       "notice": "Muutos tulee voimaan {date}, jos sitä ei vastusteta",
       "waitingCp": "Odottaa vastapuolen allekirjoitusta",
-      "signCp": "Odottaa sinun allekirjoitustasi"
+      "signCp": "Odottaa sinun allekirjoitustasi",
+      "testSigned": "Sopimus allekirjoitettiin testilompakolla, joten se ei ole voimassa. Tee uusi versio ja lähetä se allekirjoitettavaksi",
+      "testSignedCp": "Allekirjoituksesi oli testiallekirjoitus, jolla ei ole oikeusvaikutusta. Saat tiedon, kun uusi versio odottaa allekirjoitustasi"
     },
     "colStep": "Vaihe",
     "colWhen": "Milloin",
@@ -5400,7 +5411,8 @@
       "next": {
         "draft": "Lähetä allekirjoitettavaksi",
         "review": "Päätä allekirjoitetusta kopiosta",
-        "waitingCp": "Odottaa vastapuolta"
+        "waitingCp": "Odottaa vastapuolta",
+        "test-signed": "Allekirjoitettu vain testissä: tee uusi versio"
       }
     },
     "gap": {
@@ -10597,6 +10609,10 @@
   "notiftext.docsign_request.body": "Dokumentti {document}. Avaa allekirjoituspyyntö, tai pyydä tekoälyäsi näyttämään se.",
   "notiftext.app_published_by_app.title": "{publisher} teki sovelluksestasi {app} uuden version",
   "notiftext.app_published_by_app.body": "Annoit sovellukselle {publisher} luvan julkaista sovelluksia puolestasi, ja se julkaisi version {version}. Kun avaat sovelluksen {app} seuraavan kerran, näet, mitä uusi versio haluaa tehdä, ja päätät, sallitko sen.",
+  "notiftext.content_pdf_text_not_read_time.title": "PDF-tiedostosi {key} tekstiä ei luettu",
+  "notiftext.content_pdf_text_not_read_time.body": "Tiedosto on tallessa sellaisenaan. Tekstin lukeminen olisi kestänyt kauemmin kuin tämän AIMEATin aikaraja {limit}. Raja koskee PDF-tiedostoa, jonka kokoa ei voi tarkistaa ennen lukemista. Sama tieto näkyy Tietolompakko-sivullasi tämän tiedoston kohdalla.",
+  "notiftext.content_pdf_text_not_read_memory.title": "PDF-tiedostosi {key} tekstiä ei luettu",
+  "notiftext.content_pdf_text_not_read_memory.body": "Tiedosto on tallessa sellaisenaan. Tekstin lukeminen olisi vienyt enemmän muistia kuin tämän AIMEATin muistiraja {limit}. Raja koskee PDF-tiedostoa, jonka kokoa ei voi tarkistaa ennen lukemista. Sama tieto näkyy Tietolompakko-sivullasi tämän tiedoston kohdalla.",
   "notiftext.agreement_sent_cp.title": "{operator} pyytää sinua allekirjoittamaan käsittelysopimuksen",
   "notiftext.agreement_sent_cp.body": "Lue tiivistelmä ja valitse, miten allekirjoitat. Sopimus {agreement}.",
   "notiftext.agreement_copy_rejected_cp.title": "Allekirjoitettua kopiotasi ei voitu hyväksyä",
@@ -10742,6 +10758,10 @@
   "notiftext.payment_possible.body": "Maksupalvelu ei vastannut, kun ostaja maksoi sinulle, joten ei tiedetä, tuliko raha perille. Katso, onko maksuosoitteeseesi tullut siirto osoitteesta {payer}. Jos raha tuli, toimita tilaus tai palauta maksu. Tunniste: {reference}.",
   "notiftext.payout_possible.title": "Sait ehkä maksun {amount}",
   "notiftext.payout_possible.body": "{provider} lähetti sinulle {amount}, mutta maksuverkko ei vahvistanut, että siirto meni perille. Katso, onko tilitysosoitteeseesi tullut siirto osoitteesta {payer}. Viite: {reference}.",
+  "notiftext.payout_arrived.title": "Maksu {amount} tuli perille",
+  "notiftext.payout_arrived.body": "Palvelimen ylläpitäjät tarkistivat, että maksu {amount} käyttäjältä {provider} tuli perille. Se on nyt kirjattu maksetuksi. Viite: {reference}.",
+  "notiftext.payout_arrived_provider.title": "Maksusi {amount} tuli perille",
+  "notiftext.payout_arrived_provider.body": "Palvelimen ylläpitäjät tarkistivat, että maksusi {amount} käyttäjälle {beneficiary} tuli perille. Se on nyt kirjattu maksetuksi, eikä sinun tarvitse maksaa sitä uudelleen. Viite: {reference}.",
   "notiftext.package_sale_request_approved.title": "Pyyntösi paketista {name} hyväksyttiin",
   "notiftext.package_sale_request_approved.body": "Myyjä hyväksyi pyynnön. Näet Paketit-sivulta, mitä seuraavaksi tapahtuu.",
   "notiftext.package_sale_request_refused.title": "Pyyntöäsi paketista {name} ei hyväksytty",
@@ -10776,6 +10796,13 @@
   "notiftext.approval_change.ecosystem": "Muuta Ulkoiset sovellukset -sivulla",
   "notiftext.approval_change.agent_page": "Muuta agentin sivulla",
   "notiftext.approval_change.scheduler": "Muuta Ajastin-välilehdellä",
+  "notiftext.approval_change.accountants": "Muuta Tuloslaskelma-sivun kohdassa Kuka saa lukea kirjojasi",
+  "notiftext.approval_accountant_grant.title": "Saako {name} yhä lukea kirjojasi?",
+  "notiftext.approval_accountant_grant.body": "Annoit käyttäjälle {name} oikeuden lukea kirjojasi ennen kuin palvelin alkoi tallentaa jokaisen oikeuden päivämäärän. Tili nimeltä {name} on luotu sen jälkeen, kun aloit antaa oikeuksia, ja poistetun tilin nimen voi rekisteröidä joku toinen. Siksi palvelin ei tiedä, onko tämä se henkilö, jolle annoit oikeuden. Kunnes vastaat, {name} lukee kirjojasi kuten ennenkin. Jos sallit, {name} saa pitää oikeuden. Jos et salli, oikeus poistetaan.",
+  "notiftext.approval_card_adult.title": "Maksoitko omalla kortillasi?",
+  "notiftext.approval_card_adult.body": "Maksoit myyjälle {seller} luottokortilla. Maksu kulki myyjän oman korttimaksutilin kautta, ja vain se tili kertoo, että kortti oli luottokortti. Jos vahvistat, että maksoit omalla kortillasi, tämä palvelin merkitsee sinut täysi-ikäiseksi vahvistetuksi. Sen jälkeen sovellukset voivat näyttää sinulle aikuisille tarkoitettua sisältöä. Jos et vahvista, tieto täysi-ikäisyydestäsi pysyy ennallaan. Vastauksesi ei muuta ostostasi.",
+  "notiftext.approval_card_adult.allow": "Maksoin omalla kortillani",
+  "notiftext.approval_card_adult.deny": "Jätä ennalleen",
   "notiftext.approval_request.allow": "Salli",
   "notiftext.approval_request.deny": "Älä salli",
   "notiftext.approval_answer_allowed.title": "Sallittu: {what}",
@@ -10804,6 +10831,12 @@
   "notiftext.approval_email_policy_sent.body": "Palvelimen operaattori päättää asiasta. Siihen asti laajennus lähettää postia vain osoitteisiin, jotka tavalliset säännöt sallivat. Saat vastauksen tänne.",
   "notiftext.approval_email_policy_code_sent.title": "Laajennuksen {extension} koodi muuttui: operaattori vahvistaa sen postiluvan",
   "notiftext.approval_email_policy_code_sent.body": "{who} muutti koodia. Kunnes operaattori vahvistaa luvan uudelle koodille, laajennus lähettää postia vain osoitteisiin, jotka tavalliset säännöt sallivat. Saat vastauksen tänne.",
+  "notiftext.approval_extension_code.title": "{who} asensi paketin {package}: sallitaanko sen laajennuksen {extension} koodi?",
+  "notiftext.approval_extension_code.body": "Laajennus tuli paketin mukana tilille {account}. Tällä palvelimella vain operaattorin tili asentaa laajennusten koodia, joten laajennus on pois päältä, kunnes operaattori sallii sen. Jos sallit, laajennus käynnistyy heti. Jos et salli, se pysyy pois päältä, ja muu paketti pysyy asennettuna. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_extension_code_sent.title": "Paketin {package} laajennus {extension} odottaa operaattoria",
+  "notiftext.approval_extension_code_sent.body": "Tällä palvelimella vain operaattorin tili asentaa laajennusten koodia. Muu paketti on asennettu, ja laajennus pysyy pois päältä, kunnes operaattori sallii sen. Saat vastauksen tänne.",
+  "notiftext.approval_cortex_holder.title": "Sovellustesi käyttämä kirjasto {cortex} kuuluu nyt tilille {holder}",
+  "notiftext.approval_cortex_holder.body": "Kirjaston {cortex} aiempi tili on poistettu, ja {holder} asensi uuden kirjaston samalla nimellä. Sovelluksesi {apps} lataavat kirjaston tällä nimellä, joten ne ajaisivat koodia, jonka {holder} on kirjoittanut. Jos sallit, sovelluksesi lataavat uuden kirjaston heti. Jos et salli, ne eivät lataa sitä, eivätkä sitä tarvitsevat sovellusten osat toimi. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_secret_host_ask_off.title": "{who} pyytää, että agenttisi saavat lähettää salasanojasi ja avaimiasi uusiin osoitteisiin kysymättä sinulta",
   "notiftext.approval_secret_host_ask_off.body": "Nyt sinulta kysytään, ennen kuin agenttisi lähettävät tallennetun salasanan tai avaimen osoitteeseen, johon sitä ei ole aiemmin lähetetty. Jos sallit tämän, ne voivat lähettää niitä uusiin osoitteisiin kysymättä sinulta. Jos et salli, sinulta kysytään yhä.",
   "notiftext.approval_crew_model.title": "{who} pyytää, että agenttisi {agent} käyttää mallin osoitetta {host}",
@@ -10812,8 +10845,14 @@
   "notiftext.approval_crew_model_default.body": "Kun agenttiesi miehistöt kysyvät mallilta, ne lähettävät palveluntarjoajan avaimesi ({key}) tähän osoitteeseen. Osoitteen asetti sovellus, joten vahvistat sen ensin. Jos sallit, miehistöt käyttävät osoitetta seuraavasta ajosta alkaen. Jos et salli, ne pitävät nykyisen mallinsa. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_goal_model_read.title": "{who} pyytää, että AIMEATin tekoäly saa lukea yksityiset merkintäsi {records}",
   "notiftext.approval_goal_model_read.body": "{agent} tarvitsee merkinnät {records} tehtävään ”{work}” tavoitteessasi ”{goal}”. {agent} ei saa lukea yksityisiä merkintöjäsi, mutta se näkee tekoälyn vastauksen. Jos sallit, tekoäly käyttää näitä merkintöjä tehtävässä. Jos et salli, tehtävä tehdään ilman niitä.",
+  "notiftext.approval_goal_model_spend.title": "{who} pyytää, että AIMEATin tekoäly tekee tehtävän ”{work}” sinun kustannuksellasi",
+  "notiftext.approval_goal_model_spend.body": "{agent} lisäsi tavoitteeseesi ”{goal}” tehtävän ”{work}” AIMEATin tekoälylle. {agent} ei itse saa käyttää tekoälyäsi, joten tehtävän kulu odottaa sinun päätöstäsi. Jos sallit, tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka {agent} lisää tähän tavoitteeseen myöhemmin. Jos et salli, tätä tehtävää ei tehdä.",
   "notiftext.approval_schedule_instruction.title": "{who} muutti ajastusta ”{schedule}”, ja muutos odottaa hyväksyntääsi",
   "notiftext.approval_schedule_instruction.body": "Ajastuksen teki {maker}, joten se lukee tietojasi samoilla oikeuksilla kuin {maker}. {who} muutti sen ohjeita, mutta {who} ei saa lukea kaikkea, mitä {maker} saa. Siksi muutos odottaa hyväksyntääsi. Jos sallit, ajastus käyttää uusia ohjeita. Jos et salli, se palaa vanhoihin ohjeisiin.",
+  "notiftext.approval_delegation_binding.title": "{who} julkaisee kanavallesi {channel} sovelluksella {app}, jonka teki {author}",
+  "notiftext.approval_delegation_binding.body": "Annoit sovellukselle \"{label}\" luvan julkaista kanavallasi (\"{action}\"), mutta nimesit sovelluksen vain tiedostonimellä. Tämän samannimisen sovelluksen teki {author}, et sinä. Jos sallit, lupaa voi tästä eteenpäin käyttää vain käyttäjän {author} sovellus. Muiden tekemät samannimiset sovellukset eivät voi. Jos et salli, tämä sovellus ei voi julkaista kanavallasi. {who} saa tiedon vastauksestasi kummassakin tapauksessa.",
+  "notiftext.delegation_bound.title": "Vain oma sovelluksesi {app} voi nyt julkaista kanavallasi nimellä \"{label}\"",
+  "notiftext.delegation_bound.body": "Annoit sovellukselle \"{label}\" luvan julkaista kanavallasi (\"{action}\") ja nimesit sen vain tiedostonimellä. Siksi joku muu olisi voinut käyttää lupaa samannimisellä sovelluksella. Tästä eteenpäin lupaa voi käyttää vain oma sovelluksesi {app}. Sen käyttäjät julkaisevat sillä kuten ennenkin.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
   "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
@@ -12365,6 +12404,21 @@
     "ecoMoneySub": "kulkee erikseen",
     "ecoMoneyIntro": "Raha liikkuu maksupalvelujen kautta (Stripe ja kumppanit) eikä koskaan murusina. Tässä näkyy vain, paljonko rahaa täällä tehdyissä kaupoissa on liikkunut.",
     "ecoMintIntro": "Muruset kirjataan agentin omistajan tilille ja näkyvät hänen lompakossaan. Päiväraja on {cap} murusta.",
+    "possiblePayouts": {
+      "title": "Maksut, jotka ovat ehkä menneet perille",
+      "count": "{n} tarkistettavaa",
+      "lead": "Nämä myyjät maksoivat toiselle tilille sille kuuluvan osuuden tuloista, mutta x402-maksupalvelu ei vastannut. Siksi kukaan ei tiedä, lähtikö siirto. Hae jokainen nonce lohkoketjusta. Jos siirto löytyy, kirjoita sen transaction hash tai oma tapausnumerosi ja paina Merkitse perille tulleeksi. Silloin osuus kirjataan maksetuksi, ja molemmat osapuolet saavat ilmoituksen. Jos siirtoa ei löydy, älä tee mitään: myyjä sulkee maksun itse.",
+      "colWho": "Kuka maksoi kenelle",
+      "colWhen": "Aloitettu",
+      "colAmount": "Summa",
+      "who": "{provider} → {beneficiary}",
+      "nonce": "nonce {nonce}",
+      "payer": "Osoitteesta {payer} osoitteeseen {to}, verkossa {network}",
+      "reference": "Viite",
+      "referenceNote": "Siirron transaction hash tai oma tapausnumerosi.",
+      "markArrived": "Merkitse perille tulleeksi",
+      "referenceRequired": "Kirjoita ensin viite."
+    },
     "cfgSearch": "Etsi asetus nimellä, avaimella tai kuvauksella…",
     "cfgOnlyChanged": "Vain muutetut ({n})",
     "cfgAll": "Kaikki",
@@ -12490,6 +12544,8 @@
     "cfg_federation_open_join": "Avoin liittyminen",
     "cfg_federation_book_listed": "Näkyy federaatiokirjassa",
     "cfg_federation_introductions_per_hour": "Liittymispyynnöt yhdestä osoitteesta tunnissa",
+    "cfg_federation_peering_request_days": "Liittymispyynnön odotusaika päivinä",
+    "cfg_federation_resolve_max_peers": "Yhdessä haussa kysyttävät vertaiset",
     "cfg_federation_audience_required": "Hylkää viesti, joka ei nimeä tätä palvelinta",
     "cfg_quota_memory_max_value_size_kb": "Muistiarvon kokoraja",
     "cfg_quota_memory_max_keys_per_agent": "Muistiavainten enimmäismäärä",
@@ -12803,6 +12859,8 @@
     "cfgDesc_federation_open_join": "Avoin liittyminen: allekirjoitettu esittely päästää sisään matalan luottamuksen vierailijana ilman käsinhyväksyntää.",
     "cfgDesc_federation_book_listed": "Näytä tämä instanssi (operaattorit + resurssit) federaatiokirjassa; pois = yksityisyysvalinta.",
     "cfgDesc_federation_introductions_per_hour": "Montako liittymispyyntöä yksi osoite voi jättää sinulle tunnissa. Kun sama palvelin esittäytyy uudelleen samalla avaimella, sillä on silti vain yksi odottava pyyntö. Rajan ylittyessä palvelin saa tiedon, milloin se voi yrittää uudelleen. 0: ei rajaa.",
+    "cfgDesc_federation_peering_request_days": "Montako päivää toisen palvelimen liittymispyyntö odottaa vastaustasi. Sen jälkeen pyyntö vanhenee ja poistuu, ja palvelin voi esittäytyä uudelleen. Tämän palvelimen lähettämät pyynnöt säilyvät. 0: pyyntö ei vanhene.",
+    "cfgDesc_federation_resolve_max_peers": "Kuka tahansa voi kysyä tältä palvelimelta, millä palvelimella jokin henkilö tai agentti on. Kun osoite nimeää palvelimen, jonka tunnet, kysytään vain siltä tai ei keneltäkään. Kun osoite ei nimeä tuttua palvelinta, tämä palvelin kysyy vertaisiltaan yksi kerrallaan, enintään näin monelta. 0: ei rajaa.",
     "cfgDesc_federation_audience_required": "Toisen palvelimen viesti nimeää palvelimen, jolle se on tarkoitettu, joten viestiä ei voi välittää kolmannelle palvelimelle. Vanhempaa versiota ajava palvelin ei nimeä ketään. Pois päältä: tämä palvelin ottaa sellaisen viestin vastaan. Päällä: se hylkää viestin. Versiosta 3.27.0 alkaen asetus on oletuksena päällä. Viesti, joka nimeää toisen palvelimen, hylätään aina. Vanha viestimuoto, joka ei nimeä palvelinta, poistuu versiossa 4.0.0.",
     "cfgDesc_security_login_rate_limit_max": "Kirjautumisyritysten katto minuutissa IP:tä kohden.",
     "cfgDesc_security_login_rate_limit_window_ms": "Kirjautumisrajan ikkuna millisekunteina.",
@@ -13551,6 +13609,10 @@
     "cfgDesc_content_class_mode": "Päällä: jokainen omistaja päättää. Tiedoston omien tietojen lukeminen on käytössä kaikilla, ja jokainen tekoälymallia kutsuva vaihe on pois päältä, kunnes omistaja kytkee sen päälle Tietolompakko-sivullaan. Pois: mitään ei lueta, ja sisältöluokkien reitit ja työkalut vastaavat 404.",
     "cfgDesc_content_class_ffprobe_path": "ffprobe-ohjelma, joka lukee videon keston, koon ja koodekit: nimi PATH-polulla tai koko polku. Ilman sitä video saa vain ne tiedot, jotka jokainen tiedosto saa.",
     "cfgDesc_content_class_ffmpeg_path": "ffmpeg-ohjelma, joka ottaa videosta still-kuvat ja äänen sen kuvausta varten: nimi PATH-polulla tai koko polku.",
+    "cfg_content_class_pdf_text_seconds": "PDF-teksti: aikaraja (s)",
+    "cfg_content_class_pdf_text_memory_mb": "PDF-teksti: muistiraja (Mt)",
+    "cfgDesc_content_class_pdf_text_seconds": "Kuinka kauan palvelin saa lukea sellaisen PDF-tiedoston tekstiä, jonka purettua kokoa se ei voi tarkistaa etukäteen, esimerkiksi salatun PDF:n. Kun raja ylittyy, tiedosto pysyy tallessa, tekstiä ei lueta, ja sekä lataaja että tiedoston tiedot kertovat sen. Koskee keskustelun liitteitä, sähköpostin liitteitä ja sitä, mitä tiedostosta tiedetään. 0 = ei rajaa.",
+    "cfgDesc_content_class_pdf_text_memory_mb": "Kuinka paljon muistia palvelin saa käyttää tällaisen PDF-tiedoston tekstin lukemiseen. Kun raja ylittyy, tiedosto pysyy tallessa, tekstiä ei lueta, ja sekä lataaja että tiedoston tiedot kertovat sen. 0 = ei rajaa.",
     "cfgGroup_packages": "Paketit",
     "cfgGroup_themes": "Teemat",
     "cfgGroup_agents": "Agenttien siirto",
@@ -23464,6 +23526,7 @@
   "chat.youLabel": "Sinä",
   "chat.agentLabel": "Agentti",
   "chat.jumpLatest": "Hyppää uusimpaan",
+  "chat.deletedCopyKept": "Keskustelu on poistettu täältä. Keskustelutyökalu, joka vastasi siinä, säilyttää tekstistä oman kopionsa tällä palvelimella, eikä AIMEAT voi poistaa sitä. Palvelun ylläpitäjä voi poistaa kopion.",
   "chat.starterPage": "Tee minulle kotisivu",
   "chat.starterPageAsk": "Laita kotisivuni pystyyn. Pidä se yksinkertaisena ja kerro osoite, kun se on julkaistu.",
   "chat.starterCompany": "Ota yritykseni käyttöön",
@@ -26980,6 +27043,17 @@
         "high": "Tehtävä tehdään ilman näitä merkintöjä.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos sinulle sopii, että agentti tietää, mitä näissä merkinnöissä lukee. Jos agentti saa lukea kaikki merkintäsi, voit antaa sille tämän luvan agentin sivulla. Silloin se ei enää kysy."
+      },
+      "approval_goal_model_spend": {
+        "title": "Agentti pyytää tekoälyä tekemään tehtävän sinun kustannuksellasi",
+        "short": "AIMEATin tekoäly tekisi tavoitteesi tehtävän, ja kulu maksetaan omalla avaimellasi tai tekoälysaldostasi.",
+        "what": "Tavoitteessa agentti voi antaa tehtävän AIMEATin tekoälylle. Tekoäly tekee työn tililläsi, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. Tällä agentilla ei ole lupaa käyttää tekoälyäsi, joten se ei voi käyttää rahojasi yksin. Siksi sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka agentti lisää tähän tavoitteeseen myöhemmin. Sinä maksat ne.",
+        "highLabel": "Jos et salli",
+        "high": "Tätä tehtävää ei tehdä, eikä rahaa kulu.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos haluat tavoitteen jatkuvan tällä tehtävällä. Jos agentti saa aina käyttää tekoälyäsi, anna sille tämä lupa agentin sivulla. Silloin se ei enää kysy."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",

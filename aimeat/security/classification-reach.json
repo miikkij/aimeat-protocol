@@ -31,9 +31,11 @@
     },
     "src/commerce/beneficiary-payout-hold.ts": {
       "reads": {
-        "listMemory": 1
+        "listMemory": 1,
+        "listAllMemoryPages": 1,
+        "getMemory": 1
       },
-      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the provider's possible-payout records (commerce.possible.payout.*), which the payout service itself wrote when a settlement did not answer, read to leave their entries out of the provider's own quote. No content is shown to anyone else."
+      "why": "Written 2026-10-27 (secaudit2026oct26), the node's own read: the provider's possible-payout records (commerce.possible.payout.*), which the payout service itself wrote when a settlement did not answer, read to leave their entries out of the provider's own quote. No content is shown to anyone else. 2026-10-29 (round 8c): listAllMemoryPages lists the open possible payouts of every provider for the operator's check against the chain, and getMemory reads the one the operator marks arrived; both are payment records, no content, served only to an operator."
     },
     "src/commerce/beneficiary-payout.ts": {
       "reads": {
@@ -78,6 +80,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-10-11, the node's own read: the existing platform-fee or checkout record, read only to carry its version and creation time into the upsert (moved unchanged from session-service.ts)."
+    },
+    "src/commerce/platform-fee-writers.ts": {
+      "reads": {
+        "listAllMemoryPages": 1
+      },
+      "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: the money platform-fee records (commerce.platform-fee.*) read once at start to mark the ones another writer wrote and to name the undecided ones to the operator. Fee figures only, no content, shown to no one but the operator."
     },
     "src/commerce/psp-record.ts": {
       "reads": {
@@ -1293,6 +1301,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The cancel-marker record, read to push cancel wakes; no value leaves."
     },
+    "src/services/connections/delegation-binding.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: the record under system@<node> that says which author's app a channel delegation belongs to, written only by this module; no person's content is read."
+    },
     "src/services/connections/publish-run.ts": {
       "reads": {
         "getStorageFile": 1
@@ -1371,6 +1385,12 @@
         "getMemory": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Tags on seeded records, checked before uninstall deletes them."
+    },
+    "src/services/cortex-holder-change.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: its own record under system@<node> (cortex.holder-change.<name>), which lists the apps that loaded a cortex name before its holder changed and whether each app's owner allowed the new holder; the library route reads it to decide. No content is read or shown."
     },
     "src/services/cortex-seeder.ts": {
       "reads": {
@@ -1783,6 +1803,12 @@
         "listAllMemoryPages": 1
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Accountant and client access lists. 2026-10-27 (secaudit2026oct26): the second getMemory reads the same list with its write time to date an entry granted before grant times were kept, and listAllMemoryPages finds every client list naming an erased account so the account erasure takes it off; both are access lists, no content."
+    },
+    "src/services/finance/accountant-grant-ask.ts": {
+      "reads": {
+        "listAllMemoryPages": 1
+      },
+      "why": "Written 2026-10-29 (secaudit2026oct26 round 8c), the node's own read: every client's accountant list (finance.accountants) read once at start to ask each client about an older grant whose holder the node cannot place. Access lists, no content."
     },
     "src/services/genesis-sync.ts": {
       "reads": {

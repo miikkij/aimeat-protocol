@@ -13,6 +13,7 @@
   "files": [
     "dist/",
     "!dist/public/lib/ffmpeg-core*/**",
+    "npm-shrinkwrap.json",
     "scripts/vendor-libs.mjs",
     "docs/AIMEAT_Help_Prompt.md",
     "docs/AIMEAT_Help_Prompt_Person.md",
@@ -35,10 +36,13 @@
     "dev:watch": "tsx watch src/index.ts",
     "build": "node scripts/clean-dist.mjs && node scripts/vendor-libs.mjs && tsc && node scripts/copy-dist-assets.mjs && node scripts/write-build-stamp.mjs",
     "check:pack-contents": "node scripts/check-pack-contents.mjs",
+    "gen:shrinkwrap": "node scripts/gen-shrinkwrap.mjs",
+    "check:shrinkwrap": "node scripts/gen-shrinkwrap.mjs --check",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "build:everything": "tsx scripts/build-everything.ts",
     "release:bump": "tsx scripts/release-bump.ts",
+    "release:trust-cutoff": "node scripts/lib/adoption-cutoff.mjs",
     "check:everything": "tsx scripts/build-everything.ts --check",
     "check:changelog": "tsx scripts/check-changelog.ts",
     "check:imports-tracked": "tsx scripts/check-imports-tracked.ts",
@@ -195,7 +199,7 @@
     "audit:mcp-tools": "tsx scripts/audit-mcp-tools.ts",
     "audit:mcp-schemas": "tsx scripts/audit-mcp-schemas.ts",
     "eval:mcp-surface": "tsx test/eval-mcp/surface-weight.ts",
-    "prepublishOnly": "node scripts/release-ready.mjs --require=ci.yml,e2e-full.yml && node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm check:licenses && pnpm gen:notices && pnpm build && pnpm check:pack-contents && node scripts/pack-smoke.mjs",
+    "prepublishOnly": "node scripts/release-ready.mjs --require=ci.yml,e2e-full.yml && node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm check:licenses && pnpm gen:notices && pnpm build && pnpm gen:shrinkwrap && pnpm check:pack-contents && node scripts/pack-smoke.mjs",
     "perf:bench": "node --import tsx tools/perf-bench/bench.ts",
     "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts",
     "sync:viewport": "tsx scripts/embed-viewport.ts",
@@ -404,6 +408,32 @@
     "vite": "^8.3.5",
     "vitest": "^5.0.5",
     "xmllint-wasm": "^5.3.0"
+  },
+  "overrides": {
+    "hono": ">=4.13.7",
+    "@hono/node-server": ">=2.0.10",
+    "express-rate-limit": ">=8.3.0",
+    "ip-address@>=10.0.0 <10.7.1": ">=10.7.1",
+    "fast-uri@>=3.0.0 <3.1.7": "^3.1.7",
+    "body-parser@>=2.0.0 <2.3.0": ">=2.3.0",
+    "undici@>=6.0.0 <6.28.1": "^6.28.1",
+    "postcss@>=8.0.0 <8.5.23": ">=8.5.23",
+    "nanoid@>=3.0.0 <3.3.18": ">=3.3.18",
+    "vite@>=7.0.0 <7.3.5": ">=7.3.5",
+    "uuid@>=10.0.0 <11.1.1": ">=11.1.1",
+    "brace-expansion@<1.1.21": "^1.1.21",
+    "brace-expansion@>=2.0.0 <2.1.7": "^2.1.7",
+    "brace-expansion@>=4.0.0 <5.0.12": ">=5.0.12",
+    "js-yaml@>=4.0.0 <4.3.2": "^4.3.2",
+    "minimatch@>=5.0.0 <5.1.8": "5.1.8",
+    "readdir-glob@3": {
+      "minimatch": "10.2.5"
+    },
+    "path-to-regexp@>=8.0.0 <8.4.0": "8.4.0",
+    "lodash@>=4.0.0 <4.18.0": "4.18.0",
+    "esbuild@>=0.17.0 <0.28.1": ">=0.28.1",
+    "qs@>=6.11.1 <6.15.2": ">=6.15.2",
+    "zod@>=4.0.0 <4.6.6": "^4.6.7"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

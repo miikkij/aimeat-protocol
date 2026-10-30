@@ -11,6 +11,7 @@
  *   shared service handles consumed by route mounting.
  * @usage const services = await initializeServices(config, storage);
  * @version-history
+ *   2026-10-29 — The peer registry is made with peerRegistry(config.nodeId), so gatePeer refuses this node's own id at every door (secaudit2026oct26 round 8c).
  *   2026-10-27 — A stored peer with this node's own id is not loaded into the peer registry, with a log line (secaudit2026oct26).
  *   2026-10-25 — refreshOpenings: the apps open to the internet on a closed node load at start (services/internet-opening/). scheduleGoalSweep: the agent goals' minute sweep (services/goals/goals-sweep.ts). seedBundledCortexes gets the node id, for the incident a shipped cortex name held by another account opens (secaudit2026oct22).
  *   2026-10-24 — scheduleAgreementSweep: the hourly reminders, lapsed notices and signing reads of the
@@ -115,7 +116,7 @@ import type { ServiceSummary } from '../utils/service-summary.js';
 import { generateKeyPair } from '../auth/keypair.js';
 import { enableAnonymousAuth } from '../auth/middleware.js';
 import { registerVisitorPeers } from '../auth/visitor-peer.js';
-import { startHeartbeatJob, setOnPeerRecovery } from '../services/federation.js';
+import { startHeartbeatJob, setOnPeerRecovery, peerRegistry } from '../services/federation.js';
 import { startScreenshotAutoCapture } from '../services/screenshot-capture.js';
 import { presence } from '../services/presence.js';
 import { assembleBook, pullBook } from '../services/federation-book.js';
@@ -440,8 +441,7 @@ export async function initializeServices(
     .then(() => logger.info('Directory index built'))
     .catch(err => logger.error('Failed to build directory index', { error: String(err) }));
 
-  // Federation peer registry (shared between routes and heartbeat)
-  const peers = new Map<string, PeerInfo>();
+  const peers = peerRegistry<PeerInfo>(config.nodeId);   // shared between routes and heartbeat; gatePeer reads this node's id from it
   // Network directory — aggregated service summaries from federation peers
   const networkDirectory = new Map<string, ServiceSummary>();
   // Load persisted peers from storage. A row under this node's own id is not loaded: such a peer would speak for every person here (secaudit2026oct26).

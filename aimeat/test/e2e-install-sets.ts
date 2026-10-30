@@ -28,6 +28,8 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-29 — A set naming the node it is applied on as its repository is refused with 400
+ *     SELF_NODE_ID (secaudit2026oct26 round 8c, federation-07).
  *   2026-10-24 — The start-up apply is awaited until its run claim is gone, not until its record
  *     appears: the record is written first with `running` since 2026-10-18, and the nightly Postgres
  *     sweep read the empty claim (2026-10-22 and 2026-10-23).
@@ -686,6 +688,17 @@ await test('A set naming the repository under another key than the linked peer i
         body: JSON.stringify({ install_set: installSet({ repository: { node_id: R.nodeId, url: R.baseUrl, public_key: 'AAAAnotthekey' } }), dry_run: true }),
     });
     assert(r.status === 409 && r.body.error?.code === 'PEER_KEY_MISMATCH', `expected 409 PEER_KEY_MISMATCH: ${r.status} ${JSON.stringify(r.body)}`);
+});
+
+await test('A set naming this node itself as the repository is refused (SELF_NODE_ID), though its own card answers', async () => {
+    const card = await C.json('/.well-known/aimeat');
+    const r = await C.json('/v1/install-sets/apply', {
+        method: 'POST', headers: auth(opsToken),
+        body: JSON.stringify({ install_set: installSet({ bundle: { group_id: setupOnR, node_id: C.nodeId }, repository: { node_id: C.nodeId, url: C.baseUrl, public_key: card.body.data.public_key } }), dry_run: true }),
+    });
+    assert(r.status === 400 && r.body.error?.code === 'SELF_NODE_ID', `expected 400 SELF_NODE_ID: ${r.status} ${JSON.stringify(r.body)}`);
+    const peers = await C.json('/v1/federation/peers', { headers: auth(opsToken) });
+    assert(!(peers.body.data?.peers ?? []).some((p: any) => p.node_id === C.nodeId), 'no peer under this node\'s own id');
 });
 
 console.log('\nPhase 8 — Selling node to node, with no token');

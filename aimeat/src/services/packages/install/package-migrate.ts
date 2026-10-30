@@ -29,6 +29,9 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.8.0 — 2026-10-29 — With install role operator, a replaced, custom or new extension in an account
+ *     that may not install extension code is stored switched off and waits for an operator; the outcome
+ *     names it (`awaitingOperator`; services/extension-code-hold.ts; secaudit2026oct26 round 8c).
  *   v1.7.3 — 2026-10-27 — A replaced, custom or new extension names its writer (codeWriterOf): the
  *     agent or app that migrated without the owner's authority. Code a caller supplies in `content`
  *     for an extension, app, cortex or skill, other than the package's own, needs packages:install-code
@@ -78,6 +81,7 @@ import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
 import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension-first-use-keep.js';
+import type { ExtensionCodeAwaiting } from './package-install.js';
 
 export const MIGRATION_ACTIONS = ['replace', 'skip', 'custom', 'install_new'] as const;
 export type MigrationAction = (typeof MIGRATION_ACTIONS)[number];
@@ -98,6 +102,8 @@ export interface MigrateOutcome {
     newVersion: string;
     /** A skill left out because the owner has one of that name of their own (package-skill-component.ts). */
     warnings?: string[];
+    /** Extension components stored switched off, their code waiting for an operator (services/extension-code-hold.ts). */
+    awaitingOperator?: ExtensionCodeAwaiting[];
 }
 
 /**
@@ -308,6 +314,13 @@ export async function applyInstanceMigration(
     const skippedComponents: string[] = [];
     const failedComponents: { componentId: string; error: string }[] = [];
     const newInstalledComponents: InstalledComponent[] = [];
+    // Extension code the install role holds for an operator (component-registrar.ts, extension-code-hold.ts).
+    const awaitingOperator: ExtensionCodeAwaiting[] = [];
+    const noteHeld = (compId: string, held: { extension: string; request_id: string | null } | undefined) => {
+        if (!held) return;
+        awaitingOperator.push({ component: compId, ...held });
+        warnings.push(`The extension ${held.extension} is switched off: on this node only the operator's account installs add-on code, so its new code waits for an operator to allow it.`);
+    };
 
     // The words this caller lacks for a memory component, gathered rather than refused on the spot:
     // the rest of the checks still run, so a request filed from this refusal is one the node would
@@ -495,6 +508,7 @@ export async function applyInstanceMigration(
                     failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
                     break;
                 }
+                noteHeld(compId, result.awaitingOperator);
 
                 // A reinstall of byte-identical extension code keeps the old-code first-use mark the
                 // replaced record carried; changed code does not (services/extension-first-use-keep.ts).
@@ -549,6 +563,7 @@ export async function applyInstanceMigration(
                     failedComponents.push({ componentId: compId, error: result.error ?? 'registration failed' });
                     break;
                 }
+                noteHeld(compId, result.awaitingOperator);
 
                 newInstalledComponents.push({
                     componentId: compId,
@@ -596,6 +611,7 @@ export async function applyInstanceMigration(
             failedComponents,
             newVersion: targetVersion,
             ...(warnings.length ? { warnings } : {}),
+            ...(awaitingOperator.length ? { awaitingOperator } : {}),
         },
     };
 }

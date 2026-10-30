@@ -29,6 +29,9 @@
  * @version-history
  *   2026-10-30 — Section 9: a file linked from a workspace record opens to the members; ctx.files.read
  *     answers visibility and workspaceRef.
+ *   2026-10-29 — Section 10: with install role operator a package's extensions wait switched off for an
+ *     operator's one press (409 AWAITING_OPERATOR on activate), and names starting with aimeat- answer
+ *     409 NAME_RESERVED (secaudit2026oct26 round 8c). Read against crud.ts's activate and install changes.
  *   2026-10-25 — Section 2: the owner is part of the address too (`owner`, `full_name`), every bare
  *     address keeps working, and when the full name is needed (owner namespaces wish, secaudit2026oct22;
  *     reworded 2026-10-26 when the owner became additive).
@@ -345,7 +348,11 @@ writes extension code: the operator in person, and the operator's agents holding
 another account, in person or through its agents, can neither install nor redeploy nor change an
 action script; the refusal names the setting and the operator, so tell the person to ask the
 operator (support@operators) to install it. They still switch off, configure and remove the
-extensions in their own account. An app
+extensions in their own account. A package such an account installs still installs, but each of its
+extensions comes switched off and waits for an operator's one-press approval
+(\`extension_code_awaiting_operator\` in the answer); activating it answers 409 AWAITING_OPERATOR until
+then, and the account hears the answer. Names that start with \`aimeat-\` are kept for what the node
+ships: a new extension under such a name answers 409 NAME_RESERVED with another name to use. An app
 under an app grant cannot: \`ext:write\` is outside the grantable scopes, because an extension is
 persistent code that outlives the grant and can charge in the owner's name. An app may write a
 manifest and hand it over; the person or an authorised agent installs it. The node caps code at

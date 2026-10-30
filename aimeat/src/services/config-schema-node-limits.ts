@@ -9,6 +9,8 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   2026-10-29 — federation.resolve_max_peers (secaudit2026oct26 round 8c, federation-03).
+ *   2026-10-29 — federation.peering_request_days (secaudit2026oct26 round 8c, federation-06).
  *   v1.4.0 — 2026-10-27 — federation.introductions_per_hour (secaudit2026oct26, unbounded pending peering requests).
  *   2026-10-27 — realtime.echat_max_rooms and realtime.max_docs_per_room (secaudit2026oct26).
  *   v1.4.0 — 2026-10-27 — apps.renders_at_once (secaudit2026oct26, on-demand-render-no-node-slot-or-deadline).
@@ -45,6 +47,12 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
     range: '0-10000' },
   { key: 'federationIntroductionsPerHour', dotPath: 'federation.introductions_per_hour', envVar: 'AIMEAT_FEDERATION_INTRODUCTIONS_PER_HOUR', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'Peering requests one address may leave for the operator per hour through an introduction. A node that introduces itself again with the same key keeps one waiting request. Past the limit the node is told when to try again. 0 = no limit',
+    range: '0-100000' },
+  { key: 'federationPeeringRequestDays', dotPath: 'federation.peering_request_days', envVar: 'AIMEAT_FEDERATION_PEERING_REQUEST_DAYS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'Days a peering request from another node waits for your answer. After that it expires and is deleted, and the node can introduce itself again. Requests this node sent are not touched. 0 = never expires',
+    range: '0-3650' },
+  { key: 'federationResolveMaxPeers', dotPath: 'federation.resolve_max_peers', envVar: 'AIMEAT_FEDERATION_RESOLVE_MAX_PEERS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most peers one identity lookup asks when the identity names no server this node knows. An identity that names a peer you know asks only that peer, or none. 0 = no limit',
     range: '0-100000' },
   { key: 'realtimeEchatMaxRooms', dotPath: 'realtime.echat_max_rooms', envVar: 'AIMEAT_REALTIME_ECHAT_MAX_ROOMS', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'The most rooms anonymous echat visitors hold open together, inside realtime.max_rooms, so visitors without an account cannot take every room your apps use. 0 = no separate limit',

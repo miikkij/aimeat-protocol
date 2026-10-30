@@ -15,7 +15,9 @@
  *     `scim:<conn>` in externalIdentities, verbatim — Entra asks "does this user exist" with the
  *     UPN it sent, not with the owner name this node derived (R11).
  *   - Adoption (R5): a create whose verified email already belongs to a LOCALLY VERIFIED account
- *     in the connection's own domains adopts that account; any other collision is a 409.
+ *     in the connection's own domains adopts that account; any other collision is a 409. Adoption
+ *     writes the marker `scimadopted:<conn>`, so the first organisation sign-in into an adopted
+ *     account with two-step sign-in asks its code once.
  *   - R13: `active: false` (and DELETE) against an operator-role owner is refused — a directory
  *     sync must not decapitate the node.
  *   - Deletion is deactivation (R3): the person's knowledge is theirs; IdP "deleted" means
@@ -24,6 +26,9 @@
  *   normalizeEntraPatchBody() (the string-boolean shim, unit-tested in scim-entra-compat).
  * @usage declareScimResources(); // once, from routes/scim.ts
  * @version-history
+ *   2026-10-29 — Adoption writes the marker `scimadopted:<conn>` on the adopted account: the first
+ *     organisation sign-in into it asks its two-step code once (secaudit2026oct26 round 8c,
+ *     adoption-skips-second-factor).
  *   2026-10-25 — A new account's address is recorded as verified only when it is in the connection's
  *     domains; outside them the account is created without a verified address (secaudit2026oct22,
  *     sso-new-account-email-verified-outside-connection-domains).
@@ -42,6 +47,7 @@ import { deactivateOwner, reactivateOwner } from './owner-lifecycle.js';
 import { deriveUniqueUsername, emailHashOf } from './external-login.js';
 import { ensureSsoMembership } from './sso-membership.js';
 import { emailInConnectionDomains } from './sso-connections.js';
+import { adoptedMarkerKey } from './sso-adoption-notice.js';
 import { logger } from '../utils/logger.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 
@@ -114,12 +120,15 @@ function emailOf(data: Record<string, unknown>): string | null {
   return null;
 }
 
-async function writeIdentityKeys(ctx: ScimContext, ghii: GHIIRecord, userName: string, externalId: string | null): Promise<void> {
+async function writeIdentityKeys(
+  ctx: ScimContext, ghii: GHIIRecord, userName: string, externalId: string | null, extra: Record<string, string> = {},
+): Promise<void> {
   await ctx.storage.updateGHII(ghii.ghii, {
     externalIdentities: {
       ...(ghii.externalIdentities ?? {}),
       [userNameKey(ctx.conn)]: userName,
       [externalIdKey(ctx.conn)]: externalId ?? userName,
+      ...extra,
     },
   });
 }
@@ -162,9 +171,11 @@ async function createUser(ctx: ScimContext, data: Record<string, unknown>): Prom
       const adoptable = owner && !owner.managedBy && byEmail.emailVerifiedAt && ctx.conn.domains.includes(domain);
       if (!adoptable) throw scimError(409, 'uniqueness', `An account already uses ${email}`);
       // Adoption (R5): the organisation vouches for its own domain; the account verified the
-      // address locally. Lifecycle authority moves to the connection, nothing else changes.
+      // address locally. Lifecycle authority moves to the connection, nothing else changes. The
+      // adoption marker is the evidence that makes the first organisation sign-in into an account
+      // with two-step sign-in ask its code once (services/sso-adoption-notice.ts adoptionAsksCode).
       await ctx.storage.updateOwner(owner.name, { managedBy: ctx.conn.id });
-      await writeIdentityKeys(ctx, byEmail, userName, externalId);
+      await writeIdentityKeys(ctx, byEmail, userName, externalId, { [adoptedMarkerKey(ctx.conn.id)]: new Date().toISOString() });
       if (typeof data.active === 'boolean') await applyActive(ctx, { ...owner, managedBy: ctx.conn.id }, data.active);
       await ensureSsoMembership(ctx.storage, ctx.conn, owner.name);
       const adoptedOwner = await ctx.storage.getOwner(owner.name);

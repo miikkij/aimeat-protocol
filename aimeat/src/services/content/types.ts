@@ -29,6 +29,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-20 — Initial.
  *   v1.1.0 — 2026-10-21 — ClassProperty.label: the property's name for a person in fi, en and es.
+ *   v1.2.0 — 2026-10-29 — PdfFacts.textNotRead: the text read reached the node's PDF read limit
+ *     (secaudit2026oct26 round 8c, memory-b-09).
  */
 
 /** Where an item lives. The source id (sourceIdOf) is stable for the same item. */
@@ -58,6 +60,11 @@ export interface PdfFacts {
   encrypted?: boolean;
   /** Whether the file carries a text layer; a scan without one needs a model to read. */
   hasTextLayer: boolean;
+  /**
+   * The text was not read: reading it reached the node's time limit (seconds) or memory limit (MB)
+   * for a PDF whose decoded size could not be checked first (file-text/pdf-bounded.ts).
+   */
+  textNotRead?: { reason: 'time' | 'memory'; limit: number };
   signatures: {
     /** 'unchecked' when signature validation is off on this node, or the check failed. */
     verdict: 'unsigned' | 'valid' | 'invalid' | 'indeterminate' | 'unchecked';

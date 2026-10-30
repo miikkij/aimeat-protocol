@@ -21,9 +21,10 @@
  *   checks, and confirmOp() is the operator's yes or no. Nothing the model says signs anything.
  *   The version is signed when both the controller and the processor have a signature; the version
  *   in force before it is superseded.
- * @structure docsignLevel · signedLine · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
+ * @structure docsignLevel · signedLine · testSignaturesInForce · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
  * @usage const a = await syncDocsign(deps, agreement);
  * @version-history
+ *   2026-10-29 — On a node running production settings (test mode and dev mode off), a version a test wallet signature completed is `test-signed`, signed in test and not in force: the version before it stays in force and no in-force notice goes out. Test and development settings keep the round 8 flow (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A wallet signature on the EU reference wallet's test roots is recorded with the level `test`, not `advanced`, and its history line and the in-force line say it has no legal effect; the flow is unchanged (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A returned copy keeps the sha256 of the checked bytes and a copy of them beside the
  *     version's PDF, and the accepted signature's evidence names both; confirmOp takes the reviewed
@@ -84,14 +85,33 @@ export function signedLine(s: AgreementSignature): string {
 }
 
 /**
- * Signed by both sides: mark it, supersede the one before, and say so. Pure. A version that a test
- * wallet signature completed comes into force as before, and its in-force line names that signature.
+ * May a test wallet signature bring an agreement into force on this node? Only in test or development
+ * settings, where trying the wallet flow with the EU reference wallet's test roots is the point. On
+ * production settings (test mode and dev mode off) it may not (secaudit2026oct26 round 8c).
  */
-export function completeIfSigned(a: Agreement, v: AgreementVersion, now: string): Agreement {
+export function testSignaturesInForce(config: Pick<AimeatConfig, 'testMode' | 'devMode'>): boolean {
+  return config.testMode === true || config.devMode === true;
+}
+
+/**
+ * Signed by both sides: mark it, supersede the one before, and say so. Pure. A version that a test
+ * wallet signature completed comes into force as before, and its in-force line names that signature,
+ * unless `testSignaturesInForce` is false (production settings): then it is `test-signed`, signed in
+ * test and not in force, and the version in force before it stays in force.
+ */
+export function completeIfSigned(a: Agreement, v: AgreementVersion, now: string, opts: { testSignaturesInForce?: boolean } = {}): Agreement {
   const sides = new Set(v.signatures.map(s => s.party));
   if (!(sides.has('controller') && sides.has('processor'))) return { ...a, versions: a.versions.map(x => (x.n === v.n ? v : x)) };
-  const signed: AgreementVersion = { ...v, status: 'signed', signedAt: now, effectiveFrom: now };
   const tests = v.signatures.filter(s => s.level === 'test').map(s => s.party);
+  if (tests.length && opts.testSignaturesInForce === false) {
+    const line = `Version ${v.n} signed by both parties in test; not in force. The ${tests.join(' and ')} signature is ${NO_LEGAL_EFFECT}, and this node runs production settings.`;
+    return {
+      ...a,
+      versions: a.versions.map(x => (x.n === v.n ? { ...v, status: 'test-signed' as const, signedAt: now } : x)),
+      history: [...a.history, historyEntry('system', 'test-signed', line)].slice(-500),
+    };
+  }
+  const signed: AgreementVersion = { ...v, status: 'signed', signedAt: now, effectiveFrom: now };
   const line = `Version ${v.n} signed by both parties; in force.`
     + (tests.length ? ` The ${tests.join(' and ')} signature is ${NO_LEGAL_EFFECT}.` : '');
   return {
@@ -136,11 +156,12 @@ export async function syncDocsign(deps: Deps, a: Agreement): Promise<Agreement> 
     if (!add.length) return UNCHANGED;
     const next = { ...n, signatures: [...n.signatures, ...add] };
     const withHistory = { ...cur, history: [...cur.history, ...add.map(s => historyEntry(s.signer, 'signed', signedLine(s)))].slice(-500) };
-    return completeIfSigned(withHistory, next, new Date().toISOString());
+    return completeIfSigned(withHistory, next, new Date().toISOString(), { testSignaturesInForce: testSignaturesInForce(deps.config) });
   });
   if (!saved) return a;
   const cpSide: Party = a.ourRole === 'processor' ? 'controller' : 'processor';
-  if (!before.has(cpSide) && fresh.some(f => f.party === cpSide) && newest(saved).status !== 'signed') await tellAgreement(deps, saved, 'counterparty-signed');
+  const waits = newest(saved).status === 'sent' || newest(saved).status === 'review';
+  if (!before.has(cpSide) && fresh.some(f => f.party === cpSide) && waits) await tellAgreement(deps, saved, 'counterparty-signed');
   if (newest(saved).status === 'signed') await tellInForce(deps, saved);
   return saved;
 }
@@ -362,7 +383,7 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
     };
     const next: AgreementVersion = { ...n, status: 'sent', review, signatures: [...n.signatures.filter(s => s.party !== sig.party), sig] };
     const withHistory = { ...cur, history: [...cur.history, historyEntry(who.ownerGhii, 'copy-accepted', `${sig.party} signature recorded (${sig.method}, ${sig.level}).`)].slice(-500) };
-    return completeIfSigned(withHistory, next, now);
+    return completeIfSigned(withHistory, next, now, { testSignaturesInForce: testSignaturesInForce(deps.config) });
   });
   if (changed) throw copyChanged();
   if (!saved) throw new AgreementError(409, 'NOTHING_TO_CONFIRM', 'The copy was decided meanwhile.');

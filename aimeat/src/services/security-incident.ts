@@ -23,6 +23,8 @@
  *   undecidedCases · undecidedMessage · SECURITY_INCIDENT_PREFIX / QUARANTINE_PREFIX
  * @usage import { recordSecurityIncident } from '../services/security-incident.js';
  * @version-history
+ *   v1.9.0 -- 2026-10-29 -- An entry's action can be 'uncount': a platform-fee record is left out of the
+ *     dashboard's money fees (commerce/platform-fee-writers.ts; secaudit2026oct26 round 8c).
  *   v1.8.0 -- 2026-10-27 -- An entry's action can be 'app_only': a subdomain address is served only at its
  *     app address (services/subdomain-site-origin-keep.ts; Jouni, 2026-10-27).
  *   v1.7.0 -- 2026-10-27 -- `params`: the values the Security page's own sentence for the incident's type
@@ -134,8 +136,9 @@ export interface IncidentEntry {
   what: string;
   /** The values the Security page puts into its own sentence for `kind`, in the reader's language. */
   params?: Record<string, string | number>;
-  /** The action offered besides 'keep'. 'app_only' serves a subdomain address only at its app address. */
-  action: 'clear' | 'delete' | 'app_only';
+  /** The action offered besides 'keep'. 'app_only' serves a subdomain address only at its app address;
+   *  'uncount' leaves a platform-fee record out of the dashboard's money fees (commerce/platform-fee-writers.ts). */
+  action: 'clear' | 'delete' | 'app_only' | 'uncount';
   status: 'open' | 'done' | 'kept';
   decidedAt?: string;
   decidedBy?: string;

@@ -17,7 +17,8 @@
  *   1. Refuses a version that is not x.y.z or not newer than aimeat/package.json's, and a carrier
  *      file with uncommitted changes (the bump commit must hold the bump only).
  *   2. Writes the version into package.json, aimeat/package.json, openapi.yaml (info.version) and
- *      server.json, which publish-mcp.yml compares with the tag.
+ *      server.json, which publish-mcp.yml compares with the tag, and, when it is still null, the
+ *      bump's own time into ADOPTION_CUTOFF (src/cli/connect/adoption-cutoff.ts).
  *   3. Runs `pnpm gen:notices` (both THIRD-PARTY-NOTICES.md files name the version) and
  *      `pnpm build:everything` (the capability map's stamp names it).
  *   4. Runs the unit tests that read the node version, chosen by what their text reads (see
@@ -32,12 +33,15 @@
  *   pnpm release:bump 4.1.2              # from the repository root or aimeat/
  *   pnpm release:bump 4.2.0 --all-units
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Writes ADOPTION_CUTOFF once, when it is null (secaudit2026oct26 round 8c,
+ *     connector-04).
  *   v1.0.0 — 2026-10-20 — Initial (wish-one-release-bump-command-that-leaves-main-green).
  */
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { stampAdoptionCutoffFile } from './lib/adoption-cutoff.mjs';
 
 const AIMEAT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const REPO = path.resolve(AIMEAT, '..');
@@ -49,6 +53,8 @@ export const GENERATED = [
     'THIRD-PARTY-NOTICES.md', 'aimeat/public/THIRD-PARTY-NOTICES.md',
     'aimeat/public/data/everything.json', 'aimeat/public/data/everything-meta.json',
     'aimeat/public/data/everything.html', 'aimeat/public/data/everything.md',
+    // Written once, by the first bump after it exists (scripts/lib/adoption-cutoff.mjs).
+    'aimeat/src/cli/connect/adoption-cutoff.ts',
 ] as const;
 
 const SEMVER = /^\d+\.\d+\.\d+$/;
@@ -154,6 +160,10 @@ function main(): void {
         writeFileSync(full, set(readFileSync(full, 'utf-8'), version));
         console.log(`  ✓ ${file}: ${current} → ${version}`);
     }
+    // The first release that keeps a record of trusted commands carries its own time; a later bump
+    // leaves it as it is (secaudit2026oct26 round 8c, connector-04).
+    const stamp = stampAdoptionCutoffFile();
+    if (stamp.changed) console.log(`  ✓ aimeat/src/cli/connect/adoption-cutoff.ts: ADOPTION_CUTOFF → ${stamp.cutoff}`);
 
     if (!run('Third-party notices', 'pnpm', ['gen:notices'])) fail(['pnpm gen:notices failed; its output is above.']);
     if (!run('Capability map', 'pnpm', ['build:everything'])) fail(['pnpm build:everything failed; its output is above.']);

@@ -19,6 +19,9 @@
  *   const refusal = publishDecisionRefusal(decider, request, 'approve');
  *   if (refusal) return { ok: false, ...refusal };
  * @version-history
+ *   v1.2.0 — 2026-10-30 — approvalDecisionRefusal(): a question marked `in_person` is allowed only by the
+ *     owner signed in themselves (OWNER_IN_PERSON); declining it stays open to the owner's agents
+ *     (secaudit2026oct26 round 8c, commerce-07).
  *   v1.1.0 — 2026-10-25 — approvalDecisionRefusal(): who answers a request that makes nothing public,
  *     the operators' question included (secaudit2026oct22, the developer's approval standard).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4.3).
@@ -30,7 +33,7 @@ import { PUBLISH_PUBLIC_SCOPE } from '../../utils/scope-coverage.js';
 export const PUBLISH_REQUEST_DAYS = 7;
 
 /** Who is deciding: what the policy reads of the session's caller object. */
-export type PublishDecider = Pick<CallerContext, 'kind' | 'has' | 'principal'> & { auth: { sub: string } };
+export type PublishDecider = Pick<CallerContext, 'kind' | 'has' | 'principal'> & { auth: { sub: string }; inPerson?: boolean };
 
 export type PublishDecisionRefusal = { status: 403; code: 'ACCESS_DENIED' | 'OWN_REQUEST' | 'SCOPE_DENIED'; message: string };
 
@@ -75,12 +78,20 @@ export function publishDecisionRefusal(
  */
 export function approvalDecisionRefusal(
   decider: PublishDecider,
-  request: { requested_by: { principal: string; sub: string }; approval: { approver: 'owner' | 'operators'; approve_scope?: string } },
+  request: { requested_by: { principal: string; sub: string }; approval: { approver: 'owner' | 'operators'; approve_scope?: string; in_person?: boolean } },
   decision: 'approve' | 'decline',
   isOperator: boolean,
 ): { status: 403; code: string; message: string } | null {
   const me = [decider.principal, decider.auth.sub];
   const own = me.includes(request.requested_by.principal) || me.includes(request.requested_by.sub);
+  // A question that confirms a fact about the owner (a card the buyer paid with) is allowed by the
+  // owner signed in themselves; an agent may still decline it, which changes nothing.
+  if (request.approval.in_person && decision === 'approve' && decider.inPerson !== true) {
+    return {
+      status: 403, code: 'OWNER_IN_PERSON',
+      message: `This asks the account holder to confirm something about themselves, so only the account holder, signed in themselves, can allow it. ${OWNER_DECIDES_ON_THE_PAGE}`,
+    };
+  }
   if (request.approval.approver === 'operators') {
     if (!isOperator) {
       return {
