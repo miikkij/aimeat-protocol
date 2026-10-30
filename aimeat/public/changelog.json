@@ -4,6 +4,28 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-ornament-sets-one-style-for-a-whole-screen",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Ornament sets: one style for a whole screen",
+        "fi": "Koristesarjat: yksi tyyli koko näkymään"
+      },
+      "summary": {
+        "en": "Eleven styles of five ornaments each: frame, divider, progress bar, bullets and foot strip.",
+        "fi": "Yksitoista tyyliä, joissa kussakin on viisi koristetta: kehys, viiva, palkki, luettelomerkit ja alanauha."
+      },
+      "body": {
+        "en": "Pick one style and your whole screen wears it: a frame round the card, a divider under the heading, a progress bar, bullets for a list and a strip at the foot. The eleven styles are modern, futuristic, cyberpunk, vibrant, emotional, dramatic, symmetrical, chaotic, velocity, art deco and crystal, each shown live in the Design Book.",
+        "fi": "Valitse yksi tyyli, niin koko näkymä saa sen: kehys kortin ympärille, viiva otsikon alle, edistymispalkki, luettelomerkit ja nauha alareunaan. Tyylejä on yksitoista: moderni, futuristinen, kyberpunk, eloisa, tunteikas, dramaattinen, symmetrinen, kaoottinen, vauhti, art deco ja kide. Jokainen näkyy Design Bookissa elävänä."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-ornaments-that-grow-round-your-app",
       "highlight": false,
       "audience": [
