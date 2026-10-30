@@ -23,6 +23,7 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.8.1 — 2026-10-30 — The ornament description names the sets ({ set }) beside the single figures.
  *   v1.8.0 — 2026-10-29 — The ORNAMENT kind, the eleventh (ornament.ts): one figure of the kit's
  *     ornaments with its knobs, proven against the ornaments registry.
  *   v1.7.0 — 2026-10-19 — The AVATAR kind, the tenth (avatar.ts): one SVG an agent starts its own
@@ -60,7 +61,8 @@ import { LOOKS } from '../app-ui/registry.js';
 import { getAppTemplates } from '../../data/app-templates.js';
 import { AMBIENT_IDS, ambientById } from '../../data/atelier-ambients.js';
 import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
-import { ORNAMENT_IDS } from '../../data/atelier-ornaments.js';
+import { ORNAMENTS } from '../../data/atelier-ornaments.js';
+import { ORNAMENT_SET_IDS } from '../../data/atelier-ornament-sets.js';
 import { validateOrnamentBody } from './ornament.js';
 
 import { DesignBookError } from './errors.js';
@@ -300,7 +302,7 @@ function bodyShapeHint(kind: PartKind): string {
     return `An effect part's body is { effect: one of ${EFFECT_IDS.join(', ')}, params?, on?: ${EFFECT_TARGETS.join(' | ')}, look?, tokens? } — a post-process filter, proven where it lands.`;
   }
   if (kind === 'avatar') return 'An avatar part\'s body is { svg: "<svg…>…</svg>" }: one SVG element, at most 256 kB, no DOCTYPE.';
-  if (kind === 'ornament') return `An ornament part's body is { ornament: one of ${ORNAMENT_IDS.join(', ')}, params?, look? }: a figure the Atelier kit draws round an element.`;
+  if (kind === 'ornament') return `An ornament part's body is { ornament: one of ${ORNAMENTS.filter((o) => !o.set).map((o) => o.id).join(', ')} or a set's figure such as art-deco-frame, params?, look? }: a figure the Atelier kit draws round an element; or { set: one of ${ORNAMENT_SET_IDS.join(', ')}, params?, look? }: five figures in one style.`;
   if (kind === 'component') {
     return 'A component part\'s body is { prefix, html, css, use, judgement: { reach: "general" | "special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, no script.';
   }

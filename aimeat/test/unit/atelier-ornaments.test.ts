@@ -7,21 +7,25 @@
  *   a stored body keeps only what differs from the defaults, and the geometry measures what it says.
  * @usage cd aimeat && pnpm exec vitest run test/unit/atelier-ornaments.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-30 — the eleven sets: registry and kit agree, set bodies, preview, adopt line, prompt part.
  *   v1.0.0 — 2026-10-29 — initial (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
  */
 import { describe, it, expect } from 'vitest';
 import {
-  ORNAMENTS, ORNAMENT_IDS, ORNAMENT_PARAMS, ornamentById, ornamentParamProblem, resolveOrnamentParams,
+  ORNAMENTS, ORNAMENT_IDS, ORNAMENT_PARAMS, ornamentById, ornamentParamProblem, resolveOrnamentParams, ornamentsPromptPart,
 } from '../../src/data/atelier-ornaments.js';
+import { ORNAMENT_SETS, ORNAMENT_SET_IDS } from '../../src/data/atelier-ornament-sets.js';
 import { LOOKS } from '../../src/data/atelier-looks.js';
-import { ORN_PARAMS, ORNAMENT_IDS as KIT_IDS, ornamentParams } from '../../src/static/sdk-libs/atelier/ornament.js';
+import { ORN_PARAMS, ORNAMENT_IDS as KIT_IDS, ORNAMENT_SET_IDS as KIT_SET_IDS, ornamentParams } from '../../src/static/sdk-libs/atelier/ornament.js';
 import { turtle, helix, line, rrect, helixLeaves } from '../../src/static/sdk-libs/atelier/ornament-geo.js';
 import { validateOrnamentBody, ornamentPreviewHtml, ornamentSnippet } from '../../src/services/design-book/ornament.js';
 import { validatePartInput } from '../../src/services/design-book/validate.js';
 
 describe('atelier-ornaments — the registry', () => {
-  it('names 23 figures once each, in lowercase words', () => {
-    expect(ORNAMENT_IDS.length).toBe(23);
+  it('names 23 single figures and 11 sets of five once each, in lowercase words', () => {
+    expect(ORNAMENTS.filter((o) => !o.set).length).toBe(23);
+    expect(ORNAMENT_SETS.length).toBe(11);
+    expect(ORNAMENT_IDS.length).toBe(23 + 11 * 5);
     expect(new Set(ORNAMENT_IDS).size).toBe(ORNAMENT_IDS.length);
     for (const id of ORNAMENT_IDS) expect(id).toMatch(/^[a-z]+(-[a-z]+)*$/);
   });
@@ -34,7 +38,7 @@ describe('atelier-ornaments — the registry', () => {
       expect(o.summary.length).toBeLessThanOrEqual(240);
       expect(o.fitsLooks.length).toBeGreaterThan(0);
       for (const l of o.fitsLooks) expect(looks.has(l)).toBe(true);
-      for (const p of o.params) expect(['leaves', 'value', 'strands']).toContain(p);
+      for (const p of o.params) expect(['leaves', 'value', 'strands', 'mess']).toContain(p);
     }
   });
 
@@ -60,7 +64,7 @@ describe('atelier-ornaments — the kit says the same', () => {
 
   it('each figure takes in the kit the knobs the registry gives it, and no other', () => {
     for (const o of ORNAMENTS) {
-      for (const name of ['leaves', 'value', 'strands'] as const) {
+      for (const name of ['leaves', 'value', 'strands', 'mess'] as const) {
         const b = ORNAMENT_PARAMS[name];
         const given = ornamentParams(o.id, { [name]: b.max === b.default ? b.min : b.max })[name];
         const takes = o.params.includes(name);
@@ -122,6 +126,52 @@ describe('atelier-ornaments — the Design Book kind', () => {
   it('adopting answers the one line to call', () => {
     expect(ornamentSnippet({ ornament: 'rope', params: { strands: 4 } }).code).toBe('AIMEAT.atelier.ornament(el, \'rope\', {"strands":4});');
     expect(ornamentById('rope')?.wraps).toBe('block');
+  });
+});
+
+describe('atelier-ornaments — the sets', () => {
+  it('the kit draws the same eleven sets, and every set has its five figures', () => {
+    expect([...KIT_SET_IDS]).toEqual([...ORNAMENT_SET_IDS]);
+    for (const s of ORNAMENT_SETS) {
+      for (const role of ['frame', 'rule', 'bar', 'bullets', 'strip']) {
+        const o = ornamentById(`${s.id}-${role}`);
+        expect(o?.set, `${s.id}-${role}`).toBe(s.id);
+      }
+      expect(ornamentById(`${s.id}-bar`)?.params).toContain('value');
+      expect(s.summary.length).toBeLessThanOrEqual(200);
+    }
+  });
+
+  it('only the chaotic set takes mess', () => {
+    expect(ornamentById('chaotic-frame')?.params).toEqual(['mess']);
+    expect(ornamentById('chaotic-bar')?.params).toEqual(['value', 'mess']);
+    expect(ornamentParamProblem('modern-frame', { mess: 2 })).toMatch(/"mess" is none of them/);
+  });
+
+  it('a set body keeps what differs from the defaults and is refused in words outside its bounds', () => {
+    expect(validateOrnamentBody({ set: 'art-deco', params: { value: 0.4, speed: 1 } })).toEqual({ set: 'art-deco', params: { value: 0.4 } });
+    expect(() => validateOrnamentBody({ set: 'baroque' })).toThrow(/"set" is one of modern/);
+    expect(() => validateOrnamentBody({ set: 'modern', params: { leaves: 2 } })).toThrow(/The modern set takes speed, delay, value/);
+    expect(() => validateOrnamentBody({ set: 'modern', ornament: 'frame' })).toThrow(/not both/);
+  });
+
+  it('a set previews as a whole screen and is adopted as one ornamentSet line', () => {
+    const html = ornamentPreviewHtml({ title: 'Cyberpunk', summary: 'Neon.', body: { set: 'cyberpunk' } });
+    for (const role of ['frame', 'rule', 'bar', 'bullets', 'strip']) expect(html).toContain(`data-orn-role="${role}"`);
+    expect(html).toContain('AIMEAT.atelier.ornamentSet(SPEC.set');
+    expect(html).toContain('data-ak-look="neon-dense"');
+    expect(html).toContain('id="orn-value"');
+    const snip = ornamentSnippet({ set: 'cyberpunk', params: { value: 0.5 } });
+    expect(snip.set).toBe('cyberpunk');
+    expect(snip.code).toBe('AIMEAT.atelier.ornamentSet(\'cyberpunk\', { frame: card, rule: hr, bar: meter, bullets: list, strip: foot }, {"value":0.5});');
+  });
+
+  it('the build prompt names the single figures and the sets, not the 55 set figures one by one', () => {
+    const part = ornamentsPromptPart('https://n.example');
+    expect(part).toContain('`frame` (block)');
+    expect(part).toContain('`art-deco`');
+    expect(part).not.toContain('`art-deco-frame`');
+    expect(part).toContain('https://n.example/v1/designbook/ornament-set-<set>/preview');
   });
 });
 

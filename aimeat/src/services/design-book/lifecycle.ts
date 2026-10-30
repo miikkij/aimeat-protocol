@@ -24,6 +24,8 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.8.0 — 2026-10-30 — The eleven ornament sets are seeded published, one part each
+ *     (data/atelier-ornament-sets.ts); a set's own figures are not seeded one by one.
  *   v1.7.0 — 2026-10-29 — The 23 ornament figures are seeded published (data/atelier-ornaments.ts).
  *   v1.6.0 — 2026-10-19 — The nine avatar templates are seeded published (data/agent-avatar-templates.ts).
  *   v1.5.0 — 2026-09-28 — The three spring hands (snappy, soft, heavy) are seeded published as
@@ -54,6 +56,7 @@ import { EFFECTS, type AtelierEffect } from '../../data/atelier-effects.js';
 import { MOTION_RECIPES } from '../../data/atelier-motions.js';
 import { AVATAR_TEMPLATES } from '../../data/agent-avatar-templates.js';
 import { ORNAMENTS } from '../../data/atelier-ornaments.js';
+import { ORNAMENT_SETS } from '../../data/atelier-ornament-sets.js';
 import { defaultEffectTarget } from './validate.js';
 import { DesignBookService, type DesignBookPart } from './service.js';
 import { DesignBookError, validatePartInput, type PartKind } from './validate.js';
@@ -94,10 +97,17 @@ export async function seedDesignBook(storage: Storage, config: AimeatConfig): Pr
   await seedParts(book, system, AVATAR_TEMPLATES.map((a) => ({
     id: a.id, kind: 'avatar', title: a.title, summary: a.summary, body: { svg: a.svg }, tags: [...a.tags],
   })));
-  // The ornament figures the kit draws, each previewed on the first look it was drawn for.
-  await seedParts(book, system, ORNAMENTS.map((o) => ({
+  // The single ornament figures the kit draws, each previewed on the first look it was drawn for.
+  // A set's five figures are not seeded one by one: the set is one part, shown whole.
+  await seedParts(book, system, ORNAMENTS.filter((o) => !o.set).map((o) => ({
     id: `ornament-${o.id}`, kind: 'ornament', title: o.title, summary: o.summary,
     body: { ornament: o.id }, tags: ['ornament', o.wraps, 'seed'],
+  })));
+  // The ornament sets, each previewed as a whole screen: card, rule, bar, list and foot strip.
+  await seedParts(book, system, ORNAMENT_SETS.map((s) => ({
+    id: `ornament-set-${s.id}`, kind: 'ornament', title: `${s.title} ornament set`,
+    summary: `${s.summary} Five figures: a frame, a rule, a bar, list bullets and a foot strip.`,
+    body: { set: s.id }, tags: ['ornament', 'set', s.id, 'seed'],
   })));
 }
 
