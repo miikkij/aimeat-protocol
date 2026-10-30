@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.11.0 — 2026-10-29 — On a customer's node (site.purchase_plan) the static agent-facing footer is
+ *     hidden: still in the markup for a reader without JavaScript, not shown to the buyer.
  *   v1.10.0 — 2026-10-18 — The build watch is an event: window.__BUILD_ID and live-updates.js
  *     watchBuild() (the stream's `hello` names the build) replace the fetch of /v1/build every 60 s
  *     and on every return to the tab (Jouni, 2026-10-18: live data is an event, never a poll).
@@ -172,6 +174,11 @@ export function serveSpa(
     `.then(function(m){m[0].watchBuild(function(){var s=m[1].getSession();return s&&s.jwt;});})` +
     `.catch(function(){});},{once:true});})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
+
+  // A customer's node (site.purchase_plan, set by the store's fleet service) keeps the agent-facing
+  // links in the markup for a reader without JavaScript, and hidden from the buyer, who read them as
+  // developer material at the foot of every page (UX review 2026-10-29, C, measured on crew26).
+  if ((config.siteLinks.purchasePlan ?? '').trim()) html = html.replace('<footer class="agent-footer">', '<footer class="agent-footer" hidden>');
 
   // Themes & Styles: which themes this node offers, their styles, the address of each theme's sheet
   // (stamped with its own hash, so an edit reaches the next page load without a restart) and who
