@@ -8,6 +8,8 @@
  * @structure SITE_LINK_CONFIG_FIELDS
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
  * @version-history
+ *   v1.4.0 — 2026-10-30 — site.dev_links: whether the footer shows the developer links (Jouni,
+ *     2026-10-30: one switch, hidden on a node bought from the store unless the operator decides).
  *   v1.3.0 — 2026-10-29 — site.store_topup_url: a customer node's top-up page in the store, set by
  *     the fleet service (UX review 2026-10-29, A1). site.default_locale: the node's own language
  *     before the browser's (C). site.store_orders_url, site.purchase_plan and site.purchase_package:
@@ -62,6 +64,7 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   // presses "Opens soon" gets it to use when the store opens.
   { key: 'siteLinks.storeSoonCode', dotPath: 'site.store_soon_code', envVar: 'AIMEAT_SITE_STORE_SOON_CODE', type: 'string', validate: isSoonCode, immutable: false, description: 'The discount code a visitor gets by pressing "Opens soon" while the store status is "soon": one code for everybody. Set the same code in the store\'s own setting DISCOUNT_CODE (the shop extension); the store checks the code and takes the discount off the first payment. Do not make it a Stripe coupon: the Stripe total then differs from the order and the store refuses the payment. This node only shows the code. Letters, digits, - and _, at most 40. Empty keeps "Opens soon" a label with nothing to press' },
   { key: 'siteLinks.defaultLocale', dotPath: 'site.default_locale', envVar: 'AIMEAT_SITE_DEFAULT_LOCALE', type: 'string', validate: v => typeof v === 'string' && ['', 'en', 'fi', 'es'].includes(v), range: 'en | fi | es, or empty', immutable: false, description: 'The language this node\'s pages use before a visitor chooses one, ahead of the browser\'s. A node bought from the store gets its buyer\'s language. Empty: the browser\'s language' },
+  { key: 'siteLinks.devLinks', dotPath: 'site.dev_links', envVar: 'AIMEAT_SITE_DEV_LINKS', type: 'string', ...oneOf('auto', 'show', 'hide'), immutable: false, description: 'Whether the footer shows the developer links: "For Developers", "Run your own node", GitHub, and the row for machines (glossary, site map, llms.txt, AGENTS.md, API contract). "auto" shows them except on a node bought from the store (site.purchase_plan set); "show" and "hide" decide for this node. The documents themselves stay served either way', range: 'auto | show | hide' },
   // A customer node's own pages in the store and what its owner bought, set by the fleet service.
   { key: 'siteLinks.storeOrders', dotPath: 'site.store_orders_url', envVar: 'AIMEAT_SITE_STORE_ORDERS_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The owner\'s orders and invoices in the store. The node adds the person\'s language. Empty hides the "Orders and invoices" link' },
   { key: 'siteLinks.purchasePlan', dotPath: 'site.purchase_plan', envVar: 'AIMEAT_SITE_PURCHASE_PLAN', type: 'string', validate: isPurchaseName, immutable: false, description: 'What the owner bought (Solo, Team), set by the store\'s fleet service. Set, this is a customer\'s node: the welcome on the home, the shorter menu, and no node maintenance in the top bar. Empty: the full view' },
