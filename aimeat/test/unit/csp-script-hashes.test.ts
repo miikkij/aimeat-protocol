@@ -6,6 +6,7 @@
  *   the CSP nonce still runs the inline scripts the node's own serve marks added, by their hash, and
  *   only those. A script the page already carried gets no hash, even when the marks add the same text.
  * @version-history
+ *   v1.1.0 — 2026-10-30 — A script's end tag is read as a browser reads it (code scanning 1774).
  *   v1.0.0 — 2026-10-30 — Initial (the Design Book preview's AI-label script was refused on a grown
  *     genre's frame card).
  */
@@ -34,6 +35,12 @@ describe('addedScriptHashes', () => {
     const before = '<body></body>';
     const after = '<body><script src="/x.js"></script><script type="application/ld+json">{"a":1}</script></body>';
     expect(addedScriptHashes(before, after)).toEqual([]);
+  });
+
+  it('ends a script where a browser ends it: "</script >" and "</SCRIPT foo>" close it, "</scripts>" does not', () => {
+    const before = '<body><script>a()</script ><script>b()</SCRIPT foo></body>';
+    const after = `${before.replace('</body>', '')}<script>c("</scripts>")</script\t></body>`;
+    expect(addedScriptHashes(before, after)).toEqual([hash('c("</scripts>")')]);
   });
 
   it('counts copies: a second copy of a script the page had is the marks\' own', () => {

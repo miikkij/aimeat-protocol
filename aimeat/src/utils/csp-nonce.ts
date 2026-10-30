@@ -15,6 +15,8 @@
  *   import { injectCspNonce } from '../utils/csp-nonce.js';
  *   res.type('text/html').send(injectCspNonce(html, res.locals.cspNonce as string | undefined));
  * @version-history
+ *   v1.1.1 — 2026-10-30 — A script ends at `</script >` and `</SCRIPT foo>` as in a browser (code
+ *     scanning 1774, js/bad-tag-filter).
  *   v1.1.0 — 2026-10-30 — addedScriptHashes() and withScriptHashes(): the Design Book preview of a
  *     grown genre or a component carries no nonce, and the node's AI-label script on it was refused.
  *   v1.0.0 — 2026-06-04 — Extracted shared helper for portal template serving.
@@ -32,10 +34,14 @@ export function injectCspNonce(html: string, nonce: string | undefined): string 
     .replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
 }
 
-/** The text of every inline (no src) executable <script> in the page. */
+/**
+ * The text of every inline (no src) executable <script> in the page. A script ends where a browser
+ * ends it: `</script` followed by a space, a slash or `>`, with anything up to the next `>`
+ * (`</script >`, `</SCRIPT foo>`), never at `</scripts>`.
+ */
 function inlineScripts(html: string): string[] {
   const out: string[] = [];
-  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script>/gi)) {
+  for (const m of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script(?:[\s/][^>]*)?>/gi)) {
     const attrs = m[1] ?? '';
     if (/\bsrc\s*=/i.test(attrs)) continue;
     const type = /\btype\s*=\s*["']?([^"'\s>]+)/i.exec(attrs)?.[1]?.toLowerCase();
