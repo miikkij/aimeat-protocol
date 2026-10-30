@@ -8,6 +8,7 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-30 — A published document's embedded images are bound by the publisher's principal too.
  *   2026-10-30 — publishDraft and publishDraftsBatch bind every file a published value links with
  *     /v1/pub, and the publisher controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
  *   2026-10-27 — readManifest takes the newest copy of a current creator or admin (readOrganismMetaValue),
@@ -241,10 +242,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
     // Past the refusal: the document is being published, so its images may be scoped to the members
-    // who are about to be able to read it.
-    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, localAccountName(ownerGhii), `${organismId}/${ws}`);
-    // And every file it links that the publisher controls (services/record-files.ts).
-    if (ws) await scopeRecordFilesToWorkspace(storage, draftValue, { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii }, `${organismId}/${ws}`);
+    // who are about to be able to read it, and every file it links; only what the publisher controls
+    // (services/record-files.ts).
+    const publishWriter = { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii };
+    if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, publishWriter, `${organismId}/${ws}`);
+    if (ws) await scopeRecordFilesToWorkspace(storage, draftValue, publishWriter, `${organismId}/${ws}`);
 
     const versionRefs = await listVersionRefs(storage, base);
     const maxN = maxVersionOf(versionRefs);
@@ -493,9 +495,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     }
     // Past every refusal and the write: the published documents' images may now be scoped to the
     // members who can read them. A record the batch refused opens nothing.
+    const batchWriter = { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii };
     if (ws) for (const v of toScope) {
-      await scopeDocImagesToWorkspace(storage, config, v, localAccountName(ownerGhii), `${organismId}/${ws}`);
-      await scopeRecordFilesToWorkspace(storage, v, { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii }, `${organismId}/${ws}`);
+      await scopeDocImagesToWorkspace(storage, config, v, batchWriter, `${organismId}/${ws}`);
+      await scopeRecordFilesToWorkspace(storage, v, batchWriter, `${organismId}/${ws}`);
     }
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.

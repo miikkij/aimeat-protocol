@@ -10,6 +10,8 @@
  *   file by linking it, nobody opens another person's file, and a public file is never narrowed.
  *   Jouni ruled on 2026-10-30: a file in the workspace may be seen by the workspace's members.
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Tests 8 and 9: a document's embedded images follow the same rule. Test 8 is
+ *     red before the doc-images change (the agent opened its owner's image).
  *   v1.0.0 — 2026-10-30 — Initial. Tests 2, 4 and 6 are red before the change (403 for the member).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workspace-record-files
@@ -89,7 +91,10 @@ await test('Setup: A with an agent, B a member with access, C outside, one recor
     const o = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Record files', description: 'x', type: 'project', join_policy: 'open', visibility: 'public' }) });
     assert(o.status === 201, `org ${o.status}`); orgId = o.body.data.organism.id;
     await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `organism.${orgId}.meta.workspaces`, value: { workspaces: [{ id: WS, name: 'Files', createdAt: new Date().toISOString(), createdBy: A.name }] }, visibility: 'private' }) });
-    const manifest = { manifestVersion: '1.0', id: orgId, name: 'Files', kind: 'project', status: 'active', objectTypes: [{ name: 'attachment', schemaRef: 'schema:attachment@1', namespace: NS, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records' }] };
+    const manifest = { manifestVersion: '1.0', id: orgId, name: 'Files', kind: 'project', status: 'active', objectTypes: [
+        { name: 'attachment', schemaRef: 'schema:attachment@1', namespace: NS, backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'records' },
+        { name: 'page', schemaRef: 'schema:page@1', namespace: 'shared.pages', backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'document' },
+    ] };
     const mr = await json('/v1/memory', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ key: `${root()}.meta.manifest`, value: manifest, visibility: 'private' }) });
     assert(mr.status === 201 || mr.status === 200, `manifest ${mr.status}: ${JSON.stringify(mr.body.error)}`);
 
@@ -160,6 +165,29 @@ await test('7. a public file linked in a record stays public (never narrowed)', 
     assert(w.status === 200, `draft ${w.status}: ${JSON.stringify(w.body.error)}`);
     assert(await visibilityOf(agentToken, PUB_KEY) === 'public', `public stays public, got ${await visibilityOf(agentToken, PUB_KEY)}`);
     assert(await readAs(C.token, agentGaii, PUB_KEY) === 200, 'C reads a public file as before');
+});
+
+// A document's embedded images follow the same rule (Jouni, 2026-10-30: "korjaa samalla tavalla kuin
+// liitteet"). Before it, any identity of the owner opened any of the owner's images.
+const IMG_OWNER_KEY = `kuvat/${stamp}/owner.png`;
+const IMG_AGENT_KEY = `kuvat/${stamp}/agent.png`;
+const writePage = (token: string, markdown: string) => json(`/v1/organisms/${orgId}/workspace/drafts`, {
+    method: 'POST', headers: auth(token), body: JSON.stringify({ ws: WS, space: 'page', value: { title: `page ${Date.now()}`, markdown } }),
+});
+await test('8. the agent embeds its OWNER\'s private image in a document: it stays private', async () => {
+    await upload(A.token, IMG_OWNER_KEY, 'private');
+    const w = await writePage(agentToken, `![kuva](${pubPath(A.ghii, IMG_OWNER_KEY)})`);
+    assert(w.status === 200, `page ${w.status}: ${JSON.stringify(w.body.error)}`);
+    assert(await visibilityOf(A.token, IMG_OWNER_KEY) === 'private', `an agent must not open its owner's image, got ${await visibilityOf(A.token, IMG_OWNER_KEY)}`);
+    assert(await readAs(B.token, A.ghii, IMG_OWNER_KEY) === 403, 'the member is still refused');
+});
+
+await test('9. the agent embeds its OWN private image: the member reads it, C does not', async () => {
+    await upload(agentToken, IMG_AGENT_KEY, 'private');
+    const w = await writePage(agentToken, `![kuva](${pubPath(agentGaii, IMG_AGENT_KEY)})`);
+    assert(w.status === 200, `page ${w.status}: ${JSON.stringify(w.body.error)}`);
+    assert(await readAs(B.token, agentGaii, IMG_AGENT_KEY) === 200, 'a member with access reads the embedded image');
+    assert(await readAs(C.token, agentGaii, IMG_AGENT_KEY) === 403, 'C is still refused');
 });
 
 console.log(`\nWorkspace record files E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

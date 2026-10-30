@@ -4,6 +4,28 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-a-file-you-link-in-a-workspace-record-opens-to-its-members",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "A file you link in a workspace record opens to its members",
+        "fi": "Työtilan tietueeseen linkitetty tiedosto aukeaa jäsenille"
+      },
+      "summary": {
+        "en": "Put a file's address in a workspace record, and the workspace's members can open the file.",
+        "fi": "Kun lisäät tiedoston osoitteen työtilan tietueeseen, työtilan jäsenet voivat avata tiedoston."
+      },
+      "body": {
+        "en": "When you or your AI put a file's address in a workspace record, the workspace's members can open the file. Public files stay public, and nobody opens a file that is not theirs.",
+        "fi": "Kun sinä tai tekoälysi lisäätte tiedoston osoitteen työtilan tietueeseen, työtilan jäsenet voivat avata tiedoston. Julkiset tiedostot pysyvät julkisina, eikä kukaan avaa toisen tiedostoa."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-your-own-look-for-every-new-app",
       "highlight": true,
       "audience": [
