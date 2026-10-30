@@ -12989,7 +12989,10 @@ paths:
                   next_steps:
                     type: object
                     additionalProperties: true
-                    description: What to fetch next (skill bundle, handbook, onboarding), each with method, URL and auth.
+                    description: |
+                      What to fetch next (skill bundle, handbook, onboarding), each with method, URL and auth,
+                      and `keep_your_key`: keep `privateKey`, and how to sign the `proof` of a later
+                      reconnect with it (see `proof` on device-authorize), with this node's `node_id`.
         '400':
           description: |
             Authorization pending, denied, expired, or invalid.

@@ -17,6 +17,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=agent-reapproval
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Phase 7: an agent connected from a pasted prompt follows the device-token
+ *     answer's next_steps.keep_your_key, and its reconnect is a proven return (secaudit2026oct22).
  *   v1.2.0 — 2026-10-26 — Phase 6: a crew's reconnect through the real `aimeat connect add` is shown
  *     to the owner as a return, with no takeover warning and no takeover event (secaudit2026oct22,
  *     unbound-reapproval-of-existing-agent; aimeat-crewai enrols through the connector).
@@ -494,6 +496,35 @@ await test('designed use: the crew reconnects after its token stopped working, a
 });
 
 try { rmSync(dirname(crewHome), { recursive: true, force: true }); } catch { /* a handle may still be closing */ }
+
+// ── An agent connected from a pasted prompt ──
+//
+// An AI connected with the Agents page's prompt does the device flow itself and got privateKey with
+// no word of what it is for, so its reconnect showed the owner a takeover. The device-token answer
+// now says it in next_steps.keep_your_key, with this node's id; an agent that does what it says
+// proves its return (secaudit2026oct22, unbound-reapproval-of-existing-agent, the prompt-connect part).
+console.log('\nPhase 7: an agent connected from a pasted prompt follows keep_your_key and the owner sees its return');
+
+await test('designed use: the device-token answer says to keep the key and how to prove a return, and doing so is a proven return', async () => {
+    const code = await authorize();
+    assert((await approve(code)).status === 200, 'approve');
+    const r = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: lastDeviceCode, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(r.status === 200, `device-token ${r.status}`);
+    const keep = r.body.next_steps?.keep_your_key;
+    assert(typeof keep?.action === 'string' && keep.action.includes('privateKey')
+        && keep.action.includes('aimeat-device-return:v2\\n<node_id>\\n<owner>\\n<agent_name>\\n<signed_at>'), `keep_your_key: ${JSON.stringify(keep)}`);
+    assert(keep.node_id === await NODE_ID_OF(), `node_id ${keep.node_id} is this node's`);
+    assert(!!r.body.next_steps.step_1_skill_bundle && !!r.body.next_steps.step_3_onboarding, 'the earlier steps are still there');
+    // What the instruction says, done literally with the values the answer gave.
+    const signedAt = new Date().toISOString();
+    const signature = await sign(r.body.privateKey, `aimeat-device-return:v2\n${keep.node_id}\n${owner}\n${AGENT}\n${signedAt}`);
+    const back = await authorizeWithProofObject({ signed_at: signedAt, signature });
+    assert(back.proof === 'verified' && (await pendingRow(back.code))?.return_proven === true, `return_proof: ${back.proof}`);
+    await denyCode(back.code);
+});
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
 if (failed > 0) process.exit(1);

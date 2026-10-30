@@ -4,6 +4,10 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-31 — The device-token answer's next_steps adds keep_your_key: keep privateKey, and how to sign
+ *     the return proof with it, with this node's id. An agent connected from a pasted prompt got the key
+ *     and no word of it, so its reconnect showed the owner a takeover (secaudit2026oct22,
+ *     unbound-reapproval-of-existing-agent, the prompt-connect part). The other steps are unchanged.
  *   2026-10-27 — A return proof may name this node (v2) and is taken once: a proof sent again, or made
  *     for another node, leaves the request unproven (secaudit2026oct26, return-proof-unbound-to-node-and-request).
  *   2026-10-25 — A request that names an existing agent may carry `proof` (a signature by the agent's
@@ -523,6 +527,18 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
               method: 'GET',
               url: `${baseUrl}/v1/agents/${agentName}/onboarding`,
               auth: 'Authorization: Bearer <your token from above>',
+            },
+            // An agent that reconnects later proves it is the same agent with this key; without the
+            // proof the owner is shown a new device taking the agent over (services/device-return-proof.ts).
+            keep_your_key: {
+              action: 'Store privateKey with your token, privately. When you connect again later as this same agent '
+                + '(POST /v1/agents/device-authorize with the same agent_name), add "proof": { "signed_at": <ISO time now>, '
+                + '"signature": <base64 Ed25519 signature, made with privateKey, of the UTF-8 text '
+                + '"aimeat-device-return:v2\\n<node_id>\\n<owner>\\n<agent_name>\\n<signed_at>"> }. '
+                + 'node_id is node_id from GET /.well-known/aimeat; owner and agent_name are the values you send. '
+                + 'The owner then sees your return and keeps your access with one press; without the proof they are '
+                + 'told a new device is taking this agent over.',
+              node_id: config.nodeId,
             },
           },
         });
