@@ -57,6 +57,10 @@
  *   <script src="/v1/libs/aimeat-atelier.js"></script>
  *   const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  * @version-history
+ *   v0.68.0 — 2026-10-30 — ornamentSet(set, targets, opts) and ORNAMENT_SET_IDS: eleven ornament sets
+ *     (modern, futuristic, cyberpunk, vibrant, emotional, dramatic, symmetrical, chaotic, velocity,
+ *     art-deco, crystal), five figures each: frame, rule, bar, bullets, strip
+ *     (ornament-sets*.js, wish-kymmenen-koristesetti-eri-tyyleiss).
  *   v0.67.0 — 2026-10-29 — ornament(el, id, opts): 23 animated SVG ornaments that grow round an element
  *     (frames, vines round a bar or a border, wreath, rope, guilloche, flourishes, drop cap, ribbon,
  *     ivy), ornament*.js and ornaments.css (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
@@ -409,7 +413,7 @@ import { app, section, tabs, bottomNav } from './shell.js';
 import { sideNav, statusBand, checkGrid, choiceCards, settingsGroup, progressFigure, callout } from './workbench.js';
 import { promptPanel, queueRow, parseAnswer } from './workbench-parts.js';
 import { margins, marginsOf, MARGINS } from './margins.js';
-import { ornament, ornamentParams, ORNAMENT_IDS } from './ornament.js';
+import { ornament, ornamentSet, ornamentParams, ORNAMENT_IDS, ORNAMENT_SET_IDS } from './ornament.js';
 import { hero, statRow, figure, rating } from './hero.js';
 import { aide } from './aide.js';
 import { delegate, agentActivity } from './agentic.js';
@@ -486,7 +490,7 @@ const atelier = {
    * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
    * when the two drift, because a version string that never moves is worse than none.
    */
-  version: '0.67.0',
+  version: '0.68.0',
 
   /**
    * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
@@ -519,7 +523,7 @@ const atelier = {
   // The empty sides of a wide frame: the node's margin figures (margins.js, margins.css).
   margins, marginsOf, MARGINS,
   // Animated SVG ornaments that grow round an element (ornament*.js, ornaments.css).
-  ornament, ornamentParams, ORNAMENT_IDS,
+  ornament, ornamentSet, ornamentParams, ORNAMENT_IDS, ORNAMENT_SET_IDS,
 
   // ── The stored layout, rendered ──
   mosaic, appRef,

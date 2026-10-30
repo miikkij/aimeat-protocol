@@ -36697,8 +36697,9 @@ paths:
         layer too loud for its ground refuses with numbers), the effect bench for effect (the
         knobs against the registry's bounds, the target it lands on — a picture effect never on
         words, living motion only on the layer), the ornament bench for ornament (body `{ ornament,
-        params?, look? }`: a figure the Atelier kit draws, its knobs speed, delay, leaves, value and
-        strands inside the registry's bounds) — and a refusal is worded, with the
+        params?, look? }`: a figure the Atelier kit draws, its knobs speed, delay, leaves, value,
+        strands and mess inside the registry's bounds; or `{ set, params?, look? }`: one of the
+        kit's eleven ornament sets, five figures in one style) — and a refusal is worded, with the
         nearest real name suggested. A COMPONENT is the ninth kind, what an app made by hand
         because the Book had nothing for it: body `{ prefix, html, css, use, judgement: { reach:
         general|special, why }, from_app? }`, markup and a stylesheet under one class prefix, every
@@ -36932,7 +36933,9 @@ paths:
         passes answers 422 BODY_INVALID with the bench's reason. An ORNAMENT is taken the same
         way: the answer carries `ornament` { ornament, code, use }, the one line
         (`AIMEAT.atelier.ornament(el, id, params)`) that puts the figure on an element of the
-        app's own page; nothing is written, and the take counts as usage.
+        app's own page; for a SET it carries `ornament` { set, code, use } with the one
+        `AIMEAT.atelier.ornamentSet(set, { frame, rule, bar, bullets, strip }, params)` line;
+        nothing is written, and the take counts as usage.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:

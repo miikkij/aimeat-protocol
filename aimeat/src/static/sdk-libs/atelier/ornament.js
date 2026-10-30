@@ -23,13 +23,24 @@
  *
  *   ONE CLAMP, TWO CONSUMERS. ORN_PARAMS here and src/data/atelier-ornaments.ts declare the same
  *   bounds; a unit test holds them equal.
- * @structure ORN_PARAMS · ORNAMENT_IDS · ornamentParams(id, given) · ornament(target, id, opts)
+ *
+ *   SETS. Beside the 23 single figures stand eleven sets (ornament-sets.js), five figures each in
+ *   one style: `<set>-frame`, `<set>-rule`, `<set>-bar`, `<set>-bullets`, `<set>-strip`.
+ *   `ornamentSet(set, { frame, rule, bar, bullets, strip }, opts)` puts a whole set on a screen in
+ *   one call. A set draws in its own colours, the ones its canvas was accepted in; `palette: 'look'`
+ *   makes it take the look's accent and spectrum instead.
+ * @structure ORN_PARAMS · ORNAMENT_IDS · ORNAMENT_SET_IDS · ornamentParams(id, given) ·
+ *   ornament(target, id, opts) · ornamentSet(set, targets, opts)
  * @usage
  *   const h = AIMEAT.atelier.ornament('#card', 'frame');
  *   const bar = AIMEAT.atelier.ornament(el, 'vine-bar', { value: 0.4 }); bar.set(0.8);
  *   h.replay(); h.destroy();
+ *   const s = AIMEAT.atelier.ornamentSet('art-deco', { frame: card, rule: hr, bar: meter, bullets: ul, strip: foot }, { value: 0.5 });
+ *   s.update(0.9); s.replay(); s.destroy();
  * @version-history
  *   v0.1.0 — 2026-10-29 — Initial: 23 figures ported from the accepted ornament canvas.
+ *   v0.2.0 — 2026-10-30 — Eleven sets of five figures (ornament-sets.js), the `mess` knob of the
+ *     chaotic set, and ornamentSet() (wish-kymmenen-koristesetti-eri-tyyleiss).
  */
 import { reducedMotion } from './dom.js';
 import { drawing } from './ornament-svg.js';
@@ -37,6 +48,7 @@ import { FRAME_FIGURES } from './ornament-frames.js';
 import { ROUND_FIGURES } from './ornament-rounds.js';
 import { LINE_FIGURES } from './ornament-lines.js';
 import { TEXT_FIGURES } from './ornament-text.js';
+import { SET_FIGURES, SET_IDS, SET_ROLES_LIST } from './ornament-sets.js';
 
 /** Every knob a figure may take, with its bounds and default. */
 export const ORN_PARAMS = {
@@ -45,10 +57,14 @@ export const ORN_PARAMS = {
   leaves: { min: 0, max: 2, default: 1 },
   value: { min: 0, max: 1, default: 0.64 },
   strands: { min: 2, max: 4, default: 3 },
+  mess: { min: 0.5, max: 2, default: 1 },
 };
 
+/** The ornament sets this kit draws, in canvas order. */
+export const ORNAMENT_SET_IDS = SET_IDS;
+
 /**
- * @typedef {{ speed: number, delay: number, leaves: number, value: number, strands: number }} OrnParams
+ * @typedef {{ speed: number, delay: number, leaves: number, value: number, strands: number, mess: number }} OrnParams
  * @typedef {{ x: number, y: number }} Pad
  * @typedef {ReturnType<typeof drawing>} Drawing
  * @typedef {{ params: string[], overlay: { pad: (w: number, h: number) => Pad, under?: boolean, over?: boolean,
@@ -58,7 +74,7 @@ export const ORN_PARAMS = {
  */
 
 /** @type {Record<string, OverlayFigure | InlineFigure>} */
-const FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES };
+const FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES, ...SET_FIGURES };
 
 /** The ornament ids this kit draws, in registry order. */
 export const ORNAMENT_IDS = Object.keys(FIGURES);
@@ -158,7 +174,8 @@ function mountOverlay(host, fig, p, animate) {
  * Put an ornament on an element.
  * @param {Element|string|null} target  The element, or a selector.
  * @param {string} id  One of ORNAMENT_IDS.
- * @param {Record<string, unknown> & { animate?: boolean }} [opts]  The figure's knobs (ORN_PARAMS) and `animate`.
+ * @param {Record<string, unknown> & { animate?: boolean, palette?: 'look' }} [opts]  The figure's knobs (ORN_PARAMS), `animate`,
+ *   and for a set's figure `palette: 'look'`.
  * @returns {{ id: string, el: HTMLElement, replay: () => void, set: (v: number) => void, destroy: () => void } | null}
  *   null when there is no such element or no such figure.
  */
@@ -175,6 +192,8 @@ export function ornament(target, id, opts) {
     : /** @type {InlineFigure} */ (fig).mount(host, p, { speed: p.speed, delay: p.delay });
   if (!('overlay' in fig)) mounted.render(animate);
   host.setAttribute('data-ak-ornament', id);
+  // A set draws in its own canvas colours unless the app asks for the look's.
+  if (opts && opts.palette === 'look') host.classList.add('ak-orn-lookpal');
   const handle = {
     id,
     el: host,
@@ -183,9 +202,38 @@ export function ornament(target, id, opts) {
     destroy: () => {
       mounted.teardown();
       host.removeAttribute('data-ak-ornament');
+      host.classList.remove('ak-orn-lookpal');
       if (/** @type {any} */ (host).__akOrnament === handle) delete (/** @type {any} */ (host)).__akOrnament;
     },
   };
   /** @type {any} */ (host).__akOrnament = handle;
   return handle;
+}
+
+/**
+ * Put a whole set on a screen: each role on the element given for it, roles not given are skipped.
+ * @param {string} set  One of ORNAMENT_SET_IDS.
+ * @param {Partial<Record<'frame' | 'rule' | 'bar' | 'bullets' | 'strip', Element | string | null>>} targets
+ * @param {Record<string, unknown> & { animate?: boolean }} [opts]  Knobs for every figure; `value` reaches the bar.
+ * @returns {{ set: string, handles: Record<string, ReturnType<typeof ornament>>, replay: () => void, update: (v: number) => void, destroy: () => void } | null}
+ *   null when there is no such set. `update(v)` moves the bar's value.
+ */
+export function ornamentSet(set, targets, opts) {
+  if (SET_IDS.indexOf(set) < 0) return null;
+  /** @type {Record<string, ReturnType<typeof ornament>>} */
+  const handles = {};
+  for (const role of SET_ROLES_LIST) {
+    const el = targets && /** @type {any} */ (targets)[role];
+    if (!el) continue;
+    const h = ornament(el, set + '-' + role, opts);
+    if (h) handles[role] = h;
+  }
+  const all = () => Object.values(handles).filter(Boolean);
+  return {
+    set,
+    handles,
+    replay: () => { for (const h of all()) /** @type {any} */ (h).replay(); },
+    update: (v) => { if (handles.bar) handles.bar.set(v); },
+    destroy: () => { for (const h of all()) /** @type {any} */ (h).destroy(); },
+  };
 }
