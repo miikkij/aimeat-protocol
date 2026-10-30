@@ -36439,8 +36439,7 @@ paths:
         - { name: catalogue, in: query, schema: { type: string, enum: [full, index, none], default: full } }
         - { name: detail, in: query, schema: { type: string }, description: "With catalogue=index: comma-separated component ids or section names to answer in full, e.g. table,statRow,effects." }
       responses:
-        '200': { description: "{ layout, version, source: stored|none, catalogue? } — with catalogue=index the catalogue carries `detail` for the names asked and `detail_unknown` for the ones it does not hold" }
-        '404': { $ref: '#/components/responses/NotFound' }
+        '200': { description: "{ layout, version, source: stored|none|unpublished, catalogue? } — `unpublished` when no app of that name is published: the layout is null and the catalogue comes as asked, so an AI planning a new app can read it. With catalogue=index the catalogue carries `detail` for the names asked and `detail_unknown` for the ones it does not hold" }
     put:
       operationId: putAppUiLayout
       summary: Replace one app's mosaic layout (validated, versioned)
@@ -37789,9 +37788,10 @@ paths:
         in one sentence for an AI. Before a publish the steps read the app's plan and its draft; after
         it, the design spec, the data map, the listing, the development rights, the legal pages and
         the EU AI Act questions. Returns `{ app, name, published, has_draft, plan, steps, fine, total,
-        next, page_url }`: `plan` holds the choices made on the structure page (layout, nav, look,
-        genre, visibility), each with who chose it and whether it is built; `page_url` is the page
-        that shows all of it. 404 when there is no app, draft or plan by that name. For the owner, the
+        next, page_url, values }`: `plan` holds the choices made on the structure page (layout, nav, look,
+        genre, visibility), each with who chose it and whether it is built, and the layouts the AI
+        drew in `proposals`; `page_url` is the page that shows all of it; `values` lists the ids each
+        choice takes. 404 when there is no app, draft or plan by that name. For the owner, the
         owner's agents and everybody holding a development right. Needs `app:write`. MCP:
         `aimeat_app_manage` action `structure`.
       tags: [Apps]
@@ -37853,7 +37853,49 @@ paths:
                         properties:
                           value: { type: string, maxLength: 80 }
                           state: { type: string, enum: [waiting, done] }
-                          note: { type: string, maxLength: 600, description: 'Why it was chosen; for a "custom" layout or nav, which every layout and nav takes besides the listed ids, the description of it (required then).' }
+                          note: { type: string, maxLength: 600, description: 'Why it was chosen; for a "custom" layout or nav, which every layout and nav takes besides the listed ids, the description of it (required then); on a choice the person made, what they want changed in it.' }
+                proposals:
+                  type: object
+                  description: >
+                    Layouts (`layout`) and navigations (`nav`) the building AI drew for this app; the
+                    structure page shows them first, each as a sketch, and the presets after them. A
+                    layout or nav choice may name an option's id, in the same write too; a write that
+                    leaves a choice naming an option no longer listed is refused (400). Writing a key
+                    replaces its list; null clears it.
+                  additionalProperties:
+                    oneOf:
+                      - type: 'null'
+                      - type: array
+                        minItems: 1
+                        maxItems: 4
+                        items:
+                          type: object
+                          required: [id, name, note, sketch]
+                          properties:
+                            id: { type: string, pattern: '^[a-z][a-z0-9-]{1,39}$', description: 'Not a preset id.' }
+                            name: { type: string, maxLength: 60 }
+                            note: { type: string, maxLength: 400 }
+                            sketch:
+                              type: array
+                              minItems: 1
+                              maxItems: 6
+                              description: Rows top to bottom, as components/LayoutSketch.js draws them.
+                              items:
+                                type: object
+                                required: [height, cells]
+                                properties:
+                                  height: { type: string, enum: [s, m, l] }
+                                  cells:
+                                    type: array
+                                    minItems: 1
+                                    maxItems: 4
+                                    items:
+                                      type: object
+                                      required: [w]
+                                      properties:
+                                        w: { type: string, enum: [full, main, side, half, tiny] }
+                                        label: { type: string, maxLength: 40 }
+                                        tone: { type: string, enum: [ink, sun] }
                 now: { type: [string, 'null'], maxLength: 200 }
                 expected_revision: { type: integer, minimum: 0 }
       responses:

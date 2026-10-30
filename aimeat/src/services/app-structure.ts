@@ -24,6 +24,7 @@
  * @structure STEP_IDS · structurePageUrl · computeStructure · readStructureFor · writePlanFor · listPlansFor
  * @usage const out = await readStructureFor(storage, config, req.auth!, { owner, filename });
  * @version-history
+ *   v1.2.0 — 2026-10-30 — A choice of an option the AI drew carries its name; the answer lists the values each choice takes.
  *   v1.1.0 — 2026-10-29 — A layout, nav, look or genre step carries the choice's note, which describes a custom one.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
@@ -37,7 +38,7 @@ import { resolveAppTarget, listDevGrants } from './app-dev-grant.js';
 import { readAppDesignSpec } from './app-design-spec.js';
 import { readProgramMap, NODE_READ } from './data-map/data-map-access.js';
 import { legalReadiness } from './app-legal.js';
-import { readAppPlan, writeAppPlan, readPlanPatch, listAppPlansOf, type AppPlan, type AppPlanChoice } from './app-plan.js';
+import { readAppPlan, writeAppPlan, readPlanPatch, listAppPlansOf, allowedChoiceValues, PLAN_CHOICE_KEYS, type AppPlan, type AppPlanChoice, type PlanProposal } from './app-plan.js';
 import { done, refuse, type AppOpCaller, type AppOpOutcome, type AppOpRefusal } from './app-op-outcome.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
@@ -66,8 +67,13 @@ function choiceState(choices: Array<AppPlanChoice | undefined>): StepState {
   return made.length ? 'fine' : 'optional';
 }
 
-// The note goes along: a custom layout or nav is described only there.
-const choiceDetail = (c: AppPlanChoice | undefined) => (c ? { value: c.value, by: c.by, state: c.state, ...(c.note ? { note: c.note } : {}) } : null);
+// The note goes along: a custom layout or nav is described only there, and a person's note is their
+// change to the option. An option the AI drew carries its name, which the page shows in place of the id.
+const choiceDetail = (c: AppPlanChoice | undefined, proposals?: PlanProposal[]) => {
+  if (!c) return null;
+  const drawn = proposals?.find((p) => p.id === c.value);
+  return { value: c.value, by: c.by, state: c.state, ...(c.note ? { note: c.note } : {}), ...(drawn ? { name: drawn.name, proposal: true } : {}) };
+};
 
 /** The eight steps, from what was read. Pure, so a unit test holds the rules. */
 export function computeStructure(input: {
@@ -97,9 +103,10 @@ export function computeStructure(input: {
   }
 
   const layoutState = choiceState([c.layout, c.nav]);
-  steps.push({ id: 'layout', state: layoutState, detail: { layout: choiceDetail(c.layout), nav: choiceDetail(c.nav) },
-    said: layoutState === 'progress' ? 'The person chose a layout that is not built yet. Build it, then write the same value with state "done".'
-      : layoutState === 'fine' ? 'The layout is chosen.' : 'No layout is chosen. Choose one yourself and write it with your reason, or leave it to the person.' });
+  const drawn = plan?.proposals ?? {};
+  steps.push({ id: 'layout', state: layoutState, detail: { layout: choiceDetail(c.layout, drawn.layout), nav: choiceDetail(c.nav, drawn.nav), proposals: (drawn.layout?.length ?? 0) + (drawn.nav?.length ?? 0) },
+    said: layoutState === 'progress' ? 'The person chose a layout that is not built yet; a note on the choice is what they want changed in it. Build it, then write the same value with state "done".'
+      : layoutState === 'fine' ? 'The layout is chosen.' : 'No layout is chosen. Draw two or three options for this app in `proposals` so the person can pick by seeing them, or choose one yourself and write it with your reason.' });
 
   const lookState = choiceState([c.look, c.genre]);
   steps.push({ id: 'look', state: lookState, detail: { look: choiceDetail(c.look), genre: choiceDetail(c.genre) },
@@ -199,6 +206,9 @@ async function structureOf(storage: Storage, config: AimeatConfig, t: Target, pl
     total: steps.length,
     next: nextStep(steps),
     page_url: structurePageUrl(config, t.appId),
+    // The values a choice may take, so the AI needs no published app to learn them (cold runs called
+    // ui_get on an unpublished app for the layouts and were refused). Genre is any Design Book id.
+    values: Object.fromEntries(PLAN_CHOICE_KEYS.flatMap((k) => { const v = allowedChoiceValues(k); return v ? [[k, v]] : []; })),
   };
 }
 
@@ -233,6 +243,7 @@ export async function writePlanFor(storage: Storage, config: AimeatConfig, calle
     actor: isOwnerInPerson(caller) ? 'owner' : 'ai',
     ...(typeof expected === 'number' ? { expectedRevision: expected } : {}),
   });
+  if ('refused' in out) return refuse(400, 'INVALID_INPUT', out.refused);
   if ('conflict' in out) {
     return refuse(409, 'REVISION_MISMATCH', `The plan is at revision ${out.conflict?.revision ?? 0}, not ${expected}. Read it again and write from that.`, { plan: out.conflict });
   }

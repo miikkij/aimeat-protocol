@@ -8,12 +8,13 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.15.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew (proposals).
+ *   v1.14.0 — 2026-10-29 — The Apps line: a new app's first message carries its structure page. A cold
+ *     Opus run read only this page before answering a build request, and never opened the page.
  *   v1.13.0 — 2026-10-25 — One app open to everyone on a closed node: aimeat_app_internet_open.
  *   v1.12.0 — 2026-10-18 — Adult status, subscriptions, provenance in exported files (Comicland v3).
  *   v1.11.0 — 2026-10-18 — A write that answers publish_request waits for the person (plan doc-mvcn6c7e4e5q, V4.6).
  *   v1.10.0 — 2026-10-17 — What others can read of the person: aimeat_exposure_report (plan doc-mvcn6c7e4e5q, V6.3).
- *   v1.10.0 — 2026-10-29 — The Apps line: a new app's first message carries its structure page. A cold
- *     Opus run read only this page before answering a build request, and never opened the page.
  *   v1.9.0 — 2026-10-17 — The tools the person can allow with one press are on the list too, and a
  *     call to one before they allow it answers with the address to give them.
  *   v1.8.0 — 2026-10-14 — Says where the list of places is (tier "places"), for "where do I find X".
@@ -61,8 +62,9 @@ Three grounds carry most of the work:
   specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\` in parts. \`{ tier:
   "build-app" }\` is the Classic track's, for an app that is already Classic. **A new app's first
   message carries its structure page**: before your first question, call \`aimeat_app_manage\`
-  \`{ action: "structure_set", filename, name, purpose }\` and give the person \`page_url\`; there
-  they follow the build and pick a layout and a look by seeing them. **When the person
+  \`{ action: "structure_set", filename, name, purpose, proposals }\` with two or three layouts you
+  drew for the app in \`proposals.layout\`, and give the person \`page_url\`; there they follow the
+  build and pick a layout and a look by seeing them. **When the person
   says one of their apps turned out well** ("this one is good", "I'm keeping this"), in whatever
   words and whoever built it, record it: \`aimeat_designbook_keep { filename }\`. It is the one
   signal that an app was worth learning from, and nothing else gives it: a finished build is

@@ -28,6 +28,8 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.39.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
+ *     (proposals.layout), and the steps stay off the chat (cold runs drew the whole step table there).
  *   v1.38.0 — 2026-10-29 — ADDITIVE: the interview starts the structure page before its first question
  *     and points the look question there. The section itself is served in part `libraries`, which an
  *     agent reads after the interview, so on innokas.aimeat.io the first real build never opened the
@@ -757,7 +759,7 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
     + '5. Anything it must NOT do?\n\n'
-    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: pick a filename, call `aimeat_app_manage` action `structure_set` with `filename`, `name` and `purpose` from the idea, and put `page_url` from its answer in the same message, in one sentence. On that page the person sees the steps and picks a layout and a look by seeing them, so for question 3 point there; it is optional, and "you decide" is an answer. After the answers, read action `structure` before you propose: a choice with `"state": "waiting"` is theirs. The section "The structure page" (part `libraries`) has the rest.\n\n';
+    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
   full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.

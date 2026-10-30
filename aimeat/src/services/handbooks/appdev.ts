@@ -7,6 +7,7 @@
  * @version-history
  *   2026-10-17 — A package install renames its apps: link a sibling from your own name and the app
  *     host's path form, which keeps the query (pitfall-list round).
+ *   2026-10-30 — structure_set carries two or three layouts drawn for the app (proposals).
  *   2026-10-29 — The app's structure page: structure_set when an app starts, structure before the
  *     screens, the person's waiting choices, plans (services/app-structure.ts).
  *   2026-10-11 — The workspace-contracts guide is the skill aimeat-workspace-contracts; the handbook
@@ -343,7 +344,9 @@ this sections.
 data, layout, look, build, builders, visibility, requirements), what is done and what is open, and
 lets them pick a layout and a look by seeing them. It exists from the first moment, before any code
 or publish. When you start a new app, call \`aimeat_app_manage\` \`structure_set\` with \`filename\`,
-\`name\` and \`purpose\`, and give the person \`page_url\` from the answer. Write \`data\` after the
+\`name\`, \`purpose\` and two or three layouts you drew for the app in \`proposals.layout\` (the page
+shows them as sketches beside the node's presets), and give the person \`page_url\` from the answer.
+Write \`data\` after the
 data map questions and \`now\` while you build. Before you build the screens, read \`structure\`: a
 choice with state \`waiting\` is the person's, so build it and write the same value with state
 \`done\`. A choice you make yourself goes in with a \`note\` saying why. \`plans\` lists the apps the

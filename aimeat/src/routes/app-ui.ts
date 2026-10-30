@@ -20,6 +20,8 @@
  *   POST /v1/apps/:owner/:filename/ui/restore  · bring one version back (re-validated)
  * @usage app.use(appUiRouter(config, storage)) from mountRoutes.
  * @version-history
+ *   v1.2.0 — 2026-10-30 — GET …/ui answers an app not published yet with the catalogue and no
+ *     layout (`source: "unpublished"`), in place of a 404.
  *   v1.1.1 — 2026-09-26 — The app owner's name comes from localAccountName (utils/gaii.ts), which
  *     keeps an identity of another node whole, so it never names the local namesake
  *     (secaudit 2026-09, F-1).
@@ -118,15 +120,20 @@ export function appUiRouter(config: AimeatConfig, storage: Storage): Router {
 
   // The stored layout + the catalogue in one read — the read carries the vocabulary.
   router.get('/v1/apps/:owner/:filename/ui', async (req, res) => {
-    const app = await appOf(req, res);
-    if (!app) return;
+    // ?catalogue=none is what a page asks (it reads the layout and nothing else), =index what an
+    // AI asks, with ?detail=table,effects for the parts it wants whole. No parameter is the whole
+    // catalogue, as this route has always answered (catalogue-index.ts).
+    const detail = typeof req.query.detail === 'string' ? req.query.detail.split(',') : [];
+    const catalogue = buildUiCatalogueView(catalogueMode(req.query.catalogue) ?? 'full', detail);
+    // The catalogue is the node's, so an app not published yet still gets it, with no layout: cold
+    // runs of a new app asked for the layouts here while planning and were refused (2026-10-30).
+    const app = await storage.getAppByOwnerName(localAccountName(req.params.owner as string), req.params.filename as string);
+    if (!app) {
+      res.json(success(config.nodeId, { layout: null, version: null, source: 'unpublished', ...(catalogue ? { catalogue } : {}) }));
+      return;
+    }
     try {
-      const { layout, version } = await svc.read(app.ownerGaii, app.filename);
-      // ?catalogue=none is what a page asks (it reads the layout and nothing else), =index what an
-      // AI asks, with ?detail=table,effects for the parts it wants whole. No parameter is the whole
-      // catalogue, as this route has always answered (catalogue-index.ts).
-      const detail = typeof req.query.detail === 'string' ? req.query.detail.split(',') : [];
-      const catalogue = buildUiCatalogueView(catalogueMode(req.query.catalogue) ?? 'full', detail);
+      const { layout, version } = await svc.read(app.ownerGaii, req.params.filename as string);
       res.json(success(config.nodeId, {
         layout, version,
         source: layout ? 'stored' : 'none',

@@ -23,6 +23,7 @@
  * @structure registerAppManageTool
  * @usage registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller)
  * @version-history
+ *   2026-10-30 — ui_get on an app not published yet answers the catalogue with no layout, as GET .../ui does.
  *   2026-10-25 — subdomain_set passes `origin` to the update (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
@@ -268,7 +269,19 @@ export function registerAppManageTool(
                 return answer({ app: `${callerOwner}/${filename}`, ...out, geo_available: config.geoHeaders });
             }
             case 'ui_get': {
-                const app = await ui.ownApp(callerGaii, filename);
+                // The catalogue is the node's: an app not published yet gets it with no layout, as
+                // GET .../ui answers. Cold runs asked for the layouts here while planning a new app.
+                const app = await ui.ownApp(callerGaii, filename).catch((err: unknown) => {
+                    if (err instanceof AppUiError && err.code === 'NOT_FOUND') return null;
+                    throw err;
+                });
+                if (!app) {
+                    return answer({
+                        filename, layout: null, version: null, source: 'unpublished',
+                        catalogue: buildUiCatalogueView('index', Array.isArray(args.detail) ? args.detail as string[] : []),
+                        note: 'The app is not published yet, so it has no stored layout. The catalogue above is the vocabulary; while planning, draw the layouts for the structure page in structure_set proposals.',
+                    });
+                }
                 const { layout, version } = await ui.read(app.ownerGaii, filename);
                 return answer({
                     filename, layout, version, source: layout ? 'stored' : 'none',
