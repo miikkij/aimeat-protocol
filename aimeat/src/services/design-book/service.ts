@@ -34,6 +34,7 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.14.1 — 2026-10-30 — A kit's list row says its reach (and organism), for the gallery's chips.
  *   v1.14.0 — 2026-10-30 — The KIT kind (kit.ts): get, list, adopt and recordUse answer a kit narrower
  *     than the node only inside its reach (a reader outside it meets a missing part), its record is
  *     stored private, its status follows its reach, and adopt answers what to build with and writes
@@ -114,7 +115,7 @@ import { componentAsRead, componentBench, componentSnippet, type ComponentBenchR
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
 import { componentPublishing, kitPublishing, proposeChecksFor } from './propose-checks.js';
 import { ornamentSnippet, type OrnamentBody } from './ornament.js';
-import { kitReadable, kitSnippet, kitStatusOnPropose, kitVisibility, type KitBody } from './kit.js';
+import { kitReach, kitReadable, kitSnippet, kitStatusOnPropose, kitVisibility, type KitBody } from './kit.js';
 import { avatarPartSnippet, type AvatarBody } from './avatar.js';
 // Where a part is stored lives beside what a generic memory door answers for one (utils/own-door-keys.ts).
 import { DESIGN_BOOK_PART_PREFIX as PART_KEY_PREFIX } from '../../utils/own-door-keys.js';
@@ -167,6 +168,8 @@ export interface PartSummaryRow {
   id: string; kind: PartKind; title: string; summary: string; tags: string[];
   status: PartStatus; proposed_by: string; updated_at: string; version: number;
   usage: number;
+  /** A kit only: who reads it (kit.ts), and the organism when that is its reach, so a gallery can say so. */
+  reach?: 'own' | 'organism' | 'node'; organism?: string;
   /** When it was last published — so a gallery can say "new this week" from the truth. */
   published_at?: string;
 }
@@ -408,6 +411,7 @@ export class DesignBookService {
         status: part.status, proposed_by: part.proposed_by, updated_at: part.updated_at,
         version: record.version,
         usage: await this.usageOf(part.id),
+        ...(part.kind === 'kit' ? { reach: kitReach(part), ...((part.body as unknown as KitBody).organism ? { organism: (part.body as unknown as KitBody).organism } : {}) } : {}),
         ...(part.published_at ? { published_at: part.published_at } : {}),
       });
       if (rows.length >= limit) break;
