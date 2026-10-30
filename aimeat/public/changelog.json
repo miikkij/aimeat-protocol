@@ -4,6 +4,28 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-your-ai-draws-layouts-for-your-app",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your AI draws layouts for your app",
+        "fi": "Tekoälysi piirtää asettelut sovelluksellesi"
+      },
+      "summary": {
+        "en": "Your AI draws two or three layouts for your app, and you pick one on its structure page.",
+        "fi": "Tekoälysi piirtää sovelluksellesi kaksi tai kolme asettelua, ja sinä valitset yhden rakennesivulla."
+      },
+      "body": {
+        "en": "When you build an app in your own chat, your AI draws layouts made for that app, such as a game board with a side panel. You see them on the app's structure page beside the ready-made layouts, pick one, and write what you would change. The AI then builds by your choice.",
+        "fi": "Kun rakennat sovelluksen omassa keskustelussasi, tekoälysi piirtää juuri sille sopivat asettelut, esimerkiksi pelilaudan ja sivupaneelin. Näet ne sovelluksen rakennesivulla valmiiden asettelujen vieressä. Valitset yhden ja kirjoitat, mitä muuttaisit. Tekoäly rakentaa sitten valintasi mukaan."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-ornaments-that-grow-round-your-app",
       "highlight": false,
       "audience": [
