@@ -19,6 +19,9 @@
  * @structure PublishViewer · listPublishRequestsFor · readPublishRequestFor · decidePublishRequest
  * @usage const out = await decidePublishRequest({ storage, config }, viewer, id, 'approve');
  * @version-history
+ *   v1.7.0 — 2026-10-30 — The applier is told who pressed approve and whether a person or an AI, so a
+ *     kind that only the owner in person may allow checks it again before it writes (apply-card-adult.ts;
+ *     secaudit2026oct26 round 8c, commerce-07).
  *   v1.6.0 — 2026-10-29 — A declined request runs its kind's decliner, when it has one (appliers.ts
  *     PUBLISH_DECLINERS: an older accountant grant is removed; secaudit2026oct26 round 8c).
  *   v1.5.0 — 2026-10-30 — A declined `cortex-holder` request can be approved later by its owner: the
@@ -194,7 +197,7 @@ async function approveOne(
   }
   const applier = PUBLISH_APPLIERS[request.kind];
   const applied = applier
-    ? await applier(ctx, ownerGhii, request)
+    ? await applier(ctx, ownerGhii, request, { by, kind })
     : { ok: false as const, reason: 'this kind of content cannot be made public through a request on this node' };
   if (!applied.ok) {
     await settlePublishRequest(ctx, ownerGhii, request, 'outdated', { by, withParent, outcome: { reason: applied.reason } });

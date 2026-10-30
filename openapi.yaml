@@ -78897,6 +78897,11 @@ paths:
         OPERATOR_DECIDES), naming the account in `account` when it is another account's. The one who
         asked hears the answer either way: an agent as a message with the request id, a person and an
         app's account in the bell.
+        A request that confirms a fact about the owner is allowed only by the owner signed in
+        themselves (403 OWNER_IN_PERSON for an agent or an app); an agent of the owner may still
+        decline it. Kind `card-adult-confirm` is one: "I paid with my own card", asked after a credit
+        card payment that only the seller's own Stripe account attests, and allowing it records the
+        owner as a verified adult (409 OUTDATED when another check recorded that since).
       security: [{ BearerAuth: [] }]
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
