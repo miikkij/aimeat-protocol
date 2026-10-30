@@ -19,6 +19,7 @@
  *   the inferred types · MEASURE_AREAS
  * @usage const parsed = CreateInputSchema.safeParse(body);
  * @version-history
+ *   2026-10-31 — A review's level may be `test`: a PDF signed elsewhere whose valid signatures all chain to the EU reference wallet's test roots (secaudit2026oct26 outside-02b).
  *   2026-10-29 — A version and an agreement may be `test-signed`: signed in test, not in force, on a node
  *     running production settings (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A signature's level may be `test`: a wallet signature on the EU reference wallet's test roots (secaudit2026oct26).
@@ -162,7 +163,7 @@ export const ReviewSchema = z.object({
   checks: z.array(z.object({ id: z.string().max(60), ok: z.boolean().nullable(), note: text(600) })).max(30),
   /** What the check found, in one word: everything passed, something needs a look, or it failed. */
   verdict: z.enum(['pass', 'attention', 'fail']),
-  level: z.enum(['qualified', 'advanced', 'scanned']).optional(),
+  level: z.enum(['qualified', 'advanced', 'scanned', 'test']).optional(),
   checkedBy: z.string().max(200).optional(),
   decidedBy: z.string().max(300).optional(),
   decidedAt: iso.optional(),
