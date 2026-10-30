@@ -56,6 +56,9 @@
  *   wearLook reads the page's look for a dialog, a menu or a toast. Inside an app frame the
  *   frame's own data-ak-look wins.
  * @version-history
+ *   v0.68.0 — 2026-10-30 — No CSS change. The kit's JavaScript adds ornament sets
+ *     (ornamentSet, ORNAMENT_SET_IDS), which paint with the figures' existing rules; the version
+ *     moves with it.
  *   v0.67.0 — 2026-10-29 — ornaments.css: the paint, placement and growth of the ornament figures.
  *   v0.66.2 — 2026-10-11 — No CSS change. The kit's JavaScript shows an amount in morsels as pacing
  *     ("pacing 40 morsels"), never as a price; the version moves with it.
