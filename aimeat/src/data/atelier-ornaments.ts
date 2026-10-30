@@ -19,17 +19,24 @@
  *   ONE CLAMP, TWO CONSUMERS. ORNAMENT_PARAMS here and ORN_PARAMS in the kit carry the same bounds;
  *   test/unit/atelier-ornaments.test.ts holds them, the ids and each figure's knobs equal.
  * @structure OrnamentWraps · OrnamentParamName · ORNAMENT_PARAMS · AtelierOrnament · ORNAMENTS ·
- *   ORNAMENT_IDS · ornamentById() · ornamentParamProblem() · resolveOrnamentParams()
+ *   ORNAMENT_IDS · ornamentsPromptPart() · ornamentById() · ornamentParamProblem() · resolveOrnamentParams()
  * @usage
  *   import { ORNAMENTS, ornamentById, resolveOrnamentParams } from '../data/atelier-ornaments.js';
+ *
+ *   SETS. After the 23 single figures come the eleven sets of atelier-ornament-sets.ts, five
+ *   entries each (`<set>-frame`, `-rule`, `-bar`, `-bullets`, `-strip`), carrying `set` so a
+ *   picker can keep a screen to one set.
  * @version-history
  *   v1.0.0 — 2026-10-29 — Initial: 23 figures ported from the accepted ornament canvas.
+ *   v1.1.0 — 2026-10-30 — The eleven sets' 55 figures, the `set` field and the `mess` knob
+ *     (wish-kymmenen-koristesetti-eri-tyyleiss).
  */
+import { ORNAMENT_SETS, ORNAMENT_SET_ROLES, type OrnamentSetRole } from './atelier-ornament-sets.js';
 
 /** The kind of element a figure is drawn for. */
 export type OrnamentWraps = 'block' | 'badge' | 'bar' | 'rule' | 'heading' | 'text' | 'list' | 'button' | 'column';
 
-export type OrnamentParamName = 'speed' | 'delay' | 'leaves' | 'value' | 'strands';
+export type OrnamentParamName = 'speed' | 'delay' | 'leaves' | 'value' | 'strands' | 'mess';
 
 export interface OrnamentParam {
   min: number;
@@ -48,6 +55,7 @@ export const ORNAMENT_PARAMS: Readonly<Record<OrnamentParamName, OrnamentParam>>
   leaves: { min: 0, max: 2, default: 1, what: 'How leafy: 0 none, 1 as drawn, 2 lush.' },
   value: { min: 0, max: 1, default: 0.64, what: 'How far the vine has grown along the bar; at 1 the tip flowers.' },
   strands: { min: 2, max: 4, default: 3, what: 'How many strands the rope is twisted from.' },
+  mess: { min: 0.5, max: 2, default: 1, what: 'How far the chaotic set\'s scribbles wander: 0.5 tidy, 2 wild.' },
 };
 
 export interface AtelierOrnament {
@@ -61,12 +69,29 @@ export interface AtelierOrnament {
   params: readonly OrnamentParamName[];
   /** The looks it was drawn for, first one the Book previews it on. */
   fitsLooks: readonly string[];
+  /** The set it belongs to (atelier-ornament-sets.ts), absent on a single figure. */
+  set?: string;
 }
 
 const ENGRAVED = ['kirjapaino', 'broadsheet', 'lounge', 'editorial', 'gallery'] as const;
 const LIVING = ['kirjapaino', 'calm-card', 'lounge', 'dawn', 'editorial'] as const;
 
-export const ORNAMENTS: readonly AtelierOrnament[] = [
+/** The element each role of a set is drawn for. */
+const SET_WRAPS: Record<OrnamentSetRole, OrnamentWraps> = { frame: 'block', rule: 'rule', bar: 'bar', bullets: 'list', strip: 'rule' };
+const SET_ROLE_TITLE: Record<OrnamentSetRole, string> = { frame: 'frame', rule: 'rule', bar: 'bar', bullets: 'bullets', strip: 'foot strip' };
+
+/** The five registry entries of every set, in set order and then role order. */
+const SET_ORNAMENTS: AtelierOrnament[] = ORNAMENT_SETS.flatMap((s) => ORNAMENT_SET_ROLES.map((role): AtelierOrnament => ({
+  id: `${s.id}-${role}`,
+  title: `${s.title} ${SET_ROLE_TITLE[role]}`,
+  summary: `${s.roles[role]} From the ${s.title.toLowerCase()} set.`,
+  wraps: SET_WRAPS[role],
+  params: [...(role === 'bar' ? ['value' as const] : []), ...(s.extra ?? [])],
+  fitsLooks: s.fitsLooks,
+  set: s.id,
+})));
+
+const SINGLE_ORNAMENTS: readonly AtelierOrnament[] = [
   { id: 'frame', title: 'Engraved frame', wraps: 'block', params: ['leaves'], fitsLooks: ENGRAVED,
     summary: 'Double rules with hatching between them, corner scrolls that curl open from a rosette, and palmettes in the middle of the long edges. Round a card or a panel.' },
   { id: 'vine-border', title: 'Vine round the border', wraps: 'block', params: ['leaves'], fitsLooks: LIVING,
@@ -115,7 +140,27 @@ export const ORNAMENTS: readonly AtelierOrnament[] = [
     summary: 'A curved bracket with curled ends either side of a button, a leaf on each. Round the one button that matters.' },
 ];
 
+export const ORNAMENTS: readonly AtelierOrnament[] = [...SINGLE_ORNAMENTS, ...SET_ORNAMENTS];
+
 export const ORNAMENT_IDS: readonly string[] = ORNAMENTS.map((o) => o.id);
+
+/**
+ * The build prompt's ornament paragraphs (build-atelier-prompt.ts): the single figures with the
+ * element each was drawn for, then the sets. Written here so a figure or a set added to the
+ * registry is named in the prompt the same day.
+ */
+export function ornamentsPromptPart(base: string): string {
+  return 'ORNAMENTS: `AIMEAT.atelier.ornament(el, id, { speed, delay, leaves })` grows an engraved or '
+    + 'living SVG figure round ONE element, in the look\'s colours, once, then holds still: '
+    + SINGLE_ORNAMENTS.map((o) => '`' + o.id + '` (' + o.wraps + ')').join(', ')
+    + '. The word in brackets is the element it was drawn for. One or two per screen, on what matters: '
+    + 'a frame round the card, a vine round the progress bar, flourishes beside the title. Never draw '
+    + 'an ornament of your own. See each: ' + base + '/v1/designbook/ornament-<id>/preview\n'
+    + 'ORNAMENT SETS, five figures in one style: `AIMEAT.atelier.ornamentSet(set, { frame: card, rule: emptyEl, '
+    + 'bar: progressbar, bullets: ul, strip: emptyEl }, { value })`, any role left out: '
+    + ORNAMENT_SETS.map((s) => '`' + s.id + '`').join(', ')
+    + '. One set per screen, in the app\'s mood. See each: ' + base + '/v1/designbook/ornament-set-<set>/preview\n\n';
+}
 
 const byId = new Map(ORNAMENTS.map((o) => [o.id, o]));
 

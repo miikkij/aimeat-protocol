@@ -17,6 +17,7 @@
  * @structure MAP_BUDGET · MapRow · buildDesignBookMap(rows, opts)
  * @usage const text = buildDesignBookMap(rows, { baseUrl, light, unlisted });
  * @version-history
+ *   v1.3.1 — 2026-10-30 — The ORNAMENTS group names the sets.
  *   v1.3.0 — 2026-10-29 — The ORNAMENTS group.
  *   v1.2.0 — 2026-10-19 — The AVATARS group.
  *   v1.1.0 — 2026-09-20 — The COMPONENTS group, and REASONS_NOTE for the reasons queue.
@@ -50,7 +51,7 @@ const KINDS: Array<[string, string]> = [
   ['motion', 'MOTION: how things arrive and change. A sheet of motion tokens, adopted whole.'],
   ['ambient', 'AMBIENTS: the one layer allowed to move at idle, behind the words.'],
   ['effect', 'EFFECTS: a treatment on a picture or a block: still on the words, a moment on a cue.'],
-  ['ornament', 'ORNAMENTS: an animated SVG figure that grows round one element of your page: an engraved frame round a card, a vine round a progress bar, a wreath round a badge, flourishes beside a heading. Take one with `aimeat_designbook_adopt` (it answers the one line, `AIMEAT.atelier.ornament(el, id)`) and never draw an ornament yourself.'],
+  ['ornament', 'ORNAMENTS: an animated SVG figure that grows round one element of your page: an engraved frame round a card, a vine round a progress bar, a wreath round a badge, flourishes beside a heading; or a SET of five in one style (modern, cyberpunk, art deco…) for a card, a rule, a bar, a list and a foot strip. Take one with `aimeat_designbook_adopt` (it answers the one line, `AIMEAT.atelier.ornament(el, id)` or `AIMEAT.atelier.ornamentSet(set, { frame, rule, bar, bullets, strip })`) and never draw an ornament yourself.'],
   ['illustration', 'ILLUSTRATIONS: art direction as words, for the imagery pipeline.'],
   ['avatar', 'AVATARS: an SVG picture an agent starts its own avatar from. Read one with `aimeat_designbook_get`, make it yours, and write it to your `agent.avatar` memory record.'],
 ];
