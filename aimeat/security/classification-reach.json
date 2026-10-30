@@ -2336,6 +2336,13 @@
       },
       "why": "Reviewed 2026-10-18, moved from src/routes/portfolio.ts by pure extraction: the owner's own portfolio config record (portfolio.config), read to merge a settings write and to tell whether the page is switched on, and when the stored page was written (metadata only), for the publish gate. No content is shown to anyone."
     },
+    "src/services/portfolio-read-hold.ts": {
+      "reads": {
+        "getMemory": 1,
+        "getStorageFile": 1
+      },
+      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. Nothing of the page is shown to anyone or sent to a model."
+    },
     "src/services/portfolio-members.ts": {
       "reads": {
         "listMemoryForOwners": 1
