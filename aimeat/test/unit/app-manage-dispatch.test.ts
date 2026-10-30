@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   v1.11.0 — 2026-10-30 — structure_set's proposals field.
  *   v1.10.0 — 2026-10-29 — structure, structure_set and plans, and the purpose, data, choices and now fields.
  *   v1.9.0 — 2026-10-25 — subdomain_set carries origin (secaudit2026oct22).
  *   v1.8.0 — 2026-10-17 — settings carries open_to (who may open the app).
@@ -68,6 +69,7 @@ const VALUE: Record<string, unknown> = {
     manage_roles: ['zqxmgr'], year: '2026', keep: '12345', dev_level: 'publisher',
     markdown: '# zqxspec', expected_revision: 4, words: ['zqxword'],
     purpose: 'zqxpurpose', data: { summary: 'zqxdata', personalData: 'no' }, choices: { look: { value: 'zqxlook' } }, now: 'zqxnow',
+    proposals: { layout: [{ id: 'zqxproposal', name: 'n', note: 'n', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] },
 };
 
 /** Where each action goes: method and path. The body is checked field by field below. */
