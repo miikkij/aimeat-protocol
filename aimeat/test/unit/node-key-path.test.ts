@@ -14,6 +14,10 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/node-key-path.test.ts
  * @version-history
+ *   v1.2.1 — 2026-10-31 — The reading child reads with the node's own reader (readKeyFileText), so
+ *     the test measures what a starting node sees. Plain readFileSync got EPERM under load on
+ *     Windows during a rename, which the node's reader now retries; the assertion is unchanged.
+ *     Which of three: the source was broken (a node reading in that instant refused to start).
  *   v1.2.0 — 2026-10-26 — A key file written while other processes read it is never seen half
  *     written, and the first write keeps the first key. Both went red on the code before the fix:
  *     the E2E sweep of 6e56f34c0 lost 1186 SQLite suites to a key file four lanes wrote at once.
@@ -176,7 +180,8 @@ if (role === 'create') {
 while (role !== 'create' && Date.now() < end) {
     if (role === 'write') __testables.stampKeyFileClaim(keyPath, runs % 2 ? 'aimeat-iso-001-a' : 'aimeat-iso-001-with-a-longer-id');
     else {
-        try { JSON.parse(readFileSync(keyPath, 'utf-8')); } catch (err) {
+        // The reader is the one the node itself reads a key file with.
+        try { JSON.parse(__testables.readKeyFileText(keyPath)); } catch (err) {
             // Windows can show the file missing for an instant while another process renames over
             // it; a missing file is not a half-written one, and only a half-written one is counted.
             if (err.code !== 'ENOENT') { bad++; firstError ||= String(err); }
