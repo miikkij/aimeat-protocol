@@ -21,6 +21,8 @@
  * @structure registerPortfolioTools(mcp, storage, config, getAgentGaii, caller)
  * @usage registerPortfolioTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-10-31 — aimeat_portfolio_publish by a writer without memory:read files the owner's question whether
+ *     the page may read their memory, and answers it as memory_read (services/portfolio-read-hold.ts; audit H-9).
  *   2026-10-24 — aimeat_portfolio_publish refuses the shared anonymous principal with AUTH_REQUIRED, as
  *     PUT /v1/portfolio/upload does (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -58,6 +60,7 @@ import type { CallerContext } from '../services/caller-context.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
 import { publishAskedFields } from '../services/app-publish-gate.js';
 import { mergePortfolioConfig, portfolioSwitchState } from '../services/portfolio-config.js';
+import { notePortfolioWriter } from '../services/portfolio-read-hold.js';
 import { parsePageAccessInput, pageAccessOf } from '../services/page-access.js';
 import { toolError } from './tool-error.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
@@ -129,6 +132,8 @@ export function registerPortfolioTools(
             if (gate.kind === 'refused') return out({ error: gate.code, message: gate.message }, true);
             const held = gate.kind === 'ask' ? gate.change.field : null;
             if (data) await writePortfolioHtml(storage, target, data, { config, principal: getAgentGaii(), pipeline: 'mcp.portfolio_publish' });
+            // A writer without memory:read: the page reads the owner's memory once the owner allows it (audit H-9).
+            const readAsk = data ? await notePortfolioWriter({ storage, config }, owner, caller()) : undefined;
             if (access && held !== 'access') await mergePortfolioConfig(storage, target, { access: access.store });
             const served = await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, owner, target, enable === true && held !== 'enabled');
             const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, owner, gate) : undefined;
@@ -152,6 +157,7 @@ export function registerPortfolioTools(
                         ? 'The page is stored, and the person switched their page off, so the address shows nothing yet. Tell them they switch it on themselves on the Portfolio page (/v1/profile?tab=portfolio).'
                         : 'The page is stored and not public yet. When the person approves it and wants it public, publish again with enable: true, or they switch it on on the Portfolio page (/v1/profile?tab=portfolio).',
                 ...publishAskedFields(asked),
+                ...(readAsk ? { memory_read: publishAskedFields(readAsk) } : {}),
             });
         },
     );

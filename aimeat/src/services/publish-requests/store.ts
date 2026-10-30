@@ -37,6 +37,9 @@
  *     (commerce/card-adult-ask.ts). An approval may say that only the owner in person allows it
  *     (`in_person`) and name its buttons (`labels`), and an applier is told who pressed approve
  *     (PublishDecidedBy) (secaudit2026oct26 round 8c, commerce-07).
+ *   2026-10-31 — The kind `portfolio-memory-read`: the owner's welcome page reads their memory when the
+ *     owner opens it only once the owner allowed a page a writer without memory:read wrote
+ *     (services/portfolio-read-hold.ts; audit H-9).
  *   2026-10-29 — The kind `accountant-grant`: an older accountant grant whose holder the node cannot
  *     place is asked of the client (finance/accountant-grant-ask.ts; secaudit2026oct26 round 8c).
  *   2026-10-29 — The kind `delegation-binding`: an app by another author publishing through a channel
@@ -141,7 +144,9 @@ export type PublishKind =
   // An older accountant grant whose holder the node cannot place, asked of the client (finance/accountant-grant-ask.ts).
   | 'accountant-grant'
   // A credit card payment only the seller's own Stripe account attests, confirmed by the buyer in person (commerce/card-adult-ask.ts).
-  | 'card-adult-confirm';
+  | 'card-adult-confirm'
+  // The owner's welcome page reading their memory, when a writer without memory:read wrote it (services/portfolio-read-hold.ts).
+  | 'portfolio-memory-read';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

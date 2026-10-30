@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.18.0 — 2026-10-31 — The owner's welcome page may read their memory when they open it, allowed by
+ *     the owner for a page a writer without memory:read wrote (apply-portfolio-memory-read.ts; audit H-9).
  *   v1.17.0 — 2026-10-30 — A credit card payment only the seller's account attests, confirmed by the
  *     buyer in person, records them as an adult (apply-card-adult.ts; secaudit2026oct26 round 8c, commerce-07).
  *   v1.16.0 — 2026-10-29 — An older accountant grant the client allowed is confirmed, and one the client
@@ -75,6 +77,7 @@ import { applySubscriptionPrice } from './apply-subscription-price.js';
 import { applyScheduleInstruction } from './apply-schedule-instruction.js';
 import { applyGoalModelRead } from './apply-goal-model-read.js';
 import { applyGoalModelSpend } from './apply-goal-model-spend.js';
+import { applyPortfolioMemoryRead } from './apply-portfolio-memory-read.js';
 import { applyRefineryDefinition } from './apply-refinery-definition.js';
 import { applyDelegationBinding } from './apply-delegation-binding.js';
 import { applyExtensionCode } from './apply-extension-code.js';
@@ -110,6 +113,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'cortex-holder': applyCortexHolder,
   'accountant-grant': applyAccountantGrant,
   'card-adult-confirm': applyCardAdultConfirm,
+  'portfolio-memory-read': applyPortfolioMemoryRead,
 };
 
 /**

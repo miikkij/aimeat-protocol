@@ -9,6 +9,9 @@
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  *   (both in services/portfolio-config.ts, re-exported here)
  * @version-history
+ *   2026-10-31 — PUT /v1/portfolio/upload by a writer without memory:read files the owner's question
+ *     whether the page may read their memory, and answers it as memory_read; GET /v1/portfolio/data
+ *     tells the owner viewer_reads_memory and memory_read_request (services/portfolio-read-hold.ts; audit H-9).
  *   2026-10-24 — PUT /v1/portfolio/config and PUT /v1/portfolio/upload refuse the shared anonymous
  *     principal with refuseAnonymousPrincipal: the page is a public page of the account, outside the
  *     anonymous/ namespace (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
@@ -98,6 +101,7 @@ import {
 import { callerOf } from '../middleware/caller.js';
 import { portfolioRaiseAsk, filePortfolioAsk } from '../services/portfolio-publish-gate.js';
 import { publishAskedFields, askedStatus } from '../services/app-publish-gate.js';
+import { notePortfolioWriter, portfolioReadHold } from '../services/portfolio-read-hold.js';
 
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
@@ -223,6 +227,13 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
   /** The `access` a write carries (services/page-access.ts), checked for its setter; null when absent. */
   const accessInput = async (req: Request, body: Record<string, unknown>) => (!('access' in body) ? null
     : parsePageAccessInput(storage, body.access, { identity: resolveIdentity(req.auth!, config.nodeId), federated: isForeignPrincipal(req.auth) }));
+
+  /** For the owner: whether the page may read their memory through them now (audit H-9). Others: nothing. */
+  const ownerReadField = async (isOwner: boolean, ownerName: string) => {
+    if (!isOwner) return {};
+    const held = await portfolioReadHold({ storage, config }, ownerName);
+    return held ? { viewer_reads_memory: false, memory_read_request: held.request_id } : { viewer_reads_memory: true };
+  };
 
   /**
    * GET /v1/portfolio/catalog
@@ -495,6 +506,8 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
 
     await writePortfolioHtml(storage, target, fileData,
       { config, principal: resolveIdentity(req.auth!, config.nodeId), pipeline: 'rest.portfolio.upload' });
+    // A writer without memory:read: the page reads the owner's memory once the owner allows it (audit H-9).
+    const readAsk = await notePortfolioWriter({ storage, config }, ownerName, callerOf(req, config.nodeId, storage), req.auth?.app);
     if (access && !(gate.kind === 'ask' && gate.change.field === 'access')) await mergePortfolioConfig(storage, target, { access: access.store });
     const served = isJson ? await switchPortfolioOnUnlessTurnedOff(storage, config.nodeId, ownerName, target, enable) : undefined;
     const asked = gate.kind === 'ask' ? await filePortfolioAsk({ storage, config }, ownerName, gate) : undefined;
@@ -503,6 +516,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       uploaded: true, sizeKb: Math.round(fileData.length / 1024),
       ...(served === undefined ? {} : { served }),
       ...publishAskedFields(asked),
+      ...(readAsk ? { memory_read: publishAskedFields(readAsk) } : {}),
     }));
     emitChange('portfolio');
   });
@@ -551,6 +565,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       ...provenanceItemBlock(await loadServedProvenance(storage, config, resolved.aiProvenanceId)),
       viewer_authenticated: isAuthenticated,
       viewer_is_owner: isOwner,
+      // Whether the viewer's fetch bridge reads records for the page with the viewer's session. False for
+      // the owner while a page a writer without memory:read wrote waits for the owner (audit H-9): the
+      // page reads what anyone signed out reads, and memory_read_request is the question that asks.
+      ...(await ownerReadField(isOwner, username)),
       // Identities whose memory records the viewer's fetch bridge may proxy on
       // behalf of the portfolio iframe (GHII + all agent GAIIs of this owner) —
       // the allowlist that keeps the bridge from reading anyone else's records.

@@ -10777,6 +10777,11 @@
   "notiftext.approval_change.agent_page": "Muuta agentin sivulla",
   "notiftext.approval_change.scheduler": "Muuta Ajastin-välilehdellä",
   "notiftext.approval_change.accountants": "Muuta Tuloslaskelma-sivun kohdassa Kuka saa lukea kirjojasi",
+  "notiftext.approval_change.portfolio_page": "Muuta sivua Tervetulosivu-välilehdellä",
+  "notiftext.approval_portfolio_memory_read.title": "{who} kirjoitti tervetulosivusi. Saako sivu lukea merkintöjäsi, kun avaat sen?",
+  "notiftext.approval_portfolio_memory_read.body": "{who} ei itse saa lukea merkintöjäsi. Kun avaat tervetulosivusi kirjautuneena, sivu voisi lukea merkintäsi ja lähettää ne muualle. Jos sallit, sivu lukee merkintäsi kuten ennenkin. Jos et salli, sivu näytetään ilman yksityisiä merkintöjäsi. {who} saa vastauksen kummassakin tapauksessa.",
+  "notiftext.approval_portfolio_memory_read_changed.title": "Tervetulosivusi muuttui. Saako sivu lukea merkintöjäsi, kun avaat sen?",
+  "notiftext.approval_portfolio_memory_read_changed.body": "Tervetulosivuasi muutettiin sivueditorin ulkopuolella, joten palvelin ei tiedä, kuka sen kirjoitti. Kun avaat sivun kirjautuneena, sivu voisi lukea merkintäsi ja lähettää ne muualle. Jos sallit, sivu lukee merkintäsi kuten ennenkin. Jos et salli, sivu näytetään ilman yksityisiä merkintöjäsi.",
   "notiftext.approval_accountant_grant.title": "Saako {name} yhä lukea kirjojasi?",
   "notiftext.approval_accountant_grant.body": "Annoit käyttäjälle {name} oikeuden lukea kirjojasi ennen kuin palvelin alkoi tallentaa jokaisen oikeuden päivämäärän. Tili nimeltä {name} on luotu sen jälkeen, kun aloit antaa oikeuksia, ja poistetun tilin nimen voi rekisteröidä joku toinen. Siksi palvelin ei tiedä, onko tämä se henkilö, jolle annoit oikeuden. Kunnes vastaat, {name} lukee kirjojasi kuten ennenkin. Jos sallit, {name} saa pitää oikeuden. Jos et salli, oikeus poistetaan.",
   "notiftext.approval_card_adult.title": "Maksoitko omalla kortillasi?",
@@ -26951,6 +26956,17 @@
         "high": "Tehtävä tehdään ilman näitä merkintöjä.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos sinulle sopii, että agentti tietää, mitä näissä merkinnöissä lukee. Jos agentti saa lukea kaikki merkintäsi, voit antaa sille tämän luvan agentin sivulla. Silloin se ei enää kysy."
+      },
+      "approval_portfolio_memory_read": {
+        "title": "Saako tervetulosivusi lukea merkintöjäsi?",
+        "short": "Sivun kirjoitti joku, joka ei saa lukea merkintöjäsi, ja sivu voisi lukea ne sinun kauttasi.",
+        "what": "Agenttisi ja sovelluksesi saavat kirjoittaa tervetulosivusi. Kun avaat sivun kirjautuneena, sivu voi lukea merkintäsi, koska sinä saat lukea ne. Sivu, jonka kirjoitti agentti tai sovellus ilman lupaa lukea merkintöjäsi, voisi lukea ne näin ja lähettää ne muualle. Siksi sinulta kysytään kerran jokaisesta uudesta sivusta.",
+        "lowLabel": "Jos sallit",
+        "low": "Sivu lukee merkintäsi, kun avaat sen, kuten ennenkin.",
+        "highLabel": "Jos et salli",
+        "high": "Sivu näytetään, mutta ilman yksityisiä merkintöjäsi. Muut näkevät sen kuten ennenkin.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos tiedät, kuka sivun kirjoitti, ja luotat siihen. Jos agentti kirjoittaa sivuasi usein, anna sille agentin sivulla lupa lukea merkintäsi. Silloin sen sivut eivät enää kysy."
       },
       "approval_goal_model_spend": {
         "title": "Agentti pyytää tekoälyä tekemään tehtävän sinun kustannuksellasi",

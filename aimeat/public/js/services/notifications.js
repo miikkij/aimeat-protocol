@@ -10,6 +10,8 @@
  *   the page may run with the owner's session (isRunnableActionEndpoint).
  * @usage import * as notif from '/js/services/notifications.js';
  * @version-history
+ *   2026-10-31 — HELP_ALIAS: the question about a welcome page changed outside the editor shares the
+ *     explanation of the welcome page question (audit H-9).
  *   v1.4.0 — 2026-10-27 — helpTermOf: a notice whose kind has an explanation gets a question mark that
  *     opens it, on the bell and the page alike (Jouni, 2026-10-27).
  *   v1.3.0 — 2026-10-25 — A decided notice: markAnswered after a button ran, answerTextOf (who decided
@@ -162,7 +164,7 @@ export function bodyOf(n) { return (n?.i18n?.key && said(`notiftext.${n.i18n.key
 export function actionTextOf(a) { return (a?.i18n?.key && said(`notiftext.${a.i18n.key}`, a.i18n.vars || {})) || null; }
 
 /** Notices that share one explanation with another key. */
-const HELP_ALIAS = { agent_mode_set_by_agent: 'agent_mode_self_set', approval_refinery_definition_text: 'approval_refinery_definition' };
+const HELP_ALIAS = { agent_mode_set_by_agent: 'agent_mode_self_set', approval_refinery_definition_text: 'approval_refinery_definition', approval_portfolio_memory_read_changed: 'approval_portfolio_memory_read' };
 /**
  * The explanation term of a notice (`explain.notice.<key>.*`, components/ExplainDialog.js), or null
  * when its kind has none. The bell and the Notifications page draw a question mark for it.

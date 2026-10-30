@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-portfolio-read-hold.ts joins the list (not the guard tier): its own node on 28461 with the portfolio origin on (audit H-9).
  *   2026-10-30 -- e2e-designbook-kits.ts joins the list (not the guard tier): style kits (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  *   2026-10-29 -- e2e-designbook-ornaments.ts joins the list (not the guard tier): the ornament kind and the kit's ornaments (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
  *   2026-10-29 -- e2e-app-structure.ts joins the list (not the guard tier): the app's structure and plan from the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
@@ -605,6 +606,9 @@ const ALL_SUITES = [
     'test/e2e-app-design-spec.ts',
     'test/e2e-app-structure.ts',
     'test/e2e-app-silent.ts',
+    // Self-spawns with the portfolio origin ON (28461): the owner's welcome page reads their memory only
+    // when its writer may read memory or the owner allowed it (audit H-9).
+    'test/e2e-portfolio-read-hold.ts',
     // Self-spawns with the app origin OFF on a fresh database: one owner first, then a second, which
     // is the moment every app moves into the isolated frame (audit A7-1).
     'test/e2e-app-frame.ts',

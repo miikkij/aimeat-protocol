@@ -24,6 +24,8 @@
  * @structure registerWelcomeMatRoutes(router, ctx): POST /v1/home/welcome-mat, POST /v1/home/ai-client
  * @usage Registered from src/routes/home.ts.
  * @version-history
+ *   v1.4.2 — 2026-10-31 — A mat the owner accepted in person is recorded as a page that reads their
+ *     memory (services/portfolio-read-hold.ts allowOwnersOwnPage; audit H-9).
  *   v1.4.1 — 2026-10-19 — The portfolio settings are merged on the record's version (mergePortfolioConfig)
  *     (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.4.0 — 2026-10-11 — POST /v1/home/ai-client takes `meets_conditions`, the answer to the
@@ -58,6 +60,7 @@ import {
 import { readHomeState } from '../../services/home-state.js';
 import { mergeJourneyProfile, type ProfileField } from '../../services/journey-state.js';
 import { mergePortfolioConfig } from '../../services/portfolio-config.js';
+import { allowOwnersOwnPage } from '../../services/portfolio-read-hold.js';
 import {
     portfolioWriteGaii, portfolioStandaloneUrl, writePortfolioHtml,
 } from '../portfolio.js';
@@ -122,6 +125,8 @@ async function storeMatAsPortfolio(
     const data = Buffer.from(html, 'utf-8');
 
     await writePortfolioHtml(storage, target, data);
+    // The owner accepted the mat in person, so the page reads their memory as before (audit H-9).
+    await allowOwnersOwnPage({ storage, config }, owner);
 
     // Enable the portfolio, preserving whatever settings are already there. The mat is meant to be
     // looked at the moment it lands — an accepted mat behind a disabled portfolio would be the
