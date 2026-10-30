@@ -19,6 +19,8 @@
  * @structure AppsAdminTab (default) · RightNow · FourStates · TakenDown
  * @usage Mounted by the admin dashboard tab router (views/admin.js).
  * @version-history
+ *   v2.3.0 — 2026-10-30 — The last section: style kits (apps-tab.kits.js): the node's default kit, the
+ *     rules kits run by, and the kits for the whole node that wait for the operator.
  *   v2.2.1 — 2026-09-28 — No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so an app name, owner or take-down reason with a quote or an ampersand showed as
  *     &quot; / &amp; in the take-down log, the newest-app line and the take-down and delete dialogs.
@@ -62,6 +64,7 @@ import { swallowed } from '/js/swallowed.js';
 import * as adminService from '/js/services/admin.js';
 import { AppRow } from './apps-tab.row.js';
 import { CopyScan } from './apps-tab.scan.js';
+import { NodeKits } from './apps-tab.kits.js';
 
 const html = htm.bind(h);
 const A = (key, params) => t('admin.apps.' + key, params);
@@ -339,6 +342,7 @@ export default function AppsAdminTab() {
     <${CopyScan} result=${scanResult} apps=${apps} scanning=${scanning} onScan=${runCopyScan} number=${n()} />
     <${FourStates} facts=${facts} number=${n()} />
     <${TakenDown} apps=${apps} number=${n()} />
+    <${NodeKits} number=${n()} onError=${showError} onDone=${showSuccess} />
 
     <${Modal} open=${!!hiding} onClose=${() => setHiding(null)} title=${A('hideTitle')}
       footer=${hiding && html`

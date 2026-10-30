@@ -322,7 +322,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerAdminInstallSetTools(mcp, storage, config, peers, agentGaii, scopes);
     registerPortfolioTools(mcp, storage, config, agentGaii, caller);
     registerSurfaceLayoutTools(mcp, storage, config, agentGaii, scopes, caller);
-    registerDesignbookTools(mcp, storage, config, agentGaii);
+    registerDesignbookTools(mcp, storage, config, agentGaii, caller);
     registerUiLibraryTools(mcp, storage, config);
     registerThemeTools(mcp, storage, config, agentGaii, scopes, caller);
     registerAgentTelemetryTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);

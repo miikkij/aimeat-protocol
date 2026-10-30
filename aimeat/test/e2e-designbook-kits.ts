@@ -14,9 +14,15 @@
  *        person's own otherwise;
  *     4. a kit for the whole node with no app behind it waits for the operator, and nobody else takes
  *        it meanwhile; an id held by a narrower kit is refused without naming its proposer;
+ *     4b. the node's default is chosen by the operator only, only a published kit for the whole node,
+ *        and answers after the organism's and the person's own; the defaults view shows each person
+ *        their own, the node's and the organisms they run;
  *     5. the two MCP tools answer and refuse as the routes do.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=designbook-kits
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Section 4b, the node's default and the defaults view; `node` and view
+ *     "defaults" on the MCP tools; aimeat_designbook_status, the operator's agent publishing a
+ *     waiting kit and another person's agent refused.
  *   v1.0.0 — 2026-10-30 — Initial (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -47,6 +53,7 @@ const C: RegisteredOwner = await registerOwner(BASE, `kitc${stamp}`);
 const OWN = `kit-own-${stamp}`;
 const ORG = `kit-org-${stamp}`;
 const NODE = `kit-node-${stamp}`;
+const NODE2 = `kit-node2-${stamp}`;
 let orgId = '';
 
 const ownBody = {
@@ -176,7 +183,62 @@ await test('An id a narrower kit holds is refused without naming its proposer', 
   assert(r.status === 409 && r.body.error?.code === 'ID_TAKEN' && !String(r.body.error?.message).includes(A.name), `C under A's id: ${r.status} ${r.body.error?.message}`);
 });
 
+console.log('\n4b. The node\'s default');
+await test('Only the operator chooses the node\'s default, and only a published kit for the whole node', async () => {
+  assert(A.roles.includes('operator') && !B.roles.includes('operator'), `A is the operator, B is not: ${JSON.stringify([A.roles, B.roles])}`);
+  const pub = await json(`/v1/designbook/${NODE}/status`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ status: 'published' }) });
+  assert(pub.status === 200, `the operator publishes the node kit: ${pub.status} ${JSON.stringify(pub.body?.error)}`);
+  const b = await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(B.token), body: JSON.stringify({ node: true, kit: NODE }) });
+  assert(b.status === 403 && b.body.error?.code === 'NOT_ALLOWED', `B chooses the node's: ${b.status} ${b.body.error?.code}`);
+  const narrow = await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ node: true, kit: ORG }) });
+  assert(narrow.status === 409 && narrow.body.error?.code === 'NOT_FOR_THE_NODE', `an organism's kit as the node's: ${narrow.status} ${narrow.body.error?.code}`);
+  const both = await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ node: true, organism: orgId, kit: NODE }) });
+  assert(both.status === 400, `node and organism together: ${both.status}`);
+  const ok = await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ node: true, kit: NODE }) });
+  assert(ok.status === 200 && ok.body.data?.subject === 'node' && ok.body.data?.kit === NODE, `the operator chooses it: ${ok.status} ${JSON.stringify(ok.body?.error)}`);
+});
+await test('The node\'s default answers last: after the organism\'s and the person\'s own', async () => {
+  const c = await json('/v1/designbook/kits/in-force', { headers: auth(C.token) });
+  assert(c.status === 200 && c.body.data?.source === 'node' && c.body.data?.kit?.id === NODE, `C, no default of their own: ${JSON.stringify(c.body.data)}`);
+  const a = await json('/v1/designbook/kits/in-force', { headers: auth(A.token) });
+  assert(a.body.data?.source === 'own' && a.body.data?.kit?.id === OWN, `A's own still answers first: ${JSON.stringify(a.body.data)}`);
+  const b = await json(`/v1/designbook/kits/in-force?organism=${orgId}`, { headers: auth(B.token) });
+  assert(b.body.data?.source === 'organism' && b.body.data?.kit?.id === ORG, `the organism's still answers first: ${JSON.stringify(b.body.data)}`);
+});
+await test('The defaults view: each person sees their own, the node\'s, and the organisms they run', async () => {
+  const a = await json('/v1/designbook/kits/defaults', { headers: auth(A.token) });
+  assert(a.status === 200 && a.body.data?.may_set_node === true, `A: ${a.status} ${JSON.stringify(a.body.data ?? a.body.error)}`);
+  assert(a.body.data.own?.kit === OWN && a.body.data.node?.kit === NODE && a.body.data.node?.title === 'A style for everyone', `A's own and the node's: ${JSON.stringify(a.body.data)}`);
+  const org = (a.body.data.organisms ?? []).find((o: any) => o.id === orgId);
+  assert(org?.default?.kit === ORG && org?.name === `Kit Org ${stamp}`, `A runs the organism: ${JSON.stringify(a.body.data.organisms)}`);
+  const b = await json('/v1/designbook/kits/defaults', { headers: auth(B.token) });
+  assert(b.status === 200 && b.body.data?.may_set_node === false && b.body.data?.own === null, `B: ${JSON.stringify(b.body.data)}`);
+  assert(!(b.body.data.organisms ?? []).some((o: any) => o.id === orgId), `B, a plain member, does not choose the organism's: ${JSON.stringify(b.body.data.organisms)}`);
+  const anon = await json('/v1/designbook/kits/defaults');
+  assert(anon.status === 401, `a visitor: ${anon.status}`);
+});
+
 console.log('\n5. The MCP tools');
+await test('aimeat_designbook_kit_default takes node for the operator\'s agent and refuses another\'s; view "defaults" answers', async () => {
+  const agentB = await makeAgent(BASE, B, ['memory:read', 'memory:write']);
+  const sb = await openSession(BASE, agentB.token);
+  const no = await callTool(sb, 'aimeat_designbook_kit_default', { node: true, kit: NODE });
+  assert(no.isError && no.text.includes('NOT_ALLOWED'), `B's agent for the node: ${no.text.slice(0, 300)}`);
+  const view = await callTool(sb, 'aimeat_designbook_kit', { view: 'defaults' });
+  assert(!view.isError && view.data?.node?.kit === NODE && view.data?.may_set_node === false, `B's agent, defaults: ${view.text.slice(0, 300)}`);
+});
+await test('aimeat_designbook_status: the operator\'s agent publishes a waiting kit; another person\'s agent is refused', async () => {
+  const r = await propose(B.token, { id: NODE2, kind: 'kit', title: 'Night blue', summary: 'Dark and calm, for everyone.', body: { reach: 'node', look: 'editorial', tokens: { '--ak-accent': '#4338ca/#a5b4fc' } } });
+  assert(r.status === 201 && r.body.data?.status === 'proposed', `B offers it: ${r.status} ${JSON.stringify(r.body?.data ?? r.body?.error)}`);
+  const agentB = await makeAgent(BASE, B, ['memory:read', 'memory:write']);
+  const no = await callTool(await openSession(BASE, agentB.token), 'aimeat_designbook_status', { id: NODE2, status: 'published' });
+  assert(no.isError && no.text.includes('NOT_ALLOWED'), `B's agent publishes: ${no.text.slice(0, 300)}`);
+  const agentA = await makeAgent(BASE, A, ['memory:read', 'memory:write', 'operator:admin']);
+  const ok = await callTool(await openSession(BASE, agentA.token), 'aimeat_designbook_status', { id: NODE2, status: 'published' });
+  assert(!ok.isError && ok.data?.status === 'published' && ok.data?.previous === 'proposed', `the operator's agent publishes: ${ok.text.slice(0, 300)}`);
+  const c = await json(`/v1/designbook/${NODE2}`, { headers: auth(C.token) });
+  assert(c.status === 200 && c.body.data?.part?.status === 'published', `C reads it on the shelf: ${c.status}`);
+});
 await test('aimeat_designbook_kit answers the organism\'s kit for a member\'s agent and refuses a non-member\'s', async () => {
   const agentB = await makeAgent(BASE, B, ['memory:read', 'memory:write']);
   const sb = await openSession(BASE, agentB.token);
@@ -193,7 +255,8 @@ await test('aimeat_designbook_kit_default chooses the person\'s own kit, clears 
   const clear = await callTool(sa, 'aimeat_designbook_kit_default', { clear: true });
   assert(!clear.isError && clear.data?.kit === null, `clear: ${clear.text.slice(0, 300)}`);
   const none = await json('/v1/designbook/kits/in-force', { headers: auth(A.token) });
-  assert(none.body.data?.kit === null, `cleared: ${JSON.stringify(none.body.data)}`);
+  // Cleared: the person's own no longer answers, and the node's default (4b) answers in its place.
+  assert(none.body.data?.source === 'node', `cleared: ${JSON.stringify(none.body.data)}`);
   const set = await callTool(sa, 'aimeat_designbook_kit_default', { kit: OWN });
   assert(!set.isError && set.data?.kit === OWN, `set: ${set.text.slice(0, 300)}`);
   const agentB = await makeAgent(BASE, B, ['memory:read', 'memory:write']);
@@ -204,8 +267,9 @@ await test('aimeat_designbook_kit_default chooses the person\'s own kit, clears 
 
 await test('Cleanup: the kits and the defaults go', async () => {
   await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ kit: null }) });
+  await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ node: true, kit: null }) });
   await json('/v1/designbook/kits/default', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ organism: orgId, kit: null }) });
-  for (const [id, token] of [[OWN, A.token], [NODE, A.token], [ORG, B.token]] as const) {
+  for (const [id, token] of [[OWN, A.token], [NODE, A.token], [NODE2, B.token], [ORG, B.token]] as const) {
     const d = await json(`/v1/designbook/${id}`, { method: 'DELETE', headers: auth(token) });
     // The own kit was taken once, so it is retired instead of deleted.
     assert(d.status === 200 || (d.status === 409 && d.body.error?.code === 'PART_IN_USE'), `delete ${id}: ${d.status} ${d.body.error?.code}`);

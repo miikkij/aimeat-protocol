@@ -11,6 +11,7 @@
  * @structure AppsTab — state, loads, handlers, the ctx bag, render
  * @usage Registered in views/profile.js TABS as id 'apps'.
  * @version-history
+ *   v2.4.0 — 2026-10-30 — `gallery`: the Design Book gallery's address, for the style kits section (apps/kits.js).
  *   v2.3.0 — 2026-10-16 — A failed load of the owner's apps is drawn as one (appsFailed: the could-not-load
  *     note with Retry), never as "no apps yet" with the first-app guide (QA audit F6-05).
  *   v2.2.0 — 2026-10-04 — `shared`: the apps somebody else owns and the person may build
@@ -47,7 +48,7 @@ import { recordRecent } from '/js/recents.js';
 import { swallowed } from '/js/swallowed.js';
 import { useLoadState } from '/js/load-state.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { a, appRef, nameOf, computeKunto, lineDiff } from './apps/frame.js';
+import { a, appRef, appUrl, nameOf, computeKunto, lineDiff } from './apps/frame.js';
 import { buildAgentAuthoringPrompt } from './apps/build.js';
 import { renderPage } from './apps/page.js';
 
@@ -59,6 +60,7 @@ export default function AppsTab({ session, showToast, onStats }) {
   const { ok: appsLoadOk, fail: appsLoadFail } = appsLoad;
   const [community, setCommunity] = useState(0);   // other people's apps on this node
   const [communityOwners, setCommunityOwners] = useState(0);
+  const [gallery, setGallery] = useState(null);   // the Design Book gallery's address, when the node carries it
   const [bound, setBound] = useState({});          // "owner/filename" → the skills bound to it
   const [grants, setGrants] = useState([]);
   const [shared, setShared] = useState([]);       // apps somebody else owns that this person may build
@@ -89,6 +91,9 @@ export default function AppsTab({ session, showToast, onStats }) {
       setApps(own);
       appsLoadOk();
       setCommunity(others.length);
+      // The Design Book gallery, when this node carries it: the kits section links to its shelf.
+      const book = list.find((x) => x.filename === 'design-book.html');
+      setGallery(book ? appUrl(book) : null);
       setCommunityOwners(new Set(others.map((x) => x.owner)).size);
       onStatsRef.current?.({ apps: own.length });
     } catch (err) {
@@ -295,7 +300,7 @@ Start by asking me which app and what I want changed. Fill a data map (aimeat_da
 
   const ctx = {
     publishApp, submitPublish, closePublish: () => { if (!busy) setPublishApp(null); },
-    session, apps, appsFailed: appsLoad.failed, reload: load, community, communityOwners, bound, grants, shared, buildPrompt, busy, diff, openScopes,
+    session, apps, appsFailed: appsLoad.failed, reload: load, community, communityOwners, gallery, bound, grants, shared, buildPrompt, busy, diff, openScopes,
     builders, buildersBusy, onGrantBuilder, onRevokeBuilder,
     kunto: computeKunto(apps || [], bound), ConfirmUI, showToast,
     publishDraft, discardDraft, toggleDiff, revokeGrant, toggleScopes: (g) => setOpenScopes(openScopes === g.grant_id ? null : g.grant_id),

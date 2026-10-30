@@ -36878,16 +36878,32 @@ paths:
         then the caller's own default; else none. A default that no longer answers (retired,
         narrowed, deleted) is passed over and named in `passed_over`, and the next one in line
         answers. `apply` says what to build with: the genre to fork, the head stylesheet with the
-        kit's tokens, the app() line with the look and the logo, and the ornamentSet() line. A
+        kit's tokens, the app() line with the look and the logo, and the ornamentSet() line. After
+        the caller's own default comes the node's, chosen by its operator (`source` node). A
         default, never a rule: the person may ask for something else. Requires memory:read.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       parameters:
         - { name: organism, in: query, schema: { type: string }, description: The organism the app is built for }
       responses:
-        '200': { description: "{ kit: { id, title, summary, version, body } | null, source: organism|own|null, organism?, apply?: { look, genre?, fork?, css?, app, ornament?, use }, passed_over?: [{ source, kit, why }], note }" }
+        '200': { description: "{ kit: { id, title, summary, version, body } | null, source: organism|own|node|null, organism?, apply?: { look, genre?, fork?, css?, app, ornament?, use }, passed_over?: [{ source, kit, why }], note }" }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: NOT_A_MEMBER — the caller is not an active member of the organism }
+
+  /v1/designbook/kits/defaults:
+    get:
+      operationId: getDesignbookKitDefaults
+      summary: Every default style kit the caller sees or chooses
+      description: >-
+        The caller's own default kit, the node's, and the default of each organism the caller is an
+        owner or an admin of, each as the kit id and title, or with `unavailable` saying why a chosen
+        kit no longer answers. `may_set_node` says whether the caller is the node's operator, who
+        chooses the node's default. Requires memory:read.
+      tags: [Apps]
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: "{ own: { kit, title?, unavailable? } | null, node: same | null, organisms: [{ id, name, default: same | null }], may_set_node, note }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/designbook/kits/default:
     put:
@@ -36899,7 +36915,10 @@ paths:
         admins only (else 403 NOT_ALLOWED), and the kit must be readable by its members: a kit with
         reach `organism` for that organism, or a published kit for the whole node (else 409
         NOT_FOR_THIS_ORGANISM). The kit must be published (409 NOT_PUBLISHED) and a kit (422
-        NOT_A_KIT); a kit the caller cannot read answers 404. Requires memory:write.
+        NOT_A_KIT); a kit the caller cannot read answers 404. With `node` true it is the node's
+        default, chosen by its operator only (else 403 NOT_ALLOWED), and the kit must be a published
+        kit for the whole node (else 409 NOT_FOR_THE_NODE); `node` and `organism` together answer 400.
+        Requires memory:write.
       tags: [Apps]
       security: [{ bearerAuth: [] }]
       requestBody:
@@ -36912,13 +36931,14 @@ paths:
               properties:
                 kit: { type: string, nullable: true, description: The kit id, or null to clear the default }
                 organism: { type: string, description: The organism whose default this is }
+                node: { type: boolean, description: true for the node's default (the operator only) }
       responses:
-        '200': { description: "{ subject: organism|own, organism?, kit }" }
+        '200': { description: "{ subject: organism|own|node, organism?, kit }" }
         '400': { description: INVALID_INPUT }
         '401': { $ref: '#/components/responses/Unauthorized' }
-        '403': { description: NOT_ALLOWED — not an owner or admin of the organism }
+        '403': { description: NOT_ALLOWED — not an owner or admin of the organism, or not the node's operator }
         '404': { $ref: '#/components/responses/NotFound' }
-        '409': { description: NOT_PUBLISHED or NOT_FOR_THIS_ORGANISM }
+        '409': { description: NOT_PUBLISHED, NOT_FOR_THIS_ORGANISM or NOT_FOR_THE_NODE }
         '422': { description: NOT_A_KIT }
 
   /v1/designbook/keep:
