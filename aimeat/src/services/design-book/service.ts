@@ -34,6 +34,10 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.14.0 — 2026-10-30 — The KIT kind (kit.ts): get, list, adopt and recordUse answer a kit narrower
+ *     than the node only inside its reach (a reader outside it meets a missing part), its record is
+ *     stored private, its status follows its reach, and adopt answers what to build with and writes
+ *     nothing. list() takes the reader. componentPublishing moved to propose-checks.ts (pure extraction).
  *   v1.13.1 — 2026-10-30 — list() returns the newest parts first, so the 23 seeded ornaments cannot
  *     push a fresh proposal off the default page on a provider whose storage order puts it last.
  *   v1.13.0 — 2026-10-29 — The ORNAMENT kind (ornament.ts): adopt() answers the line that puts the
@@ -108,8 +112,9 @@ import { buildDesignBookMap } from './map.js';
 import { DesignBookReasons } from './reasons.js';
 import { componentAsRead, componentBench, componentSnippet, type ComponentBenchRead, type ComponentBody } from './component.js';
 import { grownGenrePage, grownGenrePublishing, isGrownGenreBody, type GrownGenrePage } from './grown-genre.js';
-import { proposeChecksFor } from './propose-checks.js';
+import { componentPublishing, kitPublishing, proposeChecksFor } from './propose-checks.js';
 import { ornamentSnippet, type OrnamentBody } from './ornament.js';
+import { kitReadable, kitSnippet, kitStatusOnPropose, kitVisibility, type KitBody } from './kit.js';
 import { avatarPartSnippet, type AvatarBody } from './avatar.js';
 // Where a part is stored lives beside what a generic memory door answers for one (utils/own-door-keys.ts).
 import { DESIGN_BOOK_PART_PREFIX as PART_KEY_PREFIX } from '../../utils/own-door-keys.js';
@@ -232,14 +237,17 @@ export class DesignBookService {
         throw new DesignBookError('ID_TAKEN', `"${input.id}" is a genre this node ships. Pick a name of its own.`, 409);
       }
     }
-    const publishing = input.kind === 'component' ? await this.componentPublishing(ownerGhii, input.body as unknown as ComponentBody)
-      : grown ? await grownGenrePublishing(this.storage, this.config, ownerGhii, grown) : undefined;
+    const publishing = input.kind === 'component' ? await componentPublishing(this.storage, this.config, ownerGhii, input.body as unknown as ComponentBody)
+      : input.kind === 'kit' ? await kitPublishing(this.storage, this.config, ownerGhii, input.body as unknown as KitBody, (g) => this.grownGenre(g))
+        : grown ? await grownGenrePublishing(this.storage, this.config, ownerGhii, grown) : undefined;
 
     const existing = await this.findRecord(input.id);
     const prev = existing ? this.parsePart(existing) : null;
     if (prev && prev.proposed_by_owner !== ownerGhii) {
+      // Whose a kit narrower than the node is stays inside its reach.
+      const whose = (await kitReadable(this.storage, this.config.nodeId, prev, ownerGhii)) ? ` proposed by ${prev.proposed_by_owner}` : '';
       throw new DesignBookError('ID_TAKEN',
-        `The id "${input.id}" is already a part proposed by ${prev.proposed_by_owner}. A part id is a node-wide address — pick another.`, 409);
+        `The id "${input.id}" is already a part${whose}. A part id is a node-wide address — pick another.`, 409);
     }
     if (prev && prev.status === 'retired') {
       throw new DesignBookError('PART_RETIRED',
@@ -256,8 +264,9 @@ export class DesignBookService {
       body: input.body as unknown as Record<string, unknown>,
       tags: input.tags,
       // A component that earned it goes straight to the shelf; nothing here ever takes a part
-      // DOWN from published, which stays the operator's call.
-      status: prev?.status === 'published' || prev?.status === 'aging' ? prev.status : (publishing?.earned ? 'published' : (prev?.status ?? 'proposed')),
+      // DOWN from published, which stays the operator's call. A kit's status follows its reach (kit.ts).
+      status: input.kind === 'kit' ? kitStatusOnPropose(input.body as unknown as KitBody, prev, !!publishing?.earned)
+        : prev?.status === 'published' || prev?.status === 'aging' ? prev.status : (publishing?.earned ? 'published' : (prev?.status ?? 'proposed')),
       proposed_by: provenance.principal,
       proposed_by_owner: ownerGhii,
       bench: { checks: proposeChecksFor(input), passed_at: now },
@@ -284,7 +293,7 @@ export class DesignBookService {
       key: partKey(input.id),
       ownerGaii: this.bookOwner(),
       value: JSON.stringify(part),
-      visibility: part.status === 'published' ? 'public' : 'members',
+      visibility: kitVisibility(part),
       tags: ['designbook', `kind:${part.kind}`, `status:${part.status}`],
       ttlHours: null,
       version: existing ? existing.version + 1 : 1,
@@ -299,32 +308,6 @@ export class DesignBookService {
       replaced_version: existing?.version ?? null,
       ...(publishing ? { publishing } : {}),
     };
-  }
-
-  /**
-   * Whether a component goes onto the shelf by itself. THREE THINGS, ALL OF THEM (ruled
-   * 2026-09-20): the bench passed (or this is not reached), its builder judged it GENERAL and
-   * said why, and it comes out of an app whose OWNER said the app turned out well. The bench
-   * proves it renders and wears the page; it cannot prove anybody else wants it, which is what
-   * the judgement is for, and a finished build proves nothing about the app, which is what the
-   * owner's word is for. A component that misses one stays proposed: listed in the queue, usable
-   * by whoever made it, and one operator action away from the shelf.
-   */
-  private async componentPublishing(ownerGhii: string, body: ComponentBody): Promise<{ earned: boolean; why: string }> {
-    if (body.judgement.reach !== 'general') {
-      return { earned: false, why: 'Its builder judged it special to one app, so it stays proposed: listed, and usable by whoever made it.' };
-    }
-    if (!body.from_app) {
-      return { earned: false, why: 'It names no app it came out of (from_app), so there is no owner\'s word to earn publishing from. It stays proposed.' };
-    }
-    const state = await new DesignBookReasons(this.storage, this.config).keptState(ownerGhii, body.from_app);
-    if (!state.kept) {
-      return { earned: false, why: `The owner has not said "${body.from_app}" turned out well (aimeat_designbook_keep). A finished build is not that. It stays proposed until they do; propose it again then.` };
-    }
-    if (!state.made.length) {
-      return { earned: false, why: `The kept version of "${body.from_app}" wrote down nothing it made by hand (the \`made\` list of its build notes), so nothing says this component came out of it. It stays proposed.` };
-    }
-    return { earned: true, why: `Published: the bench passed, its builder judged it general, and it comes out of "${body.from_app}", which its owner said turned out well.` };
   }
 
   /** The stored record version of one part, or null when the address is empty — the seeding
@@ -355,6 +338,10 @@ export class DesignBookService {
         `No Design Book part "${id}". List what exists with the search — the Book only answers for addresses it holds.`, 404);
     }
     let part = this.parsePart(record);
+    // A kit narrower than the node answers only inside its reach, and like a missing part outside it.
+    if (!(await kitReadable(this.storage, this.config.nodeId, part, reader === null ? null : await this.ownerOrNull(reader)))) {
+      throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+    }
     let bench: ComponentBenchRead | undefined;
     if (part.kind === 'component') {
       const now = componentBench(part.body);
@@ -383,12 +370,15 @@ export class DesignBookService {
   /**
    * The catalogue view: public parts, filtered in memory (the Book is a bounded, curated set). A
    * component that no longer passes the bench is left out, because nobody can take it; the aging
-   * round alone asks for it too (`withFailing`), so it fades like any part nobody takes.
+   * round alone asks for it too (`withFailing`), so it fades like any part nobody takes. A kit
+   * narrower than the node is listed only to a `reader` inside its reach, and to the aging round.
    */
   async list(
-    filters: { kind?: string; status?: string; q?: string; limit?: number } = {}, { withFailing = false }: { withFailing?: boolean } = {},
+    filters: { kind?: string; status?: string; q?: string; limit?: number } = {},
+    { withFailing = false, reader = null }: { withFailing?: boolean; reader?: string | null } = {},
   ): Promise<PartSummaryRow[]> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
+    const readerOwner = reader === null ? null : await this.ownerOrNull(reader);
     // Newest first, before the limit: the seeded shelf alone is past the default page, and
     // storage order differs per provider, so a part just proposed could fall off the first page.
     const items = (await this.storage.listMemory(this.bookOwner(), { prefix: PART_KEY_PREFIX, tags: ['designbook'] }))
@@ -412,6 +402,7 @@ export class DesignBookService {
         if (!hay.includes(q)) continue;
       }
       if (part.kind === 'component' && !withFailing && !componentBench(part.body).passes) continue;
+      if (!withFailing && !(await kitReadable(this.storage, this.config.nodeId, part, readerOwner))) continue;
       rows.push({
         id: part.id, kind: part.kind, title: part.title, summary: part.summary, tags: part.tags,
         status: part.status, proposed_by: part.proposed_by, updated_at: part.updated_at,
@@ -491,11 +482,16 @@ export class DesignBookService {
     avatar?: ReturnType<typeof avatarPartSnippet>;
     /** An ornament only: the one line that puts it on an element. */
     ornament?: ReturnType<typeof ornamentSnippet>;
+    /** A kit only: what to fork, what to put in the head, and the lines to call. */
+    kit?: ReturnType<typeof kitSnippet>;
   }> {
     const record = await this.findRecord(id);
     if (!record) throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
     const part = this.parsePart(record);
     const ownerGhii = await this.ownerOf(callerGaii);
+    if (!(await kitReadable(this.storage, this.config.nodeId, part, ownerGhii))) {
+      throw new DesignBookError('NOT_FOUND', `No Design Book part "${id}".`, 404);
+    }
     if (part.status !== 'published' && part.status !== 'aging' && part.proposed_by_owner !== ownerGhii) {
       throw new DesignBookError('NOT_PUBLISHED',
         `"${id}" is ${part.status}, and only its proposer can adopt it before it is published. The published catalogue is what everyone builds from.`, 403);
@@ -520,6 +516,12 @@ export class DesignBookService {
     if (part.kind === 'ornament') {
       await this.countUse(id, `${localAccountName(callerGaii)}/${filename}`, true);
       return { id, filename, version: record.version, replaced_version: null, kind: part.kind, ornament: ornamentSnippet(part.body as unknown as OrnamentBody) };
+    }
+    // A KIT is taken the same way: it lives in the app's own code, so it writes nothing (kit.ts).
+    if (part.kind === 'kit') {
+      await this.countUse(id, `${localAccountName(callerGaii)}/${filename}`, true);
+      if (part.status === 'aging') await this.setStatus(callerGaii, true, id, 'published');
+      return { id, filename, version: record.version, replaced_version: null, kind: part.kind, kit: kitSnippet(part.body as unknown as KitBody, part.title) };
     }
 
     const apps = new AppUiService(this.storage, this.config);
@@ -701,6 +703,8 @@ export class DesignBookService {
       // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable part is answered as unknown, which is what the builder can act on
       try { part = record ? this.parsePart(record) : null; } catch { part = null; }
       if (!part || part.kind === 'genre' || (part.status !== 'published' && part.status !== 'aging')) { out.unknown.push(id); continue; }
+      // A kit narrower than the node counts only for an app of an owner inside its reach.
+      if (!(await kitReadable(this.storage, this.config.nodeId, part, `${app.split('/')[0]}@${this.config.nodeId}`))) { out.unknown.push(id); continue; }
       ((await this.countUse(id, app, false)) ? out.counted : out.already).push(id);
     }
     return out;
@@ -740,7 +744,7 @@ export class DesignBookService {
       key: record.key,
       ownerGaii: this.bookOwner(),
       value: JSON.stringify(next),
-      visibility: next.status === 'published' ? 'public' : 'members',
+      visibility: kitVisibility(next),
       tags: ['designbook', `kind:${part.kind}`, `status:${next.status}`],
       ttlHours: null,
       version: record.version + 1,

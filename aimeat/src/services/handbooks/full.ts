@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.16.0 — 2026-10-30 — The Apps line says how a look the person wants again becomes a style kit and its default.
  *   v1.15.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew (proposals).
  *   v1.14.0 — 2026-10-29 — The Apps line: a new app's first message carries its structure page. A cold
  *     Opus run read only this page before answering a build request, and never opened the page.
@@ -68,7 +69,9 @@ Three grounds carry most of the work:
   says one of their apps turned out well** ("this one is good", "I'm keeping this"), in whatever
   words and whoever built it, record it: \`aimeat_designbook_keep { filename }\`. It is the one
   signal that an app was worth learning from, and nothing else gives it: a finished build is
-  often thrown away and rebuilt.
+  often thrown away and rebuilt. **When they want that look again**, for their own next apps or for
+  everyone in their organism, save it as a style kit (\`aimeat_designbook_propose\`, kind \`kit\`) and
+  make it the default (\`aimeat_designbook_kit_default\`); a new app asks \`aimeat_designbook_kit\` first.
 - **Organisms and workspaces** are how the person shares knowledge with others. A **skill**
   (\`aimeat_skill_list\`, \`aimeat_skill_get\`) is the operating guide for one named capability, and
   reading the skill first is faster than deriving it.
