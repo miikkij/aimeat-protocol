@@ -44,6 +44,7 @@ import { fileAsk, requesterOf } from './publish-requests/ask.js';
 import type { PublishRequester } from './publish-requests/store.js';
 import { askedOf, type AppPublishAsked } from './app-publish-gate.js';
 import { logger } from '../utils/logger.js';
+import { parseGAII } from '../utils/gaii.js';
 
 /** The record, in the owner's GHII namespace. Service-owned (utils/reserved-keys.ts). */
 export const PORTFOLIO_READ_HOLD_KEY = 'portfolio-read-hold.page';
@@ -77,7 +78,9 @@ async function writeHold(ctx: Ctx, ownerName: string, mutate: (cur: Hold) => Hol
 }
 
 /** File the owner's question about the page with `digest`. `writer` null: a write this module did not see. */
-async function askOwner(ctx: Ctx, ownerName: string, digest: string, requester: PublishRequester, writer: string | null) {
+async function askOwner(ctx: Ctx, ownerName: string, digest: string, requester: PublishRequester, writerId: string | null) {
+  // The name a person reads: an agent's own name, an app's name, never the whole identity.
+  const writer = writerId === null ? null : (parseGAII(writerId)?.agent ?? writerId).replace(/^eco:/, '');
   const writerName = writer ?? '';
   return fileAsk(ctx, ownerName, requester, {
     kind: 'portfolio-memory-read',
