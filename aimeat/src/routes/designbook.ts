@@ -14,6 +14,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-30 — The node's default kit: PUT /v1/designbook/kits/default takes `node: true` (the
+ *     operator), and GET /v1/designbook/kits/defaults answers every default the caller sees or chooses.
+ *     A preview built without the nonce still gives it to the node's own AI-label script.
  *   2026-10-30 — Style kits (services/design-book/kit.ts, kit-defaults.ts): GET /v1/designbook/kits/in-force
  *     and PUT /v1/designbook/kits/default. The list names its reader, a kit's preview address always
  *     carries the token, and the preview shows a kit narrower than the node only inside its reach.
@@ -97,6 +100,7 @@ import { INPUT_LIMITS } from '../models/input-limits.js';
 const KitDefaultSchema = z.object({
   kit: z.string().trim().min(1).max(INPUT_LIMITS.id).nullable(),
   organism: z.string().trim().min(1).max(INPUT_LIMITS.id).optional(),
+  node: z.boolean().optional(),
 }).strict();
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
@@ -202,12 +206,25 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     } catch (err) { refuse(res, err); }
   });
 
-  // Choose the default kit, or clear it with "kit": null: the organism's (its owners and admins) or your own.
+  // Every default the caller sees or chooses: their own, the node's, and each organism's they administer.
+  router.get('/v1/designbook/kits/defaults', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:read'), async (req: Request, res: Response) => {
+    try {
+      res.json(success(config.nodeId, await kits.defaults(caller(req), await isOperatorCaller(storage, req.auth)), [
+        { description: 'Choose the default kit', method: 'PUT', url: '/v1/designbook/kits/default' },
+        { description: 'The kits you can read', method: 'GET', url: '/v1/designbook?kind=kit' },
+      ]));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // Choose the default kit, or clear it with "kit": null: the node's (its operator), the organism's
+  // (its owners and admins) or your own.
   router.put('/v1/designbook/kits/default', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), validateBody(KitDefaultSchema, config.nodeId), async (req: Request, res: Response) => {
     try {
       const body = req.body as z.infer<typeof KitDefaultSchema>;
-      res.json(success(config.nodeId, await kits.setDefault(caller(req), {
+      const isOperator = body.node === true ? await isOperatorCaller(storage, req.auth) : false;
+      res.json(success(config.nodeId, await kits.setDefault(caller(req), isOperator, {
         ...(body.organism ? { organism: body.organism } : {}),
+        ...(body.node === true ? { node: true } : {}),
         kit: body.kit,
       })));
     } catch (err) { refuse(res, err); }
@@ -320,7 +337,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // no index — the gallery at /v1/design-book is the address a person keeps. The page's
       // inline script needs the request's CSP nonce; the part's body cannot mint a script tag of
       // its own (the builder escapes `</` and the genre pages are the node's own templates).
-      const { injectCspNonce } = await import('../utils/csp-nonce.js');
+      const { injectCspNonce, addedScriptHashes, withScriptHashes } = await import('../utils/csp-nonce.js');
       // The page is a rendering of an app part, so its PICTURES follow the app policy (img-src *,
       // the same a published app runs under): a part's illustration lives on the apex (/v1/pub)
       // and a map part draws tiles, while the gallery frames this page from the app origin, where
@@ -342,6 +359,11 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       const marked = prov
         ? applyServeMarks(html, { provenance: prov, visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) }, isDocument: true }).toString('utf-8')
         : html;
+      // Without the nonce, the label's own script is allowed by its hash: the scripts the marks
+      // added, and only those, so a script the page itself carried is still refused.
+      if (!nonce && marked !== html) {
+        res.setHeader('Content-Security-Policy', withScriptHashes(String(res.getHeader('Content-Security-Policy') ?? ''), addedScriptHashes(html, marked)));
+      }
       res.type('html').send(injectCspNonce(marked, nonce));
     } catch (err) { refuse(res, err); }
   });

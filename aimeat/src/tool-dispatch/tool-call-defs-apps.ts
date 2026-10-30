@@ -8,6 +8,7 @@
  * @usage
  *   import { appTools } from './tool-call-defs-apps.js';
  * @version-history
+ *   2026-10-30 -- aimeat_designbook_kit takes view "defaults", aimeat_designbook_kit_default takes `node`, and aimeat_designbook_status proxies POST /v1/designbook/:id/status.
  *   v1.13.0 -- 2026-10-20 -- The eight extension entries move to tool-call-defs-extensions.ts (pure
  *     extraction at the 800-line ceiling, so the next extension tool had somewhere to go).
  *   2026-10-19 -- aimeat_app_draft_save and aimeat_app_draft_publish forward `version`, the display version (wish-the-app-draft-tools-can-set-the-display-version).
@@ -479,13 +480,22 @@ export const appTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_designbook_kit',
-        handler: ({ client }, input) => client.get(`/v1/designbook/kits/in-force${query({ organism: optionalString(input, 'organism') })}`),
+        handler: ({ client }, input) => optionalString(input, 'view') === 'defaults'
+            ? client.get('/v1/designbook/kits/defaults')
+            : client.get(`/v1/designbook/kits/in-force${query({ organism: optionalString(input, 'organism') })}`),
     },
     {
         name: 'aimeat_designbook_kit_default',
         handler: ({ client }, input) => client.put('/v1/designbook/kits/default', {
             kit: input.clear === true ? null : requiredString(input, 'kit'),
             ...(optionalString(input, 'organism') ? { organism: optionalString(input, 'organism') } : {}),
+            ...(input.node === true ? { node: true } : {}),
+        }),
+    },
+    {
+        name: 'aimeat_designbook_status',
+        handler: ({ client }, input) => client.post(`/v1/designbook/${encodeURIComponent(requiredString(input, 'id'))}/status`, {
+            status: requiredString(input, 'status'),
         }),
     },
     // ── The component catalogue of the node's own interface. Public and read-only. ──
