@@ -104,6 +104,30 @@ regexes = [
   '''Sec-WebSocket-Key['"]?\s*:\s*['"]dGhlIHNhbXBsZSBub25jZQ==['"]''',
 ]
 
+# 9. A test owner's key pair kept in a variable. Suites that sign as a second owner store the key
+#    the registration returned (owner2PrivKey = owner2.privateKey), and the rule reads the variable
+#    name as a key and the property access as its value. No literal is assigned, so nothing secret
+#    can be in the match. Five suites had grown one hit each by 2026-10-31.
+[[allowlists]]
+description = "A test owner's private key copied from its registration object into a variable"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''aimeat/test/.*''']
+regexTarget = "match"
+regexes = ['''(?i)privkey\s*=\s*[A-Za-z_$][A-Za-z0-9_$]*\.privateKey''']
+
+# 10. Skill review digests. aimeat/security/skill-reviews.json maps each source file a skill watches
+#     to the first 16 hex characters of its content hash (pnpm check:skill-reviews), and a file named
+#     after access or keys (workspace-access.ts) makes the rule read the digest as a key. The file
+#     holds nothing but file paths and those digests.
+[[allowlists]]
+description = "Content digests of watched source files in the skill review ledger"
+targetRules = ["generic-api-key"]
+condition = "AND"
+paths = ['''aimeat/security/skill-reviews\.json''']
+regexTarget = "match"
+regexes = ['''\.(ts|js|mjs|cjs|md|json)"\s*:\s*"[0-9a-f]{16}"''']
+
 # 8. The early specification drafts, in history only. The v1.x RFC copies, the numbered chapter
 #    files and rfc-parts were removed from the tree on 2026-07-12 and exist only in commits from
 #    February to July 2026. Their example tokens and keys sit in several identical files of one
