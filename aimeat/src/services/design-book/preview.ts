@@ -19,6 +19,7 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
+ *   v1.9.0 — 2026-10-30 — A kit previews as its look and tokens, as a look part does (kit.ts).
  *   v1.8.0 — 2026-10-29 — An ornament part previews as its figure on the element it was drawn for
  *     (ornament.ts), with a control that grows it again.
  *   v1.7.0 — 2026-10-19 — An avatar part previews as its picture at three sizes (avatar.ts).
@@ -106,7 +107,8 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   if (part.kind === 'ornament') return { __page: ornamentPreviewHtml(part) };
   // A LOOK (or a motion recipe) is worn by a page whose content fits its character, chosen from
   // the part's own words (preview-stages.ts), and no longer by one arrangement called "Bench".
-  if (part.kind === 'look' || part.kind === 'motion') {
+  // A KIT previews as its look and tokens worn by a page that fits its words, as a look does.
+  if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'kit') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };
     return lookStage(`${part.id} ${part.title} ${body.look ?? ''}`, body.tokens ?? {}, body.look);
   }

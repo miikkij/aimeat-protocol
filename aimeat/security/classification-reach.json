@@ -1551,6 +1551,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Parts read to run the bench and a notice digest; only ids and reasons reach the notification."
     },
+    "src/services/design-book/kit-defaults.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-30 (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa), the node's own read: the default style kit record under the node's system identity, which holds only a kit id; the kit itself is read through DesignBookService.get with the reader's reach."
+    },
     "src/services/design-book/part-provenance.ts": {
       "reads": {
         "listMemory": 1
