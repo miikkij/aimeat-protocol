@@ -11,7 +11,8 @@
  *   while one is open; it is read when the tab opens, after each mark and on 'aimeat-live-update'.
  * @structure PossiblePayoutsSection
  * @version-history
- *   v1.0.1 -- 2026-10-30 -- Re-reads on 'aimeat-live-update' like the other server-data sections.
+ *   v1.0.1 -- 2026-10-30 -- Re-reads on 'aimeat-live-update' like the other server-data sections; the
+ *     reference field's line goes in `hint`, which TextField shows (`note` is the search line's count).
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  */
 import { h } from 'preact';
@@ -47,7 +48,7 @@ function PayoutRow({ p, onArrived }) {
   return html`
     <${Row} rail="warn" below=${html`
       <${Fields} cols=${1}>
-        <${TextField} label=${P('reference')} note=${P('referenceNote')} value=${reference} onInput=${setReference} onEnter=${mark} code />
+        <${TextField} label=${P('reference')} hint=${P('referenceNote')} value=${reference} onInput=${setReference} onEnter=${mark} code />
       <//>
       <${FormActions}>
         <${Loud} control onClick=${mark}>${P('markArrived')}<//>
