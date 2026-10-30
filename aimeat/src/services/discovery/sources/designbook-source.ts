@@ -12,6 +12,8 @@
  * @structure createDesignbookSource(storage, config) → DiscoverySource
  * @usage registry.register(createDesignbookSource(storage, config));
  * @version-history
+ *   v1.2.1 — 2026-10-30 — Newest parts first before the limit: the seeded shelf (23 ornaments among
+ *     it) is past one page, and Postgres storage order put a fresh proposal beyond it.
  *   v1.2.0 — 2026-09-26 — A component that no longer passes the bench is left out, as the Book's own
  *     search leaves it out (design-book/component.ts componentBench): nobody can take it.
  *   v1.1.0 — 2026-08-30 — A query narrows the parts to the ones whose title, summary or tags carry
@@ -67,7 +69,9 @@ export function createDesignbookSource(storage: Storage, config: AimeatConfig): 
         const part = storedPartOf(r);
         return part?.kind !== 'component' || componentBench(part.body).passes;
       };
+      // Newest first before the limit, as the Book's own list does: the seeded shelf is past one page.
       return records
+        .sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')))
         .filter((r) => PART_KEY_RE.test(r.key))
         .filter(matches)
         .filter(takeable)
