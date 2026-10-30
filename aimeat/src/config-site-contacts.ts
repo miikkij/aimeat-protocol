@@ -8,6 +8,7 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.5.0 — 2026-10-30 — AIMEAT_SITE_DEV_LINKS ('auto' unless it says 'show' or 'hide').
  *   v1.4.0 — 2026-10-29 — AIMEAT_SITE_STORE_TOPUP_URL, AIMEAT_SITE_STORE_ORDERS_URL,
  *     AIMEAT_SITE_DEFAULT_LOCALE, AIMEAT_SITE_PURCHASE_PLAN and AIMEAT_SITE_PURCHASE_PACKAGE.
  *   v1.3.0 — 2026-10-06 — AIMEAT_SITE_STORE_SOON_CODE.
@@ -61,6 +62,11 @@ export function parseSiteContacts(): SiteContact[] {
   return single.email ? [single] : [];
 }
 
+/** AIMEAT_SITE_DEV_LINKS as the setting holds it: 'show', 'hide', or 'auto' for anything else. */
+function devLinksFromEnv(raw: string): SiteLinksConfig['devLinks'] {
+  return raw === 'show' || raw === 'hide' ? raw : 'auto';
+}
+
 /**
  * Links the public pages point at, from the AIMEAT_SITE_* variables. Empty by design: the marketing
  * pages point at apps that belong to whoever runs the node, and a fresh clone must not advertise
@@ -93,6 +99,8 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     // Only a language the node ships; anything else is no language, so the browser's applies.
     defaultLocale: ['en', 'fi', 'es'].includes((process.env.AIMEAT_SITE_DEFAULT_LOCALE ?? '').trim().toLowerCase())
         ? (process.env.AIMEAT_SITE_DEFAULT_LOCALE ?? '').trim().toLowerCase() : '',
+    // Anything but 'show' or 'hide' is 'auto', so a typo keeps the default rather than deciding.
+    devLinks: devLinksFromEnv((process.env.AIMEAT_SITE_DEV_LINKS ?? '').trim().toLowerCase()),
     incubator: (process.env.AIMEAT_SITE_INCUBATOR_URL ?? '').trim(),
     signage: (process.env.AIMEAT_SITE_SIGNAGE_URL ?? '').trim(),
     signageAdmin: (process.env.AIMEAT_SITE_SIGNAGE_ADMIN_URL ?? '').trim(),

@@ -17,6 +17,7 @@
  * @structure MAP_BUDGET · MapRow · buildDesignBookMap(rows, opts)
  * @usage const text = buildDesignBookMap(rows, { baseUrl, light, unlisted });
  * @version-history
+ *   v1.4.0 — 2026-10-30 — The KITS group, first: a kit someone chose comes before a genre.
  *   v1.3.1 — 2026-10-30 — The ORNAMENTS group names the sets.
  *   v1.3.0 — 2026-10-29 — The ORNAMENTS group.
  *   v1.2.0 — 2026-10-19 — The AVATARS group.
@@ -43,6 +44,7 @@ export interface MapOptions {
 }
 
 const KINDS: Array<[string, string]> = [
+  ['kit', 'KITS: a whole style for a new app (a look, its colours and faces, the genre to fork, an ornament set, a logo). Ask `aimeat_designbook_kit` FIRST: the kit the person or their organism chose comes before everything else on this page.'],
   ['genre', 'GENRES: a whole page in a committed look. A build STARTS by forking one (`aimeat_app_template_get`), never by adopting it.'],
   ['layout', 'LAYOUTS: a complete arrangement of a screen, with its blocks placed. Adopt one instead of arranging blocks yourself.'],
   ['fill', 'FILLS: a starting shape for ONE screen or dialog, with the words and the states already thought through.'],

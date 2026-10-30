@@ -48,6 +48,8 @@
  *     readerGaii: installer.gaii, readerOwner: installer.owner,
  *     readerRoles: installer.roles, readerScopes: installer.scopes });
  * @version-history
+ *   v1.7.0 — 2026-10-30 — read() answers the file's `visibility`, and `workspaceRef` when it is bound
+ *     to workspaces, so an extension can tell whether the people it links the file for can open it.
  *   v1.6.0 — 2026-10-22 — `publishers`: a public write takes the closed node's level, the label's
  *     audience cap and the publish gate, as an upload does, and answers `visibility` and, when making
  *     it public waits for the owner, `publishRequest` (secaudit 2026-10, v69).
@@ -186,7 +188,10 @@ export function makeExtensionFiles(deps: {
      */
     publishers?: readonly PublishActor[];
 }): {
-    read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string; classificationWarning?: ExtensionFileWarning } | null>;
+    read(ref: string): Promise<{
+        base64: string; mime: string; size: number; key: string; visibility: string; workspaceRef?: string;
+        classificationWarning?: ExtensionFileWarning;
+    } | null>;
     write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
         Promise<{
             key: string; gaii: string; owner: string; url: string; size: number; visibility: string;
@@ -253,6 +258,10 @@ export function makeExtensionFiles(deps: {
                 mime: file.mimeType,
                 size: file.size,
                 key: `${gaii}/${key}`,
+                // Who else can open it, so a script that hands the address on can say when the
+                // reader will get 403 (a private upload linked into a shared record, 2026-10-30).
+                visibility: file.visibility,
+                ...(file.visibility === 'workspace' && file.workspaceRef ? { workspaceRef: file.workspaceRef } : {}),
                 ...(warning ? { classificationWarning: warning } : {}),
             };
         },

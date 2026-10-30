@@ -107,10 +107,6 @@
       "reason": "REVIEWED 2026-10-27 (cc-jouni-ports). The suite does refuse a second principal: \"Another owner cannot read, change or run this calibration\" asserts 404 for another signed-in owner on read, detail, update, batch and completion. It is 404 and not 403 on purpose, so a project id is not an oracle for whether someone else's project exists; this check counts only 403 and isError, so the suite reads as anonymous-only. Its fixed ports moved to 28000-29999 with every suite's.",
       "sha": "e9114569f9b2f82a"
     },
-    "test/e2e-ext-files.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "765fd1689c5b4298"
-    },
     "test/e2e-extension-fetch-gunzip.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
       "sha": "1b72f3b6c3ac226a"

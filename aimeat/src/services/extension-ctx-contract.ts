@@ -13,6 +13,7 @@
  * @structure MemoryWriteResult · ExtensionCtx · EXT_HASH_REFERENCE_JS · ExtensionLimits
  * @usage import type { ExtensionCtx } from './extension-runtime.js';  // unchanged
  * @version-history
+ *   2026-10-30 — ctx.files.read answers `visibility` and `workspaceRef`.
  *   2026-10-25 — ctx.email's comment: one recipient per message and the hourly allowance (secaudit2026oct22, lead 325).
  *   2026-10-18 — ctx.ai.result(jobId): the answer of a job this extension started, for its installer.
  *   2026-10-18 — ctx.caller.anonymous (a visitor on a public action), ctx.caller.adult (verified
@@ -202,7 +203,7 @@ export interface ExtensionCtx {
      *  `write()` returns `owner` alongside `gaii`: the caller the sandbox sees is not necessarily
      *  the namespace its bytes landed in, and a script handing the address on must not have to guess. */
     files?: {
-        read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string } | null>;
+        read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string; visibility: string; workspaceRef?: string } | null>;
         write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
             Promise<{ key: string; gaii: string; owner: string; url: string; size: number }>;
     };

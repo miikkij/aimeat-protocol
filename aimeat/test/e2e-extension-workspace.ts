@@ -21,6 +21,9 @@
  *   each test with `// HOLE:`. Two tests (no declaration, scheduled run) assert a GUARD the old tree
  *   satisfied trivially, and say so.
  * @version-history
+ *   v1.8.0 — 2026-10-30 — The ifVersion document test writes as B in person: B's agent no longer opens
+ *     B's own image by embedding it (an agent opens only its own files, Jouni 2026-10-30), and the
+ *     test is about the order of the swap and the opening, which a writer who may open the file shows.
  *   v1.7.0 — 2026-10-18 — An agent's write through the extension is marked AI output and a person's
  *     own write is not (wish-ihmisen-laajennuksen-kautta-kirjoittama-teksti-ei-ole-teko-l).
  *   v1.6.0 — 2026-10-12 — B's two agents also hold ext:invoke, the word node 4.0.0 asks on POST
@@ -382,14 +385,17 @@ await test('ifVersion on a document: a write that loses the swap opens none of i
     assert(await visibility() === 'private', 'the file starts private');
     const embed = `# Second\n\n![x](/v1/storage/${key})`;
 
-    const first = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: '# First', ifVersion: 0 });
+    // B writes in person: the file is B's, and an image opens only for a writer who controls it (an
+    // agent opens only its own; services/record-files.ts). So a still-private file after the lost swap
+    // is the swap's refusal holding, not the writer lacking the right.
+    const first = await invoke(EXT, 'docv', B.token, { id: 'd-cas', markdown: '# First', ifVersion: 0 });
     assert(first.status === 200 && first.body.data?.version === 1, `first ${first.status}: ${JSON.stringify(first.body?.error ?? first.body?.data)}`);
-    const lost = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: embed, ifVersion: 0 });
+    const lost = await invoke(EXT, 'docv', B.token, { id: 'd-cas', markdown: embed, ifVersion: 0 });
     assert(lost.status === 409 && lost.body?.error?.code === 'VERSION_CONFLICT', `lost ${lost.status}: ${JSON.stringify(lost.body?.error)}`);
     assert(await visibility() === 'private', `a write that lost the swap opened the file: ${await visibility()}`);
 
     // The write that lands is the one that opens it to the members.
-    const won = await invoke(EXT, 'docv', bAgentToken, { id: 'd-cas', markdown: embed, ifVersion: 1 });
+    const won = await invoke(EXT, 'docv', B.token, { id: 'd-cas', markdown: embed, ifVersion: 1 });
     assert(won.status === 200 && won.body.data?.version === 2, `won ${won.status}: ${JSON.stringify(won.body?.error ?? won.body?.data)}`);
     assert(await visibility() !== 'private', 'the write that landed scoped the file to the workspace');
 });

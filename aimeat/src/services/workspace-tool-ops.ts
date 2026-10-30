@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-30 — A document's embedded images are bound by the writer's principal, as linked files are.
+ *   2026-10-30 — writeWorkspaceOp binds every file a landed value links with /v1/pub, and the writer
+ *     controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
  *   2026-10-24 — publishWorkspaceOp, and publishRecordsBatchOp with draft ids in a workspace, ask the
  *     organism rule's write test with the draft's key, so a viewer or a member with no grant does not
  *     publish another member's draft (secaudit2026oct22, publish-draft-without-workspace-write-role).
@@ -135,6 +138,7 @@ import { readStoredSections } from './workspace-sections.js';
 import { emitChange, emitWorkspaceChange } from './event-bus.js';
 import { updateOrganismStructure } from './structure-snapshot.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from './doc-images.js';
+import { scopeRecordFilesToWorkspace } from './record-files.js';
 import { normalizeWriteItems, resolveWriteItem, resolveSpaceNamespace, type ResolvedWriteItem } from './workspace-write-items.js';
 import { findWorkspaceRecord, writeWorkspaceRecord } from './workspace-write.js';
 import { fileDocumentInSection, isRefusal } from './workspace-member-changes.js';
@@ -482,7 +486,9 @@ export async function writeWorkspaceDraftsOp(
                 { version: outcome.version });
         }
         // The draft landed, so its embedded files may now be opened to the workspace's members.
-        if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller.ownerName, `${organismId}/${ws}`);
+        if (item.isDoc) await scopeDocImagesToWorkspace(storage, config, v, caller, `${organismId}/${ws}`);
+        // And every file the value links that the writer controls (services/record-files.ts).
+        await scopeRecordFilesToWorkspace(storage, v, caller, `${organismId}/${ws}`);
         // Filing under a section changes the space's section index, which is the workspace's own
         // record: the member change door writes it into the copy that counts, or files it as a
         // suggestion when the workspace's rule asks members to suggest. It wrote a copy under the

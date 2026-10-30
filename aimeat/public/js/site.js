@@ -15,8 +15,10 @@
  *   - SIGN_IN_STEPS · signInFirst(pathname, signedIn) — which SPA addresses a visitor without a
  *     session reaches on such a node, and whether this one shows the sign-in page instead
  *   - customerNode() · storeOrdersHref(locale) — a node the store made for a buyer, and their orders
+ *   - devLinksShown() — whether the footer shows the developer links (site.dev_links)
  * @usage import { siteLink, hasSite } from '/js/site.js';
  * @version-history
+ *   v1.7.0 — 2026-10-30 — devLinksShown(): the footer's developer links follow site.dev_links.
  *   v1.6.0 — 2026-10-29 — customerNode() and storeOrdersHref(): a node the store made for a buyer
  *     shows the customer's view, and the orders page in the store (UX review 2026-10-29, B to D).
  *   v1.5.2 — 2026-10-22 — /v1/eco-capability-allow is a sign-in step: the owner allows another
@@ -114,6 +116,17 @@ export function storeSoonNote(locale) {
  */
 export function customerNode() {
   return siteLink('purchasePlan') !== '';
+}
+
+/**
+ * Whether the footer shows the developer links: "For Developers", "Run your own node", GitHub and the
+ * row for machines (site.dev_links). 'auto' shows them except on a customer's node; 'show' and 'hide'
+ * are the operator's own decision (Jouni, 2026-10-30).
+ * @returns {boolean}
+ */
+export function devLinksShown() {
+  const mode = siteLink('devLinks') || 'auto';
+  return mode === 'auto' ? !customerNode() : mode === 'show';
 }
 
 /**

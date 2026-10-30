@@ -36,7 +36,10 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
- *   2026-10-27 -- A session's MCP token is refused once a reset or a delete ends its conversation, and
+ *   2026-10-30 -- Setup no longer matched production: 3f read the refusal from the agent's model call,
+ *     and since 34c646e2b the chat asks the AI gate first and ends the turn with the gate's code before
+ *     the agent starts. 3f reads that error event and asserts no model call was made.
+ *   2026-10-27 --A session's MCP token is refused once a reset or a delete ends its conversation, and
  *     once its process dies; a live conversation's token keeps working (secaudit2026oct26).
  *   2026-10-22 — A session id another owner writes into their own thread record opens a fresh session
  *     rather than the first owner's (secaudit 2026-10, r55).
@@ -955,10 +958,14 @@ async function runNodeRoute(): Promise<void> {
         await setPolicy(true);
         const before = await usage('a');
         const chatsBefore = stub!.requestsFor('chat').length;
-        await turn(owners.a.thread, { text: 'LLMCALL-A under the policy' });
-        const refused = peerEntries().filter((e) => e.kind === 'llm-call').at(-1);
-        assert(refused.status === 403 && refused.body?.error?.code === 'AI_MODEL_NOT_ALLOWED',
-            `the chat's call is the chat's, and the chat switch refuses it: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+        const callsBefore = peerEntries().filter((e) => e.kind === 'llm-call').length;
+        // Since chat-session v1.12.0 the chat asks the AI gate before the agent starts, so the refusal
+        // ends the turn with the gate's own code and no model call is made at all.
+        const events = await turn(owners.a.thread, { text: 'LLMCALL-A under the policy' });
+        const refused = events.find((e) => e.kind === 'error');
+        assert(refused?.code === 'AI_MODEL_NOT_ALLOWED' && !!refused.message,
+            `the chat's call is the chat's, and the chat switch refuses it: ${JSON.stringify(events.slice(-3))}`);
+        assert(peerEntries().filter((e) => e.kind === 'llm-call').length === callsBefore, 'the agent made no model call');
         assert(stub!.requestsFor('chat').length === chatsBefore, 'the provider was never called');
         assert((await usage('a')).total_calls === before.total_calls, 'and nothing was metered');
 

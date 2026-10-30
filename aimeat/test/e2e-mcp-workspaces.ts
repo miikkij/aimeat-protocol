@@ -5,6 +5,10 @@
  *   schema) via REST, then drives the tools as the owner's agent over MCP, and checks the
  *   membership gate with a second owner's organism.
  * @version-history
+ *   2026-10-30 — 9b: an agent embedding ANOTHER agent's image leaves it private (it read 'workspace',
+ *     the hole closed: an agent opens only its own files, Jouni 2026-10-30). 9b2: the owner's write in
+ *     person scopes the same image. 9b3: a public image stays public (it was narrowed before). 9e
+ *     writes as the owner, whose write would open the image, so the refusal is what keeps it private.
  *   2026-10-20 — Tests 22, 23 and 24 drive the member's OWN session beside the member's agent: a
  *     workspace role is the member's permission, so a revoked member and a viewer are refused the
  *     write in person as well, and a contributor makes it either way (Core 2026-11 COL-09; secaudit
@@ -387,7 +391,10 @@ await test('9a. storage upload response carries owner_gaii + embed_url/embed_mar
     assert(typeof up.body.data.embed_markdown === 'string' && up.body.data.embed_markdown.includes(up.body.data.embed_url), 'embed_markdown wraps embed_url');
 });
 
-await test('9b. write doc embedding /v1/storage/<key> → stored markdown rewritten to /v1/pub + file scoped to the workspace', async () => {
+const imgVisibility = async (key: string) =>
+    (await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } })).headers.get('x-aimeat-visibility');
+
+await test('9b. an agent writes a doc embedding /v1/storage/<key> → rewritten to /v1/pub; ANOTHER agent\'s image stays private', async () => {
     const md = `# Pyramid\n\n![pyramid](/v1/storage/${IMG_KEY})\n`;
     const w = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'page', value: { title: 'Pyramid', markdown: md } }, 190);
     assert(w.result.isError !== true, `write error: ${w.result.content?.[0]?.text}`);
@@ -398,10 +405,32 @@ await test('9b. write doc embedding /v1/storage/<key> → stored markdown rewrit
     const stored = item.value.markdown as string;
     assert(!stored.includes(`/v1/storage/${IMG_KEY}`), `raw /v1/storage URL must be gone: ${stored}`);
     assert(stored.includes(embedUrlFor(imgAgentGaii, IMG_KEY)), `rewritten to owner-addressed /v1/pub: ${stored}`);
-    // The file is now workspace-scoped (members-only), NOT public.
-    const head = await fetch(`${BASE}/v1/storage/${IMG_KEY}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
-    assert(head.status === 200, `HEAD own file ${head.status}`);
-    assert(head.headers.get('x-aimeat-visibility') === 'workspace', `file scoped to workspace, got ${head.headers.get('x-aimeat-visibility')}`);
+    // The writer is A's MCP agent and the image is the image agent's: an agent opens only its own
+    // files (services/record-files.ts; Jouni, 2026-10-30). Read 'workspace' before that change.
+    assert(await imgVisibility(IMG_KEY) === 'private', `a sibling agent's image must stay private, got ${await imgVisibility(IMG_KEY)}`);
+});
+
+await test('9b2. the owner writes the same embed in person → the image (their agent\'s) is scoped to the workspace', async () => {
+    const w = await json(`/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+        body: JSON.stringify({ ws: WS, space: 'page', value: { title: 'Pyramid by the owner', markdown: `![pyramid](${embedUrlFor(imgAgentGaii, IMG_KEY)})` } }),
+    });
+    assert(w.status === 200, `drafts ${w.status}: ${JSON.stringify(w.body.error)}`);
+    // Workspace-scoped (members-only), NOT public.
+    assert(await imgVisibility(IMG_KEY) === 'workspace', `file scoped to workspace, got ${await imgVisibility(IMG_KEY)}`);
+});
+
+await test('9b3. a PUBLIC image the owner embeds stays public (never narrowed to the members)', async () => {
+    const key = `img/public-${Date.now()}.png`;
+    const up = await json('/v1/storage', { method: 'POST', headers: { Authorization: `Bearer ${imgAgentToken}` }, body: JSON.stringify({ key, data: PNG_1x1_B64, mime_type: 'image/png', visibility: 'public' }) });
+    assert(up.status === 201, `upload ${up.status}: ${JSON.stringify(up.body.error || up.body)}`);
+    const w = await json(`/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+        body: JSON.stringify({ ws: WS, space: 'page', value: { title: 'Public picture', markdown: `![p](${embedUrlFor(imgAgentGaii, key)})` } }),
+    });
+    assert(w.status === 200, `drafts ${w.status}: ${JSON.stringify(w.body.error)}`);
+    // Read 'workspace' before 2026-10-30: the image was taken off the internet by being embedded.
+    assert(await imgVisibility(key) === 'public', `a public image stays public, got ${await imgVisibility(key)}`);
 });
 
 await test('9c. publish → .latest markdown also carries the /v1/pub URL', async () => {
@@ -438,15 +467,20 @@ await test('9e. a refused batch leaves the first item\'s embedded file unscoped'
     const before = await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
     assert(before.headers.get('x-aimeat-visibility') === 'private', `starts private, got ${before.headers.get('x-aimeat-visibility')}`);
 
-    // Item 0 embeds it and is fine; item 1 is the schema-invalid record test 4 already pins.
-    const b = await A.client.call('aimeat_workspace_write', {
-        organism_id: orgId, ws: WS,
-        items: [
-            { space: 'page', value: { title: 'Refused batch', markdown: `![x](/v1/storage/${key})` } },
-            { space: 'note', id: 'refused-note', value: { body: 'no title' } },
-        ],
-    }, 196);
-    assert(b.result.isError === true, `the batch must be refused: ${b.result.content?.[0]?.text}`);
+    // Item 0 embeds it and is fine; item 1 is the schema-invalid record test 4 already pins. Written by
+    // the owner in person, whose write WOULD open the image (9b2), so a still-private file means the
+    // refusal held, not that the writer lacked the right (an agent opens only its own files).
+    const b = await json(`/v1/organisms/${orgId}/workspace/drafts`, {
+        method: 'POST', headers: { Authorization: `Bearer ${A.ownerToken}` },
+        body: JSON.stringify({
+            ws: WS,
+            items: [
+                { space: 'page', value: { title: 'Refused batch', markdown: `![x](${embedUrlFor(imgAgentGaii, key)})` } },
+                { space: 'note', id: 'refused-note', value: { body: 'no title' } },
+            ],
+        }),
+    });
+    assert(b.status >= 400 && b.status < 500, `the batch must be refused: ${b.status} ${JSON.stringify(b.body.error)}`);
 
     const after = await fetch(`${BASE}/v1/storage/${key}`, { method: 'HEAD', headers: { Authorization: `Bearer ${imgAgentToken}` } });
     assert(after.headers.get('x-aimeat-visibility') === 'private',

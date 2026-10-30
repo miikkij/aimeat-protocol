@@ -14,6 +14,9 @@
  * @structure designbookRouter(config, storage): Router
  * @usage mounted by server-bootstrap/routes-loader.ts
  * @version-history
+ *   2026-10-30 — Style kits (services/design-book/kit.ts, kit-defaults.ts): GET /v1/designbook/kits/in-force
+ *     and PUT /v1/designbook/kits/default. The list names its reader, a kit's preview address always
+ *     carries the token, and the preview shows a kit narrower than the node only inside its reach.
  *   2026-10-24 — Every write route (keep, propose, adopt, bench, status, delete) refuses the shared
  *     anonymous principal with refuseAnonymousPrincipal: the Design Book is node-wide and written
  *     under the node's identity, outside the anonymous.* namespace (secaudit2026oct22,
@@ -83,10 +86,23 @@ import { grownGenreFramePage, grownGenrePage, isGrownGenreBody } from '../servic
 import { resolveAppUrls } from './apps/helpers.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { designBookPreviewToken, designBookPreviewTokenOpens } from '../services/design-book/preview-token.js';
+import { DesignBookKits } from '../services/design-book/kit-defaults.js';
+import { kitReach, kitReadable } from '../services/design-book/kit.js';
+import { callerOf } from '../middleware/caller.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
+
+/** PUT /v1/designbook/kits/default: the kit id, or null to clear; the organism for an organism's default. */
+const KitDefaultSchema = z.object({
+  kit: z.string().trim().min(1).max(INPUT_LIMITS.id).nullable(),
+  organism: z.string().trim().min(1).max(INPUT_LIMITS.id).optional(),
+}).strict();
 
 export function designbookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const book = new DesignBookService(storage, config);
+  const kits = new DesignBookKits(storage, config);
 
   const caller = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
 
@@ -121,11 +137,12 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
   /** Where a frame shows each part. A published part's address is public; a part in proposal only
    *  reaches a signed-in reader's list, and its address carries a token naming it, because the
    *  frame that loads it carries no session. */
-  async function previewUrls(rows: Array<{ id: string; status: string }>): Promise<Map<string, string>> {
+  async function previewUrls(rows: Array<{ id: string; status: string; kind: string }>): Promise<Map<string, string>> {
     const out = new Map<string, string>();
     for (const r of rows) {
       const base = `/v1/designbook/${encodeURIComponent(r.id)}/preview`;
-      out.set(r.id, r.status === 'published' ? base : `${base}?t=${encodeURIComponent(await designBookPreviewToken(r.id))}`);
+      // A kit may be narrower than the node, and its frame carries no session either: always the token.
+      out.set(r.id, r.status === 'published' && r.kind !== 'kit' ? base : `${base}?t=${encodeURIComponent(await designBookPreviewToken(r.id))}`);
     }
     return out;
   }
@@ -160,7 +177,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         status: isSignedIn(req) ? (req.query.status as string | undefined) : 'published',
         q: req.query.q as string | undefined,
         limit: req.query.limit ? parseInt(req.query.limit as string, 10) : undefined,
-      });
+      }, { reader: isSignedIn(req) ? caller(req) : null });
       // Each part carries its own record, `ai_provenance`: a gallery labels the parts an AI wrote.
       const recordOf = await partProvenanceIds(storage, config, rows.map(r => r.id));
       const served = await loadServedProvenanceMany(storage, config, [...recordOf.values()]);
@@ -170,6 +187,29 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
         { description: 'Read one part whole', method: 'GET', url: '/v1/designbook/{id}' },
         { description: 'Propose a part (the bench runs first)', method: 'POST', url: '/v1/designbook' },
       ]));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // THE KIT A NEW APP STARTS FROM (kit-defaults.ts): the organism's when the builder names one they
+  // are an active member of, else the person's own, else none. Registered before /v1/designbook/:id.
+  router.get('/v1/designbook/kits/in-force', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:read'), async (req: Request, res: Response) => {
+    try {
+      const organism = typeof req.query.organism === 'string' && req.query.organism ? req.query.organism : undefined;
+      res.json(success(config.nodeId, await kits.inForce(caller(req), organism), [
+        { description: 'Take the kit once the app has a file name (counts the use)', method: 'POST', url: '/v1/designbook/{id}/adopt' },
+        { description: 'Choose the default kit', method: 'PUT', url: '/v1/designbook/kits/default' },
+      ]));
+    } catch (err) { refuse(res, err); }
+  });
+
+  // Choose the default kit, or clear it with "kit": null: the organism's (its owners and admins) or your own.
+  router.put('/v1/designbook/kits/default', requireAuth(), refuseAnonymousPrincipal(), requireScope('memory:write'), validateBody(KitDefaultSchema, config.nodeId), async (req: Request, res: Response) => {
+    try {
+      const body = req.body as z.infer<typeof KitDefaultSchema>;
+      res.json(success(config.nodeId, await kits.setDefault(caller(req), {
+        ...(body.organism ? { organism: body.organism } : {}),
+        kit: body.kit,
+      })));
     } catch (err) { refuse(res, err); }
   });
 
@@ -233,6 +273,11 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
       // read do. A frame carries no session, so it shows one with the token those reads hand out
       // in `preview_url`; without either it answers like a part that does not exist.
       if (part && part.status !== 'published' && !isSignedIn(req) && !(await designBookPreviewTokenOpens(req.query.t, id))) {
+        return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
+      }
+      // A kit narrower than the node: a reader inside its reach, or the token the list handed to one.
+      if (part && kitReach(part) !== 'node' && !(await designBookPreviewTokenOpens(req.query.t, id))
+        && !(isSignedIn(req) && await kitReadable(storage, config.nodeId, part, callerOf(req, config.nodeId, storage).ownerGhii))) {
         return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No published part has this id.'));
       }
       const served = part ? null : getAppTemplates().find(t => t.kind === 'genre' && t.id === id);
@@ -339,7 +384,7 @@ export function designbookRouter(config: AimeatConfig, storage: Storage): Router
     try {
       const { benchAndStamp } = await import('../services/design-book/bench.js');
       const id = req.params.id as string;
-      const { part } = await book.get(id);
+      const { part } = await book.get(id, caller(req));
       const who = caller(req);
       const ownerGhii = who.includes('#') ? who.slice(who.indexOf('#') + 1) : who;
       if (part.proposed_by_owner !== ownerGhii && !(await isOperatorCaller(storage, req.auth))) {

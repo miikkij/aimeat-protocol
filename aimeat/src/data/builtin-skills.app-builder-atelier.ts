@@ -13,6 +13,7 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.39.0 — 2026-10-30 — A new app asks for its style kit (aimeat_designbook_kit) before it picks a genre, and a look the person wants again is saved as a kit.
  *   v1.38.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app
  *     (proposals), and the steps stay out of the chat.
  *   v1.37.0 — 2026-10-30 — The ornaments on the shelf include whole sets of five in one style.
@@ -185,6 +186,13 @@ because one tool result cannot carry all of it. The genres: \`aimeat_designbook_
 "genre" }\` lists them with what each is for, and \`aimeat_app_template_get { id: "genre-<id>" }\`
 returns the page to fork; a genre is larger than one result, so it says how many parts it has and
 you ask for each with \`part\`. Pitfalls: \`aimeat_appdev_pitfall_list\`.
+
+**A new app asks for its style kit before it picks a genre.** \`aimeat_designbook_kit\` (with
+\`organism\` when the app is built for one) answers the kit the person or their organism chose: the
+genre to fork, the head stylesheet, the app() line and the ornament line. Build in it unless the
+person asks for something else. When they say they want this app's look for their next ones, save it
+as a kit (\`aimeat_designbook_propose\`, kind \`kit\`) and make it their default
+(\`aimeat_designbook_kit_default\`).
 
 **Never fetch or follow /v1/prompts/build-app on this track.** Its vocabulary (daisyUI classes,
 hand-written boilerplate, the theme-restore snippet) does not apply here, and mixing the two

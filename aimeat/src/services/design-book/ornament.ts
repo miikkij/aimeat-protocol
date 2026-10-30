@@ -16,12 +16,13 @@
  *
  *   TAKEN LIKE A COMPONENT, NOT MERGED. An ornament lives in the app's own code, on the element the
  *   app chooses, so adopting one writes nothing and answers the one line that puts it there.
- * @structure OrnamentBody · validateOrnamentBody(o) · ornamentPreviewHtml(part, theme) · ornamentSnippet(body)
+ * @structure OrnamentBody · validateOrnamentBody(o) · ornamentPreviewHtml(part, theme) · ornamentSnippet(body) · SET_STAGE · STAGE_CSS
  * @usage
  *   const body = validateOrnamentBody({ ornament: 'frame', params: { leaves: 2 } });
  *   const set = validateOrnamentBody({ set: 'art-deco', params: { value: 0.4 } });
  * @version-history
  *   v1.0.0 — 2026-10-29 — Initial.
+ *   v1.1.1 — 2026-10-30 — SET_STAGE and STAGE_CSS are exported: a style kit previews on the same screen (kit.ts).
  *   v1.1.0 — 2026-10-30 — A SET body ({ set, params?, look? }) previewed as a whole screen and
  *     adopted as one ornamentSet() line; the value control on every figure that takes a value.
  */
@@ -98,7 +99,7 @@ const STAGE: Record<OrnamentWraps, string> = {
 };
 
 /** A whole screen for a set: each element carries the role its figure takes. */
-const SET_STAGE = [
+export const SET_STAGE = [
   '<div class="orn-set">',
   '<div class="orn-card" data-orn-role="frame"><h2>A card in the set</h2><p>The frame grows round the card while the rest of the set grows beside it.</p></div>',
   '<div class="orn-set__side">',
@@ -112,7 +113,7 @@ const SET_STAGE = [
 ].join('');
 
 /** Shapes the demo elements so each figure has the room it was drawn for. */
-const STAGE_CSS = [
+export const STAGE_CSS = [
   'html, body { margin: 0; }',
   'body { background: var(--ak-bg); color: var(--ak-ink); font-family: var(--ak-font, Georgia, serif); }',
   'main { max-width: 760px; margin: 0 auto; padding: 32px 20px 96px; display: flex; flex-direction: column; gap: 28px; }',

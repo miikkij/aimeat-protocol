@@ -23,6 +23,8 @@
  * @usage
  *   const part = validatePartInput(raw);   // throws DesignBookError with worded refusals
  * @version-history
+ *   v1.9.0 — 2026-10-30 — The KIT kind, the twelfth (kit.ts): a style kit with a reach, the whole look
+ *     of an app a person, an organism or the whole node starts new apps from.
  *   v1.8.1 — 2026-10-30 — The ornament description names the sets ({ set }) beside the single figures.
  *   v1.8.0 — 2026-10-29 — The ORNAMENT kind, the eleventh (ornament.ts): one figure of the kit's
  *     ornaments with its knobs, proven against the ornaments registry.
@@ -64,6 +66,7 @@ import { EFFECT_IDS, effectById } from '../../data/atelier-effects.js';
 import { ORNAMENTS } from '../../data/atelier-ornaments.js';
 import { ORNAMENT_SET_IDS } from '../../data/atelier-ornament-sets.js';
 import { validateOrnamentBody } from './ornament.js';
+import { validateKitBody } from './kit.js';
 
 import { DesignBookError } from './errors.js';
 import { validateComponentBody } from './component.js';
@@ -73,7 +76,7 @@ import { isGrownGenreBody, validateGrownGenreBody } from './grown-genre.js';
 export { DesignBookError } from './errors.js';
 
 /** The kinds the node can PROVE. Growing this list means growing the bench first. */
-export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect', 'component', 'avatar', 'ornament'] as const;
+export const PART_KINDS = ['layout', 'fill', 'look', 'motion', 'illustration', 'genre', 'ambient', 'effect', 'component', 'avatar', 'ornament', 'kit'] as const;
 export type PartKind = (typeof PART_KINDS)[number];
 
 /** Where an effect part lands: a moment on the hero band, a picture effect on one figure, or a
@@ -143,7 +146,9 @@ export function validatePartInput(raw: unknown): PartInput {
       'templates, shown and forked rather than adopted; ambient = the animated layer behind an app, ' +
       'proven on a look; effect = a post-process filter on the hero band, a figure or the ambient ' +
       'layer, proven where it lands; component = markup and a stylesheet an app made by hand ' +
-      'because the Book had nothing for it, every colour a page token and no script.)');
+      'because the Book had nothing for it, every colour a page token and no script; ornament = an animated ' +
+      'figure or a set of five the kit grows round elements; kit = a style kit, the whole look of an app ' +
+      'that a person, an organism or the whole node starts new apps from.)');
   }
 
   const title = typeof p.title === 'string' ? p.title.trim() : '';
@@ -186,6 +191,10 @@ function benchBodyFor(kind: PartKind, raw: unknown): Record<string, unknown> {
     // An ORNAMENT names one figure the kit draws, with its knobs inside their bounds (ornament.ts).
     if (kind === 'ornament') {
       return validateOrnamentBody(o) as unknown as Record<string, unknown>;
+    }
+    // A KIT is a whole style: a look, its tokens, the genre, the ornament set and the logo, with a reach (kit.ts).
+    if (kind === 'kit') {
+      return validateKitBody(o) as unknown as Record<string, unknown>;
     }
     // A GENRE points at one of the registry's genre templates — a complete committed page.
     // The Book PROVES and SHOWS it; taking one home is a FORK of the template, never a merge,
@@ -303,6 +312,7 @@ function bodyShapeHint(kind: PartKind): string {
   }
   if (kind === 'avatar') return 'An avatar part\'s body is { svg: "<svg…>…</svg>" }: one SVG element, at most 256 kB, no DOCTYPE.';
   if (kind === 'ornament') return `An ornament part's body is { ornament: one of ${ORNAMENTS.filter((o) => !o.set).map((o) => o.id).join(', ')} or a set's figure such as art-deco-frame, params?, look? }: a figure the Atelier kit draws round an element; or { set: one of ${ORNAMENT_SET_IDS.join(', ')}, params?, look? }: five figures in one style.`;
+  if (kind === 'kit') return 'A kit part\'s body is { reach: "own" | "organism" | "node", organism?, look, tokens?, genre?, ornament?: { set, palette? }, logo?, from_app? }: the whole look of an app, and who reads it.';
   if (kind === 'component') {
     return 'A component part\'s body is { prefix, html, css, use, judgement: { reach: "general" | "special", why }, from_app? }: markup and a stylesheet under one class prefix, every colour a var(--ak-…) token, no script.';
   }

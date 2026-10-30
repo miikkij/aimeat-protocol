@@ -477,6 +477,17 @@ export const appTools: ConnectCliToolDefinition[] = [
             ...(input.ai_provenance_id ? { ai_provenance_id: input.ai_provenance_id } : {}),
         }),
     },
+    {
+        name: 'aimeat_designbook_kit',
+        handler: ({ client }, input) => client.get(`/v1/designbook/kits/in-force${query({ organism: optionalString(input, 'organism') })}`),
+    },
+    {
+        name: 'aimeat_designbook_kit_default',
+        handler: ({ client }, input) => client.put('/v1/designbook/kits/default', {
+            kit: input.clear === true ? null : requiredString(input, 'kit'),
+            ...(optionalString(input, 'organism') ? { organism: optionalString(input, 'organism') } : {}),
+        }),
+    },
     // ── The component catalogue of the node's own interface. Public and read-only. ──
     {
         name: 'aimeat_ui_component_list',
