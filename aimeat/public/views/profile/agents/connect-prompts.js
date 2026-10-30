@@ -7,6 +7,9 @@
  *   max-file-lines. The Hello Integration instruction is NOT here: the Agents tab fetches it
  *   from GET /v1/prompts/hello-integration, which serves the CLI's own text.
  * @version-history
+ *   v1.3.2 — 2026-10-31 — buildAgentPrompt step 3 adds one line: keep privateKey, and a later reconnect
+ *     proves the return as the device-token answer's next_steps.keep_your_key says (secaudit2026oct22,
+ *     unbound-reapproval-of-existing-agent). Additive; the other lines are unchanged.
  *   v1.3.1 — 2026-10-11 — buildAgentPrompt's last line names the package README and the node skill
  *     add-a-crew-agent; it named ${url}/docs/integrations/crewai, which no route serves.
  *   v1.3.0 — 2026-09-18 — buildAgentPrompt takes the model recommendation as a parameter (the
@@ -53,6 +56,7 @@ This uses standard OAuth device authorization (RFC 8628). Follow your normal saf
      POST ${url}/v1/agents/device-token
      { "device_code": "<device_code>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }
    The 200 response contains access_token. Use it only within the approved scopes.
+   Keep its privateKey with the token. If you connect again later as this same agent, its next_steps.keep_your_key says how to prove that with the key, so I can keep your access with one press.
 
 4. Fetch your configuration and operating context:
      GET ${url}/v1/agents/<your-agent-name>/skill-bundle
