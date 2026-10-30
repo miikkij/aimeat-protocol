@@ -8,6 +8,8 @@
  * @structure fileMethods
  * @usage Object.assign(SqliteStorage.prototype, fileMethods) in ../index.ts
  * @version-history
+ *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of the database or of one
+ *     store id (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — `blobRef` written and read on every path (Postgres 0121), the caller's UTF-8 verdict
  *     kept for a row whose bytes are an object elsewhere, and setStorageFileBlobRef,
  *     storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -229,10 +231,12 @@ export const fileMethods = {
     return out;
   },
 
-  async listStorageFilesInDatabase(this: SqliteStorage, opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
+  async listStorageFilesIn(this: SqliteStorage, opts: { store: string; limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
     if (opts.owners && opts.owners.length === 0) return [];
-    const where: string[] = ['blobRef IS NULL'];
-    const args: unknown[] = [];
+    // A store id is compared as the reference's first part, never with LIKE, which reads `_` as any character.
+    const head = `${opts.store}|`;
+    const where: string[] = [opts.store === 'database' ? 'blobRef IS NULL' : 'substr(blobRef, 1, ?) = ?'];
+    const args: unknown[] = opts.store === 'database' ? [] : [head.length, head];
     if (opts.owners) { where.push(`ownerGaii IN (${opts.owners.map(() => '?').join(',')})`); args.push(...opts.owners); }
     if (opts.after) { where.push('(ownerGaii > ? OR (ownerGaii = ? AND key > ?))'); args.push(opts.after.ownerGaii, opts.after.ownerGaii, opts.after.key); }
     const rows = this.db.prepare(

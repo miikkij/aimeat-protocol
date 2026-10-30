@@ -6,6 +6,8 @@
  *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
  *   memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-10-30 — uploadFilesPresigned(…, store): the store the person picked; a store refusal in
+ *     their words (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.2.0 — 2026-10-21 — userFiles(): the Files list leaves out the content class pipeline's text files.
  *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
@@ -13,6 +15,7 @@
 import * as memoryService from '/js/services/memory.js';
 import { swallowed } from '/js/swallowed.js';
 import { authHeaders } from '/js/services/auth.js';
+import { refusalWords } from '../storage/store-words.js';
 
 /**
  * The files a person stored, without the content class pipeline's own text files
@@ -115,18 +118,21 @@ export async function fetchFileBytes(f, nodeUrl) {
  *
  *  Failures are returned as MESSAGES, not counted. The reason is the useful part (too large / no
  *  URL / HTTP status); collapsing it to "Upload failed" hid a limit the user could fix in one
- *  setting. */
-export async function uploadFilesPresigned(fileItems, visibility, tags) {
+ *  setting.
+ *
+ *  `store` is the store the person picked for the bytes, or empty for where new files go now. A store
+ *  refusal (no longer open, no longer reachable) reads in the person's words, not the server's. */
+export async function uploadFilesPresigned(fileItems, visibility, tags, store) {
   if (!fileItems || fileItems.length === 0) return { ok: 0, failures: [] };
   let ok = 0;
   const failures = [];
   for (const item of fileItems) {
     try {
-      await memoryService.uploadFilePresigned(item.file, item.key, item.file.type, visibility, tags);
+      await memoryService.uploadFilePresigned(item.file, item.key, item.file.type, visibility, tags, undefined, store || undefined);
       ok++;
     } catch (err) {
       swallowed('memory-tab: upload', err);
-      failures.push(err instanceof Error ? err.message : String(err));
+      failures.push(err && err.code ? refusalWords(err).text : err instanceof Error ? err.message : String(err));
     }
   }
   return { ok, failures };
