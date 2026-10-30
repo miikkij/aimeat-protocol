@@ -26,6 +26,8 @@
  * @variants dialog danger · celebrate · ai · roomy · wide
  * @fork dialog Do not: the focus trap, Escape and focus return are the browser's through native <dialog>, and a hand-rolled overlay loses all three. Put your own markup in body(host) instead.
  * @version-history
+ *   2026-10-30 - Require a backdrop press before dismissing on click; dragging a text selection
+ *     from a field to the backdrop keeps the dialog and its form values open.
  *   v0.59.0 — 2026-09-29 — A dialog wears the app's look (wearLook): it sits on the body, outside
  *     the frame that carries the look's tokens, and a workbench app's dialog drew in the default look.
  *   v0.51.0 — 2026-09-05 — FOUR SLOTS AND ELEVEN NAMED PARTS: `parts.before` opens the body,
@@ -134,15 +136,32 @@ export function dialog(spec) {
     anim.oncancel = done;
   }
 
+  let pressedBackdrop = false;
   // The browser's own dismiss paths (Escape, the backdrop) route through the same close.
   node.addEventListener('cancel', function (ev) {
+    pressedBackdrop = false;
     ev.preventDefault();
     if (dismissible) close('dismiss');
   });
   if (dismissible) {
+    /** @param {MouseEvent} ev */
+    const outside = function (ev) {
+      const rect = node.getBoundingClientRect();
+      return ev.clientX < rect.left || ev.clientX > rect.right
+        || ev.clientY < rect.top || ev.clientY > rect.bottom;
+    };
+    // A selection drag can produce a click on the dialog even when it began in a field.
+    // Capture the press before descendants can stop propagation; pointer events cover touch too.
+    node.addEventListener('pointerdown', function (ev) {
+      pressedBackdrop = ev.isPrimary && ev.button === 0 && ev.target === node && outside(ev);
+    }, true);
+    node.addEventListener('pointercancel', function () { pressedBackdrop = false; }, true);
     node.addEventListener('click', function (ev) {
-      if (ev.target === node) close('dismiss');   // the backdrop, never the panel
-    });
+      const startedOutside = pressedBackdrop;
+      pressedBackdrop = false;
+      // Keyboard and programmatic clicks do not complete a pointer press on the backdrop.
+      if (startedOutside && ev.button === 0 && ev.detail > 0 && ev.target === node && outside(ev)) close('dismiss');
+    }, true);
   }
 
   node.showModal();
