@@ -14,6 +14,10 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.5.1 — 2026-10-31 — Every read of a key file goes through readKeyFileText, which retries the
+ *     codes Windows gives an open during another process's rename over the file (EPERM, EBUSY,
+ *     EACCES, ENOENT) for about 250 ms. A node that read the file in that instant refused to start
+ *     ("could not be read") although the file was whole; incident node-key-path EPERM, 2026-10-26.
  *   v1.5.0 — 2026-10-26 — A key file is written whole or not at all, and only the first of several
  *     processes of one node creates it. The claim stamp and the first write used writeFileSync in
  *     place, so a process that read the file during another's write saw a truncated or overlapped
@@ -127,6 +131,28 @@ function getLegacyNodeKeyPath(): string {
   return join(home, '.aimeat', 'node-key.json');
 }
 
+/** The error codes Windows gives an open while another process renames over the same file. */
+const RENAME_RACE_CODES = new Set(['EPERM', 'EBUSY', 'EACCES', 'ENOENT']);
+
+/**
+ * Read a key file as text. On Windows an open during another process's rename over the file
+ * answers EPERM (the old file is pending deletion) or ENOENT for an instant, although the file is
+ * whole before and after. Those codes are retried for up to about 250 ms; anything else, or a code
+ * that lasts past that, is thrown as before, so a file that really is unreadable still refuses.
+ */
+function readKeyFileText(keyPath: string): string {
+  const waitCell = new Int32Array(new SharedArrayBuffer(4));
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return readFileSync(keyPath, 'utf-8');
+    } catch (err) {
+      const code = (err as NodeJS.ErrnoException).code ?? '';
+      if (attempt >= 25 || !RENAME_RACE_CODES.has(code)) throw err;
+      Atomics.wait(waitCell, 0, 0, 10);
+    }
+  }
+}
+
 /**
  * Which node id already owns a key file, if any.
  *
@@ -138,7 +164,7 @@ function getLegacyNodeKeyPath(): string {
  */
 function readKeyFileClaim(keyPath: string): string | null {
   try {
-    const data = JSON.parse(readFileSync(keyPath, 'utf-8')) as { nodeId?: unknown };
+    const data = JSON.parse(readKeyFileText(keyPath)) as { nodeId?: unknown };
     return typeof data.nodeId === 'string' && data.nodeId ? data.nodeId : null;
   } catch {
     // An unreadable key file is not this function's to report: loadPersistedNodeKey refuses to
@@ -198,7 +224,7 @@ function createKeyFile(keyPath: string, content: string): boolean {
 /** Record which node owns a key file, leaving the keypair itself untouched. */
 function stampKeyFileClaim(keyPath: string, nodeId: string): void {
   try {
-    const data = JSON.parse(readFileSync(keyPath, 'utf-8')) as Record<string, unknown>;
+    const data = JSON.parse(readKeyFileText(keyPath)) as Record<string, unknown>;
     if (data.nodeId === nodeId) return;
     replaceKeyFile(keyPath, JSON.stringify({ ...data, nodeId }, null, 2) + '\n');
   } catch (err) {
@@ -270,7 +296,7 @@ function loadPersistedNodeKey(keyPath: string): { publicKey: string; privateKey:
 
   let raw: string;
   try {
-    raw = readFileSync(keyPath, 'utf-8');
+    raw = readKeyFileText(keyPath);
   } catch (err) {
     logger.error('Node key file exists but could not be read. Refusing to start with a NEW identity — '
       + 'fix the file permissions, or move the file aside if you intend to regenerate the node key.',
@@ -510,4 +536,4 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
  * Deliberately not part of the module's API: nothing else should be deciding where a node's key
  * lives, and a second caller would be a second answer to that question.
  */
-export const __testables = { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, stampKeyFileClaim, persistNodeKey };
+export const __testables = { getNodeKeyPath, getLegacyNodeKeyPath, readKeyFileClaim, readKeyFileText, stampKeyFileClaim, persistNodeKey };
