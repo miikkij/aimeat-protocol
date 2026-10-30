@@ -15,6 +15,8 @@
  *   GET /v1/apps/:owner/:filename/structure · PUT /v1/apps/:owner/:filename/structure · GET /v1/app-plans
  * @usage registerStructureRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-30 — `proposals`: the layouts and navigations the AI drew for the app, each with its sketch.
+ *   v1.1.0 — 2026-10-29 — A choice's note takes 600 characters: a custom layout is described in it.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import type { Router, Request } from 'express';
@@ -42,8 +44,17 @@ const PlanWriteSchema = z.object({
     choices: z.record(z.string().max(40), z.union([
         z.null(),
         safeText(80),
-        z.object({ value: safeText(80), state: z.enum(['waiting', 'done']).optional(), note: safeText(300).optional() }),
+        z.object({ value: safeText(80), state: z.enum(['waiting', 'done']).optional(), note: safeText(600).optional() }),
     ])).optional(),
+    proposals: z.record(z.string().max(20), z.union([z.null(), z.array(z.object({
+        id: safeText(40),
+        name: safeText(60),
+        note: safeText(400),
+        sketch: z.array(z.object({
+            height: z.enum(['s', 'm', 'l']),
+            cells: z.array(z.object({ w: z.enum(['full', 'main', 'side', 'half', 'tiny']), label: safeText(40).optional(), tone: z.enum(['ink', 'sun']).optional() })).min(1).max(4),
+        })).min(1).max(6),
+    })).min(1).max(4)])).optional(),
     now: safeText(200).nullable().optional(),
     expected_revision: z.number().int().min(0).nullable().optional(),
 });

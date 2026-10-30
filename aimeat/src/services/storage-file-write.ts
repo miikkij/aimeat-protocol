@@ -38,6 +38,8 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.9.2 — 2026-10-30 — removeStorageFile reads the file's metadata, not its bytes: a file in an S3 or
+ *     Azure store was downloaded whole to be deleted, and one whose object had gone answered 404 for ever.
  *   v1.9.1 — 2026-10-26 — removeStorageFile and changeStorageFileVisibility reach the account's own extension file by its short key
  *     `ext/<name>/...` too, stored as `ext/<account>/<name>/...` (owner namespaces, secaudit2026oct22).
  *   v1.9.0 — 2026-10-20 — setStorageFileHooks(): the write and the delete tell the content class
@@ -511,11 +513,13 @@ export async function removeStorageFile(
 
     // The account's own extension's file named by its short key is stored under the stored name
     // (services/component-address.ts ownExtensionFileKey); tried only when the key as written names no file.
+    // Metadata only: a delete needs the row, not the bytes. Reading the bytes downloaded a whole file
+    // from an object store just to remove it, and a row whose object had gone could not be deleted.
     let key = asked;
-    let existing = await storage.getStorageFile(ownerGaii, key);
+    let existing = await storage.getStorageFileMeta(ownerGaii, key);
     if (!existing) {
         const stored = await ownExtensionFileKey(storage, key, localAccountName(ownerGaii));
-        const found = stored ? await storage.getStorageFile(ownerGaii, stored) : null;
+        const found = stored ? await storage.getStorageFileMeta(ownerGaii, stored) : null;
         if (found && stored) { existing = found; key = stored; }
     }
     if (!existing) {

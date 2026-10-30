@@ -73,9 +73,9 @@
   }
   function needsAddedFaces(families, declared2) {
     const known3 = /* @__PURE__ */ new Set();
-    for (const f of declared2) known3.add(String(f).replace(/^["']|["']$/g, "").trim().toLowerCase());
-    return families.some((f) => {
-      const name = String(f || "").trim().toLowerCase();
+    for (const f2 of declared2) known3.add(String(f2).replace(/^["']|["']$/g, "").trim().toLowerCase());
+    return families.some((f2) => {
+      const name = String(f2 || "").trim().toLowerCase();
       return !!name && !SYSTEM_FACES.has(name) && !known3.has(name);
     });
   }
@@ -1039,13 +1039,13 @@
         if (next.has(key)) return;
         if (row.parentNode === node) node.removeChild(row);
       });
-      let at2 = node.firstChild;
+      let at3 = node.firstChild;
       order.forEach(function(row) {
-        if (at2 === row) {
-          at2 = row.nextSibling;
+        if (at3 === row) {
+          at3 = row.nextSibling;
           return;
         }
-        node.insertBefore(row, at2);
+        node.insertBefore(row, at3);
       });
       kept.clear();
       next.forEach(function(row, key) {
@@ -1811,12 +1811,12 @@
     const base = opts && opts.delay || 0;
     let i = 0;
     for (const ch of text) {
-      const f = document.createElement("span");
-      f.className = "ak-flap" + (ch === " " ? " ak-flap--space" : "");
-      f.textContent = ch;
-      wrap2.appendChild(f);
-      if (!reducedMotion() && f.animate && ch !== " ") {
-        f.animate(
+      const f2 = document.createElement("span");
+      f2.className = "ak-flap" + (ch === " " ? " ak-flap--space" : "");
+      f2.textContent = ch;
+      wrap2.appendChild(f2);
+      if (!reducedMotion() && f2.animate && ch !== " ") {
+        f2.animate(
           [{ transform: "rotateX(90deg)", opacity: 0.2 }, { transform: "rotateX(0deg)", opacity: 1 }],
           { duration: 240, delay: base + i * 14, easing: "cubic-bezier(0.22, 1, 0.36, 1)", fill: "backwards" }
         );
@@ -1899,10 +1899,10 @@
     list3.forEach((el2, i) => {
       if (!el2.animate) return;
       const rest = getComputedStyle(el2).transform;
-      const at2 = rest && rest !== "none" ? rest + " " : "";
+      const at3 = rest && rest !== "none" ? rest + " " : "";
       el2.animate(
         [
-          { opacity: 0, transform: at2 + "translateY(24px) scale(0.96)" },
+          { opacity: 0, transform: at3 + "translateY(24px) scale(0.96)" },
           { opacity: 1, transform: rest === "none" ? "none" : rest }
         ],
         { duration: 380, delay: i * step, easing: easeOf2(el2), fill: "backwards" }
@@ -2144,10 +2144,10 @@
       ctx.fillRect(0, hz - depth * 0.35, w, depth * 0.35);
       ctx.lineWidth = 1;
       const vx = w / 2;
-      const fan = ctx.createLinearGradient(0, hz, 0, h);
-      fan.addColorStop(0, rgba(palette2.accent, 0));
-      fan.addColorStop(1, rgba(palette2.accent, PEAK.grid * 0.7));
-      ctx.strokeStyle = fan;
+      const fan2 = ctx.createLinearGradient(0, hz, 0, h);
+      fan2.addColorStop(0, rgba(palette2.accent, 0));
+      fan2.addColorStop(1, rgba(palette2.accent, PEAK.grid * 0.7));
+      ctx.strokeStyle = fan2;
       for (let i = 0; i <= state.columns; i++) {
         const bx = vx + (i / state.columns - 0.5) * w * 3;
         ctx.beginPath();
@@ -2252,9 +2252,9 @@
     const lut = new Uint8ClampedArray(256 * 3);
     const n = stops.length - 1;
     for (let i = 0; i < 256; i++) {
-      const f = i / 255 * n;
-      const k = Math.min(n - 1, Math.floor(f));
-      const p = f - k;
+      const f2 = i / 255 * n;
+      const k = Math.min(n - 1, Math.floor(f2));
+      const p = f2 - k;
       for (let c = 0; c < 3; c++) lut[i * 3 + c] = stops[k][c] * (1 - p) + stops[k + 1][c] * p;
     }
     return lut;
@@ -2337,19 +2337,19 @@
       let o = 0;
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          let f = 0;
+          let f2 = 0;
           for (const b of live) {
             const dx = x - b.cx;
             const dy = (y - b.cy) * b.sy;
-            f += b.r2 / (dx * dx + dy * dy + 1);
+            f2 += b.r2 / (dx * dx + dy * dy + 1);
           }
-          if (f < 0.75) {
+          if (f2 < 0.75) {
             d[o + 3] = 0;
             o += 4;
             continue;
           }
-          const edge = f >= 1 ? 1 : (f - 0.75) * 4;
-          const mix = f >= 1.8 ? 1 : f <= 1 ? 0 : (f - 1) * 1.25;
+          const edge = f2 >= 1 ? 1 : (f2 - 0.75) * 4;
+          const mix = f2 >= 1.8 ? 1 : f2 <= 1 ? 0 : (f2 - 1) * 1.25;
           d[o] = rim[0] + (core[0] - rim[0]) * mix;
           d[o + 1] = rim[1] + (core[1] - rim[1]) * mix;
           d[o + 2] = rim[2] + (core[2] - rim[2]) * mix;
@@ -2816,7 +2816,7 @@
     const old = document.getElementById(inst.filterId);
     if (old && old.parentNode) old.parentNode.removeChild(old);
     const p = inst.params;
-    const f = svgEl(defs, "filter", {
+    const f2 = svgEl(defs, "filter", {
       id: inst.filterId,
       "color-interpolation-filters": "sRGB",
       x: "-6%",
@@ -2828,7 +2828,7 @@
     inst.disp = null;
     inst.map = null;
     if (inst.id === "distort") {
-      svgEl(f, "feTurbulence", {
+      svgEl(f2, "feTurbulence", {
         type: "fractalNoise",
         baseFrequency: p.frequency,
         numOctaves: p.octaves,
@@ -2836,7 +2836,7 @@
         stitchTiles: "stitch",
         result: "n"
       });
-      inst.disp = svgEl(f, "feDisplacementMap", {
+      inst.disp = svgEl(f2, "feDisplacementMap", {
         in: "SourceGraphic",
         in2: "n",
         scale: p.scale,
@@ -2846,13 +2846,13 @@
     } else if (inst.id === "duotone") {
       const s = tokenRgb(inst.el, TOKEN_VARS[p.shadow]);
       const l = tokenRgb(inst.el, TOKEN_VARS[p.light]);
-      svgEl(f, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: LUM_MATRIX, result: "lum" });
-      const ct = svgEl(f, "feComponentTransfer", { in: "lum", result: "tone" });
+      svgEl(f2, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: LUM_MATRIX, result: "lum" });
+      const ct = svgEl(f2, "feComponentTransfer", { in: "lum", result: "tone" });
       const channels = ["R", "G", "B"];
       for (let i = 0; i < 3; i++) {
         svgEl(ct, "feFunc" + channels[i], { type: "table", tableValues: (s[i] / 255).toFixed(4) + " " + (l[i] / 255).toFixed(4) });
       }
-      svgEl(f, "feComposite", {
+      svgEl(f2, "feComposite", {
         in: "tone",
         in2: "SourceGraphic",
         operator: "arithmetic",
@@ -2863,17 +2863,17 @@
       });
     } else if (inst.id === "vhs" || inst.id === "glitch") {
       const d = Math.max(1, Math.round(inst.id === "vhs" ? 2 + 10 * p.strength : 3 + 14 * p.strength));
-      svgEl(f, "feOffset", { in: "SourceGraphic", dx: -d, dy: 0, result: "l" });
-      svgEl(f, "feColorMatrix", { in: "l", type: "matrix", values: "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "red" });
-      svgEl(f, "feOffset", { in: "SourceGraphic", dx: d, dy: 0, result: "r" });
-      svgEl(f, "feColorMatrix", { in: "r", type: "matrix", values: "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0", result: "blue" });
-      svgEl(f, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "green" });
-      svgEl(f, "feBlend", { in: "red", in2: "green", mode: "screen", result: "rg" });
-      svgEl(f, "feBlend", { in: "rg", in2: "blue", mode: "screen" });
+      svgEl(f2, "feOffset", { in: "SourceGraphic", dx: -d, dy: 0, result: "l" });
+      svgEl(f2, "feColorMatrix", { in: "l", type: "matrix", values: "1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "red" });
+      svgEl(f2, "feOffset", { in: "SourceGraphic", dx: d, dy: 0, result: "r" });
+      svgEl(f2, "feColorMatrix", { in: "r", type: "matrix", values: "0 0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 1 0", result: "blue" });
+      svgEl(f2, "feColorMatrix", { in: "SourceGraphic", type: "matrix", values: "0 0 0 0 0 0 1 0 0 0 0 0 0 0 0 0 0 0 1 0", result: "green" });
+      svgEl(f2, "feBlend", { in: "red", in2: "green", mode: "screen", result: "rg" });
+      svgEl(f2, "feBlend", { in: "rg", in2: "blue", mode: "screen" });
     } else if (inst.id === "ripple") {
       if (!ringMap) ringMap = ringMapUri();
-      inst.map = svgEl(f, "feImage", { href: ringMap, x: 0, y: 0, width: 0, height: 0, preserveAspectRatio: "none", result: "map" });
-      inst.disp = svgEl(f, "feDisplacementMap", {
+      inst.map = svgEl(f2, "feImage", { href: ringMap, x: 0, y: 0, width: 0, height: 0, preserveAspectRatio: "none", result: "map" });
+      inst.disp = svgEl(f2, "feDisplacementMap", {
         in: "SourceGraphic",
         in2: "map",
         scale: 0,
@@ -2898,9 +2898,9 @@
     const step = function(now2) {
       inst.raf = 0;
       if (inst.destroyed) return;
-      const f = Math.min(1, (now2 - t0) / ms);
-      fn(f);
-      if (f < 1) inst.raf = requestAnimationFrame(step);
+      const f2 = Math.min(1, (now2 - t0) / ms);
+      fn(f2);
+      if (f2 < 1) inst.raf = requestAnimationFrame(step);
       else done();
     };
     fn(0);
@@ -3031,23 +3031,23 @@
         inst.playing = true;
         node.classList.add(PLAYING);
         if (id === "distort") {
-          ramp2(inst, p.duration, function(f) {
-            if (inst.disp) inst.disp.setAttribute("scale", (p.scale * (1 + 1.4 * Math.sin(Math.PI * f))).toFixed(2));
+          ramp2(inst, p.duration, function(f2) {
+            if (inst.disp) inst.disp.setAttribute("scale", (p.scale * (1 + 1.4 * Math.sin(Math.PI * f2))).toFixed(2));
           }, done);
         } else if (id === "ripple") {
           const box = node.getBoundingClientRect();
           const cx = box.width / 2;
           const cy = box.height / 2;
           const reach = Math.hypot(cx, cy) * 1.2;
-          ramp2(inst, 900 / p.speed, function(f) {
-            const r = Math.max(1, f * reach);
+          ramp2(inst, 900 / p.speed, function(f2) {
+            const r = Math.max(1, f2 * reach);
             if (inst.map) {
               inst.map.setAttribute("x", (cx - r).toFixed(1));
               inst.map.setAttribute("y", (cy - r).toFixed(1));
               inst.map.setAttribute("width", (2 * r).toFixed(1));
               inst.map.setAttribute("height", (2 * r).toFixed(1));
             }
-            if (inst.disp) inst.disp.setAttribute("scale", (p.amplitude * 48 * (1 - f)).toFixed(2));
+            if (inst.disp) inst.disp.setAttribute("scale", (p.amplitude * 48 * (1 - f2)).toFixed(2));
           }, done);
         } else {
           if (typeof node.animate !== "function") {
@@ -3082,8 +3082,8 @@
         node.classList.remove("ak-fx-" + id);
         if (inst.backdrop) node.removeAttribute("data-ak-fx-backdrop");
         for (const name in inst.params) node.style.removeProperty("--ak-fx-" + id + "-" + name);
-        const f = document.getElementById(inst.filterId);
-        if (f && f.parentNode) f.parentNode.removeChild(f);
+        const f2 = document.getElementById(inst.filterId);
+        if (f2 && f2.parentNode) f2.parentNode.removeChild(f2);
         OWNERS.delete(inst.filterId);
         if (MOMENTS[id]) {
           for (const band of Array.prototype.slice.call(node.querySelectorAll(".ak-fx__band, .ak-fx__glitch-band"))) {
@@ -3899,7 +3899,7 @@
       if (sky && sky.set) sky.set({ alpha: saved });
       saved = null;
     }
-    function arm() {
+    function arm2() {
       if (timer) clearTimeout(timer);
       timer = 0;
       if (destroyed || reducedMotion()) return;
@@ -3910,22 +3910,22 @@
       if (!on2 && now2 - lastInput < 250) return;
       lastInput = now2;
       if (on2) disengage();
-      arm();
+      arm2();
     }
     const onMotion = function() {
       if (reducedMotion()) {
         if (timer) clearTimeout(timer);
         timer = 0;
         disengage();
-      } else arm();
+      } else arm2();
     };
     for (const type of INPUTS) window.addEventListener(type, onInput, { capture: true, passive: true });
     const scroller = app2.main || null;
     if (scroller) scroller.addEventListener("scroll", onInput, { passive: true });
     window.addEventListener("ak-motion", onMotion);
-    arm();
+    arm2();
     return {
-      arm,
+      arm: arm2,
       disarm() {
         if (timer) clearTimeout(timer);
         timer = 0;
@@ -5565,9 +5565,9 @@
     if (prior) {
       const p = prior.effect && prior.effect.getComputedTiming ? prior.effect.getComputedTiming().progress : null;
       if (typeof p === "number") {
-        const at2 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
+        const at3 = prior.__frames[Math.min(prior.__frames.length - 1, Math.round(p * (prior.__frames.length - 1)))];
         Object.keys(from).forEach(function(key) {
-          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at2;
+          from[key] = prior.__from[key] + (prior.__to[key] - prior.__from[key]) * at3;
         });
       }
       prior.cancel();
@@ -5580,10 +5580,10 @@
       } };
     }
     const sf = springFrames(Object.assign({}, opts, { el: node }));
-    const frames = sf.samples.map(function(at2, i) {
+    const frames = sf.samples.map(function(at3, i) {
       const s = {};
       Object.keys(from).forEach(function(key) {
-        s[key] = from[key] + (dest[key] - from[key]) * at2;
+        s[key] = from[key] + (dest[key] - from[key]) * at3;
       });
       return { offset: i / (sf.samples.length - 1), transform: transformOf(s), opacity: s.opacity };
     });
@@ -5631,12 +5631,12 @@
     let timing = { duration: span, easing: ease, fill: "backwards" };
     if (o.spring) {
       const sf = springFrames({ el: kids[0], stiffness: o.stiffness, damping: o.damping, mass: o.mass });
-      frames = sf.samples.map(function(at2, i) {
+      frames = sf.samples.map(function(at3, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          opacity: Math.min(1, at2 * 1.4),
-          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at2) + ")" : start.replace(/[-\d.]+px/, function(px) {
-            return (parseFloat(px) * (1 - at2)).toFixed(2) + "px";
+          opacity: Math.min(1, at3 * 1.4),
+          transform: o.from === "scale" ? "scale(" + (0.92 + 0.08 * at3) + ")" : start.replace(/[-\d.]+px/, function(px) {
+            return (parseFloat(px) * (1 - at3)).toFixed(2) + "px";
           })
         };
       });
@@ -5838,31 +5838,31 @@
   // src/static/sdk-libs/atelier/menu.js
   var GAP = 6;
   var EDGE = 8;
-  function placeAt(box, at2, o) {
+  function placeAt(box, at3, o) {
     const opts = o || {};
     const w = box.offsetWidth;
     const h = box.offsetHeight;
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    let top = opts.placement === "above" ? at2.top - GAP - h : at2.bottom + GAP;
-    if (top + h > vh - EDGE && at2.top - GAP - h >= EDGE) top = at2.top - GAP - h;
-    if (top < EDGE && at2.bottom + GAP + h <= vh - EDGE) top = at2.bottom + GAP;
-    let left = opts.align === "end" ? at2.right - w : opts.align === "center" ? (at2.left + at2.right) / 2 - w / 2 : at2.left;
+    let top = opts.placement === "above" ? at3.top - GAP - h : at3.bottom + GAP;
+    if (top + h > vh - EDGE && at3.top - GAP - h >= EDGE) top = at3.top - GAP - h;
+    if (top < EDGE && at3.bottom + GAP + h <= vh - EDGE) top = at3.bottom + GAP;
+    let left = opts.align === "end" ? at3.right - w : opts.align === "center" ? (at3.left + at3.right) / 2 - w / 2 : at3.left;
     left = Math.max(EDGE, Math.min(left, vw - w - EDGE));
     top = Math.max(EDGE, Math.min(top, vh - h - EDGE));
     box.style.left = Math.round(left) + "px";
     box.style.top = Math.round(top) + "px";
-    const ox = Math.max(0, Math.min(w, (at2.left + at2.right) / 2 - left));
-    const oy = top >= at2.bottom ? 0 : top + h <= at2.top ? h : h / 2;
+    const ox = Math.max(0, Math.min(w, (at3.left + at3.right) / 2 - left));
+    const oy = top >= at3.bottom ? 0 : top + h <= at3.top ? h : h / 2;
     return ox.toFixed(0) + "px " + oy.toFixed(0) + "px";
   }
   function openMotion(box, origin) {
     box.style.transformOrigin = origin;
     if (motionOff(box) || typeof box.animate !== "function") return;
     const sf = springFrames({ el: box });
-    const frames = sf.samples.map(function(at2, i) {
-      const s = 0.9 + 0.1 * at2;
-      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at2 * 1.6) };
+    const frames = sf.samples.map(function(at3, i) {
+      const s = 0.9 + 0.1 * at3;
+      return { offset: i / (sf.samples.length - 1), transform: "scale(" + s.toFixed(4) + ")", opacity: Math.min(1, at3 * 1.6) };
     });
     box.animate(frames, { duration: sf.duration, easing: "linear" });
   }
@@ -6007,11 +6007,11 @@
       });
       return root;
     }
-    function open(at2, fromKeys) {
+    function open(at3, fromKeys) {
       if (box) return;
       box = build();
       document.body.appendChild(wearLook(box, anchor));
-      const r = at2 ? { left: at2.x, right: at2.x, top: at2.y, bottom: at2.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
+      const r = at3 ? { left: at3.x, right: at3.x, top: at3.y, bottom: at3.y } : anchor ? anchor.getBoundingClientRect() : { left: EDGE, right: EDGE, top: EDGE, bottom: EDGE };
       const origin = placeAt(box, r, { align: s.align });
       mark = ink2(box, { axis: "y", active: ".ak-menu__item--on", className: "ak-menu__ink" });
       openMotion(box, origin);
@@ -6331,11 +6331,11 @@
       const sx = to.width / Math.max(from.width, 1);
       const sy = to.height / Math.max(from.height, 1);
       const sf = springFrames({ el: box });
-      const frames = sf.samples.map(function(at2, i) {
+      const frames = sf.samples.map(function(at3, i) {
         return {
           offset: i / (sf.samples.length - 1),
-          transform: "translate(" + (dx * at2).toFixed(1) + "px, " + (dy * at2).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at2).toFixed(4) + ", " + (1 + (sy - 1) * at2).toFixed(4) + ")",
-          opacity: at2 > 0.85 ? 1 - (at2 - 0.85) / 0.15 : 1
+          transform: "translate(" + (dx * at3).toFixed(1) + "px, " + (dy * at3).toFixed(1) + "px) scale(" + (1 + (sx - 1) * at3).toFixed(4) + ", " + (1 + (sy - 1) * at3).toFixed(4) + ")",
+          opacity: at3 > 0.85 ? 1 - (at3 - 0.85) / 0.15 : 1
         };
       });
       box.style.transformOrigin = "0 0";
@@ -6351,15 +6351,15 @@
         mark = null;
       }
       let handed = false;
-      const hand = function() {
+      const hand2 = function() {
         if (handed) return;
         handed = true;
         if (gone && gone.parentNode) gone.parentNode.removeChild(gone);
         toast({ title: it.done, tone: "ok", ttl: 3200 });
       };
       it.run();
-      setTimeout(hand, Math.min(sf.duration, 420));
-      anim.onfinish = hand;
+      setTimeout(hand2, Math.min(sf.duration, 420));
+      anim.onfinish = hand2;
     }
     function highlight() {
       if (!list3) return;
@@ -6492,12 +6492,12 @@
     const dy = a.top - b.top;
     const sf = springFrames({ el: box });
     box.style.transformOrigin = "0 0";
-    box.animate(sf.samples.map(function(at2, i) {
-      const k = 1 - at2;
+    box.animate(sf.samples.map(function(at3, i) {
+      const k = 1 - at3;
       return {
         offset: i / (sf.samples.length - 1),
         transform: "translate(" + (dx * k).toFixed(1) + "px, " + (dy * k).toFixed(1) + "px) scale(" + (1 + (sx - 1) * k).toFixed(4) + ", " + (1 + (sy - 1) * k).toFixed(4) + ")",
-        opacity: Math.min(1, 0.4 + at2)
+        opacity: Math.min(1, 0.4 + at3)
       };
     }), { duration: sf.duration, easing: "linear" });
   }
@@ -6525,17 +6525,17 @@
       if (s.onChange) s.onChange(pct);
     }
     let dragging = false;
-    function at2(e) {
+    function at3(e) {
       const r = root.getBoundingClientRect();
       set((e.clientX - r.left) / Math.max(r.width, 1) * 100);
     }
     root.addEventListener("pointerdown", function(e) {
       dragging = true;
       root.setPointerCapture(e.pointerId);
-      at2(e);
+      at3(e);
     });
     root.addEventListener("pointermove", function(e) {
-      if (dragging) at2(e);
+      if (dragging) at3(e);
     });
     root.addEventListener("pointerup", function() {
       dragging = false;
@@ -6880,6 +6880,2249 @@
     return d.getDate() + "." + (d.getMonth() + 1) + ". " + pad(d.getHours()) + "." + pad(d.getMinutes());
   }
 
+  // src/static/sdk-libs/atelier/ornament-geo.js
+  function R(n) {
+    return Math.round(n * 10) / 10;
+  }
+  function pathOf(pts) {
+    if (!pts.length) return "";
+    let d = "M" + R(pts[0][0]) + " " + R(pts[0][1]);
+    for (let i = 1; i < pts.length; i++) d += "L" + R(pts[i][0]) + " " + R(pts[i][1]);
+    return d;
+  }
+  function lengthOf(pts) {
+    let l = 0;
+    for (let i = 1; i < pts.length; i++) l += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return Math.ceil(l) + 2;
+  }
+  function turtle(x, y, h, len, kappa, ds) {
+    const step = ds || 1.5;
+    const n = Math.max(2, Math.ceil(len / step));
+    const pts = [[x, y]];
+    const hs = [h];
+    for (let i = 0; i < n; i++) {
+      h += kappa(i / n) * step;
+      x += Math.cos(h) * step;
+      y += Math.sin(h) * step;
+      pts.push([x, y]);
+      hs.push(h);
+    }
+    return { pts, hs, d: pathOf(pts), len: lengthOf(pts), end: { x, y, h } };
+  }
+  function at(t2, u) {
+    const i = Math.min(t2.pts.length - 1, Math.max(0, Math.round(u * (t2.pts.length - 1))));
+    return { x: t2.pts[i][0], y: t2.pts[i][1], h: t2.hs[i] };
+  }
+  function leafPath(s, wf) {
+    const w = s * (wf || 0.34);
+    return "M0 0C" + R(s * 0.18) + " " + R(-w) + " " + R(s * 0.62) + " " + R(-w * 0.8) + " " + R(s) + " 0C" + R(s * 0.62) + " " + R(w * 0.8) + " " + R(s * 0.18) + " " + R(w) + " 0 0Z";
+  }
+  function line(x0, y0, x1, y1, flip) {
+    const L = Math.max(1e-6, Math.hypot(x1 - x0, y1 - y0));
+    const tx = (x1 - x0) / L;
+    const ty = (y1 - y0) / L;
+    const nx = flip ? -ty : ty;
+    const ny = flip ? tx : -tx;
+    return { L, at: (s) => ({ x: x0 + tx * s, y: y0 + ty * s, tx, ty, nx, ny }) };
+  }
+  function arc(cx, cy, r, a0, a1) {
+    const dir = a1 > a0 ? 1 : -1;
+    return {
+      L: Math.abs(a1 - a0) * r,
+      at: (s) => {
+        const a = a0 + dir * s / r;
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + r * c, y: cy + r * sn, tx: -sn * dir, ty: c * dir, nx: c, ny: sn };
+      }
+    };
+  }
+  function rrect(x, y, w, h, r) {
+    const rad = Math.max(0, Math.min(r, w / 2, h / 2));
+    const P = Math.PI;
+    const segs = [];
+    const edge = (x0, y0, tx, ty, len) => segs.push({ len, f: (t2) => ({ x: x0 + tx * t2, y: y0 + ty * t2, tx, ty, nx: ty, ny: -tx }) });
+    const bend = (cx, cy, a0) => segs.push({
+      len: P * rad / 2,
+      f: (t2) => {
+        const a = a0 + (rad > 0 ? t2 / rad : 0);
+        const c = Math.cos(a);
+        const sn = Math.sin(a);
+        return { x: cx + rad * c, y: cy + rad * sn, tx: -sn, ty: c, nx: c, ny: sn };
+      }
+    });
+    edge(x + rad, y, 1, 0, w - 2 * rad);
+    bend(x + w - rad, y + rad, -P / 2);
+    edge(x + w, y + rad, 0, 1, h - 2 * rad);
+    bend(x + w - rad, y + h - rad, 0);
+    edge(x + w - rad, y + h, -1, 0, w - 2 * rad);
+    bend(x + rad, y + h - rad, P / 2);
+    edge(x, y + h - rad, 0, -1, h - 2 * rad);
+    bend(x + rad, y + rad, P);
+    let L = 0;
+    for (const g of segs) L += g.len;
+    return {
+      L,
+      at: (s) => {
+        let rest = Math.max(0, Math.min(L, s));
+        for (let i = 0; i < segs.length - 1; i++) {
+          if (rest <= segs[i].len) return segs[i].f(rest);
+          rest -= segs[i].len;
+        }
+        const last = segs[segs.length - 1];
+        return last.f(Math.min(rest, last.len));
+      }
+    };
+  }
+  function roundedRectPath(x, y, w, h, r) {
+    const q = Math.max(0, Math.min(r, w / 2, h / 2));
+    const a = (ex, ey) => "A" + R(q) + " " + R(q) + " 0 0 1 " + R(ex) + " " + R(ey);
+    return "M" + R(x + q) + " " + R(y) + "H" + R(x + w - q) + a(x + w, y + q) + "V" + R(y + h - q) + a(x + w - q, y + h) + "H" + R(x + q) + a(x, y + h - q) + "V" + R(y + q) + a(x + q, y) + "Z";
+  }
+  function helix(base, L, amp, period, phase, ds) {
+    const step = ds || 2;
+    const k = 2 * Math.PI / period;
+    const n = Math.ceil(L / step);
+    const segs = [];
+    let cur = null;
+    for (let i = 0; i <= n; i++) {
+      const s = Math.min(L, i * step);
+      const b = base(s);
+      const th = k * s + phase;
+      const o = amp * Math.sin(th);
+      const front = Math.cos(th) >= 0;
+      const p = [b.x + b.nx * o, b.y + b.ny * o];
+      if (!cur || cur.front !== front) {
+        const last = cur ? cur.pts[cur.pts.length - 1] : null;
+        cur = { front, s0: last ? Math.max(0, s - step) : s, s1: s, pts: last ? [last] : [] };
+        segs.push(cur);
+      }
+      cur.pts.push(p);
+      cur.s1 = s;
+    }
+    return segs.filter((g) => g.pts.length > 1).map((g) => ({ front: g.front, s0: g.s0, s1: g.s1, d: pathOf(g.pts), len: lengthOf(g.pts) }));
+  }
+  function helixLeaves(base, L, amp, period, phase, opt) {
+    const k = 2 * Math.PI / period;
+    const a = opt.alpha || 0.9;
+    const every = Math.max(1, Math.round(opt.every || 1));
+    const from = opt.from || 0;
+    const endGap = opt.endGap || 0;
+    const cand = [];
+    for (let m = -1; m * period < L + period; m++) {
+      for (const t0 of [Math.PI / 3, 5 * Math.PI / 3]) {
+        const s = (t0 + 2 * Math.PI * m - phase) / k;
+        if (s >= from && s <= L - endGap) cand.push({ s, th: t0 });
+      }
+    }
+    cand.sort((p, q) => p.s - q.s);
+    const out = [];
+    cand.forEach((c, i) => {
+      if (i % every) return;
+      const b = base(c.s);
+      const o = amp * Math.sin(c.th);
+      const sg = o >= 0 ? 1 : -1;
+      const dx = b.tx * Math.cos(a) + b.nx * sg * Math.sin(a);
+      const dy = b.ty * Math.cos(a) + b.ny * sg * Math.sin(a);
+      out.push({ s: c.s, x: b.x + b.nx * o, y: b.y + b.ny * o, ang: Math.atan2(dy, dx), size: opt.size * (0.82 + 0.06 * (i * 5 % 4)) });
+    });
+    return out;
+  }
+
+  // src/static/sdk-libs/atelier/ornament-svg.js
+  var NS = "http://www.w3.org/2000/svg";
+  function svgEl2(tag, attrs, parent) {
+    const el2 = (
+      /** @type {SVGElement} */
+      document.createElementNS(NS, tag)
+    );
+    if (attrs) for (const k of Object.keys(attrs)) el2.setAttribute(k, String(attrs[k]));
+    if (parent) parent.appendChild(el2);
+    return el2;
+  }
+  var ROLE = {
+    ln: "ak-orn-ln",
+    dim: "ak-orn-dim",
+    hi: "ak-orn-hi",
+    vine: "ak-orn-vine",
+    vback: "ak-orn-vback",
+    gap: "ak-orn-gap",
+    gapc: "ak-orn-gapc",
+    band: "ak-orn-band",
+    hatch: "ak-orn-hatch",
+    leaf: "ak-orn-leaf",
+    rib: "ak-orn-rib",
+    petal: "ak-orn-petal",
+    prib: "ak-orn-prib",
+    dot: "ak-orn-dot",
+    vdot: "ak-orn-vdot",
+    card: "ak-orn-card",
+    solid: "ak-orn-solid",
+    tail: "ak-orn-tail",
+    crease: "ak-orn-crease",
+    ring: "ak-orn-ring"
+  };
+  function drawing(parent, w, h, opts) {
+    const o = opts || {};
+    const animate = o.animate !== false;
+    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
+    const base = Math.max(0, Number(o.delay) || 0);
+    const v = o.view || { x: 0, y: 0, w, h };
+    const svg6 = svgEl2("svg", {
+      viewBox: R(v.x) + " " + R(v.y) + " " + R(v.w) + " " + R(v.h),
+      "aria-hidden": "true",
+      focusable: "false",
+      class: "ak-orn-svg" + (o.cls ? " " + o.cls : "")
+    }, parent);
+    if (o.viewBox !== true) {
+      svg6.setAttribute("width", String(R(v.w)));
+      svg6.setAttribute("height", String(R(v.h)));
+    }
+    const sec = (t2) => ((base + t2) / speed).toFixed(2) + "s";
+    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
+    const group = (p, attrs) => svgEl2("g", attrs, p);
+    const stroke = (p, d, role, width, len, del, dur, lin, extra) => {
+      const el2 = svgEl2("path", { d, class: ROLE[role] + (extra && extra.butt ? " ak-orn-butt" : ""), "stroke-width": width }, p);
+      if (animate && len) {
+        el2.classList.add("ak-orn-grow");
+        if (lin) el2.classList.add("ak-orn-lin");
+        const s = (
+          /** @type {SVGElement & { style: CSSStyleDeclaration }} */
+          el2.style
+        );
+        s.strokeDasharray = String(len);
+        s.strokeDashoffset = String(len);
+        s.animationDelay = sec(del || 0);
+        s.animationDuration = span(dur || 1);
+      }
+      return el2;
+    };
+    const sprouting = (p, transform, del) => {
+      const outer = group(p, { transform });
+      const inner = group(outer);
+      if (animate) {
+        inner.classList.add("ak-orn-sprout");
+        inner.style.animationDelay = sec(del || 0);
+      }
+      return inner;
+    };
+    const leaf = (p, x, y, ang, size, del, wf, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ") rotate(" + R(ang * 180 / Math.PI) + ")", del);
+      svgEl2("path", { d: leafPath(size, wf), class: ROLE[role || "leaf"] }, g);
+      svgEl2("path", { d: "M" + R(size * 0.12) + " 0L" + R(size * 0.8) + " 0", class: ROLE[role === "petal" ? "prib" : "rib"] }, g);
+      return g;
+    };
+    const bead = (p, x, y, r, del, role) => {
+      const g = sprouting(p, "translate(" + R(x) + " " + R(y) + ")", del);
+      svgEl2("circle", { r, class: ROLE[role || "dot"] }, g);
+      return g;
+    };
+    const rosette2 = (p, cx, cy, n, r0, size, ringR, del) => {
+      const g = sprouting(p, "translate(" + R(cx) + " " + R(cy) + ")", del);
+      if (ringR) svgEl2("circle", { r: ringR, class: ROLE.ln, "stroke-width": 1.4 }, g);
+      for (let i = 0; i < n; i++) {
+        svgEl2("path", { d: leafPath(size), class: ROLE.ln, "stroke-width": 0.8, transform: "rotate(" + R(360 * i / n) + ") translate(" + r0 + " 0)" }, g);
+      }
+      svgEl2("circle", { r: Math.max(1.6, r0 * 0.75), class: ROLE.dot }, g);
+      return g;
+    };
+    const fade = (el2, del) => {
+      if (animate) {
+        el2.classList.add("ak-orn-fade");
+        el2.style.animationDelay = sec(del || 0);
+      }
+      return el2;
+    };
+    const chain = (back, front, segs, L, t0, T, fronts, backRole, extra) => {
+      for (const g of segs) {
+        const del = t0 + T * g.s0 / L;
+        const dur = T * (g.s1 - g.s0) / L;
+        if (g.front) for (const [role, width] of fronts) stroke(front, g.d, role, width, g.len, del, dur, true, extra);
+        else if (backRole) stroke(back, g.d, backRole[0], backRole[1], g.len, del, dur, true, extra);
+      }
+    };
+    return { svg: svg6, group, stroke, leaf, bead, rosette: rosette2, fade, chain, animate };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-frames.js
+  var PI = Math.PI;
+  function radiusOf(host, fallback) {
+    const r = host ? parseFloat(getComputedStyle(host).borderTopLeftRadius) : NaN;
+    return Number.isFinite(r) && r > 0 ? r : fallback;
+  }
+  function flower(d, parent, x, y, n, r0, size, del) {
+    for (let i = 0; i < n; i++) {
+      const a = 2 * PI * i / n;
+      d.leaf(parent, x + Math.cos(a) * r0, y + Math.sin(a) * r0, a, size, del + 0.04 * i);
+    }
+    d.bead(parent, x, y, Math.max(2, size * 0.32), del + 0.2);
+  }
+  function drawFrame(layers, w, h, _pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.55, Math.min(1, Math.min(w, h) / 420));
+    const rect = (i) => "M" + R(i) + " " + R(i) + "H" + R(w - i) + "V" + R(h - i) + "H" + R(i) + "Z";
+    const rlen = (i) => Math.ceil(2 * (w + h - 4 * i)) + 4;
+    let hatch = "";
+    const hs = 10 * k;
+    for (let x = 3 * k; x <= w - hs - 2; x += 5 * k) hatch += "M" + R(x) + " " + R(hs - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8) + "M" + R(x) + " " + R(h - 1) + "l" + R(hs * 0.7) + " " + R(-hs * 0.8);
+    for (let y = hs + 1; y <= h - 3; y += 5 * k) hatch += "M1 " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8) + "M" + R(w - hs + 1) + " " + R(y) + "l" + R(hs * 0.8) + " " + R(-hs * 0.8);
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 1.2);
+    d.stroke(d.svg, rect(0), "ln", 1, rlen(0), 0, 1.8);
+    d.stroke(d.svg, rect(10 * k), "ln", 1.6, rlen(10 * k), 0.15, 1.8);
+    d.stroke(d.svg, rect(15 * k), "ln", 0.8, rlen(15 * k), 0.3, 1.8);
+    const t0 = 1.2;
+    const T = 2;
+    const Lc = Math.max(50, Math.min(135, Math.min(w, h) / k * 0.27));
+    const m = turtle(46, 34, 0, Lc, (u) => -15e-4 + 0.27 * 135 / Lc * Math.pow(u, 4));
+    const pa = at(m, 0.42);
+    const b = turtle(pa.x, pa.y, pa.h + 0.8, 62 * Lc / 135, (u) => (0.012 + 0.32 * u * u) * 135 / Lc);
+    const lush = p.leaves;
+    const corner = (g) => {
+      d.stroke(g, "M15 58A43 43 0 0 0 58 15", "ln", 1.2, 72, 0.9, 0.8);
+      d.stroke(g, "M15 64A49 49 0 0 0 64 15", "ln", 0.8, 80, 1, 0.8);
+      for (const view of ["translate(0 0)", "matrix(0 1 1 0 0 0)"]) {
+        const v = d.group(g, { transform: view });
+        d.stroke(v, m.d, "ln", 1.6, m.len, t0, T);
+        d.stroke(v, b.d, "ln", 1.2, b.len, t0 + 0.85, 1.3);
+        if (lush > 0) {
+          const onM = [[0.14, -1, 10], [0.3, 1, 12], [0.56, -1, 9], [0.7, 1, 11]];
+          if (lush > 1.5) onM.push([0.44, -1, 8], [0.82, 1, 8]);
+          for (const [u, side, s] of onM) {
+            const q = at(m, u);
+            d.leaf(v, q.x, q.y, q.h + side * 0.95, s, t0 + T * u * 0.9 + 0.2);
+          }
+          const qb = at(b, 0.3);
+          d.leaf(v, qb.x, qb.y, qb.h - 0.95, 9, t0 + 1.05 + 1.3 * 0.3);
+        }
+        d.bead(v, m.end.x, m.end.y, 2.2, t0 + T);
+        d.bead(v, b.end.x, b.end.y, 1.8, t0 + 2.15);
+      }
+      d.rosette(g, 34, 34, 8, 4, 7.5, 12, 0.7);
+    };
+    for (const [x, y, sx, sy] of [[0, 0, 1, 1], [w, 0, -1, 1], [0, h, 1, -1], [w, h, -1, -1]]) {
+      corner(d.group(d.svg, { transform: "translate(" + R(x) + " " + R(y) + ") scale(" + R(sx * k * 100) / 100 + " " + R(sy * k * 100) / 100 + ")" }));
+    }
+    const mid = (tf, len, gain, s0) => {
+      const g = d.group(d.svg, { transform: tf });
+      for (const sx of [1, -1]) {
+        const s = turtle(sx * 4, 24, sx > 0 ? 0.35 : PI - 0.35, len, (u) => sx * (-0.02 + gain * u * u * u));
+        d.stroke(g, s.d, "ln", 1.4, s.len, s0, 1.6);
+        if (lush > 0) {
+          const p1 = at(s, 0.25);
+          const p2 = at(s, 0.5);
+          d.leaf(g, p1.x, p1.y, p1.h + sx * 0.95, 11, s0 + 0.5);
+          d.leaf(g, p2.x, p2.y, p2.h - sx * 0.95, 8, s0 + 0.9);
+        }
+        d.bead(g, s.end.x, s.end.y, 2, s0 + 1.6);
+      }
+      d.leaf(g, 0, 27, PI / 2, 20, s0 + 0.1);
+      d.bead(g, 0, 23, 3.2, s0);
+    };
+    const ks = R(k * 100) / 100;
+    if (w / k >= 2 * (46 + Lc) + 200) {
+      mid("translate(" + R(w / 2) + " 0) scale(" + ks + ")", 95, 0.28, 1.8);
+      mid("translate(" + R(w / 2) + " " + R(h) + ") scale(" + ks + " " + -ks + ")", 95, 0.28, 1.8);
+    }
+    if (h / k >= 2 * (46 + Lc) + 140) {
+      mid("translate(0 " + R(h / 2) + ") rotate(-90) scale(" + ks + ")", 64, 0.42, 1.9);
+      mid("translate(" + R(w) + " " + R(h / 2) + ") rotate(90) scale(" + ks + ")", 64, 0.42, 1.9);
+    }
+  }
+  function drawVineBorder(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const r = radiusOf(host, 18);
+    const x = pad.x;
+    const y = pad.y;
+    const base = rrect(x, y, w, h, r);
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 72));
+    const t0 = 1;
+    const T = Math.max(2.5, Math.min(6, L / 400));
+    d.fade(d.stroke(d.svg, roundedRectPath(x + 9, y + 9, w - 18, h - 18, Math.max(0, r - 9)), "dim", 0.8), 0.8);
+    const back = d.group(d.svg);
+    d.stroke(d.svg, roundedRectPath(x, y, w, h, r), "ln", 3, Math.ceil(L) + 4, 0, 1.2);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, L, 9, per, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    d.chain(back, front, helix(base.at, L, 7, per, PI, 2), L, t0 + 0.25, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      const every = p.leaves > 1.5 ? 1 : 2;
+      for (const q of helixLeaves(base.at, L, 9, per, 0, { size: 13, alpha: 0.9, every, from: 6 })) {
+        d.leaf(front, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1);
+      }
+    }
+    const s0 = base.at(0);
+    flower(d, front, s0.x, s0.y, 5, 3, 11, t0 + T + 0.2);
+  }
+  function drawRope(layers, w, h, pad, p, host) {
+    const d = layers.under;
+    if (!d) return;
+    const base = rrect(pad.x, pad.y, w, h, radiusOf(host, 14));
+    const L = base.L;
+    const per = L / Math.max(4, Math.round(L / 34));
+    const n = Math.round(p.strands);
+    const T = Math.max(2, Math.min(5, L / 400));
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    for (let j = 0; j < n; j++) {
+      d.chain(back, front, helix(base.at, L, 6, per, j * 2 * PI / n, 1.5), L, 0.3, T, [["gapc", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    }
+  }
+  function drawJugend(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const k = Math.max(0.45, Math.min(1.4, h / 520));
+    const x0 = pad.x;
+    const yB = pad.y + h;
+    const ground = yB + 62 * k;
+    d.stroke(d.svg, roundedRectPath(x0, pad.y, w, h, 14 * k), "ln", 1.6, Math.ceil(2 * (w + h)) + 8, 0, 1.6);
+    d.stroke(d.svg, roundedRectPath(x0 + 8 * k, pad.y + 8 * k, w - 16 * k, h - 16 * k, 8 * k), "ln", 0.8, Math.ceil(2 * (w + h)) + 8, 0.15, 1.6);
+    d.fade(d.stroke(d.svg, "M" + R(x0 - 160 * k) + " " + R(ground) + "H" + R(x0 + w + 160 * k), "dim", 1), 0.2);
+    const UP = -PI / 2;
+    const TAU5 = 2 * PI;
+    const sx = x0 - 64 * k;
+    const stems = [
+      { dx: 0, h: UP, L: 540, t0: 0.6, k: (u) => 35e-4 * Math.cos(TAU5 * 1.2 * u) + 0.012 * Math.pow(u, 8), flower: "lily", lv: [[0.2, 1, 36], [0.34, -1, 30], [0.55, 1, 22], [0.7, -1, 16]] },
+      { dx: -14, h: UP - 0.12, L: 430, t0: 0.8, k: (u) => -4e-3 * Math.cos(TAU5 * u + 0.6) - 0.02 * Math.pow(u, 6), flower: "cup", lv: [[0.25, -1, 30], [0.5, 1, 22]] },
+      { dx: 4, h: UP + 0.02, L: 300, t0: 1, k: (u) => 6e-3 * Math.cos(TAU5 * 0.8 * u + 1) + 0.025 * Math.pow(u, 6), flower: "bud", lv: [[0.35, 1, 24]] }
+    ];
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * (x0 + w / 2)) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      [[-0.38, 110], [-0.16, 88], [0.22, 96]].forEach(([a, s], i) => d.leaf(g, sx - 4 * k, ground, UP + a, s * k, 0.3 + i * 0.12, 0.13));
+      for (const st of stems) {
+        const dur = 2.6;
+        const t2 = turtle(sx + st.dx * k, ground, st.h, st.L * k, (u) => st.k(u) / k, 2);
+        const e = t2.end;
+        const bloom = st.t0 + dur + 0.1;
+        d.stroke(g, t2.d, "vine", 2, t2.len, st.t0, dur);
+        if (p.leaves > 0) {
+          for (const [u, side, s] of st.lv) {
+            const q = at(t2, u);
+            d.leaf(g, q.x, q.y, q.h + side * 0.45, s * k, st.t0 + dur * u * 0.85 + 0.1, 0.22);
+          }
+        }
+        if (st.flower === "lily") {
+          for (const a of [-1.5, 1.5]) d.leaf(g, e.x, e.y, e.h + a, 10 * k, bloom, 0.3, "petal");
+          for (const a of [-0.6, 0.6, 0]) d.leaf(g, e.x, e.y, e.h + a, 26 * k, bloom + 0.1, 0.42, "petal");
+          [-0.22, 0, 0.22].forEach((a, i) => {
+            const len = (30 + i % 2 * 6) * k;
+            const x2 = e.x + Math.cos(e.h + a) * len;
+            const y2 = e.y + Math.sin(e.h + a) * len;
+            d.stroke(g, "M" + R(e.x) + " " + R(e.y) + "L" + R(x2) + " " + R(y2), "ln", 1, Math.ceil(len) + 2, bloom + 0.5, 0.5);
+            d.bead(g, x2, y2, 2.2 * k, bloom + 0.9);
+          });
+        } else if (st.flower === "cup") {
+          const cx = e.x + Math.cos(e.h) * 9 * k;
+          const cy = e.y + Math.sin(e.h) * 9 * k;
+          for (let i = 0; i < 6; i++) d.leaf(g, cx, cy, e.h + i * TAU5 / 6, 15 * k, bloom + 0.05 * i, 0.5, "petal");
+          d.bead(g, cx, cy, 3.4 * k, bloom + 0.4);
+        } else {
+          for (const a of [-0.5, 0.5]) d.leaf(g, e.x, e.y, e.h + a, 9 * k, bloom, 0.3, "petal");
+          d.leaf(g, e.x, e.y, e.h, 17 * k, bloom + 0.1, 0.5, "petal");
+        }
+      }
+    }
+  }
+  function drawRibbon(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const u = h / 54;
+    const x0 = pad.x;
+    const x1 = pad.x + w;
+    const cx = pad.x + w / 2;
+    const y0 = pad.y;
+    const y1 = pad.y + h;
+    const a = Math.min(12 * u, h * 0.22);
+    const tails = d.group(d.svg);
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cx) + " 0) scale(-1 1)"]) {
+      const g = d.group(tails, { transform: tf });
+      const top = y0 + a + 20 * u;
+      const bot = y1 + a + 22 * u;
+      const inner = x1 - 14 * u;
+      const outer = x1 + 86 * u;
+      const tail = "M" + R(inner) + " " + R(top) + "H" + R(outer) + "L" + R(outer - 20 * u) + " " + R((top + bot) / 2) + "L" + R(outer) + " " + R(bot) + "H" + R(inner) + "Z";
+      d.stroke(g, tail, "tail", 1.2);
+      d.stroke(g, "M" + R(inner + 6 * u) + " " + R(top + 7 * u) + "H" + R(outer - 7 * u) + "M" + R(inner + 6 * u) + " " + R(bot - 7 * u) + "H" + R(outer - 7 * u), "dim", 0.8);
+      d.stroke(g, "M" + R(x1) + " " + R(y1 + a) + "L" + R(x1) + " " + R(bot) + "L" + R(inner) + " " + R(bot) + "Z", "crease", 1);
+    }
+    d.fade(tails, 0.7);
+    const band = d.group(d.svg);
+    if (d.animate) band.classList.add("ak-orn-unroll");
+    const q = (yc) => "Q" + R(cx) + " " + R(yc) + " ";
+    d.stroke(band, "M" + R(x0) + " " + R(y0 + a) + q(y0 - a) + R(x1) + " " + R(y0 + a) + "L" + R(x1) + " " + R(y1 + a) + q(y1 - a) + R(x0) + " " + R(y1 + a) + "Z", "solid", 1.4);
+    d.stroke(band, "M" + R(x0 + 7 * u) + " " + R(y0 + a + 6 * u) + q(y0 - a + 6 * u) + R(x1 - 7 * u) + " " + R(y0 + a + 6 * u) + "M" + R(x0 + 7 * u) + " " + R(y1 + a - 6 * u) + q(y1 - a - 6 * u) + R(x1 - 7 * u) + " " + R(y1 + a - 6 * u), "dim", 0.8);
+  }
+  var FRAME_FIGURES = {
+    frame: { params: ["leaves"], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawFrame } },
+    "vine-border": { params: ["leaves"], overlay: { pad: () => ({ x: 26, y: 26 }), draw: drawVineBorder } },
+    rope: { params: ["strands"], overlay: { pad: () => ({ x: 12, y: 12 }), draw: drawRope } },
+    jugend: {
+      params: ["leaves"],
+      overlay: {
+        pad: (_w, h) => {
+          const k = Math.max(0.45, Math.min(1.4, h / 520));
+          return { x: Math.ceil(200 * k), y: Math.ceil(76 * k) };
+        },
+        draw: drawJugend
+      }
+    },
+    ribbon: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 1.7 + 4), y: Math.ceil(h * 0.9) }), draw: drawRibbon } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-rounds.js
+  var PI2 = Math.PI;
+  var TAU3 = 2 * PI2;
+  var D = PI2 / 180;
+  function drawWreath(layers, w, h, pad, p) {
+    const d = layers.under;
+    if (!d) return;
+    const r = Math.min(w, h) / 2;
+    const k = r / 84;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const Rw = 118 * k;
+    const t0 = 1.1;
+    const T = 2.6;
+    d.stroke(d.svg, "M" + R(cx + r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx - r) + " " + R(cy) + "A" + R(r) + " " + R(r) + " 0 1 1 " + R(cx + r) + " " + R(cy), "ln", 1.6, Math.ceil(TAU3 * r) + 4, 0, 1.4);
+    const r2 = r - 7 * k;
+    d.stroke(d.svg, "M" + R(cx + r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx - r2) + " " + R(cy) + "A" + R(r2) + " " + R(r2) + " 0 1 1 " + R(cx + r2) + " " + R(cy), "ln", 0.8, Math.ceil(TAU3 * r2) + 4, 0.15, 1.4);
+    let hatch = "";
+    for (let a = 0; a < 360; a += 4) {
+      const c = Math.cos(a * D);
+      const s = Math.sin(a * D);
+      hatch += "M" + R(cx + (r - 5.4 * k) * c) + " " + R(cy + (r - 5.4 * k) * s) + "L" + R(cx + (r - 1.6 * k) * c) + " " + R(cy + (r - 1.6 * k) * s);
+    }
+    d.fade(d.stroke(d.svg, hatch, "hatch", 0.8), 0.8);
+    const back = d.group(d.svg);
+    const stems = d.group(d.svg);
+    const front = d.group(d.svg);
+    const leaves = d.group(d.svg);
+    [[95, 250, 1], [85, -70, -1]].forEach(([a0, a1, sx], bi) => {
+      const br = arc(cx, cy, Rw, a0 * D, a1 * D);
+      const pts = [];
+      for (let s = 0; s <= br.L; s += 2) {
+        const q = br.at(s);
+        pts.push([q.x, q.y]);
+      }
+      d.stroke(stems, pathOf(pts), "vine", 2 * Math.max(0.6, k), lengthOf(pts), t0, T, true);
+      d.chain(back, front, helix(br.at, br.L, 3.5 * k, 24 * k, 0, 1.5), br.L, t0 + 0.35, T, [["gap", 3], ["vine", 1]], ["vback", 0.8]);
+      if (p.leaves > 0) {
+        const step = (p.leaves > 1.5 ? 10 : 14) * k;
+        for (let i = 0, s2 = 12 * k; s2 < br.L - 8 * k; i++, s2 += step) {
+          const u = s2 / br.L;
+          const size = 16 * k * (1 - 0.45 * u);
+          const q2 = br.at(s2);
+          const q3 = br.at(Math.min(br.L, s2 + 6 * k));
+          const al = 0.8;
+          const del = t0 + T * u + 0.1;
+          d.leaf(leaves, q2.x, q2.y, Math.atan2(q2.ty * Math.cos(al) + q2.ny * Math.sin(al), q2.tx * Math.cos(al) + q2.nx * Math.sin(al)), size, del);
+          d.leaf(leaves, q3.x, q3.y, Math.atan2(q3.ty * Math.cos(al) - q3.ny * Math.sin(al), q3.tx * Math.cos(al) - q3.nx * Math.sin(al)), size * 0.9, del + 0.08);
+          if (i % 3 === 1) {
+            const qm = br.at(Math.min(br.L, s2 + 9 * k));
+            d.bead(leaves, qm.x + qm.nx * 7 * k, qm.y + qm.ny * 7 * k, 2.3 * k, del + 0.25, "vdot");
+            d.bead(leaves, qm.x + qm.nx * 11 * k + qm.tx * 3 * k, qm.y + qm.ny * 11 * k + qm.ty * 3 * k, 1.8 * k, del + 0.32, "vdot");
+          }
+        }
+      }
+      const e = br.at(br.L);
+      d.leaf(leaves, e.x, e.y, Math.atan2(e.ty, e.tx), 11 * k, t0 + T);
+      const s0 = br.at(0);
+      const tl = turtle(s0.x, s0.y, Math.atan2(-s0.ty, -s0.tx), 46 * k, () => sx * 0.028 / k);
+      const tp = tl.pts.slice().reverse();
+      if (bi === 1) d.stroke(stems, pathOf(tp), "gap", 6, tl.len, 0.6, 0.5);
+      d.stroke(stems, pathOf(tp), "vine", 2 * Math.max(0.6, k), tl.len, 0.6, 0.5);
+      d.bead(stems, tp[0][0], tp[0][1], 2.6 * k, 0.5);
+    });
+  }
+  function drawGuilloche(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const half = Math.min(w, h) / 2;
+    const k = half / 135;
+    const cx = pad.x + w / 2;
+    const cy = pad.y + h / 2;
+    const circle = (rr, width, del) => d.stroke(
+      d.svg,
+      "M" + R(cx + rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx - rr) + " " + R(cy) + "A" + R(rr) + " " + R(rr) + " 0 1 1 " + R(cx + rr) + " " + R(cy),
+      "ln",
+      width,
+      Math.ceil(TAU3 * rr) + 4,
+      del,
+      1.5
+    );
+    circle(128 * k, 1.4, 0);
+    circle(133 * k, 0.8, 0.1);
+    circle(84 * k, 1, 0.5);
+    circle(88 * k, 0.6, 0.6);
+    const ring2 = (rb, amp, kk, n, t0, width) => {
+      for (let j = 0; j < n; j++) {
+        const ph = j * TAU3 / (kk * n);
+        const pts = [];
+        for (let i = 0; i <= 360; i++) {
+          const th = i * TAU3 / 360;
+          const rr = (rb + amp * Math.cos(kk * (th + ph))) * k;
+          pts.push([cx + rr * Math.cos(th), cy + rr * Math.sin(th)]);
+        }
+        d.stroke(d.svg, pathOf(pts), "ln", width, lengthOf(pts), t0 + j * 0.12, 2.4);
+      }
+    };
+    ring2(108, 14, 12, 8, 0.2, 0.7);
+    ring2(62, 10, 9, 6, 0.9, 0.7);
+    ring2(24, 12, 8, 5, 1.6, 0.8);
+    d.bead(d.svg, cx, cy, 3 * Math.max(0.6, k), 3.4);
+  }
+  function drawGuillocheBand(layers, w, h, pad) {
+    const d = layers.under;
+    if (!d) return;
+    const x0 = pad.x + 4;
+    const x1 = pad.x + w - 4;
+    const cy = pad.y + h / 2;
+    const half = h / 2 - 12;
+    d.stroke(d.svg, "M" + R(x0) + " " + R(pad.y + 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + 8) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 4) + "H" + R(x1) + "M" + R(x0) + " " + R(pad.y + h - 8) + "H" + R(x1), "ln", 0.8, Math.ceil(4 * (x1 - x0)) + 8, 0.3, 1.4);
+    if (half < 6) return;
+    const wl = Math.max(28, Math.min(72, half * 1.1));
+    for (let j = 0; j < 16; j++) {
+      const pts = [];
+      for (let x = x0; x <= x1; x += 2) {
+        const a = half * (0.72 + 0.28 * Math.cos(TAU3 * (x - (x0 + x1) / 2) / Math.max(120, (x1 - x0) / 2)));
+        pts.push([x, cy + a * Math.sin(TAU3 * (x - x0) / wl + j * PI2 / 8)]);
+      }
+      d.stroke(d.svg, pathOf(pts), "hatch", 0.6, lengthOf(pts), 0.6 + j * 0.06, 2.2);
+    }
+  }
+  function drawIvy(layers, w, h, pad, p) {
+    const back = layers.under;
+    const over = layers.over;
+    if (!back || !over) return;
+    const cx = pad.x + w / 2;
+    const amp = w / 2 + 4;
+    const period = Math.max(60, Math.min(160, w * 4));
+    const base = line(cx, pad.y + h - 2, cx, pad.y);
+    const L = base.L;
+    const t0 = 0.8;
+    const T = Math.max(2, Math.min(5, L / 140));
+    const size = Math.max(10, Math.min(20, w * 0.3));
+    const fronts = over.group(over.svg);
+    over.chain(back.svg, fronts, helix(base.at, L, amp, period, 0, 2), L, t0, T, [["gap", 6], ["vine", 2.4]], ["vback", 1.6]);
+    over.chain(back.svg, fronts, helix(base.at, L, amp - 1, period, 2.4, 2), L, t0 + 0.3, T, [["gap", 4], ["vine", 1.2]], ["vback", 1]);
+    if (p.leaves > 0) {
+      for (const q of helixLeaves(base.at, L, amp, period, 0, { size, alpha: 0.9, from: 12, endGap: 4 })) {
+        over.leaf(fronts, q.x, q.y, q.ang, q.size, t0 + T * q.s / L + 0.1, 0.42);
+      }
+      const top = base.at(L);
+      [-2.2, -1.57, -0.9].forEach((a, i) => over.leaf(fronts, top.x, top.y + 2, a, size * 0.75 - i, t0 + T + 0.1 * i, 0.42));
+    }
+  }
+  function drawWrap(layers, w, h, pad) {
+    const back = layers.under;
+    const d = layers.over;
+    if (!back || !d) return;
+    const cy = pad.y + h / 2;
+    const rr = h / 2;
+    let hatch = "";
+    for (const deg of [48, 60, 70, 80]) {
+      for (const sg of [-1, 1]) hatch += "M" + R(pad.x + 4) + " " + R(cy + sg * rr * Math.sin(deg * D)) + "H" + R(pad.x + w - 4);
+    }
+    back.stroke(back.svg, hatch, "hatch", 0.6);
+    const x0 = pad.x + Math.min(w * 0.12, h * 1.5);
+    const x1 = pad.x + w - Math.min(w * 0.12, h * 1.5);
+    const base = line(x0, cy, x1, cy);
+    const bw = h * 0.46;
+    const front = d.group(d.svg);
+    d.chain(front, front, helix(base.at, base.L, rr, h * 1.07, 0, 1), base.L, 0.6, Math.max(1, base.L / 200), [["ln", bw + 3], ["band", bw]], null, { butt: true });
+    for (const x of [x0 - h * 0.36, x1]) {
+      d.fade(d.stroke(d.svg, "M" + R(x) + " " + R(cy - rr - 3) + "h" + R(h * 0.36) + "v" + R(h + 6) + "h" + R(-h * 0.36) + "Z", "solid", 1.4), 0.4);
+    }
+  }
+  function drawBrackets(layers, w, h, pad, p) {
+    const d = layers.over;
+    if (!d) return;
+    const k = h / 44;
+    const cxc = pad.x + w / 2;
+    for (const tf of ["translate(0 0)", "translate(" + R(2 * cxc) + " 0) scale(-1 1)"]) {
+      const g = d.group(d.svg, { transform: tf });
+      const bx = pad.x - 12 * k;
+      const top = pad.y + 2;
+      const bot = pad.y + h - 2;
+      d.stroke(g, "M" + R(bx) + " " + R(top) + "Q" + R(bx - 16 * k) + " " + R((top + bot) / 2) + " " + R(bx) + " " + R(bot), "ln", 1.4, Math.ceil((bot - top) * 1.15) + 4, 0.2, 0.6);
+      const tc2 = turtle(bx, top, -0.6, 20 * k, (u) => (0.3 + 0.2 * u) / k);
+      const bc = turtle(bx, bot, 0.6, 20 * k, (u) => -(0.3 + 0.2 * u) / k);
+      d.stroke(g, tc2.d, "ln", 1.2, tc2.len, 0.7, 0.5);
+      d.stroke(g, bc.d, "ln", 1.2, bc.len, 0.7, 0.5);
+      if (p.leaves > 0) d.leaf(g, bx - 9 * k, (top + bot) / 2, PI2, 11 * k, 0.8);
+    }
+  }
+  var ROUND_FIGURES = {
+    wreath: { params: ["leaves"], overlay: { pad: (w, h) => {
+      const k = Math.min(w, h) / 168;
+      return { x: Math.ceil(72 * k), y: Math.ceil(84 * k) };
+    }, draw: drawWreath } },
+    guilloche: { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuilloche } },
+    "guilloche-band": { params: [], overlay: { pad: () => ({ x: 0, y: 0 }), draw: drawGuillocheBand } },
+    ivy: { params: ["leaves"], overlay: { pad: (w) => ({ x: Math.ceil(30 + Math.max(10, Math.min(20, w * 0.3))), y: 16 }), under: true, over: true, draw: drawIvy } },
+    wrap: { params: [], overlay: { pad: (_w, h) => ({ x: Math.ceil(h * 0.5), y: 6 }), under: true, over: true, draw: drawWrap } },
+    brackets: { params: ["leaves"], overlay: { pad: (_w, h) => ({ x: Math.ceil(30 * h / 44), y: 4 }), under: false, over: true, draw: drawBrackets } }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-lines.js
+  var PI3 = Math.PI;
+  var TAU4 = 2 * PI3;
+  function fillMount(host, height, cls, opts, draw) {
+    const box = document.createElement("span");
+    box.className = "ak-orn-strip " + cls;
+    box.setAttribute("aria-hidden", "true");
+    box.style.height = height + "px";
+    host.appendChild(box);
+    let lastW = -1;
+    let frame2 = 0;
+    const render = (animate) => {
+      const W7 = Math.round(box.getBoundingClientRect().width) || host.clientWidth || 0;
+      lastW = W7;
+      box.textContent = "";
+      if (W7 < 40) return;
+      draw(drawing(box, W7, height, { animate, speed: opts.speed, delay: opts.delay }), W7, height);
+    };
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(Math.round(box.getBoundingClientRect().width) - lastW) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(box);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        box.remove();
+      }
+    };
+  }
+  function mountVineBar(host, p, opts) {
+    let value = p.value;
+    let apply2 = null;
+    const strip = fillMount(host, 96, "ak-orn-strip--bar", opts, (d, W7) => {
+      const y = 48;
+      const base = line(0, y, W7, y);
+      const L = base.L;
+      const period = Math.max(70, Math.min(110, W7 / 6));
+      const amp = 21;
+      const k = TAU4 / period;
+      const x0 = 20;
+      const bw = W7 - 40;
+      const segs = [];
+      const back = d.group(d.svg);
+      const budBack = d.group(d.svg);
+      svgEl2("rect", { x: x0, y: y - 11, width: R(bw), height: 22, rx: 11, class: "ak-orn-track" }, d.svg);
+      let hatch = "";
+      for (let x = x0 + 12; x <= x0 + bw - 14; x += 6) hatch += "M" + R(x) + " " + (y + 7) + "l6 -14";
+      svgEl2("path", { d: hatch, class: "ak-orn-hatch", "stroke-width": 0.8 }, d.svg);
+      const fill2 = svgEl2("rect", { x: x0 + 3, y: y - 8, width: 0, height: 16, rx: 8, class: "ak-orn-fill" }, d.svg);
+      const front = d.group(d.svg);
+      const add = (parent, gs, role, width) => {
+        for (const g of gs) {
+          const el2 = svgEl2("path", { d: g.d, class: "ak-orn-" + role + " ak-orn-dash", "stroke-width": width }, parent);
+          el2.style.strokeDasharray = String(g.len);
+          el2.style.strokeDashoffset = String(g.len);
+          segs.push({ el: el2, s0: g.s0, s1: g.s1, len: g.len });
+        }
+      };
+      for (const [a, ph, wf, wb, wg] of [[amp, 0, 2.4, 1.6, 6], [16, PI3, 1.2, 1, 4]]) {
+        const gs = helix(base.at, L, a, period, ph, 2);
+        add(back, gs.filter((g) => !g.front), "vback", wb);
+        const fr = gs.filter((g) => g.front);
+        add(front, fr, "gap", wg);
+        add(front, fr, "vine", wf);
+      }
+      const leaves = [];
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(base.at, L, amp, period, 0, { size: 13, alpha: 0.95, from: 10, endGap: 6 })) {
+          const outer = svgEl2("g", { transform: "translate(" + R(q.x) + " " + R(q.y) + ") rotate(" + R(q.ang * 180 / PI3) + ")" }, front);
+          const inner = svgEl2("g", { class: "ak-orn-pop" }, outer);
+          svgEl2("path", { d: leafPath(q.size), class: "ak-orn-leaf" }, inner);
+          svgEl2("path", { d: "M" + R(q.size * 0.12) + " 0L" + R(q.size * 0.8) + " 0", class: "ak-orn-rib" }, inner);
+          leaves.push({ el: inner, s: q.s });
+        }
+      }
+      const budFront = d.group(d.svg);
+      const buds = [budBack, budFront].map((g) => {
+        const bloom = svgEl2("g", { class: "ak-orn-bloom" }, g);
+        for (let i = 0; i < 5; i++) svgEl2("path", { d: leafPath(9), class: "ak-orn-leaf", transform: "rotate(" + 72 * i + ") translate(2.5 0)" }, bloom);
+        svgEl2("circle", { r: 3.2, class: "ak-orn-vdot" }, g);
+        return { g, bloom };
+      });
+      apply2 = (v) => {
+        const rv = 14 + v * (L - 14);
+        for (const s of segs) {
+          const f2 = Math.max(0, Math.min(1, (rv - s.s0) / Math.max(1, s.s1 - s.s0)));
+          s.el.style.strokeDashoffset = String(Math.round(s.len * (1 - f2)));
+        }
+        for (const lf of leaves) lf.el.classList.toggle("ak-orn-open", lf.s <= rv - 4);
+        fill2.setAttribute("width", String(R(Math.max(0, (bw - 6) * v))));
+        const b = base.at(rv);
+        const th = k * rv;
+        const o = amp * Math.sin(th);
+        const inFront = Math.cos(th) >= 0;
+        buds.forEach((bd, i) => {
+          bd.g.setAttribute("transform", "translate(" + R(b.x + b.nx * o) + " " + R(b.y + b.ny * o) + ")");
+          bd.g.style.display = i === 1 === inFront ? "" : "none";
+          bd.bloom.classList.toggle("ak-orn-open", v >= 0.995);
+        });
+      };
+      apply2(value);
+    });
+    const clamp3 = (v) => Math.max(0, Math.min(1, Number(v) || 0));
+    return {
+      render: (animate) => {
+        strip.render(animate);
+        if (!apply2) return;
+        if (animate) {
+          apply2(0);
+          requestAnimationFrame(() => requestAnimationFrame(() => apply2 && apply2(value)));
+        } else apply2(value);
+      },
+      set: (v) => {
+        value = clamp3(v);
+        if (apply2) apply2(value);
+      },
+      teardown: strip.teardown
+    };
+  }
+  function drawRail(d, W7) {
+    const y = 14;
+    const base = line(8, y, W7 - 8, y);
+    const T = Math.max(1.2, Math.min(3, W7 / 300));
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M8 " + y + "H" + R(W7 - 8), "ln", 1, Math.ceil(W7), 0, 0.8);
+    const front = d.group(d.svg);
+    d.chain(back, front, helix(base.at, base.L, 7, 44, 0, 1.5), base.L, 0.3, T, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+    d.chain(back, front, helix(base.at, base.L, 6, 44, PI3, 1.5), base.L, 0.45, T, [["gap", 4], ["vine", 1]], ["vback", 0.8]);
+    for (const q of helixLeaves(base.at, base.L, 7, 44, 0, { size: 7.5, alpha: 0.95, every: 2, from: 6, endGap: 6 })) d.leaf(front, q.x, q.y, q.ang, q.size, 0.3 + T * q.s / base.L);
+    d.bead(d.svg, 5, y, 3, 0.1);
+    d.bead(d.svg, W7 - 5, y, 3, 0.3 + T);
+  }
+  function drawDivider(d, W7, H4, leaves) {
+    const y = H4 / 2;
+    const c = W7 / 2;
+    const reach = Math.min(W7 / 2 - 40, 420);
+    const d0 = 0.4;
+    const T = Math.max(1.2, Math.min(2.4, reach / 180));
+    const ends = [c + reach, c - reach];
+    const back = d.group(d.svg);
+    d.stroke(d.svg, "M" + R(c + 14) + " " + R(y) + "H" + R(ends[0]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    d.stroke(d.svg, "M" + R(c - 14) + " " + R(y) + "H" + R(ends[1]), "ln", 1, Math.ceil(reach) + 2, 0.2, 1);
+    const front = d.group(d.svg);
+    for (const bs of [line(c + 14, y, ends[0], y), line(c - 14, y, ends[1], y, true)]) {
+      d.chain(back, front, helix(bs.at, bs.L, 6, 42, 0, 1.5), bs.L, d0, T, [["gap", 4], ["vine", 1.6]], ["vback", 1]);
+      if (leaves > 0) {
+        for (const q of helixLeaves(bs.at, bs.L, 6, 42, 0, { size: 7.5, alpha: 0.95, every: leaves > 1.5 ? 1 : 2, from: 8, endGap: 10 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, d0 + T * q.s / bs.L + 0.1);
+        }
+      }
+    }
+    const cr = turtle(ends[0], y, 0, 40, (u) => -(0.02 + 0.42 * u * u));
+    const cl = turtle(ends[1], y, PI3, 40, (u) => 0.02 + 0.42 * u * u);
+    d.stroke(d.svg, cr.d, "ln", 1.2, cr.len, d0 + T - 0.2, 0.7);
+    d.stroke(d.svg, cl.d, "ln", 1.2, cl.len, d0 + T - 0.2, 0.7);
+    d.rosette(d.svg, c, y, 6, 3, 5, 9, 0.1);
+  }
+  function rope(d, back, front, base, n, amp, period, t0, T, fronts, backRole) {
+    for (let j = 0; j < n; j++) d.chain(back, front, helix(base.at, base.L, amp, period, j * TAU4 / n, 1.5), base.L, t0, T, fronts, backRole);
+  }
+  function drawBraid(d, W7, H4, strands) {
+    const y = H4 / 2;
+    const base = line(14, y, W7 - 14, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    rope(d, back, front, base, Math.round(strands), 6, 34, 0.4, Math.max(1.2, Math.min(3, W7 / 300)), [["gap", 7], ["ln", 4], ["hi", 1]], ["dim", 3]);
+    for (const x of [8, W7 - 8]) {
+      const g = d.bead(d.svg, x, y, 2.6, x < W7 / 2 ? 0.3 : 2.4);
+      g.insertBefore(svgEl2("circle", { r: 7, class: "ak-orn-ring" }), g.firstChild);
+    }
+  }
+  function drawCord(d, W7) {
+    const y = 16;
+    const base = line(18, y, W7 - 18, y);
+    const back = d.group(d.svg);
+    const front = d.group(d.svg);
+    const T = Math.max(1, Math.min(2.4, W7 / 300));
+    rope(d, back, front, base, 2, 3.5, 20, 0.3, T, [["gap", 5], ["ln", 2.4], ["hi", 0.8]], ["dim", 1.6]);
+    let tassel = "";
+    for (let i = -3; i <= 3; i++) tassel += "M" + R(i * 1.6) + " 11L" + R(i * 2.6) + " 44";
+    for (const [x, del] of [[12, 0.3], [W7 - 12, 0.3 + T]]) {
+      const g = d.bead(d.svg, x, y, 4.5, del);
+      svgEl2("path", { d: tassel, class: "ak-orn-ln", "stroke-width": 1 }, g);
+      svgEl2("path", { d: "M-5 9H5", class: "ak-orn-ln", "stroke-width": 3 }, g);
+    }
+  }
+  function drawStrip(d, W7, H4) {
+    const y = H4 / 2;
+    d.stroke(d.svg, "M4 3H" + R(W7 - 4) + "M4 " + R(H4 - 3) + "H" + R(W7 - 4), "ln", 0.8, Math.ceil(2 * W7), 0, 1.2);
+    for (let m = 0; m < 8; m++) {
+      const pts = [];
+      for (let x = 4; x <= W7 - 4; x += 2) pts.push([x, y + 7 * Math.sin(TAU4 * (x - 4) / 28 + m * PI3 / 4)]);
+      d.stroke(d.svg, pathOf(pts), "ln", 0.6, lengthOf(pts), 0.3 + m * 0.08, 2.4);
+    }
+  }
+  var LINE_FIGURES = {
+    "vine-bar": { params: ["leaves", "value"], mount: mountVineBar },
+    "vine-rail": { params: [], mount: (host, _p, opts) => fillMount(host, 28, "ak-orn-strip--rail", opts, drawRail) },
+    divider: { params: ["leaves"], mount: (host, p, opts) => fillMount(host, 48, "ak-orn-strip--divider", opts, (d, W7, H4) => drawDivider(d, W7, H4, p.leaves)) },
+    braid: { params: ["strands"], mount: (host, p, opts) => fillMount(host, 32, "ak-orn-strip--braid", opts, (d, W7, H4) => drawBraid(d, W7, H4, p.strands)) },
+    cord: { params: [], mount: (host, _p, opts) => fillMount(host, 64, "ak-orn-strip--cord", opts, drawCord) },
+    "guilloche-strip": { params: [], mount: (host, _p, opts) => fillMount(host, 30, "ak-orn-strip--guilloche", opts, drawStrip) }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-text.js
+  var PI4 = Math.PI;
+  function owned(render, teardown) {
+    return { render, teardown };
+  }
+  function slot(cls) {
+    const s = document.createElement("span");
+    s.className = cls;
+    s.setAttribute("aria-hidden", "true");
+    return s;
+  }
+  function flourishInto(d, leaves) {
+    const t0 = 0.3;
+    const m = turtle(8, 58, 0, 200, (u) => -4e-3 + 0.3 * Math.pow(u, 5));
+    const pa = at(m, 0.38);
+    const b1 = turtle(pa.x, pa.y, pa.h + 0.9, 80, (u) => 0.012 + 0.3 * u * u * u);
+    const pb = at(m, 0.15);
+    const b2 = turtle(pb.x, pb.y, pb.h - 0.9, 55, (u) => -(0.012 + 0.34 * u * u * u));
+    d.stroke(d.svg, m.d, "ln", 1.8, m.len, t0, 1.8);
+    d.stroke(d.svg, b2.d, "ln", 1.2, b2.len, t0 + 0.3, 1);
+    d.stroke(d.svg, b1.d, "ln", 1.2, b1.len, t0 + 0.7, 1.3);
+    if (leaves > 0) {
+      const marks = [
+        { t: m, u: 0.26, side: 1, s: 12, start: t0, dur: 1.8 },
+        { t: m, u: 0.5, side: -1, s: 11, start: t0, dur: 1.8 },
+        { t: m, u: 0.64, side: 1, s: 10, start: t0, dur: 1.8 },
+        { t: b1, u: 0.3, side: -1, s: 9, start: t0 + 0.7, dur: 1.3 },
+        { t: b2, u: 0.35, side: 1, s: 8, start: t0 + 0.3, dur: 1 }
+      ];
+      for (const mk of marks) {
+        const q = at(mk.t, mk.u);
+        d.leaf(d.svg, q.x, q.y, q.h + mk.side * 0.95, mk.s, mk.start + mk.dur * mk.u + 0.15);
+      }
+    }
+    d.bead(d.svg, 8, 58, 3.4, 0.1);
+    d.bead(d.svg, m.end.x, m.end.y, 2.6, t0 + 1.8);
+    d.bead(d.svg, b1.end.x, b1.end.y, 2, t0 + 2);
+    d.bead(d.svg, b2.end.x, b2.end.y, 2, t0 + 1.3);
+  }
+  function mountFlourish(host, p, opts) {
+    const left = slot("ak-orn-flourish ak-orn-flourish--left");
+    const right = slot("ak-orn-flourish ak-orn-flourish--right");
+    host.classList.add("ak-orn-flourished");
+    host.insertBefore(left, host.firstChild);
+    host.appendChild(right);
+    return owned((animate) => {
+      for (const s of [left, right]) {
+        s.textContent = "";
+        flourishInto(drawing(s, 200, 110, { animate, speed: opts.speed, delay: opts.delay, viewBox: true }), p.leaves);
+      }
+    }, () => {
+      left.remove();
+      right.remove();
+      host.classList.remove("ak-orn-flourished");
+    });
+  }
+  function mountSwash(host, p, opts) {
+    const s = slot("ak-orn-swash");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 300, 72, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const sc = turtle(20, 26, PI4 + 0.1, 40, (u) => 0.3 * u * u);
+      const sm = turtle(20, 26, -0.1, 270, (u) => 7e-4 + 0.25 * Math.pow(u, 9));
+      d.stroke(d.svg, sc.d, "ln", 1.2, sc.len, 0.5, 0.5);
+      d.stroke(d.svg, sm.d, "ln", 1.6, sm.len, 0.6, 1.6);
+      if (p.leaves > 0) {
+        const q = at(sm, 0.55);
+        d.leaf(d.svg, q.x, q.y, q.h - 0.9, 9, 1.4);
+      }
+      d.bead(d.svg, sm.end.x, sm.end.y, 2, 2.2);
+    }, () => s.remove());
+  }
+  function firstLetter(root) {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+      const text = n.nodeValue || "";
+      const i = text.search(/\S/);
+      if (i >= 0) return { node: (
+        /** @type {Text} */
+        n
+      ), index: i };
+    }
+    return null;
+  }
+  function mountDropcap(host, p, opts) {
+    const found = firstLetter(host);
+    if (!found) return owned(() => {
+    }, () => {
+    });
+    const { node, index } = found;
+    const text = node.nodeValue || "";
+    const letter = Array.from(text.slice(index))[0] || "";
+    const cap = document.createElement("span");
+    cap.className = "ak-orn-cap";
+    const art = slot("ak-orn-cap__art");
+    const glyph = document.createElement("span");
+    glyph.className = "ak-orn-cap__letter";
+    glyph.textContent = letter;
+    cap.appendChild(art);
+    cap.appendChild(glyph);
+    node.nodeValue = text.slice(index + letter.length);
+    const pre = text.slice(0, index);
+    node.parentNode.insertBefore(cap, node);
+    const preNode = pre ? node.parentNode.insertBefore(document.createTextNode(pre), cap) : null;
+    return owned((animate) => {
+      art.textContent = "";
+      const d = drawing(art, 124, 124, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      const box = rrect(8, 8, 108, 108, 10);
+      const per = box.L / Math.round(box.L / 34);
+      d.fade(d.stroke(d.svg, roundedRectPath(14, 14, 96, 96, 5), "dim", 0.8), 1.4);
+      const back = d.group(d.svg);
+      d.stroke(d.svg, roundedRectPath(8, 8, 108, 108, 10), "ln", 2, 420, 0.4, 1.2);
+      const front = d.group(d.svg);
+      d.chain(back, front, helix(box.at, box.L, 5, per, 0, 1.5), box.L, 1, 3, [["gap", 4], ["vine", 1.4]], ["vback", 1]);
+      if (p.leaves > 0) {
+        for (const q of helixLeaves(box.at, box.L, 5, per, 0, { size: 6.5, alpha: 0.9, every: p.leaves > 1.5 ? 1 : 2 })) {
+          d.leaf(front, q.x, q.y, q.ang, q.size, 1 + 3 * q.s / box.L + 0.1);
+        }
+      }
+      if (animate) d.fade(glyph, 0.6);
+    }, () => {
+      node.nodeValue = text;
+      cap.remove();
+      if (preNode) preNode.remove();
+    });
+  }
+  function mountFleuron(host, p, opts) {
+    const s = slot("ak-orn-fleuron");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 160, 64, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      for (const sx of [1, -1]) {
+        const c = turtle(80 + sx * 4, 38, sx > 0 ? 0.3 : PI4 - 0.3, 70, (u) => -sx * (0.01 + 0.34 * u * u * u));
+        d.stroke(d.svg, c.d, "ln", 1.4, c.len, 0.3, 1.3);
+        if (p.leaves > 0) {
+          const q = at(c, 0.35);
+          d.leaf(d.svg, q.x, q.y, q.h + sx * 0.95, 10, 0.8);
+        }
+        d.bead(d.svg, c.end.x, c.end.y, 1.8, 1.6);
+        d.bead(d.svg, 80 + sx * 14, 52, 1.6, 0.5);
+      }
+      d.leaf(d.svg, 80, 34, -PI4 / 2, 22, 0.2);
+      d.bead(d.svg, 80, 44, 2.4, 0.1);
+    }, () => s.remove());
+  }
+  function mountDinkus(host, _p, opts) {
+    const s = slot("ak-orn-dinkus");
+    host.appendChild(s);
+    return owned((animate) => {
+      s.textContent = "";
+      const d = drawing(s, 200, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+      d.stroke(d.svg, "M20 12H64M136 12H180", "dim", 0.8, 120, 0.2, 0.8);
+      d.leaf(d.svg, 108, 12, 0, 14, 0.3);
+      d.leaf(d.svg, 92, 12, PI4, 14, 0.3);
+      d.bead(d.svg, 100, 12, 3.2, 0.2);
+      d.bead(d.svg, 128, 12, 1.6, 0.5);
+      d.bead(d.svg, 72, 12, 1.6, 0.5);
+    }, () => s.remove());
+  }
+  function mountBullets(host, _p, opts) {
+    host.classList.add("ak-orn-bullets");
+    const marks = [];
+    return owned((animate) => {
+      for (const m of marks) m.remove();
+      marks.length = 0;
+      Array.from(host.children).forEach((li, i) => {
+        if (li.tagName !== "LI") return;
+        const m = slot("ak-orn-bullet");
+        li.insertBefore(m, li.firstChild);
+        marks.push(m);
+        const d = drawing(m, 18, 18, { animate, speed: opts.speed, delay: opts.delay + i * 0.12, viewBox: true });
+        d.leaf(d.svg, 3, 15, -PI4 / 4, 16, 0, 0.36);
+      });
+    }, () => {
+      for (const m of marks) m.remove();
+      host.classList.remove("ak-orn-bullets");
+    });
+  }
+  var TEXT_FIGURES = {
+    flourish: { params: ["leaves"], mount: mountFlourish },
+    swash: { params: ["leaves"], mount: mountSwash },
+    dropcap: { params: ["leaves"], mount: mountDropcap },
+    fleuron: { params: ["leaves"], mount: mountFleuron },
+    dinkus: { params: [], mount: mountDinkus },
+    bullets: { params: [], mount: mountBullets }
+  };
+
+  // src/static/sdk-libs/atelier/ornament-set-pen.js
+  var f = (n) => Math.round(n * 10) / 10;
+  var dOf = (pts) => "M" + pts.map((p) => f(p[0]) + " " + f(p[1])).join(" L");
+  var lenOf = (pts) => {
+    let L = 0;
+    for (let i = 1; i < pts.length; i++) L += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    return Math.ceil(L) + 2;
+  };
+  var poly = (pts) => dOf(pts) + " Z";
+  var circ = (x, y, r) => "M" + f(x - r) + " " + f(y) + " a" + f(r) + " " + f(r) + " 0 1 0 " + f(2 * r) + " 0 a" + f(r) + " " + f(r) + " 0 1 0 " + f(-2 * r) + " 0 Z";
+  var arc2 = (cx, cy, r, a0, a1, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) {
+      const a = a0 + (a1 - a0) * i / n;
+      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return o;
+  };
+  var bz = (a, b, c, d, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) {
+      const u = i / n;
+      const v = 1 - u;
+      o.push([
+        v * v * v * a[0] + 3 * v * v * u * b[0] + 3 * v * u * u * c[0] + u * u * u * d[0],
+        v * v * v * a[1] + 3 * v * v * u * b[1] + 3 * v * u * u * c[1] + u * u * u * d[1]
+      ]);
+    }
+    return o;
+  };
+  var hex = (cx, cy, r, a0) => {
+    const o = [];
+    for (let i = 0; i <= 6; i++) {
+      const a = (a0 || 0) + i * Math.PI / 3;
+      o.push([cx + r * Math.cos(a), cy + r * Math.sin(a)]);
+    }
+    return o;
+  };
+  var HOW = { pop: "ak-orn-spop", turn: "ak-orn-sturn", shoot: "ak-orn-sshoot", spin: "ak-orn-sspin", fade: "ak-orn-sfade", drift: "ak-orn-sdrift", wipe: "ak-orn-swipe" };
+  function pen(svg6, o) {
+    const speed = Math.max(0.25, Math.min(3, Number(o.speed) || 1));
+    const base = Math.max(0, Number(o.delay) || 0);
+    const shift = o.shift || 0;
+    const sec = (t2) => ((base + Math.max(0, t2 - shift)) / speed).toFixed(2) + "s";
+    const span = (t2) => (Math.max(0.05, t2) / speed).toFixed(2) + "s";
+    let seed = o.seed || 1;
+    const rnd = () => (seed = seed * 16807 % 2147483647) / 2147483647;
+    const timed = (el2, cls, dl, du, ease) => {
+      el2.classList.add(cls);
+      const s = (
+        /** @type {any} */
+        el2.style
+      );
+      s.animationDelay = sec(dl);
+      s.animationDuration = span(du);
+      if (ease) s.animationTimingFunction = ease;
+    };
+    const line2 = (pts, role, width, dl, du) => {
+      if (pts.length < 2) return null;
+      const el2 = svgEl2("path", { d: dOf(pts), class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
+      if (o.animate) {
+        const len = lenOf(pts);
+        const s = (
+          /** @type {any} */
+          el2.style
+        );
+        s.strokeDasharray = String(len);
+        s.strokeDashoffset = String(len);
+        timed(el2, "ak-orn-grow", dl, du, o.ease);
+      }
+      return el2;
+    };
+    const shape = (d, role, dl, du, how) => {
+      const el2 = svgEl2("path", { d, class: "ak-orn-f ak-orn-r-" + role }, svg6);
+      if (o.animate) timed(el2, HOW[how || "pop"], dl, du || 0.5, !how || how === "pop" || how === "turn" || how === "spin" ? o.popEase : null);
+      return el2;
+    };
+    const stroke = (d, role, width, dl, du, how) => {
+      const el2 = svgEl2("path", { d, class: "ak-orn-k ak-orn-r-" + role, "stroke-width": width }, svg6);
+      if (o.animate) timed(el2, HOW[how || "fade"], dl, du, null);
+      return el2;
+    };
+    const rect = (x, y, w, h, role, opts) => {
+      const r = opts || {};
+      if (w <= 0 || h <= 0) return null;
+      const el2 = svgEl2("rect", {
+        x: f(x),
+        y: f(y),
+        width: f(w),
+        height: f(h),
+        rx: r.rx || 0,
+        class: (r.stroke ? "ak-orn-k" : "ak-orn-f") + " ak-orn-r-" + role,
+        "stroke-width": r.sw || 1
+      }, svg6);
+      if (o.animate && r.wipe) timed(el2, HOW.wipe, r.wipe[0], r.wipe[1], r.wipe[2] || o.ease);
+      return el2;
+    };
+    return { line: line2, shape, stroke, rect, rnd, poly, circ, arc: arc2, bz, hex, f };
+  }
+
+  // src/static/sdk-libs/atelier/ornament-sets-a.js
+  var PI5 = Math.PI;
+  var modern = {
+    id: "modern",
+    // A hairline drawn all round, two corner brackets growing out of their corners, one accent square.
+    frame(P, C) {
+      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      const arm2 = Math.min(64, C.w / 4, C.h / 3);
+      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "mute", 0.75, 0.1, 1.8);
+      P.line([[x0 - 10, y0 + arm2], [x0 - 10, y0 - 10], [x0 + arm2, y0 - 10]], "ink", 2, 0.35, 0.6);
+      P.line([[x1 + 10, y1 - arm2], [x1 + 10, y1 + 10], [x1 - arm2, y1 + 10]], "ink", 2, 0.55, 0.6);
+      P.shape(poly([[x1 + 4, y0 - 16], [x1 + 16, y0 - 16], [x1 + 16, y0 - 4], [x1 + 4, y0 - 4]]), "s1", 1.2);
+      for (let i = 0; i < 5; i++) P.line([[x0 + 24 + i * 10, y1 + 4], [x0 + 24 + i * 10, y1 + 12]], "mute", 1, 1.3 + i * 0.06, 0.2);
+    },
+    // An accent lead, a hairline, ticks every 44 px.
+    rule(P, D2) {
+      const span = D2.x1 - D2.x0;
+      P.line([[D2.x0, D2.y], [D2.x1, D2.y]], "mute", 0.75, 0.3, 1.1);
+      P.line([[D2.x0, D2.y], [D2.x0 + Math.min(48, span / 4), D2.y]], "s1", 3, 0.2, 0.45);
+      for (let x = D2.x0 + 88; x <= D2.x1 + 0.1; x += 44) P.line([[x, D2.y - 4], [x, D2.y + 4]], "ink", 1, 0.5 + (x - D2.x0) / span * 0.8, 0.15);
+    },
+    // An outlined track, a ruler under it and a marker at the value.
+    bar(P, B) {
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "ink", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
+      for (let i = 0; i <= 10; i++) {
+        const x = B.x + B.w * i / 10, h = i % 5 === 0 ? 10 : 5;
+        P.line([[x, B.y + B.h + 5], [x, B.y + B.h + 5 + h]], i % 5 === 0 ? "ink" : "mute", 1, 0.5 + i * 0.05, 0.15);
+      }
+      const vx = B.x + B.w * B.v;
+      P.line([[vx, B.y - 10], [vx, B.y + B.h + 2]], "ink", 1.5, 1.8, 0.3);
+      P.shape(poly([[vx - 5, B.y - 18], [vx + 5, B.y - 18], [vx, B.y - 10]]), "s1", 1.9);
+    },
+    // Open squares, the first one filled with the accent.
+    bullet(P, p, i) {
+      P.line([[p[0] - 5, p[1] - 5], [p[0] + 5, p[1] - 5], [p[0] + 5, p[1] + 5], [p[0] - 5, p[1] + 5], [p[0] - 5, p[1] - 5]], "ink", 1.5, 0.9 + i * 0.15, 0.4);
+      if (i === 0) P.shape(poly([[p[0] - 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] - 2.5], [p[0] + 2.5, p[1] + 2.5], [p[0] - 2.5, p[1] + 2.5]]), "s1", 1.4);
+    },
+    // A ruler along the foot.
+    strip(P, S) {
+      const span = S.x1 - S.x0;
+      P.line([[S.x0, S.y], [S.x1, S.y]], "mute", 0.75, 0.6, 1.4);
+      for (let x = S.x0; x <= S.x1 + 0.1; x += 16) {
+        const big = Math.round((x - S.x0) / 16) % 5 === 0;
+        P.line([[x, S.y], [x, S.y - (big ? 10 : 5)]], big ? "ink" : "mute", 1, 0.7 + (x - S.x0) / span, 0.12);
+      }
+    }
+  };
+  var futuristic = {
+    id: "futuristic",
+    // A chamfered outline drawn from the top-left cut both ways at once, readout ticks, a segmented arc, a crosshair.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12, k = 18;
+      P.line([[x0 + k, y0], [x1 - k, y0], [x1, y0 + k], [x1, y1 - k], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
+      P.line([[x0 + k, y0], [x0, y0 + k], [x0, y1 - k], [x0 + k, y1], [x1 - k, y1]], "s1", 1.5, 0.1, 1.2);
+      P.line([[x0 - 6, y0 + k + 6], [x0 + k + 6, y0 - 6]], "s2", 3, 1.1, 0.25);
+      P.line([[x1 - k - 6, y1 + 6], [x1 + 6, y1 - k - 6]], "s2", 3, 1.25, 0.25);
+      const ticks = Math.max(4, Math.min(12, Math.floor((C.w - 2 * k) / 16)));
+      for (let i = 0; i < ticks; i++) {
+        const x = x1 - k - 10 - i * 8;
+        P.line([[x, y0 - 4], [x, y0 - (i % 3 === 0 ? 11 : 7)]], i % 3 === 0 ? "s1" : "pale", 1.2, 1 + i * 0.04, 0.15);
+      }
+      for (let s = 0; s < 4; s++) {
+        const a0 = PI5 / 2 + s * PI5 / 8 + 0.05;
+        P.line(arc2(x0, y1, 26, a0, a0 + PI5 / 8 - 0.1, 6), s === 3 ? "s2" : "s1", 2, 1.2 + s * 0.1, 0.2);
+      }
+      const hx = x1 - 34, hy = y1 + 22;
+      P.line(arc2(hx, hy, 7, 0, PI5 * 2, 28), "s1", 1.2, 1.5, 0.4);
+      P.line([[hx - 14, hy], [hx - 4, hy]], "pale", 1, 1.7, 0.15);
+      P.line([[hx + 4, hy], [hx + 14, hy]], "pale", 1, 1.7, 0.15);
+      P.line([[hx, hy - 14], [hx, hy - 4]], "pale", 1, 1.75, 0.15);
+      P.line([[hx, hy + 4], [hx, hy + 14]], "pale", 1, 1.75, 0.15);
+    },
+    // Two lines run to a centre diamond, brackets close the ends.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      P.line([[D2.x0 + 10, D2.y], [mid - 16, D2.y]], "s1", 1.2, 0.3, 0.6);
+      P.line([[D2.x1 - 10, D2.y], [mid + 16, D2.y]], "s1", 1.2, 0.3, 0.6);
+      P.line([[mid, D2.y - 8], [mid + 8, D2.y], [mid, D2.y + 8], [mid - 8, D2.y], [mid, D2.y - 8]], "s2", 1.5, 0.8, 0.4);
+      P.shape(poly([[mid, D2.y - 3.5], [mid + 3.5, D2.y], [mid, D2.y + 3.5], [mid - 3.5, D2.y]]), "s2", 1.1);
+      P.line([[D2.x0 + 6, D2.y - 6], [D2.x0, D2.y - 6], [D2.x0, D2.y + 6], [D2.x0 + 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
+      P.line([[D2.x1 - 6, D2.y - 6], [D2.x1, D2.y - 6], [D2.x1, D2.y + 6], [D2.x1 - 6, D2.y + 6]], "mute", 1.2, 0.2, 0.3);
+    },
+    // Blocks; the filled ones light up in turn, the last lit block in the second colour.
+    bar(P, B) {
+      const n = Math.max(8, Math.round(24 * B.w / 356)), g = 3, bw = (B.w - (n - 1) * g) / n, lit = Math.round(n * B.v);
+      for (let i = 0; i < n; i++) {
+        const x = B.x + i * (bw + g), r = [[x, B.y], [x + bw, B.y], [x + bw, B.y + B.h], [x, B.y + B.h]];
+        if (i < lit) P.shape(poly(r), i === lit - 1 ? "s2" : "s1", 0.5 + i * 0.06 * 24 / n, 0.25);
+        else P.line(r.concat([r[0]]), "pale", 1, 0.5 + i * 0.03 * 24 / n, 0.2);
+      }
+      P.line([[B.x - 6, B.y - 4], [B.x - 10, B.y - 4], [B.x - 10, B.y + B.h + 4], [B.x - 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
+      P.line([[B.x + B.w + 6, B.y - 4], [B.x + B.w + 10, B.y - 4], [B.x + B.w + 10, B.y + B.h + 4], [B.x + B.w + 6, B.y + B.h + 4]], "mute", 1.2, 0.4, 0.3);
+    },
+    // Hexagons, the first one with a lit core.
+    bullet(P, p, i) {
+      P.line(hex(p[0], p[1], 7, PI5 / 6), "s1", 1.4, 0.9 + i * 0.15, 0.45);
+      if (i === 0) P.shape(poly(hex(p[0], p[1], 3, PI5 / 6).slice(0, 6)), "s2", 1.4);
+    },
+    // A dim rail with nodes; lit runs between them in turn.
+    strip(P, S) {
+      const nodes = [0, 112, 248, 416, 552, 696, 832].map((u) => S.x0 + u / 832 * (S.x1 - S.x0));
+      P.line([[S.x0, S.y], [S.x1, S.y]], "pale", 1, 0.5, 1.2);
+      for (let i = 0; i < nodes.length - 1; i++) P.line([[nodes[i] + 6, S.y], [nodes[i + 1] - 6, S.y]], i % 2 ? "s2" : "s1", 2, 0.9 + i * 0.22, 0.3);
+      nodes.forEach((x, i) => P.line(arc2(x, S.y, 4, 0, PI5 * 2, 16), "s1", 1.4, 0.8 + i * 0.22, 0.2));
+    }
+  };
+  function via(P, x, y, r, role, dl) {
+    P.line(arc2(x, y, r, 0, PI5 * 2, 18), role, 1.4, dl, 0.2);
+    if (P.rnd() > 0.5) P.shape(circ(x, y, r * 0.45), "s3", dl + 0.2, 0.3);
+  }
+  var cyberpunk = {
+    id: "cyberpunk",
+    seed: 31,
+    // A neon outline with a shifted ghost of three of its runs; traces leave every side, turn at 45 degrees and end in a via.
+    frame(P, C) {
+      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10;
+      const kx = (x1 - x0) / 420, ky = (y1 - y0) / 268;
+      P.line([[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0]], "s1", 1.6, 0.1, 1.1);
+      P.line([[x0 + 40 * kx, y0 - 3], [x0 + 170 * kx, y0 - 3]], "s2", 1.2, 1, 0.12);
+      P.line([[x1 + 3, y0 + 60 * ky], [x1 + 3, y0 + 130 * ky]], "s2", 1.2, 1.1, 0.12);
+      P.line([[x1 - 210 * kx, y1 + 3], [x1 - 120 * kx, y1 + 3]], "s2", 1.2, 1.2, 0.12);
+      [40, 84, 150, 204].forEach((u, i) => {
+        const y = y0 + u * ky, s = i % 2 ? 1 : -1;
+        P.line([[x0, y], [x0 - 8, y], [x0 - 18, y + 10 * s], [x0 - 26, y + 10 * s]], i % 2 ? "s2" : "s1", 1.3, 0.6 + i * 0.1, 0.35);
+        via(P, x0 - 30, y + 10 * s, 3.5, "s2", 0.95 + i * 0.1);
+      });
+      [60, 110, 290, 340].forEach((u, i) => {
+        const x = x0 + u * kx;
+        P.line([[x, y1], [x, y1 + 8], [x + 12, y1 + 20], [x + 12, y1 + 34]], i % 2 ? "s1" : "s2", 1.3, 0.7 + i * 0.1, 0.35);
+        via(P, x + 12, y1 + 38, 3.5, "s1", 1.05 + i * 0.1);
+      });
+      [30, 72].forEach((u, i) => {
+        const y = y0 + u * ky;
+        P.line([[x1, y], [x1 + 10, y], [x1 + 20, y + 10], [x1 + 30, y + 10]], "s2", 1.3, 0.8 + i * 0.1, 0.3);
+        via(P, x1 + 34, y + 10, 3.5, "s2", 1.1 + i * 0.1);
+      });
+      [250, 290].forEach((u, i) => {
+        const x = x0 + u * kx;
+        P.line([[x, y0], [x, y0 - 4], [x + 6, y0 - 10]], "s1", 1.3, 0.9 + i * 0.1, 0.25);
+        via(P, x + 9, y0 - 13, 3, "s1", 1.15 + i * 0.1);
+      });
+    },
+    // A three-line bus with one 45-degree jog, a via at each end of each line.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      ["s1", "s2", "s1"].forEach((role, j) => {
+        const y = D2.y - 7 + j * 5;
+        P.line([[D2.x0 + 6, y], [mid - 8, y], [mid, y + 8], [D2.x1 - 6, y + 8]], role, 1.3, 0.3 + j * 0.08, 0.9);
+        P.line(arc2(D2.x0 + 3, y, 2.5, 0, PI5 * 2, 12), role, 1, 0.25, 0.15);
+        P.line(arc2(D2.x1 - 3, y + 8, 2.5, 0, PI5 * 2, 12), role, 1, 1.2, 0.15);
+      });
+    },
+    // A neon track, a ghost of its edges, data packets in the filled run, a cursor at the value.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v;
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4, "steps(12, end)"] });
+      P.line([[B.x, B.y - 3], [vx, B.y - 3]], "s2", 1, 1.3, 0.2);
+      if (vx - 60 > B.x + 40) P.line([[B.x + 40, B.y + B.h + 3], [vx - 60, B.y + B.h + 3]], "s2", 1, 1.4, 0.2);
+      for (let i = 0, x = B.x + 14; x + 6 < vx - 10; i++, x += 36) P.shape(poly([[x, B.y + 3], [x + 6, B.y + 3], [x + 6, B.y + B.h - 3], [x, B.y + B.h - 3]]), "s3", 1.5 + i * 0.07, 0.2);
+      P.line([[vx + 2, B.y - 7], [vx + 2, B.y + B.h + 7]], "s2", 2, 1.9, 0.15);
+    },
+    // A via with a short stub, the first one lit.
+    bullet(P, p, i) {
+      P.line(arc2(p[0], p[1], 5, 0, PI5 * 2, 20), "s1", 1.5, 0.9 + i * 0.15, 0.3);
+      P.line([[p[0] + 5, p[1]], [p[0] + 9, p[1] - 4], [p[0] + 14, p[1] - 4]], "s2", 1.3, 1.1 + i * 0.15, 0.2);
+      if (i === 0) P.shape(circ(p[0], p[1], 2.2), "s3", 1.3);
+    },
+    // Three traces along the foot, each jogging twice at its own places.
+    strip(P, S) {
+      const k = (S.x1 - S.x0) / 832;
+      [[S.y - 10, "s2"], [S.y, "s1"], [S.y + 10, "pale"]].forEach((row, j) => {
+        const y = (
+          /** @type {number} */
+          row[0]
+        ), role = (
+          /** @type {string} */
+          row[1]
+        );
+        const a = S.x0 + (80 + P.rnd() * 260) * k, b = Math.min(S.x1 - 12, a + (180 + P.rnd() * 260) * k), s = j === 1 ? 1 : -1;
+        P.line([[S.x0, y], [a, y], [a + 6, y + 6 * s], [b, y + 6 * s], [b + 6, y], [S.x1, y]], role, 1.4, 0.5 + j * 0.12, 1.4);
+        via(P, S.x1 + 4, y, 3, role, 1.9 + j * 0.1);
+      });
+    }
+  };
+  function wave(a, b, amp, per, ph) {
+    const dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len, o = [];
+    for (let s = 0; s <= len; s += 3) {
+      const w = amp * Math.sin(2 * PI5 * s / per + ph);
+      o.push([a[0] + dx * s / len + nx * w, a[1] + dy * s / len + ny * w]);
+    }
+    return o;
+  }
+  function star(x, y, r) {
+    const o = [];
+    for (let i = 0; i < 10; i++) {
+      const a = -PI5 / 2 + i * PI5 / 5, q = i % 2 ? r * 0.45 : r;
+      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
+    }
+    return poly(o);
+  }
+  var vibrant = {
+    id: "vibrant",
+    seed: 5,
+    barH: 16,
+    popEase: "cubic-bezier(.3,1.7,.5,1)",
+    // One thick wavy ribbon per side, each in its own colour, then confetti round the card.
+    frame(P, C) {
+      const x0 = C.x - 16, y0 = C.y - 16, x1 = C.x + C.w + 16, y1 = C.y + C.h + 16;
+      P.line(wave([x0 + 18, y0], [x1 - 18, y0], 4, 40, 0), "s1", 6, 0.1, 0.7);
+      P.line(wave([x1, y0 + 18], [x1, y1 - 18], 4, 40, 0), "s3", 6, 0.45, 0.55);
+      P.line(wave([x1 - 18, y1], [x0 + 18, y1], 4, 40, 0), "s2", 6, 0.75, 0.7);
+      P.line(wave([x0, y1 - 18], [x0, y0 + 18], 4, 40, 0), "s4", 6, 1.1, 0.55);
+      const map2 = (v, lo, len, size, at3) => v < lo ? at3 + (v - lo) : v > lo + len ? at3 + size + (v - lo - len) : at3 + (v - lo) / len * size;
+      const roles = ["s1", "s3", "s2", "s4"];
+      [[34, 250], [26, 330], [40, 420], [30, 470], [110, 516], [190, 526], [290, 512], [380, 528], [440, 516], [500, 250], [508, 330], [496, 410], [512, 470]].forEach((q, i) => {
+        const x = map2(q[0], 64, 400, C.w, C.x), y = map2(q[1], 232, 248, C.h, C.y), role = roles[i % 4], kind = i % 3, dl = 1.3 + i * 0.05;
+        if (kind === 0) P.shape(circ(x, y, 3 + P.rnd() * 2.5), role, dl);
+        else if (kind === 1) P.shape(poly([[x, y - 5], [x + 5, y + 4], [x - 5, y + 4]]), role, dl);
+        else P.line([[x - 6, y], [x - 2, y - 4], [x + 2, y], [x + 6, y - 4]], role, 2.5, dl, 0.25);
+      });
+    },
+    // Two waves half a period apart, a dot at each end.
+    rule(P, D2) {
+      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, 0), "s1", 4, 0.3, 1);
+      P.line(wave([D2.x0 + 10, D2.y], [D2.x1 - 10, D2.y], 5, 36, PI5), "s4", 4, 0.45, 1);
+      P.shape(circ(D2.x0 + 2, D2.y, 4.5), "s3", 0.25);
+      P.shape(circ(D2.x1 - 2, D2.y, 4.5), "s3", 1.4);
+    },
+    // A rounded track, a wave riding the filled run, a star where it ends.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
+      P.rect(B.x, B.y, B.w, B.h, "t3", { rx: B.h / 2 });
+      P.rect(B.x, B.y, B.w * B.v, B.h, "s3", { rx: B.h / 2, wipe: [0.5, 1.4, "cubic-bezier(.3,1.3,.5,1)"] });
+      if (vx - 14 > B.x + 10) P.line(wave([B.x + 10, my], [vx - 14, my], 2.5, 18, 0), "s4", 2.5, 1.2, 0.7);
+      P.shape(star(vx + 2, B.y - 8, 9), "s1", 1.9, 0.6);
+    },
+    // Dots in three colours, each with a small bounce beside it.
+    bullet(P, p, i) {
+      P.shape(circ(p[0], p[1], 7), ["s1", "s2", "s4"][i % 3], 0.9 + i * 0.15, 0.6);
+      P.shape(circ(p[0] + 6, p[1] - 6, 2.5), "s3", 1.1 + i * 0.15, 0.4);
+    },
+    // A zigzag in four colour runs.
+    strip(P, S) {
+      const run = (S.x1 - S.x0) / 4, roles = ["s1", "s3", "s2", "s4"];
+      for (let k = 0; k < 4; k++) {
+        const o = [];
+        for (let x = S.x0 + k * run; x <= S.x0 + (k + 1) * run + 0.1; x += 12) o.push([x, S.y + (Math.round((x - S.x0) / 12) % 2 ? -7 : 7)]);
+        P.line(o, roles[k], 5, 0.6 + k * 0.3, 0.35);
+      }
+    }
+  };
+  var SETS_A = [modern, futuristic, cyberpunk, vibrant];
+
+  // src/static/sdk-libs/atelier/ornament-sets-b.js
+  var PI6 = Math.PI;
+  function hand(P, pts, amp) {
+    const p1 = P.rnd() * 6, p2 = P.rnd() * 6, o = [];
+    let s = 0;
+    for (let i = 1; i < pts.length; i++) {
+      const a = pts[i - 1], b = pts[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let u = 0; u < len; u += 4) {
+        const w = amp * (0.6 * Math.sin((s + u) / 23 + p1) + 0.4 * Math.sin((s + u) / 9 + p2));
+        o.push([a[0] + dx * u / len + nx * w, a[1] + dy * u / len + ny * w]);
+      }
+      s += len;
+    }
+    o.push(pts[pts.length - 1]);
+    return o;
+  }
+  function petal(x, y, s, a) {
+    const raw = bz([0, -s], [s * 0.6, -s * 0.3], [s * 0.5, s * 0.5], [0, s * 0.5], 10).concat(bz([0, s * 0.5], [-s * 0.5, s * 0.5], [-s * 0.6, -s * 0.3], [0, -s], 10));
+    const c = Math.cos(a), sn = Math.sin(a);
+    return poly(raw.map((p) => [x + p[0] * c - p[1] * sn, y + p[0] * sn + p[1] * c]));
+  }
+  var emotional = {
+    id: "emotional",
+    seed: 13,
+    ease: "cubic-bezier(.35,0,.25,1)",
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // The outline twice by hand, each pass a little off the other; a curl at the top left, petals falling at the lower right.
+    frame(P, C) {
+      const x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      P.line(hand(P, [[x0 + 30, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + 60, y0 + 1]], 1.8), "s1", 1.6, 0.1, 2.2);
+      P.line(hand(P, [[x0 + 4, y0 + 3], [x1 - 3, y0 - 2], [x1 + 3, y1 - 4], [x0 - 2, y1 + 3], [x0 + 3, y0 - 3], [x0 + 30, y0 - 2]], 2.4), "s2", 1, 0.5, 2.2);
+      P.line(bz([x0 + 30, y0], [x0 - 4, y0 - 2], [x0 - 26, y0 - 4], [x0 - 22, y0 + 14], 16).concat(bz([x0 - 22, y0 + 14], [x0 - 18, y0 + 30], [x0 + 4, y0 + 22], [x0 - 4, y0 + 10], 14)), "s1", 1.6, 2.1, 0.6);
+      [[x1 - 8, y1 + 20, 9, 2.4, "s1"], [x1 + 18, y1 + 6, 7, 3.1, "s3"], [x1 - 40, y1 + 34, 6, 1.9, "s2"], [x1 + 12, y1 + 38, 8, 2.7, "s3"]].forEach((q, i) => P.shape(
+        petal(
+          /** @type {number} */
+          q[0],
+          /** @type {number} */
+          q[1],
+          /** @type {number} */
+          q[2],
+          /** @type {number} */
+          q[3]
+        ),
+        /** @type {string} */
+        q[4],
+        2 + i * 0.25,
+        0.9,
+        "drift"
+      ));
+    },
+    // A handwritten line that ties one loop in the middle.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      const loop = bz([mid - 34, D2.y], [mid + 12, D2.y + 2], [mid + 14, D2.y - 24], [mid, D2.y - 24], 16).concat(bz([mid, D2.y - 24], [mid - 14, D2.y - 24], [mid - 10, D2.y + 2], [mid + 34, D2.y], 16));
+      P.line(hand(P, [[D2.x0, D2.y + 2], [mid - 34, D2.y]], 1.2).concat(loop).concat(hand(P, [[mid + 34, D2.y], [D2.x1, D2.y - 2]], 1.2)), "s1", 1.8, 0.3, 1.6);
+    },
+    // A soft pencil track, a thicker stroke over the value, a petal where it stops.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2;
+      P.line(hand(P, [[B.x, my], [B.x + B.w, my]], 1), "pale", 2, 0.3, 1);
+      if (vx > B.x + 6) P.line(hand(P, [[B.x + 2, my], [vx, my]], 1.4), "s1", 6, 0.7, 1.2);
+      P.shape(petal(vx + 10, my - 8, 7, 2.2), "s3", 1.9, 0.9, "drift");
+    },
+    // Petals in the three soft colours.
+    bullet(P, p, i) {
+      P.shape(petal(p[0], p[1], 8, -0.5 + i % 3 * 0.3), ["s1", "s2", "s3"][i % 3], 0.9 + i * 0.2, 0.7, "drift");
+    },
+    // A quiet line that beats once in the middle.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2, y = S.y;
+      const beat = [[S.x0, y], [sm - 60, y]].concat(bz([sm - 60, y], [sm - 44, y], [sm - 40, y + 8], [sm - 30, y + 6], 6)).concat(bz([sm - 30, y + 6], [sm - 18, y + 4], [sm - 16, y - 26], [sm - 4, y - 24], 8)).concat(bz([sm - 4, y - 24], [sm + 8, y - 22], [sm + 8, y + 14], [sm + 22, y + 12], 8)).concat(bz([sm + 22, y + 12], [sm + 34, y + 10], [sm + 40, y], [sm + 60, y], 6)).concat([[S.x1, y]]);
+      P.line(hand(P, beat, 0.6), "s1", 2, 0.6, 2.4);
+    }
+  };
+  var diamond = (x, y, r) => poly([[x, y - r], [x + r * 0.7, y], [x, y + r], [x - r * 0.7, y]]);
+  function taper(pts, wf) {
+    let tot = 0;
+    for (let i = 1; i < pts.length; i++) tot += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    const left = [], right = [];
+    let s = 0;
+    for (let i = 0; i < pts.length; i++) {
+      if (i > 0) s += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+      const a = pts[Math.max(0, i - 1)], b = pts[Math.min(pts.length - 1, i + 1)], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, w = wf(s / (tot || 1)) / 2;
+      left.push([pts[i][0] - dy / len * w, pts[i][1] + dx / len * w]);
+      right.push([pts[i][0] + dy / len * w, pts[i][1] - dx / len * w]);
+    }
+    return poly(left.concat(right.reverse()));
+  }
+  var seg = (a, b, n) => {
+    const o = [];
+    for (let i = 0; i <= n; i++) o.push([a[0] + (b[0] - a[0]) * i / n, a[1] + (b[1] - a[1]) * i / n]);
+    return o;
+  };
+  var dramatic = {
+    id: "dramatic",
+    ease: "cubic-bezier(.7,0,.2,1)",
+    // A heavy rule opened from the top centre both ways, a fine inner rule, swashes and a diamond on top, rays under the card.
+    frame(P, C) {
+      const cx = C.x + C.w / 2, x0 = C.x - 18, y0 = C.y - 18, x1 = C.x + C.w + 18, y1 = C.y + C.h + 18;
+      const reach = Math.min(150, C.w / 2 - 10);
+      P.line([[cx, y0], [x1, y0], [x1, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
+      P.line([[cx, y0], [x0, y0], [x0, y1], [cx, y1]], "s2", 3, 0.1, 1.1);
+      P.line([[C.x - 8, C.y - 8], [C.x + C.w + 8, C.y - 8], [C.x + C.w + 8, C.y + C.h + 8], [C.x - 8, C.y + C.h + 8], [C.x - 8, C.y - 8]], "s2", 0.8, 0.9, 1.3);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => P.shape(diamond(q[0], q[1], 7), "s1", 1.1 + i * 0.05));
+      for (const sx of [-1, 1]) {
+        P.line(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 20), "s2", 0.8, 1.2, 0.5);
+        P.shape(taper(seg([cx + sx * 12, y0 - 6], [cx + sx * reach, y0 - 6], 30), (u) => 6 * (1 - u)), "s2", 1.5, 0.7, "fade");
+      }
+      P.shape(diamond(cx, y0 - 6, 14), "s1", 1, 0.6);
+      for (let i = 0; i < 11; i++) {
+        const a = PI6 * (0.18 + 0.64 * i / 10), r1 = i % 2 ? 16 : 30;
+        P.line([[cx + 6 * Math.cos(a), y1 + 6 * Math.sin(a)], [cx + r1 * Math.cos(a), y1 + r1 * Math.sin(a)]], "s2", 1, 1.4 + Math.abs(i - 5) * 0.05, 0.3);
+      }
+    },
+    // A blade, thickest in the middle, a hairline under it and a diamond at its heart.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(50, (D2.x1 - D2.x0) / 6);
+      P.line(seg([D2.x0, D2.y], [D2.x1, D2.y], 2), "s2", 0.8, 0.3, 0.8);
+      P.shape(taper(seg([D2.x0, D2.y], [D2.x1, D2.y], 60), (u) => 7 * Math.sin(PI6 * u)), "s1", 0.9, 0.8, "fade");
+      P.line(seg([D2.x0 + inset, D2.y + 9], [D2.x1 - inset, D2.y + 9], 2), "s2", 0.8, 1.1, 0.6);
+      P.line([[mid, D2.y - 10], [mid + 7, D2.y], [mid, D2.y + 10], [mid - 7, D2.y], [mid, D2.y - 10]], "s2", 1.5, 1.4, 0.4);
+    },
+    // A dark track in a fine rule, a mark at the value with a diamond, a hairline under the track.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v;
+      P.rect(B.x, B.y, B.w, B.h, "deep");
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s2", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.6] });
+      P.line([[vx, B.y - 12], [vx, B.y + B.h + 12]], "s2", 1.5, 2, 0.25);
+      P.shape(diamond(vx, B.y - 16, 6), "s2", 2.1);
+      P.line(seg([B.x, B.y + B.h + 6], [B.x + B.w, B.y + B.h + 6], 2), "s2", 0.6, 0.6, 1);
+    },
+    // Diamonds inside fine outlines.
+    bullet(P, p, i) {
+      P.line([[p[0], p[1] - 9], [p[0] + 6, p[1]], [p[0], p[1] + 9], [p[0] - 6, p[1]], [p[0], p[1] - 9]], "s2", 1.2, 0.9 + i * 0.15, 0.35);
+      P.shape(diamond(p[0], p[1], 4.5), "s1", 1.15 + i * 0.15);
+    },
+    // Two swords drawn out from a centre diamond.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2;
+      P.line(seg([sm - 16, S.y], [S.x0, S.y], 2), "s2", 0.8, 0.5, 0.9);
+      P.line(seg([sm + 16, S.y], [S.x1, S.y], 2), "s2", 0.8, 0.5, 0.9);
+      P.shape(taper(seg([sm - 16, S.y], [S.x0 + 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
+      P.shape(taper(seg([sm + 16, S.y], [S.x1 - 20, S.y], 50), (u) => 5 * (1 - u)), "s2", 1.2, 0.7, "fade");
+      P.shape(diamond(sm, S.y, 12), "s1", 0.4, 0.6);
+      P.shape(diamond(S.x0, S.y, 5), "s1", 1.4);
+      P.shape(diamond(S.x1, S.y, 5), "s1", 1.4);
+    }
+  };
+  var mirX = (pts, mx) => pts.map((p) => [2 * mx - p[0], p[1]]);
+  var mirY = (pts, my) => pts.map((p) => [p[0], 2 * my - p[1]]);
+  function rosette(P, x, y, r, n, role, dl) {
+    for (let i = 0; i < n; i++) {
+      const a = i * 2 * PI6 / n, c = Math.cos(a), s = Math.sin(a);
+      const lens = bz([0, 0], [r * 0.3, -r * 0.36], [r * 0.75, -r * 0.3], [r, 0], 8).concat(bz([r, 0], [r * 0.75, r * 0.3], [r * 0.3, r * 0.36], [0, 0], 8));
+      P.shape(poly(lens.map((p) => [x + p[0] * c - p[1] * s, y + p[0] * s + p[1] * c])), role, dl, 0.6, "turn");
+    }
+    P.shape(circ(x, y, r * 0.22), "ground", dl + 0.15, 0.4);
+  }
+  var symmetrical = {
+    id: "symmetrical",
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // Both halves drawn from the top centre and meeting at the bottom centre, an inner rule the same way, rosettes on the corners, mirrored scrolls.
+    frame(P, C) {
+      const cx = C.x + C.w / 2, cy = C.y + C.h / 2, x0 = C.x - 14, y0 = C.y - 14, x1 = C.x + C.w + 14, y1 = C.y + C.h + 14;
+      const half = [[cx, y0], [x1, y0], [x1, y1], [cx, y1]];
+      P.line(half, "s1", 1.5, 0.1, 1.4);
+      P.line(mirX(half, cx), "s1", 1.5, 0.1, 1.4);
+      const inner = [[cx, y0 + 7], [x1 - 7, y0 + 7], [x1 - 7, y1 - 7], [cx, y1 - 7]];
+      P.line(inner, "s2", 0.8, 0.5, 1.4);
+      P.line(mirX(inner, cx), "s2", 0.8, 0.5, 1.4);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q) => rosette(P, q[0], q[1], 11, 8, "s1", 1.4));
+      const curl = bz([cx, y0], [cx - 14, y0 - 16], [cx - 40, y0 - 14], [cx - 40, y0 - 4], 16).concat(bz([cx - 40, y0 - 4], [cx - 40, y0 + 1], [cx - 32, y0 + 1], [cx - 32, y0 - 5], 8));
+      for (const c of [curl, mirX(curl, cx), mirY(curl, cy), mirX(mirY(curl, cy), cx)]) P.line(c, "s2", 1.4, 1, 0.6);
+      const side = bz([x0, cy], [x0 - 14, cy - 10], [x0 - 14, cy - 30], [x0 - 5, cy - 34], 14);
+      for (const c of [side, mirY(side, cy), mirX(side, cx), mirX(mirY(side, cy), cx)]) P.line(c, "s2", 1.4, 1.1, 0.5);
+      P.shape(circ(cx, y0, 3), "s2", 1.5);
+      P.shape(circ(cx, y1, 3), "s2", 1.5);
+    },
+    // A rosette in the middle, lines growing out to both ends, a scroll at each end.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      rosette(P, mid, D2.y, 10, 8, "s2", 0.2);
+      P.line([[mid + 14, D2.y], [D2.x1 - 20, D2.y]], "s1", 1.4, 0.5, 0.9);
+      P.line([[mid - 14, D2.y], [D2.x0 + 20, D2.y]], "s1", 1.4, 0.5, 0.9);
+      const end = bz([D2.x1 - 20, D2.y], [D2.x1 - 6, D2.y], [D2.x1, D2.y - 12], [D2.x1 - 10, D2.y - 12], 10);
+      P.line(end, "s1", 1.4, 1.35, 0.35);
+      P.line(mirX(end, mid), "s1", 1.4, 1.35, 0.35);
+      [0.33, 0.66].forEach((k) => {
+        P.shape(circ(mid + (D2.x1 - 20 - mid) * k, D2.y, 2.5), "s2", 0.8 + k);
+        P.shape(circ(mid - (mid - D2.x0 - 20) * k, D2.y, 2.5), "s2", 0.8 + k);
+      });
+    },
+    // A rounded track, mirrored end brackets and a mark at the middle.
+    bar(P, B) {
+      const bm = B.x + B.w / 2, by = B.y + B.h / 2;
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true, rx: B.h / 2 });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { rx: (B.h - 2) / 2, wipe: [0.5, 1.4] });
+      const cap = [[B.x + B.w + 6, B.y - 5], [B.x + B.w + 11, by], [B.x + B.w + 6, B.y + B.h + 5]];
+      P.line(cap, "s2", 1.4, 0.4, 0.3);
+      P.line(mirX(cap, bm), "s2", 1.4, 0.4, 0.3);
+      P.line([[bm, B.y - 8], [bm, B.y - 2]], "s2", 1.4, 0.3, 0.2);
+      P.line([[bm, B.y + B.h + 2], [bm, B.y + B.h + 8]], "s2", 1.4, 0.3, 0.2);
+    },
+    // Four-petal rosettes.
+    bullet(P, p, i) {
+      rosette(P, p[0], p[1], 8, 4, i === 0 ? "s1" : "s2", 0.9 + i * 0.15);
+    },
+    // From the middle outward: rosettes at the centre and the quarters, diamonds between, all in pairs.
+    strip(P, S) {
+      const sm = (S.x0 + S.x1) / 2, q = (S.x1 - S.x0) / 4;
+      P.line([[sm + 14, S.y], [S.x1, S.y]], "s1", 1, 0.5, 1.2);
+      P.line([[sm - 14, S.y], [S.x0, S.y]], "s1", 1, 0.5, 1.2);
+      rosette(P, sm, S.y, 12, 8, "s1", 0.3);
+      [1, 2].forEach((k) => {
+        rosette(P, sm + q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
+        rosette(P, sm - q * k, S.y, k === 1 ? 8 : 6, 6, "s2", 0.6 + k * 0.5);
+      });
+      [0.5, 1.5].forEach((k) => {
+        const dl = 0.6 + k * 0.5;
+        [sm + q * k, sm - q * k].forEach((x) => P.shape(poly([[x, S.y - 5], [x + 4, S.y], [x, S.y + 5], [x - 4, S.y]]), "s1", dl));
+      });
+    }
+  };
+  function loopRound(P, x0, y0, x1, y1, amp, over, mess) {
+    const per = [[x0, y0], [x1, y0], [x1, y1], [x0, y1], [x0, y0], [x0 + over, y0]], o = [];
+    let v = 0;
+    for (let i = 1; i < per.length; i++) {
+      const a = per[i - 1], b = per[i], dx = b[0] - a[0], dy = b[1] - a[1], len = Math.hypot(dx, dy) || 1, nx = -dy / len, ny = dx / len;
+      for (let u = 0; u < len; u += 7) {
+        v = v * 0.8 + (P.rnd() - 0.5) * amp * mess;
+        o.push([a[0] + dx * u / len + nx * v, a[1] + dy * u / len + ny * v]);
+      }
+    }
+    return o;
+  }
+  function knot(P, x, y, r, steps2, mess) {
+    const o = [];
+    let a = P.rnd() * 6;
+    for (let i = 0; i < steps2; i++) {
+      a += 0.6 + P.rnd() * 0.7;
+      const q = r * (0.4 + P.rnd() * 0.6 * mess);
+      o.push([x + q * Math.cos(a), y + q * Math.sin(a)]);
+    }
+    return o;
+  }
+  function walk(P, xa, xb, y, amp, loops, mess) {
+    const o = [];
+    let v = 0, x = xa;
+    while (x < xb) {
+      v = v * 0.85 + (P.rnd() - 0.5) * amp * mess;
+      o.push([x, y + v]);
+      if (loops && P.rnd() < 0.06) {
+        const r = 4 + P.rnd() * 5;
+        for (let k = 1; k <= 10; k++) {
+          const a = PI6 / 2 + k * 2 * PI6 / 10;
+          o.push([x + r * Math.cos(a), y + v - r + r * Math.sin(a)]);
+        }
+      }
+      x += 5 + P.rnd() * 6;
+    }
+    o.push([xb, y]);
+    return o;
+  }
+  var chaotic = {
+    id: "chaotic",
+    seed: 2026,
+    ease: "cubic-bezier(.5,.1,.5,.9)",
+    popEase: "cubic-bezier(.2,2,.5,1)",
+    // Three scribbled loops in three inks, a knot on the top-right corner, a splatter at the lower left.
+    frame(P, C, p) {
+      const x0 = C.x - 10, y0 = C.y - 10, x1 = C.x + C.w + 10, y1 = C.y + C.h + 10, m = p.mess;
+      P.line(loopRound(P, x0, y0, x1, y1, 6, 40, m), "ink", 1.4, 0.1, 1.6);
+      P.line(loopRound(P, x0 - 4, y0 + 3, x1 + 5, y1 - 2, 9, 70, m), "s1", 2.2, 0.5, 1.4);
+      P.line(loopRound(P, x0 + 3, y0 - 5, x1 - 2, y1 + 6, 7, 20, m), "s2", 1.1, 0.9, 1.3);
+      P.line(knot(P, x1 + 2, y0 + 2, 16, 26, m), "ink", 1.3, 1.6, 0.7);
+      for (let i = 0; i < 14; i++) {
+        const a = P.rnd() * PI6 * 2, q = 6 + P.rnd() * 34;
+        P.shape(circ(x0 + 10 + q * Math.cos(a) * 0.9, y1 + 8 + q * Math.sin(a) * 0.5, 0.8 + P.rnd() * 3.2), ["ink", "s1", "s2"][i % 3], 1.5 + P.rnd() * 0.6);
+      }
+    },
+    // A wandering line that ties a few small loops on its way, an echo under it.
+    rule(P, D2, p) {
+      P.line(walk(P, D2.x0, D2.x1, D2.y, 6, true, p.mess), "ink", 1.6, 0.3, 1.5);
+      P.line(walk(P, D2.x0 + 20, D2.x1 - 30, D2.y + 5, 5, false, p.mess), "s2", 1, 0.7, 1.2);
+    },
+    // A scribbled outline and a zigzag hatched over the value.
+    bar(P, B, p) {
+      const vx = B.x + B.w * B.v, hz = [];
+      P.line(loopRound(P, B.x - 2, B.y - 2, B.x + B.w + 2, B.y + B.h + 2, 2.5, 30, p.mess), "ink", 1.2, 0.3, 1.1);
+      for (let x = B.x + 2, k = 0; x < vx; x += 3 + P.rnd() * 3, k++) hz.push([x, k % 2 ? B.y + B.h - P.rnd() * 2 : B.y + P.rnd() * 2]);
+      P.line(hz, "s1", 1.6, 0.8, 1.2);
+    },
+    // Small knots in the three inks.
+    bullet(P, pt, i, p) {
+      P.line(knot(P, pt[0], pt[1], 6, 12, p.mess), ["ink", "s1", "s2"][i % 3], 1.5, 0.9 + i * 0.15, 0.5);
+    },
+    // Three walks that cross one another along the foot.
+    strip(P, S, p) {
+      [["ink", 1.4], ["s1", 2], ["s2", 1.2]].forEach((q, i) => P.line(
+        walk(P, S.x0, S.x1, S.y + (i - 1) * 4, 9, i === 0, p.mess),
+        /** @type {string} */
+        q[0],
+        /** @type {number} */
+        q[1],
+        0.5 + i * 0.2,
+        1.8
+      ));
+    }
+  };
+  var SETS_B = [emotional, dramatic, symmetrical, chaotic];
+
+  // src/static/sdk-libs/atelier/ornament-sets-c.js
+  var PI7 = Math.PI;
+  var DEG = PI7 / 180;
+  var chev = (x, y, h) => [[x, y - h / 2], [x + h * 0.45, y], [x, y + h / 2]];
+  var velocity = {
+    id: "velocity",
+    seed: 99,
+    ease: "cubic-bezier(.7,0,.25,1)",
+    // Speed lines trail off the left edge, the top edge shoots across into a chevron, two lines run under the card, chevrons point on.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
+      const n = Math.max(4, Math.min(12, Math.round(C.h / 27)));
+      for (let i = 0; i < n; i++) {
+        const y = C.y + 16 + i * (C.h - 32) / Math.max(1, n - 1), len = 12 + P.rnd() * 34;
+        P.line([[x0 - 4 - len, y], [x0 - 4, y]], i % 3 === 1 ? "s2" : "pale", i % 3 === 1 ? 2 : 1.4, 0.05 + i * 0.04, 0.25);
+      }
+      P.line([[x0, y0], [x1 - 6, y0]], "s2", 2.5, 0.2, 0.45);
+      P.line(chev(x1 - 6, y0, 14), "s1", 2.5, 0.62, 0.15);
+      P.line([[x0 + 20, y1], [x1, y1]], "pale", 1.4, 0.35, 0.45);
+      P.line([[x0 + Math.min(120, C.w / 3), y1 + 7], [x1 - 30, y1 + 7]], "s1", 1.6, 0.5, 0.4);
+      ["s1", "s2", "pale"].forEach((role, i) => P.line(chev(x1 + 10 + i * 13, C.y + C.h / 2, 18), role, 2.6, 0.8 + i * 0.08, 0.15));
+    },
+    // A streak that thickens toward its point, with two thinner lines riding beside it.
+    rule(P, D2) {
+      const tail = D2.x0, head = D2.x1 - 14, wmax = 7, top = [], bot = [], span = D2.x1 - D2.x0;
+      for (let x = tail; x <= head; x += 6) {
+        const u = (x - tail) / (head - tail), w = wmax * Math.pow(u, 1.6) / 2;
+        top.push([x, D2.y - w]);
+        bot.push([x, D2.y + w]);
+      }
+      P.shape(poly(top.concat([[D2.x1, D2.y]]).concat(bot.reverse())), "s1", 0.3, 0.55, "shoot");
+      P.line([[D2.x0 + span * 0.34, D2.y - 9], [D2.x1 - span * 0.17, D2.y - 9]], "s2", 1.3, 0.45, 0.35);
+      P.line([[D2.x0 + span * 0.17, D2.y + 9], [D2.x1 - span * 0.34, D2.y + 9]], "pale", 1.3, 0.5, 0.35);
+    },
+    // A pale track, a striped fill, a chevron at the value with speed lines trailing it.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, fw = B.w * B.v;
+      P.rect(B.x, B.y, B.w, B.h, "pale");
+      P.rect(B.x, B.y, fw, B.h, "s1", { wipe: [0.5, 1] });
+      const slant = B.h * Math.tan(25 * DEG);
+      let d = "";
+      for (let x = B.x + 4; x + slant < B.x + fw - 1; x += 14) d += "M" + P.f(x) + " " + P.f(B.y + B.h) + " L" + P.f(x + slant) + " " + P.f(B.y);
+      if (d) P.stroke(d, "d1", 3, 1.5, 0.35, "fade");
+      P.shape(poly([[vx - 4, B.y - 6], [vx + 8, my], [vx - 4, B.y + B.h + 6], [vx + 1, my]]), "s2", 1.4, 0.3, "shoot");
+      if (vx - 14 > B.x) P.line([[Math.max(B.x, vx - 70), B.y - 7], [vx - 14, B.y - 7]], "s2", 1.4, 1.3, 0.25);
+      if (vx - 30 > B.x) P.line([[Math.max(B.x, vx - 110), B.y + B.h + 7], [vx - 30, B.y + B.h + 7]], "pale", 1.4, 1.35, 0.25);
+    },
+    // Chevrons.
+    bullet(P, p, i) {
+      P.line(chev(p[0] - 3, p[1], 14), i === 0 ? "s1" : "s2", 2.6, 0.9 + i * 0.1, 0.18);
+    },
+    // A burst of speed lines along the foot, quicker at the far end.
+    strip(P, S) {
+      const k = (S.x1 - S.x0) / 832;
+      for (let i = 0; i < 16; i++) {
+        const y = S.y - 14 + P.rnd() * 28, a = S.x0 + P.rnd() * 600 * k, len = (60 + P.rnd() * 200) * k, b = Math.min(S.x1, a + len);
+        P.line([[a, y], [b, y]], i % 5 === 0 ? "s1" : i % 2 ? "s2" : "pale", i % 5 === 0 ? 2.2 : 1.4, 0.5 + i * 0.06, 0.3 - i * 8e-3);
+      }
+    }
+  };
+  function stepped(x0, y0, x1, y1, s) {
+    const cx = (x0 + x1) / 2;
+    return [
+      [cx, y0],
+      [x1 - 2 * s, y0],
+      [x1 - 2 * s, y0 + s],
+      [x1 - s, y0 + s],
+      [x1 - s, y0 + 2 * s],
+      [x1, y0 + 2 * s],
+      [x1, y1 - 2 * s],
+      [x1 - s, y1 - 2 * s],
+      [x1 - s, y1 - s],
+      [x1 - 2 * s, y1 - s],
+      [x1 - 2 * s, y1],
+      [x0 + 2 * s, y1],
+      [x0 + 2 * s, y1 - s],
+      [x0 + s, y1 - s],
+      [x0 + s, y1 - 2 * s],
+      [x0, y1 - 2 * s],
+      [x0, y0 + 2 * s],
+      [x0 + s, y0 + 2 * s],
+      [x0 + s, y0 + s],
+      [x0 + 2 * s, y0 + s],
+      [x0 + 2 * s, y0],
+      [cx, y0]
+    ];
+  }
+  function fan(P, x, y, r, n, dir, role, dl) {
+    P.line(arc2(x, y, r, 0, dir * PI7, 24), role, 1.2, dl, 0.5);
+    P.line(arc2(x, y, r * 0.55, 0, dir * PI7, 16), role, 1, dl + 0.1, 0.4);
+    for (let i = 1; i < n; i++) {
+      const a = dir * PI7 * i / n;
+      P.line([[x + r * 0.2 * Math.cos(a), y + r * 0.2 * Math.sin(a)], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1, dl + 0.2 + Math.abs(i - n / 2) * 0.04, 0.3);
+    }
+  }
+  var artDeco = {
+    id: "art-deco",
+    barH: 16,
+    popEase: "cubic-bezier(.3,1.4,.55,1)",
+    // Three stepped rules, the outer one heaviest, a rising sun on top and a setting one below.
+    frame(P, C) {
+      const cx = C.x + C.w / 2;
+      P.line(stepped(C.x - 20, C.y - 20, C.x + C.w + 20, C.y + C.h + 20, 7), "s1", 1.6, 0.1, 1.8);
+      P.line(stepped(C.x - 14, C.y - 14, C.x + C.w + 14, C.y + C.h + 14, 6), "s1", 0.8, 0.3, 1.8);
+      P.line(stepped(C.x - 8, C.y - 8, C.x + C.w + 8, C.y + C.h + 8, 5), "h1", 0.6, 0.5, 1.8);
+      fan(P, cx, C.y - 20, 28, 9, -1, "s1", 1.4);
+      fan(P, cx, C.y + C.h + 20, 18, 7, 1, "s1", 1.6);
+    },
+    // Three lines from each end close in on a small sun and a diamond.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2, inset = Math.min(36, (D2.x1 - D2.x0) / 10);
+      [-5, 0, 5].forEach((o, j) => {
+        const ins = j === 1 ? 0 : inset;
+        P.line([[D2.x0 + ins, D2.y + o], [mid - 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
+        P.line([[D2.x1 - ins, D2.y + o], [mid + 26, D2.y + o]], "s1", j === 1 ? 1.2 : 0.7, 0.3 + j * 0.06, 0.8);
+      });
+      fan(P, mid, D2.y - 2, 16, 7, -1, "s1", 1);
+      P.shape(poly([[mid, D2.y + 2], [mid + 6, D2.y + 9], [mid, D2.y + 16], [mid - 6, D2.y + 9]]), "s1", 1.4);
+    },
+    // A double rule round the track, the fill inside it, stepped marks under the quarters.
+    bar(P, B) {
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "s1", { stroke: true });
+      P.rect(B.x + 2.5, B.y + 2.5, B.w - 5, B.h - 5, "s1", { stroke: true });
+      P.rect(B.x + 5, B.y + 5, (B.w - 10) * B.v, B.h - 10, "s1", { wipe: [0.5, 1.4] });
+      for (let i = 0; i <= 4; i++) {
+        const x = B.x + B.w * i / 4, y = B.y + B.h + 6;
+        P.line([[x - 6, y + 8], [x - 6, y + 4], [x - 3, y + 4], [x - 3, y], [x + 3, y], [x + 3, y + 4], [x + 6, y + 4], [x + 6, y + 8]], "s1", 1, 0.6 + i * 0.12, 0.3);
+      }
+    },
+    // Quarter suns.
+    bullet(P, p, i) {
+      const x = p[0] - 6, y = p[1] + 6;
+      P.line(arc2(x, y, 12, -PI7 / 2, 0, 10), "s1", 1.2, 0.9 + i * 0.15, 0.3);
+      for (let k = 1; k < 4; k++) {
+        const a = -PI7 / 2 * k / 4;
+        P.line([[x + 3 * Math.cos(a), y + 3 * Math.sin(a)], [x + 12 * Math.cos(a), y + 12 * Math.sin(a)]], "s1", 1, 1.05 + i * 0.15 + k * 0.03, 0.2);
+      }
+    },
+    // A row of scallops over a straight rule, every other one holding a sun.
+    strip(P, S) {
+      const y = S.y + 10, n = Math.max(6, Math.round(16 * (S.x1 - S.x0) / 832)), w = (S.x1 - S.x0) / n;
+      P.line([[S.x0, y], [S.x1, y]], "s1", 1, 0.4, 1.4);
+      for (let i = 0; i < n; i++) {
+        const x = S.x0 + w * (i + 0.5), dl = 0.6 + i * 0.06 * 16 / n;
+        P.line(arc2(x, y, w / 2, PI7, 2 * PI7, 14), i % 2 ? "h1" : "s1", 1, dl, 0.3);
+        if (i % 2 === 0) for (let k = 1; k < 5; k++) {
+          const a = PI7 + PI7 * k / 5;
+          P.line([[x + 4 * Math.cos(a), y + 4 * Math.sin(a)], [x + (w / 2 - 4) * Math.cos(a), y + (w / 2 - 4) * Math.sin(a)]], "s1", 0.8, dl + 0.2, 0.2);
+        }
+      }
+    }
+  };
+  var ARM_SPEED = 260;
+  function arm(P, x, y, dir, len, s, br, role, dl) {
+    const c = Math.cos(dir * DEG), sn = Math.sin(dir * DEG);
+    P.line([[x, y], [x + c * len, y + sn * len]], role, 1.4, dl, len / ARM_SPEED);
+    for (let d = 12; d < len - 4; d += 13) {
+      const bl = br * Math.pow(1 - d / len, 0.8) + 3, px = x + c * d, py = y + sn * d, when2 = dl + d / ARM_SPEED;
+      (s === 0 ? [1, -1] : [s]).forEach((side) => {
+        const a = (dir + side * 60) * DEG;
+        P.line([[px, py], [px + Math.cos(a) * bl, py + Math.sin(a) * bl]], role, 1, when2, 0.2);
+        if (bl > 10) {
+          const tx = px + Math.cos(a) * bl * 0.55, ty = py + Math.sin(a) * bl * 0.55, a2 = dir * DEG;
+          P.line([[tx, ty], [tx + Math.cos(a2) * bl * 0.35, ty + Math.sin(a2) * bl * 0.35]], role, 0.8, when2 + 0.15, 0.15);
+        }
+      });
+    }
+  }
+  function flake(P, x, y, r, role, dl) {
+    for (let i = 0; i < 6; i++) {
+      const a = (i * 60 + 30) * DEG;
+      P.line([[x, y], [x + r * Math.cos(a), y + r * Math.sin(a)]], role, 1.1, dl, 0.25);
+      const mx = x + r * 0.6 * Math.cos(a), my = y + r * 0.6 * Math.sin(a);
+      [-1, 1].forEach((sd) => {
+        const b = a + sd * 60 * DEG;
+        P.line([[mx, my], [mx + r * 0.3 * Math.cos(b), my + r * 0.3 * Math.sin(b)]], role, 0.9, dl + 0.2, 0.15);
+      });
+    }
+    P.line(hex(x, y, r * 0.3), role, 1, dl + 0.1, 0.25);
+  }
+  var crystal = {
+    id: "crystal",
+    popEase: "cubic-bezier(.3,1.3,.55,1)",
+    // From every corner an arm grows along each edge, branching outward; a crystal sits in each corner.
+    frame(P, C) {
+      const x0 = C.x - 12, y0 = C.y - 12, x1 = C.x + C.w + 12, y1 = C.y + C.h + 12;
+      const lx = Math.min(150, (x1 - x0) * 0.36), ly = Math.min(110, (y1 - y0) * 0.41);
+      arm(P, x0, y0, 0, lx, -1, 16, "s1", 0.2);
+      arm(P, x0, y0, 90, ly, 1, 14, "s2", 0.2);
+      arm(P, x1, y0, 180, lx, 1, 16, "s1", 0.35);
+      arm(P, x1, y0, 90, ly, -1, 14, "s2", 0.35);
+      arm(P, x1, y1, 180, lx, -1, 16, "s1", 0.5);
+      arm(P, x1, y1, 270, ly, 1, 14, "s2", 0.5);
+      arm(P, x0, y1, 0, lx, 1, 16, "s1", 0.65);
+      arm(P, x0, y1, 270, ly, -1, 14, "s2", 0.65);
+      [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].forEach((q, i) => {
+        P.shape(poly(hex(q[0], q[1], 7).slice(0, 6)), "s3", 0.1 + i * 0.15, 0.6, "spin");
+        P.line(hex(q[0], q[1], 11), "s1", 1, 0.3 + i * 0.15, 0.4);
+      });
+    },
+    // A flake in the middle with branching arms growing out both ways.
+    rule(P, D2) {
+      const mid = (D2.x0 + D2.x1) / 2;
+      flake(P, mid, D2.y, 13, "s3", 0.2);
+      arm(P, mid + 16, D2.y, 0, D2.x1 - mid - 16, 0, 11, "s1", 0.5);
+      arm(P, mid - 16, D2.y, 180, mid - 16 - D2.x0, 0, 11, "s1", 0.5);
+    },
+    // A light track, twigs frosting the filled run, a faceted point at the value.
+    bar(P, B) {
+      const vx = B.x + B.w * B.v, my = B.y + B.h / 2, a = -60 * DEG;
+      P.rect(B.x, B.y, B.w, B.h, "paper");
+      P.rect(B.x + 0.5, B.y + 0.5, B.w - 1, B.h - 1, "t1", { stroke: true });
+      P.rect(B.x + 1, B.y + 1, (B.w - 2) * B.v, B.h - 2, "s1", { wipe: [0.5, 1.4] });
+      for (let x = B.x + 14; x < vx - 10; x += 18) {
+        P.line([[x, B.y - 1], [x + Math.cos(a) * 9, B.y - 1 + Math.sin(a) * 9]], "s2", 1, 1 + (x - B.x) / 400, 0.15);
+        P.line([[x + 9, B.y + B.h + 1], [x + 9 + Math.cos(-a) * 7, B.y + B.h + 1 + Math.sin(-a) * 7]], "s2", 1, 1.05 + (x - B.x) / 400, 0.15);
+      }
+      P.shape(poly([[vx - 4, B.y - 7], [vx + 8, B.y - 2], [vx + 14, my], [vx + 8, B.y + B.h + 2], [vx - 4, B.y + B.h + 7]]), "s3", 1.9, 0.5, "spin");
+      P.line([[vx - 4, B.y - 7], [vx + 4, my], [vx - 4, B.y + B.h + 7]], "paper", 1, 2.2, 0.2);
+    },
+    // Small flakes.
+    bullet(P, p, i) {
+      flake(P, p[0], p[1], 8, i === 0 ? "s3" : "s1", 0.9 + i * 0.15);
+    },
+    // A band of facets between two rules, every third one filled.
+    strip(P, S) {
+      const step = 16, top = S.y - 8, bot = S.y + 8, zz = [];
+      P.line([[S.x0, top], [S.x1, top]], "s1", 0.8, 0.5, 1.2);
+      P.line([[S.x0, bot], [S.x1, bot]], "s1", 0.8, 0.5, 1.2);
+      for (let x = S.x0, k = 0; x <= S.x1 + 0.1; x += step, k++) zz.push([x, k % 2 ? top : bot]);
+      P.line(zz, "s2", 1, 0.7, 1.6);
+      for (let k = 0; k + 2 < zz.length; k += 3) P.shape(poly([zz[k], zz[k + 1], zz[k + 2]]), k % 2 ? "t3" : "t2", 0.8 + k * 0.03, 0.4, "spin");
+    }
+  };
+  var SETS_C = [velocity, artDeco, crystal];
+
+  // src/static/sdk-libs/atelier/ornament-sets.js
+  var SETS = [...SETS_A, ...SETS_B, ...SETS_C];
+  var SET_IDS = SETS.map((s) => s.id);
+  var SET_ROLES_LIST = ["frame", "rule", "bar", "bullets", "strip"];
+  var knobs = (style, role) => {
+    const out = role === "bar" ? ["value"] : [];
+    if (style.id === "chaotic") out.push("mess");
+    return out;
+  };
+  var penFor = (svg6, style, animate, p, shift) => {
+    svg6.classList.add("ak-orn-pal-" + style.id);
+    return pen(svg6, {
+      animate,
+      speed: p.speed,
+      delay: p.delay,
+      shift: shift || 0,
+      ease: style.ease || null,
+      popEase: style.popEase || null,
+      seed: style.seed || 1
+    });
+  };
+  function figuresOf(style) {
+    const out = {};
+    out[style.id + "-frame"] = {
+      params: knobs(style, "frame"),
+      overlay: {
+        pad: () => ({ x: 64, y: 64 }),
+        draw: (layers, w, h, pad, p) => {
+          const d = layers.under;
+          if (d) style.frame(penFor(d.svg, style, d.animate, p, 0), { x: pad.x, y: pad.y, w, h }, p);
+        }
+      }
+    };
+    const run = (role, height, y, shift) => ({
+      params: knobs(style, role),
+      mount: (host, p, opts) => fillMount(host, height, "ak-orn-strip--set", opts, (d, W7) => {
+        style[role](penFor(d.svg, style, d.animate, p, shift), { x0: 12, x1: W7 - 12, y }, p);
+      })
+    });
+    out[style.id + "-rule"] = run("rule", 44, 24, 0.2);
+    out[style.id + "-bar"] = {
+      params: knobs(style, "bar"),
+      mount: (host, p, opts) => {
+        let value = p.value;
+        const bh = style.barH || 12;
+        const strip = fillMount(host, 56, "ak-orn-strip--set ak-orn-strip--setbar", opts, (d, W7) => {
+          style.bar(penFor(d.svg, style, d.animate, p, 0.3), { x: 18, y: (56 - bh) / 2, w: W7 - 36, h: bh, v: value }, p);
+        });
+        return {
+          render: strip.render,
+          set: (v) => {
+            value = Math.max(0, Math.min(1, Number(v) || 0));
+            strip.render(false);
+          },
+          teardown: strip.teardown
+        };
+      }
+    };
+    out[style.id + "-bullets"] = {
+      params: knobs(style, "bullets"),
+      mount: (host, p, opts) => {
+        host.classList.add("ak-orn-bullets");
+        const marks = [];
+        const clear2 = () => {
+          for (const m of marks) m.remove();
+          marks.length = 0;
+        };
+        return {
+          render: (animate) => {
+            clear2();
+            let i = 0;
+            for (const li of Array.from(host.children)) {
+              if (li.tagName !== "LI") continue;
+              const m = document.createElement("span");
+              m.className = "ak-orn-sbullet";
+              m.setAttribute("aria-hidden", "true");
+              li.insertBefore(m, li.firstChild);
+              marks.push(m);
+              const d = drawing(m, 30, 24, { animate, speed: opts.speed, delay: opts.delay, viewBox: true });
+              style.bullet(penFor(d.svg, style, animate, p, 0.85), [11, 12], i, p);
+              i++;
+            }
+          },
+          teardown: () => {
+            clear2();
+            host.classList.remove("ak-orn-bullets");
+          }
+        };
+      }
+    };
+    out[style.id + "-strip"] = run("strip", 64, 32, 0.4);
+    return out;
+  }
+  var SET_FIGURES = Object.assign({}, ...SETS.map(figuresOf));
+
+  // src/static/sdk-libs/atelier/ornament.js
+  var ORN_PARAMS = {
+    speed: { min: 0.25, max: 3, default: 1 },
+    delay: { min: 0, max: 5, default: 0 },
+    leaves: { min: 0, max: 2, default: 1 },
+    value: { min: 0, max: 1, default: 0.64 },
+    strands: { min: 2, max: 4, default: 3 },
+    mess: { min: 0.5, max: 2, default: 1 }
+  };
+  var ORNAMENT_SET_IDS = SET_IDS;
+  var FIGURES = { ...FRAME_FIGURES, ...ROUND_FIGURES, ...LINE_FIGURES, ...TEXT_FIGURES, ...SET_FIGURES };
+  var ORNAMENT_IDS = Object.keys(FIGURES);
+  function ornamentParams(id, given) {
+    const fig = FIGURES[id];
+    const g = given || {};
+    const out = {};
+    for (const name of Object.keys(ORN_PARAMS)) {
+      const b = ORN_PARAMS[
+        /** @type {keyof typeof ORN_PARAMS} */
+        name
+      ];
+      const takes = name === "speed" || name === "delay" || fig && fig.params.indexOf(name) >= 0;
+      const n = Number(g[name]);
+      out[name] = takes && Number.isFinite(n) ? Math.max(b.min, Math.min(b.max, n)) : b.default;
+    }
+    return (
+      /** @type {OrnParams} */
+      /** @type {unknown} */
+      out
+    );
+  }
+  function hostFor(el2) {
+    if (getComputedStyle(el2).position === "static") el2.classList.add("ak-orn-host");
+    else el2.classList.add("ak-orn-host--placed");
+  }
+  function mountOverlay(host, fig, p, animate) {
+    hostFor(host);
+    const spec = fig.overlay;
+    const make = (cls) => {
+      const box = document.createElement("span");
+      box.className = "ak-orn-layer " + cls;
+      box.setAttribute("aria-hidden", "true");
+      host.appendChild(box);
+      return box;
+    };
+    const under = spec.under !== false ? make("ak-orn-layer--under") : null;
+    const over = spec.over ? make("ak-orn-layer--over") : null;
+    let lastW = -1;
+    let lastH = -1;
+    const render = (grow) => {
+      const w = host.offsetWidth;
+      const h = host.offsetHeight;
+      lastW = w;
+      lastH = h;
+      if (w < 8 || h < 8) return;
+      const pad = spec.pad(w, h);
+      const W7 = w + 2 * pad.x;
+      const H4 = h + 2 * pad.y;
+      const opts = { animate: grow, speed: p.speed, delay: p.delay, view: { x: pad.x, y: pad.y, w, h } };
+      const layers = { under: null, over: null };
+      for (
+        const [key, box] of
+        /** @type {Array<['under' | 'over', HTMLElement | null]>} */
+        [["under", under], ["over", over]]
+      ) {
+        if (!box) continue;
+        box.textContent = "";
+        box.style.left = "0px";
+        box.style.top = "0px";
+        box.style.width = w + "px";
+        box.style.height = h + "px";
+        layers[key] = drawing(box, W7, H4, opts);
+      }
+      spec.draw(layers, w, h, pad, p, host);
+    };
+    render(animate);
+    let frame2 = 0;
+    const ro = typeof ResizeObserver === "function" ? new ResizeObserver(() => {
+      if (Math.abs(host.offsetWidth - lastW) < 2 && Math.abs(host.offsetHeight - lastH) < 2) return;
+      cancelAnimationFrame(frame2);
+      frame2 = requestAnimationFrame(() => render(false));
+    }) : null;
+    if (ro) ro.observe(host);
+    return {
+      render,
+      teardown: () => {
+        if (ro) ro.disconnect();
+        cancelAnimationFrame(frame2);
+        if (under) under.remove();
+        if (over) over.remove();
+        host.classList.remove("ak-orn-host", "ak-orn-host--placed");
+      }
+    };
+  }
+  function ornament(target, id, opts) {
+    const host = (
+      /** @type {HTMLElement | null} */
+      typeof target === "string" ? document.querySelector(target) : target
+    );
+    const fig = FIGURES[id];
+    if (!host || !fig) return null;
+    const prev = (
+      /** @type {any} */
+      host.__akOrnament
+    );
+    if (prev && typeof prev.destroy === "function") prev.destroy();
+    const p = ornamentParams(id, opts);
+    const animate = !(opts && opts.animate === false) && !reducedMotion();
+    const mounted = "overlay" in fig ? mountOverlay(host, fig, p, animate) : (
+      /** @type {InlineFigure} */
+      fig.mount(host, p, { speed: p.speed, delay: p.delay })
+    );
+    if (!("overlay" in fig)) mounted.render(animate);
+    host.setAttribute("data-ak-ornament", id);
+    if (opts && opts.palette === "look") host.classList.add("ak-orn-lookpal");
+    const handle2 = {
+      id,
+      el: host,
+      replay: () => mounted.render(!reducedMotion()),
+      set: (v) => {
+        if (typeof /** @type {any} */
+        mounted.set === "function") mounted.set(v);
+      },
+      destroy: () => {
+        mounted.teardown();
+        host.removeAttribute("data-ak-ornament");
+        host.classList.remove("ak-orn-lookpal");
+        if (
+          /** @type {any} */
+          host.__akOrnament === handle2
+        ) delete /** @type {any} */
+        host.__akOrnament;
+      }
+    };
+    host.__akOrnament = handle2;
+    return handle2;
+  }
+  function ornamentSet(set, targets, opts) {
+    if (SET_IDS.indexOf(set) < 0) return null;
+    const handles = {};
+    for (const role of SET_ROLES_LIST) {
+      const el2 = targets && /** @type {any} */
+      targets[role];
+      if (!el2) continue;
+      const h = ornament(el2, set + "-" + role, opts);
+      if (h) handles[role] = h;
+    }
+    const all = () => Object.values(handles).filter(Boolean);
+    return {
+      set,
+      handles,
+      replay: () => {
+        for (const h of all()) h.replay();
+      },
+      update: (v) => {
+        if (handles.bar) handles.bar.set(v);
+      },
+      destroy: () => {
+        for (const h of all()) h.destroy();
+      }
+    };
+  }
+
   // src/static/sdk-libs/_core/format.js
   function fmt() {
     const ns = typeof window !== "undefined" ? window.AIMEAT : null;
@@ -6887,8 +9130,8 @@
   }
   function num(n, opts) {
     if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
-    const f = fmt();
-    if (f && typeof f.num === "function") return f.num(n, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.num === "function") return f2.num(n, opts);
     try {
       return n.toLocaleString(void 0, opts);
     } catch {
@@ -6896,8 +9139,8 @@
     }
   }
   function money(n, currency, opts) {
-    const f = fmt();
-    if (f && typeof f.money === "function") return f.money(n, currency, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.money === "function") return f2.money(n, currency, opts);
     if (typeof n !== "number" || !Number.isFinite(n)) return String(n == null ? "" : n);
     const code = String(currency || "USD").toUpperCase();
     const digits = n !== 0 && Math.abs(n) < 0.01 ? 4 : 2;
@@ -6912,8 +9155,8 @@
     }
   }
   function date(v, opts) {
-    const f = fmt();
-    if (f && typeof f.date === "function") return f.date(v, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.date === "function") return f2.date(v, opts);
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
@@ -6923,8 +9166,8 @@
     }
   }
   function time(v, opts) {
-    const f = fmt();
-    if (f && typeof f.time === "function") return f.time(v, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.time === "function") return f2.time(v, opts);
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
@@ -6934,8 +9177,8 @@
     }
   }
   function dateTime(v, opts) {
-    const f = fmt();
-    if (f && typeof f.dateTime === "function") return f.dateTime(v, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.dateTime === "function") return f2.dateTime(v, opts);
     const d = new Date(v);
     if (!Number.isFinite(d.getTime())) return String(v == null ? "" : v);
     try {
@@ -6948,8 +9191,8 @@
   function duration(ms, opts) {
     const n = Math.abs(Number(ms));
     if (!Number.isFinite(n)) return "—";
-    const f = fmt();
-    if (f && typeof f.duration === "function") return f.duration(ms, opts);
+    const f2 = fmt();
+    if (f2 && typeof f2.duration === "function") return f2.duration(ms, opts);
     const { max = 3, ...rest } = opts || {};
     const parts = {};
     let left = Math.round(n / 1e3) * 1e3;
@@ -6995,12 +9238,12 @@
       if (!parts) return String(v);
       [y, m, d] = [Number(parts[1]), Number(parts[2]) - 1, Number(parts[3])];
     }
-    const at2 = new Date(Date.UTC(y, m, d, 12));
-    const f = fmt();
+    const at3 = new Date(Date.UTC(y, m, d, 12));
+    const f2 = fmt();
     const withUtc = Object.assign({}, opts, { timeZone: "UTC" });
-    if (f && typeof f.date === "function") return f.date(at2, withUtc);
+    if (f2 && typeof f2.date === "function") return f2.date(at3, withUtc);
     try {
-      return at2.toLocaleDateString(void 0, withUtc);
+      return at3.toLocaleDateString(void 0, withUtc);
     } catch {
       return String(v);
     }
@@ -7291,10 +9534,10 @@
     node.setAttribute("aria-hidden", "true");
     node.setAttribute("class", "ak-rating__stars");
     for (let i = 0; i < 5; i++) {
-      const star = document.createElementNS(ns, "path");
-      star.setAttribute("d", STAR_PATH);
-      star.setAttribute("transform", `translate(${i * 17} 0)`);
-      node.appendChild(star);
+      const star2 = document.createElementNS(ns, "path");
+      star2.setAttribute("d", STAR_PATH);
+      star2.setAttribute("transform", `translate(${i * 17} 0)`);
+      node.appendChild(star2);
     }
     return node;
   }
@@ -10224,30 +12467,30 @@ Known schemas:
   }
   function propSchema(schema, path) {
     let s = schema;
-    for (const seg of path) {
+    for (const seg2 of path) {
       if (!s || typeof s !== "object") return null;
-      if (s.properties && s.properties[seg]) s = s.properties[seg];
-      else if (s.items && typeof s.items === "object" && /^\d+$/.test(seg)) s = s.items;
+      if (s.properties && s.properties[seg2]) s = s.properties[seg2];
+      else if (s.items && typeof s.items === "object" && /^\d+$/.test(seg2)) s = s.items;
       else return null;
     }
     return s;
   }
-  function at(value, path) {
+  function at2(value, path) {
     let v = (
       /** @type {any} */
       value
     );
-    for (const seg of path) {
+    for (const seg2 of path) {
       if (v == null) return void 0;
-      v = v[seg];
+      v = v[seg2];
     }
     return v;
   }
   function atPointer(schema, pointer) {
     let s = schema;
-    for (const seg of segments(pointer)) {
+    for (const seg2 of segments(pointer)) {
       if (s == null || typeof s !== "object") return null;
-      s = s[seg];
+      s = s[seg2];
     }
     return s == null ? null : s;
   }
@@ -10331,7 +12574,7 @@ Known schemas:
         if (nested.indexOf(e) >= 0) continue;
         const path = segments(e.instanceLocation);
         const here = path.join(".");
-        const value = at(data, path);
+        const value = at2(data, path);
         if (kw === "required" || kw === "dependencies" && /does not have/.test(e.error)) {
           const names = quoted(e.error);
           const field = (here ? here + "." : "") + names[names.length - 1];
@@ -10421,9 +12664,9 @@ Known schemas:
       const out = [];
       for (const i of r.errors) {
         const touched = [i.field].concat(i.fields || []);
-        for (const f of touched) {
-          if (names ? names.indexOf(f) >= 0 : true) {
-            if (out.indexOf(f) < 0) out.push(f);
+        for (const f2 of touched) {
+          if (names ? names.indexOf(f2) >= 0 : true) {
+            if (out.indexOf(f2) < 0) out.push(f2);
           }
         }
       }
@@ -10480,33 +12723,33 @@ Known schemas:
     const base = schema && typeof schema === "object" ? schema : {};
     const props = Object.assign({}, base.properties || {});
     const required = Array.isArray(base.required) ? base.required.slice() : [];
-    for (const f of fields || []) {
-      if (!f || !f.name) continue;
-      const type = f.type || "text";
-      const p = Object.assign({}, props[f.name] || {});
-      if (p.title == null && typeof f.label === "string") p.title = f.label;
+    for (const f2 of fields || []) {
+      if (!f2 || !f2.name) continue;
+      const type = f2.type || "text";
+      const p = Object.assign({}, props[f2.name] || {});
+      if (p.title == null && typeof f2.label === "string") p.title = f2.label;
       if (p.type == null) {
         if (NUMERIC.indexOf(type) >= 0) p.type = "number";
         else if (type === "checkbox" || type === "toggle") p.type = "boolean";
         else p.type = "string";
       }
-      const fmt2 = f.format || FIELD_FORMAT[
+      const fmt2 = f2.format || FIELD_FORMAT[
         /** @type {keyof typeof FIELD_FORMAT} */
         type
       ];
       if (fmt2 && p.format == null) p.format = fmt2;
-      if (f.pattern != null && p.pattern == null) p.pattern = String(f.pattern);
-      if (f.minLength != null && p.minLength == null) p.minLength = f.minLength;
-      if (f.maxLength != null && p.maxLength == null && NUMERIC.indexOf(type) < 0) p.maxLength = f.maxLength;
+      if (f2.pattern != null && p.pattern == null) p.pattern = String(f2.pattern);
+      if (f2.minLength != null && p.minLength == null) p.minLength = f2.minLength;
+      if (f2.maxLength != null && p.maxLength == null && NUMERIC.indexOf(type) < 0) p.maxLength = f2.maxLength;
       if (NUMERIC.indexOf(type) >= 0) {
-        if (f.min != null && p.minimum == null) p.minimum = f.min;
-        if (f.max != null && p.maximum == null) p.maximum = f.max;
+        if (f2.min != null && p.minimum == null) p.minimum = f2.min;
+        if (f2.max != null && p.maximum == null) p.maximum = f2.max;
       }
-      if (f.sameAs && p["x-same-as"] == null) p["x-same-as"] = f.sameAs;
-      if (f.messages && typeof f.messages === "object") p["x-messages"] = Object.assign({}, p["x-messages"] || {}, f.messages);
-      if (f.required && (type === "checkbox" || type === "toggle") && p.const == null) p.const = true;
-      if (f.required && required.indexOf(f.name) < 0) required.push(f.name);
-      props[f.name] = p;
+      if (f2.sameAs && p["x-same-as"] == null) p["x-same-as"] = f2.sameAs;
+      if (f2.messages && typeof f2.messages === "object") p["x-messages"] = Object.assign({}, p["x-messages"] || {}, f2.messages);
+      if (f2.required && (type === "checkbox" || type === "toggle") && p.const == null) p.const = true;
+      if (f2.required && required.indexOf(f2.name) < 0) required.push(f2.name);
+      props[f2.name] = p;
     }
     const out = Object.assign({}, base, { type: base.type || "object", properties: props });
     if (required.length) out.required = required;
@@ -10648,9 +12891,9 @@ Known schemas:
     function missingFrom(r, names) {
       const out = [];
       for (const i of r.errors) {
-        for (const f of [i.field].concat(i.fields || [])) {
-          if (names ? names.indexOf(f) >= 0 : true) {
-            if (out.indexOf(f) < 0) out.push(f);
+        for (const f2 of [i.field].concat(i.fields || [])) {
+          if (names ? names.indexOf(f2) >= 0 : true) {
+            if (out.indexOf(f2) < 0) out.push(f2);
           }
         }
       }
@@ -10714,8 +12957,8 @@ Known schemas:
       }
       if (!names) {
         const loose = r.errors.filter(function(i) {
-          return !controls.has(i.field) && !(i.fields || []).some(function(f) {
-            return controls.has(f);
+          return !controls.has(i.field) && !(i.fields || []).some(function(f2) {
+            return controls.has(f2);
           });
         });
         formAlert.textContent = loose.map(function(i) {
@@ -11296,20 +13539,20 @@ Known schemas:
     if (!slices.length) return ctx.empty();
     const total = slices.reduce((sum, s) => sum + s.value, 0);
     ctx.root.setAttribute("aria-label", (ctx.title ? ctx.title + " — " : "") + slices.map((s) => s.label + " " + s.value).join(", "));
-    const R = 88;
+    const R2 = 88;
     const STROKE = 26;
-    const C = 2 * Math.PI * R;
+    const C = 2 * Math.PI * R2;
     const GAP2 = 4;
     const wrap2 = el("div", { class: "ak-chart__donutwrap" });
     const node = svg("svg", { viewBox: "0 0 230 230", class: "ak-chart__svg ak-chart__svg--donut", "aria-hidden": "true" });
-    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R, class: "ak-chart__ring", "stroke-width": STROKE }));
+    node.appendChild(svg("circle", { cx: 115, cy: 115, r: R2, class: "ak-chart__ring", "stroke-width": STROKE }));
     let offset = 0;
     slices.forEach((s, i) => {
       const frac = s.value / total;
       const ring2 = svg("circle", {
         cx: 115,
         cy: 115,
-        r: R,
+        r: R2,
         class: "ak-chart__slice",
         style: `stroke:${SERIES_VARS[i % SERIES_VARS.length]}`,
         "stroke-width": STROKE,
@@ -11697,13 +13940,13 @@ Known schemas:
     const H4 = 340;
     const CX = W7 / 2;
     const CY = H4 / 2 + 4;
-    const R = 118;
+    const R2 = 118;
     const angle = (i) => -Math.PI / 2 + 2 * Math.PI * i / axes.length;
-    const at2 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
+    const at3 = (i, r) => `${(CX + Math.cos(angle(i)) * r).toFixed(1)} ${(CY + Math.sin(angle(i)) * r).toFixed(1)}`;
     const node = svg("svg", { viewBox: `0 0 ${W7} ${H4}`, class: "ak-chart__svg", "aria-hidden": "true" });
     for (const frac of [0.25, 0.5, 0.75, 1]) {
       node.appendChild(svg("polygon", {
-        points: axes.map((a, i) => at2(i, R * frac)).join(" "),
+        points: axes.map((a, i) => at3(i, R2 * frac)).join(" "),
         class: "ak-chart__radarring"
       }));
     }
@@ -11711,12 +13954,12 @@ Known schemas:
       node.appendChild(svg("line", {
         x1: CX,
         y1: CY,
-        x2: CX + Math.cos(angle(i)) * R,
-        y2: CY + Math.sin(angle(i)) * R,
+        x2: CX + Math.cos(angle(i)) * R2,
+        y2: CY + Math.sin(angle(i)) * R2,
         class: "ak-chart__radarspoke"
       }));
-      const lx = CX + Math.cos(angle(i)) * (R + 16);
-      const ly = CY + Math.sin(angle(i)) * (R + 16);
+      const lx = CX + Math.cos(angle(i)) * (R2 + 16);
+      const ly = CY + Math.sin(angle(i)) * (R2 + 16);
       const cap = svg("text", {
         x: lx.toFixed(1),
         y: (ly + 4).toFixed(1),
@@ -11728,7 +13971,7 @@ Known schemas:
     });
     const still2 = ctx.still();
     series.forEach((s, si) => {
-      const points = axes.map((a, i) => at2(i, R * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
+      const points = axes.map((a, i) => at3(i, R2 * Math.min(Math.max((Number(s.values[i]) || 0) / max, 0), 1))).join(" ");
       const shape = svg("polygon", { points, class: "ak-chart__radarshape" });
       shape.style.fill = SERIES_VARS[si % SERIES_VARS.length];
       shape.style.stroke = SERIES_VARS[si % SERIES_VARS.length];
@@ -11760,12 +14003,12 @@ Known schemas:
     const lines = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__line"));
     const rest = Array.prototype.slice.call(node.querySelectorAll(".ak-chart__area, .ak-chart__dot"));
     if (motionOff(root) || !lines.length) return;
-    lines.forEach(function(line) {
-      const len = typeof line.getTotalLength === "function" ? line.getTotalLength() : 0;
+    lines.forEach(function(line2) {
+      const len = typeof line2.getTotalLength === "function" ? line2.getTotalLength() : 0;
       if (!len) return;
-      line.setAttribute("stroke-dasharray", String(len));
-      line.setAttribute("stroke-dashoffset", String(len));
-      line.classList.add("ak-chart__line--enter");
+      line2.setAttribute("stroke-dasharray", String(len));
+      line2.setAttribute("stroke-dashoffset", String(len));
+      line2.classList.add("ak-chart__line--enter");
     });
     rest.forEach(function(n) {
       n.classList.add("ak-chart__late");
@@ -11779,8 +14022,8 @@ Known schemas:
       clearTimeout(late);
       if (watch3) watch3.destroy();
       requestAnimationFrame(function() {
-        lines.forEach(function(line) {
-          line.classList.add("ak-chart__line--drawn");
+        lines.forEach(function(line2) {
+          line2.classList.add("ak-chart__line--drawn");
         });
         rest.forEach(function(n) {
           n.classList.add("ak-chart__late--in");
@@ -11925,7 +14168,7 @@ Known schemas:
       const innerAlong = horizontal ? height - pad.top - pad.bottom : width - pad.left - pad.right;
       const innerCross = horizontal ? width - pad.left - pad.right : height - pad.top - pad.bottom;
       const along = (i) => (horizontal ? pad.top : pad.left) + innerAlong * i / labels.length;
-      const slot = innerAlong / labels.length;
+      const slot2 = innerAlong / labels.length;
       const cross = (v) => horizontal ? pad.left + innerCross * ((v - min) / (max - min)) : pad.top + innerCross * (1 - (v - min) / (max - min));
       const node = svg("svg", { viewBox: `0 0 ${horizontal ? width : W} ${horizontal ? height : H}`, class: "ak-chart__svg", "aria-hidden": "true" });
       const defs = defsFor(node, series.length);
@@ -11937,7 +14180,7 @@ Known schemas:
         node.appendChild(tick);
       }
       labels.forEach((label, i) => {
-        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
+        const tx = horizontal ? svg("text", { x: pad.left - 10, y: along(i) + slot2 / 2 + 4, class: "ak-chart__tick", "text-anchor": "end" }) : svg("text", { x: along(i) + slot2 / 2, y: height - pad.bottom + 18, class: "ak-chart__tick", "text-anchor": "middle" });
         tx.textContent = String(label);
         node.appendChild(tx);
       });
@@ -11945,14 +14188,14 @@ Known schemas:
       for (const s of series) {
         if (s.kind !== "area" || horizontal) continue;
         const si = series.indexOf(s);
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
         const path = smoothPath(pts) + ` L ${pts[pts.length - 1].x} ${cross(0)} L ${pts[0].x} ${cross(0)} Z`;
         node.appendChild(svg("path", { d: path, class: "ak-chart__area", fill: defs.fade(si) }));
       }
-      const groupPad = slot * 0.16;
-      const radius = Math.min(7, Math.max(3, (slot - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
+      const groupPad = slot2 * 0.16;
+      const radius = Math.min(7, Math.max(3, (slot2 - groupPad * 2) / (stacked ? 1 : Math.max(bars.length, 1)) * 0.28));
       if (stacked) {
-        const stackW = Math.max(slot - groupPad * 2, 2);
+        const stackW = Math.max(slot2 - groupPad * 2, 2);
         for (let i = 0; i < labels.length; i++) {
           let acc = 0;
           bars.forEach((s, bi) => {
@@ -11970,7 +14213,7 @@ Known schemas:
           });
         }
       } else {
-        const barW = bars.length ? (slot - groupPad * 2) / bars.length : 0;
+        const barW = bars.length ? (slot2 - groupPad * 2) / bars.length : 0;
         bars.forEach((s, bi) => {
           const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
           s.values.slice(0, labels.length).forEach((v, i) => {
@@ -12006,9 +14249,9 @@ Known schemas:
       for (const s of lines) {
         if (horizontal) continue;
         const colour = SERIES_VARS[series.indexOf(s) % SERIES_VARS.length];
-        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot / 2, y: cross(v) }));
-        const line = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
-        node.appendChild(line);
+        const pts = s.values.slice(0, labels.length).map((v, i) => ({ x: along(i) + slot2 / 2, y: cross(v) }));
+        const line2 = svg("path", { d: smoothPath(pts), class: "ak-chart__line", style: `stroke:${colour}` });
+        node.appendChild(line2);
         const last = pts[pts.length - 1];
         node.appendChild(svg("circle", { cx: last.x, cy: last.y, r: 5, class: "ak-chart__dot", style: `stroke:${colour}` }));
       }
@@ -12018,12 +14261,12 @@ Known schemas:
         const rig = hoverRig(root, node, {
           top: pad.top,
           bottom: H - pad.bottom,
-          x: (i) => along(i) + slot / 2,
+          x: (i) => along(i) + slot2 / 2,
           points: lines.map((s) => ({ colour: SERIES_VARS[series.indexOf(s) % SERIES_VARS.length], y: (i) => cross(s.values[i] ?? 0) }))
         });
-        wireTooltip(node, labels, series, along, slot, rig);
+        wireTooltip(node, labels, series, along, slot2, rig);
       }
-      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot);
+      if (data.note && !horizontal) noteBubble(node, data.note, labels, along, slot2);
       if (!still2) drawWhenSeen(root, node);
     }
     function legendFor(series) {
@@ -12041,14 +14284,14 @@ Known schemas:
       });
       root.appendChild(legend);
     }
-    function wireTooltip(node, labels, series, along, slot, rig) {
+    function wireTooltip(node, labels, series, along, slot2, rig) {
       const tip = el("div", { class: "ak-chart__tip" });
       root.appendChild(tip);
       let shownAt = -1;
       node.addEventListener("pointermove", (ev) => {
         const box = node.getBoundingClientRect();
         const sx = (ev.clientX - box.left) * (W / box.width);
-        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot)));
+        const i = Math.max(0, Math.min(labels.length - 1, Math.floor((sx - along(0)) / slot2)));
         if (i !== shownAt) {
           shownAt = i;
           clear(tip);
@@ -12064,7 +14307,7 @@ Known schemas:
           });
         }
         const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
         tip.style.top = `${box.top - rootBox.top + 6}px`;
         rig.at(i, tip, Math.max(8, Math.min(rootBox.width - tip.offsetWidth - 8, px - tip.offsetWidth / 2)));
       });
@@ -12073,7 +14316,7 @@ Known schemas:
         rig.hide(tip);
       });
     }
-    function noteBubble(node, note, labels, along, slot) {
+    function noteBubble(node, note, labels, along, slot2) {
       const i = labels.indexOf(note.label);
       if (i < 0 || !note.text) return;
       const bubble = el("div", { class: "ak-chart__note" }, [
@@ -12084,7 +14327,7 @@ Known schemas:
       requestAnimationFrame(() => {
         const box = node.getBoundingClientRect();
         const rootBox = root.getBoundingClientRect();
-        const px = (along(i) + slot / 2) / W * box.width + (box.left - rootBox.left);
+        const px = (along(i) + slot2 / 2) / W * box.width + (box.left - rootBox.left);
         bubble.style.left = `${Math.max(8, Math.min(rootBox.width - bubble.offsetWidth - 8, px - bubble.offsetWidth / 2))}px`;
         bubble.style.top = `${box.top - rootBox.top + 4}px`;
       });
@@ -12259,11 +14502,11 @@ Known schemas:
       root.setAttribute("aria-label", (spec.title ? spec.title + " — " : "") + nodes.map((n) => n.label).join(", "));
       const widths = /* @__PURE__ */ new Map();
       for (const item of nodes) widths.set(item.id, pillWidth(item.label));
-      const at2 = place(nodes, widths);
+      const at3 = place(nodes, widths);
       const node = svg2("svg", { viewBox: `0 0 ${W2} ${H2}`, class: "ak-graph__svg", "aria-hidden": "true" });
       for (const edge of edges) {
-        const a = at2.get(edge.from);
-        const b = at2.get(edge.to);
+        const a = at3.get(edge.from);
+        const b = at3.get(edge.to);
         if (!a || !b) continue;
         node.appendChild(svg2("line", { x1: a.x, y1: a.y, x2: b.x, y2: b.y, class: "ak-graph__edge" }));
         if (edge.label) {
@@ -12278,7 +14521,7 @@ Known schemas:
         }
       }
       for (const item of nodes) {
-        const p = at2.get(item.id);
+        const p = at3.get(item.id);
         const width = widths.get(item.id);
         const g = svg2("g", { class: "ak-graph__node ak-graph__node--" + (item.tone || "plain"), transform: `translate(${p.x}, ${p.y})` });
         g.appendChild(svg2("rect", { x: -width / 2, y: -PILL_H / 2, width, height: PILL_H, rx: PILL_H / 2, class: "ak-graph__pill" }));
@@ -12344,13 +14587,13 @@ Known schemas:
       root.setAttribute("aria-label", spec.title || t("empty"));
       const max = data && typeof data.max === "number" && data.max > 0 ? data.max : Math.max(...values, 1e-4);
       const node = svg3("svg", { viewBox: `0 0 ${W3} ${H3}`, class: "ak-waveform__svg", "aria-hidden": "true", preserveAspectRatio: "none" });
-      const slot = W3 / values.length;
-      const barW = Math.max(Math.min(slot * 0.62, 14), 1.5);
+      const slot2 = W3 / values.length;
+      const barW = Math.max(Math.min(slot2 * 0.62, 14), 1.5);
       values.forEach((v, i) => {
         const half = Math.max(Math.min(v / max, 1) * (H3 - 8) / 2, 1.2);
         const strength = Math.round(Math.min(v / max, 1) * 100);
         node.appendChild(svg3("rect", {
-          x: i * slot + (slot - barW) / 2,
+          x: i * slot2 + (slot2 - barW) / 2,
           y: H3 / 2 - half,
           width: barW,
           height: half * 2,
@@ -12641,24 +14884,24 @@ Known schemas:
         return;
       }
       if (kind === "globe") {
-        const R = 3;
+        const R2 = 3;
         const accentC = new THREE.Color(accent);
         const inkC = new THREE.Color(ink3);
         const surfaceC = new THREE.Color(surface);
         const ball = new THREE.Group();
         group.add(ball);
         ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R - 0.02, 48, 32),
+          new THREE.SphereGeometry(R2 - 0.02, 48, 32),
           new THREE.MeshStandardMaterial({ color: surfaceC.clone().lerp(inkC, 0.05), roughness: 0.9, metalness: 0.02 })
         ));
         ball.add(new THREE.Mesh(
-          new THREE.SphereGeometry(R * 1.045, 48, 32),
+          new THREE.SphereGeometry(R2 * 1.045, 48, 32),
           new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.16, side: THREE.BackSide, depthWrite: false })
         ));
         const gratMat = new THREE.LineBasicMaterial({ color: inkC, transparent: true, opacity: 0.22 });
         const toV = function(lat, lon, r) {
           return new THREE.Vector3().setFromSphericalCoords(
-            r || R,
+            r || R2,
             THREE.MathUtils.degToRad(90 - lat),
             THREE.MathUtils.degToRad(lon + 180)
           );
@@ -12680,7 +14923,7 @@ Known schemas:
         const dotMat = new THREE.MeshBasicMaterial({ color: accentC });
         for (const p of points) {
           const dot = new THREE.Mesh(dotGeo, dotMat);
-          dot.position.copy(toV(p.lat, p.lon, R + 0.02));
+          dot.position.copy(toV(p.lat, p.lon, R2 + 0.02));
           ball.add(dot);
         }
         const routes = (data && Array.isArray(data.routes) ? data.routes : []).filter(function(r2) {
@@ -12688,11 +14931,11 @@ Known schemas:
         });
         const arcMat = new THREE.MeshBasicMaterial({ color: accentC, transparent: true, opacity: 0.7 });
         for (const r2 of routes) {
-          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R + 0.02);
-          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R + 0.02);
+          const a = toV(Number(r2.from[0]) || 0, Number(r2.from[1]) || 0, R2 + 0.02);
+          const b = toV(Number(r2.to[0]) || 0, Number(r2.to[1]) || 0, R2 + 0.02);
           const sum = a.clone().add(b);
-          if (sum.lengthSq() < 1e-6) sum.set(0, R, 0);
-          const lift = R + 0.25 + a.distanceTo(b) * 0.3;
+          if (sum.lengthSq() < 1e-6) sum.set(0, R2, 0);
+          const lift = R2 + 0.25 + a.distanceTo(b) * 0.3;
           const mid = sum.normalize().multiplyScalar(lift);
           const curve = new THREE.QuadraticBezierCurve3(a, mid, b);
           ball.add(new THREE.Mesh(new THREE.TubeGeometry(curve, 40, 0.025, 6, false), arcMat));
@@ -13233,11 +15476,11 @@ Known schemas:
     }
     let drag2 = null;
     viewport.addEventListener("pointerdown", function(ev) {
-      const at2 = (
+      const at3 = (
         /** @type {Element|null} */
         ev.target instanceof Element ? ev.target : null
       );
-      if (at2 && at2.closest(".ak-mosaic__tilecover")) return;
+      if (at3 && at3.closest(".ak-mosaic__tilecover")) return;
       drag2 = { x: ev.clientX, y: ev.clientY };
       viewport.setPointerCapture(ev.pointerId);
     });
@@ -13779,7 +16022,7 @@ Known schemas:
     const root = el("figure", { class: "ak-root ak-gauge", role: "img", "data-ak-part": "root" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let emptyCard = null;
-    const R = 96;
+    const R2 = 96;
     const CX = 120;
     const CY = 118;
     function pointAt(frac, radius) {
@@ -13816,16 +16059,16 @@ Known schemas:
       if (bands.length && data.value > bands[bands.length - 1].upTo) tone = toneOf2(bands[bands.length - 1].tone);
       root.setAttribute("aria-label", (data.label ? data.label + ": " : "") + data.value + (data.unit || ""));
       const node = svg4("svg", { viewBox: "0 0 240 132", class: "ak-gauge__svg", "aria-hidden": "true" });
-      node.appendChild(svg4("path", { d: arcPath(0, 1, R), class: "ak-gauge__track" }));
-      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R), class: "ak-gauge__value ak-gauge__value--" + tone });
+      node.appendChild(svg4("path", { d: arcPath(0, 1, R2), class: "ak-gauge__track" }));
+      const value = svg4("path", { d: arcPath(0, Math.max(frac, 5e-3), R2), class: "ak-gauge__value ak-gauge__value--" + tone });
       node.appendChild(value);
       for (const band of bands.slice(0, -1)) {
-        const f = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
-        const [x1, y1] = pointAt(f, R - 12);
-        const [x2, y2] = pointAt(f, R + 12);
+        const f2 = Math.max(0, Math.min(1, (band.upTo - min) / (max - min)));
+        const [x1, y1] = pointAt(f2, R2 - 12);
+        const [x2, y2] = pointAt(f2, R2 + 12);
         node.appendChild(svg4("line", { x1, y1, x2, y2, class: "ak-gauge__tickmark" }));
       }
-      const [dx, dy] = pointAt(frac, R);
+      const [dx, dy] = pointAt(frac, R2);
       node.appendChild(svg4("circle", { cx: dx, cy: dy, r: 8, class: "ak-gauge__marker ak-gauge__marker--" + tone }));
       root.appendChild(node);
       if (!reducedMotion()) {
@@ -14096,7 +16339,7 @@ Known schemas:
         },
         onMove: function(dx, dy) {
           const all = rows();
-          const at2 = all.indexOf(row);
+          const at3 = all.indexOf(row);
           const others = all.filter(function(r) {
             return r !== row;
           });
@@ -14104,8 +16347,8 @@ Known schemas:
           const step = row.offsetHeight + gap();
           others.forEach(function(r, i) {
             let to = 0;
-            if (want > at2 && i >= at2 && i < want) to = -step;
-            else if (want < at2 && i >= want && i < at2) to = step;
+            if (want > at3 && i >= at3 && i < want) to = -step;
+            else if (want < at3 && i >= want && i < at3) to = step;
             if ((held.get(r) || 0) === to) return;
             held.set(r, to);
             spring(r, { y: to }, CARRY);
@@ -14114,11 +16357,11 @@ Known schemas:
         onEnd: function(dx, dy) {
           row.classList.remove("is-carried");
           const all = rows();
-          const at2 = all.indexOf(row);
+          const at3 = all.indexOf(row);
           const want = Math.max(0, Math.min(wanted(row, dy), all.length - 1));
           held.set(row, dy);
           place2(row, want);
-          if (want !== at2) tell();
+          if (want !== at3) tell();
         }
       }, { axis: "y", back: false });
     }
@@ -14452,11 +16695,11 @@ Known schemas:
     function toggle2(rec) {
       const facet = rec.facet;
       const list3 = picked[facet.id] ? picked[facet.id].slice() : [];
-      const at2 = list3.indexOf(rec.option.id);
+      const at3 = list3.indexOf(rec.option.id);
       if (facet.multi) {
-        if (at2 >= 0) list3.splice(at2, 1);
+        if (at3 >= 0) list3.splice(at3, 1);
         else list3.push(rec.option.id);
-      } else if (at2 >= 0) {
+      } else if (at3 >= 0) {
         list3.length = 0;
       } else {
         list3.length = 0;
@@ -14496,8 +16739,8 @@ Known schemas:
       return rec;
     }
     function render(data) {
-      const defs = (data && Array.isArray(data.facets) ? data.facets : []).filter(function(f) {
-        return f && f.id;
+      const defs = (data && Array.isArray(data.facets) ? data.facets : []).filter(function(f2) {
+        return f2 && f2.id;
       });
       if (emptyCard) {
         emptyCard.destroy();
@@ -14803,9 +17046,9 @@ Known schemas:
       });
       const today = data.today ? day(data.today) : /* @__PURE__ */ new Date();
       if (today && today.getTime() >= min.getTime() && today.getTime() <= max.getTime()) {
-        const line = el("span", { class: "ak-plan__today", title: t("today") });
-        line.style.left = X(today) + "%";
-        body.appendChild(line);
+        const line2 = el("span", { class: "ak-plan__today", title: t("today") });
+        line2.style.left = X(today) + "%";
+        body.appendChild(line2);
       }
       root.appendChild(body);
     }
@@ -14845,9 +17088,9 @@ Known schemas:
       const grid2 = el("div", { class: "ak-schedule__grid" });
       const hours = el("div", { class: "ak-schedule__hours" });
       for (let m = Math.ceil(open / 60) * 60; m <= close; m += 60) {
-        const line = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
-        line.style.top = Y(m) + "%";
-        hours.appendChild(line);
+        const line2 = el("span", { class: "ak-schedule__hour", text: `${String(Math.floor(m / 60)).padStart(2, "0")}:00` });
+        line2.style.top = Y(m) + "%";
+        hours.appendChild(line2);
       }
       grid2.appendChild(hours);
       days.forEach((label, di) => {
@@ -14958,11 +17201,11 @@ Known schemas:
     function atTail() {
       return vane.scrollHeight - vane.scrollTop - vane.clientHeight < 24;
     }
-    function lineNode(line, entering) {
-      const tone = TONES7.indexOf(line.tone) >= 0 ? line.tone : "plain";
+    function lineNode(line2, entering) {
+      const tone = TONES7.indexOf(line2.tone) >= 0 ? line2.tone : "plain";
       const node = el("div", { class: "ak-console__line ak-console__line--" + tone }, [
-        line.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line.ts) }) : null,
-        el("span", { class: "ak-console__text", text: String(line.text == null ? "" : line.text) })
+        line2.ts != null ? el("span", { class: "ak-console__ts", text: stamp2(line2.ts) }) : null,
+        el("span", { class: "ak-console__text", text: String(line2.text == null ? "" : line2.text) })
       ]);
       if (entering && !reducedMotion()) node.classList.add("ak-console__line--enter");
       return node;
@@ -14982,7 +17225,7 @@ Known schemas:
         emptyCard = emptyState({ target: vane, tone: "quiet", title: e.title || t("consoleEmpty"), hint: e.hint || "" });
         return;
       }
-      for (const line of lines.slice(-cap)) vane.appendChild(lineNode(line, false));
+      for (const line2 of lines.slice(-cap)) vane.appendChild(lineNode(line2, false));
       vane.scrollTop = vane.scrollHeight;
     }
     render(spec.data);
@@ -14999,7 +17242,7 @@ Known schemas:
           emptyCard = null;
         }
         const follow = atTail();
-        for (const line of lines) vane.appendChild(lineNode(line, true));
+        for (const line2 of lines) vane.appendChild(lineNode(line2, true));
         trim();
         if (follow) vane.scrollTop = vane.scrollHeight;
       },
@@ -15261,8 +17504,8 @@ Known schemas:
     let s = String(principal || "");
     const hash = s.lastIndexOf("#");
     if (hash >= 0) s = s.slice(hash + 1);
-    const at2 = s.indexOf("@");
-    return at2 >= 0 ? s.slice(0, at2) : s;
+    const at3 = s.indexOf("@");
+    return at3 >= 0 ? s.slice(0, at3) : s;
   }
   function legalPath(ref) {
     return apiBase() + "/v1/apps/" + encodeURIComponent(ref.owner) + "/" + encodeURIComponent(ref.filename) + "/legal";
@@ -15503,13 +17746,13 @@ Known schemas:
       window.AIMEAT
     );
     if (!ns || !ns.rows) return Promise.reject(new Error("aimeat-rows.js is not loaded"));
-    const at2 = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
+    const at3 = ev.occurredAt || (/* @__PURE__ */ new Date()).toISOString();
     return ns.rows.append(
       ev.org,
       ev.ws,
       ev.space,
-      { app: ev.app, kind: ev.kind, actor: ev.actor, at: at2, detail: ev.detail == null ? null : ev.detail },
-      { rowId: ev.rowId, occurredAt: at2 }
+      { app: ev.app, kind: ev.kind, actor: ev.actor, at: at3, detail: ev.detail == null ? null : ev.detail },
+      { rowId: ev.rowId, occurredAt: at3 }
     );
   }
   function feedbackForm(spec) {
@@ -15524,7 +17767,7 @@ Known schemas:
     if (spec.hint) root.appendChild(el("p", { class: "ak-com__intro" }, spec.hint));
     if (sample) root.appendChild(el("p", { class: "ak-com__intro" }, tc("sample.formNote")));
     const done = el("p", { class: "ak-com__aside", hidden: true }, tc("feedback.sent"));
-    const f = form({
+    const f2 = form({
       target: root,
       submitLabel: tc("feedback.send"),
       fields: [
@@ -15547,14 +17790,14 @@ Known schemas:
         const payload = { ...values };
         payload.company_url = hp ? hp.value : "";
         return ns.intake.submit(spec.org, spec.ws, spec.formId, payload).then(function() {
-          f.setValues({ [names.topic]: "", [names.message]: "", [names.contact]: "" });
+          f2.setValues({ [names.topic]: "", [names.message]: "", [names.contact]: "" });
           done.hidden = false;
         }, function(err) {
           throw { field: names.message, message: String(err && err.message || tc("feedback.failed")) };
         });
       }
     });
-    f.el.appendChild(el("div", { class: "ak-com-hp", "aria-hidden": "true" }, [
+    f2.el.appendChild(el("div", { class: "ak-com-hp", "aria-hidden": "true" }, [
       el("input", { type: "text", name: "company_url", tabindex: "-1", autocomplete: "off" })
     ]));
     root.appendChild(done);
@@ -17227,31 +19470,31 @@ Known schemas:
     const root = el("div", { class: "ak-ws-follow", "data-ak-part": "follow" });
     if (spec.target) resolve(spec.target).appendChild(root);
     let inner = null;
-    let at2 = "";
+    let at3 = "";
     let stopped = false;
-    function line(key) {
+    function line2(key) {
       clear(root);
       root.appendChild(el("section", { class: "ak-root ak-mem ak-ws", "data-ak-part": "root" }, [
         el("p", { class: "ak-mem__none", role: "status", "data-ak-part": key === "follow.wait" ? "wait" : "private" }, tw(key))
       ]));
     }
     function waiting() {
-      line("follow.wait");
+      line2("follow.wait");
     }
     function mount(c) {
       if (stopped || !c) return;
       if (c.private) {
-        if (at2 === "private") return;
-        at2 = "private";
+        if (at3 === "private") return;
+        at3 = "private";
         if (inner) inner.destroy();
         inner = null;
-        line("follow.private");
+        line2("follow.private");
         return;
       }
       if (!c.orgId || !c.wsId) return;
       const key = c.orgId + "/" + c.wsId;
-      if (key === at2) return;
-      at2 = key;
+      if (key === at3) return;
+      at3 = key;
       if (inner) inner.destroy();
       clear(root);
       inner = factory(Object.assign({}, spec, { target: root, org: c.orgId, ws: c.wsId }));
@@ -17273,7 +19516,7 @@ Known schemas:
       if (!o || typeof o.recall !== "function") return;
       try {
         const c = await o.recall(spec.app, { verify: true });
-        if (!at2 && c && c.orgId && c.wsId) mount(c);
+        if (!at3 && c && c.orgId && c.wsId) mount(c);
       } catch (e) {
         console.debug("aimeat-atelier: remembered workspace not read", e);
       }
@@ -17286,11 +19529,11 @@ Known schemas:
       recall();
     }
     const stopWatch = watch2(function() {
-      if (at2 === "private") {
-        line("follow.private");
+      if (at3 === "private") {
+        line2("follow.private");
         return;
       }
-      if (at2) return;
+      if (at3) return;
       waiting();
       recall();
     }, root);
@@ -17448,9 +19691,9 @@ Known schemas:
     function nameOf2(m) {
       return m.displayName || m.account;
     }
-    let drawing = 0;
+    let drawing2 = 0;
     async function render() {
-      const mine = ++drawing;
+      const mine = ++drawing2;
       clear(root);
       root.appendChild(el(
         "h3",
@@ -17485,11 +19728,11 @@ Known schemas:
           data = both[0];
           open = both[1];
         } catch (e) {
-          if (mine !== drawing) return;
+          if (mine !== drawing2) return;
           root.appendChild(el("p", { class: "ak-mem__failure", role: "alert", "data-ak-part": "failure" }, tw("failed", { why: refusal(e) || String(e) })));
           return;
         }
-        if (mine !== drawing) return;
+        if (mine !== drawing2) return;
       }
       const people = (data && data.members || []).filter(function(m) {
         return m && m.account;
@@ -18831,14 +21074,14 @@ Known schemas:
   }
   function labelled(def, list3, labelFn) {
     const raw = /* @__PURE__ */ new Map();
-    for (const f of def && Array.isArray(def.fields) ? def.fields : []) {
-      if (f && typeof f === "object") raw.set(String(f.key != null ? f.key : f.name), f);
+    for (const f2 of def && Array.isArray(def.fields) ? def.fields : []) {
+      if (f2 && typeof f2 === "object") raw.set(String(f2.key != null ? f2.key : f2.name), f2);
     }
-    return list3.map(function(f) {
-      const r = raw.get(f.name);
-      const out = Object.assign({}, f);
-      if (r && r.label && typeof r.label === "object") out.label = inLanguage(r.label) || f.name;
-      if (r && Array.isArray(r.options) && Array.isArray(f.options)) {
+    return list3.map(function(f2) {
+      const r = raw.get(f2.name);
+      const out = Object.assign({}, f2);
+      if (r && r.label && typeof r.label === "object") out.label = inLanguage(r.label) || f2.name;
+      if (r && Array.isArray(r.options) && Array.isArray(f2.options)) {
         const words = /* @__PURE__ */ new Map();
         for (const o of r.options) {
           if (o && typeof o === "object" && o.value != null && o.label && typeof o.label === "object") {
@@ -18846,7 +21089,7 @@ Known schemas:
           }
         }
         if (words.size) {
-          out.options = f.options.map(function(o) {
+          out.options = f2.options.map(function(o) {
             return words.has(o.value) ? { value: o.value, label: words.get(o.value) || o.value } : o;
           });
         }
@@ -18935,7 +21178,7 @@ Known schemas:
       const form2 = el("form", { class: "ak-form ak-intake__form", "data-ak-part": "form", novalidate: true });
       root.appendChild(failure);
       if (!list3.length) root.appendChild(el("p", { class: "ak-intake__intro" }, ti("intake.noFields")));
-      for (const f of list3) form2.appendChild(fieldNode(f, controls));
+      for (const f2 of list3) form2.appendChild(fieldNode(f2, controls));
       const hpName = def && def.honeypot_field || HONEYPOT;
       const hp = (
         /** @type {HTMLInputElement} */
@@ -19076,20 +21319,20 @@ Known schemas:
         });
       });
     }
-    function fieldNode(f, controls) {
+    function fieldNode(f2, controls) {
       const id = uid("ak-intake");
       const errId = id + "-err";
       const error = el("p", { class: "ak-form__error", "data-ak-part": "error", id: errId, role: "alert", hidden: true });
-      const marks = f.required ? [
+      const marks = f2.required ? [
         el("span", { class: "ak-form__req", "data-ak-part": "req", "aria-hidden": "true" }, "*"),
         el("span", { class: "ak-sr-only" }, " (" + t("required") + ")")
       ] : [];
-      const req = f.required ? "true" : null;
+      const req = f2.required ? "true" : null;
       let inputs;
       let wrap2;
-      if (f.type === "radio") {
+      if (f2.type === "radio") {
         const group = id + "-r";
-        const labels = (f.options || []).map(function(o, i) {
+        const labels = (f2.options || []).map(function(o, i) {
           const oid = id + "-" + i;
           const input = (
             /** @type {HTMLInputElement} */
@@ -19108,14 +21351,14 @@ Known schemas:
         inputs = labels.map(function(x) {
           return x.input;
         });
-        wrap2 = el("fieldset", { class: "ak-form__field ak-intake__group", "data-ak-part": "field", "data-ak-field": f.name, "aria-required": req }, [
-          el("legend", { class: "ak-form__label", "data-ak-part": "label" }, [f.label].concat(marks)),
+        wrap2 = el("fieldset", { class: "ak-form__field ak-intake__group", "data-ak-part": "field", "data-ak-field": f2.name, "aria-required": req }, [
+          el("legend", { class: "ak-form__label", "data-ak-part": "label" }, [f2.label].concat(marks)),
           el("div", { class: "ak-intake__choices" }, labels.map(function(x) {
             return x.node;
           })),
           error
         ]);
-      } else if (f.type === "checkbox") {
+      } else if (f2.type === "checkbox") {
         const input = (
           /** @type {HTMLInputElement} */
           el("input", {
@@ -19128,33 +21371,33 @@ Known schemas:
           })
         );
         inputs = [input];
-        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f.name }, [
+        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f2.name }, [
           el("div", { class: "ak-intake__check" }, [
             input,
-            el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f.label].concat(marks))
+            el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f2.label].concat(marks))
           ]),
           error
         ]);
       } else {
         let input;
-        if (f.type === "textarea") {
-          input = el("textarea", { id, class: "ak-input ak-input--area", "data-ak-part": "input", rows: 4, maxlength: f.maxLength || null, "aria-describedby": errId, "aria-required": req });
-        } else if (f.type === "select") {
+        if (f2.type === "textarea") {
+          input = el("textarea", { id, class: "ak-input ak-input--area", "data-ak-part": "input", rows: 4, maxlength: f2.maxLength || null, "aria-describedby": errId, "aria-required": req });
+        } else if (f2.type === "select") {
           input = el(
             "select",
             { id, class: "ak-input", "data-ak-part": "input", "aria-describedby": errId, "aria-required": req },
-            [el("option", { value: "" }, ti("intake.choose"))].concat((f.options || []).map(function(o) {
+            [el("option", { value: "" }, ti("intake.choose"))].concat((f2.options || []).map(function(o) {
               return el("option", { value: o.value }, o.label);
             }))
           );
         } else {
-          const type = TYPES.indexOf(f.type) === -1 ? "text" : f.type;
+          const type = TYPES.indexOf(f2.type) === -1 ? "text" : f2.type;
           input = el("input", {
             id,
             type,
             class: "ak-input",
             "data-ak-part": "input",
-            maxlength: f.maxLength || null,
+            maxlength: f2.maxLength || null,
             autocomplete: type === "email" ? "email" : type === "tel" ? "tel" : type === "url" ? "url" : null,
             inputmode: type === "number" ? "decimal" : null,
             "aria-describedby": errId,
@@ -19165,13 +21408,13 @@ Known schemas:
           /** @type {HTMLInputElement} */
           input
         ];
-        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f.name }, [
-          el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f.label].concat(marks)),
+        wrap2 = el("div", { class: "ak-form__field", "data-ak-part": "field", "data-ak-field": f2.name }, [
+          el("label", { class: "ak-form__label", "data-ak-part": "label", for: id }, [f2.label].concat(marks)),
           input,
           error
         ]);
       }
-      controls.set(f.name, { field: f, wrap: wrap2, error, inputs });
+      controls.set(f2.name, { field: f2, wrap: wrap2, error, inputs });
       return wrap2;
     }
     const ready2 = render().then(function() {
@@ -19224,25 +21467,25 @@ Known schemas:
       };
       return el("button", { type: "button", class: "ak-btn ak-btn--" + tone, "data-ak-part": part, disabled: sample ? true : null, on: { click: sample ? noop : run } }, label);
     }
-    function linkOf(f) {
-      if (typeof spec.link === "function") return spec.link(f);
+    function linkOf(f2) {
+      if (typeof spec.link === "function") return spec.link(f2);
       const here = String(window.location.href || "").split(/[?#]/)[0];
-      return here + "?form=" + encodeURIComponent(f.form_id) + "&org=" + encodeURIComponent(spec.org) + "&ws=" + encodeURIComponent(spec.ws);
+      return here + "?form=" + encodeURIComponent(f2.form_id) + "&org=" + encodeURIComponent(spec.org) + "&ws=" + encodeURIComponent(spec.ws);
     }
-    function ownActions(f) {
+    function ownActions(f2) {
       return (Array.isArray(spec.actions) ? spec.actions : []).filter(function(a) {
         return a && a.label && typeof a.run === "function";
       }).map(function(a) {
         const b = button2(String(a.label), a.tone || "ghost", "action", function() {
           whileBusy(b, act(function() {
-            return a.run(f);
+            return a.run(f2);
           }));
         });
         return b;
       });
     }
-    function countOf(f) {
-      const n = [f.submissions, f.submission_count, f.count].filter(function(v) {
+    function countOf(f2) {
+      const n = [f2.submissions, f2.submission_count, f2.count].filter(function(v) {
         return typeof v === "number";
       })[0];
       if (typeof n !== "number") return "";
@@ -19291,37 +21534,37 @@ Known schemas:
       }
       function tellByHand(url) {
         const whole = ti("intake.copyByHand", { url });
-        const at2 = whole.lastIndexOf(url);
+        const at3 = whole.lastIndexOf(url);
         clear(noticeEl);
         const link = el("span", { text: url });
-        if (at2 < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
-        else if (at2 > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at2)));
+        if (at3 < 0) noticeEl.appendChild(el("span", { text: whole + " " }));
+        else if (at3 > 0) noticeEl.appendChild(document.createTextNode(whole.slice(0, at3)));
         noticeEl.appendChild(link);
-        if (at2 >= 0 && at2 + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at2 + url.length)));
+        if (at3 >= 0 && at3 + url.length < whole.length) noticeEl.appendChild(document.createTextNode(whole.slice(at3 + url.length)));
         noticeEl.hidden = false;
         selectForHand(link);
       }
-      const rows = (Array.isArray(forms) ? forms : []).map(function(f) {
-        const name = f.title || f.form_id;
+      const rows = (Array.isArray(forms) ? forms : []).map(function(f2) {
+        const name = f2.title || f2.form_id;
         const meta = [
-          f.form_id !== name ? f.form_id : "",
-          countOf(f),
-          f.enabled === false ? ti("intake.closed") : "",
-          f.discoverable === false ? ti("intake.private") : "",
-          f.mode === "draft" ? ti("intake.draft") : ""
+          f2.form_id !== name ? f2.form_id : "",
+          countOf(f2),
+          f2.enabled === false ? ti("intake.closed") : "",
+          f2.discoverable === false ? ti("intake.private") : "",
+          f2.mode === "draft" ? ti("intake.draft") : ""
         ].filter(Boolean).join(" · ");
-        return el("li", { class: "ak-intake__row", "data-ak-part": "row", "data-ak-form": f.form_id }, [
+        return el("li", { class: "ak-intake__row", "data-ak-part": "row", "data-ak-form": f2.form_id }, [
           el("span", { class: "ak-intake__name" }, name),
           el("span", { class: "ak-intake__meta", "data-ak-part": "meta" }, meta),
           el("span", { class: "ak-intake__acts", "data-ak-part": "acts" }, [
             button2(ti("intake.copy"), "ghost", "copy", function() {
-              const url = linkOf(f);
+              const url = linkOf(f2);
               copy(url).then(function(ok) {
                 if (ok) tell(ti("intake.copied", { url }));
                 else tellByHand(url);
               });
             })
-          ].concat(ownActions(f), [
+          ].concat(ownActions(f2), [
             button2(ti("intake.delete"), "ghost", "delete", function() {
               ask({
                 title: ti("intake.confirmDelete", { name }),
@@ -19330,7 +21573,7 @@ Known schemas:
                 tone: "danger"
               }).then(function(yes) {
                 if (yes) act(function() {
-                  return lib.deleteForm(spec.org, spec.ws, f.form_id);
+                  return lib.deleteForm(spec.org, spec.ws, f2.form_id);
                 }, function() {
                   return ti("intake.deleted");
                 });
@@ -19485,13 +21728,13 @@ Known schemas:
           ws: spec.ws,
           namespace: namespace2,
           title: draft.title.trim(),
-          allowed_fields: fields.map(function(f) {
-            return f.key;
+          allowed_fields: fields.map(function(f2) {
+            return f2.key;
           }),
-          required_fields: fields.filter(function(f) {
-            return f.required;
-          }).map(function(f) {
-            return f.key;
+          required_fields: fields.filter(function(f2) {
+            return f2.required;
+          }).map(function(f2) {
+            return f2.key;
           }),
           fields,
           honeypot_field: HONEYPOT
@@ -19850,16 +22093,16 @@ Known schemas:
           disabled: sample ? true : null
         })
       ) : null;
-      const fields = (p.attachFields || []).map(function(f) {
+      const fields = (p.attachFields || []).map(function(f2) {
         return (
           /** @type {HTMLInputElement} */
           el("input", {
-            type: f.secret ? "password" : "text",
+            type: f2.secret ? "password" : "text",
             class: "ak-input ak-conn__input",
-            "data-field": f.name,
-            placeholder: f.placeholder || f.label,
-            "aria-label": f.label,
-            autocomplete: f.secret ? "new-password" : "off",
+            "data-field": f2.name,
+            placeholder: f2.placeholder || f2.label,
+            "aria-label": f2.label,
+            autocomplete: f2.secret ? "new-password" : "off",
             disabled: sample ? true : null
           })
         );
@@ -20167,7 +22410,7 @@ Known schemas:
   }
   function sampleInputs() {
     const now2 = Date.now();
-    const at2 = function(hours) {
+    const at3 = function(hours) {
       return new Date(now2 + hours * 36e5).toISOString();
     };
     return [
@@ -20177,8 +22420,8 @@ Known schemas:
         stepId: "review",
         mode: "full-live",
         workflowTitle: twf("wf.sample.wf1"),
-        askedAt: at2(-2),
-        deadline: at2(22),
+        askedAt: at3(-2),
+        deadline: at3(22),
         question: {
           header: twf("wf.sample.header1"),
           prompt: twf("wf.sample.q1"),
@@ -20196,8 +22439,8 @@ Known schemas:
         stepId: "pick-suppliers",
         mode: "full-sandbox",
         workflowTitle: twf("wf.sample.wf2"),
-        askedAt: at2(-20),
-        deadline: at2(52),
+        askedAt: at3(-20),
+        deadline: at3(52),
         question: {
           prompt: twf("wf.sample.q2"),
           multiSelect: true,
@@ -20705,9 +22948,9 @@ Known schemas:
     }
     host.appendChild(el("div", { class: cls || "ak-aitask__text" }, text));
   }
-  function madeWhen(at2) {
-    if (at2 == null || at2 === "") return "";
-    const d = new Date(at2);
+  function madeWhen(at3) {
+    if (at3 == null || at3 === "") return "";
+    const d = new Date(at3);
     if (!isFinite(d.getTime())) return "";
     return dateTime(d.toISOString(), { dateStyle: "medium", timeStyle: "short" });
   }
@@ -22101,13 +24344,13 @@ Known schemas:
     return { result, thresholds };
   }
   function reviewedWords(rev) {
-    const at2 = day2(rev.at);
+    const at3 = day2(rev.at);
     let words;
-    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at: at2 });
-    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at: at2 });
+    if (rev.outcome === "confirmed") words = td("decision.reviewed.confirmed", { at: at3 });
+    else if (rev.override === void 0 || rev.override === null) words = td("decision.reviewed.overridden", { at: at3 });
     else {
       const v = rev.override === true ? td("decision.yes") : rev.override === false ? td("decision.no") : String(rev.override);
-      words = td("decision.reviewed.overriddenTo", { at: at2, v });
+      words = td("decision.reviewed.overriddenTo", { at: at3, v });
     }
     return rev.note ? words + " " + td("decision.reviewed.note", { note: rev.note }) : words;
   }
@@ -22460,7 +24703,7 @@ Known schemas:
           const box = el("div", { class: "ak-dec__step", "data-ak-part": "step", "data-step": String(i + 1) });
           box.appendChild(el("p", { class: "ak-dec__step-title", "data-ak-part": "stepTitle" }, td("decision.round", { n: i + 1 })));
           box.appendChild(answerList(r, i, ownWord));
-          for (const line of facts(r)) box.appendChild(line);
+          for (const line2 of facts(r)) box.appendChild(line2);
           body.appendChild(box);
         });
       } else body.appendChild(answerList(result, 0, ownWord));
@@ -22471,7 +24714,7 @@ Known schemas:
         /** @type {HTMLElement} */
         drawPerson()
       );
-      if (!rounds2) for (const line of facts(result)) body.appendChild(line);
+      if (!rounds2) for (const line2 of facts(result)) body.appendChild(line2);
       if (!sample && !storedId && !noState(state)) {
         const again = el("button", { type: "button", class: "ak-btn ak-btn--ghost", "data-ak-part": "again" }, td("decision.again"));
         again.addEventListener("click", function() {
@@ -23217,8 +25460,8 @@ Known schemas:
       add(files) {
         if (gone) return;
         place2();
-        (files || []).forEach(function(f) {
-          queue2.push({ file: f, row: row(f) });
+        (files || []).forEach(function(f2) {
+          queue2.push({ file: f2, row: row(f2) });
         });
         pump();
       },
@@ -23234,11 +25477,11 @@ Known schemas:
   }
 
   // src/static/sdk-libs/atelier/parts.js
-  function acceptsFile(f, accept) {
+  function acceptsFile(f2, accept) {
     if (!accept.length) return true;
-    const name = String(f && f.name || "");
+    const name = String(f2 && f2.name || "");
     const ext = name.indexOf(".") === -1 ? "" : "." + name.split(".").pop().toLowerCase();
-    const type = String(f && f.type || "").toLowerCase();
+    const type = String(f2 && f2.type || "").toLowerCase();
     return accept.some(function(a) {
       if (a === "*" || a === "*/*") return true;
       if (a.charAt(0) === ".") return a === ext;
@@ -23257,7 +25500,7 @@ Known schemas:
     if (s.target) resolve(s.target).appendChild(root);
     const size = s.size || 96;
     const r = (size - 12) / 2;
-    const circ = 2 * Math.PI * r;
+    const circ2 = 2 * Math.PI * r;
     function render(d) {
       clear(root);
       if (!d || typeof d.value !== "number" || !(d.total > 0)) {
@@ -23281,8 +25524,8 @@ Known schemas:
         cy: size / 2,
         r,
         "stroke-width": 10,
-        "stroke-dasharray": circ.toFixed(1),
-        "stroke-dashoffset": (circ * (1 - share)).toFixed(1),
+        "stroke-dasharray": circ2.toFixed(1),
+        "stroke-dashoffset": (circ2 * (1 - share)).toFixed(1),
         transform: "rotate(-90 " + size / 2 + " " + size / 2 + ")"
       }));
       const t2 = svg("text", { class: "ak-ring__value", x: size / 2, y: size / 2 + 6, "text-anchor": "middle", "font-size": Math.round(size / 5) });
@@ -23424,9 +25667,9 @@ Known schemas:
     let warned = false;
     function take(list3) {
       const files = Array.prototype.slice.call(list3 || []);
-      const bad = files.find(function(f) {
-        if (!acceptsFile(f, accept)) return true;
-        return s.maxBytes ? f.size > s.maxBytes : false;
+      const bad = files.find(function(f2) {
+        if (!acceptsFile(f2, accept)) return true;
+        return s.maxBytes ? f2.size > s.maxBytes : false;
       });
       if (bad) {
         err.textContent = s.maxBytes && bad.size > s.maxBytes ? tu("drop.tooBig", { name: bad.name, mb: Math.round(s.maxBytes / 1e6) }) : tu("drop.wrongKind", { name: bad.name });
@@ -23496,8 +25739,8 @@ Known schemas:
     if (data && isMorsels(data.currency)) return false;
     if (data && data.unit === "micros") return true;
     return (Array.isArray(items) ? items : []).some(function(item) {
-      return !!item && fields.some(function(f) {
-        return typeof item[f + "Micros"] === "number";
+      return !!item && fields.some(function(f2) {
+        return typeof item[f2 + "Micros"] === "number";
       });
     });
   }
@@ -23609,21 +25852,21 @@ Known schemas:
     };
   }
   var STATUS_KEYS = { sent: "threadSent", read: "threadRead", failed: "threadFailed" };
-  function dateOf(at2) {
-    if (!at2) return null;
-    const d = new Date(at2);
+  function dateOf(at3) {
+    if (!at3) return null;
+    const d = new Date(at3);
     return Number.isNaN(d.getTime()) ? null : d;
   }
-  function dayKeyOf(at2) {
-    const d = dateOf(at2);
+  function dayKeyOf(at3) {
+    const d = dateOf(at3);
     if (!d) return "unknown";
     return d.getFullYear() + "-" + (d.getMonth() + 1) + "-" + d.getDate();
   }
-  function dayLabelOf(at2) {
-    const d = dateOf(at2);
+  function dayLabelOf(at3) {
+    const d = dateOf(at3);
     if (!d) return t("earlier");
     const now2 = /* @__PURE__ */ new Date();
-    const key = dayKeyOf(at2);
+    const key = dayKeyOf(at3);
     if (key === dayKeyOf(now2)) return t("today");
     const back = new Date(now2.getTime() - 864e5);
     if (key === dayKeyOf(back)) return t("yesterday");
@@ -23632,8 +25875,8 @@ Known schemas:
     }
     return d.toDateString();
   }
-  function timeLabelOf(at2) {
-    const d = dateOf(at2);
+  function timeLabelOf(at3) {
+    const d = dateOf(at3);
     if (!d) return "";
     if (typeof Intl === "object" && Intl.DateTimeFormat) {
       return time(d, { hour: "2-digit", minute: "2-digit" });
@@ -24035,12 +26278,12 @@ Known schemas:
       if (placed) return;
       const contact = details.values();
       details.clearErrors();
-      const missing = fields.filter(function(f) {
-        return f.required && !String(contact[f.name] == null ? "" : contact[f.name]).trim();
+      const missing = fields.filter(function(f2) {
+        return f2.required && !String(contact[f2.name] == null ? "" : contact[f2.name]).trim();
       });
       if (missing.length) {
-        missing.forEach(function(f) {
-          details.setError(f.name, t("coNeeded", { field: f.label }));
+        missing.forEach(function(f2) {
+          details.setError(f2.name, t("coNeeded", { field: f2.label }));
         });
         goTo(1);
         return;
@@ -24376,14 +26619,14 @@ Known schemas:
     }
     function roll() {
       const engine = !reducedMotion() && W4.anime && W4.anime.animate ? W4.anime : null;
-      figures.forEach(function(f) {
-        f.per.textContent = perWord(period);
-        const to = figureOf(f.plan);
-        const from = f.shown;
-        f.shown = to;
+      figures.forEach(function(f2) {
+        f2.per.textContent = perWord(period);
+        const to = figureOf(f2.plan);
+        const from = f2.shown;
+        f2.shown = to;
         const d = digitsOf(to);
         if (!engine || from === to) {
-          f.amount.textContent = money5(to, currency, d);
+          f2.amount.textContent = money5(to, currency, d);
           return;
         }
         const box = { v: from };
@@ -24392,10 +26635,10 @@ Known schemas:
           duration: 520,
           ease: "outQuad",
           onUpdate: function() {
-            f.amount.textContent = money5(box.v, currency, d);
+            f2.amount.textContent = money5(box.v, currency, d);
           },
           onComplete: function() {
-            f.amount.textContent = money5(to, currency, d);
+            f2.amount.textContent = money5(to, currency, d);
           }
         });
       });
@@ -24432,10 +26675,10 @@ Known schemas:
       const per = el("span", { class: "ak-price__per" }, perWord(period));
       figures.push({ plan: plan2, amount: amount2, per, shown: value });
       const features = el("ul", { class: "ak-price__features" });
-      (Array.isArray(plan2.features) ? plan2.features : []).forEach(function(f) {
+      (Array.isArray(plan2.features) ? plan2.features : []).forEach(function(f2) {
         features.appendChild(el("li", { class: "ak-price__feature" }, [
           el("span", { class: "ak-price__check", "aria-hidden": "true" }, "✓"),
-          el("span", {}, String(f))
+          el("span", {}, String(f2))
         ]));
       });
       return el("article", {
@@ -24837,11 +27080,11 @@ Known schemas:
       });
     };
     const swipe = drag(track, {
-      onEnd: function(dx, _dy, velocity) {
+      onEnd: function(dx, _dy, velocity2) {
         if (Math.abs(dx) < 6) return;
         swiped = true;
         const width = cards[index] ? cards[index].offsetWidth : viewport.clientWidth;
-        const far = Math.abs(dx) > width * PULL || Math.abs(velocity.x) > FLICK;
+        const far = Math.abs(dx) > width * PULL || Math.abs(velocity2.x) > FLICK;
         if (far) step(dx < 0 ? 1 : -1);
         else goTo(index);
       }
@@ -25007,8 +27250,8 @@ Known schemas:
       if (ev.target === node) close();
     };
     const swipe = drag(figure2, {
-      onEnd: function(dx, _dy, velocity) {
-        const far = Math.abs(dx) > figure2.clientWidth * PULL || Math.abs(velocity.x) > FLICK;
+      onEnd: function(dx, _dy, velocity2) {
+        const far = Math.abs(dx) > figure2.clientWidth * PULL || Math.abs(velocity2.x) > FLICK;
         if (far) step(dx < 0 ? 1 : -1);
       }
     }, { axis: "x", back: true, stiffness: 260, damping: 24 });
@@ -25756,12 +27999,12 @@ Known schemas:
       else if (nav === "rail") root.appendChild(projectRail(units));
       else if (nav === "overlay") root.appendChild(projectOverlay(units, alive));
       else root.appendChild(projectStack(units, alive));
-      for (const f of fills) {
+      for (const f2 of fills) {
         if (destroyed) return;
         try {
-          f.run(f.body);
+          f2.run(f2.body);
         } catch (err) {
-          console.error('aimeat-atelier: the fill for section "' + f.id + '" threw; the other blocks were built.', err);
+          console.error('aimeat-atelier: the fill for section "' + f2.id + '" threw; the other blocks were built.', err);
         }
       }
     }
@@ -25889,8 +28132,8 @@ Known schemas:
           const host2 = resolve(opts.target);
           const panel = el("div", { class: "ak-root ak-explain" }, [
             el("h3", { class: "ak-section__title", text: t("explainTitle") }),
-            el("ul", { class: "ak-explain__list" }, lines.map(function(line) {
-              return el("li", { text: line });
+            el("ul", { class: "ak-explain__list" }, lines.map(function(line2) {
+              return el("li", { text: line2 });
             }))
           ]);
           host2.appendChild(panel);
@@ -26313,8 +28556,8 @@ Known schemas:
   var FAR = 0.55;
   var NUDGE = 10;
   function rectOf(entry) {
-    const f = entry.frame;
-    return { x: f.x || 0, y: f.y || 0, w: f.w || FRAME_W, h: f.h || entry.el.offsetHeight || 240 };
+    const f2 = entry.frame;
+    return { x: f2.x || 0, y: f2.y || 0, w: f2.w || FRAME_W, h: f2.h || entry.el.offsetHeight || 240 };
   }
   function sampleFrames() {
     return [
@@ -26326,8 +28569,8 @@ Known schemas:
   function sampleRings() {
     return [{ id: "s-ring", title: "Who is coming", members: ["s-tbl", "s-chart"] }];
   }
-  function renderSample(f, body) {
-    if (f.kind === "table") {
+  function renderSample(f2, body) {
+    if (f2.kind === "table") {
       const rows = [["Anna", "Virtanen", "coming"], ["Mikko", "Korhonen", "coming"], ["Sari", "Nieminen", "maybe"]];
       body.appendChild(el("div", { class: "ak-board__srows" }, [
         el("div", { class: "ak-board__srow ak-board__srow--head" }, [el("span", { text: "First" }), el("span", { text: "Last" }), el("span", { text: "Status" })])
@@ -26338,7 +28581,7 @@ Known schemas:
       }))));
       return;
     }
-    if (f.kind === "chart") {
+    if (f2.kind === "chart") {
       body.appendChild(el("div", { class: "ak-board__sbars" }, [38, 52, 61, 48, 75, 90].map(function(h) {
         return el("div", { class: "ak-board__sbar", style: "height:" + h + "%" });
       })));
@@ -26461,11 +28704,11 @@ Known schemas:
       const onHead = !!t2.closest(".ak-board__head");
       if (!onGrip && !onHead && (mode === "interact" || node.hasAttribute("data-ak-live"))) return swallow();
       select(entry.frame.id);
-      const f = entry.frame;
+      const f2 = entry.frame;
       const start = rectOf(entry);
       let moved = false;
       const wasIn = ringsUnder(entry);
-      const towed = (!onGrip && spec.tow ? spec.tow(f) || [] : []).map(function(id) {
+      const towed = (!onGrip && spec.tow ? spec.tow(f2) || [] : []).map(function(id) {
         return shown.get(String(id));
       }).filter(function(e) {
         return e && e !== entry;
@@ -26476,21 +28719,21 @@ Known schemas:
         return {
           onMove: function(dx, dy) {
             moved = true;
-            f.w = Math.max(FRAME_MIN_W, Math.round(start.w + dx));
-            f.h = Math.max(FRAME_MIN_H, Math.round(start.h + dy));
+            f2.w = Math.max(FRAME_MIN_W, Math.round(start.w + dx));
+            f2.h = Math.max(FRAME_MIN_H, Math.round(start.h + dy));
             place2(entry);
             drawRings();
           },
           onEnd: function() {
-            if (moved && spec.onMove) spec.onMove(f, rectOf(entry));
+            if (moved && spec.onMove) spec.onMove(f2, rectOf(entry));
           }
         };
       }
       return {
         onMove: function(dx, dy) {
           moved = true;
-          f.x = Math.round(start.x + dx);
-          f.y = Math.round(start.y + dy);
+          f2.x = Math.round(start.x + dx);
+          f2.y = Math.round(start.y + dy);
           place2(entry);
           towed.forEach(function(tw2) {
             tw2.entry.frame.x = Math.round(tw2.x0 + dx);
@@ -26503,7 +28746,7 @@ Known schemas:
           if (!moved) return;
           dropCheck(entry, wasIn);
           if (spec.onMove) {
-            spec.onMove(f, rectOf(entry));
+            spec.onMove(f2, rectOf(entry));
             towed.forEach(function(tw2) {
               spec.onMove(tw2.entry.frame, rectOf(tw2.entry));
             });
@@ -26531,8 +28774,8 @@ Known schemas:
         return;
       }
     }
-    function buildFrame(f) {
-      const node = el("div", { class: "ak-board__frame ak-board__frame--in", "data-ak-part": "frame", "data-ak-frame": true, "data-ak-id": f.id });
+    function buildFrame(f2) {
+      const node = el("div", { class: "ak-board__frame ak-board__frame--in", "data-ak-part": "frame", "data-ak-frame": true, "data-ak-id": f2.id });
       const head = el("div", { class: "ak-board__head", "data-ak-part": "head" });
       const title = el("span", { class: "ak-board__title", "data-ak-part": "title" });
       const kind = el("span", { class: "ak-board__kind", "data-ak-part": "kind" });
@@ -26552,27 +28795,27 @@ Known schemas:
           /** @type {Element} */
           e.target.closest("button")
         ) return;
-        select(f.id);
+        select(f2.id);
       });
       node.addEventListener("dblclick", function(e) {
         if (
           /** @type {Element} */
           e.target.closest("button, input, textarea, select, a")
         ) return;
-        const entry = shown.get(f.id);
+        const entry = shown.get(f2.id);
         if (entry && spec.onActivate) spec.onActivate(entry.frame);
       });
       node.addEventListener("animationend", function() {
         node.classList.remove("ak-board__frame--in");
       });
-      return { el: node, frame: f, head, title, kind, extra, acts, body, rev: void 0, sig: "" };
+      return { el: node, frame: f2, head, title, kind, extra, acts, body, rev: void 0, sig: "" };
     }
     function place2(entry) {
-      const f = entry.frame;
-      entry.el.style.left = (f.x || 0) + "px";
-      entry.el.style.top = (f.y || 0) + "px";
-      entry.el.style.width = (f.w || FRAME_W) + "px";
-      entry.el.style.height = f.h ? f.h + "px" : "";
+      const f2 = entry.frame;
+      entry.el.style.left = (f2.x || 0) + "px";
+      entry.el.style.top = (f2.y || 0) + "px";
+      entry.el.style.width = (f2.w || FRAME_W) + "px";
+      entry.el.style.height = f2.h ? f2.h + "px" : "";
     }
     function fillSlot(host, value) {
       clear(host);
@@ -26584,25 +28827,25 @@ Known schemas:
       else host.textContent = String(value);
     }
     function chrome(entry) {
-      const f = entry.frame;
-      const titleVal = parts.title ? parts.title(f) : f.title || "";
+      const f2 = entry.frame;
+      const titleVal = parts.title ? parts.title(f2) : f2.title || "";
       fillSlot(entry.title, titleVal);
-      const kindKey = f.kind ? "kind." + f.kind : "";
+      const kindKey = f2.kind ? "kind." + f2.kind : "";
       const kindText = kindKey ? tb(kindKey) : "";
-      entry.kind.textContent = kindText === kindKey ? String(f.kind) : kindText;
-      fillSlot(entry.extra, parts.extra ? parts.extra(f) : f.extra || "");
-      if (f.kind) entry.el.setAttribute("data-ak-kind", String(f.kind));
+      entry.kind.textContent = kindText === kindKey ? String(f2.kind) : kindText;
+      fillSlot(entry.extra, parts.extra ? parts.extra(f2) : f2.extra || "");
+      if (f2.kind) entry.el.setAttribute("data-ak-kind", String(f2.kind));
       else entry.el.removeAttribute("data-ak-kind");
-      if (f.live) entry.el.setAttribute("data-ak-live", "");
+      if (f2.live) entry.el.setAttribute("data-ak-live", "");
       else entry.el.removeAttribute("data-ak-live");
-      if (f.tone) entry.el.setAttribute("data-ak-tone", String(f.tone));
+      if (f2.tone) entry.el.setAttribute("data-ak-tone", String(f2.tone));
       else entry.el.removeAttribute("data-ak-tone");
-      entry.el.classList.toggle("ak-board__frame--borrowed", !!f.borrowed);
+      entry.el.classList.toggle("ak-board__frame--borrowed", !!f2.borrowed);
       const visible = actions.filter(function(a) {
-        return !a.when || a.when(f);
+        return !a.when || a.when(f2);
       });
       const sig = visible.map(function(a) {
-        return a.id + (a.pressed && a.pressed(f) ? "*" : "");
+        return a.id + (a.pressed && a.pressed(f2) ? "*" : "");
       }).join("|");
       if (sig !== entry.sig) {
         entry.sig = sig;
@@ -26616,11 +28859,11 @@ Known schemas:
             "data-ak-noguard": true,
             "aria-label": a.label || a.id,
             title: a.label || a.id,
-            "aria-pressed": a.pressed ? a.pressed(f) ? "true" : "false" : null,
+            "aria-pressed": a.pressed ? a.pressed(f2) ? "true" : "false" : null,
             text: a.glyph || a.label || a.id,
             on: { click: function(e) {
               e.stopPropagation();
-              const now2 = shown.get(f.id);
+              const now2 = shown.get(f2.id);
               if (now2 && spec.onAction) spec.onAction(a.id, now2.frame);
             } }
           });
@@ -26629,20 +28872,20 @@ Known schemas:
       }
     }
     function renderBody(entry, fresh) {
-      const f = entry.frame;
-      if (!fresh && entry.rev === f.rev) return;
-      entry.rev = f.rev;
+      const f2 = entry.frame;
+      if (!fresh && entry.rev === f2.rev) return;
+      entry.rev = f2.rev;
       clear(entry.body);
       if (sample) {
-        renderSample(f, entry.body);
+        renderSample(f2, entry.body);
         return;
       }
-      if (spec.render) spec.render(f, entry.body, { el: entry.el });
+      if (spec.render) spec.render(f2, entry.body, { el: entry.el });
     }
     function reconcile(frames) {
       const next = /* @__PURE__ */ new Map();
-      (frames || []).forEach(function(f) {
-        if (f && f.id != null) next.set(String(f.id), f);
+      (frames || []).forEach(function(f2) {
+        if (f2 && f2.id != null) next.set(String(f2.id), f2);
       });
       shown.forEach(function(entry, id) {
         if (next.has(id)) return;
@@ -26650,15 +28893,15 @@ Known schemas:
         shown.delete(id);
         if (selected === id) selected = null;
       });
-      next.forEach(function(f, id) {
+      next.forEach(function(f2, id) {
         let entry = shown.get(id);
         const fresh = !entry;
         if (!entry) {
-          entry = buildFrame(f);
+          entry = buildFrame(f2);
           shown.set(id, entry);
           world.appendChild(entry.el);
         } else {
-          entry.frame = f;
+          entry.frame = f2;
         }
         place2(entry);
         chrome(entry);
@@ -26783,18 +29026,18 @@ Known schemas:
       const entry = shown.get(selected);
       if (!entry) return;
       const step = ev.shiftKey ? NUDGE * 5 : NUDGE;
-      const f = entry.frame;
+      const f2 = entry.frame;
       let moved = true;
-      if (ev.key === "ArrowLeft") f.x = (f.x || 0) - step;
-      else if (ev.key === "ArrowRight") f.x = (f.x || 0) + step;
-      else if (ev.key === "ArrowUp") f.y = (f.y || 0) - step;
-      else if (ev.key === "ArrowDown") f.y = (f.y || 0) + step;
+      if (ev.key === "ArrowLeft") f2.x = (f2.x || 0) - step;
+      else if (ev.key === "ArrowRight") f2.x = (f2.x || 0) + step;
+      else if (ev.key === "ArrowUp") f2.y = (f2.y || 0) - step;
+      else if (ev.key === "ArrowDown") f2.y = (f2.y || 0) + step;
       else moved = false;
       if (!moved) return;
       ev.preventDefault();
       place2(entry);
       drawRings();
-      if (spec.onMove) spec.onMove(f, rectOf(entry));
+      if (spec.onMove) spec.onMove(f2, rectOf(entry));
     });
     reconcile(sample ? sampleFrames() : spec.frames || []);
     if (vp) {
@@ -27738,9 +29981,9 @@ Known schemas:
     return m ? m[0] : null;
   }
   function splitTarget(target, selfOwner) {
-    const at2 = String(target || "").trim();
-    const cut = at2.indexOf("/");
-    return cut < 0 ? { gaii: selfOwner || "", key: at2 } : { gaii: at2.slice(0, cut), key: at2.slice(cut + 1) };
+    const at3 = String(target || "").trim();
+    const cut = at3.indexOf("/");
+    return cut < 0 ? { gaii: selfOwner || "", key: at3 } : { gaii: at3.slice(0, cut), key: at3.slice(cut + 1) };
   }
   function verbs(spec) {
     const root = (
@@ -27868,8 +30111,8 @@ Known schemas:
           return;
         }
         if (kind === "now") {
-          const d = /* @__PURE__ */ new Date(), f = attr(elm, "format") || "datetime";
-          show(out, f === "date" ? date(d) : f === "time" ? time(d) : dateTime(d));
+          const d = /* @__PURE__ */ new Date(), f2 = attr(elm, "format") || "datetime";
+          show(out, f2 === "date" ? date(d) : f2 === "time" ? time(d) : dateTime(d));
           return;
         }
         if (kind === "count") {
@@ -28324,8 +30567,8 @@ Known schemas:
     let shape = null;
     let mu = false;
     let emptyCard = null;
-    function each(line) {
-      return readAmount(line, "price", shape);
+    function each(line2) {
+      return readAmount(line2, "price", shape);
     }
     function totalOf() {
       return current2.reduce(function(n, l) {
@@ -28335,28 +30578,28 @@ Known schemas:
     function rollTotal() {
       odometer(totalValue, money6(totalOf(), unit, mu));
     }
-    function subOf(line, qty) {
-      const own = line.sub != null && line.sub !== "" ? String(line.sub) : "";
-      const unitPrice = qty > 1 ? qty + " × " + money6(each(line), unit, mu) : "";
+    function subOf(line2, qty) {
+      const own = line2.sub != null && line2.sub !== "" ? String(line2.sub) : "";
+      const unitPrice = qty > 1 ? qty + " × " + money6(each(line2), unit, mu) : "";
       return own && unitPrice ? own + " · " + unitPrice : own || unitPrice;
     }
-    function paintSub(rec, line, qty) {
-      const text = subOf(line, qty);
+    function paintSub(rec, line2, qty) {
+      const text = subOf(line2, qty);
       rec.sub.textContent = text;
       rec.sub.hidden = !text;
     }
-    function setQty(line, next) {
+    function setQty(line2, next) {
       const q = Math.max(1, Math.round(Number(next) || 1));
-      if (q === Number(line.qty)) return;
-      line.qty = q;
-      const rec = shown.get(String(line.id));
+      if (q === Number(line2.qty)) return;
+      line2.qty = q;
+      const rec = shown.get(String(line2.id));
       if (rec) {
         rec.count.textContent = String(q);
-        rec.price.textContent = money6(each(line) * q, unit, mu);
-        paintSub(rec, line, q);
+        rec.price.textContent = money6(each(line2) * q, unit, mu);
+        paintSub(rec, line2, q);
       }
       rollTotal();
-      if (s.onChange) s.onChange(line.id, q);
+      if (s.onChange) s.onChange(line2.id, q);
     }
     function collapse(node, after) {
       const done = function() {
@@ -28376,8 +30619,8 @@ Known schemas:
       anim.addEventListener("finish", done);
       anim.addEventListener("cancel", done);
     }
-    function remove(line) {
-      const id = String(line.id);
+    function remove(line2) {
+      const id = String(line2.id);
       const rec = shown.get(id);
       current2 = current2.filter(function(l) {
         return String(l.id) !== id;
@@ -28387,15 +30630,15 @@ Known schemas:
         render({ lines: [], currency: unit, note: "" });
       });
       rollTotal();
-      if (s.onRemove) s.onRemove(line.id);
+      if (s.onRemove) s.onRemove(line2.id);
     }
-    function buildLine(line) {
-      const picture = pictureOf(line.image);
+    function buildLine(line2) {
+      const picture = pictureOf(line2.image);
       const rec = (
         /** @type {any} */
         {
           node: null,
-          line,
+          line: line2,
           art: el("span", {
             class: "ak-cart__art" + (picture ? " ak-cart__art--image" : ""),
             "aria-hidden": "true",
@@ -28412,7 +30655,7 @@ Known schemas:
           setQty(rec.line, (Number(rec.line.qty) || 1) + by);
         };
       };
-      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line.id) }, [
+      rec.node = el("div", { class: "ak-cart__line", "data-id": String(line2.id) }, [
         rec.art,
         el("span", { class: "ak-cart__body" }, [rec.title, rec.sub]),
         el("span", { class: "ak-cart__qty" }, [
@@ -28430,18 +30673,18 @@ Known schemas:
           } }
         }, null)
       ]);
-      fillLine(rec, line);
+      fillLine(rec, line2);
       return rec;
     }
-    function fillLine(rec, line) {
-      rec.line = line;
-      const qty = Math.max(1, Math.round(Number(line.qty) || 1));
-      rec.title.textContent = String(line.title || line.id);
-      paintSub(rec, line, qty);
+    function fillLine(rec, line2) {
+      rec.line = line2;
+      const qty = Math.max(1, Math.round(Number(line2.qty) || 1));
+      rec.title.textContent = String(line2.title || line2.id);
+      paintSub(rec, line2, qty);
       rec.count.textContent = String(qty);
-      rec.price.textContent = money6(each(line) * qty, unit, mu);
+      rec.price.textContent = money6(each(line2) * qty, unit, mu);
       const mono = rec.art.querySelector(".ak-cart__monogram");
-      if (mono) mono.textContent = (Array.from(String(line.title || "?"))[0] || "?").toUpperCase();
+      if (mono) mono.textContent = (Array.from(String(line2.title || "?"))[0] || "?").toUpperCase();
     }
     function render(data) {
       const list3 = (data && Array.isArray(data.lines) ? data.lines : []).filter(function(l) {
@@ -28484,14 +30727,14 @@ Known schemas:
         shown.delete(id);
         if (rec.node.parentNode) rec.node.parentNode.removeChild(rec.node);
       });
-      list3.forEach(function(line) {
-        const id = String(line.id);
+      list3.forEach(function(line2) {
+        const id = String(line2.id);
         let rec = shown.get(id);
         if (!rec) {
-          rec = buildLine(line);
+          rec = buildLine(line2);
           shown.set(id, rec);
         } else {
-          fillLine(rec, line);
+          fillLine(rec, line2);
         }
         lines.appendChild(rec.node);
       });
@@ -29217,7 +31460,7 @@ Known schemas:
       };
     });
     const fill2 = el("span", { class: "ak-reading__fill", "aria-hidden": "true" });
-    const line = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
+    const line2 = el("div", { class: "ak-reading__line", "aria-hidden": "true" }, [fill2]);
     const links = items.map(function(it) {
       return el("a", {
         class: "ak-reading__link",
@@ -29236,7 +31479,7 @@ Known schemas:
     const nav = el("nav", {
       class: "ak-reading" + (s.target ? " ak-reading--inset" : ""),
       "aria-label": "Contents"
-    }, [line, list3]);
+    }, [line2, list3]);
     const parent = (
       /** @type {HTMLElement} */
       s.target ? resolve(s.target) : document.body
@@ -29280,11 +31523,11 @@ Known schemas:
       const through = clamp012((v.top - r.top) / Math.max(1, r.height - v.h));
       fill2.style.setProperty("--ak-fill", (through * 100).toFixed(2) + "%");
       const edge = v.top + v.h / READ_LINE;
-      let at2 = 0;
+      let at3 = 0;
       items.forEach(function(it, i) {
-        if (it.head.getBoundingClientRect().top <= edge) at2 = i;
+        if (it.head.getBoundingClientRect().top <= edge) at3 = i;
       });
-      mark(items.length ? at2 : -1);
+      mark(items.length ? at3 : -1);
     };
     let rafId = 0;
     const onScroll = function() {
@@ -29542,8 +31785,8 @@ Known schemas:
       });
     }
     function progress(p) {
-      const at2 = Math.max(0, Math.min(1, Number(p) || 0));
-      setDraw("0 " + at2);
+      const at3 = Math.max(0, Math.min(1, Number(p) || 0));
+      setDraw("0 " + at3);
     }
     function reset() {
       setDraw("0 0");
@@ -29706,17 +31949,17 @@ Known schemas:
   }
   function settle2(node, props) {
     let moved = false;
-    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at3 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS.forEach(function(key) {
       const end = endOf(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at2[key] = parseFloat(String(end)) || 0;
+      else at3[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
+      node.style.transform = "translate(" + at3.x + "px, " + at3.y + "px) scale(" + (props.scale === void 0 ? 1 : at3.scale) + ") rotate(" + at3.rotate + "deg)";
     }
   }
   function sequence(steps2, opts) {
@@ -29885,9 +32128,9 @@ Known schemas:
        * @param {number} p
        */
       seek: function(p) {
-        const at2 = Math.max(0, Math.min(1, Number(p) || 0));
+        const at3 = Math.max(0, Math.min(1, Number(p) || 0));
         runs.forEach(function(run) {
-          run.seek(at2 * duration2);
+          run.seek(at3 * duration2);
         });
       },
       destroy: function() {
@@ -29993,17 +32236,17 @@ Known schemas:
   }
   function settle3(node, props) {
     let moved = false;
-    const at2 = { x: 0, y: 0, scale: 1, rotate: 0 };
+    const at3 = { x: 0, y: 0, scale: 1, rotate: 0 };
     END_KEYS2.forEach(function(key) {
       const end = endOf2(props[key]);
       if (end == null) return;
       moved = true;
       if (key === "opacity") node.style.opacity = String(end);
-      else at2[key] = parseFloat(String(end)) || 0;
+      else at3[key] = parseFloat(String(end)) || 0;
     });
     if (!moved) return;
     if (props.x !== void 0 || props.y !== void 0 || props.scale !== void 0 || props.rotate !== void 0) {
-      node.style.transform = "translate(" + at2.x + "px, " + at2.y + "px) scale(" + (props.scale === void 0 ? 1 : at2.scale) + ") rotate(" + at2.rotate + "deg)";
+      node.style.transform = "translate(" + at3.x + "px, " + at3.y + "px) scale(" + (props.scale === void 0 ? 1 : at3.scale) + ") rotate(" + at3.rotate + "deg)";
     }
   }
   var MORPHABLE = "path, polygon, polyline";
@@ -30042,13 +32285,13 @@ Known schemas:
       });
     }
     const names = Object.keys(spares);
-    let at2 = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
+    let at3 = shown && shown.getAttribute ? shown.getAttribute("data-shape") : null;
     warmAnime3();
     function to(name) {
       const spare = spares[name];
       if (!shown || !spare) return Promise.resolve();
       const prop = geometryProp(shown);
-      at2 = name;
+      at3 = name;
       return new Promise(function(done) {
         const swap = function() {
           shown.setAttribute(prop, spare.getAttribute(prop) || "");
@@ -30073,7 +32316,7 @@ Known schemas:
     }
     function cycle() {
       if (!names.length) return Promise.resolve();
-      const i = at2 === null ? 0 : (names.indexOf(at2) + 1) % names.length;
+      const i = at3 === null ? 0 : (names.indexOf(at3) + 1) % names.length;
       return to(names[i]);
     }
     return {
@@ -30082,7 +32325,7 @@ Known schemas:
       cycle,
       /** The name of the shape on the screen, or null while the author's own shape is showing. */
       current: function() {
-        return at2;
+        return at3;
       },
       /** Every name this call can reach, in the order `cycle` walks them. */
       names: function() {
@@ -30165,7 +32408,7 @@ Known schemas:
     }
     function build(a) {
       if (gone || dg || held) return;
-      const at2 = { x: seat.x, y: seat.y };
+      const at3 = { x: seat.x, y: seat.y };
       if (floor) {
         floor.destroy();
         floor = null;
@@ -30204,9 +32447,9 @@ Known schemas:
         params.minVelocity = 0;
       }
       dg = a.createDraggable(node, params);
-      if (at2.x || at2.y) {
-        dg.setX(at2.x, true);
-        dg.setY(at2.y, true);
+      if (at3.x || at3.y) {
+        dg.setX(at3.x, true);
+        dg.setY(at3.y, true);
       }
     }
     function handover() {
@@ -30277,12 +32520,12 @@ Known schemas:
     const distance = o.distance || 140;
     const duration2 = o.duration || 1100;
     const box = host.getBoundingClientRect();
-    const at2 = o.from || { x: box.width / 2, y: box.height / 2 };
+    const at3 = o.from || { x: box.width / 2, y: box.height / 2 };
     const lend = getComputedStyle(host).position === "static";
     if (lend) host.classList.add("ak-burst-host");
     const layer = el("div", { class: "ak-burst", "aria-hidden": "true" });
-    layer.style.setProperty("--ak-burst-x", (Number(at2.x) || 0) + "px");
-    layer.style.setProperty("--ak-burst-y", (Number(at2.y) || 0) + "px");
+    layer.style.setProperty("--ak-burst-x", (Number(at3.x) || 0) + "px");
+    layer.style.setProperty("--ak-burst-y", (Number(at3.y) || 0) + "px");
     host.appendChild(layer);
     const clean = function() {
       layer.remove();
@@ -30605,8 +32848,8 @@ Known schemas:
       return k == null ? kid : k;
     }
     function drop(ghost) {
-      const at2 = ghosts.indexOf(ghost);
-      if (at2 >= 0) ghosts.splice(at2, 1);
+      const at3 = ghosts.indexOf(ghost);
+      if (at3 >= 0) ghosts.splice(at3, 1);
       if (ghost.parentNode) ghost.parentNode.removeChild(ghost);
     }
     function ghostOf(kid, box) {
@@ -30773,15 +33016,15 @@ Known schemas:
         return spring(card, { x: 0, y: 0 }, BACK);
       });
     }
-    function arm() {
+    function arm2() {
       const top = live[0];
       if (!top || top.hand) return;
       top.hand = drag(top.el, {
         onMove: function(dx) {
           pull(top.face, dx);
         },
-        onEnd: function(dx, dy, velocity) {
-          if (Math.abs(dx) > threshold || Math.abs(velocity.x) > FLICK2) toss(dx < 0 ? "left" : "right", dx, dy);
+        onEnd: function(dx, dy, velocity2) {
+          if (Math.abs(dx) > threshold || Math.abs(velocity2.x) > FLICK2) toss(dx < 0 ? "left" : "right", dx, dy);
           else settle4(top.el, top.face);
         }
       }, { axis: "both", back: false });
@@ -30816,7 +33059,7 @@ Known schemas:
         deck.appendChild(built.card);
         live[d] = { el: built.card, face: built.face, item, hand: null };
       }
-      arm();
+      arm2();
     }
     function toss(direction, dx, dy) {
       const top = live[0];
@@ -30954,7 +33197,7 @@ Known schemas:
     nodes.forEach(function(n) {
       n.classList.add.apply(n.classList, classes);
     });
-    const owned = classes.filter(function(c) {
+    const owned2 = classes.filter(function(c) {
       return c !== "ak-micro" && c !== "ak-micro--glow";
     });
     function bind2(M) {
@@ -30962,7 +33205,7 @@ Known schemas:
       const hoverMove = hoverKind && hoverKind !== "glow" ? MOVES[hoverKind] : null;
       const pressMove = pressKind ? MOVES[pressKind] : null;
       nodes.forEach(function(n) {
-        owned.forEach(function(c) {
+        owned2.forEach(function(c) {
           n.classList.remove(c);
         });
         if (hoverMove) {
@@ -30983,7 +33226,7 @@ Known schemas:
         }
       });
     }
-    if (owned.length) {
+    if (owned2.length) {
       ensureMotion2().then(function(M) {
         if (dead || reducedMotion() || !M || typeof M.hover !== "function") return;
         bind2(M);
@@ -31456,7 +33699,7 @@ Known schemas:
      * match the newest entry in the /lib/aimeat-atelier.css version history; e2e-libs.ts fails
      * when the two drift, because a version string that never moves is worse than none.
      */
-    version: "0.66.2",
+    version: "0.68.0",
     /**
      * WHAT YOU MAY CHANGE IN THIS COMPONENT WITHOUT FORKING IT. Answers with the component's
      * named parts (every one carries `data-ak-part`, so an app's own CSS reaches it), the slots
@@ -31498,6 +33741,12 @@ Known schemas:
     margins,
     marginsOf,
     MARGINS,
+    // Animated SVG ornaments that grow round an element (ornament*.js, ornaments.css).
+    ornament,
+    ornamentSet,
+    ornamentParams,
+    ORNAMENT_IDS,
+    ORNAMENT_SET_IDS,
     // ── The stored layout, rendered ──
     mosaic,
     appRef,

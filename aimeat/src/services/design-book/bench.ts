@@ -21,6 +21,8 @@
  * @usage
  *   const result = await runPartBench(storage, config, 'leiska-cover');
  * @version-history
+ *   v1.8.0 — 2026-10-29 — ornaments_drawn (ornament drawings with a box and a shape in them); an
+ *     ORNAMENT part passes only when every viewport drew its figure.
  *   v1.7.2 — 2026-10-27 — One bench holds a node-wide headless slot for its six launches; a busy node
  *     answers ran:false with words (services/headless-slots.ts; secaudit2026oct26). The viewport loop
  *     moved unchanged into measureAtViewports.
@@ -99,6 +101,8 @@ export interface BenchViewportResult {
    *  the settle (a moment that did not finish). Absent on results stamped before 2026-09-05. */
   fx_applied?: number;
   fx_running?: number;
+  /** Ornament drawings with a box and something drawn in them. Absent on results stamped before 2026-10-29. */
+  ornaments_drawn?: number;
 }
 
 export interface DesignBookBenchResult {
@@ -155,13 +159,19 @@ const MEASURE_JS = `(() => {
     if (a.animationName === 'ak-hero-drift') continue;
     if (target.closest && target.closest('.ak-fx')) fxRunning++;
   }
-  return { overflow, units, smallControls, clippedContent, smallText, ambientLayers, ambientPainted, fxApplied, fxRunning };
+  // Ornaments: a drawing of the kit's ornament figures with a box and at least one shape in it.
+  let ornamentsDrawn = 0;
+  for (const svg of document.querySelectorAll('.ak-orn-svg')) {
+    const r = svg.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && svg.querySelector('path, circle, rect')) ornamentsDrawn++;
+  }
+  return { overflow, units, smallControls, clippedContent, smallText, ambientLayers, ambientPainted, fxApplied, fxRunning, ornamentsDrawn };
 })()`;
 
 /** What MEASURE_JS answers. */
 interface Measured {
   overflow: number; units: number; smallControls: number; ambientLayers: number; ambientPainted: number;
-  fxApplied: number; fxRunning: number; clippedContent: number; smallText: number;
+  fxApplied: number; fxRunning: number; clippedContent: number; smallText: number; ornamentsDrawn: number;
 }
 
 /**
@@ -269,6 +279,7 @@ async function measureAtViewports(
       ambient_painted: measured.ambientPainted,
       fx_applied: measured.fxApplied,
       fx_running: measured.fxRunning,
+      ornaments_drawn: measured.ornamentsDrawn,
     });
   }
 
@@ -283,7 +294,8 @@ async function measureAtViewports(
     && (part.kind !== 'ambient' || (v.ambient_painted ?? 0) > 0)
     && (part.kind !== 'effect' || (on === 'layer'
       ? (v.ambient_painted ?? 0) > 0
-      : (v.fx_applied ?? 0) > 0 && (v.fx_running ?? 0) === 0)));
+      : (v.fx_applied ?? 0) > 0 && (v.fx_running ?? 0) === 0))
+    && (part.kind !== 'ornament' || (v.ornaments_drawn ?? 0) > 0));
   return { ran: true, passed, viewports, at };
 }
 

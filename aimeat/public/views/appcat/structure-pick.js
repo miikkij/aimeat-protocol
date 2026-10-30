@@ -14,11 +14,19 @@
  *   a connected AI reads it from there, and "Copy prompt" gives an AI that cannot connect the same
  *   choice in words.
  *
+ *   The AI's own options come first (Jouni, 2026-10-30: the layouts should adapt to the app "eikä
+ *   pakota jotain tiettyä muottia", and the presets stay to look at too): the layouts and navigations
+ *   the building AI drew for this app (plan.proposals), each drawn from its own sketch, then the
+ *   node's presets in a section of their own. Under them, a field for what the person would change,
+ *   which goes to the AI as the note on their choice.
+ *
  *   Writes no class; the parts are components.
  * @structure StructurePick({ kind, s, appRef, onSaved, onBack }) (`appRef`, never `ref`: Preact keeps
- *   `ref` for itself and the component never sees it) · layoutRows(preset) · NAV_SKETCH · LOOK_GROUPS
+ *   `ref` for itself and the component never sees it) · layoutRows(preset) · NAV_SKETCH · LOOK_GROUPS ·
+ *   PickSections · drawnOption · wishOf · patchOf(s, picks, wish)
  * @usage html`<${StructurePick} kind="layout" s=${structure} appRef=${ref} onSaved=${set} onBack=${back} />`
  * @version-history
+ *   v1.1.0 — 2026-10-30 — The layouts the AI drew for the app first, the presets after, and the person's change.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { h } from 'preact';
@@ -37,10 +45,11 @@ import { Action, Loud } from '/components/Action.js';
 import { Row as Line, Stack, Beside } from '/components/Layout.js';
 import { LayoutSketch } from '/components/LayoutSketch.js';
 import { LookSample } from '/components/LookSample.js';
+import { TextArea } from '/components/TextField.js';
 import { swallowed } from '/js/swallowed.js';
 import { tOr } from '/js/i18n.js';
 import { x } from '/views/appcat/i18n.js';
-import { readCatalogue, readGenres, writePlan, choiceName, choiceLine, aiPrompt } from '/views/appcat/structure-data.js';
+import { readCatalogue, readGenres, writePlan, choiceName, choiceLine, aiPrompt, proposalsOf, optionName } from '/views/appcat/structure-data.js';
 
 const html = htm.bind(h);
 const AI = '__ai';
@@ -92,26 +101,39 @@ const theme = () => (document.documentElement.getAttribute('data-theme') === 'da
 /** The plan's value of a choice, or AI when nothing is chosen. */
 const picked = (s, key) => s.plan?.choices?.[key]?.value || AI;
 
+/** The person's change to their layout choice, as the plan holds it: their own note on it. */
+const wishOf = (s) => {
+  const c = s.plan?.choices?.layout;
+  return c && c.by === 'owner' && c.note ? c.note : '';
+};
+
 /**
  * The patch that sends the picks: a pick that differs from the plan is written; "let the AI decide"
- * clears a choice only the person had made, and leaves the AI's own choice alone.
+ * clears a choice only the person had made, and leaves the AI's own choice alone. The person's change
+ * (`wish`) rides on the layout choice as its note; with the layout left to the AI it becomes a layout
+ * of their own, described by the change.
  */
-function patchOf(s, picks) {
+function patchOf(s, picks, wish) {
   const choices = {};
   for (const [key, v] of Object.entries(picks)) {
     const cur = s.plan?.choices?.[key];
-    if (v === AI) { if (cur && cur.by === 'owner') choices[key] = null; continue; }
-    if (!cur || cur.value !== v || cur.by !== 'owner') choices[key] = { value: v };
+    const note = key === 'layout' && wish !== undefined ? wish.trim() : '';
+    if (v === AI) {
+      if (note) { if (!cur || cur.value !== 'custom' || cur.note !== note) choices[key] = { value: 'custom', note }; continue; }
+      if (cur && cur.by === 'owner') choices[key] = null;
+      continue;
+    }
+    if (!cur || cur.value !== v || cur.by !== 'owner' || (note && cur.note !== note)) choices[key] = { value: v, ...(note ? { note } : {}) };
   }
   return Object.keys(choices).length ? { choices } : null;
 }
 
-function SendBar({ s, appRef: ref, picks, onSaved }) {
+function SendBar({ s, appRef: ref, picks, wish, onSaved }) {
   const [said, setSaid] = useState(null);
   const [busy, setBusy] = useState(false);
-  const names = Object.entries(picks).map(([k, v]) => `${x(`structure.prompt.${k}`)}: ${v === AI ? x('structure.aiDecides') : choiceName(k, v)}`).join(' · ');
+  const names = Object.entries(picks).map(([k, v]) => `${x(`structure.prompt.${k}`)}: ${v === AI ? x('structure.aiDecides') : optionName(s, k, v)}`).join(' · ');
   const send = async () => {
-    const patch = patchOf(s, picks);
+    const patch = patchOf(s, picks, wish);
     if (!patch) { setSaid('same'); return; }
     setBusy(true);
     try { onSaved(await writePlan(ref.owner, ref.filename, patch)); setSaid('sent'); } catch (err) { swallowed('structure: send', err); setSaid('failed'); }
@@ -126,37 +148,62 @@ function SendBar({ s, appRef: ref, picks, onSaved }) {
         ${said ? html`<${Note} kind="message" error=${said === 'failed'}>${x(`structure.said.${said}`)}<//>` : null}
       <//>
       <${Line} wrap align="center">
-        <${Action} small copy=${aiPrompt(s, words)}>${x('structure.copyPrompt')}<//>
+        <${Action} small copy=${aiPrompt(s, words, wish?.trim())}>${x('structure.copyPrompt')}<//>
         <${Loud} control onClick=${send} disabled=${busy}>${x('structure.send')}<//>
       <//>
     <//>
   <//>`;
 }
 
+/** An option the AI drew for this app, drawn from its own sketch. */
+const drawnOption = (p) => ({ value: p.id, label: p.name, hint: p.note, pic: html`<${LayoutSketch} rows=${p.sketch} label=${p.name} />` });
+
+/**
+ * One choice of the layout page. With options the AI drew for this app, they come first, with "let
+ * the AI decide", and the node's presets follow in a section of their own; both sections pick the
+ * same value. Without them it is the presets after "let the AI decide", as before.
+ */
+function PickSections({ kind, cols, drawn, presets, value, onChange, aiOption }) {
+  const title = x(`structure.layout.${kind}Title`);
+  if (!drawn.length) {
+    return html`<${Section} id=${`structure-layout-${kind}`} title=${title} first=${kind === 'main'}>
+      <${Note} kind="lead">${x(`structure.layout.${kind}Lead`)}<//>
+      <${Choice} boxed cols=${cols} value=${value} onChange=${onChange} options=${[aiOption, ...presets]} ariaLabel=${title} />
+    <//>`;
+  }
+  return html`
+    <${Section} id=${`structure-layout-${kind}-drawn`} title=${title} first=${kind === 'main'}>
+      <${Note} kind="lead">${x(`structure.layout.${kind}Drawn`)}<//>
+      <${Choice} boxed cols=${3} value=${value} onChange=${onChange} options=${[...drawn.map(drawnOption), aiOption]} ariaLabel=${title} />
+    <//>
+    <${Section} id=${`structure-layout-${kind}`} title=${x(`structure.layout.${kind}PresetsTitle`)}>
+      <${Note} kind="lead">${x(`structure.layout.${kind}PresetsLead`)}<//>
+      <${Choice} boxed cols=${cols} value=${value} onChange=${onChange} options=${presets} ariaLabel=${x(`structure.layout.${kind}PresetsTitle`)} />
+    <//>`;
+}
+
 function LayoutPick({ s, appRef: ref, onSaved }) {
   const [cat, setCat] = useState(null);
-  const [layout, setLayout] = useState(picked(s, 'layout'));
-  const [nav, setNav] = useState(picked(s, 'nav'));
+  const [layout, setLayout] = useState(picked(s, 'layout') === 'custom' ? AI : picked(s, 'layout'));
+  const [nav, setNav] = useState(picked(s, 'nav') === 'custom' ? AI : picked(s, 'nav'));
+  const [wish, setWish] = useState(wishOf(s));
   useEffect(() => { readCatalogue().then(setCat).catch((err) => swallowed('structure: catalogue', err)); }, []);
   if (!cat) return html`<${Note} kind="loading">${x('structure.loading')}<//>`;
   const aiOption = (kind) => ({ value: AI, label: x('structure.aiDecides'), hint: x(`structure.aiDecides.${kind}`), pic: html`<${LayoutSketch} rows=${AI_SKETCH} label=${x('structure.aiDecides')} />` });
-  const layoutOptions = [aiOption('layout'), ...cat.layouts.map((p) => ({
+  const layoutPresets = cat.layouts.map((p) => ({
     value: p.id, label: choiceName('layout', p.id),
     hint: html`${choiceLine('layout', p.id, p.summary)}<${Code}>${tOr(`appcat.structure.layout.${p.id}.say`, p.id)}<//>`,
     pic: html`<${LayoutSketch} rows=${layoutRows(p)} label=${choiceName('layout', p.id)} />`,
-  }))];
-  const navOptions = [aiOption('nav'), ...cat.navModes.map((id) => ({
+  }));
+  const navPresets = cat.navModes.map((id) => ({
     value: id, label: choiceName('nav', id), hint: choiceLine('nav', id, ''),
     pic: html`<${LayoutSketch} rows=${NAV_SKETCH[id] || AI_SKETCH} label=${choiceName('nav', id)} />`,
-  }))];
+  }));
   return html`
-    <${Section} id="structure-layout-main" title=${x('structure.layout.mainTitle')} first>
-      <${Note} kind="lead">${x('structure.layout.mainLead')}<//>
-      <${Choice} boxed cols=${3} value=${layout} onChange=${setLayout} options=${layoutOptions} ariaLabel=${x('structure.layout.mainTitle')} />
-    <//>
-    <${Section} id="structure-layout-nav" title=${x('structure.layout.navTitle')}>
-      <${Note} kind="lead">${x('structure.layout.navLead')}<//>
-      <${Choice} boxed cols=${4} value=${nav} onChange=${setNav} options=${navOptions} ariaLabel=${x('structure.layout.navTitle')} />
+    <${PickSections} kind="main" cols=${3} drawn=${proposalsOf(s, 'layout')} presets=${layoutPresets} value=${layout} onChange=${setLayout} aiOption=${aiOption('layout')} />
+    <${PickSections} kind="nav" cols=${4} drawn=${proposalsOf(s, 'nav')} presets=${navPresets} value=${nav} onChange=${setNav} aiOption=${aiOption('nav')} />
+    <${Section} id="structure-layout-wish" title=${x('structure.wish.title')}>
+      <${TextArea} label=${x('structure.wish.label')} hint=${x('structure.wish.hint')} value=${wish} onInput=${setWish} rows=${3} grow />
     <//>
     <${Beside} wide above="section" side=${html`<${Note} kind="aside">${x('structure.fromNode.layout')}<//>`}>
       <${Box} name=${x('structure.learn.title')}>
@@ -165,7 +212,7 @@ function LayoutPick({ s, appRef: ref, onSaved }) {
         <${Note}>${x('structure.learn.example')}<//>
       <//>
     <//>
-    <${SendBar} s=${s} appRef=${ref} picks=${{ layout, nav }} onSaved=${onSaved} />`;
+    <${SendBar} s=${s} appRef=${ref} picks=${{ layout, nav }} wish=${wish} onSaved=${onSaved} />`;
 }
 
 function LookPick({ s, appRef: ref, onSaved }) {

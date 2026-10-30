@@ -12,6 +12,7 @@
  *        their own app requires.
  * @usage cd aimeat && pnpm exec vitest run test/unit/ai-client-branch.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-30 — Grok works on every tier (x.ai, docs.x.ai/grok/connectors): naming it goes to A.
  *   v1.2.0 — 2026-10-11 — The Gemini app is region-dependent (Jouni's ruling, 2026-10-11): naming
  *     it asks about Google's conditions, and only a "no" reaches B. The test that held "the Gemini
  *     app cannot connect" now holds the Copilot app alone.
@@ -141,11 +142,14 @@ describe('an app name never sends anyone to branch B', () => {
 
     it('the paid-tier apps are ASKED about the tier, not refused', () => {
         // Cursor since 2026-10-11: its pricing page lists MCP on the paid Individual plan only.
-        for (const id of ['chatgpt', 'grok', 'cursor', 'perplexity'] as const) {
+        for (const id of ['chatgpt', 'cursor', 'perplexity'] as const) {
             expect(capabilityOf(id)).toBe('plan-dependent');
             expect(branchOf(id)).toMatchObject({ branch: 'ask', question: 'paid-plan', toolId: id });
         }
         expect(capabilityOf('copilot-studio')).toBe('plan-dependent');
+        // Grok since 2026-10-30: x.ai opens connectors to every Grok user, so naming it goes straight to A.
+        expect(capabilityOf('grok')).toBe('yes');
+        expect(branchOf('grok')).toMatchObject({ branch: 'A', toolId: 'grok' });
     });
 
     it('the plan line of the table and the branch agree on which tools need a paid tier', () => {
@@ -208,8 +212,8 @@ describe('what the person answers', () => {
     it('B has exactly one entrance: the person said they lack the tier', () => {
         expect(decideBranch(resolveAiClient('chatgpt'), { hasPaidPlan: false }))
             .toEqual({ branch: 'B', reason: 'plan-missing', toolId: 'chatgpt' });
-        expect(decideBranch(resolveAiClient('grok'), { hasPaidPlan: false }))
-            .toEqual({ branch: 'B', reason: 'plan-missing', toolId: 'grok' });
+        expect(decideBranch(resolveAiClient('perplexity'), { hasPaidPlan: false }))
+            .toEqual({ branch: 'B', reason: 'plan-missing', toolId: 'perplexity' });
     });
 
     it('no combination of an app name alone reaches B', () => {

@@ -8,6 +8,9 @@
  *   node's MCP server.
  * @usage pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-app-structure
  * @version-history
+ *   v1.2.0 — 2026-10-30 — Layouts the AI drew: the person's pick with a change waits under the option's name;
+ *     a list that drops the chosen option, an option nobody drew and a preset's id are refused.
+ *   v1.1.0 — 2026-10-29 — A custom nav with a 340-character description, and custom without one refused.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import * as ed from '@noble/ed25519';
@@ -156,6 +159,45 @@ await test('FAILURE: a layout the node does not offer is refused, and the refusa
     const r = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { layout: { value: 'carousel-of-doom' } } }) });
     assert(r.status === 400, `expected 400, got ${r.status}`);
     assert(String(r.body?.error?.message).includes('dashboard'), `the refusal names the layouts: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('a screen no preset fits is written as custom with its description, and custom without one is refused', async () => {
+    const bare = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'custom' } } }) });
+    assert(bare.status === 400, `custom with no note: expected 400, got ${bare.status}`);
+    const note = 'One screen: the cube in the middle turns by drag, and the three layers sit beside it. '.repeat(4).trim();
+    const r = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'custom', note } } }) });
+    assert(r.status === 200, `expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.plan.choices.nav.note === note, 'the description is kept whole');
+    const back = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ choices: { nav: { value: 'bottom-bar' } } }) });
+    assert(back.status === 200, `restoring the nav: ${back.status}`);
+});
+
+await test('the AI draws layouts for the app; the person picks one with a change, and it waits for the AI under its name', async () => {
+    const sketch = [{ height: 's', cells: [{ w: 'full', label: 'Vuoro', tone: 'ink' }] }, { height: 'l', cells: [{ w: 'main', label: 'Kuutio', tone: 'sun' }, { w: 'side', label: 'Kerrokset' }] }];
+    const proposals = { layout: [
+        { id: 'board-layers', name: 'Lauta ja kerrokset', note: 'Kuutio isona, kerrokset vieressä.', sketch },
+        { id: 'board-only', name: 'Pelkkä lauta', note: 'Kuutio koko ruudulla.', sketch: [{ height: 'l', cells: [{ w: 'full', label: 'Kuutio', tone: 'sun' }] }] },
+    ] };
+    const w = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ proposals }) });
+    assert(w.status === 200, `proposals: expected 200, got ${w.status}: ${JSON.stringify(w.body?.error)}`);
+    assert(w.body.data.plan.proposals.layout.length === 2, 'both options are kept');
+    assert(Array.isArray(w.body.data.values?.layout) && w.body.data.values.layout.includes('dashboard'), 'the answer lists the layout values');
+    const pick = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { layout: { value: 'board-layers', note: 'Kerrokset alle puhelimella.' } } }) });
+    assert(pick.status === 200, `the person's pick: ${pick.status} ${JSON.stringify(pick.body?.error)}`);
+    const layout = stepOf(pick.body.data, 'layout');
+    assert(layout.state === 'progress', `the pick waits for the AI: ${layout.state}`);
+    assert(layout.detail.layout.name === 'Lauta ja kerrokset' && layout.detail.layout.note === 'Kerrokset alle puhelimella.' && layout.detail.layout.by === 'owner', `the step names the option and the change: ${JSON.stringify(layout.detail.layout)}`);
+});
+
+await test('FAILURE: a list that drops the chosen option, and a choice of an option nobody drew, are refused', async () => {
+    const drop = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ proposals: { layout: [{ id: 'board-only', name: 'Pelkkä lauta', note: 'Kuutio koko ruudulla.', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] } }) });
+    assert(drop.status === 400 && String(drop.body?.error?.message).includes('board-layers'), `dropping the chosen option: ${drop.status} ${JSON.stringify(drop.body?.error)}`);
+    const ghost = await json(path(), { method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ choices: { layout: { value: 'never-drawn' } } }) });
+    assert(ghost.status === 400, `an option nobody drew: expected 400, got ${ghost.status}`);
+    const bad = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ proposals: { layout: [{ id: 'dashboard', name: 'x', note: 'y', sketch: [{ height: 'l', cells: [{ w: 'full' }] }] }] } }) });
+    assert(bad.status === 400, `a preset's id as an option: expected 400, got ${bad.status}`);
+    const back = await json(path(), { method: 'PUT', headers: auth(ai), body: JSON.stringify({ proposals: { layout: null }, choices: { layout: { value: 'work-queue', note: 'The queue is what people do here.' } } }) });
+    assert(back.status === 200 && !back.body.data.plan.proposals, `restoring the layout: ${back.status} ${JSON.stringify(back.body?.error)}`);
 });
 
 await test('FAILURE: an unknown choice key is refused before anything is written', async () => {

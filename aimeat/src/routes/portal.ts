@@ -88,6 +88,9 @@
  *     app: the guide the served app's "Use with your AI" mark links to.
  *   v1.20.0 — 2026-10-29 — /v1/appcat/structure serves the SPA: one app's structure and status, from
  *     the first moment of building (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+ *   v1.21.0 — 2026-10-30 — The SPA page list moved to data/spa-page-paths.ts, which the content
+ *     access gate reads too: three addresses here had never reached the gate, so on a signed-in-only
+ *     node a link to them showed SIGN_IN_REQUIRED.
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -98,6 +101,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
+import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 import { getSoftwareVersion } from '../utils/version.js';
@@ -552,60 +556,10 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   // ── SPA routes — serve spa.html for all portal pages ──
-  // The Preact SPA handles client-side routing for all /v1/ portal URLs.
-
-  const spaRoutes = [
-    '/v1/profile',
-    // The built-in chat. Registered here AND in spa.html's ROUTES, or F5 is a 404.
-    '/v1/chat',
-    // KOTI — the remake's home path. Registered here AND in spa.html's ROUTES: without both,
-    // the view works on a client-side click and 404s on a refresh.
-    '/v1/home',
-    '/v1/aimeat-os',
-    '/v1/app-store',
-    '/v1/classic',
-    '/v1/portfolio',
-    // The Agents section (Agent v2 V3). Registered here AND in spa.html's ROUTES.
-    '/v1/fleet',
-    '/v1/members',
-    '/v1/admin',
-    // appcat, the app catalogue on the component library (2026-09-27). Registered here AND in
-    // spa.html's ROUTES; the old /app-catalog.html stays as it is.
-    '/v1/appcat',
-    // One app's structure and status (views/appcat/structure.js, 2026-10-29). Here AND in spa.html.
-    '/v1/appcat/structure',
-    // The design lab's preview page, which the lab shows in frames. Registered here AND in
-    // spa.html's ROUTES.
-    '/v1/design-lab/frame',
-    '/v1/help',
-    '/v1/publicknowledgeviewer',
-    '/v1/publicworkspaceviewer',
-    // /v1/pricing left this list on 2026-08-28: the page is gone and the address redirects below.
-    '/v1/how-it-works',
-    // The showroom's two companions (2026-08-28): the whole change log, and how an app gets built.
-    '/v1/changelog',
-    '/v1/how-an-app-builds',
-    // The connect story (2026-08-29): the road from "connect the AI you already use" to the
-    // guided path, told before the account exists.
-    '/v1/connect-your-ai',
-    // Everything in AIMEAT (2026-09-15): the whole feature list as a page. Registered here AND in
-    // spa.html's ROUTES, or F5 is a 404; /everything below is its short address.
-    '/v1/everything',
-    '/v1/glossary',
-    '/v1/business',
-    // The human sibling of the machine-readable statement at /v1/ai-transparency. A different
-    // path on purpose: that one is JSON and is mounted ahead of this router, so a page there
-    // would never be reached, and a compliance statement is not a surface to route by Accept.
-    '/v1/transparency',
-    '/v1/start',
-    '/v1/app-grant',   // H-2 app-grant consent page (SPA)
-    '/v1/app-open',    // Opening an app or a page that needs a sign-in (SPA, ?app=<owner>/<file>, ?portfolio=<user>, ?company=<id>; routes/apps/open.ts, routes/page-open.ts)
-    '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)
-    '/v1/oauth-round', // The owner confirms a sign-in round an agent started (SPA, ?state=)
-    '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
-    '/v1/secret-allow', // The owner allows an extension to send a secret to one address (SPA, ?secret=&extension=&host=)
-    '/v1/eco-capability-allow', // The owner allows another account's capability to run one action of their outside app (SPA, ?app=&capability=)
-  ];
+  // The Preact SPA handles client-side routing for all /v1/ portal URLs. The list is shared with
+  // the content access gate (data/spa-page-paths.ts), so a page served here also opens from a link
+  // on a signed-in-only node.
+  const spaRoutes = SPA_PAGE_PATHS;
 
   // The short address of the whole feature list, the one the front page and the footer hand out.
   router.get('/everything', (_req, res) => {

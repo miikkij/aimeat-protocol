@@ -2,6 +2,72 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-30",
+      "kind": "feature",
+      "id": "2026-10-30-your-ai-draws-layouts-for-your-app",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your AI draws layouts for your app",
+        "fi": "Tekoälysi piirtää asettelut sovelluksellesi"
+      },
+      "summary": {
+        "en": "Your AI draws two or three layouts for your app, and you pick one on its structure page.",
+        "fi": "Tekoälysi piirtää sovelluksellesi kaksi tai kolme asettelua, ja sinä valitset yhden rakennesivulla."
+      },
+      "body": {
+        "en": "When you build an app in your own chat, your AI draws layouts made for that app, such as a game board with a side panel. You see them on the app's structure page beside the ready-made layouts, pick one, and write what you would change. The AI then builds by your choice.",
+        "fi": "Kun rakennat sovelluksen omassa keskustelussasi, tekoälysi piirtää juuri sille sopivat asettelut, esimerkiksi pelilaudan ja sivupaneelin. Näet ne sovelluksen rakennesivulla valmiiden asettelujen vieressä. Valitset yhden ja kirjoitat, mitä muuttaisit. Tekoäly rakentaa sitten valintasi mukaan."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
+      "id": "2026-10-30-ornament-sets-one-style-for-a-whole-screen",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Ornament sets: one style for a whole screen",
+        "fi": "Koristesarjat: yksi tyyli koko näkymään"
+      },
+      "summary": {
+        "en": "Eleven styles of five ornaments each: frame, divider, progress bar, bullets and foot strip.",
+        "fi": "Yksitoista tyyliä, joissa kussakin on viisi koristetta: kehys, viiva, palkki, luettelomerkit ja alanauha."
+      },
+      "body": {
+        "en": "Pick one style and your whole screen wears it: a frame round the card, a divider under the heading, a progress bar, bullets for a list and a strip at the foot. The eleven styles are modern, futuristic, cyberpunk, vibrant, emotional, dramatic, symmetrical, chaotic, velocity, art deco and crystal, each shown live in the Design Book.",
+        "fi": "Valitse yksi tyyli, niin koko näkymä saa sen: kehys kortin ympärille, viiva otsikon alle, edistymispalkki, luettelomerkit ja nauha alareunaan. Tyylejä on yksitoista: moderni, futuristinen, kyberpunk, eloisa, tunteikas, dramaattinen, symmetrinen, kaoottinen, vauhti, art deco ja kide. Jokainen näkyy Design Bookissa elävänä."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
+      "id": "2026-10-30-ornaments-that-grow-round-your-app",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Ornaments that grow round your app",
+        "fi": "Koristeet, jotka kasvavat sovelluksen ympärille"
+      },
+      "summary": {
+        "en": "Frames, vines and wreaths grow round your app's cards, bars and titles, in its own colours.",
+        "fi": "Kehykset, köynnökset ja seppeleet kasvavat sovelluksesi korttien, palkkien ja otsikoiden ympärille."
+      },
+      "body": {
+        "en": "An engraved frame round a card, a vine that grows with a progress bar, a wreath round a badge, flourishes beside a title: 23 ornaments in your app's own colours, each shown live in the Design Book.",
+        "fi": "Kaiverrettu kehys kortin ympärille, köynnös, joka kasvaa edistymispalkin mukana, seppele merkin ympärille ja kiehkurat otsikon vierelle. Koristeita on 23. Ne ovat sovelluksesi omissa väreissä, ja jokainen näkyy Design Bookissa elävänä."
+      }
+    },
+    {
       "date": "2026-10-29",
       "kind": "feature",
       "id": "2026-10-29-files-in-s3-or-azure-blob-storage",
