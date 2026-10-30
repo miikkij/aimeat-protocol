@@ -38,7 +38,9 @@
  * @version-history
  *   2026-10-30 -- Setup no longer matched production: 3f read the refusal from the agent's model call,
  *     and since 34c646e2b the chat asks the AI gate first and ends the turn with the gate's code before
- *     the agent starts. 3f reads that error event and asserts no model call was made.
+ *     the agent starts. 3f reads that error event and asserts no model call was made. 3g: another
+ *     owner gets 404 reading, writing and deleting a conversation, and the owner's own agent gets 403
+ *     on the chat routes, which are the owner's in person.
  *   2026-10-27 --A session's MCP token is refused once a reset or a delete ends its conversation, and
  *     once its process dies; a live conversation's token keeps working (secaudit2026oct26).
  *   2026-10-22 — A session id another owner writes into their own thread record opens a fresh session
@@ -61,6 +63,7 @@ import { waitForServer } from './helpers/wait-for-server.js';
 import { ownNodeDb } from './helpers/own-node-db.js';
 import { startFakeAiProvider, type FakeAiProvider } from './helpers/fake-ai-provider.js';
 import { registerOwner as registerWithPassword } from './helpers/owner-login.js';
+import { makeAgent } from './helpers/mcp-session.js';
 
 const PORT = Number(process.env.E2E_CHAT_AGENT_PORT ?? 28300);
 const BROKEN_PORT = PORT + 1;
@@ -977,6 +980,23 @@ async function runNodeRoute(): Promise<void> {
         assert(allowed.status === 200, `with "the node's chat" off the call passes, got ${allowed.status} ${JSON.stringify(allowed.body?.error)}`);
         const open = await json('/v1/ai/policy', authed({ method: 'PUT', body: JSON.stringify({ policy: { mode: 'open' } }) }));
         assert(open.status === 200, `policy back to open ${open.status}`);
+    });
+
+    await test('3g. another owner neither reads nor writes a conversation (404), and the owner\'s own agent is not the owner in the chat (403)', async () => {
+        const bAuth = { Authorization: `Bearer ${owners.b.token}` };
+        const read = await json(`/v1/chat/threads/${owners.a.thread}`, { headers: bAuth });
+        assert(read.status === 404, `b reads a's conversation: ${read.status} ${JSON.stringify(read.body?.error)}`);
+        const write = await json(`/v1/chat/threads/${owners.a.thread}/turn`, { method: 'POST', headers: bAuth, body: JSON.stringify({ text: 'not mine' }) });
+        assert(write.status === 404, `b writes a turn into a's conversation: ${write.status} ${JSON.stringify(write.body?.error)}`);
+        const del = await json(`/v1/chat/threads/${owners.a.thread}`, { method: 'DELETE', headers: bAuth });
+        assert(del.status === 404, `b deletes a's conversation: ${del.status}`);
+        const agent = await makeAgent(BASE, owners.a, ['*']);
+        const agentRead = await json('/v1/chat/threads', { headers: { Authorization: `Bearer ${agent.token}` } });
+        assert(agentRead.status === 403, `a's agent lists a's conversations: ${agentRead.status} ${JSON.stringify(agentRead.body?.error)}`);
+        // POSITIVE CONTROL: the owner still reads the conversation the refusals left alone.
+        as('a');
+        const own = await json(`/v1/chat/threads/${owners.a.thread}`, authed());
+        assert(own.status === 200, `a reads their own conversation: ${own.status}`);
     });
 
     await stopNode(routed);
