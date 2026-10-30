@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.17.0 — 2026-10-30 — A credit card payment only the seller's account attests, confirmed by the
+ *     buyer in person, records them as an adult (apply-card-adult.ts; secaudit2026oct26 round 8c, commerce-07).
  *   v1.16.0 — 2026-10-29 — An older accountant grant the client allowed is confirmed, and one the client
  *     did not allow is removed (PUBLISH_DECLINERS) (apply-accountant-grant.ts; secaudit2026oct26 round 8c).
  *   v1.15.0 — 2026-10-29 — A cortex name's new holder, allowed by the owner of apps that loaded the
@@ -49,6 +51,7 @@
  */
 import type { PublishApplier, PublishKind, PublishRequest, PublishStoreCtx } from './store.js';
 import { applyAccountantGrant } from './apply-accountant-grant.js';
+import { applyCardAdultConfirm } from './apply-card-adult.js';
 import { declineAccountantGrant } from '../finance/accountant-grant-ask.js';
 import { applyMemoryPublish } from './apply-memory.js';
 import { applyFilePublish } from './apply-file.js';
@@ -106,6 +109,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'extension-code': applyExtensionCode,
   'cortex-holder': applyCortexHolder,
   'accountant-grant': applyAccountantGrant,
+  'card-adult-confirm': applyCardAdultConfirm,
 };
 
 /**

@@ -9,6 +9,9 @@
  *   amount and currency; a CREDIT card records the buyer as a verified adult and a debit or prepaid
  *   card does not, on both card paths (Jouni's ruling, Comicland v3 A-4).
  * @version-history
+ *   v1.2.0 — 2026-10-30 — The seller here is not an operator, so a credit card waits for the buyer's
+ *     one-press confirmation before the adult check is recorded; three assertions changed with Jouni's
+ *     approval (secaudit2026oct26 round 8c, commerce-07).
  *   v1.1.0 — 2026-10-25 — A test-mode credit card payment records no adult check, on both card
  *     paths (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-4).
@@ -30,11 +33,27 @@ import type { CheckoutSessionRecord } from '../../src/commerce/types.js';
 import { openStripeCheckout, stripeCheckoutHandler } from '../../src/commerce/stripe-checkout.js';
 import { stripePaymentHandler } from '../../src/commerce/stripe-handler.js';
 import { readAdult } from '../../src/services/adult-assurance.js';
+import { listPublishRequests } from '../../src/services/publish-requests/store.js';
+import { decidePublishRequest } from '../../src/services/publish-requests/decide.js';
+import { callerFromAuth } from '../../src/services/caller-context.js';
 
 const config = { encryptionKey: null, totpSecretEncryptionKey: null, baseUrl: 'https://node.test' };
 const seller = { ghii: 'shop@node', owner: 'shop', psp: { secretKey: 'sk_test_stand_in' } };
 const BUYER = 'reader@node';
 let storage: Storage;
+
+/**
+ * The seller here is not an operator, so a credit card payment on its Stripe account waits for the
+ * buyer's one-press confirmation (secaudit2026oct26 round 8c, commerce-07): this is the buyer, signed
+ * in themselves, pressing "I paid with my own card".
+ */
+async function buyerConfirmsCard(): Promise<void> {
+  const asked = (await listPublishRequests(storage, BUYER)).find(r => r.kind === 'card-adult-confirm' && r.state === 'awaiting_owner');
+  expect(asked).toBeTruthy();
+  const out = await decidePublishRequest({ storage, config: { ...config, nodeId: 'node' } as never },
+    { caller: callerFromAuth({ sub: 'reader', owner: 'reader', roles: ['owner'], scopes: [] }, 'node', storage) }, asked!.id, 'approve');
+  expect(out.ok).toBe(true);
+}
 
 const session = (over: Partial<CheckoutSessionRecord> = {}): CheckoutSessionRecord => ({
   id: 'chk_abc', status: 'open', total: 4_990_000, currency: 'EUR', buyerGhii: BUYER,
@@ -50,8 +69,10 @@ const paidSession = (funding: string, over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-beforeEach(() => {
+beforeEach(async () => {
   storage = new SqliteStorage(':memory:') as unknown as Storage;
+  // The buyer has an account here, so the node can ask them to confirm the card (commerce-07).
+  await storage.createOwner({ name: 'reader', displayName: 'reader', publicKey: 'pk', roles: ['owner'], createdAt: new Date().toISOString() } as never);
   sent.length = 0;
 });
 
@@ -92,6 +113,11 @@ describe('the hosted page handler', () => {
     const r = await collect('cs_test_1');
     expect(r.trackingCode).toBe('pi_1');
     expect(sent[0].url).toContain('checkout/sessions/cs_test_1?expand[]=payment_intent.latest_charge');
+    // Changed 2026-10-30 (secaudit2026oct26 round 8c, commerce-07, approved by Jouni): this assertion
+    // asserted the hole being closed, an adult recorded on the seller's own account's word. It now
+    // waits for the buyer's confirmation, and after it the adult is recorded.
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+    await buyerConfirmsCard();
     expect(await readAdult(storage, BUYER)).toMatchObject({ verified: true, method: 'credit-card' });
   });
   it('a debit or a prepaid card pays, and records nothing', async () => {
@@ -124,6 +150,10 @@ describe('the direct card handler', () => {
     answer = { id: 'pi_2', status: 'succeeded', latest_charge: { payment_method_details: { card: { funding: 'credit' } } } };
     await collect();
     expect(new URLSearchParams(sent[0].body).get('expand[]')).toBe('latest_charge');
+    // Changed 2026-10-30 (commerce-07, approved by Jouni): asserted the hole being closed. It now
+    // waits for the buyer's confirmation, and after it the adult is recorded.
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+    await buyerConfirmsCard();
     expect((await readAdult(storage, BUYER)).method).toBe('credit-card');
   });
   it('a debit card records nothing', async () => {
@@ -140,6 +170,10 @@ describe('the direct card handler', () => {
   it('a live-mode credit card records the adult check', async () => {
     answer = { id: 'pi_5', status: 'succeeded', livemode: true, latest_charge: { livemode: true, payment_method_details: { card: { funding: 'credit' } } } };
     await collect();
+    // Changed 2026-10-30 (commerce-07, approved by Jouni): asserted the hole being closed. It now
+    // waits for the buyer's confirmation, and after it the adult is recorded.
+    expect((await readAdult(storage, BUYER)).verified).toBe(false);
+    await buyerConfirmsCard();
     expect((await readAdult(storage, BUYER)).method).toBe('credit-card');
   });
 });
