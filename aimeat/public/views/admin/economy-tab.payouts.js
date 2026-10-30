@@ -8,9 +8,10 @@
  *   writes the reference (the transaction hash or a case number) and marks the payout arrived. The
  *   entries are then recorded as paid and both parties are told (GET /v1/commerce/beneficiary/
  *   possible-payouts and POST .../arrived, commerce/beneficiary-payout-hold.ts). The section shows only
- *   while one is open; it is read when the tab opens and after each mark.
+ *   while one is open; it is read when the tab opens, after each mark and on 'aimeat-live-update'.
  * @structure PossiblePayoutsSection
  * @version-history
+ *   v1.0.1 -- 2026-10-30 -- Re-reads on 'aimeat-live-update' like the other server-data sections.
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  */
 import { h } from 'preact';
@@ -68,6 +69,10 @@ export function PossiblePayoutsSection() {
       .catch(err => setFailed(err.message));
   }, []);
   useEffect(load, [load]);
+  useEffect(() => {
+    window.addEventListener('aimeat-live-update', load);
+    return () => window.removeEventListener('aimeat-live-update', load);
+  }, [load]);
   if (!rows.length && !failed) return null;
   return html`
     <${Section} title=${P('title')} count=${P('count', { n: rows.length })}>
