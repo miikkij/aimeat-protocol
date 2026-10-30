@@ -18,17 +18,19 @@
  *     (.claude/rules/security.md, the owner sees their agents' data, ONE DIRECTION).
  *   - Never narrower. 'private' and 'owner' become 'workspace'; 'workspace' gains this workspace
  *     beside the ones it has; 'members', 'group', 'organism:*' and 'public' stay as they are, because
- *     rebinding them would take readers away. Unlike doc-images.ts, which scopes a document's embedded
- *     images and does narrow a public image.
+ *     rebinding them would take readers away. A document's embedded images follow the same two rules
+ *     through bindFileToWorkspace (Jouni, 2026-10-30: "korjaa samalla tavalla kuin liitteet").
  *   - After the write. The callers call this once every refusal has passed and the value has landed,
  *     the same order doc-images.ts scopeDocImagesToWorkspace keeps (refuse before you write).
  * @structure
  *   - pubFileRefsIn(value) — every distinct /v1/pub/<owner>/<key> the value's strings carry.
+ *   - bindFileToWorkspace(storage, writer, owner, key, workspaceRef) — the rule for one file.
  *   - scopeRecordFilesToWorkspace(storage, value, writer, workspaceRef) — bind the writer's own files.
  * @usage
  *   import { scopeRecordFilesToWorkspace } from '../services/record-files.js';
  *   await scopeRecordFilesToWorkspace(storage, value, { principal, ownerName, ownerGhii }, `${orgId}/${ws}`);
  * @version-history
+ *   v1.1.0 — 2026-10-30 — bindFileToWorkspace: the one-file rule, which doc-images.ts now uses too.
  *   v1.0.0 — 2026-10-30 — Initial (wish-ty-tilan-tietueeseen-liitetty-yksityinen-tiedosto-aukeaa-ty-).
  */
 import type { Storage } from '../storage/interface.js';
@@ -89,33 +91,41 @@ function writerControls(writer: RecordFileWriter, fileOwner: string): boolean {
 }
 
 /**
- * Bind every file the value links that the writer controls to `workspaceRef` (`<orgId>/<ws>`), so the
- * workspace's members can read it. Best-effort and total: it never throws, and a file it cannot bind
- * stays readable to its writer only, which is the behaviour before this existed.
+ * Bind one stored file to `workspaceRef` (`<orgId>/<ws>`) when the writer controls it, never narrowing
+ * it. The one rule for a file a workspace value links, whether a record links it or a document embeds
+ * it as an image (doc-images.ts). Best-effort and total: it never throws, and a file it cannot bind
+ * stays as it was.
+ */
+export async function bindFileToWorkspace(
+  storage: Storage, writer: RecordFileWriter, owner: string, key: string, workspaceRef: string,
+): Promise<void> {
+  if (!workspaceRef || !writer.principal || !writerControls(writer, owner)) return;
+  try {
+    // The metadata only: a linked zip can be large, and only its visibility is read here.
+    const file = await storage.getStorageFileMeta(owner, key);
+    if (!file) return;
+    let merged: string;
+    if (file.visibility === 'workspace') {
+      const current = (file.workspaceRef ?? '').split(/\s+/).filter(Boolean);
+      if (current.includes(workspaceRef)) return;
+      merged = normalizeWorkspaceRefs([...current, workspaceRef], undefined);
+    } else if (WIDENABLE.has(file.visibility)) {
+      merged = workspaceRef;
+    } else {
+      return;
+    }
+    await storage.updateFileVisibility(owner, key, 'workspace', merged);
+  } catch (err) {
+    logger.warn('bindFileToWorkspace: a linked file was not bound to the workspace', { owner, key, workspaceRef, error: String(err) });
+  }
+}
+
+/**
+ * Bind every file the value links that the writer controls to `workspaceRef`, so the workspace's
+ * members can read it.
  */
 export async function scopeRecordFilesToWorkspace(
   storage: Storage, value: unknown, writer: RecordFileWriter, workspaceRef: string,
 ): Promise<void> {
-  if (!workspaceRef || !writer.principal) return;
-  for (const { owner, key } of pubFileRefsIn(value)) {
-    if (!writerControls(writer, owner)) continue;
-    try {
-      // The metadata only: a linked zip can be large, and only its visibility is read here.
-      const file = await storage.getStorageFileMeta(owner, key);
-      if (!file) continue;
-      let merged: string;
-      if (file.visibility === 'workspace') {
-        const current = (file.workspaceRef ?? '').split(/\s+/).filter(Boolean);
-        if (current.includes(workspaceRef)) continue;
-        merged = normalizeWorkspaceRefs([...current, workspaceRef], undefined);
-      } else if (WIDENABLE.has(file.visibility)) {
-        merged = workspaceRef;
-      } else {
-        continue;
-      }
-      await storage.updateFileVisibility(owner, key, 'workspace', merged);
-    } catch (err) {
-      logger.warn('scopeRecordFilesToWorkspace: a linked file was not bound to the workspace', { owner, key, workspaceRef, error: String(err) });
-    }
-  }
+  for (const { owner, key } of pubFileRefsIn(value)) await bindFileToWorkspace(storage, writer, owner, key, workspaceRef);
 }
