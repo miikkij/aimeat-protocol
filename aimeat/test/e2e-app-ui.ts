@@ -7,6 +7,7 @@
  *   never refused has never been tested.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-ui
  * @version-history
+ *   v1.3.0 — 2026-10-30 — The read of an app not published yet answers the catalogue with no layout; the write still answers 404.
  *   v1.2.0 — 2026-09-05 — A block's `effect` and the ambient's `post` (wish-atelier-post-process-
  *     effects): a still under words validates, a picture effect on words refuses naming the hosts,
  *     a loud grade refuses with the matrix numbers and passes on a world, a misspelt knob and a
@@ -573,10 +574,15 @@ const GOOD_LAYOUT = {
         assert(r.status === 200 && r.body.data.source === 'stored', 'public read holds');
     });
 
-    await test("a layout for an app that does not exist answers 404 naming the remedy", async () => {
-        const r = await json(`/v1/apps/${o.name}/nosuch.html/ui`);
-        assert(r.status === 404 && r.body.error.message.includes('publish first'),
-            `the 404 must say what to do: ${JSON.stringify(r.body.error)}`);
+    // Changed 2026-10-30: the read of an app not published yet answers the node's catalogue with no
+    // layout, because an AI planning a new app reads the layouts there; the write still says what to do.
+    await test("an app not published yet reads as no layout with the catalogue; a write to it answers 404 naming the remedy", async () => {
+        const r = await json(`/v1/apps/${o.name}/nosuch.html/ui?catalogue=index`);
+        assert(r.status === 200 && r.body.data.source === 'unpublished' && r.body.data.layout === null && !!r.body.data.catalogue,
+            `the read answers the catalogue: ${r.status} ${JSON.stringify(r.body.error ?? r.body.data?.source)}`);
+        const w = await json(`/v1/apps/${o.name}/nosuch.html/ui`, { method: 'PUT', headers: auth(o.token), body: JSON.stringify({ layout: { blocks: [] } }) });
+        assert(w.status === 404 && w.body.error.message.includes('publish first'),
+            `the 404 must say what to do: ${w.status} ${JSON.stringify(w.body.error)}`);
     });
 
     console.log('\n─────────────────────────────────────');

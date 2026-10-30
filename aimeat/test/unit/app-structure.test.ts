@@ -4,10 +4,12 @@
  *   accepts and refuses (services/app-plan.ts readPlanPatch, held to the node's own registries), and
  *   how the eight steps read a plan, a draft and a published app (services/app-structure.ts).
  * @version-history
+ *   v1.2.0 — 2026-10-30 — Layouts the AI drew (proposals); a layout or nav id is held to them where the plan is written.
+ *   v1.1.0 — 2026-10-29 — A custom layout or nav with a note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { describe, it, expect } from 'vitest';
-import { readPlanPatch, allowedChoiceValues, APP_PLAN_SPEC, type AppPlan } from '../../src/services/app-plan.js';
+import { readPlanPatch, allowedChoiceValues, strayChoice, APP_PLAN_SPEC, type AppPlan } from '../../src/services/app-plan.js';
 import { computeStructure, nextStep, STEP_IDS } from '../../src/services/app-structure.js';
 import { LOOKS } from '../../src/data/atelier-looks.js';
 import { UI_LAYOUT_PRESETS } from '../../src/services/app-ui/layouts.js';
@@ -22,13 +24,15 @@ const state = (steps: ReturnType<typeof computeStructure>, id: string) => steps.
 describe('what a plan write accepts', () => {
   it('takes every look and every layout preset the node serves, so a new one is valid with no change', () => {
     expect(allowedChoiceValues('look')).toEqual(LOOKS.map((l) => l.id));
-    expect(allowedChoiceValues('layout')).toEqual(UI_LAYOUT_PRESETS.map((p) => p.id));
+    expect(allowedChoiceValues('layout')).toEqual([...UI_LAYOUT_PRESETS.map((p) => p.id), 'custom']);
     for (const l of LOOKS) expect(readPlanPatch({ choices: { look: { value: l.id } } }).ok, l.id).toBe(true);
   });
   it('refuses a value the node does not offer, naming the ones it does', () => {
-    const r = readPlanPatch({ choices: { nav: { value: 'teleport' } } });
+    const r = readPlanPatch({ choices: { look: { value: 'teleport' } } });
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.message).toContain('bottom-bar');
+    expect(!r.ok && r.message).toContain('flat');
+    // A layout or nav value in the id form may name an option the AI drew, so the plan as written decides.
+    expect(strayChoice(plan({ choices: { nav: { value: 'teleport', by: 'ai', state: 'done', at: '' } } }))).toContain('bottom-bar');
   });
   it('refuses a choice key that does not exist and a state that is neither waiting nor done', () => {
     expect(readPlanPatch({ choices: { colour: { value: 'red' } } }).ok).toBe(false);
@@ -42,6 +46,39 @@ describe('what a plan write accepts', () => {
     expect(readPlanPatch({ choices: { genre: 'nightfloor' } }).ok).toBe(true);
     expect(readPlanPatch({ choices: { genre: 'Not An Id!' } }).ok).toBe(false);
     expect(readPlanPatch({ data: { summary: 'x', personalData: 'maybe' } }).ok).toBe(false);
+  });
+  it('takes a custom layout or nav only with a note, and the refusal of an unknown one names custom', () => {
+    // Cold Opus runs of a 3D game reached for "single" and "agent-decides" and had no value to write.
+    expect(strayChoice(plan({ choices: { layout: { value: 'single', by: 'ai', state: 'done', at: '' } } }))).toContain('"custom"');
+    expect(readPlanPatch({ choices: { layout: { value: 'Agent decides!' } } }).ok).toBe(false);
+    expect(readPlanPatch({ choices: { layout: { value: 'custom' } } }).ok).toBe(false);
+    expect(readPlanPatch({ choices: { nav: { value: 'custom', note: 'One screen; the cube turns by drag.' } } }).ok).toBe(true);
+  });
+});
+
+describe('layouts the AI drew for the app', () => {
+  const sketch = [{ height: 's', cells: [{ w: 'full', label: 'Vuoro', tone: 'ink' }] }, { height: 'l', cells: [{ w: 'main', label: 'Kuutio', tone: 'sun' }, { w: 'side', label: 'Kerrokset' }] }];
+  const option = (id: string) => ({ id, name: 'Lauta ja kerrokset', note: 'Kuutio isona, kerrokset vieressä.', sketch });
+
+  it('takes up to four options with a sketch, and a choice of one in the same write', () => {
+    const r = readPlanPatch({ proposals: { layout: [option('board-layers'), option('board-only')] }, choices: { layout: { value: 'board-layers' } } });
+    expect(r.ok).toBe(true);
+    const written = plan({ proposals: r.ok ? (r.patch.proposals as AppPlan['proposals']) : {}, choices: { layout: { value: 'board-layers', by: 'owner', state: 'waiting', at: '' } } });
+    expect(strayChoice(written)).toBeNull();
+  });
+  it('refuses a preset id, a sketch that does not draw, five options and a key that takes none', () => {
+    expect(readPlanPatch({ proposals: { layout: [option('dashboard')] } }).ok).toBe(false);
+    expect(readPlanPatch({ proposals: { layout: [{ ...option('a-b'), sketch: [{ height: 'xl', cells: [{ w: 'full' }] }] }] } }).ok).toBe(false);
+    expect(readPlanPatch({ proposals: { layout: [{ ...option('a-b'), sketch: [{ height: 'l', cells: [{ w: 'wide' }] }] }] } }).ok).toBe(false);
+    expect(readPlanPatch({ proposals: { layout: ['a', 'b', 'c', 'd', 'e'].map((c) => option(`opt-${c}`)) } }).ok).toBe(false);
+    expect(readPlanPatch({ proposals: { look: [option('a-b')] } }).ok).toBe(false);
+  });
+  it('a choice of an option the plan does not hold is refused, and the step names the chosen option', () => {
+    expect(strayChoice(plan({ proposals: { layout: [option('board-only')] }, choices: { layout: { value: 'board-layers', by: 'owner', state: 'waiting', at: '' } } }))).toContain('board-only');
+    const p = plan({ proposals: { layout: [option('board-layers')] }, choices: { layout: { value: 'board-layers', by: 'owner', state: 'waiting', at: '', note: 'Kerrokset alle.' } } });
+    const layout = computeStructure({ ...base, plan: p }).find((s) => s.id === 'layout')!;
+    expect(layout.state).toBe('progress');
+    expect(layout.detail.layout).toMatchObject({ value: 'board-layers', name: 'Lauta ja kerrokset', note: 'Kerrokset alle.', proposal: true });
   });
 });
 

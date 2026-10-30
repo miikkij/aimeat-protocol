@@ -18,6 +18,7 @@
  *   import { parseTranscript } from './transcript.js';
  *   const metrics = parseTranscript(readFileSync(path, 'utf8'));
  * @version-history
+ *   v1.1.0 — 2026-10-30 — A task of several turns: the cost is the sum of its sessions, and turnTexts keeps each turn's last message.
  *   v1.0.0 — 2026-09-18 — Initial (wish-kylm-agentti-ja-oikea-teht-v-mittaus-...).
  */
 
@@ -42,6 +43,8 @@ export interface RunMetrics {
     costUsd: number | null;
     durationMs: number | null;
     finalText: string;
+    /** The last message of each turn the person had, in order; one entry for a one-message task. */
+    turnTexts: string[];
     /** True when the driver reported a clean finish, false when it stopped on a limit or an error. */
     finished: boolean;
     unparsedLines: number;
@@ -66,6 +69,9 @@ export function parseTranscript(raw: string): RunMetrics {
     const order: ToolCall[] = [];
     let turns = 0, unparsed = 0, lastText = '';
     let result: Record<string, unknown> | null = null;
+    // A task of several turns is one session per turn, each ending in its own result with its own cost.
+    let cost: number | null = null;
+    const turnTexts: string[] = [];
 
     for (const line of raw.split('\n')) {
         if (!line.trim()) continue;
@@ -94,6 +100,8 @@ export function parseTranscript(raw: string): RunMetrics {
             }
         } else if (ev.type === 'result') {
             result = ev;
+            if (typeof ev.total_cost_usd === 'number') cost = (cost ?? 0) + ev.total_cost_usd;
+            turnTexts.push(typeof ev.result === 'string' && ev.result ? ev.result : lastText);
         }
     }
 
@@ -109,9 +117,10 @@ export function parseTranscript(raw: string): RunMetrics {
         inputTokens: usage.input_tokens ?? 0,
         outputTokens: usage.output_tokens ?? 0,
         cacheReadTokens: usage.cache_read_input_tokens ?? 0,
-        costUsd: typeof result?.total_cost_usd === 'number' ? result.total_cost_usd : null,
+        costUsd: cost,
         durationMs: typeof result?.duration_ms === 'number' ? result.duration_ms : null,
         finalText: typeof result?.result === 'string' && result.result ? result.result : lastText,
+        turnTexts: turnTexts.length ? turnTexts : [lastText],
         finished: result?.subtype === 'success',
         unparsedLines: unparsed,
     };

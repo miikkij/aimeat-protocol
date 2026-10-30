@@ -22,6 +22,10 @@
  * @usage
  *   import { TASKS } from './tasks.js';
  * @version-history
+ *   2026-10-30 — build-structure-flow (by name): three turns through the structure page, from the
+ *     drawn layouts to a published app built by the person's picks; followUps on a task.
+ *   2026-10-29 — build-structure (by name): a new app's first message carries the structure page's
+ *     address, and its plan is on the node before any code.
  *   2026-10-02 — propose-agent (by name): a request for an agent over the person's own sales
  *     workspace passes only as a proposal on this node that names the workspace, with the approval
  *     address in the answer and no outside product named.
@@ -61,6 +65,11 @@ export interface Task {
     byNameOnly?: boolean;
     /** Runs before the agent starts, for a task that needs something to exist first. */
     setup?: (ctx: Omit<TaskContext, 'metrics'>) => Promise<void>;
+    /**
+     * What the person says next, in the same conversation, after the agent's answer. `before` acts
+     * as the person between the turns (a choice on a page), and reads what the agent did so far.
+     */
+    followUps?: Array<{ prompt: string; before?: (ctx: TaskContext) => Promise<void> }>;
     /** `note` is what a PASSING run is worth knowing about; the report lists it. */
     verify: (ctx: TaskContext) => Promise<{ ok: boolean; detail: string; note?: string }>;
 }
@@ -89,6 +98,18 @@ const pierOf = (marker: string): string => String(20 + (parseInt(marker.replace(
 const sharedOrgs = new Map<string, string>();
 /** propose-agent: the organism its setup made, to archive afterwards. */
 const proposeOrgs = new Map<string, string>();
+
+/** build-structure-flow: the person's change to the layout they pick, and which option they picked, by marker. */
+const FLOW_WISH = 'Puhelimella kerrokset kuution alle.';
+const flowPick = new Map<string, string>();
+/** build-structure-flow: this run's plan, found by its marker in the owner's plans. */
+async function flowPlan(ctx: Omit<TaskContext, 'metrics'>): Promise<{ appId: string; proposals?: unknown } | null> {
+    const r = await api<{ plans: Array<{ app: string; filename: string; name?: string }> }>(ctx.baseUrl, '/v1/app-plans', ctx.ownerToken);
+    const row = (r.data?.plans ?? []).find(p => JSON.stringify(p).includes(ctx.marker));
+    if (!row) return null;
+    const s = await api<{ plan: { appId: string; proposals?: unknown } }>(ctx.baseUrl, `/v1/apps/me/${encodeURIComponent(row.filename)}/structure`, ctx.ownerToken);
+    return s.data?.plan ?? null;
+}
 
 const says = (ctx: TaskContext, ...needles: string[]) => needles.every(n => ctx.metrics.finalText.toLowerCase().includes(n.toLowerCase()));
 
@@ -181,6 +202,83 @@ export const TASKS: Task[] = [
             const quality = await appQuality(ctx.baseUrl, ctx.ownerName, hit.filename, ctx.metrics.toolCalls);
             const ok = onAtelier(quality);
             return { ok, detail: ok ? 'the app is published on the Atelier track' : 'the app is published, and it is not an Atelier app with a register', note: describeQuality(quality) };
+        },
+    },
+    {
+        // The structure page from the first message (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
+        // A print-mode run ends at the interview, which waits for the person, so the pass is what a
+        // person sees in that first message: a plan on the node and the page's address, before code.
+        // Added 2026-10-29 after the first real build on innokas.aimeat.io never opened the page.
+        id: 'build-structure',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Haluan tehdä sovelluksen: 3D-ristinolla, jossa pelilauta on 3x3x3-kuutio. Pelimuotoja on kaksi: kaksi pelaajaa samalla laitteella ja pelaaja tietokonetta vastaan. Kuutiota pitää pystyä kääntämään. Sovelluksen nimi on "{marker}". En ole tehnyt sovelluksia ennen. Näytä ensin, missä vaiheessa ollaan ja mitä minun pitää päättää. Haluan itse valita ulkoasun, mutta layoutin saat päättää sinä.',
+        goodTools: ['aimeat_skill_get', 'aimeat_app_manage'],
+        verify: async (ctx) => {
+            const r = await api<{ plans: Array<{ filename: string; name?: string; page_url?: string }> }>(ctx.baseUrl, '/v1/app-plans', ctx.ownerToken);
+            const plans = r.data?.plans ?? [];
+            const plan = plans.find(p => JSON.stringify(p).includes(ctx.marker)) ?? plans.find(p => /ristinolla|tic|tac|kuutio|cube/i.test(JSON.stringify(p)));
+            const filename = plan?.filename ?? '';
+            const gaveLink = /\/v1\/appcat\/structure\?app=/.test(ctx.metrics.finalText);
+            const before = ctx.metrics.toolCalls.findIndex(c => c.name.endsWith('aimeat_app_manage') && JSON.stringify(c.input ?? {}).includes('structure_set'));
+            const published = ctx.metrics.toolCalls.findIndex(c => /aimeat_app_(publish|draft_save|draft_write)$/.test(c.name));
+            const ok = Boolean(plan) && gaveLink && (published < 0 || before < published);
+            return {
+                ok,
+                detail: ok ? 'a plan on the node and the structure page address in the first message' : `plan ${plan ? 'written' : 'MISSING'}, page address ${gaveLink ? 'given' : 'NOT given'}, structure_set ${before < 0 ? 'never called' : (published >= 0 && before > published ? 'after the code' : 'before the code')}`,
+                note: plan ? `plan ${filename}: ${plan.name ?? ''}` : undefined,
+            };
+        },
+    },
+    {
+        // The whole road a person takes through the structure page, which build-structure stops short
+        // of: the AI draws layouts for the app, the person picks one on the page with a change and a
+        // look, says so in the chat, and the AI builds by those choices, says on the page what it is
+        // doing, marks the choices built, and publishes. Added 2026-10-30, after the first fix was
+        // measured on the first message only.
+        id: 'build-structure-flow',
+        door: 'mcp',
+        byNameOnly: true,
+        prompt: 'Haluan tehdä sovelluksen: 3D-ristinolla, jossa pelilauta on 3x3x3-kuutio. Pelimuotoja on kaksi: kaksi pelaajaa samalla laitteella ja pelaaja tietokonetta vastaan. Kuutiota pitää pystyä kääntämään. Sovelluksen nimi on "{marker}". En ole tehnyt sovelluksia ennen.',
+        goodTools: ['aimeat_skill_get', 'aimeat_app_manage', 'aimeat_handbook_get', 'aimeat_app_publish', 'aimeat_app_draft_save', 'aimeat_datamap_set'],
+        followUps: [
+            {
+                // The person on the page: the first layout the AI drew, with a change, and a look.
+                before: async (ctx) => {
+                    const plan = await flowPlan(ctx);
+                    const drawn = (plan?.proposals as { layout?: Array<{ id: string }> } | undefined)?.layout ?? [];
+                    flowPick.set(ctx.marker, drawn[0]?.id ?? '');
+                    if (!plan) return;
+                    await api(ctx.baseUrl, `/v1/apps/me/${encodeURIComponent(plan.appId.slice(plan.appId.indexOf('/') + 1))}/structure`, ctx.ownerToken, { method: 'PUT', body: {
+                        choices: { ...(drawn[0] ? { layout: { value: drawn[0].id, note: FLOW_WISH } } : {}), look: { value: 'neon-dense' } },
+                    } });
+                },
+                prompt: 'Valitsin asettelun ja ulkoasun rakennesivulla. Muut vastaukset: suomi ja englanti, vain minä käytän, mitään ei tallenneta, tietokoneella kolme tasoa, keskiruutu kielletty ensimmäisellä siirrolla. Saat päättää loput.',
+            },
+            { prompt: 'Kyllä, rakenna ja julkaise se.' },
+        ],
+        verify: async (ctx) => {
+            const plan = await flowPlan(ctx);
+            if (!plan) return { ok: false, detail: 'no plan on the node' };
+            const filename = plan.appId.slice(plan.appId.indexOf('/') + 1);
+            const s = await api<{ published: boolean; plan: { choices: Record<string, { value: string; state: string; by: string; note?: string }> } }>(ctx.baseUrl, `/v1/apps/me/${encodeURIComponent(filename)}/structure`, ctx.ownerToken);
+            const c = s.data?.plan.choices ?? {};
+            const picked = flowPick.get(ctx.marker) ?? '';
+            const sets = ctx.metrics.toolCalls.filter(t => t.name.endsWith('aimeat_app_manage') && JSON.stringify(t.input ?? {}).includes('structure_set'));
+            const checks: Array<[string, boolean]> = [
+                ['link in the first message', /\/v1\/appcat\/structure\?app=/.test(ctx.metrics.turnTexts[0] ?? '')],
+                ['layouts drawn for the app', Boolean(picked)],
+                ['the picked layout built', Boolean(picked) && c.layout?.value === picked && c.layout.state === 'done' && c.layout.by === 'owner'],
+                ['the picked look built', c.look?.value === 'neon-dense' && c.look.state === 'done'],
+                ['"now" said on the page', sets.some(t => JSON.stringify(t.input ?? {}).includes('"now"'))],
+                ['published', s.data?.published === true],
+            ];
+            const failed = checks.filter(([, ok]) => !ok).map(([name]) => name);
+            return {
+                ok: failed.length === 0,
+                detail: failed.length ? `missing: ${failed.join(', ')}` : 'drawn, picked on the page, built by the picks, said on the page, published',
+                note: `plan ${filename}; ${ctx.metrics.turnTexts.length} turns; layout ${c.layout?.value ?? '-'} (${c.layout?.state ?? '-'}), look ${c.look?.value ?? '-'} (${c.look?.state ?? '-'})`,
+            };
         },
     },
     {

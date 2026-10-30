@@ -24,6 +24,9 @@
  * @structure APP_BUILDER_SKILL_ENTRY
  * @usage import { APP_BUILDER_SKILL_ENTRY } from './builtin-skills.app-builder.js';
  * @version-history
+ *   v1.12.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app (proposals).
+ *   v1.11.0 — 2026-10-29 — A new app's first message carries its structure page (services/app-structure.ts):
+ *     a cold Opus run that read this skill and not the Atelier one never opened it (1 of 3 runs).
  *   v1.10.1 — 2026-10-21 — A key is stored "for host X": the app tells the person the name and the
  *     host, and the extension declares both in `uses_secrets` (secaudit 2026-10, v58 and v59 follow-up).
  *   v1.10.0 — 2026-10-11 —Do / Don't: the node tells the screen when its data changed, and a timer
@@ -108,6 +111,15 @@ below; the research, the proposal in the person's own words and the finish still
 
 Over MCP the Atelier specification is \`aimeat_handbook_get { tier: "build-app-atelier" }\`, in
 parts, and the genres are in \`aimeat_app_template_list\` (the ids that begin \`genre-\`).
+
+**Before your first question on a new app, start its structure page**, on either track: pick a
+filename, call \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose, proposals }\`
+and put \`page_url\` from the answer in your first message, in one sentence. \`proposals.layout\` is
+two or three layouts you drew for this app, each with a sketch; the page shows them beside the
+node's presets. There the person sees the steps the app goes through and picks a layout and a look
+by seeing them, so a question about the look points to the page and the steps stay out of the chat;
+it is optional, and "you decide" is an answer. Read \`{ action: "structure" }\`
+before you propose: a choice with \`"state": "waiting"\` is theirs to build.
 
 The **Classic track**, which is the rest of this skill, is for two cases: you are improving an
 app that is already Classic (its head says \`aimeat-track\` \`classic\`, or it loads no Atelier kit),

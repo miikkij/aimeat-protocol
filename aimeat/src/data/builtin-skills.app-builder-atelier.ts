@@ -13,6 +13,13 @@
  * @structure APP_BUILDER_ATELIER_SKILL_ENTRY
  * @usage import { APP_BUILDER_ATELIER_SKILL_ENTRY } from './builtin-skills.app-builder-atelier.js';
  * @version-history
+ *   v1.38.0 — 2026-10-30 — The structure page's first write carries two or three layouts drawn for the app
+ *     (proposals), and the steps stay out of the chat.
+ *   v1.37.0 — 2026-10-30 — The ornaments on the shelf include whole sets of five in one style.
+ *   v1.36.0 — 2026-10-29 — The Design Book's shelf names ornaments among the kinds it holds.
+ *   v1.35.0 — 2026-10-29 — The interview starts the structure page before its first question and the look
+ *     question points there: the first real build on innokas.aimeat.io sent Design Book links instead,
+ *     because the page was named only inside the research step (Jouni's test, 2026-10-29).
  *   v1.34.0 — 2026-10-29 — Research names the app's structure page: structure_set when a new app starts
  *     and page_url to the person, structure before the screens (services/app-structure.ts).
  *   v1.33.1 — 2026-10-21 — A key is stored "for host X" (secaudit 2026-10, v58 and v59 follow-up).
@@ -205,6 +212,16 @@ moved under you says so.
 
 1. **Interview** — what the app does, who uses it, how it should FEEL (this picks the look
    preset), which languages, what it must not do.
+   **START THE STRUCTURE PAGE BEFORE THE FIRST QUESTION** on a new app: pick a filename, call
+   \`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose, proposals }\` and put
+   \`page_url\` from the answer in your first message. \`proposals.layout\` is two or three layouts
+   you drew for THIS app, each with a sketch (the field's description has the shape); the page
+   shows them first and the node's presets after. There the person sees the steps and picks
+   a layout and a look by seeing them (the looks, the layouts and the Design Book genres), so the
+   look question points to the page; it is optional, and "you decide" is an answer. The page shows
+   the steps, so leave them out of the chat and ask there only what needs words. Read
+   \`{ action: "structure" }\` before you propose: a choice with \`"state": "waiting"\` is theirs,
+   and the genre links below are for a person who would rather choose in the chat.
    **THEN THE DATA MAP, AND A YES.** Three more questions, as the specification's interview asks
    them: who opens the app (just them, their organisation, anyone), whose each kind of data is
    (personal, shared by the team, public), and who may change the shared data. Then write back a
@@ -241,8 +258,8 @@ moved under you says so.
    (\`aimeat_app_manage\` \`{ action: "structure_set", filename, name, purpose }\` when a new app
    starts, and hand the person \`page_url\`; \`{ action: "structure" }\` before the screens, where a
    choice with state \`waiting\` is the person's layout or look to build), and
-   **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients and
-   effects that each passed their own bench. Called with nothing, the search answers the WHOLE
+   **the Design Book** (\`aimeat_designbook_search\`): layouts, fills, looks, motion, ambients,
+   effects and ornaments (single figures, and sets of five in one style) that each passed their own bench. Called with nothing, the search answers the WHOLE
    Book on one page, every part on a line under its kind, and part \`book\` of the
    specification ends with the same page: read it, because you cannot search for a part you do
    not know exists. Adopting one is one call (\`aimeat_designbook_adopt\`)

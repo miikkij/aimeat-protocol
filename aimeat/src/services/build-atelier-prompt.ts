@@ -28,6 +28,14 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.41.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
+ *     (proposals.layout), and the steps stay off the chat (cold runs drew the whole step table there).
+ *   v1.40.0 — 2026-10-30 — ADDITIVE: ORNAMENT SETS beside the single figures; the paragraph moved to ornamentsPromptPart() in data/atelier-ornaments.ts.
+ *   v1.39.0 — 2026-10-29 — ADDITIVE: ORNAMENTS in the genre part, the kit's ornament figures named from data/atelier-ornaments.ts.
+ *   v1.38.0 — 2026-10-29 — ADDITIVE: the interview starts the structure page before its first question
+ *     and points the look question there. The section itself is served in part `libraries`, which an
+ *     agent reads after the interview, so on innokas.aimeat.io the first real build never opened the
+ *     page and sent Design Book links instead (Jouni's test, 2026-10-29).
  *   v1.37.0 — 2026-10-29 — ADDITIVE: the structure page section after the data map step (build-structure-step.ts): start the app's plan, give the person the page, read their layout and look choices. Interview mode only; the body and its spec token are unchanged.
  *   v1.36.0 — 2026-10-17 — ADDITIVE: the data map step after the interview's five questions (unchanged) and its team branch at the end of "Data, in short" (build-data-map-step.ts, plan V7); the spec token moves with the body. To stay under 800 lines, "What the review always catches" moved verbatim to build-atelier-review.ts.
  *   v1.35.0 — 2026-10-17 — The mosaic section says block ids are a contract like source names: a renamed block needs ui_set in the same change.
@@ -154,6 +162,7 @@ import { atelierMotionParts } from './build-atelier-motion-parts.js';
 import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.js';
 import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
+import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -482,6 +491,8 @@ function composeBody(config: AimeatConfig): string {
     + 'stagecraft. When an app needs a full animation library, the node serves three as packs — '
     + 'Motion (`motion`), anime.js (`anime`) and Lenis (`lenis`) — read the pack\'s doc before '
     + 'writing a line, because every one of them changed its API after the version you know.\n\n';
+  // The ornaments come from their registry, so a figure or a set added there is named here the same day.
+  body += ornamentsPromptPart(base);
   // Each line ends with the two things an owner chooses by: whether the page keeps its own
   // colours or follows their theme, and an address where they can LOOK at it.
   const bookUrl = config.baseUrl.replace(/\/+$/, '');
@@ -752,7 +763,8 @@ function composeFull(config: AimeatConfig, body: string, opts: AtelierPromptOpti
     + '2. Who uses it — just you, or others too (shared data)?\n'
     + '3. How should it look and FEEL? (Map the answer to a look from the table below.)\n'
     + '4. Which languages should it speak?\n'
-    + '5. Anything it must NOT do?\n\n';
+    + '5. Anything it must NOT do?\n\n'
+    + 'BEFORE YOU SEND THESE QUESTIONS, start the app\'s structure page: call `aimeat_app_manage` action `structure_set` with a `filename`, `name`, `purpose` and `proposals.layout`, two or three layouts you drew for this app. Give `page_url` from its answer in one sentence and point question 3 there: the person sees the steps and picks a layout and a look by seeing them, or says "you decide". Do not list the steps in the chat; the page shows them. After the answers, read action `structure`: a choice with `"state": "waiting"` is theirs. Section "The structure page" (part `libraries`) has the rest.\n\n';
   full += buildDataMapStep('atelier') + ATELIER_STRUCTURE_STEP;
   // The interview ended with "Then build on the Atelier track:"; that line now closes the
   // proposal, because between the answers and the code the owner is shown what will be built.

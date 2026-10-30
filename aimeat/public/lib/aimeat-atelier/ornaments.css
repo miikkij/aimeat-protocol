@@ -1,0 +1,200 @@
+/*
+ * @file aimeat-atelier/ornaments.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description THE ORNAMENTS' PAINT: every colour the ornament figures (atelier/ornament*.js) use,
+ *   as roles over the look's own tokens, plus how the figures sit on the page and how they grow.
+ *   The script writes geometry and timing only; this sheet decides what an engraved line, a vine,
+ *   a leaf or a gap looks like in whichever look the app wears.
+ *
+ *   SIX TOKENS A LOOK MAY SET, each with a default mixed from the look's own colours:
+ *   --ak-orn-line (the engraved metal: rules, scrolls, rope), --ak-orn-dim (hatching, fine rules),
+ *   --ak-orn-hi (the highlight along a rope strand), --ak-orn-vine (living stems and strands),
+ *   --ak-orn-leaf (a leaf's fill), --ak-orn-gap (the cut that shows one strand passing over
+ *   another, the ground colour by default).
+ *
+ *   FINITE MOTION: strokes draw themselves by their dash offset, leaves and beads scale up from
+ *   where they sit, fills fade in, a ribbon unrolls from its middle. Nothing loops. Reduced motion
+ *   and data-ak-motion="less" take every animation and transition away, so the figure stands
+ *   settled.
+ *
+ *   THE SETS (atelier/ornament-sets*.js) paint by fifteen roles of their own, `ak-orn-r-<role>`
+ *   on a stroke (`ak-orn-k`) or a fill (`ak-orn-f`): s1 to s4 are the set's inks (its own
+ *   palette from the canvas; a look may set --ak-orn-set-1 to -4, and `palette: 'look'` takes
+ *   the look's accent, its two spectrum colours and a mix of them instead), ink,
+ *   mute and pale are the text colour at three strengths, paper and ground the surface and the
+ *   page, deep a sunken track a step off the page in either theme, d1 a darker s1, h1 a lighter or darker s1 that stands off the
+ *   ground, and t1 to t3 tints of s1 to s3.
+ * @structure tokens · roles · set roles · set palettes · host and layers · strips · text figures · growth ·
+ *   set motion · reduced motion
+ * @usage  Loaded with aimeat-atelier.css; AIMEAT.atelier.ornament(el, id) puts the classes on.
+ * @version-history
+ *   v0.1.0 — 2026-10-29 — Initial (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
+ *   v0.2.0 — 2026-10-30 — The eleven sets' roles and the ways their shapes arrive
+ *     (wish-kymmenen-koristesetti-eri-tyyleiss).
+ */
+
+/* ── Tokens: resolved on the drawing itself, so the nearest look's colours win. ── */
+.ak-orn-svg {
+  --_orn-line: var(--ak-orn-line, var(--ak-accent, #9a7a35));
+  --_orn-dim: var(--ak-orn-dim, color-mix(in oklab, var(--_orn-line) 45%, var(--ak-bg, #f3f5f8)));
+  --_orn-hi: var(--ak-orn-hi, color-mix(in oklab, var(--_orn-line) 55%, var(--ak-surface, #ffffff)));
+  --_orn-vine: var(--ak-orn-vine, color-mix(in oklab, var(--ak-ink-dim, #4a5560) 70%, var(--_orn-line)));
+  --_orn-vback: color-mix(in oklab, var(--_orn-vine) 45%, var(--ak-bg, #f3f5f8));
+  --_orn-leaf: var(--ak-orn-leaf, color-mix(in oklab, var(--_orn-vine) 26%, var(--ak-surface, #ffffff)));
+  --_orn-gap: var(--ak-orn-gap, var(--ak-bg, #f3f5f8));
+  --_orn-s1: var(--ak-orn-set-1, var(--_pal-1, var(--ak-accent, #e4572e)));
+  --_orn-s2: var(--ak-orn-set-2, var(--_pal-2, var(--ak-spectrum-2, #2b59ff)));
+  --_orn-s3: var(--ak-orn-set-3, var(--_pal-3, var(--ak-spectrum-3, #ffb000)));
+  --_orn-s4: var(--ak-orn-set-4, var(--_pal-4, color-mix(in oklab, var(--_orn-s2) 55%, var(--_orn-s3))));
+  display: block;
+  overflow: visible;
+}
+
+/* ── Roles ── */
+.ak-orn-ln, .ak-orn-dim, .ak-orn-hi, .ak-orn-vine, .ak-orn-vback, .ak-orn-gap, .ak-orn-gapc,
+.ak-orn-band, .ak-orn-hatch, .ak-orn-rib, .ak-orn-prib {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.ak-orn-ln { stroke: var(--_orn-line); }
+.ak-orn-dim, .ak-orn-hatch { stroke: var(--_orn-dim); }
+.ak-orn-hi { stroke: var(--_orn-hi); }
+.ak-orn-vine { stroke: var(--_orn-vine); }
+.ak-orn-vback { stroke: var(--_orn-vback); }
+.ak-orn-gap { stroke: var(--_orn-gap); }
+.ak-orn-gapc, .ak-orn-band { stroke: var(--ak-surface, #ffffff); }
+.ak-orn-butt { stroke-linecap: butt; }
+.ak-orn-leaf { fill: var(--_orn-leaf); stroke: var(--_orn-vine); stroke-width: 1.1; stroke-linejoin: round; }
+.ak-orn-rib { stroke: var(--_orn-vine); stroke-width: 0.8; }
+.ak-orn-petal { fill: var(--ak-surface, #ffffff); stroke: var(--_orn-line); stroke-width: 1.2; stroke-linejoin: round; }
+.ak-orn-prib { stroke: var(--_orn-line); stroke-width: 0.7; }
+.ak-orn-dot { fill: var(--_orn-line); }
+.ak-orn-vdot { fill: var(--_orn-vine); }
+.ak-orn-solid, .ak-orn-track { fill: var(--ak-surface, #ffffff); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-track { stroke-width: 1.4; }
+.ak-orn-fill { fill: var(--_orn-line); }
+.ak-orn-tail { fill: color-mix(in oklab, var(--ak-surface, #ffffff) 74%, var(--_orn-line)); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-crease { fill: var(--_orn-dim); stroke: var(--_orn-line); stroke-linejoin: round; }
+.ak-orn-ring { fill: var(--ak-bg, #f3f5f8); stroke: var(--_orn-line); stroke-width: 1.6; }
+
+/* ── Set roles: one colour each, on a stroke or a fill ── */
+.ak-orn-k { fill: none; stroke: var(--_c); stroke-linecap: round; stroke-linejoin: round; }
+.ak-orn-f { fill: var(--_c); stroke: none; }
+.ak-orn-r-s1 { --_c: var(--_orn-s1); }
+.ak-orn-r-s2 { --_c: var(--_orn-s2); }
+.ak-orn-r-s3 { --_c: var(--_orn-s3); }
+.ak-orn-r-s4 { --_c: var(--_orn-s4); }
+.ak-orn-r-ink { --_c: var(--ak-ink, #17181a); }
+.ak-orn-r-mute { --_c: color-mix(in oklab, var(--ak-ink-dim, #5c6370) 72%, var(--ak-bg, #f3f5f8)); }
+.ak-orn-r-pale { --_c: color-mix(in oklab, var(--ak-ink-dim, #5c6370) 32%, var(--ak-bg, #f3f5f8)); }
+.ak-orn-r-paper { --_c: var(--ak-surface, #ffffff); }
+.ak-orn-r-ground { --_c: var(--ak-bg, #f3f5f8); }
+.ak-orn-r-deep { --_c: color-mix(in oklab, var(--ak-ink, #17181a) 14%, var(--ak-bg, #f3f5f8)); }
+.ak-orn-r-d1 { --_c: color-mix(in oklab, var(--_orn-s1) 76%, var(--ak-ink, #17181a)); }
+.ak-orn-r-h1 { --_c: color-mix(in oklab, var(--_orn-s1) 58%, var(--ak-ink, #17181a)); }
+.ak-orn-r-t1 { --_c: color-mix(in oklab, var(--_orn-s1) 32%, var(--ak-surface, #ffffff)); }
+.ak-orn-r-t2 { --_c: color-mix(in oklab, var(--_orn-s2) 26%, var(--ak-surface, #ffffff)); }
+.ak-orn-r-t3 { --_c: color-mix(in oklab, var(--_orn-s3) 26%, var(--ak-surface, #ffffff)); }
+
+/* ── Set palettes: each set's own inks, from the accepted canvas. A look's --ak-orn-set-N wins
+      over them; `palette: 'look'` (the ak-orn-lookpal class on the element) drops them, so the
+      set takes the look's accent and spectrum instead. ── */
+.ak-orn-pal-modern { --_pal-1: #e4572e; }
+.ak-orn-pal-futuristic { --_pal-1: #2fb3dc; --_pal-2: #7b6bf5; }
+.ak-orn-pal-cyberpunk { --_pal-1: #ff2a6d; --_pal-2: #05c4d2; --_pal-3: #e6d94a; }
+.ak-orn-pal-vibrant { --_pal-1: #ff5a5f; --_pal-2: #00a6a6; --_pal-3: #ffb000; --_pal-4: #6a4cff; }
+.ak-orn-pal-emotional { --_pal-1: #c25e7a; --_pal-2: #7e95ba; --_pal-3: #e7a98f; }
+.ak-orn-pal-dramatic { --_pal-1: #b3192b; --_pal-2: #c9a24a; }
+.ak-orn-pal-symmetrical { --_pal-1: #2f6f8f; --_pal-2: #b07a2c; }
+.ak-orn-pal-chaotic { --_pal-1: #ff3b00; --_pal-2: #2b59ff; }
+.ak-orn-pal-velocity { --_pal-1: #ff4d2e; --_pal-2: #1e5eff; }
+.ak-orn-pal-art-deco { --_pal-1: #c9a032; }
+.ak-orn-pal-crystal { --_pal-1: #2f7bc0; --_pal-2: #4fafba; --_pal-3: #8c7bd8; }
+.ak-orn-lookpal .ak-orn-svg { --_pal-1: initial; --_pal-2: initial; --_pal-3: initial; --_pal-4: initial; }
+
+/* ── The element an overlay figure sits on, and its two layers ── */
+.ak-orn-host { position: relative; isolation: isolate; }
+.ak-orn-host--placed { isolation: isolate; }
+.ak-orn-layer { position: absolute; display: block; pointer-events: none; }
+.ak-orn-layer--under { z-index: -1; }
+.ak-orn-layer--over { z-index: 1; }
+
+/* Room for a frame's corners when the app has not given the element padding of its own. */
+:where([data-ak-ornament='frame']) { padding: clamp(40px, 8vw, 72px); }
+:where([data-ak-ornament='jugend']) { padding: clamp(28px, 5vw, 48px); }
+:where([data-ak-ornament='vine-border'], [data-ak-ornament='rope']) { padding: clamp(24px, 5vw, 40px); }
+:where([data-ak-ornament='ribbon']) { padding: 0.35em 1.2em; text-align: center; }
+
+/* ── Strips that run the width of their element ── */
+.ak-orn-strip { display: block; width: 100%; pointer-events: none; }
+.ak-orn-strip > .ak-orn-svg { width: 100%; }
+
+/* ── Text figures, sized in the type's own units ── */
+.ak-orn-flourished { display: flex; align-items: center; justify-content: center; gap: 0.35em; }
+.ak-orn-flourish { display: block; flex: 0 1 auto; min-width: 0; width: clamp(36px, 14vw, 200px); pointer-events: none; }
+.ak-orn-flourish > .ak-orn-svg { width: 100%; height: auto; }
+.ak-orn-flourish--left > .ak-orn-svg { transform: scaleX(-1); }
+.ak-orn-swash { display: block; width: min(100%, 18em); margin: 0.1em auto 0; pointer-events: none; }
+.ak-orn-swash > .ak-orn-svg, .ak-orn-fleuron > .ak-orn-svg, .ak-orn-dinkus > .ak-orn-svg,
+.ak-orn-bullet > .ak-orn-svg, .ak-orn-cap__art > .ak-orn-svg { width: 100%; height: auto; }
+.ak-orn-fleuron { display: block; width: min(100%, 160px); margin: 0 auto; }
+.ak-orn-dinkus { display: block; width: min(100%, 200px); margin: 0 auto; }
+.ak-orn-cap { float: left; position: relative; width: 4.6em; height: 4.6em; margin: 0.25em 0.9em 0.1em 0; }
+.ak-orn-cap__art { position: absolute; inset: 0; pointer-events: none; }
+.ak-orn-cap__letter {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-family: var(--ak-font-display, Georgia, serif); font-weight: var(--ak-weight-display, 600);
+  font-size: 2.6em; line-height: 1; color: var(--ak-orn-line, var(--ak-accent, #9a7a35));
+}
+.ak-orn-bullets { list-style: none; padding-left: 0; }
+.ak-orn-bullets > li { display: flex; align-items: baseline; gap: 0.7em; }
+.ak-orn-bullet { flex: 0 0 auto; width: 1em; height: 1em; align-self: center; }
+.ak-orn-sbullet { flex: 0 0 auto; width: 1.5em; height: 1.2em; align-self: center; margin-left: -0.15em; pointer-events: none; }
+.ak-orn-sbullet > .ak-orn-svg { width: 100%; height: 100%; }
+
+/* ── Growth ── */
+.ak-orn-grow { animation-name: ak-orn-draw; animation-fill-mode: forwards; animation-timing-function: cubic-bezier(0.45, 0.05, 0.35, 1); }
+.ak-orn-lin { animation-timing-function: linear; }
+@keyframes ak-orn-draw { to { stroke-dashoffset: 0; } }
+.ak-orn-sprout { transform: scale(0); animation: ak-orn-sprout 0.9s cubic-bezier(0.3, 1.5, 0.55, 1) forwards; }
+@keyframes ak-orn-sprout { to { transform: scale(1); } }
+.ak-orn-fade { opacity: 0; animation: ak-orn-fade 1.2s ease forwards; }
+@keyframes ak-orn-fade { to { opacity: 1; } }
+.ak-orn-unroll { transform-box: fill-box; transform-origin: center; transform: scaleX(0); animation: ak-orn-unroll 1s cubic-bezier(0.3, 0.9, 0.4, 1) forwards; }
+@keyframes ak-orn-unroll { to { transform: scaleX(1); } }
+.ak-orn-dash { transition: stroke-dashoffset 0.16s linear; }
+.ak-orn-pop, .ak-orn-bloom { transform: scale(0); transition: transform 0.5s cubic-bezier(0.3, 1.5, 0.55, 1); }
+.ak-orn-pop.ak-orn-open, .ak-orn-bloom.ak-orn-open { transform: scale(1); }
+.ak-orn-fill { transition: width 0.16s linear; }
+
+/* ── Set motion: how a set's filled shape arrives; the script sets delay, duration and, for some, the curve ── */
+.ak-orn-spop, .ak-orn-sturn, .ak-orn-sspin, .ak-orn-sshoot, .ak-orn-swipe { transform-box: fill-box; animation-fill-mode: both; }
+.ak-orn-spop, .ak-orn-sturn, .ak-orn-sspin { transform-origin: center; animation-timing-function: cubic-bezier(0.3, 1.5, 0.55, 1); }
+.ak-orn-spop { animation-name: ak-orn-spop; }
+@keyframes ak-orn-spop { from { transform: scale(0); } to { transform: none; } }
+.ak-orn-sturn { animation-name: ak-orn-sturn; }
+@keyframes ak-orn-sturn { from { transform: scale(0) rotate(-45deg); } to { transform: none; } }
+.ak-orn-sspin { animation-name: ak-orn-sspin; }
+@keyframes ak-orn-sspin { from { transform: scale(0) rotate(30deg); } to { transform: none; } }
+.ak-orn-sshoot { transform-origin: left center; animation-name: ak-orn-sshoot; animation-timing-function: cubic-bezier(0.7, 0, 0.25, 1); }
+@keyframes ak-orn-sshoot { from { transform: translateX(-14px) scaleX(0); } to { transform: none; } }
+.ak-orn-swipe { transform-origin: left center; animation-name: ak-orn-swipe; animation-timing-function: cubic-bezier(0.45, 0, 0.2, 1); }
+@keyframes ak-orn-swipe { from { transform: scaleX(0); } to { transform: none; } }
+.ak-orn-sfade { animation: ak-orn-sfade 0.6s ease-out both; }
+@keyframes ak-orn-sfade { from { opacity: 0; } to { opacity: 1; } }
+.ak-orn-sdrift { animation: ak-orn-sdrift 0.9s ease-out both; }
+@keyframes ak-orn-sdrift { from { opacity: 0; transform: translateY(-10px) rotate(-12deg); } to { opacity: 1; transform: none; } }
+
+/* ── Less motion: the figure stands settled ── */
+@media (prefers-reduced-motion: reduce) {
+  .ak-orn-grow { animation: none; stroke-dashoffset: 0 !important; }
+  .ak-orn-sprout, .ak-orn-fade, .ak-orn-unroll { animation: none; transform: none; opacity: 1; }
+  .ak-orn-dash, .ak-orn-pop, .ak-orn-bloom, .ak-orn-fill { transition: none; }
+  .ak-orn-spop, .ak-orn-sturn, .ak-orn-sspin, .ak-orn-sshoot, .ak-orn-swipe, .ak-orn-sfade, .ak-orn-sdrift { animation: none !important; transform: none; opacity: 1; }
+}
+[data-ak-motion='less'] .ak-orn-grow { animation: none; stroke-dashoffset: 0 !important; }
+[data-ak-motion='less'] .ak-orn-sprout, [data-ak-motion='less'] .ak-orn-fade, [data-ak-motion='less'] .ak-orn-unroll { animation: none; transform: none; opacity: 1; }
+[data-ak-motion='less'] :is(.ak-orn-spop, .ak-orn-sturn, .ak-orn-sspin, .ak-orn-sshoot, .ak-orn-swipe, .ak-orn-sfade, .ak-orn-sdrift) { animation: none !important; transform: none; opacity: 1; }
+[data-ak-motion='less'] .ak-orn-dash, [data-ak-motion='less'] .ak-orn-pop, [data-ak-motion='less'] .ak-orn-bloom, [data-ak-motion='less'] .ak-orn-fill { transition: none; }

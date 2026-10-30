@@ -9,9 +9,12 @@
  *   so a layout, a look or a genre added to the node shows here with no change. A thing the locale
  *   files have no words for yet shows the node's own English sentence.
  * @structure readStructure · writePlan · readCatalogue · readGenres · stepLine(step, words) ·
- *   choiceName(kind, id) · aiPrompt(structure, picks) · appRefFromAddress()
+ *   choiceName(kind, id) · proposalsOf(structure, kind) · optionName(structure, kind, id) ·
+ *   aiPrompt(structure, picks, wish) · appRefFromAddress()
  * @usage const s = await readStructure('alice', 'talkoot.html');
  * @version-history
+ *   v1.2.0 — 2026-10-30 — The layouts the AI drew (proposalsOf, optionName), and a person's change to a choice.
+ *   v1.1.0 — 2026-10-29 — A `custom` layout or nav reads as its name and the AI's note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { apiGet, apiPut } from '/js/api.js';
@@ -68,6 +71,17 @@ export function choiceName(kind, id) {
   return tOr(`appcat.structure.${kind}.${id}.name`, id);
 }
 
+/** The options the building AI drew for this app's layout or nav (plan.proposals), or none. */
+export function proposalsOf(structure, kind) {
+  const list = structure?.plan?.proposals?.[kind];
+  return Array.isArray(list) ? list : [];
+}
+
+/** The name of a choice's value: an option the AI drew is named by the AI, anything else as choiceName. */
+export function optionName(structure, kind, id) {
+  return proposalsOf(structure, kind).find((p) => p.id === id)?.name || choiceName(kind, id);
+}
+
 /** One line on what a layout, a navigation mode or a look is for, or the node's own sentence. */
 export function choiceLine(kind, id, fallback) {
   return tOr(`appcat.structure.${kind}.${id}.line`, fallback || '');
@@ -91,7 +105,17 @@ export function stepLine(step) {
       const ka = step.id === 'layout' ? 'layout' : 'look';
       const kb = step.id === 'layout' ? 'nav' : 'genre';
       if (!a && !b) return x('structure.line.choiceNone');
-      const names = [a && choiceName(ka, a.value), b && choiceName(kb, b.value)].filter(Boolean).join(' · ');
+      // A custom layout or nav is described only by its note; an option the AI drew carries its
+      // name; a person's note on any other choice is what they want changed. A closing full stop
+      // goes, because the line around it ends with one.
+      const bare = (note) => note.replace(/[.!?]\s*$/, '');
+      const named = (k, c) => {
+        if (!c) return '';
+        if (c.value === 'custom' && c.note) return `${choiceName(k, c.value)}: ${bare(c.note)}`;
+        const name = c.name || choiceName(k, c.value);
+        return c.by === 'owner' && c.note ? `${name} (${x('structure.line.wish', { note: bare(c.note) })})` : name;
+      };
+      const names = [named(ka, a), named(kb, b)].filter(Boolean).join(' · ');
       const waiting = [a, b].some((c) => c && c.state === 'waiting');
       return waiting ? x('structure.line.choiceWaiting', { names }) : x('structure.line.choiceDone', { names, by: by(a || b) });
     }
@@ -123,12 +147,13 @@ export function stepLine(step) {
  * The prompt for an AI that cannot reach the node: the choices, said in plain words, for the person
  * to paste into their own chat. A connected AI reads the plan itself and needs none of this.
  */
-export function aiPrompt(structure, picks) {
+export function aiPrompt(structure, picks, wish) {
   const lines = [x('structure.prompt.head', { name: structure.name })];
   for (const [kind, id] of Object.entries(picks)) {
     if (!id) continue;
-    lines.push(`- ${x(`structure.prompt.${kind}`)}: ${choiceName(kind, id)} (${id})`);
+    lines.push(`- ${x(`structure.prompt.${kind}`)}: ${optionName(structure, kind, id)} (${id})`);
   }
+  if (wish) lines.push(`- ${x('structure.prompt.wish')}: ${wish}`);
   lines.push(x('structure.prompt.tail'));
   return lines.join('\n');
 }
