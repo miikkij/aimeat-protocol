@@ -34,6 +34,8 @@
  *   const book = new DesignBookService(storage, config);
  *   const out = await book.propose(callerGaii, raw, provenance);
  * @version-history
+ *   v1.13.1 — 2026-10-30 — list() returns the newest parts first, so the 23 seeded ornaments cannot
+ *     push a fresh proposal off the default page on a provider whose storage order puts it last.
  *   v1.13.0 — 2026-10-29 — The ORNAMENT kind (ornament.ts): adopt() answers the line that puts the
  *     figure on an element, writes nothing and counts the take.
  *   v1.12.1 — 2026-10-19 — countUse() counts on the usage record's version (record-cas.ts) (check:atomic-writes).
@@ -387,7 +389,10 @@ export class DesignBookService {
     filters: { kind?: string; status?: string; q?: string; limit?: number } = {}, { withFailing = false }: { withFailing?: boolean } = {},
   ): Promise<PartSummaryRow[]> {
     const limit = Math.min(Math.max(filters.limit ?? 50, 1), 200);
-    const items = await this.storage.listMemory(this.bookOwner(), { prefix: PART_KEY_PREFIX, tags: ['designbook'] });
+    // Newest first, before the limit: the seeded shelf alone is past the default page, and
+    // storage order differs per provider, so a part just proposed could fall off the first page.
+    const items = (await this.storage.listMemory(this.bookOwner(), { prefix: PART_KEY_PREFIX, tags: ['designbook'] }))
+      .sort((a, b) => String(b.updatedAt ?? '').localeCompare(String(a.updatedAt ?? '')));
     const rows: PartSummaryRow[] = [];
     for (const record of items) {
       if (!PART_KEY_RE.test(record.key)) continue;
