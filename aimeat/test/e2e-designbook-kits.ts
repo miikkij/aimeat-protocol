@@ -93,6 +93,7 @@ await test('Its proposer lists it, previews it through the list\'s address and t
   const list = await json('/v1/designbook?kind=kit', { headers: auth(A.token) });
   const row = (list.body.data?.parts ?? []).find((p: any) => p.id === OWN);
   assert(row && String(row.preview_url).includes('?t='), `listed with a token: ${JSON.stringify(row)}`);
+  assert(row.reach === 'own' && row.organism === undefined, `the row says its reach: ${JSON.stringify(row)}`);
   const prev = await fetch(`${BASE}${row.preview_url}`);
   assert(prev.status === 200 && (await prev.text()).includes('data-ak-look'), `preview ${prev.status}`);
   const adopt = await json(`/v1/designbook/${OWN}/adopt`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ filename: 'new-app.html' }) });
@@ -123,6 +124,8 @@ await test('A member proposes a kit for the organism; somebody outside it is ref
 await test('Every member reads it, and nobody outside the organism does', async () => {
   const a = await json(`/v1/designbook/${ORG}`, { headers: auth(A.token) });
   assert(a.status === 200, `A, the organism's creator, reads it: ${a.status}`);
+  const row = ((await json('/v1/designbook?kind=kit', { headers: auth(A.token) })).body.data?.parts ?? []).find((p: any) => p.id === ORG);
+  assert(row?.reach === 'organism' && row?.organism === orgId, `A's list row says the organism: ${JSON.stringify(row)}`);
   const c = await json(`/v1/designbook/${ORG}`, { headers: auth(C.token) });
   assert(c.status === 404, `C reads it: ${c.status}`);
 });
