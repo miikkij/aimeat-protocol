@@ -11,6 +11,10 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-30 -- POST /v1/storage takes `store` (JSON) or `?store=` (raw body), the store the writer
+ *     names for the bytes, for the inline write and the presigned mint; the upload answer and the list
+ *     say each file's `store`; GET /v1/storage moved by pure extraction to routes/storage-files-list.ts
+ *     (800-line limit) (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-26 -- GET and HEAD /v1/storage/{key} (DELETE through removeStorageFile), and /v1/pub for the account's own namespace,
  *     read the short `ext/<name>/...` of the account's own extension as its stored
  *     `ext/<account>/<name>/...` when the key as written names no file (owner namespaces, secaudit2026oct22).
@@ -176,6 +180,7 @@ import { createOrganismHelpers, type OrganismHelpers } from './organisms/shared.
 import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
 import { ownExtensionFileKey } from '../services/component-address.js';
+import { storageFilesListRouter, storePlaceOf } from './storage-files-list.js';
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -265,9 +270,15 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // The writer, and what it said about how the bytes were made (services/storage-file-write.ts
         // decides). A raw-body upload carries no statement: the writer alone decides its record.
         let provenance: StorageProvenanceInput & { wireBlock?: unknown } = { actor: gaii, scopes: req.auth!.scopes, pipeline: 'rest.storage' };
+        // The store the writer named for the bytes (`own:<name>`, `node:<name>`): the JSON body's
+        // `store`, or `?store=` with a raw body. Checked by the shared write with the caller's rights.
+        const storeOf = async (raw: unknown) => (typeof raw === 'string' && raw
+            ? { id: raw.slice(0, 100), operator: await callerOf(req, config.nodeId, storage).operator() } : undefined);
+        let store = await storeOf(req.query.store);
 
         if (contentType.includes('application/json')) {
-            const { key: k, visibility: asked, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs } = req.body ?? {};
+            const { key: k, visibility: asked, data, mime_type, mode, federate: reqFederate, group_id: reqGroupId, workspace_ref: reqWorkspaceRef, workspace_refs: reqWorkspaceRefs, store: reqStore } = req.body ?? {};
+            store = (await storeOf(reqStore)) ?? store;
             federateFlag = reqFederate === true;
             // The node's starting level (plan V5.2), before anything reads the level: 'default' (the
             // SDK's word) is the app-upload default for an app grant; none at all is the file default.
@@ -293,6 +304,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     workspaceRef: normalizeWorkspaceRefs(reqWorkspaceRefs, reqWorkspaceRef) || undefined,
                     provenance,
                     publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
+                    ...(store ? { store } : {}),
                 });
                 if (!minted.ok) {
                     res.status(minted.status).json(error(config.nodeId, minted.code, minted.message));
@@ -355,6 +367,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             provenance,
             // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
             publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
+            ...(store ? { store } : {}),
         });
         if (!written.ok) {
             res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -369,6 +382,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // The record the file carries: the one attached, declared or stamped above.
             ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
             key: file.key,
+            // Where the bytes went: `database`, `node:<name>` or `own:<name>`.
+            store: storePlaceOf(file),
             owner_gaii: file.ownerGaii,
             size: file.size,
             mime_type: file.mimeType,
@@ -391,24 +406,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         ]));
     });
 
-    // GET /v1/storage — list storage items (agent auth)
-    router.get('/v1/storage', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
-        const gaii = resolve(req);
-        // The classification reader (TARGET-082): a file this caller may not see is not listed.
-        const files = await contentReaderFor({ storage, config }, req.auth)
-            .show(await storage.listStorageFiles(gaii), f => fileTarget(gaii, f.key, f.workspaceRef));
-
-        res.json(success(config.nodeId, {
-            files: files.map(f => ({
-                key: f.key,
-                size: f.size,
-                mime_type: f.mimeType,
-                visibility: f.visibility,
-                created_at: f.createdAt,
-            })),
-            total: files.length,
-        }));
-    });
+    // GET /v1/storage — list storage items (routes/storage-files-list.ts)
+    router.use(storageFilesListRouter(config, storage));
 
     // PATCH /v1/storage/{*key}/visibility — change a file's visibility (owner of the file only).
     // Mirrors PATCH /v1/memory/files/:key/visibility. Lets a document make its embedded images

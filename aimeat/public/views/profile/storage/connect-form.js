@@ -2,19 +2,22 @@
  * @file public/views/profile/storage/connect-form.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The form that connects a person's own storage on the page "Your own storage"
- *   (views/profile/storage-tab.js): an S3 bucket (Amazon S3 or any S3-compatible service: the address
- *   empty for Amazon S3, the region, the bucket, the access key id and its secret, how the bucket is
- *   named in the address) or an Azure Blob container (the account, the container, and one credential:
- *   the account key, a connection string or a container SAS URL), an optional folder, and the reason
- *   an operator reads when the rule here is that an operator approves. PUT /v1/file-store tests the
- *   storage (write, read, read part, list, remove) before it saves anything; the form shows each step
- *   of a passed test, or the refusal in the node's words. The keys are typed hidden, never sent back by
- *   the node, and the form empties them after every send. Every part is a library component; the form
- *   passes data and writes no class.
- * @structure S · placeWords · ConnectForm({ mode, approved, replacing, onConnected, clearSignal }) · TestSteps
- * @usage html`<${ConnectForm} mode=${v.mode} approved=${approved} replacing=${!!v.store} onConnected=${reload} />`
+ * @description The form that connects one of a person's own stores on the page "Your own storage"
+ *   (views/profile/storage-tab.js): the store's name (the first one is "main" unless the person names
+ *   it; a name they already use gives that store new keys), whether it becomes the default, the address
+ *   and keys of an S3 bucket or an Azure Blob container (store-fields.js), an optional folder, and the
+ *   reason an operator reads when the rule here is that an operator approves. PUT /v1/file-store tests
+ *   the storage (write, read, read part, list, remove) before it saves anything; the form shows each
+ *   step of a passed test, or the refusal in the reader's words (store-words.js). The keys are typed
+ *   hidden, never sent back by the node, and the form empties them after every send. Every part is a
+ *   library component; the form passes data and writes no class.
+ * @structure S · placeWords · ConnectForm({ mode, approved, names, onConnected, clearSignal }) · TestSteps
+ * @usage html`<${ConnectForm} mode=${v.mode} approved=${approved} names=${v.stores.map((s) => s.name)} onConnected=${reload} />`
  * @version-history
+ *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
+ *     the name field and "Make this the default"; `names` (the stores the person has) replaces
+ *     `replacing`, and the form says when a name gives an existing store new keys. The address and key
+ *     fields moved to store-fields.js, shared with the admin form. A refusal reads in the reader's words.
  *   v1.1.0 — 2026-10-29 — placeWords: where a storage is, built from the API's `place` in the reader's
  *     language (the English `where` only as a fallback). The secret fields empty after every send,
  *     a refused one too, and after Disconnect (`clearSignal`).
@@ -25,23 +28,27 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { connectMyFileStore } from '/js/services/file-store.js';
-import { Choice } from '/components/Choice.js';
 import { TextField } from '/components/TextField.js';
 import { Fields, FormActions } from '/components/Field.js';
+import { Check } from '/components/Check.js';
 import { Action } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { List, Row, Name, Tick } from '/components/List.js';
 import { Stack, Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
+import { EMPTY_STORE, withoutSecrets, lackingOf, storeBody, StoreFields } from './store-fields.js';
+import { refusalWords, RefusalNote } from './store-words.js';
 
 const html = htm.bind(h);
 /** One word of the page "Your own storage". */
 export const S = (key, params) => t('profile.storage.' + key, params);
 
-const EMPTY = {
-  endpoint: '', region: '', bucket: '', access_key_id: '', secret_access_key: '', addressing: 'auto',
-  account: '', container: '', credential: '', prefix: '', reason: '',
-};
+/** A store's name: what a person types to choose it (src/services/file-store/store-target.ts STORE_NAME). */
+export const STORE_NAME = /^[a-z0-9][a-z0-9-]{0,39}$/;
+/** The name of a person's first store when they name none (owner-file-store.ts LEGACY_STORE_NAME). */
+const FIRST_NAME = 'main';
+
+const EMPTY = { ...EMPTY_STORE, name: '', prefix: '', reason: '' };
 
 /**
  * Where a storage is, in the reader's language, built from the API's `place` ({ kind, name, at }):
@@ -73,55 +80,56 @@ export function TestSteps({ steps }) {
     <//>`;
 }
 
-/** The form's fields with every secret emptied: the S3 secret and the Azure credential. */
-const withoutSecrets = (cur) => ({ ...cur, secret_access_key: '', credential: '' });
+/** What the form says once a store was saved: waiting for an operator, the default now, or one to choose. */
+function savedWords(outcome, isDefault) {
+  if (outcome === 'waiting_for_operator') return S('form.waiting');
+  return isDefault ? S('form.connected') : S('form.connectedOther');
+}
 
 /**
  * The connect form. `mode` is the rule here ('operator' | 'self'); `approved` whether an operator has
- * approved this person; `replacing` whether a storage is connected already; `onConnected(data)` gets
- * the node's answer ({ outcome, test, view }) after a connection was saved; a change of `clearSignal`
- * (the page bumps it after Disconnect) empties the secret fields.
+ * approved this person; `names` the names of the stores the person has; `onConnected(data)` gets the
+ * node's answer ({ outcome, test, view }) after a store was saved; a change of `clearSignal` (the page
+ * bumps it after Disconnect) empties the secret fields.
  */
-export function ConnectForm({ mode, approved, replacing, onConnected, clearSignal }) {
+export function ConnectForm({ mode, approved, names = [], onConnected, clearSignal }) {
   const [kind, setKind] = useState('s3');
   const [f, setF] = useState(EMPTY);
+  const [makeDefault, setMakeDefault] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState(null);
   const set = (name) => (v) => setF((cur) => ({ ...cur, [name]: v }));
   const asksReason = mode === 'operator' && !approved;
   useEffect(() => { if (clearSignal) setF(withoutSecrets); }, [clearSignal]);
 
-  const missing = kind === 's3'
-    ? [!f.bucket.trim() && S('form.bucket'), !f.access_key_id.trim() && S('form.keyId'), !f.secret_access_key.trim() && S('form.secret')]
-    : [!f.credential.trim() && S('form.credential')];
-  const lacking = missing.filter(Boolean);
+  const first = names.length === 0;
+  const name = f.name.trim() || (first ? FIRST_NAME : '');
+  const nameBad = !!f.name.trim() && !STORE_NAME.test(f.name.trim());
+  const replacing = !!name && names.includes(name);
+  const lacking = [!name && S('form.name'), ...lackingOf(kind, f)].filter(Boolean);
 
   const send = async () => {
-    if (lacking.length || busy) return;
-    const common = { ...(f.prefix.trim() ? { prefix: f.prefix.trim() } : {}), ...(asksReason && f.reason.trim() ? { reason: f.reason.trim() } : {}) };
-    const body = kind === 's3'
-      ? {
-        kind: 's3', bucket: f.bucket.trim(), access_key_id: f.access_key_id.trim(), secret_access_key: f.secret_access_key.trim(),
-        addressing: f.addressing, ...(f.endpoint.trim() ? { endpoint: f.endpoint.trim() } : {}), ...(f.region.trim() ? { region: f.region.trim() } : {}), ...common,
-      }
-      : {
-        kind: 'azure', credential: f.credential.trim(),
-        ...(f.account.trim() ? { account: f.account.trim() } : {}), ...(f.container.trim() ? { container: f.container.trim() } : {}), ...common,
-      };
+    if (lacking.length || nameBad || busy) return;
+    const body = {
+      name, ...(makeDefault && !first ? { make_default: true } : {}), ...storeBody(kind, f),
+      ...(f.prefix.trim() ? { prefix: f.prefix.trim() } : {}), ...(asksReason && f.reason.trim() ? { reason: f.reason.trim() } : {}),
+    };
     setBusy(true);
     setResult(null);
     try {
       const r = await connectMyFileStore(body);
-      setResult({ outcome: r.data.outcome, steps: r.data.test?.steps || [] });
+      const view = r.data.view || {};
+      setResult({ outcome: r.data.outcome, steps: r.data.test?.steps || [], isDefault: view.default_store === `own:${name}` });
       // The keys leave the page once the node has them: the form never holds a saved secret.
-      setF((cur) => ({ ...withoutSecrets(cur), access_key_id: '', reason: '' }));
+      setF((cur) => ({ ...withoutSecrets(cur), access_key_id: '', reason: '', name: '' }));
+      setMakeDefault(false);
       onConnected?.(r.data);
     } catch (e) {
-      // The node names what failed (a missing field, the test step, files still in the old storage); it
+      // The node names what failed (a missing field, the test step, files still in the old place); it
       // stays under the button. The secrets go here too: a key typed once is never left in the page.
       swallowed('storage-tab: connect', e);
       setF(withoutSecrets);
-      setResult({ error: (e && e.message) || t('common.error'), code: e && e.code });
+      setResult({ refusal: refusalWords(e) });
     } finally {
       setBusy(false);
     }
@@ -129,30 +137,15 @@ export function ConnectForm({ mode, approved, replacing, onConnected, clearSigna
 
   return html`
     <${Stack} gap="medium">
-      <${Note} kind="lead">${replacing ? S('form.leadReplace') : S('form.lead')}<//>
-      <${Choice} label=${S('form.kind')} value=${kind} onChange=${(v) => { setKind(v); setResult(null); }}
-        options=${[['s3', S('form.kindS3')], ['azure', S('form.kindAzure')]]} />
-      ${kind === 's3' ? html`
-        <${Fields} cols=${2}>
-          <${TextField} label=${S('form.endpoint')} hint=${S('form.endpointHint')} value=${f.endpoint} code maxLength=${300}
-            placeholder="https://…" onInput=${set('endpoint')} />
-          <${TextField} label=${S('form.region')} hint=${S('form.regionHint')} value=${f.region} code size="medium" maxLength=${64}
-            placeholder="eu-north-1" onInput=${set('region')} />
-          <${TextField} label=${S('form.bucket')} hint=${S('form.bucketHint')} value=${f.bucket} code maxLength=${255} onInput=${set('bucket')} />
-          <${TextField} label=${S('form.keyId')} value=${f.access_key_id} code maxLength=${256} onInput=${set('access_key_id')} />
-          <${TextField} unmanaged label=${S('form.secret')} hint=${S('form.secretHint')} value=${f.secret_access_key} maxLength=${512}
-            onInput=${set('secret_access_key')} onEnter=${send} />
-        <//>
-        <${Choice} label=${S('form.addressing')} hint=${S('form.addressingHint')} value=${f.addressing} onChange=${set('addressing')}
-          options=${[['auto', S('form.addrAuto')], ['path', S('form.addrPath')], ['host', S('form.addrHost')]]} />` : html`
-        <${Fields} cols=${2}>
-          <${TextField} label=${S('form.account')} hint=${S('form.accountHint')} value=${f.account} code maxLength=${64} onInput=${set('account')} />
-          <${TextField} label=${S('form.container')} hint=${S('form.containerHint')} value=${f.container} code maxLength=${63} onInput=${set('container')} />
-        <//>
-        <${Fields}>
-          <${TextField} unmanaged label=${S('form.credential')} hint=${S('form.credentialHint')} value=${f.credential} maxLength=${4096}
-            onInput=${set('credential')} onEnter=${send} />
-        <//>`}
+      <${Note} kind="lead">${first ? S('form.lead') : S('form.leadMore')}<//>
+      <${Fields} cols=${2}>
+        <${TextField} label=${S('form.name')} hint=${replacing ? S('form.nameReplaces', { name }) : S('form.nameHint')} value=${f.name}
+          code size="medium" maxLength=${40} placeholder=${first ? FIRST_NAME : ''} onInput=${(v) => set('name')(v.toLowerCase())}
+          invalid=${nameBad} message=${nameBad ? { text: S('form.nameBad'), error: true } : undefined} />
+      <//>
+      ${first ? null : html`
+        <${Check} checked=${makeDefault} onChange=${setMakeDefault} hint=${S('form.makeDefaultHint')}>${S('form.makeDefault')}<//>`}
+      <${StoreFields} kind=${kind} onKind=${(v) => { setKind(v); setResult(null); }} f=${f} set=${set} onEnter=${send} />
       <${Fields} cols=${asksReason ? 2 : undefined}>
         <${TextField} label=${S('form.folder')} hint=${S('form.folderHint')} value=${f.prefix} code maxLength=${200} onInput=${set('prefix')} />
         ${asksReason ? html`
@@ -160,17 +153,17 @@ export function ConnectForm({ mode, approved, replacing, onConnected, clearSigna
       <//>
       <${Space} above="small">
         <${FormActions} apart>
-          <${Action} small control disabled=${busy || lacking.length > 0} onClick=${send}>
-            ${busy ? S('form.testing') : S('form.connect')}
+          <${Action} small control disabled=${busy || lacking.length > 0 || nameBad} onClick=${send}>
+            ${busy ? S('form.testing') : replacing ? S('form.connectReplace') : S('form.connect')}
           <//>
           <${Note} kind="hint" inline>
             ${lacking.length ? S('form.fillFirst', { fields: lacking.join(', ') }) : S('form.testFirst')}
           <//>
         <//>
       <//>
-      ${result && result.error ? html`<${Note} kind="message" error>${result.error}<//>` : null}
-      ${result && !result.error ? html`
-        <${Note} kind="message">${result.outcome === 'waiting_for_operator' ? S('form.waiting') : S('form.connected')}<//>
+      ${result && result.refusal ? html`<${RefusalNote} refusal=${result.refusal} />` : null}
+      ${result && !result.refusal ? html`
+        <${Note} kind="message">${savedWords(result.outcome, result.isDefault)}<//>
         <${TestSteps} steps=${result.steps} />` : null}
     <//>`;
 }

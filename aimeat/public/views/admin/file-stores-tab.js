@@ -4,20 +4,27 @@
  * SPDX-License-Identifier: MIT
  * @description The admin page "File storage" (id `file-stores`, opened by /v1/admin?tab=file-stores,
  *   the link the operators' notifications carry). Stored files can keep their bytes in the node's
- *   database, in one S3 bucket or in one Azure Blob container for the whole node, and a person may
- *   connect a storage of their own when the operator's rule lets them. This page shows where new files
- *   go and whether that place is complete and answers (Test connection), how many files sit where,
- *   moves the older files out of the database, and decides people's requests for their own storage.
+ *   database, in the S3 bucket or Azure Blob container the environment names, or in a named store an
+ *   operator adds on this page (one of them the default, some open for everyone to choose), and a
+ *   person may connect stores of their own when the operator's rule lets them. This page shows where
+ *   new files go and whether that place is complete and answers (Test connection), the named stores
+ *   with their actions and the form that adds one, how many files sit where, moves files from one
+ *   place to another, and decides people's requests for their own storage.
  *   One read, GET /v1/admin/file-store, which the aimeat_admin_file_store tool returns too, re-read on
  *   the SSE change domains `config` (a setting saved on the Config tab), `notifications` (a person's
  *   request reaches the operators as one) and `file-store`. In order: the lead, the numeral strip (in
- *   the database, in the node's store, in people's own storage, waiting for you), where new files go,
- *   the files in the database with the move, people's own storage, and the aside on the same page for
- *   the operator's own AI. Every part is a library component; the page passes data and writes no class.
+ *   the database, in the server's stores, in people's own storage, waiting for you), where new files
+ *   go, the server's stores, add a store, the move, people's own storage, and the aside on the same
+ *   page for the operator's own AI. Every part is a library component; the page passes data and writes
+ *   no class.
  * @structure FileStoresTab({ switchPage }) — load · Strip · PlaceSection · MoveSection · OwnersSection
- *   (file-stores-tab.parts.js) · AiAside · the writes (test, move, decide)
+ *   (file-stores-tab.parts.js) · NamedSection · AddStoreSection (file-stores-tab.named.js) · AiAside ·
+ *   the writes (test, move, decide)
  * @usage Registered in views/admin.js NAV_GROUPS as { id: 'file-stores', key: 'admin.fileStores.title' }.
  * @version-history
+ *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
+ *     the sections "The server's stores" and "Add a store" (file-stores-tab.named.js); the move takes a
+ *     from and a to; a refusal reads in the reader's words.
  *   v1.1.0 — 2026-10-29 — Sizes in the unit that fits (fileSize), so small files no longer read "0 MB".
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
@@ -33,12 +40,17 @@ import { Marks, Code } from '/components/Mark.js';
 import { getNodeFileStore, testNodeFileStore, moveNodeFiles, decideOwnerFileStore } from '/js/services/file-store.js';
 import { fileSize } from '/js/services/file-store.js';
 import { F, PlaceSection, MoveSection, OwnersSection } from './file-stores-tab.parts.js';
+import { NamedSection, AddStoreSection } from './file-stores-tab.named.js';
+import { refusalWords } from '../profile/storage/store-words.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
 /** The tools the operator's own AI reads and runs this page with. */
-const AI_TOOLS = ['aimeat_admin_file_store', 'aimeat_admin_file_store_test', 'aimeat_admin_file_store_move', 'aimeat_admin_file_store_decide'];
+const AI_TOOLS = [
+  'aimeat_admin_file_store', 'aimeat_admin_file_store_set', 'aimeat_admin_file_store_remove', 'aimeat_admin_file_store_test',
+  'aimeat_admin_file_store_move', 'aimeat_admin_file_store_decide',
+];
 /** Files moved per call: the route's default, small enough that one call never holds the node for long. */
 const MOVE_BATCH = 100;
 /** The most failures the page lists; the count says how many there were. */
@@ -54,7 +66,8 @@ function Strip({ view, toSection }) {
   const waiting = view.owner_stores.mode === 'operator' ? view.owner_stores.waiting.length : 0;
   return html`<${FigureStrip} wrap items=${[
     { key: 'db', n: num(f.database.count), label: F('strip.database'), sub: fileSize(f.database.bytes), onClick: () => toSection('adm-fs-move') },
-    { key: 'node', n: num(f.node_store.count), label: F('strip.node'), sub: fileSize(f.node_store.bytes), onClick: () => toSection('adm-fs-place') },
+    // The server's storage is the environment's store and the named ones together.
+    { key: 'node', n: num(f.node_store.count + (f.named_stores?.count || 0)), label: F('strip.node'), sub: fileSize(f.node_store.bytes + (f.named_stores?.bytes || 0)), onClick: () => toSection('adm-fs-named') },
     { key: 'own', n: num(f.own_stores.count), label: F('strip.own'), sub: fileSize(f.own_stores.bytes), onClick: () => toSection('adm-fs-owners') },
     view.owner_stores.mode === 'operator' && {
       key: 'waiting', n: num(waiting), label: F('strip.waiting'), sub: F('strip.waitingSub'),
@@ -116,14 +129,14 @@ export default function FileStoresTab(props) {
    * Move batch after batch until none remain, the operator presses Stop, or a batch was the last page
    * (`next` null: what is left failed, and the next press tries it again from the start).
    */
-  const runMove = async () => {
+  const runMove = async (from, to) => {
     stopRef.current = false;
-    let sum = { running: true, moved: 0, mb: 0, remaining: null, failed: [], failedCount: 0, error: '' };
+    let sum = { running: true, from, moved: 0, mb: 0, remaining: null, failed: [], failedCount: 0, refusal: null };
     setMove(sum);
     let after;
     try {
       for (let round = 0; round < MOVE_ROUNDS_MAX; round++) {
-        const r = (await moveNodeFiles(MOVE_BATCH, after)).data;
+        const r = (await moveNodeFiles({ limit: MOVE_BATCH, after, from, to: to || undefined })).data;
         sum = {
           ...sum,
           moved: sum.moved + r.moved,
@@ -138,7 +151,7 @@ export default function FileStoresTab(props) {
       }
     } catch (e) {
       swallowed('file-stores-tab: move', e);
-      sum = { ...sum, error: errWords(e) };
+      sum = { ...sum, refusal: refusalWords(e) };
     }
     setMove({ ...sum, running: false });
     load();
@@ -160,6 +173,12 @@ export default function FileStoresTab(props) {
     }
   };
 
+  /** After a write to a named store: the words to the operator, when there are any, and one re-read. */
+  const named = async (words) => {
+    if (words) showOk(words);
+    await load();
+  };
+
   if (!view) {
     return html`
       ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
@@ -171,7 +190,9 @@ export default function FileStoresTab(props) {
     <${Note} kind="lead">${F('lead')}<//>
     <${Strip} view=${view} toSection=${toSection} />
     <${PlaceSection} number="01" view=${view} test=${test} testing=${testing} onTest=${runTest} switchPage=${switchPage} />
-    <${MoveSection} number="02" view=${view} move=${move} onMove=${runMove} onStop=${stopMove} />
-    <${OwnersSection} number="03" view=${view} onDecide=${decide} switchPage=${switchPage} />
+    <${NamedSection} number="02" view=${view} onDone=${named} />
+    <${AddStoreSection} number="03" view=${view} onDone=${named} />
+    <${MoveSection} number="04" view=${view} move=${move} onMove=${runMove} onStop=${stopMove} />
+    <${OwnersSection} number="05" view=${view} onDecide=${decide} switchPage=${switchPage} />
     <${AiAside} />`;
 }

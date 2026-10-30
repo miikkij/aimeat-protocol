@@ -8,15 +8,27 @@
  * @structure fileStoreCliTools[]
  * @usage import { fileStoreCliTools } from './tool-call-defs-file-store.js';
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Named stores: name and make_default on set, name on remove, to and from on
+ *     move; aimeat_admin_file_store_set and aimeat_admin_file_store_remove; a test by name and a move
+ *     with from and to (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
-import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { requiredString, optionalString, optionalNumber } from './tool-call-helpers.js';
+import type { ConnectCliToolDefinition, JsonObject } from './tool-call-helpers.js';
+import { requiredString, optionalString, optionalNumber, optionalBoolean } from './tool-call-helpers.js';
 
 const enc = encodeURIComponent;
 
-/** The optional string fields of a connect call, passed on only when given. */
-const SET_FIELDS = ['endpoint', 'region', 'bucket', 'addressing', 'access_key_id', 'secret_access_key', 'account', 'container', 'credential', 'prefix', 'reason'] as const;
+/** The address and key fields of a store, passed on only when given. */
+const STORE_FIELDS = ['kind', 'endpoint', 'region', 'bucket', 'addressing', 'access_key_id', 'secret_access_key', 'account', 'container', 'credential', 'prefix'] as const;
+
+/** The given string and boolean fields of `input`, by name. */
+function pick(input: Record<string, unknown>, strings: readonly string[], booleans: readonly string[] = [], numbers: readonly string[] = []): JsonObject {
+  const body: JsonObject = {};
+  for (const f of strings) { const v = optionalString(input, f); if (v !== undefined) body[f] = v; }
+  for (const f of booleans) { const v = optionalBoolean(input, f); if (v !== undefined) body[f] = v; }
+  for (const f of numbers) { const v = optionalNumber(input, f); if (v !== undefined) body[f] = v; }
+  return body;
+}
 
 export const fileStoreCliTools: ConnectCliToolDefinition[] = [
   {
@@ -27,27 +39,20 @@ export const fileStoreCliTools: ConnectCliToolDefinition[] = [
   {
     // → PUT /v1/file-store
     name: 'aimeat_file_store_set',
-    handler: ({ client }, input) => {
-      const body: Record<string, string> = { kind: requiredString(input, 'kind') };
-      for (const f of SET_FIELDS) {
-        const v = optionalString(input, f);
-        if (v !== undefined) body[f] = v;
-      }
-      return client.put('/v1/file-store', body);
-    },
+    handler: ({ client }, input) => client.put('/v1/file-store', pick(input, [...STORE_FIELDS, 'name', 'reason'], ['make_default'])),
   },
   {
-    // → DELETE /v1/file-store
+    // → DELETE /v1/file-store?name=
     name: 'aimeat_file_store_remove',
-    handler: ({ client }) => client.delete('/v1/file-store'),
+    handler: ({ client }, input) => {
+      const name = optionalString(input, 'name');
+      return client.delete(`/v1/file-store${name ? `?name=${enc(name)}` : ''}`);
+    },
   },
   {
     // → POST /v1/file-store/move
     name: 'aimeat_file_store_move',
-    handler: ({ client }, input) => {
-      const limit = optionalNumber(input, 'limit');
-      return client.post('/v1/file-store/move', { direction: requiredString(input, 'direction'), ...(limit !== undefined ? { limit } : {}) });
-    },
+    handler: ({ client }, input) => client.post('/v1/file-store/move', pick(input, ['to', 'from', 'direction'], [], ['limit'])),
   },
   {
     // → GET /v1/admin/file-store
@@ -55,18 +60,25 @@ export const fileStoreCliTools: ConnectCliToolDefinition[] = [
     handler: ({ client }) => client.get('/v1/admin/file-store'),
   },
   {
+    // → PUT /v1/admin/file-store/stores/:name
+    name: 'aimeat_admin_file_store_set',
+    handler: ({ client }, input) => client.put(`/v1/admin/file-store/stores/${enc(requiredString(input, 'name'))}`,
+      pick(input, STORE_FIELDS, ['selectable', 'make_default'])),
+  },
+  {
+    // → DELETE /v1/admin/file-store/stores/:name
+    name: 'aimeat_admin_file_store_remove',
+    handler: ({ client }, input) => client.delete(`/v1/admin/file-store/stores/${enc(requiredString(input, 'name'))}`),
+  },
+  {
     // → POST /v1/admin/file-store/test
     name: 'aimeat_admin_file_store_test',
-    handler: ({ client }) => client.post('/v1/admin/file-store/test', {}),
+    handler: ({ client }, input) => client.post('/v1/admin/file-store/test', pick(input, ['name'])),
   },
   {
     // → POST /v1/admin/file-store/move
     name: 'aimeat_admin_file_store_move',
-    handler: ({ client }, input) => {
-      const limit = optionalNumber(input, 'limit');
-      const after = optionalString(input, 'after');
-      return client.post('/v1/admin/file-store/move', { ...(limit !== undefined ? { limit } : {}), ...(after ? { after } : {}) });
-    },
+    handler: ({ client }, input) => client.post('/v1/admin/file-store/move', pick(input, ['after', 'from', 'to'], [], ['limit'])),
   },
   {
     // → POST /v1/admin/file-store/owners/:owner/decision

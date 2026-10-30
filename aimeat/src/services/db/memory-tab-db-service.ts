@@ -13,6 +13,8 @@
  * @structure MemoryTabService.overview(reader, ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(readerFor({ storage, config }, req.auth), owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.4.0 — 2026-10-30 — Each file row says its `store`, as GET /v1/memory/files does: the tab's first
+ *     load showed no place until the list was read again (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.3.0 — 2026-10-09 — The agents go out without their webhook signing secret (agentRecordView),
  *     found by e2e-secret-canary-sweep (secrets audit 2026-10-09).
  *   v1.2.1 — 2026-10-05 — A file's workspace binding goes to fileTarget (secaudit 2026-10, DATA-4).
@@ -32,6 +34,8 @@ import { visibilityToZone } from '../../routes/memory/shared.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import type { ContentReader } from '../classification/reader.js';
 import { agentRecordView } from '../agent-record-view.js';
+import { choiceIdOf } from '../file-store/file-store-resolver.js';
+import { parseBlobRef } from '../../storage/blob/blob-types.js';
 
 export interface MemoryTabOverview {
   agents: unknown[];
@@ -98,6 +102,8 @@ export class MemoryTabService {
           fileRows.push({
             key: f.key, owner_gaii: f.ownerGaii, size: f.size, mime_type: f.mimeType,
             visibility: f.visibility, tags: f.tags || [], created_at: f.createdAt,
+            // Where the bytes are, as GET /v1/memory/files says it: `database`, `node:<name>`, `own:<name>`.
+            store: choiceIdOf(parseBlobRef(f.blobRef)?.storeId),
           });
         }
       }

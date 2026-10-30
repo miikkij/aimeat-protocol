@@ -11,6 +11,8 @@
  *   - chunked-upload methods: create/get/addChunk/delete for resumable uploads
  *
  * @version-history
+ *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of any one place, so a
+ *     move can empty a store as well as the database (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — setStorageFileBlobRef, storageFileBlobRefsIn, listStorageFilesInDatabase and countStorageFilesByStore, and
  *     StorageFileRecord.blobRef on every read: a file's bytes may live in an S3 or Azure Blob store
  *     (storage/blob/; wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -66,9 +68,10 @@ export interface FileRepository {
   /** Of these object references, the ones some row still holds. The orphan sweep asks this for each
    *  page of objects it lists, so an object no row names can be removed. */
   storageFileBlobRefsIn(refs: string[]): Promise<string[]>;
-  /** Files whose bytes the database holds, metadata only, ordered by (ownerGaii, key) after `after`.
-   *  `owners` narrows to those identities. The page the move to an object store works through. */
-  listStorageFilesInDatabase(opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]>;
+  /** The files of one place, metadata only, ordered by (ownerGaii, key) after `after`: `database` for
+   *  the rows that hold their own bytes, else a store id (`node:s3`, `owner:<ghii>/<name>`), matched
+   *  exactly. `owners` narrows to those identities. The page a move between places works through. */
+  listStorageFilesIn(opts: { store: string; limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]>;
   /** How many files, and how many bytes, each place holds: `database` for the rows that hold their
    *  own bytes, else the store id of the reference (`node:s3`, `owner:<ghii>`). One grouped query. */
   countStorageFilesByStore(): Promise<{ store: string; count: number; bytes: number }[]>;

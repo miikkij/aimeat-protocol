@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Memory, action/work/wallet, boards, disputes, files, and flags record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.7.1 — 2026-10-30 — StorageFileRecord.storeChoice: the store a write's writer named, taken off by
+ *     the file-store wrapper; ChunkedUploadRecord.storeChoice carries it from init to complete
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.6.1 — 2026-10-17 — BoardRecord.visibility may be `organism:<id>`: the active members of one
  *     organism (services/audience.ts; plan doc-mvcn6c7e4e5q, V3.5).
  *   v1.6.0 — 2026-10-17 — MemoryRecord, StorageFileRecord and ChunkedUploadRecord visibility are
@@ -302,6 +305,9 @@ export interface StorageFileRecord {
   /** Where the bytes are when they are not in the row: `<storeId>|<objectKey>` (storage/blob/blob-types.ts).
    *  Absent for a file whose bytes the database holds. Set by the file-store wrapper, never by a route. */
   blobRef?: string;
+  /** On a write only: the store its writer named (`own:<name>`, `node:<name>`), already checked by
+   *  services/storage-file-write.ts. The file-store wrapper takes it off before the row is written. */
+  storeChoice?: string;
 }
 
 export interface ChunkedUploadRecord {
@@ -313,6 +319,8 @@ export interface ChunkedUploadRecord {
   /** The group a 'group' file is for, and the "<organismId>/<workspaceId>" refs a 'workspace' file is for. */
   groupId?: string;
   workspaceRef?: string;
+  /** The store the bytes are kept in, named at init and checked there with the writer's rights. */
+  storeChoice?: string;
   chunkSize: number;
   totalChunks?: number;
   receivedChunks: Map<number, Buffer>;

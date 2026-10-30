@@ -5,6 +5,7 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v3.5.0 — 2026-10-30 — The upload passes on the store the person picked (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v3.4.0 — 2026-10-21 — The Files list and its count leave out contentclass-text/ files (userFiles).
  *   v3.3.0 — 2026-10-16 — A failed load of the records or the files is drawn as one (the could-not-load
  *     note with Retry, through memFailed / filesFailed in the render context), never as "Nothing here
@@ -554,8 +555,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     loadMemories();
   }
 
-  async function handleUploadFiles(fileItems, visibility, tags) {
-    const { ok, failures } = await uploadFilesPresigned(fileItems, visibility, tags);
+  async function handleUploadFiles(fileItems, visibility, tags, store) {
+    const { ok, failures } = await uploadFilesPresigned(fileItems, visibility, tags, store);
     if (ok > 0) showToast(ok === 1 ? t('profile.files.uploaded') : `${ok} ${t('profile.files.filesUploaded')}`);
     for (const message of failures) showToast(message || t('profile.files.uploadFailed'), true);
     if (ok > 0) { setShowFileForm(false); loadFiles(); }

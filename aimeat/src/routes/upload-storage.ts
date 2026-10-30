@@ -10,6 +10,8 @@
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.3.0 — 2026-10-30 — The token's `store`, the store the writer named at the mint, goes to the write
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.2.0 — 2026-10-20 — An agent the mint allowed to publish (no `publish_ask` in the token) is asked
  *     the publish gate again from its current record (uploadPublishGate), so a raise to public by an
  *     agent that lost publish:public after the mint is stored at its kept level with a request
@@ -34,6 +36,8 @@ import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { versionedAddress } from '../utils/http-range.js';
 import { uploadProvenanceBlock } from './storage-provenance-input.js';
+import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
+import { parseBlobRef } from '../storage/blob/blob-types.js';
 
 /**
  * The `ai_provenance` block a presigned token carries, mapped to the mint path's input — or
@@ -98,6 +102,10 @@ export async function handleStorageUpload(
                 ...(meta.ai_provenance !== undefined ? { declared: declaredFromMeta(meta) } : {}),
             },
             ...(requester ? { publishGate: { requester } } : liveGate ? { publishGate: liveGate } : {}),
+            // The store the mint checked with the writer's rights, from the SIGNED token. Asked again
+            // as an operator would ask it: who may choose it was settled at the mint, and the store's
+            // state now (gone, closed to own storage) is what the write asks.
+            ...(typeof meta.store === 'string' && meta.store ? { store: { id: meta.store, operator: true } } : {}),
         },
     );
     if (!written.ok) {
@@ -115,6 +123,8 @@ export async function handleStorageUpload(
         // The record the file carries: attached, declared or stamped by the write above.
         ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
         key: file.key,
+        // Where the bytes went: `database`, `node:<name>` or `own:<name>`.
+        store: choiceIdOf(parseBlobRef(file.blobRef)?.storeId),
         owner_gaii: file.ownerGaii,
         size: file.size,
         mime_type: file.mimeType,

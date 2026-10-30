@@ -15,6 +15,7 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-10-30 — ChunkedUploadInitSchema takes `store` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   String limits — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   Field errors — 2026-10-27 — validateBody answers through models/validation-issues.ts: each detail
  *     carries a code and the limit, and the messages follow the caller's language; it was a fixed
@@ -383,6 +384,8 @@ export const ChunkedUploadInitSchema = z.object({
     group_id: z.string().min(1).max(200).optional(),
     workspace_ref: z.string().min(1).max(2000).optional(),
     workspace_refs: z.array(z.string().min(1).max(200)).max(50).optional(),
+    // The store the bytes are kept in, as POST /v1/storage takes it: "own:<name>" or "node:<name>".
+    store: z.string().min(1).max(100).optional(),
 });
 
 // ── Schema Locking (Phase 0.1) ──────────────────────────────
