@@ -16,13 +16,18 @@
  *        collect() reads that session back from Stripe and takes it as payment only when it is paid,
  *        for this AIMEAT session, in this amount and currency. The app completes when the person
  *        returns; the Stripe webhook completes it when they never do (routes/commerce-webhooks.ts).
- *   A credit card records the buyer as a verified adult, as on the direct card path (A-4). A line
- *   that renews (auto_renew) keeps the card for the renewals (setup_future_usage off_session).
+ *   A credit card records the buyer as a verified adult, as on the direct card path (A-4): at once on
+ *   an operator's own Stripe account, and after the buyer's one-press confirmation on another seller's
+ *   (commerce/card-adult-ask.ts). A line that renews (auto_renew) keeps the card for the renewals
+ *   (setup_future_usage off_session).
  * @structure STRIPE_CHECKOUT_HANDLER_ID · openStripeCheckout · stripeCheckoutHandler
  * @usage
  *   const { url } = await openStripeCheckout(config, session, psp, returnUrl);
  *   registerPaymentHandler(stripeCheckoutHandler(config));
  * @version-history
+ *   v1.0.2 — 2026-10-30 — A credit card on a seller's own Stripe account waits for the buyer's
+ *     confirmation before the adult check is recorded (secaudit2026oct26 round 8c, commerce-07,
+ *     commerce/stripe-checkout-complete:seller-paid-session-records-buyer-adult).
  *   v1.0.1 — 2026-10-25 — A test-mode payment records no adult check (secaudit2026oct22).
  *   v1.0.0 — 2026-10-18 — Initial (Comicland v3 A-4, A-5, KAU-07).
  */
@@ -123,7 +128,7 @@ export function stripeCheckoutHandler(config: EncryptionConfig): PaymentHandler 
       const intent = (typeof cs.payment_intent === 'object' && cs.payment_intent ? cs.payment_intent : null) as Record<string, unknown> | null;
       const intentId = intent ? String(intent.id) : String(cs.payment_intent ?? '');
       if (!intentId) throw new PaymentError('PSP_ERROR', 502, 'The card payment provider did not say which payment this was.');
-      await recordCreditCardAdult(ctx.storage, buyerGhii, cardFundingOf(intent), isStripeTestMode(cs, intent));
+      await recordCreditCardAdult(ctx, buyerGhii, cardFundingOf(intent), isStripeTestMode(cs, intent), { seller, checkout: reference, payment: intentId });
       const customer = typeof cs.customer === 'string' ? cs.customer : null;
       const method = intent && typeof intent.payment_method === 'string' ? intent.payment_method : null;
       return { trackingCode: intentId, ...(customer && method ? { saved: { customer, payment_method: method } } : {}) };
