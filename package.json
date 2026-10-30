@@ -55,6 +55,7 @@
     "gen:notices": "cd aimeat && pnpm gen:notices",
     "check:notices": "cd aimeat && pnpm check:notices",
     "release:bump": "cd aimeat && pnpm release:bump",
+    "release:trust-cutoff": "cd aimeat && pnpm release:trust-cutoff",
     "check:protocol-versions": "cd aimeat && pnpm check:protocol-versions",
     "check:supply-chain": "cd aimeat && pnpm check:supply-chain",
     "sbom": "cd aimeat && pnpm sbom",

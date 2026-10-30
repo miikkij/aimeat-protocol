@@ -44,6 +44,10 @@
  *   node scripts/release-ready.mjs [--sha=<commit>] [--require=ci.yml,e2e-full.yml] [--no-main-check]
  *   AIMEAT_RELEASE_RED_REASON="<why this release cannot wait for the nightly>" npm publish
  * @version-history
+ *   v1.3.0 -- 2026-10-30 -- A node release (one that requires e2e-full.yml) is refused while
+ *     ADOPTION_CUTOFF in the released commit's aimeat/src/cli/connect/adoption-cutoff.ts is null; a
+ *     commit without that file is not checked; `pnpm release:trust-cutoff` or
+ *     `pnpm release:bump` writes it (secaudit2026oct26 round 8c, connector-04).
  *   v1.2.0 -- 2026-10-20 -- The nightly also passes with a green run of an earlier commit on main that
  *     started within 24 hours; the commits since are printed, and CI must be green on the exact
  *     commit (Jouni, 2026-10-20, after 4.1.2 waited for a sweep of test-only commits).
@@ -56,6 +60,7 @@
 import { execFileSync } from 'node:child_process';
 import { appendFileSync } from 'node:fs';
 import { apiGet, repoSlug, runsForCommit } from './lib/ci-runs.mjs';
+import { CUTOFF_PATH, readAdoptionCutoff } from './lib/adoption-cutoff.mjs';
 
 /** The workflows a named reason may release over: the nightly sweep only. */
 const NIGHTLY_WORKFLOWS = ['e2e-full.yml'];
@@ -146,6 +151,25 @@ async function main() {
     }
 
     const problems = [];
+    // A node release carries the release time of the first version whose connector keeps a record of
+    // trusted commands; until it is written, a fresh install would adopt a folder that arrived after
+    // the release (secaudit2026oct26 round 8c, connector-04). The Python package does not carry it.
+    // It is read from the commit being released; a commit that has no such file predates it.
+    if (required.includes('e2e-full.yml')) {
+        let text = null;
+        try { text = git('show', `${sha}:${CUTOFF_PATH}`); } catch { /* not in this commit: nothing to check */ }
+        if (text !== null) {
+            let cutoff = '';
+            try { cutoff = readAdoptionCutoff(text); } catch (e) {
+                problems.push(`${CUTOFF_PATH} could not be read (${e instanceof Error ? e.message : String(e)}).`);
+            }
+            if (cutoff === null) {
+                problems.push(`ADOPTION_CUTOFF in ${CUTOFF_PATH} is not set. This is the first release whose connector keeps a record of trusted commands, and it carries its own time: run \`pnpm release:trust-cutoff\`, commit the file to main, and release that commit. \`pnpm release:bump\` writes it too.`);
+            } else if (cutoff) {
+                console.log(`  ✓ adoption cut-off: ${cutoff}`);
+            }
+        }
+    }
     /** Problems a named reason may release over: the nightly's red, missing or running run. */
     const nightly = [];
     for (const workflow of required) {

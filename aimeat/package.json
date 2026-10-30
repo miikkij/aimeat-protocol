@@ -42,6 +42,7 @@
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "build:everything": "tsx scripts/build-everything.ts",
     "release:bump": "tsx scripts/release-bump.ts",
+    "release:trust-cutoff": "node scripts/lib/adoption-cutoff.mjs",
     "check:everything": "tsx scripts/build-everything.ts --check",
     "check:changelog": "tsx scripts/check-changelog.ts",
     "check:imports-tracked": "tsx scripts/check-imports-tracked.ts",

@@ -10,6 +10,8 @@
  *   commands names each one in the log (secaudit2026oct26, mtime-cutoff-not-bound-to-update).
  * @usage cd aimeat && pnpm exec vitest run test/unit/connect-enrol-held-notice.test.ts
  * @version-history
+ *   v1.0.1 -- 2026-10-30 -- The adopted config is dated before any release that keeps a trust record;
+ *     the assertions are unchanged (secaudit2026oct26 round 8c, connector-04).
  *   v1.0.0 -- 2026-10-27 -- Initial (secaudit2026oct26, node-offer-trusts-held-commands).
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
@@ -92,7 +94,9 @@ describe('an enrolment the owner approved takes a held command into use, and say
     const { logger } = await import('../../src/utils/logger.js');
     const { adoptExistingCommands, heldBackCommands } = await import('../../src/cli/connect/command-trust.js');
     const cfg = join(home, 'agents', 'alice', 'concierge', 'config.yaml');
-    const past = new Date(Date.now() - 3_600_000);
+    // Before any release that keeps a trust record (ADOPTION_CUTOFF), as an install from before that
+    // release is (secaudit2026oct26 round 8c, connector-04: the date moved, the assertions did not).
+    const past = new Date('2026-10-01T00:00:00.000Z');
     const { utimesSync } = await import('node:fs');
     utimesSync(cfg, past, past);
     const infos: unknown[][] = [];

@@ -41,13 +41,22 @@
  *   that holds the program (secaudit2026oct26 round 8c, home-bound-not-resolution-directory).
  *   Absolute paths and bare names keep the hash they had.
  *
+ *   A FRESH INSTALL. A machine with no record treats its first start as the first start after the
+ *   update, and the cut-off bounds it: a config file is adopted only when it is also older than the
+ *   release time of the first version that keeps a record (ADOPTION_CUTOFF, adoption-cutoff.ts). An
+ *   install made after that release adopts nothing it did not write; its other commands are held as
+ *   in 3 (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update; Jouni, 2026-10-30, option A).
+ *
  *   KNOWN RESIDUAL. Adoption reads file times. An archive that keeps the times of its files, older
- *   than this machine's first start after the update, is adopted as an existing install would be.
- *   A machine with no record at all treats its first start as the first start after the update.
+ *   than that release and than this machine's first start, is adopted as an existing install would be.
  * @structure HeldCommands · commandTrustFile · commandHash · isTrustedCommand · trustWrittenCommands ·
  *   adoptExistingCommands · heldBackCommands · heldNotices
  * @usage adoptExistingCommands(home); const { config, held } = heldBackCommands(perAgent, home);
  * @version-history
+ *   v2.3.0 -- 2026-10-30 -- Adoption also requires a config file older than ADOPTION_CUTOFF, the
+ *     release time of the first version that keeps a record, so a fresh install after that release
+ *     adopts nothing it did not write (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update;
+ *     Jouni, 2026-10-30, option A).
  *   v2.2.0 -- 2026-10-29 -- A record that cannot be read, or has no firstRunAt, adopts nothing and gets
  *     no new firstRunAt (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update). A relative
  *     program path is resolved where it runs and the hash binds the absolute path; a record from
@@ -69,6 +78,7 @@ import { homedir } from 'node:os';
 import { dirname, join, resolve, isAbsolute } from 'node:path';
 import { parse } from 'yaml';
 import { logger } from '../../utils/logger.js';
+import { ADOPTION_CUTOFF } from './adoption-cutoff.js';
 
 // The parts of a per-agent config this file reads and changes. config.ts AimeatPerAgentConfig and
 // RunnerConfig have them; they are written out here so this file imports nothing from config.ts,
@@ -241,13 +251,15 @@ function configFilesOf(home: string): string[] {
 
 /**
  * The once-only adoption: the first start after this update writes `firstRunAt`, and every command
- * of this home whose config file is older than that is trusted, so an install keeps running what it
- * ran. A file written later (a folder cloned after the update) is not adopted. A record that exists
+ * of this home whose config file is older than that, and older than `cutoff` (the release time of
+ * the first version that keeps a record, adoption-cutoff.ts), is trusted, so an install keeps
+ * running what it ran. A file written later (a folder cloned after the update, or after that
+ * release on a fresh install) is not adopted. A record that exists
  * but cannot be read, or has no firstRunAt, adopts nothing and gets no firstRunAt: its commands are
  * held until `aimeat connect` takes each one into use. Never throws: a home that cannot be read
  * adopts nothing, and its commands do not run.
  */
-export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = process.env, dir: string = process.cwd()): void {
+export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = process.env, dir: string = process.cwd(), cutoff: string | null = ADOPTION_CUTOFF): void {
   try {
     const file = commandTrustFile(env);
     const found = readTrust(file);
@@ -256,7 +268,11 @@ export function adoptExistingCommands(home: string, env: NodeJS.ProcessEnv = pro
       return;
     }
     const record: TrustRecord = found ?? { firstRunAt: new Date().toISOString(), hashes: {} };
-    const before = Date.parse(record.firstRunAt!);
+    // A config file is adopted only when it is older than both this machine's first start and the
+    // first release that keeps a record: a fresh install after that release adopts nothing it did
+    // not write (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update).
+    const cut = cutoff ? Date.parse(cutoff) : NaN;
+    const before = Number.isNaN(cut) ? Date.parse(record.firstRunAt!) : Math.min(Date.parse(record.firstRunAt!), cut);
     let changed = !found?.firstRunAt;
     for (const path of configFilesOf(home)) {
       if (statSync(path).mtimeMs >= before) continue;
