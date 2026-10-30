@@ -1148,6 +1148,7 @@ const ALL_SUITES = [
     'test/e2e-appdev-proofs.ts',
     'test/e2e-mcp-organisms.ts',
     'test/e2e-mcp-workspaces.ts',
+    'test/e2e-workspace-record-files.ts',
     'test/e2e-organism-workspace-access.ts',
     'test/e2e-organism-provision.ts',
     // organism:write on the three organism WRITE doors. They used requireRoleOrScope('agent', …),

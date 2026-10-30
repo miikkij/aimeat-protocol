@@ -8,6 +8,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   2026-10-30 — publishDraft and publishDraftsBatch bind every file a published value links with
+ *     /v1/pub, and the publisher controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
  *   2026-10-27 — readManifest takes the newest copy of a current creator or admin (readOrganismMetaValue),
  *     and findWsEntry the registry copy that counts (workspaceRegistrations), not the first copy in store
  *     order (secaudit2026oct26, organism-meta-first-store-order-copy).
@@ -89,6 +91,7 @@ import { requireAuth, requireExternalPrincipal, requireScope } from '../../auth/
 import { verifyShareToken, shareTokenVersionOf } from '../../services/share-token.js';
 import { emitMemoryWritten } from '../../services/event-bus.js';
 import { normalizeDocValueImages, scopeDocImagesToWorkspace } from '../../services/doc-images.js';
+import { scopeRecordFilesToWorkspace } from '../../services/record-files.js';
 import { resolveIdentity, isSameOwner, isGEAI, localAccountName } from '../../utils/gaii.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -240,6 +243,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // Past the refusal: the document is being published, so its images may be scoped to the members
     // who are about to be able to read it.
     if (ws) await scopeDocImagesToWorkspace(storage, config, draftValue, localAccountName(ownerGhii), `${organismId}/${ws}`);
+    // And every file it links that the publisher controls (services/record-files.ts).
+    if (ws) await scopeRecordFilesToWorkspace(storage, draftValue, { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii }, `${organismId}/${ws}`);
 
     const versionRefs = await listVersionRefs(storage, base);
     const maxN = maxVersionOf(versionRefs);
@@ -488,7 +493,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     }
     // Past every refusal and the write: the published documents' images may now be scoped to the
     // members who can read them. A record the batch refused opens nothing.
-    if (ws) for (const v of toScope) await scopeDocImagesToWorkspace(storage, config, v, localAccountName(ownerGhii), `${organismId}/${ws}`);
+    if (ws) for (const v of toScope) {
+      await scopeDocImagesToWorkspace(storage, config, v, localAccountName(ownerGhii), `${organismId}/${ws}`);
+      await scopeRecordFilesToWorkspace(storage, v, { principal: publisher, ownerName: localAccountName(ownerGhii), ownerGhii }, `${organismId}/${ws}`);
+    }
     // Fire Tracked-Response evaluation for each published record (gated O(1) in the subscriber).
     // ...and schedule write-time classification of each (TARGET-082 V3), never awaited.
     for (const e of toEmit) {
