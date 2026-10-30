@@ -2409,6 +2409,12 @@
       },
       "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here. 2026-10-19: updateMemoryRecord is the same read for a caller that also sets tags or visibility; the reads it replaced left calibrator.ts, design-book/reasons.ts, design-book/service.ts, knowledge-sharing.ts and app-template-proposals.ts (check:atomic-writes)."
     },
+    "src/services/record-files.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-30, the node's own read: the metadata of a file a workspace record links, read only to decide whether to bind the writer's own file to the workspace; no bytes and no metadata are returned to anyone."
+    },
     "src/services/refinery/definition-ask.ts": {
       "reads": {
         "getMemory": 1

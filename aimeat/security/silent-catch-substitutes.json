@@ -213,6 +213,10 @@
       "count": 1,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."
     },
+    "src/services/record-files.ts": {
+      "count": 1,
+      "reason": "WRITTEN 2026-10-30 and right. decodeSegments keeps a URL segment with a malformed %-escape as written. Such a segment names no stored file, so the metadata lookup that follows misses and no file is bound to the workspace; the substitute cannot make anything readable that was not. [written 2026-10-30]"
+    },
     "src/services/relay-claim.ts": {
       "count": 1,
       "reason": "SEEDED 2026-09-13, NOT REVIEWED — this file answered a caught error with a value that says nothing failed, and whether that substitute is the right answer or a confident wrong one is a question nobody has read yet. Kept so the gate can refuse a NEW one."

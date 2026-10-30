@@ -312,7 +312,7 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-26",
+      "reviewedOn": "2026-10-30",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:8baa34c1b4642d1875c2b84a"
+      "digest": "sha256:b69649bdd5c329f4374a05ca"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-28",
@@ -349,7 +349,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-10-30",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,7 +359,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:4aaf6c52336aa508cd8b28fa"
+      "digest": "sha256:93aafcce1b6c8bf31142dd91"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-29",
@@ -747,7 +747,7 @@
     },
     "node:aimeat-extension-builder": {
       "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1",
-      "aimeat/src/services/extension-ctx-contract.ts": "6861be8a58b438ec",
+      "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/extension-manifest.ts": "09e04a048b7c541f",
       "aimeat/src/routes/extensions/paywall.ts": "11ff2227c7028795",
       "aimeat/src/routes/extensions/crud.ts": "0d6ef9babdda6ff3",
@@ -786,7 +786,7 @@
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
       "aimeat/src/commerce/app-tool-catalog.ts": "dfb27bab240a9d9c",
-      "aimeat/src/services/extension-ctx-contract.ts": "6861be8a58b438ec",
+      "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
       "aimeat/src/services/refinery/pipeline.ts": "5a26add0ca7f5509",
