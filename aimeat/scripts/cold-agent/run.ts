@@ -38,6 +38,7 @@
  *   cd aimeat && pnpm cold-agent --compare .cold-agent/<a> .cold-agent/<b>
  *   cd aimeat && pnpm cold-agent --tasks propose-agent --runs 1 --keep   # leave the proposal to approve
  * @version-history
+ *   v1.2.0 — 2026-10-30 — A task's followUps: the person's next turns, resumed in the same session.
  *   v1.1.0 — 2026-10-02 — `--keep`: a task's verify leaves what the run made on the sandbox.
  *   v1.0.0 — 2026-09-18 — Initial (wish-kylm-agentti-ja-oikea-teht-v-mittaus-...).
  */
@@ -162,9 +163,11 @@ function autoApprove(s: Sandbox): () => void {
  * On the `mcp` door only the node's tools are allowed, so the agent is a chat client without a
  * shell: it cannot curl its way around a tool that did not do the job, which is the point.
  */
-function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cwd: string): Promise<string> {
+function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cwd: string, resume?: string): Promise<string> {
     const cli = ['-p', '--output-format', 'stream-json', '--verbose', '--model', args.model,
         '--max-budget-usd', String(args.maxBudgetUsd), '--setting-sources', 'project', '--strict-mcp-config'];
+    // A follow-up turn goes on in the same session, which the CLI keeps under the same directory.
+    if (resume) cli.push('--resume', resume);
     if (task.door === 'mcp') {
         const cfg = join(cwd, 'mcp.json');
         writeFileSync(cfg, JSON.stringify({ mcpServers: { aimeat: { type: 'http', url: `${s.baseUrl}/v1/mcp`, headers: { Authorization: `Bearer ${s.agent!.token}` } } } }));
@@ -191,6 +194,15 @@ function claudeTranscript(task: Task, prompt: string, s: Sandbox, args: Args, cw
     });
 }
 
+/** The session id of the last session in a transcript, which a follow-up turn resumes. */
+function sessionOf(raw: string): string | null {
+    let id: string | null = null;
+    for (const line of raw.split('\n')) {
+        try { const ev = JSON.parse(line) as { session_id?: unknown }; if (typeof ev.session_id === 'string') id = ev.session_id; } catch { /* a non-JSON line carries no id */ }
+    }
+    return id;
+}
+
 async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: string): Promise<RunRecord> {
     const marker = `ca-${randomBytes(4).toString('hex')}`;
     const owner = s.owners[0];
@@ -207,6 +219,13 @@ async function runOne(task: Task, run: number, s: Sandbox, args: Args, outDir: s
     let raw: string;
     try {
         raw = args.driver === 'scripted' ? await scriptedTranscript(task, base) : await claudeTranscript(task, prompt, s, args, cwd);
+        // The person's next turns, in the same session. The scripted driver has one turn only.
+        for (const next of args.driver === 'scripted' ? [] : task.followUps ?? []) {
+            const session = sessionOf(raw);
+            if (!session) break;
+            await next.before?.({ ...base, metrics: parseTranscript(raw), keep: args.keep });
+            raw += '\n' + await claudeTranscript(task, fill(next.prompt), s, args, cwd, session);
+        }
     } finally {
         stopApproving();
         rmSync(cwd, { recursive: true, force: true });

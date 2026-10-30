@@ -12,6 +12,7 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-10-30 -- structure_set forwards `proposals`.
  *   2026-10-29 -- structure, structure_set and plans over GET and PUT .../structure and GET /v1/app-plans.
  *   2026-10-25 -- subdomain_set forwards `origin` (secaudit2026oct22).
  *   2026-10-18 -- marks forwards `info` and `tucked`.
@@ -210,7 +211,7 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/structure`);
         case 'structure_set':
             return client.put(`/v1/apps/${enc(ownerName)}/${file}/structure`,
-                pick(input, ['name', 'purpose', 'data', 'choices', 'now', 'expected_revision']));
+                pick(input, ['name', 'purpose', 'data', 'choices', 'proposals', 'now', 'expected_revision']));
         case 'plans':
             return client.get('/v1/app-plans');
         case 'scope_allowance':
