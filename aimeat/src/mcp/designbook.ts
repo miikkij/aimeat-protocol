@@ -10,6 +10,9 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-30 — Style kits: aimeat_designbook_kit (the kit a new app starts from) and
+ *     aimeat_designbook_kit_default; the search names its reader, so a kit narrower than the node is
+ *     listed only inside its reach.
  *   2026-10-24 — keep, propose and adopt refuse the shared anonymous principal with AUTH_REQUIRED, as
  *     the REST write routes do (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -56,6 +59,7 @@ import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { DesignBookService } from '../services/design-book/service.js';
+import { DesignBookKits } from '../services/design-book/kit-defaults.js';
 import { DesignBookError } from '../services/design-book/validate.js';
 import { MAP_NOTE, REASONS_NOTE } from '../services/design-book/map.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -73,6 +77,7 @@ export function registerDesignbookTools(
     getAgentGaii: () => string,
 ): void {
     const book = new DesignBookService(storage, config);
+    const kits = new DesignBookKits(storage, config);
 
     // The write tools (keep, propose, adopt) refuse the shared anonymous principal: the Design Book
     // is node-wide and written under the node's identity, outside the anonymous.* namespace.
@@ -107,7 +112,8 @@ export function registerDesignbookTools(
                 return text(`${out.map}${MAP_NOTE}`);
             }
             return answer(async () => {
-            const parts = await book.list({ kind, status, q, limit });
+            // The reader is named: a kit narrower than the node is listed only inside its reach (kit.ts).
+            const parts = await book.list({ kind, status, q, limit }, { reader: getAgentGaii() });
             return {
                 parts, count: parts.length,
                 note: parts.length
@@ -178,7 +184,9 @@ export function registerDesignbookTools(
             });
             return {
                 ...out,
-                note: out.kind === 'component'
+                note: out.kind === 'kit'
+                    ? 'Taken. Build the app in this kit as `kit.use` says: fork its genre, put `kit.css` in the head, open the app with `kit.app`, and call `kit.ornament` with your elements. Nothing was written; the use is counted.'
+                    : out.kind === 'component'
                     ? 'Taken. Build `snippet.html` and `snippet.css` into your page as they are, and wire the behaviour yourself as `snippet.use` says: a component carries no script. It reads the page\'s tokens, so inside a genre it wears the genre. Name it in your page\'s build notes (`took`, with why you chose it): that is what counts it as used.'
                     : out.kind === 'fill'
                     ? 'Adopted. This part is a starting shape: its <placeholder> texts are yours to replace with aimeat_app_manage (action "ui_set").'
@@ -188,6 +196,30 @@ export function registerDesignbookTools(
                             ? 'Adopted. The effect wears on the block it names, or runs as a pass over the app\'s ambient, on the next open; the rest of the arrangement is untouched.'
                             : 'Adopted. The app renders it on its next open; the replaced layout is archived and one restore brings it back.',
             };
+        }),
+    );
+
+    // The style kit a new app starts from, and the default one (kit-defaults.ts).
+    mcp.registerTool(
+        'aimeat_designbook_kit',
+        {
+            description: descriptionFor('aimeat_designbook_kit'),
+            inputSchema: zodShapeFor('aimeat_designbook_kit'),
+            annotations: annotationsFor('aimeat_designbook_kit'),
+        },
+        async ({ organism }) => refuseAnonymous() ?? answer(() => kits.inForce(getAgentGaii(), organism || undefined)),
+    );
+
+    mcp.registerTool(
+        'aimeat_designbook_kit_default',
+        {
+            description: descriptionFor('aimeat_designbook_kit_default'),
+            inputSchema: zodShapeFor('aimeat_designbook_kit_default'),
+            annotations: annotationsFor('aimeat_designbook_kit_default'),
+        },
+        async ({ kit, clear, organism }) => refuseAnonymous() ?? answer(async () => {
+            if (!clear && !kit) throw new DesignBookError('INVALID_INPUT', 'Name the kit ("kit"), or clear the default with "clear": true.', 400);
+            return kits.setDefault(getAgentGaii(), { ...(organism ? { organism } : {}), kit: clear ? null : kit! });
         }),
     );
 }

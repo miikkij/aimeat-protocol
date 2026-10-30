@@ -174,6 +174,7 @@ everywhere at once, and say so in the Changes section.
 | shipped with this server | the AIMEAT theme and its six styles: read only, can be copied | built-in | valmis | incorporado |
 | a theme's corners, frames, shadows and letter case | the same in every style and in light and dark; every component reads them, so a component added later follows them | shapes (one of them: a shape value) | muodot (yksi: muoto) | formas (una: forma) |
 | the admin view that manages themes | its name, on the Design group of the admin pages | Themes & Styles | Teemat ja tyylit | Temas y estilos |
+| the whole look a new app starts from | a Design Book part: a look, its colours and faces, the genre to fork, an ornament set, a logo; a person keeps one for themselves, an organism's owners choose one for their members, or everyone on the node takes it; never the node's own pages, which is a theme | style kit | tyylipohja | plantilla de estilo |
 | where a person picks the look | the control at the top of the page, beside language and light or dark, that offers the themes and styles (the "pill") | look picker | ulkoasun valitsin | selector de aspecto |
 | a typeface a style may choose | served by this node as woff2 files; a style takes three (headlines, running text, code); the Fonts tab of Themes & Styles lists them | face (the tab: Fonts) | fontti | fuente |
 | a face this node ships with | vendored in the repository, free licences (SIL OFL 1.1), the same on every node | base face; base setup | perusfontti; perusasennus | fuente de base; instalación de base |

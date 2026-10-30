@@ -28,6 +28,7 @@
  *   import { buildAtelierPrompt, buildAtelierSpecToken } from './build-atelier-prompt.js';
  *   const { full, body } = buildAtelierPrompt(config, { lang: 'en', mode: 'new' });
  * @version-history
+ *   v1.42.0 — 2026-10-30 — ADDITIVE: THE STYLE KIT COMES BEFORE THE GENRE, first in "The Design Book first" (KIT_PROMPT_PARAGRAPH in design-book/kit.ts).
  *   v1.41.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew
  *     (proposals.layout), and the steps stay off the chat (cold runs drew the whole step table there).
  *   v1.40.0 — 2026-10-30 — ADDITIVE: ORNAMENT SETS beside the single figures; the paragraph moved to ornamentsPromptPart() in data/atelier-ornaments.ts.
@@ -163,6 +164,7 @@ import { ATELIER_DATA_MAP_STEER, buildDataMapStep } from './build-data-map-step.
 import { ATELIER_STRUCTURE_STEP } from './build-structure-step.js';
 import { ATELIER_REVIEW_SECTION } from './build-atelier-review.js';
 import { ornamentsPromptPart } from '../data/atelier-ornaments.js';
+import { KIT_PROMPT_PARAGRAPH } from './design-book/kit.js';
 
 /** Slot the publish gate's token is substituted into (mirrors build-app-prompt.ts). */
 const SPEC_TOKEN_SLOT = '{{aimeat_spec_token}}';
@@ -685,6 +687,7 @@ function composeBody(config: AimeatConfig): string {
     + 'trust.\n\n';
 
   body += '## The Design Book first\n\n';
+  body += KIT_PROMPT_PARAGRAPH;
   body += 'Before composing a screen from nothing, search the Design Book '
     + '(`aimeat_designbook_search`, or GET /v1/designbook): it holds PROVEN parts — every one '
     + 'passed its own bench before landing, and adopting one (`aimeat_designbook_adopt`) is one '

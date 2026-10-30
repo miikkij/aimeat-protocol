@@ -28239,14 +28239,28 @@ Known schemas:
       anim.onfinish = done;
       anim.oncancel = done;
     }
+    let pressedBackdrop = false;
     node.addEventListener("cancel", function(ev) {
+      pressedBackdrop = false;
       ev.preventDefault();
       if (dismissible) close("dismiss");
     });
     if (dismissible) {
+      const outside2 = function(ev) {
+        const rect = node.getBoundingClientRect();
+        return ev.clientX < rect.left || ev.clientX > rect.right || ev.clientY < rect.top || ev.clientY > rect.bottom;
+      };
+      node.addEventListener("pointerdown", function(ev) {
+        pressedBackdrop = ev.isPrimary && ev.button === 0 && ev.target === node && outside2(ev);
+      }, true);
+      node.addEventListener("pointercancel", function() {
+        pressedBackdrop = false;
+      }, true);
       node.addEventListener("click", function(ev) {
-        if (ev.target === node) close("dismiss");
-      });
+        const startedOutside = pressedBackdrop;
+        pressedBackdrop = false;
+        if (startedOutside && ev.button === 0 && ev.detail > 0 && ev.target === node && outside2(ev)) close("dismiss");
+      }, true);
     }
     node.showModal();
     if (!reducedMotion() && typeof node.animate === "function") {

@@ -1078,7 +1078,7 @@
     // trip in front of every date on the screen.
     import { loadDisplayPrefs } from '/js/display-prefs.js';
     import { initThemeSystem, setTheme } from '/js/theme.js';
-    import { siteLink, signInFirst, signedInOnly, customerNode } from '/js/site.js';
+    import { siteLink, signInFirst, signedInOnly, customerNode, devLinksShown } from '/js/site.js';
     import { getSession } from '/js/services/auth.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
@@ -1853,22 +1853,25 @@
             <a href="/v1/changelog" onClick=${(e) => go(e, '/v1/changelog')}>${tr('footer.changelog', 'What shipped')}</a>
             <a href="/v1/business" onClick=${(e) => go(e, '/v1/business')}>${tr('nav.business', 'For your business')}</a>
             <a href="/v1/members" onClick=${(e) => go(e, '/v1/members')}>${tr('nav.members', 'Members')}</a>
-            <a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>
-            <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own node')}</a>
+            ${/* The developer links follow site.dev_links: hidden on a customer's node unless the
+                  operator decides otherwise (Jouni, 2026-10-30). */''}
+            ${devLinksShown() && html`<a href="/v1/portal?view=dev" onClick=${(e) => go(e, '/v1/portal?view=dev')}>${tr('nav.devView', 'For Developers')}</a>`}
+            ${devLinksShown() && html`<a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('footer.ownNode', 'Run your own node')}</a>`}
             <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
             ${/* The privacy policy and the terms are the server's own pages, one per language the
                   node ships (English at the bare path). No onClick: the router's interceptor leaves
                   a /v1/ address no view owns to the browser. */''}
             <a href=${getLocale() === 'en' ? '/v1/privacy' : '/v1/privacy/' + getLocale()}>${tr('footer.privacy', 'Privacy')}</a>
             <a href=${getLocale() === 'en' ? '/v1/terms' : '/v1/terms/' + getLocale()}>${tr('footer.terms', 'Terms')}</a>
-            <a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>
+            ${devLinksShown() && html`<a href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">GitHub</a>`}
           </div>
           ${/* For machines, and for the person who wants the contract. /v1/spec, /sitemap.md,
                 /llms.txt and /AGENTS.md are served documents rather than SPA routes: opened in
                 the same tab, the router's /v1/ interceptor would match none of them and land
                 the reader on the landing page instead. */''}
-          ${/* A buyer on their own node reads these as developer material (UX review 2026-10-29, C). */''}
-          ${!customerNode() && html`<div class="site-footer-row site-footer-machine">
+          ${/* A buyer on their own node reads these as developer material (UX review 2026-10-29, C):
+                they follow site.dev_links with the links above. */''}
+          ${devLinksShown() && html`<div class="site-footer-row site-footer-machine">
             <a href="/v1/glossary" onClick=${(e) => go(e, '/v1/glossary')}>${tr('footer.glossary', 'Glossary')}</a>
             <a href="/sitemap.md" target="_blank" rel="noopener">${tr('footer.sitemap', 'Site map')}</a>
             <a href="/llms.txt" target="_blank" rel="noopener">llms.txt</a>

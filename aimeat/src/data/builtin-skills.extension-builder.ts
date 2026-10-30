@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-10-30 — Section 9: a file linked from a workspace record opens to the members; ctx.files.read
+ *     answers visibility and workspaceRef.
  *   2026-10-29 — Section 10: with install role operator a package's extensions wait switched off for an
  *     operator's one press (409 AWAITING_OPERATOR on activate), and names starting with aimeat- answer
  *     409 NAME_RESERVED (secaudit2026oct26 round 8c). Read against crud.ts's activate and install changes.
@@ -324,6 +326,11 @@ Every action can carry two values, and they do different jobs:
   Never put a key in a script or a return value.
 - Files: a client uploads through the storage API and passes the keys; \`ctx.files\` reads and writes
   stored files by reference. Return references, not large payloads.
+- **A file linked from a workspace record opens to that workspace's members.** When a record that
+  carries \`/v1/pub/<owner>/<key>\` is written or published into a workspace, a private file of the
+  writer becomes readable by the workspace's members; a file of somebody else stays as it is.
+  \`ctx.files.read\` answers \`visibility\` and \`workspaceRef\`, so an extension can tell the person
+  when a file it links is still closed to the readers.
 - **A read with nobody present may be narrower than the same read with a person there.** A write
   always lands in the owner's namespace under \`ext/{name}/\`, on every road. A READ on a schedule, an
   \`@activate\` job or a workflow step is judged against whoever the owner chose: their own reach by

@@ -9,6 +9,7 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.5.0 — 2026-10-30 — devLinks: whether the footer shows the developer links (Jouni, 2026-10-30).
  *   v1.4.0 — 2026-10-29 — storeTopup: a customer node's own top-up page in the store (UX review
  *     2026-10-29, A1). defaultLocale: the node's own language before the browser's (C). storeOrders,
  *     purchasePlan and purchasePackage: the customer's orders page and what they bought (B, D).
@@ -115,6 +116,12 @@ export interface SiteLinksConfig {
    * bought from the store speaks its buyer's language. One of the shipped locales, or empty.
    */
   defaultLocale: string;
+  /**
+   * Whether the footer shows the developer links ("For Developers", "Run your own node", GitHub and the
+   * row for machines: glossary, site map, llms.txt, AGENTS.md, API contract). 'auto' shows them except
+   * on a customer's node (purchasePlan set); 'show' and 'hide' decide for every node.
+   */
+  devLinks: 'auto' | 'show' | 'hide';
   /** The agent incubator: where a visitor adopts a ready-made helper. Empty hides its card's door. */
   incubator: string;
   /**

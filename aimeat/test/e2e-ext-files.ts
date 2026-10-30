@@ -10,6 +10,9 @@
  *   the result, return only the new key — no base64 in the arguments or the result.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-ext-files.ts
  * @version-history
+ *   v1.2.0 — 2026-10-30 — read() answers the file's visibility: private on the round trip, public once
+ *     the owner opened it. Red before the change (undefined). And the second owner is refused the
+ *     private file on /v1/pub with 403, the refusal of a signed-in principal the suite lacked (P3-08).
  *   v1.1.0 — 2026-09-04 — The HTTP door, not the sandbox's answer. This suite was already
  *     cross-owner, and its refusals are result objects — `{ ok: false }` — because the caller is
  *     inside an extension and there is nothing to send a status to. That is the right shape there
@@ -59,10 +62,10 @@ const SCRIPTS = {
     const bytes = got.base64;
     const flipped = bytes.split('').reverse().join('');
     const out = await ctx.files.write(input.out || 'result.bin', bytes, { mime: got.mime, visibility: input.visibility || 'private' });
-    return { read: { size: got.size, mime: got.mime }, wrote: out, sameLength: flipped.length === bytes.length };
+    return { read: { size: got.size, mime: got.mime, visibility: got.visibility }, wrote: out, sameLength: flipped.length === bytes.length };
   }`,
   peek: `export default async function(ctx, input){
-    try { const got = await ctx.files.read(input.ref); return { ok: true, size: got && got.size }; }
+    try { const got = await ctx.files.read(input.ref); return { ok: true, size: got && got.size, visibility: got && got.visibility }; }
     catch (e) { return { ok: false, message: String(e && e.message || e) }; }
   }`,
   probe: `export default async function(ctx){ return { hasFiles: !!(ctx.files && ctx.files.read && ctx.files.write) }; }`,
@@ -116,6 +119,7 @@ await test('Round trip: reference in, reference out, no bytes in the arguments',
   assert(out.wrote.key === `ext/${EXT}/derived.bin`, `wrote under the reserved prefix, got ${out.wrote.key}`);
   assert(out.wrote.gaii === owner.gaii, `the result belongs to the caller, got ${out.wrote.gaii}`);
   wroteKey = out.wrote.key;
+  assert(out.read.visibility === 'private', `read says who can open it, got ${out.read.visibility}`);
 });
 
 await test('What the extension wrote is a real file in the caller\'s storage', async () => {
@@ -141,6 +145,13 @@ await test('A read is authorized AS THE CALLER: another owner\'s private file is
   assert(/denied|not permitted|private/i.test(out.message || ''), `and it must say why, got: ${out.message}`);
 });
 
+await test('The other owner is refused the private file on the owner-addressed door as well (403)', async () => {
+  // The address an extension hands on is /v1/pub/<owner>/<key>; a signed-in second principal asking
+  // for it is refused there too, not only inside the sandbox.
+  const r = await fetch(`${BASE}/v1/pub/${encodeURIComponent(owner.gaii)}/${SOURCE_KEY}`, { headers: auth(other.token) });
+  assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
 await test('The same file, made public, IS readable by the other caller', async () => {
   const vis = await json(`/v1/storage/${encodeURIComponent(SOURCE_KEY)}/visibility`, {
     method: 'PATCH', headers: auth(owner.token), body: JSON.stringify({ visibility: 'public' }),
@@ -149,6 +160,7 @@ await test('The same file, made public, IS readable by the other caller', async 
   const r = await invoke(other.token, 'peek', { ref: `${owner.gaii}/${SOURCE_KEY}` });
   assert(r.status === 200, `status ${r.status}`);
   assert(r.body.data.ok === true, `a public file is readable, got: ${r.body.data.message}`);
+  assert(r.body.data.visibility === 'public', `and read says so, got ${r.body.data.visibility}`);
 });
 
 await test('A missing reference answers null rather than throwing', async () => {

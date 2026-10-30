@@ -24,6 +24,7 @@
  *   await seedDesignBook(storage, config);                    // server-bootstrap/service-init.ts
  *   scheduler.registerCoreHandler('designbook-aging', ...);   // services/core-jobs.ts
  * @version-history
+ *   v1.8.1 — 2026-10-30 — The aging round reads each part as the node itself, which reads a kit of any reach.
  *   v1.8.0 — 2026-10-30 — The eleven ornament sets are seeded published, one part each
  *     (data/atelier-ornament-sets.ts); a set's own figures are not seeded one by one.
  *   v1.7.0 — 2026-10-29 — The 23 ornament figures are seeded published (data/atelier-ornaments.ts).
@@ -241,7 +242,8 @@ export async function runDesignBookAgingJob(storage: Storage, config: AimeatConf
   let faded = 0;
   for (const row of rows) {
     if (row.usage > 0) continue;
-    const { part }: { part: DesignBookPart } = await book.get(row.id);
+    // Read as the node itself, which reads a kit of any reach (kit.ts).
+    const { part }: { part: DesignBookPart } = await book.get(row.id, system);
     const publishedAt = Date.parse(part.published_at ?? part.created_at);
     if (Number.isNaN(publishedAt) || publishedAt > cutoff) continue;
     await book.setStatus(system, true, row.id, 'aging');

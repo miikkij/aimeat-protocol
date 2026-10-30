@@ -1571,6 +1571,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Parts read to run the bench and a notice digest; only ids and reasons reach the notification."
     },
+    "src/services/design-book/kit-defaults.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-30 (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa), the node's own read: the default style kit record under the node's system identity, which holds only a kit id; the kit itself is read through DesignBookService.get with the reader's reach."
+    },
     "src/services/design-book/part-provenance.ts": {
       "reads": {
         "listMemory": 1
@@ -2434,6 +2440,12 @@
         "getMemory": 2
       },
       "why": "The node's own read (secaudit 2026-10, PKG-7): updateRecord reads a service record and its version to rewrite it with compare-and-swap (the classification service's records, package entitlements and claims, an agent's daily spend); its callers decide what reaches a caller, and nothing is shown from here. 2026-10-19: updateMemoryRecord is the same read for a caller that also sets tags or visibility; the reads it replaced left calibrator.ts, design-book/reasons.ts, design-book/service.ts, knowledge-sharing.ts and app-template-proposals.ts (check:atomic-writes)."
+    },
+    "src/services/record-files.ts": {
+      "reads": {
+        "getStorageFileMeta": 1
+      },
+      "why": "Reviewed 2026-10-30, the node's own read: the metadata of a file a workspace record links, read only to decide whether to bind the writer's own file to the workspace; no bytes and no metadata are returned to anyone."
     },
     "src/services/refinery/definition-ask.ts": {
       "reads": {
