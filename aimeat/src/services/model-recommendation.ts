@@ -21,6 +21,8 @@
  * @structure MODEL_RECOMMENDATION · MODEL_REVIEW_MAX_AGE_DAYS · modelReviewAgeDays()
  * @usage import { MODEL_RECOMMENDATION as M } from './model-recommendation.js';   // M.claude → 'Opus 5'
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Checked at the vendors: GPT-6 replaced Latest in ChatGPT's model menu on
+ *     2026-10-07 (help.openai.com/en/articles/20001354); Opus 5 is still the floor, Opus 5.5 the latest.
  *   v1.0.1 — 2026-10-03 — The comment names the two skills that read it now. No value changed.
  *   v1.0.0 — 2026-09-18 — Initial. The date is the one ai-tool-setup.ts already carried for its
  *     sources; nothing was re-checked against the vendors today, so it was not moved.
@@ -30,9 +32,9 @@ export const MODEL_RECOMMENDATION = {
   /** The weakest Claude model the setup steps recommend; read as "<name> or better". */
   claude: 'Opus 5',
   /** The ChatGPT model the setup steps recommend, used with thinking on. */
-  chatgpt: 'GPT-5.6',
+  chatgpt: 'GPT-6',
   /** ISO date the names and the vendors' menu paths were last checked at the source. */
-  reviewedOn: '2026-07-31',
+  reviewedOn: '2026-10-30',
 } as const;
 
 export const MODEL_REVIEW_MAX_AGE_DAYS = 90;

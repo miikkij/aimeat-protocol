@@ -10,6 +10,7 @@
  *   aiClientVariantOptions() · aiClientQuestionOptions()
  * @usage import { resolveAiClient, decideBranch } from '../services/ai-tool-branch.js';
  * @version-history
+ *   v1.3.0 — 2026-10-30 — Grok leaves the paid-tier set: x.ai opens connectors to every Grok user.
  *   v1.2.0 — 2026-10-11 — The consumer Gemini app (`gemini-app`) is region-dependent (Jouni's ruling,
  *     2026-10-11): naming it raises the `conditions` question, and the person's answer
  *     (`meetsConditions`) decides A or B. The tier and the conditions share conditionalBranch().
@@ -43,7 +44,8 @@ export type AiToolId = typeof AI_TOOL_IDS[number];
  * Which tools need a paid tier. Everything else in the table works on its free one. The table's own
  * `capability` says the same per tool, and test/unit/ai-client-branch.test.ts holds the two equal.
  */
-const PLAN_DEPENDENT: ReadonlySet<string> = new Set<string>(['chatgpt', 'grok', 'cursor', 'perplexity', 'copilot-studio']);
+// Grok left on 2026-10-30: x.ai opens connectors to every Grok user (docs.x.ai/grok/connectors).
+const PLAN_DEPENDENT: ReadonlySet<string> = new Set<string>(['chatgpt', 'cursor', 'perplexity', 'copilot-studio']);
 
 /**
  * Which tools connect only where the vendor offers it, under conditions the table's `plans` line

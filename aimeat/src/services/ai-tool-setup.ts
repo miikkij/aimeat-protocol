@@ -18,8 +18,9 @@
  *   their UI.
  *
  *   Sources. The menu paths and plans marked 2026-10-11 were checked on that day against the vendor's
- *   own pages; the rest were verified 2026-07-31 (MODEL_RECOMMENDATION.reviewedOn is the date the
- *   model names were checked, and moves only when they are):
+ *   own pages; the rest were verified 2026-10-30, and the model names with them
+ *   (MODEL_RECOMMENDATION.reviewedOn is the date the model names were checked, and moves only when
+ *   they are; ChatGPT at https://help.openai.com/en/articles/20001354):
  *   - Claude connectors (2026-10-11) https://claude.com/docs/connectors/custom/add-unlisted and
  *     https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp
  *   - Claude personalization https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features
@@ -43,6 +44,10 @@
  *   (aliases, resolveAiClient, decideBranch, the question options) is in ai-tool-branch.ts.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.10.0 — 2026-10-30 — The sources last checked 2026-07-31 checked again: Claude's instructions are
+ *     under Settings > Your Claude, thinking is always on in Opus 5.5 and Fable 5.1, ChatGPT's model is
+ *     GPT-6 at a thinking level, VS Code's scope is Global > Copilot Global and its tools are under
+ *     Chat: Open Customizations, and Grok connectors are open to every Grok user.
  *   v1.9.0 — 2026-10-11 — The consumer Gemini app joins the table as `region-dependent` (Jouni's
  *     ruling, 2026-10-11): Google lets it add a custom MCP server in the United States only, under
  *     the conditions its row states. Until then the app counted as one that cannot connect.
@@ -266,12 +271,12 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. A free account can hold one custom connector, which is enough for this. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot. This server must be reachable from the public internet.',
                     'Free, Pro, Max, Team ja Enterprise. Ilmaisella tilillä voi olla yksi oma konnektori, mikä riittää tähän. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi. Tämän palvelimen pitää olla saavutettavissa julkisesta internetistä.'),
-                note: s(l, `Pick ${MODEL.claude} or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.`,
-                    `Valitse mallivalikosta ${MODEL.claude} tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
+                note: s(l, `Pick ${MODEL.claude} or better in the model menu, with thinking on (on the newest models it is always on). The connection steps and the first conversations go right the first time on a strong model.`,
+                    `Valitse mallivalikosta ${MODEL.claude} tai parempi, ajattelu päällä (uusimmissa malleissa se on aina päällä). Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
             },
             instructions: {
-                where: s(l, 'Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account.',
-                    'Settings > General > Instructions for Claude (joissakin versioissa Profile-kohdan alla). Koskee jokaista uutta keskustelua tällä tilillä.'),
+                where: s(l, 'Settings > Your Claude > Instructions (Account > Instructions for Claude in the older settings). Applies to every new conversation on the account.',
+                    'Settings > Your Claude > Instructions (vanhemmissa asetuksissa Account > Instructions for Claude). Koskee jokaista uutta keskustelua tällä tilillä.'),
                 docs: 'https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features',
             },
         },
@@ -294,12 +299,12 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                 params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
                 plans: s(l, 'Free, Pro, Max, Team and Enterprise. A free account can hold exactly one custom connector, which is enough for this.',
                     'Free, Pro, Max, Team ja Enterprise. Ilmaisella tilillä voi olla tasan yksi oma konnektori, mikä riittää tähän.'),
-                note: s(l, `Pick ${MODEL.claude} or better in the model menu and turn extended thinking on. The connection steps and the first conversations go right the first time on a strong model.`,
-                    `Valitse mallivalikosta ${MODEL.claude} tai parempi ja kytke laajennettu ajattelu päälle. Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
+                note: s(l, `Pick ${MODEL.claude} or better in the model menu, with thinking on (on the newest models it is always on). The connection steps and the first conversations go right the first time on a strong model.`,
+                    `Valitse mallivalikosta ${MODEL.claude} tai parempi, ajattelu päällä (uusimmissa malleissa se on aina päällä). Vahvalla mallilla kytkentä ja ensimmäiset keskustelut menevät kerralla oikein.`),
             },
             instructions: {
-                where: s(l, 'Settings > General > Instructions for Claude. Applies to every new conversation on the account.',
-                    'Settings > General > Instructions for Claude. Koskee jokaista uutta keskustelua tällä tilillä.'),
+                where: s(l, 'Settings > Your Claude > Instructions (Account > Instructions for Claude in the older settings). Applies to every new conversation on the account.',
+                    'Settings > Your Claude > Instructions (vanhemmissa asetuksissa Account > Instructions for Claude). Koskee jokaista uutta keskustelua tällä tilillä.'),
                 docs: 'https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features',
             },
         },
@@ -376,8 +381,8 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     'Business, Enterprise ja Edu: luku- ja kirjoitustyökalut (OpenAI kutsuu sitä betaksi). Pro: vain lukevat työkalut. OpenAI:n sivut eivät kerro, voiko Plus- tai ilmaisella tasolla lisätä palvelimen. Vain selaimessa, ei sovelluksissa.'),
                 warn: s(l, 'OpenAI marks a custom MCP server as being for people who understand the risk: a server can carry tools that write as well as read. Their own warning is worth reading before you confirm it.',
                     'OpenAI merkitsee oman MCP-palvelimen niille, jotka ymmärtävät riskin: palvelimella voi olla myös kirjoittavia työkaluja. Heidän oma varoituksensa kannattaa lukea ennen kuin vahvistat sen.'),
-                note: s(l, `Use ${MODEL.chatgpt} with thinking enabled. A strong model makes the setup and the first conversations go right the first time.`,
-                    `Käytä mallia ${MODEL.chatgpt} ajattelu päällä. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.`),
+                note: s(l, `Use ${MODEL.chatgpt} at the High thinking level or above. A strong model makes the setup and the first conversations go right the first time.`,
+                    `Käytä mallia ${MODEL.chatgpt} ajattelutasolla High tai korkeammalla. Vahva malli vie kytkennän ja ensimmäiset keskustelut kerralla oikein.`),
             },
             instructions: {
                 where: s(l, 'Settings > Personalization > Custom instructions, in the field for what ChatGPT should know about you.',
@@ -461,10 +466,10 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                         'Avaa komentopaletti (Ctrl+Shift+P, Macissa Cmd+Shift+P) ja aja MCP: Add Server.'),
                     s(l, 'Choose HTTP as the type, then give the values below.',
                         'Valitse tyypiksi HTTP ja anna sitten alla olevat arvot.'),
-                    s(l, 'Choose Global to make it available everywhere, or Workspace to write it into .vscode/mcp.json in this project.',
-                        'Valitse Global jos haluat sen kaikkialle, tai Workspace jos se kirjoitetaan tämän projektin .vscode/mcp.json-tiedostoon.'),
-                    s(l, 'Complete the sign-in in the browser, then open Agent mode and check the node is in the tool list.',
-                        'Vie kirjautuminen loppuun selaimessa, avaa sitten Agent mode ja tarkista että node on työkalulistassa.'),
+                    s(l, 'Choose Global, then Copilot Global, to make it available everywhere.',
+                        'Valitse Global ja sitten Copilot Global, niin se on käytössä kaikkialla.'),
+                    s(l, 'Complete the sign-in in the browser, then run Chat: Open Customizations and check the node is listed under Tools.',
+                        'Vie kirjautuminen loppuun selaimessa, aja sitten Chat: Open Customizations ja tarkista, että node näkyy kohdassa Tools.'),
                 ],
                 command: `code --add-mcp '{"name":"aimeat","type":"http","url":"${mcpUrl}"}'`,
                 install: install('vscode',
@@ -538,9 +543,9 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     { label: 'Name', value: 'AIMEAT' },
                     { label: 'MCP server URL', value: mcpUrl },
                 ],
-                capability: 'plan-dependent',
-                plans: s(l, 'Paid tiers only. The node also has to be reachable from the public internet, so a node on localhost will not work here.',
-                    'Vain maksullisilla tasoilla. Noden pitää lisäksi olla saavutettavissa julkisesta internetistä, joten localhostilla ajettava node ei toimi tässä.'),
+                capability: 'yes',
+                plans: s(l, 'Every Grok user. On Business and Enterprise, an admin adds the connector first. The node also has to be reachable from the public internet, so a node on localhost will not work here.',
+                    'Kaikilla Grokin käyttäjillä. Business- ja Enterprise-tasoilla ylläpitäjä lisää liittimen ensin. Noden pitää lisäksi olla saavutettavissa julkisesta internetistä, joten localhostilla ajettava node ei toimi tässä.'),
                 note: s(l, 'Pick Grok’s strongest model, with reasoning on. The cheap default model is where the setup goes wrong.',
                     'Valitse Grokin vahvin malli, päättely päällä. Halpa oletusmalli on se, jossa kytkentä menee pieleen.'),
             },
