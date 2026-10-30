@@ -11,6 +11,8 @@
  *   3. A named reason releases over a nightly sweep that is red, missing or running, and over nothing
  *      else; without one the check refuses as before (Jouni, decision 2026-10-16).
  * @version-history
+ *   v1.3.0 -- 2026-10-30 -- A node release is refused while the released commit's ADOPTION_CUTOFF is
+ *     null (secaudit2026oct26 round 8c, connector-04).
  *   v1.2.0 -- 2026-10-20 -- A green nightly of an earlier commit on main counts for 24 hours.
  *   v1.1.0 -- 2026-10-16 -- The named reason for releasing over a red nightly: the environment, the
  *     tag message, the loud line, the job summary and step output, and the two workflows that pass it.
@@ -18,7 +20,7 @@
  */
 import { afterAll, describe, expect, it } from 'vitest';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -125,6 +127,48 @@ describe('a green nightly of an earlier commit on main counts for 24 hours', () 
         const r = checkChild('ancestor-old', at(25 * 3600_000));
         expect(r.status).toBe(1);
         expect(r.stderr).toContain('e2e-full.yml: no run of this commit exists');
+    });
+});
+
+describe('a node release carries the adoption cut-off of the connector (secaudit2026oct26 round 8c, connector-04)', () => {
+    // A repository of its own whose commits hold aimeat/src/cli/connect/adoption-cutoff.ts.
+    const repo = mkdtempSync(join(tmpdir(), 'aimeat-release-ready-cutoff-'));
+    afterAll(() => rmSync(repo, { recursive: true, force: true }));
+    const rgit = (...a: string[]) => execFileSync('git', a, { cwd: repo, encoding: 'utf8' }).trim();
+    rgit('init', '-q');
+    function commitCutoff(value: string): string {
+        mkdirSync(join(repo, 'aimeat', 'src', 'cli', 'connect'), { recursive: true });
+        writeFileSync(join(repo, 'aimeat', 'src', 'cli', 'connect', 'adoption-cutoff.ts'), `export const ADOPTION_CUTOFF: string | null = ${value};\n`);
+        rgit('add', 'aimeat/src/cli/connect/adoption-cutoff.ts');
+        rgit('-c', 'user.name=T', '-c', 'user.email=t@example.invalid', '-c', 'commit.gpgsign=false', '-c', 'core.hooksPath=', 'commit', '--allow-empty', '-qm', `cut-off ${value}`);
+        return rgit('rev-parse', 'HEAD');
+    }
+    function checkRepo(name: string, sha: string, required = 'ci.yml,e2e-full.yml') {
+        const file = join(repo, `${name}.json`);
+        writeFileSync(file, JSON.stringify({
+            [`/repos/${SLUG}/actions/workflows/ci.yml/runs`]: { workflow_runs: [run(1, 'CI', 'success', sha)] },
+            [`/repos/${SLUG}/actions/workflows/e2e-full.yml/runs`]: { workflow_runs: [run(2, 'E2E full sweep', 'success', sha)] },
+            [`/repos/${SLUG}/actions/workflows/python-aimeat-crewai.yml/runs`]: { workflow_runs: [run(3, 'Python', 'success', sha)] },
+        }));
+        return spawnSync(process.execPath, [SCRIPT, '--no-main-check', `--require=${required}`, `--sha=${sha}`], {
+            cwd: repo, encoding: 'utf8',
+            env: { ...process.env, GITHUB_ACTIONS: '', GITHUB_OUTPUT: '', GITHUB_STEP_SUMMARY: '', AIMEAT_RELEASE_RED_REASON: '', AIMEAT_CI_API_FIXTURE: file, AIMEAT_CI_REPO: SLUG },
+        });
+    }
+
+    it('refuses a commit whose cut-off is not set, and names the command that sets it', () => {
+        const r = checkRepo('cutoff-null', commitCutoff('null'));
+        expect(r.status).toBe(1);
+        expect(r.stderr).toContain('ADOPTION_CUTOFF');
+        expect(r.stderr).toContain('pnpm release:trust-cutoff');
+    });
+
+    it('designed use: passes a commit whose cut-off is set, and the Python package is not asked for one', () => {
+        const unset = commitCutoff('null');
+        expect(checkRepo('cutoff-python', unset, 'ci.yml,python-aimeat-crewai.yml').status).toBe(0);
+        const r = checkRepo('cutoff-set', commitCutoff("'2026-11-02T10:00:00.000Z'"));
+        expect(r.status, r.stderr).toBe(0);
+        expect(r.stdout).toContain('adoption cut-off: 2026-11-02T10:00:00.000Z');
     });
 });
 

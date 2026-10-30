@@ -18,6 +18,8 @@
  *
  * @usage cd aimeat && pnpm exec vitest run test/unit/connector-config-layout.test.ts
  * @version-history
+ *   v1.0.3 -- 2026-10-30 -- The old-layout file is dated before any release that keeps a trust record;
+ *     the assertions are unchanged (secaudit2026oct26 round 8c, connector-04).
  *   v1.0.2 -- 2026-10-25 -- Each case has its own record of trusted commands, so its start is the first
  *     one after the update and the old file's runner is adopted (cli/connect/command-trust.ts; secaudit2026oct22).
  *   v1.0.1 — 2026-09-24 — The re-enrolment case stays on one node and names its receiving identity:
@@ -25,7 +27,7 @@
  *   v1.0.0 — 2026-09-01 — Initial, with the slimmed file and the per-owner layout.
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync, rmSync, existsSync, readFileSync, utimesSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { stringify as yamlStringify, parse as yamlParse } from 'yaml';
 
@@ -55,6 +57,11 @@ function oldLayoutHome(owners: string[], extra: Record<string, unknown> = {}): v
         }),
         'utf-8',
     );
+    // An old-layout file is from before any release that keeps a trust record (ADOPTION_CUTOFF), so
+    // its runner is adopted (secaudit2026oct26 round 8c, connector-04: the date moved, the assertions
+    // did not).
+    const old = new Date('2026-10-01T00:00:00.000Z');
+    utimesSync(join(home, 'agents', 'concierge', 'config.yaml'), old, old);
 }
 
 async function loadModule(): Promise<ConfigModule> {
