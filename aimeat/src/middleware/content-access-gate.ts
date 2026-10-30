@@ -43,6 +43,10 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.2 — 2026-10-30 — The SPA page addresses come from data/spa-page-paths.ts, the list
+ *     routes/portal.ts serves spa.html on. The gate's own copy had missed /v1/appcat/structure,
+ *     /v1/secret-allow and /v1/eco-capability-allow, so a link to the structure page an AI handed out
+ *     answered a signed-in person SIGN_IN_REQUIRED (seen on innokas.aimeat.io).
  *   v1.4.1 — 2026-10-27 — The origin of an app opened to the internet passes the app's own documents
  *     and the open routes only (isOpenedOriginDocument), not every path outside /v1/: the node-wide
  *     agent directory, agent skills, UCP and ACP documents reached strangers there while the apex
@@ -71,6 +75,7 @@ import type { AimeatConfig } from '../config.js';
 import { signedInOnly } from '../config-visibility.js';
 import { isNodeAccount } from '../services/audience.js';
 import { mirroredPages } from '../data/public-pages.js';
+import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
 import { localAccountName } from '../utils/gaii.js';
 import type { Storage } from '../storage/interface.js';
 import {
@@ -78,14 +83,20 @@ import {
 } from '../services/internet-opening/opening-registry.js';
 import { error } from './envelope.js';
 
+/** One pattern that matches any of `paths` whole, each taken literally. */
+function wholePaths(paths: readonly string[]): RegExp {
+  return new RegExp(`^(${paths.map(p => p.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})$`);
+}
+
 /** `method` null matches every method. A path is matched whole, after its trailing slashes go. */
 export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; why: string }> = [
   // ── The SPA shell and its page addresses (no content in this mode, see the header) ──
   { method: 'GET', path: /^\/$/, why: 'the front page shell' },
   { method: 'GET', path: /^\/(spa|app-silent|app-catalog)\.html$/, why: 'shell files' },
   { method: 'GET', path: /^\/(everything|start)$/, why: 'redirects to shell pages' },
-  { method: 'GET', path: /^\/v1\/(portal|profile|chat|home|aimeat-os|app-store|classic|portfolio|fleet|members|admin|appcat|help|publicknowledgeviewer|publicworkspaceviewer|how-it-works|changelog|how-an-app-builds|connect-your-ai|everything|glossary|business|transparency|start|app-grant|app-open|invite|oauth-round|allow|echat)$/, why: 'SPA page addresses' },
-  { method: 'GET', path: /^\/v1\/design-lab\/frame$/, why: 'SPA page address' },
+  { method: 'GET', path: /^\/v1\/(portal|echat)$/, why: 'SPA page addresses served outside the portal list' },
+  // The same list routes/portal.ts serves spa.html on, so a page served there opens from a link here.
+  { method: 'GET', path: wholePaths(SPA_PAGE_PATHS), why: 'SPA page addresses' },
   // A person's portfolio PAGE, never the portfolio API beside it (catalog, config, data, me, members).
   { method: 'GET', path: /^\/v1\/portfolio\/(?!(catalog|config|data|me|members|upload)$)[^/]+$/, why: 'SPA page address; the shell drops the person from the head in this mode' },
   { method: 'GET', path: /^\/v1\/use-with-ai\/[^/]+\/[^/]+$/, why: 'SPA page address; the shell drops the app from the head in this mode' },

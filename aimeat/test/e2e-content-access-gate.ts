@@ -20,6 +20,9 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-10-30 — The shell test opens the structure page, the secret allow page and the outside-app
+ *     capability allow page too: the gate had its own copy of the page list and missed all three, so
+ *     the structure page link an AI handed out answered SIGN_IN_REQUIRED on innokas.aimeat.io.
  *   2026-10-26 — POST /v1/federation/message/reaction joins the open list beside the receipt route:
  *     a signed peer message, refused without the messaging right or with a bad signature.
  *   2026-10-19 — The open list names the node's own documents, the live stream and the connection
@@ -212,7 +215,9 @@ async function main() {
             // the steps of signing in (js/site.js signInFirst). The server's half is that every one of
             // these addresses answers the shell, never a 401 or a 404, and that the files it loads are there.
             for (const path of ['/', '/v1/portal', '/v1/how-it-works', '/v1/publicworkspaceviewer?org=x&ws=y', `/v1/portfolio/${owner}`,
-                `/v1/app-open?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/invite?token=x', '/v1/app-grant', '/v1/oauth-round?state=x', '/v1/allow?agent=x&need=y']) {
+                `/v1/app-open?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/invite?token=x', '/v1/app-grant', '/v1/oauth-round?state=x', '/v1/allow?agent=x&need=y',
+                // The links an AI hands a person, which a new tab opens with no session.
+                `/v1/appcat/structure?app=${encodeURIComponent(`${owner}/${filename}`)}`, '/v1/secret-allow?secret=x', '/v1/eco-capability-allow?app=x']) {
                 const res = await fetch(`${BASE}${path}`, { headers: { Accept: 'text/html' } });
                 const body = await res.text();
                 assert(res.status === 200, `${path}: ${res.status}`);
