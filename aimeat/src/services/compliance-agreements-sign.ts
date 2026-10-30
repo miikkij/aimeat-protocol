@@ -21,9 +21,10 @@
  *   checks, and confirmOp() is the operator's yes or no. Nothing the model says signs anything.
  *   The version is signed when both the controller and the processor have a signature; the version
  *   in force before it is superseded.
- * @structure docsignLevel · signedLine · testSignaturesInForce · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
+ * @structure docsignLevel · signedLine · signedPdfLevel · acceptedCopyLevel · testSignaturesInForce · completeIfSigned · syncDocsign · signedCopyOp · confirmOp
  * @usage const a = await syncDocsign(deps, agreement);
  * @version-history
+ *   2026-10-31 — A PDF signed elsewhere whose only valid signatures chain to the EU reference wallet's test roots is reviewed and recorded with the level `test`, not `advanced` (signedPdfLevel); on production settings the version it completes is `test-signed`, as a test wallet signature's is (secaudit2026oct26 outside-02b).
  *   2026-10-29 — On a node running production settings (test mode and dev mode off), a version a test wallet signature completed is `test-signed`, signed in test and not in force: the version before it stays in force and no in-force notice goes out. Test and development settings keep the round 8 flow (secaudit2026oct26 round 8c, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A wallet signature on the EU reference wallet's test roots is recorded with the level `test`, not `advanced`, and its history line and the in-force line say it has no legal effect; the flow is unchanged (secaudit2026oct26, syncDocsign:test-anchor-wallet-signature-as-advanced).
  *   2026-10-27 — A returned copy keeps the sha256 of the checked bytes and a copy of them beside the
@@ -78,10 +79,33 @@ export function docsignLevel(wallet?: { validation: { level: string; test: boole
 }
 
 const NO_LEGAL_EFFECT = 'a test wallet signature with no legal effect';
+const NO_LEGAL_EFFECT_PDF = 'a signature on a test certificate with no legal effect';
+
+/** How a history line names a `test` signature: a wallet one, or a PDF signed elsewhere on a test certificate. */
+const noLegalEffect = (tests: Pick<AgreementSignature, 'method'>[]): string =>
+  tests.every(s => s.method === 'eudi-wallet') ? NO_LEGAL_EFFECT : NO_LEGAL_EFFECT_PDF;
 
 /** The history line of a recorded signature. Pure. */
 export function signedLine(s: AgreementSignature): string {
-  return s.level === 'test' ? `${s.party} signed (${s.method}, ${NO_LEGAL_EFFECT}).` : `${s.party} signed (${s.method}, ${s.level}).`;
+  return s.level === 'test' ? `${s.party} signed (${s.method}, ${noLegalEffect([s])}).` : `${s.party} signed (${s.method}, ${s.level}).`;
+}
+
+/**
+ * The level a PDF signed elsewhere proves, from its valid signatures. Pure. A signature whose chain
+ * ends at the EU reference wallet's test roots is a test with no legal effect, so a copy whose only
+ * valid signatures are such is `test`, never `advanced` (secaudit2026oct26 outside-02b).
+ */
+export function signedPdfLevel(valid: { level: string; trust: { source: string | null } }[]): 'qualified' | 'advanced' | 'test' {
+  const real = valid.filter(s => s.trust.source !== 'eudi-test-anchor');
+  if (real.some(s => s.level === 'qualified')) return 'qualified';
+  if (!real.length && valid.length) return 'test';
+  return 'advanced';
+}
+
+/** The level an accepted copy is recorded with: the PDF's level from its review, or `scanned`. Pure. */
+export function acceptedCopyLevel(review: Pick<AgreementReview, 'kind' | 'level'>): AgreementSignature['level'] {
+  if (review.kind !== 'pdf') return 'scanned';
+  return review.level === 'qualified' || review.level === 'test' ? review.level : 'advanced';
 }
 
 /**
@@ -102,9 +126,10 @@ export function testSignaturesInForce(config: Pick<AimeatConfig, 'testMode' | 'd
 export function completeIfSigned(a: Agreement, v: AgreementVersion, now: string, opts: { testSignaturesInForce?: boolean } = {}): Agreement {
   const sides = new Set(v.signatures.map(s => s.party));
   if (!(sides.has('controller') && sides.has('processor'))) return { ...a, versions: a.versions.map(x => (x.n === v.n ? v : x)) };
-  const tests = v.signatures.filter(s => s.level === 'test').map(s => s.party);
+  const testSigs = v.signatures.filter(s => s.level === 'test');
+  const tests = testSigs.map(s => s.party);
   if (tests.length && opts.testSignaturesInForce === false) {
-    const line = `Version ${v.n} signed by both parties in test; not in force. The ${tests.join(' and ')} signature is ${NO_LEGAL_EFFECT}, and this node runs production settings.`;
+    const line = `Version ${v.n} signed by both parties in test; not in force. The ${tests.join(' and ')} signature is ${noLegalEffect(testSigs)}, and this node runs production settings.`;
     return {
       ...a,
       versions: a.versions.map(x => (x.n === v.n ? { ...v, status: 'test-signed' as const, signedAt: now } : x)),
@@ -113,7 +138,7 @@ export function completeIfSigned(a: Agreement, v: AgreementVersion, now: string,
   }
   const signed: AgreementVersion = { ...v, status: 'signed', signedAt: now, effectiveFrom: now };
   const line = `Version ${v.n} signed by both parties; in force.`
-    + (tests.length ? ` The ${tests.join(' and ')} signature is ${NO_LEGAL_EFFECT}.` : '');
+    + (tests.length ? ` The ${tests.join(' and ')} signature is ${noLegalEffect(testSigs)}.` : '');
   return {
     ...a,
     versions: a.versions.map(x => (x.n === v.n ? signed : x.status === 'signed' ? { ...x, status: 'superseded' as const } : x)),
@@ -215,7 +240,7 @@ async function checkSignedPdf(deps: Deps, a: Agreement, v: AgreementVersion, dat
     id: 'signer', ok: expected ? names.some(n => n.includes(expected) || expected.includes(n)) : null,
     note: expected ? `Expected ${expected}; the certificates name ${names.join(', ') || 'nobody'}.` : 'Annex I names no signer, so the certificate names were not compared.',
   });
-  const best = valid.some(s => s.level === 'qualified') ? 'qualified' : 'advanced';
+  const best = signedPdfLevel(valid);
   const verdict = checks[0]!.ok === false ? 'fail' : checks.every(c => c.ok === true) ? 'pass' : 'attention';
   return { checks, verdict, level: best };
 }
@@ -373,7 +398,7 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
     const side = n.review.party === 'controller' ? n.annexes.I.controller : n.annexes.I.processor;
     const sig: AgreementSignature = {
       party: n.review.party, method: n.review.kind === 'pdf' ? 'external-pdf' : 'scan',
-      level: n.review.kind === 'pdf' ? (n.review.level === 'qualified' ? 'qualified' : 'advanced') : 'scanned',
+      level: acceptedCopyLevel(n.review),
       signer: (side.signerName || side.name).slice(0, 300), at: now,
       evidence: {
         uploadedBy: n.review.uploadedBy, storageOwner: n.review.storageOwner, storageKey: n.review.storageKey, verdict: n.review.verdict,
@@ -382,7 +407,7 @@ export async function confirmOp(deps: Deps, caller: CallerContext, id: string, b
       },
     };
     const next: AgreementVersion = { ...n, status: 'sent', review, signatures: [...n.signatures.filter(s => s.party !== sig.party), sig] };
-    const withHistory = { ...cur, history: [...cur.history, historyEntry(who.ownerGhii, 'copy-accepted', `${sig.party} signature recorded (${sig.method}, ${sig.level}).`)].slice(-500) };
+    const withHistory = { ...cur, history: [...cur.history, historyEntry(who.ownerGhii, 'copy-accepted', `${sig.party} signature recorded (${sig.method}, ${sig.level === 'test' ? noLegalEffect([sig]) : sig.level}).`)].slice(-500) };
     return completeIfSigned(withHistory, next, now, { testSignaturesInForce: testSignaturesInForce(deps.config) });
   });
   if (changed) throw copyChanged();
