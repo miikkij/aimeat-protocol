@@ -19,7 +19,8 @@
  * @usage
  *   const html = partPreviewHtml(part);   // a complete self-contained page, kit assets relative
  * @version-history
- *   v1.9.0 — 2026-10-30 — A kit previews as its look and tokens, as a look part does (kit.ts).
+ *   v1.9.0 — 2026-10-30 — A kit previews as a page of its own (kit.ts kitPreviewHtml): its bar and logo,
+ *     and the five-figure screen in its look, tokens and ornament set, in the light ?theme asks for.
  *   v1.8.0 — 2026-10-29 — An ornament part previews as its figure on the element it was drawn for
  *     (ornament.ts), with a control that grows it again.
  *   v1.7.0 — 2026-10-19 — An avatar part previews as its picture at three sizes (avatar.ts).
@@ -61,6 +62,7 @@ import type { DesignBookPart } from './service.js';
 import { componentPreviewHtml, type ComponentBody } from './component.js';
 import { avatarPreviewHtml } from './avatar.js';
 import { ornamentPreviewHtml } from './ornament.js';
+import { kitPreviewHtml } from './kit.js';
 import { lookStage, layerStage, wornStage, lookForShape } from './preview-stages.js';
 import { escapeHtml } from '../../utils/html-escape.js';
 
@@ -107,8 +109,10 @@ export function renderableBodyFor(part: DesignBookPart): Record<string, unknown>
   if (part.kind === 'ornament') return { __page: ornamentPreviewHtml(part) };
   // A LOOK (or a motion recipe) is worn by a page whose content fits its character, chosen from
   // the part's own words (preview-stages.ts), and no longer by one arrangement called "Bench".
-  // A KIT previews as its look and tokens worn by a page that fits its words, as a look does.
-  if (part.kind === 'look' || part.kind === 'motion' || part.kind === 'kit') {
+  // A KIT is a page of its own: its bar and logo, and the five-figure screen in its look,
+  // tokens and ornament set (kit.ts), so two kits differ by everything they set.
+  if (part.kind === 'kit') return { __page: kitPreviewHtml(part) };
+  if (part.kind === 'look' || part.kind === 'motion') {
     const body = part.body as { tokens?: Record<string, string>; look?: string };
     return lookStage(`${part.id} ${part.title} ${body.look ?? ''}`, body.tokens ?? {}, body.look);
   }
@@ -365,6 +369,7 @@ export function partPreviewHtml(part: DesignBookPart, opts: { theme?: 'light' | 
   // The bench keeps measuring the light page (renderableBodyFor), which is what its stamp says.
   if (part.kind === 'component' && opts.theme) return componentPreviewHtml(part.body as unknown as ComponentBody, opts.theme);
   if (part.kind === 'ornament' && opts.theme) return ornamentPreviewHtml(part, opts.theme);
+  if (part.kind === 'kit' && opts.theme) return kitPreviewHtml(part, opts.theme);
   const renderable = renderableBodyFor(part);
   if (renderable === null) return null;
   // Every kit page may be asked for in the reader's theme; the bench measures the light one.
