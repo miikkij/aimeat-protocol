@@ -245,12 +245,12 @@
       "digest": "sha256:42f828df4da0fc8ecebe65cf"
     },
     "node:ai-transparency": {
-      "reviewedOn": "2026-10-28",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/mcp/ai-provenance-input.ts",
         "aimeat/src/services/ai-provenance.ts"
       ],
-      "digest": "sha256:2752dbf8bcf814ca4673944a"
+      "digest": "sha256:1ea7dfa493e75f47b2328855"
     },
     "node:aimeat-node-operations": {
       "reviewedOn": "2026-10-25",
@@ -349,7 +349,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,7 +359,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:7f23722fdd48a478960f79e7"
+      "digest": "sha256:e19574b16dbc48536d54d550"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-31",
@@ -623,7 +623,7 @@
     },
     "node:ai-transparency": {
       "aimeat/src/mcp/ai-provenance-input.ts": "02f738b290959c61",
-      "aimeat/src/services/ai-provenance.ts": "bd92779a1b66d1b2"
+      "aimeat/src/services/ai-provenance.ts": "4abad08da5b1ccbe"
     },
     "node:aimeat-node-operations": {
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
@@ -785,7 +785,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
-      "aimeat/src/commerce/app-tool-catalog.ts": "dfb27bab240a9d9c",
+      "aimeat/src/commerce/app-tool-catalog.ts": "9f754fa8073a0adf",
       "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
