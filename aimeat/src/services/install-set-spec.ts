@@ -29,6 +29,8 @@
  *   const set = parseInstallSet(body.install_set);
  *   if (!set.ok) return refusal(set.message);
  * @version-history
+ *   v1.3.0 — 2026-10-31 — owner.welcome (true or false, default true): false sends the owner no welcome
+ *     mail, at any apply (v28 #8: the store mails its own ready message with the sign-in link).
  *   v1.2.1 — 2026-10-05 — Addresses are checked with isValidEmail (utils/email-validator.ts), which
  *     also caps the length (secaudit 2026-10, M2).
  *   v1.2.0 — 2026-10-04 — The set takes `grant_apps` (default true: the owner's grant for each app it
@@ -108,7 +110,11 @@ export interface InstallSet {
      * never from the repository itself.
      */
     repository?: { nodeId: string; url: string; publicKey: string };
-    owner: { name: string; email: string; displayName?: string };
+    /**
+     * `welcome: false`: the owner gets no welcome mail from the set, at any apply. The store sends its
+     * own ready mail with the sign-in link, and two near-identical mails confused the buyer (v28 #8).
+     */
+    owner: { name: string; email: string; displayName?: string; welcome?: false };
     members: InstallSetUser[];
     /** The customer's own organism names, by the bundle's organism key. */
     organismNames: Record<string, string>;
@@ -261,12 +267,13 @@ export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = nul
         const b = doc.bundle as Obj;
         const nodeId = str(b.node_id, 120);
         const version = str(b.version, 60);
-        if (!isObj(doc.owner)) fail('owner is { name, email, display_name? }.');
+        if (!isObj(doc.owner)) fail('owner is { name, email, display_name?, welcome? }.');
         const ow = doc.owner as Obj;
         const ownerName = str(ow.name, 64);
         if (!ownerName || !NAME_RE.test(ownerName)) fail(`owner.name is an account name: ${NAME_RULE}.`);
         const ownerEmail = str(ow.email, 254);
         if (!ownerEmail || !isValidEmail(ownerEmail)) fail('owner.email is required: every user has an email.');
+        if (ow.welcome !== undefined && typeof ow.welcome !== 'boolean') fail('owner.welcome is true or false.');
         const seen = new Set<string>([(ownerEmail as string).toLowerCase()]);
         const members = list(doc.members, 'members').map((u, i): InstallSetUser => {
             if (!isObj(u)) fail(`members[${i}] is an object.`);
@@ -327,7 +334,7 @@ export function parseInstallSet(raw: unknown, bundle: InstallBundle | null = nul
         return {
             bundle: { groupId: groupIdOf(b.group_id, 'bundle.group_id'), ...(nodeId ? { nodeId } : {}), ...(version ? { version } : {}) },
             ...(repository ? { repository } : {}),
-            owner: { name: ownerName as string, email: ownerEmail as string, ...(displayName ? { displayName } : {}) },
+            owner: { name: ownerName as string, email: ownerEmail as string, ...(displayName ? { displayName } : {}), ...(ow.welcome === false ? { welcome: false } : {}) },
             members, organismNames, config,
             autoUpdate: doc.auto_update === undefined ? true : doc.auto_update as boolean,
             grantApps: doc.grant_apps === undefined ? true : doc.grant_apps as boolean,

@@ -19,6 +19,8 @@
  *   is about a destination and nothing short of a listening socket proves it.
  * @usage cd aimeat && pnpm test -- app-artifact-lint
  * @version-history
+ *   v1.8.0 — 2026-10-31 — A page that calls AIMEAT.atelier with no kit script is refused
+ *     (atelier-kit-not-loaded); a loaded or guarded call is not (v28 #13).
  *   v1.7.0 — 2026-10-02 — Classic with kit blocks: a Classic page that loads the kit and calls a
  *     library block publishes with no finding at all; one that loads the kit and calls nothing, or
  *     draws the Atelier shell, is still told; the kit with no track line is still refused and the
@@ -542,5 +544,28 @@ describe('lintAppArtifact — the two tracks never mix', () => {
       const ate = await findings(ATELIER.replace('<meta name="aimeat-register" content="genre-nightfloor">', ''));
       expect(ate.blocking.find(f => f.pitfall === 'atelier-register')?.message).not.toContain('content="classic"');
     });
+  });
+});
+
+// v28 #13 (2026-10-31): the node chat published a shopping list whose first script line was
+// AIMEAT.atelier.i18n with no kit loaded; the TypeError stopped the script and Add did nothing.
+describe('lintAppArtifact — the Atelier kit called and never loaded', () => {
+  const calling = (code: string) => CLEAN.replace("AIMEAT.auth.mountLoginButton('#login', { onLogin: start });", `${code}\n    AIMEAT.auth.mountLoginButton('#login', { onLogin: start });`);
+
+  it('BLOCKS a page that calls AIMEAT.atelier with no kit script', async () => {
+    const r = await findings(calling('var i18n = AIMEAT.atelier.i18n;'));
+    const f = r.blocking.find(x => x.pitfall === 'atelier-kit-not-loaded');
+    expect(f?.severity).toBe('critical');
+    expect(f?.message).toContain('/v1/libs/aimeat-atelier.js');
+    expect(f?.url).toBe('/v1/appdev/pitfalls/atelier-kit-not-loaded');
+  });
+
+  it('stays quiet when the kit is loaded, or the page tests for it first', async () => {
+    const loaded = calling('var i18n = AIMEAT.atelier.i18n;').replace('</head>', '<script src="https://aimeat.io/v1/libs/aimeat-atelier.js"></script></head>');
+    expect((await findings(loaded)).ids).not.toContain('atelier-kit-not-loaded');
+    const guarded = calling('if (window.AIMEAT && AIMEAT.atelier) { AIMEAT.atelier.copy(); }');
+    expect((await findings(guarded)).ids).not.toContain('atelier-kit-not-loaded');
+    const typed = calling("if (typeof AIMEAT.atelier !== 'undefined') AIMEAT.atelier.copy();");
+    expect((await findings(typed)).ids).not.toContain('atelier-kit-not-loaded');
   });
 });

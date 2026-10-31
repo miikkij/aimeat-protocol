@@ -15,6 +15,8 @@
  *   import * as pkgService from '/js/services/packages.js';
  *   const res = await pkgService.listPackages({ status: 'published' });
  * @version-history
+ *   v1.7.0 — 2026-10-31 — setPrice, getSales, refundSale, listPurchases, and the checkout calls Buy
+ *     makes (openCheckout, cardPage, completeCheckout): a package its author sells to accounts.
  *   v1.6.0 — 2026-10-16 — listFederationTemplates removed: it called the peer-signed GET, which an owner
  *     session cannot open; the page reads the stored listings from GET /v1/packages/tab (QA audit F1-04).
  *   v1.5.0 — 2026-09-30 — refreshFromSources: the page's update check asks the package's source first.
@@ -27,7 +29,7 @@
  *     pullPackage. updateInstance is the one to reach for rather than applyMigration with every
  *     component set to `replace`: it leaves what the owner edited alone and says which those were.
  */
-import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
+import { apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 import { authHeaders } from '/js/services/auth.js';
 
 // ── Packages ──
@@ -45,6 +47,22 @@ export const createVersion = (groupId, data) => apiPost(`/v1/packages/${enc(grou
 export const updatePackage = (groupId, data) => apiPatch(`/v1/packages/${enc(groupId)}`, data);
 export const archiveVersion = (groupId, version) => apiDelete(`/v1/packages/${enc(groupId)}/versions/${enc(version)}`);
 export const archivePackageGroup = (groupId) => apiDelete(`/v1/packages/${enc(groupId)}`);
+
+// ── A package its author sells to accounts of this node ──
+/** The author's price: { price: { amount, currency } | null, state?, preview? } (PUT /v1/packages/:group/price). */
+export const setPrice = (groupId, data) => apiPut(`/v1/packages/${enc(groupId)}/price`, data);
+/** The author's sales of it, with the totals. */
+export const getSales = (groupId) => apiGet(`/v1/packages/${enc(groupId)}/sales`);
+/** The author refunds one purchase on the rail that collected it. */
+export const refundSale = (groupId, order) => apiPost(`/v1/packages/${enc(groupId)}/sales/${enc(order)}/refund`, {});
+/** The caller's own purchases. */
+export const listPurchases = () => apiGet('/v1/package-purchases');
+/** Open a checkout: `{ items: [line], currency }`, the line from the listing's `buy`. */
+export const openCheckout = (data) => apiPost('/v1/commerce/checkout-sessions', data);
+/** Stripe's own card page for the checkout, on the seller's account; the person comes back to `returnUrl`. */
+export const cardPage = (id, returnUrl) => apiPost(`/v1/commerce/checkout-sessions/${enc(id)}/card`, { return_url: returnUrl });
+/** Complete a checkout with `{ handler, instrument }`. */
+export const completeCheckout = (id, payment) => apiPost(`/v1/commerce/checkout-sessions/${enc(id)}/complete`, { payment });
 
 // ── Instances ──
 export const listInstances = (params) => apiGet('/v1/instances' + buildQuery(params));
