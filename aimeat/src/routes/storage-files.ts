@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-01 -- GET /v1/pub answers 410 GONE for a withdrawn data package's own file to a reader its
+ *     audience admits (services/datapackage/withdraw.ts; plan doc-mvwxcas3dom3, D0.3).
  *   2026-11-01 -- GET /v1/pub reads a data package's own file (the pointer, a descriptor, a resource
  *     CSV) on the package's audience (services/datapackage/file-read.ts): an organism package's files
  *     are stored at 'private', so its members got 403 CONSENT_DENIED following the descriptor's
@@ -184,6 +186,7 @@ import { generateDownloadToken } from '../services/download-token.js';
 import { storageDownloadRouter } from './storage-files-download.js';
 import { odpsRedirectFor } from '../services/datapackage/odps-read.js';
 import { packageFileVerdict } from '../services/datapackage/file-read.js';
+import { withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
 // Named apart from this file's own byte `readerFor` below: this one is the classification reader.
@@ -497,6 +500,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // an organism or private package's files are stored at 'private', which the tier rules below
         // open to nobody but a consent holder, so a member following the descriptor read nothing.
         const pkg = await packageFileVerdict(storage, gaii, key, req.auth);
+        if (pkg.kind === 'withdrawn') { res.status(410).json(error(config.nodeId, 'GONE', withdrawnMessage(key.split('/')[1], pkg.withdrawnAt))); return; }
         if (pkg.kind === 'open' && file.visibility !== 'public') {
             if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
             const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii;

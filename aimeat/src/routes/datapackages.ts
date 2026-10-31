@@ -23,9 +23,13 @@
  *   - GET  /v1/datapackages            the caller's own packages, newest version each
  *   - GET  /v1/datapackages/:owner/:name         the descriptor (public packages: no auth), with odps_url
  *   - GET  /v1/datapackages/:owner/:name/odps    the ODPS sheet, projected from the version's audience
+ *   - DELETE /v1/datapackages/:owner/:name       withdraw (?purge=true deletes the files too)
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.6.0 -- 2026-11-01 -- DELETE /v1/datapackages/:owner/:name withdraws a package (?purge=true deletes
+ *     its files and pointer); the reads answer 410 GONE for a withdrawn package to a reader its audience
+ *     admits (plan doc-mvwxcas3dom3, D0.3).
  *   v1.5.0 -- 2026-11-01 -- GET /v1/datapackages/:owner/:name/odps answers the ODPS sheet projected at
  *     read time from the version's audience, and the descriptor read names it as `odps_url`; the sheet
  *     stored at publish said public and "No authentication" for every package (plan doc-mvwxcas3dom3, D0.1).
@@ -67,7 +71,8 @@ import { publishPackage, openPackage, readRows, listPackages, listVersions, pars
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
-import { denyScope403 } from '../auth/deny.js';
+import { denyScope403, deny403 } from '../auth/deny.js';
+import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
 import { odpsSheetFor, odpsAddress } from '../services/datapackage/odps-read.js';
 import { ODPS_VERSION } from '../services/exchange-odps.js';
@@ -90,6 +95,13 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * package or version is there for its owner, so a missing one or a missing resource stays 404.
      */
     const refusedForScope = async (req: Request, res: Response, ref: string): Promise<boolean> => {
+        // A withdrawn package answers 410 to a reader its audience admits; anyone else gets the 404
+        // below, so a withdrawn non-public package does not reveal that it existed.
+        const withdrawn = await withdrawalOfRef(store, ref, config.nodeId, req.auth);
+        if (withdrawn) {
+            res.status(410).json(error(config.nodeId, 'GONE', withdrawnMessage(ref, withdrawn.withdrawnAt), undefined, { withdrawn_at: withdrawn.withdrawnAt }));
+            return true;
+        }
         const parsed = parseRef(ref, config.nodeId);
         if (!parsed || !lacksPackageReadScope(parsed.ownerGhii, req.auth)) return false;
         if (await openPackage(store, ref, config.nodeId, req.auth)) return false;
@@ -256,6 +268,31 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         }, [
             { description: 'The permanent address of these bytes', method: 'GET', url: opened.descriptorUrl },
             { description: 'The ODPS product sheet of this version (YAML)', method: 'GET', url: odpsUrl },
+        ]));
+    });
+
+    /**
+     * Withdraw a package (services/datapackage/withdraw.ts): every read answers 410 after it and the
+     * catalogue no longer lists it; the version files stay unless `?purge=true`, which deletes them and
+     * the pointer. The owner in person, or the owner's principal with storage:write; every refusal comes
+     * before any write. The shared anonymous principal is refused with 401 as on the publish.
+     */
+    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
+        const purge = req.query.purge === 'true' || req.query.purge === '1';
+        const out = await withdrawPackage(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string, { purge });
+        if (!out.ok) {
+            if (out.code === 'SCOPE_DENIED') { denyScope403(req, res, [DATAPACKAGE_WITHDRAW_SCOPE], out.message); return; }
+            if (out.code === 'FORBIDDEN') { deny403(req, res, out.code, out.message); return; }
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            package_id: out.packageId, name: out.name, status: 'withdrawn', withdrawn_at: out.withdrawnAt,
+            purged: out.purged, already_withdrawn: out.alreadyWithdrawn, files_deleted: out.filesDeleted,
+            catalogue_removed: out.catalogueRemoved,
+        }, [
+            { description: 'Your packages, with this one marked withdrawn (or gone, when purged)', method: 'GET', url: '/v1/datapackages' },
+            ...(out.purged ? [] : [{ description: 'Publish a version again to restore it', method: 'POST', url: '/v1/datapackages' }]),
         ]));
     });
 

@@ -27,6 +27,8 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-11-01 — Section 5: the ODPS sheet's address (odps_url) and aimeat_datapackage_withdraw, after
+ *     which the feed answers 410 (plan doc-mvwxcas3dom3, D0.1 and D0.3; routes/odata.ts).
  *   2026-10-21 — Section 5: only a PRIVATE package needs storage:read for the person's agent or app,
  *     not every non-public one (the restore round of secaudit 2026-10 v41).
  *   2026-10-21 — Section 5: the person's agent or app reads a non-public package only with
@@ -145,8 +147,11 @@ programs read it:
 
 - \`aimeat_datapackage_publish\` with a \`name\` and \`resources\` (each a table: \`name\`, \`rows\`,
   optionally \`schema\`), plus \`title\`, \`description\`, \`license\` and \`sources\`. Each publish is a
-  new version with a permanent address; an ODPS description of the product goes with it.
+  new version with a permanent address; an ODPS description of the product goes with it (\`odps_url\`
+  in the answer), and it says who may read the package.
 - \`aimeat_datapackage_export\` reads a package back as CSV, JSON or an address.
+- \`aimeat_datapackage_withdraw\` takes a package back: the feed, the files and the export answer that
+  it was withdrawn (410), and it leaves the catalogue. Publishing a version again restores it.
 - **The OData feed** is \`/v1/odata/{owner}/{name}\`: one entity set per table, with \`$metadata\`, and
   \`$select\`, \`$top\`, \`$skip\`, \`$filter\`, \`$orderby\`, \`$count\` and \`$format\`. Excel, Power BI
   and other OData clients read it directly. A table over 5 000 rows comes in pages: each answer
