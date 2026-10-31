@@ -13,6 +13,7 @@
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
  *   v1.37.0 -- 2026-10-31 -- Jouni's review of v31 (K58, K60): the credit shows once, on its own card, with "riittää noin N tavalliseen viestiin" when this place's 30-day average cost per call can tell (messagesLeft), and no tag; sums under a cent read "alle 1 snt" (creditWords); the daily limit says it protects the credit; under "Buy more credit" it says the same card pays and no new subscription is made; the decision model, transparency and compliance cards sit inside "Lisäasetukset" (ctx.extras); there the key section is "Oma tekoälytili (valinnainen)" and says that no own key is the usual way.
+ *   v1.37.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
  *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
  *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
  *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
@@ -160,12 +161,23 @@ function renderSimple(ctx) {
     <//>`;
 }
 
+/**
+ * Today's limit as a buyer can actually spend it: the daily limit, but never more than today's use
+ * plus the credit left, so the page does not promise more than the credit pays (Jouni, K58).
+ */
+function todayLimit(ctx) {
+  const budget = Number(ctx.usage?.daily_budget_usd) || 0;
+  if (!ctx.chat) return budget;
+  const left = Math.max(0, Number(ctx.chat.allowance_remaining_usd) || 0);
+  return Math.min(budget, (Number(ctx.usage?.spent_today_usd) || 0) + left);
+}
+
 /** Today's use against the daily limit, and this month's, in euros of AI credit (v31 K60). */
 function secToday(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
   if (!u) return html`<${PageSection} id="ai-today" num="01" title=${x('simple.todayTitle')} count=${null} first=${true}><${Note} kind="loading">${x('loading')}<//><//>`;
-  const budget = Number(u.daily_budget_usd) || 0;
+  const budget = todayLimit(ctx);
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
   return html`
@@ -264,7 +276,7 @@ function strip(ctx) {
     return html`<${FigureStrip} items=${[
       { key: 'credit', n: ctx.chat ? creditWords(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit'),
         sub: lasts ? x('simple.lasts', { n: lasts }) : '' },
-      { key: 'today', n: u ? creditWords(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: creditWords(u.daily_budget_usd) }) : '' },
+      { key: 'today', n: u ? creditWords(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: creditWords(todayLimit(ctx)) }) : '' },
       { key: 'month', n: r ? creditWords(r.cost) : '…', label: x('stripMonth') },
     ]} />`;
   }

@@ -11,15 +11,29 @@
  *   levelWords · keyRows · crumb · pageLinks
  * @usage import { x, keyRows, rightsInWords } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — x() reads a `<key>Place` variant on a node the store sold: no "key" words
+ *     and no password warning for a buyer who signs in by emailed link (Jouni's review, Access page).
  *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (the steps,
  *     and { tab, label, count } items); the local openTab goes, the Rail opens a tab itself (page
  *     parts, a move: nothing on the page changes).
  *   v1.0.0 — 2026-09-05 — Initial (design canvas "AIMEAT Pääsy-sivu", direction A).
  */
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { date as fmtDate, time as fmtTime, num as fmtNum } from '/js/format.js';
 
-export const x = (key, vars) => t('accesspage.' + key, vars);
+/**
+ * The page's words. On a node the store sold, a string with a `<key>Place` variant reads that one:
+ * the buyer signs in with an emailed link and never needs "key" words (Jouni 2026-11-01).
+ */
+export const x = (key, vars) => {
+  if (customerNode()) {
+    const place = 'accesspage.' + key + 'Place';
+    const said = t(place, vars);
+    if (said !== place) return said;
+  }
+  return t('accesspage.' + key, vars);
+};
 
 // The six copies of localeTag() that used to live here derived the FORMAT from the LANGUAGE, and
 // they had already drifted: five gave English en-GB while the money path special-cased en-US. The

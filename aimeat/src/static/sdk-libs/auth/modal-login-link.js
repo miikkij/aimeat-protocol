@@ -25,6 +25,9 @@
  * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — Opened first, the way to the password is a link under the notes that says
+ *     when it applies (modal.loginLinkPasswordWhy: "if you set a password yourself"), not a second
+ *     button beside Send (Jouni's review, K24 with K62: explain it or hide it).
  *   v1.4.0 — 2026-10-31 — Opened first, the step also says that the demo, the store and the buyer's
  *     own AIMEAT are three places with three sign-ins (modal.loginLinkPlacesFirst), which is why
  *     this one asks again (Jouni's K62: no signed handover from the store; people are told instead).
@@ -69,11 +72,15 @@ export function loginLinkViewHtml(i, field, linkFirst) {
     + field(first('emailLabelFirst', 'emailLabel', 'Email'), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">')
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first('loginLinkSendFirst', 'loginLinkSend', 'Send the link')) + '</button>'
-    + '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>'
+    // Opened first, the password is not a second button beside Send: a buyer never chose one, so it
+    // is a link at the end that says when it applies (Jouni 2026-11-01, K24 with K62).
+    + (linkFirst ? '' : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>')
     + '</div>'
     + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + '</p>' : '')
     // Why this place asks again although the store already knows the buyer (K62).
     + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + '</p>' : '')
+    + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + ' ' : '')
+      + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + '</a></p>' : '')
     + '<p id="aimeat-ll-msg" class="aimeat-msg"></p>'
     + '</div>';
 }
@@ -124,7 +131,7 @@ export function wireLoginLinkStep(ctx) {
     e.preventDefault();
     open();
   });
-  document.getElementById('aimeat-ll-back').addEventListener('click', function () { ctx.showView('login'); });
+  document.getElementById('aimeat-ll-back').addEventListener('click', function (e) { e.preventDefault(); ctx.showView('login'); });
 
   async function send() {
     var email = emailEl.value.trim();
