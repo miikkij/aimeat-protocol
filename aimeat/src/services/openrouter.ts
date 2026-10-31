@@ -15,6 +15,8 @@
  *   - listModels(apiKey, baseUrl?, modality?) — fetch available models
  *   - sniffImage(bytes) — a picture's format and pixel size from its header
  * @version-history
+ *   v4.2.1 — 2026-10-31 — The attribution headers and generationCost accept OpenRouter's in-region
+ *     hosts (eu.openrouter.ai, us.openrouter.ai) as well as openrouter.ai.
  *   v4.2.0 — 2026-10-18 — generateImage takes input pictures (`inputs`): reference images, and a mask
  *     that redraws part of the first one. OpenRouter gets them as `input_references` on its
  *     documented `/images` endpoint, with the mask as a last reference the prompt explains; another
@@ -74,6 +76,7 @@ import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readJson } from '../utils/read-capped.js';
 import { providerReason, providerReasonFromText, retryAfterHeader } from './ai/errors.js';
+import { isOpenRouterApiUrl } from './ai/types.js';
 
 /** The most of one answer this node reads from the AI provider: a model list, a transcript, images
  *  as base64. Read under a ceiling so the provider does not decide how much memory a call takes
@@ -382,7 +385,7 @@ const STT_TIMEOUT_MS = 120_000;
 export function providerHeaders(apiKey: string | undefined, baseUrl: string): Record<string, string> {
   const headers: Record<string, string> = {};
   if (apiKey) headers['Authorization'] = `Bearer ${apiKey}`;
-  if (baseUrl === OPENROUTER_BASE) {
+  if (baseUrl === OPENROUTER_BASE || isOpenRouterApiUrl(baseUrl)) {
     headers['HTTP-Referer'] = 'https://aimeat.io';
     headers['X-Title'] = 'AIMEAT';
   }
@@ -480,7 +483,7 @@ export async function speechRaw(apiKey: string | undefined, baseUrl: string, bod
 
 /** OpenRouter reports the actual charge separately for binary speech responses. */
 export async function generationCost(apiKey: string | undefined, baseUrl: string, id: string): Promise<number | undefined> {
-  if (new URL(baseUrl).hostname !== 'openrouter.ai') return undefined;
+  if (!isOpenRouterApiUrl(baseUrl)) return undefined;
   const response = await safeFetch(`${baseUrl}/generation?id=${encodeURIComponent(id)}`, {
     headers: providerHeaders(apiKey, baseUrl), signal: AbortSignal.timeout(5000),
   });

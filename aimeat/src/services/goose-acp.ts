@@ -26,6 +26,8 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.11.0 — 2026-10-31 — On the shared key the child's OpenRouter host is the node's region for the
+ *     chat model (services/ai/openrouter-region.ts); before, it was always openrouter.ai.
  *   v2.10.0 — 2026-10-31 — newSession() takes `required`: a named MCP server that failed to load
  *     throws McpServerNotLoadedError instead of a session with no tools (v27 P2).
  *   v2.9.0 — 2026-10-04 — start() writes the chat's goose config first (services/goose-chat-config.ts).
@@ -68,7 +70,24 @@ import { EventEmitter } from 'node:events';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { cardFromToolResult, type ChatCard } from './chat-cards.js';
-import { gooseChildEnv } from './goose-env.js';
+import { chatUsesSharedKey, gooseChildEnv } from './goose-env.js';
+import { decideRegion, regionBaseUrl, regionChoiceFor } from './ai/openrouter-region.js';
+import { DEFAULT_RULES } from './ai/routing.js';
+
+/**
+ * Where the shared key's chat calls go: the node's OpenRouter region for the chat model, as a host
+ * goose's OpenRouter provider takes (it adds /api/v1 itself). A model the region does not offer and
+ * no allowed fallback takes stays at the wanted region, which refuses the call rather than send it
+ * elsewhere. Undefined on the node route, where every call goes through /v1/llm and its own region.
+ */
+async function sharedKeyOpenRouterHost(config: AimeatConfig): Promise<string | undefined> {
+    if (!chatUsesSharedKey(config)) return undefined;
+    const choice = regionChoiceFor(config, DEFAULT_RULES, 'node');
+    const decided = config.gooseModel ? await decideRegion(config, choice, config.gooseModel) : null;
+    if (decided && !decided.ok) logger.warn(`[goose] ${decided.message}`);
+    const base = decided?.ok ? decided.baseUrl : regionBaseUrl(config, choice.region);
+    return base.endsWith('/api/v1') ? base.slice(0, -'/api/v1'.length) : undefined;
+}
 import { ensureChatGooseConfig } from './goose-chat-config.js';
 
 /** An MCP server handed to one session. `http` is the transport goose reports as supported. */
@@ -176,7 +195,7 @@ export class GooseAcpClient {
         const bin = config.gooseBin || 'goose';
         // Only what the agent needs, never the node's whole environment (services/goose-env.ts): the
         // agent talks to people and can run the tools goose's own config switches on.
-        const env = gooseChildEnv(config, process.env, personal);
+        const env = gooseChildEnv(config, process.env, personal, await sharedKeyOpenRouterHost(config));
         // The config that switches off the goose extensions the chat does not use, written before goose
         // reads it (services/goose-chat-config.ts).
         ensureChatGooseConfig(config);

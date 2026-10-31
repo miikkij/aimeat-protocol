@@ -22,6 +22,8 @@
  * @structure
  *   AttemptRecord · AiRoute · classifyFailure · noCreditRetry · runRoute · routeOf
  * @version-history
+ *   v1.4.0 — 2026-10-31 — An OpenRouter attempt records its region, and the region it was meant for
+ *     when it went elsewhere; answeredBy carries both (ai/openrouter-region.ts).
  *   v1.3.0 — 2026-10-29 — A key at its spending limit (OpenRouter's 403 in key-limit words) is a
  *     spent key like a 402: not an `auth` failure, and retried on the free router like one. A spent
  *     node key is marked (ai/node-key-balance.ts), so the next call is refused before it is made.
@@ -41,10 +43,14 @@ import type { RoutingRules } from './routing.js';
 import type { AiCapability } from './types.js';
 import { CONTENT_REFUSAL, isNoCreditFailure } from './errors.js';
 import { markNodeKeySpent } from './node-key-balance.js';
+import type { OpenRouterRegion } from './openrouter-region.js';
 
 export interface AttemptRecord {
   provider: string;
   model: string;
+  /** OpenRouter only: where the attempt was processed, and the region it was meant for when that differs. */
+  region?: OpenRouterRegion;
+  regionWanted?: OpenRouterRegion;
   ok?: true;
   error?: FailureClass;
   costUsd: number;
@@ -54,7 +60,7 @@ export interface AttemptRecord {
 export interface AiRoute {
   capability: AiCapability;
   chosenBy: ChosenBy;
-  answeredBy: { provider: string; model: string } | null;
+  answeredBy: { provider: string; model: string; region?: OpenRouterRegion; regionWanted?: OpenRouterRegion } | null;
   attempts: AttemptRecord[];
   fellBack: boolean;
 }
@@ -139,8 +145,23 @@ export function routeOf(ctx: Pick<RunContext, 'capability' | 'chosenBy'>, attemp
   const ok = attempts.find(a => a.ok);
   return {
     capability: ctx.capability, chosenBy: ctx.chosenBy,
-    answeredBy: ok ? { provider: ok.provider, model: ok.model } : null,
+    answeredBy: ok ? { provider: ok.provider, model: ok.model, ...regionFields(ok) } : null,
     attempts, fellBack: attempts.length > 1,
+  };
+}
+
+/** The region fields of an attempt: where it ran, and what was wanted only when that was elsewhere. */
+function regionFields(a: { region?: OpenRouterRegion; regionWanted?: OpenRouterRegion }): Pick<AttemptRecord, 'region' | 'regionWanted'> {
+  if (!a.region) return {};
+  return { region: a.region, ...(a.regionWanted && a.regionWanted !== a.region ? { regionWanted: a.regionWanted } : {}) };
+}
+
+/** One attempt as the route records it. */
+function attemptOf(c: AiCandidate, outcome: { ok: true } | { error: FailureClass }, costUsd: number): AttemptRecord {
+  return {
+    provider: c.provider.id, model: c.model,
+    ...(c.region ? regionFields({ region: c.region.used, regionWanted: c.region.wanted }) : {}),
+    ...outcome, costUsd,
   };
 }
 
@@ -163,13 +184,13 @@ export async function runRoute<T>(
     try {
       const result = await attempt(c);
       noteHealth(ctx, c, { ok: true });
-      attempts.push({ provider: c.provider.id, model: c.model, ok: true, costUsd: 0 });
+      attempts.push(attemptOf(c, { ok: true }, 0));
       return { result, candidate: c, route: routeOf(ctx, attempts), failed };
     } catch (e) {
       const cls = classifyFailure(e, ctx.signal);
       const costUsd = failedCost(e);
       noteHealth(ctx, c, { error: cls, message: e instanceof Error ? e.message : String(e) });
-      attempts.push({ provider: c.provider.id, model: c.model, error: cls, costUsd });
+      attempts.push(attemptOf(c, { error: cls }, costUsd));
       failed.push({ candidate: c, error: cls, costUsd });
       // The node's own key at its limit: from now on the planner refuses before calling, with the
       // person's notice, until the limit is raised (ai/node-key-balance.ts).

@@ -51,6 +51,8 @@
  *     audit 2026-10-09, S1).
  *   v1.3.0 — 2026-10-08 — A speech capability may state the PCM its server sends (sampleRate,
  *     channels, sampleFormat), which the speech answer's `audio` block reports (aiprov plan, A4).
+ *   v1.5.0 — 2026-10-31 — AIMEAT_AI_FIXED_BASEURL_OVERRIDES takes openrouter-eu and openrouter-us too
+ *     (regionOverrideOf), for a stub standing in for OpenRouter's in-region addresses.
  *   v1.4.1 — 2026-10-25 — An extension provider may name its extension `<owner>/<name>`, the stored
  *     name since names live in the owner's namespace (secaudit2026oct22).
  */
@@ -237,17 +239,21 @@ const BUILTIN: Readonly<Record<string, { title: string; baseUrl: string }>> = {
   llamacpp: { title: 'llama.cpp server (local)', baseUrl: 'http://127.0.0.1:8080/v1' },
 };
 
+/** OpenRouter's in-region addresses, which a test stub may stand in for (services/ai/openrouter-region.ts). */
+type RegionOverrideKey = 'openrouter-eu' | 'openrouter-us';
+const isRegionOverrideKey = (k: string): k is RegionOverrideKey => k === 'openrouter-eu' || k === 'openrouter-us';
+
 /** The operator's overrides of the fixed addresses, read once per value. Empty on a public node. */
-let overrideCache: { raw: string; profile: string; map: Partial<Record<FixedProviderType, string>> } | null = null;
-function fixedOverrides(config: AimeatConfig): Partial<Record<FixedProviderType, string>> {
+let overrideCache: { raw: string; profile: string; map: Partial<Record<FixedProviderType | RegionOverrideKey, string>> } | null = null;
+function fixedOverrides(config: AimeatConfig): Partial<Record<FixedProviderType | RegionOverrideKey, string>> {
   const raw = config.aiFixedBaseUrlOverrides ?? '';
   if (overrideCache && overrideCache.raw === raw && overrideCache.profile === config.securityProfile) return overrideCache.map;
-  const map: Partial<Record<FixedProviderType, string>> = {};
+  const map: Partial<Record<FixedProviderType | RegionOverrideKey, string>> = {};
   if (raw.trim() && config.securityProfile !== 'public') {
     try {
       const parsed = JSON.parse(raw) as unknown;
       for (const [type, url] of Object.entries(isObj(parsed) ? parsed : {})) {
-        if (isFixedType(type) && typeof url === 'string' && URL.canParse(url)) map[type] = stripTrailingSlashes(url);
+        if ((isFixedType(type) || isRegionOverrideKey(type)) && typeof url === 'string' && URL.canParse(url)) map[type] = stripTrailingSlashes(url);
         else logger.error('[ai] an AIMEAT_AI_FIXED_BASEURL_OVERRIDES entry was refused', { type, fix: 'a fixed type and an http(s) address' });
       }
       if (Object.keys(map).length) logger.warn('[ai] fixed provider addresses are overridden on this node', { types: Object.keys(map) });
@@ -262,6 +268,11 @@ function fixedOverrides(config: AimeatConfig): Partial<Record<FixedProviderType,
 /** The address of a fixed type on this node. */
 export function fixedBaseUrlOf(config: AimeatConfig, type: FixedProviderType): string {
   return fixedOverrides(config)[type] ?? FIXED_BASE_URLS[type];
+}
+
+/** A test stub standing in for one of OpenRouter's in-region addresses, on a node that is not public. */
+export function regionOverrideOf(config: AimeatConfig, region: 'eu' | 'us'): string | undefined {
+  return fixedOverrides(config)[`openrouter-${region}`];
 }
 
 /** Whether this node allows a fixed type (AIMEAT_AI_PROVIDER_TYPES; empty allows all five). */
