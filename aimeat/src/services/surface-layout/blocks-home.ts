@@ -131,6 +131,20 @@ export const HOME_BLOCKS: readonly SurfaceBlockDef[] = [
         summary: 'How many of their agents are home and whether any of them is in trouble.',
     },
     {
+        // The account in one line of five figures (computers, agents, apps, knowledge, offerings),
+        // what has gone quiet, and the way to the Overview page. It reads GET /v1/overview with a
+        // small limit; the totals are the whole account's. It renders nothing for an account with
+        // no agent, computer or app, which has the guided steps instead.
+        id: 'home.overview',
+        surfaces: ['home'],
+        presence: { kind: 'always' },
+        localeStem: 'home.overview.block',
+        liveDomains: ['agents', 'agent-tasks', 'apps', 'organisms'],
+        props: {},
+        maxPerSurface: 1,
+        summary: 'The account at a glance: computers, agents, apps, knowledge and offerings, what has gone quiet, and the way to the Overview.',
+    },
+    {
         // Where a person makes an agent from one sentence and sees the ones at work. It reads
         // GET /v1/home/agents: proposals that wait for them, workers, and the machines they run on.
         id: 'home.agents',

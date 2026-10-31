@@ -28,6 +28,7 @@
  *   every sentence on the page says computer.
  * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   v1.4.0 — 2026-10-31 — "Show in the overview" on each computer: the Overview page opened on it (views/home/overview.js).
  *   v1.3.0 — 2026-10-31 — Each computer lists the programs it may start for its agents, and the person
  *     allows or stops each one; a copyable prompt does the same from their own AI (./machine-programs.js;
  *     wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
@@ -209,6 +210,7 @@ function Machine({ c, others, onChanged, confirm }) {
 
         <${Actions}>
           ${!naming && html`<${Action} small onClick=${() => { setName(c.name || ''); setNaming(true); }}>${m('rename', 'Rename')}<//>`}
+          <${Action} small href=${`/v1/home?overview=1&focus=${encodeURIComponent(`machine:${c.id}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//>
           ${c.online && c.agents.length > 0 && !menu && html`
             <${Action} small disabled=${asking} onClick=${ask}>${asking ? m('asking', 'Asking the computer…') : m('ask', 'Show what it can do')}<//>`}
           ${everyone.length > 0 && others.length > 0 && !moving && html`

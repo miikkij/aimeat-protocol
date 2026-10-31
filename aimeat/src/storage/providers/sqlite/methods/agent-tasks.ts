@@ -8,12 +8,14 @@
  * @structure agentTaskMethods
  * @usage Object.assign(SqliteStorage.prototype, agentTaskMethods) in ../index.ts
  * @version-history
+ *   2026-10-31 — countTasksByOwner returns OwnerTaskCounts (done24h and done30d added).
  *   v1.0.0 — 2026-10-05 — 12 methods (createAgentTask, getAgentTask, findLiveTaskByDedupeKey, …) moved here
  *     from capability-agents.ts so the file mirrors postgres-kysely/methods/agent-tasks.ts (secaudit 2026-10,
  *     M8).
  */
 import type { AgentTaskRecord, AgentTaskEventRecord } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import type { OwnerTaskCounts } from '../../../repositories/agent-task.repository.js';
 import * as agentTaskRepo from '../repos/agent-task.js';
 
 export const agentTaskMethods = {
@@ -62,7 +64,7 @@ export const agentTaskMethods = {
     return agentTaskRepo.countTasksByAgent(this.db, agentGaii);
   },
 
-  async countTasksByOwner(this: SqliteStorage, ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
+  async countTasksByOwner(this: SqliteStorage, ownerGaii: string): Promise<Record<string, OwnerTaskCounts>> {
     return agentTaskRepo.countTasksByOwner(this.db, ownerGaii);
   },
 

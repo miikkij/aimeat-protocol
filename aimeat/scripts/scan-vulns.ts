@@ -21,12 +21,18 @@
  *   pnpm scan:vulns            # everything that ships: npm production tree + served libraries
  *   pnpm scan:vulns -- --dev   # add the build toolchain (it runs on the machine that cuts releases)
  *   pnpm scan:vulns -- --json  # machine-readable, for CI
+ *
+ *   THE ORDER IS THE PATCH ORDER. Each finding is printed with its priority from CISA KEV (used in
+ *   attacks) and FIRST EPSS (likely to be used), scripts/lib/exploit-signals.ts, so the exploited one
+ *   comes first whatever its severity label says.
  * @version-history
+ *   v1.2.0 — 2026-10-31 — Findings in patch order, with KEV and EPSS per finding.
  *   v1.1.0 — 2026-08-31 — Query extracted to scripts/lib/osv-scan.ts so the security report shares it.
  *   v1.0.0 — 2026-08-31 — Initial: OSV over both populations, the served libraries included.
  */
 import { npmComponents, vendoredComponents } from './lib/license-inventory.js';
-import { scanComponents } from './lib/osv-scan.js';
+import { scanComponents, type Finding } from './lib/osv-scan.js';
+import { fetchSignals, priorityOf, rank } from './lib/exploit-signals.js';
 
 async function main(): Promise<void> {
   const withDev = process.argv.includes('--dev');
@@ -42,9 +48,16 @@ async function main(): Promise<void> {
   }
 
   const { scanned, findings } = await scanComponents([...npm, ...served]);
+  const signals = await fetchSignals(findings.flatMap(f => f.cves));
+  const rankedOf = (f: Finding) => priorityOf(f.cves, signals);
+  const ordered = rank(findings, rankedOf);
 
   if (asJson) {
-    console.log(JSON.stringify({ scanned, findings }, null, 2));
+    console.log(JSON.stringify({
+      scanned,
+      exploitSignals: { kevCatalog: signals.kevCatalog, epssDate: signals.epssDate, errors: signals.errors },
+      findings: ordered.map(f => ({ ...f, ...rankedOf(f) })),
+    }, null, 2));
     if (findings.length > 0) process.exitCode = 1;
     return;
   }
@@ -55,13 +68,17 @@ async function main(): Promise<void> {
   }
 
   const affected = new Set(findings.map(f => f.component));
-  console.log(`\n✗ ${findings.length} finding(s) across ${affected.size} component version(s):\n`);
-  for (const f of findings) {
-    console.log(`  ${f.component}  [${f.where}]`);
-    console.log(`    ${f.id}  severity ${f.severity}`);
+  console.log(`\n✗ ${findings.length} finding(s) across ${affected.size} component version(s), in the order to patch:\n`);
+  for (const f of ordered) {
+    const r = rankedOf(f);
+    console.log(`  [${r.priority}]  ${f.component}  [${f.where}]`);
+    console.log(`    ${f.id}${f.cves.length > 0 ? ` (${f.cves.join(', ')})` : ''}  severity ${f.severity}`);
     console.log(`    ${f.summary}`);
+    console.log(`    why this priority: ${r.reason}`);
     console.log(`    fixed in: ${f.fixed}\n`);
   }
+  console.log(`Exploitation signals: CISA KEV ${signals.kevCatalog ?? 'NOT READ'}, FIRST EPSS ${signals.epssDate ?? 'NOT READ'}.`);
+  for (const e of signals.errors) console.log(`  could not read ${e}`);
   console.log('Cross-check with `pnpm audit`: the two databases do not always agree, and a');
   console.log('disagreement is worth reading rather than averaging.');
   process.exitCode = 1;
