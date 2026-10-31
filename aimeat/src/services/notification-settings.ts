@@ -83,7 +83,7 @@ export function defaultSettings(): NotificationSettings {
 /** The last emails the node sent to the owner's own address: what and when, never the content. */
 export const MAIL_LOG_KEY = 'notifications.mail-log';
 /** `agent_narrowed` names entries written from 2026-10-18 to 2026-10-28, when the node narrowed agents by itself. */
-export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation' | 'agent_ask' | 'agent_narrowed';
+export type MailLogKind = 'verification' | 'password_reset' | 'username' | 'magic_link' | 'workflow_end' | 'digest' | 'nudge' | 'invitation' | 'agent_ask' | 'agent_narrowed' | 'notification';
 export interface MailLogEntry { kind: MailLogKind; subject: string; at: string }
 const MAIL_LOG_MAX = 50;
 

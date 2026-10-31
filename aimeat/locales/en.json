@@ -10378,6 +10378,7 @@
   "emailpage.kind.invitation": "an invitation",
   "emailpage.kind.agent_ask": "your agent's request",
   "emailpage.kind.agent_narrowed": "your agent's narrowed permissions",
+  "emailpage.kind.notification": "a report from your agent or app",
   "emailpage.chatTitle": "Mail from a chat",
   "emailpage.chatSub": "search, read, send to a saved contact · an app's delegation · the prompt",
   "emailpage.copyPrompt": "Copy the prompt",

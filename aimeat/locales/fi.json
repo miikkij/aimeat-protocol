@@ -10572,6 +10572,7 @@
   "emailpage.kind.invitation": "kutsu",
   "emailpage.kind.agent_ask": "agenttisi pyyntö",
   "emailpage.kind.agent_narrowed": "agenttisi rajatut oikeudet",
+  "emailpage.kind.notification": "agenttisi tai sovelluksesi raportti",
   "emailpage.chatTitle": "Sähköposti chatista",
   "emailpage.chatSub": "hae, lue, lähetä tallennetulle · sovelluksen valtuutus · kehote",
   "emailpage.copyPrompt": "Kopioi kehote",
