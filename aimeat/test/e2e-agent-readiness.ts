@@ -10,6 +10,7 @@
  *   The suite grows with the programme in docs/internal/agentscanner/ — sitemap.md, AGENTS.md,
  *   llms.txt structure and llms-full.txt land here as their phases ship.
  * @version-history
+ *   2026-10-31 — The help page's body is checked against public/help/help.en.md, the new page's text, and must not carry the old page's morsels.
  *   2026-10-15 — visibleText decodes the HTML entities a reader sees decoded: the newest change log title holds "&", which the page sends as &amp;, and the test failed on a correct page.
  *   v0.5.0 - 2026-10-03 - Glossary plain layer: ?lang=fi gives Finnish plain sentences, an unknown lang is English.
  *   v0.4.0 - 2026-10-03 - The person help prompt at /v1/help/prompt/person, and 404 for an unknown one.
@@ -205,10 +206,14 @@ function locs(xml: string): string[] {
         assert(seen.includes('What changed recently'), 'no recent-changes section in the front page body');
     });
 
-    await test('the help page sends its questions and answers', async () => {
+    // The text version is public/help/help.en.md, the file the view reads. Until 2026-10-31 it was
+    // the old page's questions, morsels included, while the view had moved on.
+    await test('the help page sends the text the view shows', async () => {
         const seen = visibleText(shellBodies.get('/v1/help') ?? '');
-        assert(seen.includes('What does this cost me?'), 'the first question is missing');
-        assert(seen.includes('Who can see my things?'), 'the privacy question is missing');
+        assert(seen.includes('What this costs'), 'the cost section is missing');
+        assert(seen.includes('Who sees my things'), 'the privacy section is missing');
+        assert(!/\{#[a-z]/.test(seen), 'a section address {#id} reached the text');
+        assert(!/morsel/i.test(seen), 'the old page text is still sent');
     });
 
     await test('/v1/docs sends the operation index until Swagger UI replaces it', async () => {
