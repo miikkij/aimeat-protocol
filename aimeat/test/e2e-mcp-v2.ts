@@ -17,6 +17,9 @@
 // stays on an agent's list, so the narrow agent is listed memory_write on the agent and chat surfaces
 // and a call is refused SCOPE_DENIED with the allow address; a tool missing a powerful word
 // (task_create, task:write) stays absent, and the finder does not offer it.
+// 2026-10-31: the chat lists its start tools in short words (mcp/chat-tool-text.ts, v31 K63):
+// memory_write under 800 characters, the start set under 26 000 (45 769 before), a call without the
+// required key still refused, and the full surface keeps the full text.
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-v2.ts
 
 import { MCP_SURFACES } from '../src/tool-catalog/surfaces.js';
@@ -212,7 +215,7 @@ async function openSession(gaii: string, privKey: string, role: string) {
     await fetch(`${BASE}/v2/mcp/${role}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${token}`, 'mcp-session-id': sid, 'mcp-protocol-version': '2025-03-26' }, body: JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) });
     const names = async () => ((await rpc('tools/list', {})).result?.tools ?? []).map((t: any) => t.name as string);
     const call = async (name: string, args: Record<string, unknown>) => (await rpc('tools/call', { name, arguments: args })).result ?? {};
-    return { names, call };
+    return { names, call, rpc };
 }
 
 // ── The chat surface (2026-10-02) ──
@@ -225,6 +228,27 @@ await test('/v2/mcp/chat lists exactly its small starting set', async () => {
     const missing = [...want].filter(t => !got.has(t));
     const extra = [...got].filter(t => !want.has(t));
     assert(missing.length === 0 && extra.length === 0, `chat lists its own set: missing ${missing.join(', ')}; extra ${extra.join(', ')}`);
+});
+
+await test('chat lists its start tools in short words, and a bad call is still refused (v31 K63)', async () => {
+    // The source was broken: the start tools were listed with their full text, about 46 000
+    // characters on every model call. /v1/mcp keeps the full text.
+    const s = await openSession(agent.gaii, agent.key, 'chat');
+    const listed = (await s.rpc('tools/list', {})).result?.tools ?? [];
+    const size = JSON.stringify(listed).length;
+    const write = listed.find((t: any) => t.name === 'aimeat_memory_write');
+    assert(write && write.description.startsWith('Save a memory entry'), `memory_write has its short text: ${String(write?.description).slice(0, 80)}`);
+    // 7 141 characters before, its name, text and schema; under 800 is Jouni's figure, and the
+    // listing on the wire adds the annotations.
+    assert(JSON.stringify({ name: write.name, description: write.description, inputSchema: write.inputSchema }).length < 800,
+        `memory_write is listed in under 800 characters: ${JSON.stringify(write).length}`);
+    assert(write.inputSchema?.required?.includes('key') && write.inputSchema?.properties?.ai_provenance, 'its parameters and their types stay');
+    assert(size < 26_000, `the start set is listed in under 26 000 characters (45 769 before): ${size}`);
+    const bad = await s.call('aimeat_memory_write', { value: 'no key' });
+    assert(bad.isError === true, `a call without the required key is still refused: ${JSON.stringify(bad).slice(0, 200)}`);
+    const full = await openSession(agent.gaii, agent.key, 'full');
+    const fullWrite = ((await full.rpc('tools/list', {})).result?.tools ?? []).find((t: any) => t.name === 'aimeat_memory_write');
+    assert(fullWrite && !fullWrite.description.startsWith('Save a memory entry'), 'another surface keeps the full text');
 });
 
 await test('on chat, aimeat_tools_find adds the tools for a purpose to this session', async () => {
