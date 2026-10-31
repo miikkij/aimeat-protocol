@@ -11,6 +11,9 @@
  * @structure designbookTools
  * @usage import { designbookTools } from './designbook.js';
  * @version-history
+ *   2026-10-30 — The node's default kit: `node` on aimeat_designbook_kit_default, view "defaults" on
+ *     aimeat_designbook_kit. aimeat_designbook_status: the operator publishes a part (a kit waiting for
+ *     everyone among them) from chat, as POST /v1/designbook/:id/status does on the admin Apps tab.
  *   2026-10-30 — Style kits: aimeat_designbook_kit and aimeat_designbook_kit_default, and the kit kind
  *     in the search filter, the propose part description and adopt.
  *   2026-10-30 — Ornament sets ({ set }) in the propose part description and adopt.
@@ -129,7 +132,7 @@ export const designbookTools = [
     },
     {
         name: 'aimeat_designbook_kit',
-        description: "The style kit a NEW APP starts from: call it FIRST, before you pick a genre. A kit is the whole look of an app in one Design Book part (a look, its colours, faces, corners and motion, the genre to fork, an ornament set, a logo), chosen by the person for their own new apps, or by an organism's owners for every member's. Name the `organism` when the app is built for one: its kit answers when it chose one and you are an active member, else the person's own, else none. The answer carries the kit and `apply`: the genre to fork, the `css` to put in the head, the `app` line with the look and the logo, the `ornament` line, and `use`, what to do in order. Build in the kit unless the person asks for something else: it is a default, never a rule. `passed_over` says when a chosen kit no longer answers and why. No kit is answered with how the person can choose one.",
+        description: "The style kit a NEW APP starts from: call it FIRST, before you pick a genre. A kit is the whole look of an app in one Design Book part (a look, its colours, faces, corners and motion, the genre to fork, an ornament set, a logo), chosen by the person for their own new apps, or by an organism's owners for every member's. Name the `organism` when the app is built for one: its kit answers when it chose one and you are an active member, else the person's own, else none. The answer carries the kit and `apply`: the genre to fork, the `css` to put in the head, the `app` line with the look and the logo, the `ornament` line, and `use`, what to do in order. Build in the kit unless the person asks for something else: it is a default, never a rule. When neither the organism nor the person chose one, the node's own default answers (`source` \"node\"). `passed_over` says when a chosen kit no longer answers and why. No kit is answered with how the person can choose one. With view \"defaults\" it answers every default the person can see or choose instead: their own, the node's, and each organism's they are an owner or an admin of, and whether they may choose the node's.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Design Book: the style kit a new app starts from', readOnlyHint: true },
@@ -137,11 +140,12 @@ export const designbookTools = [
         surfaces: ['agent'],
         input: {
             organism: { type: 'string', description: 'The organism the app is built for, when it is built for one. Omit for the person\'s own kit.' },
+            view: { type: 'string', enum: ['defaults'], description: '"defaults" answers every default the person can see or choose, instead of the kit in force.' },
         },
     },
     {
         name: 'aimeat_designbook_kit_default',
-        description: "Choose the style kit new apps start from, or clear it with clear true. Without `organism` it is the person's own: their next apps start in it. With `organism` it is that organism's, for every member's new apps, and only its owners and admins choose it; the kit must be one its members can read (proposed with reach \"organism\" for that organism, or a published kit for the whole node). Make a kit with aimeat_designbook_propose, kind \"kit\": body { reach: \"own\" | \"organism\" | \"node\", organism?, look, tokens?, genre?, ornament?: { set, palette? }, logo?, from_app? }. To save the style of an app the person likes, read the app (aimeat_app_get), take its look, its --ak-… tokens, its genre and its ornament set, and propose them as a kit with from_app naming it. List the kits they can read with aimeat_designbook_search { kind: \"kit\" }.",
+        description: "Choose the style kit new apps start from, or clear it with clear true. Without `organism` it is the person's own: their next apps start in it. With `organism` it is that organism's, for every member's new apps, and only its owners and admins choose it; the kit must be one its members can read (proposed with reach \"organism\" for that organism, or a published kit for the whole node). With `node` true it is the node's, for every new app whose organism and person chose none; only the node's operator chooses it, and the kit must be a published kit for the whole node. Make a kit with aimeat_designbook_propose, kind \"kit\": body { reach: \"own\" | \"organism\" | \"node\", organism?, look, tokens?, genre?, ornament?: { set, palette? }, logo?, from_app? }. To save the style of an app the person likes, read the app (aimeat_app_get), take its look, its --ak-… tokens, its genre and its ornament set, and propose them as a kit with from_app naming it. List the kits they can read with aimeat_designbook_search { kind: \"kit\" }.",
         caller: 'agent',
         visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         annotations: { title: 'Design Book: choose the default style kit', idempotentHint: true },
@@ -151,6 +155,20 @@ export const designbookTools = [
             kit: { type: 'string', description: 'The kit id. Leave it out with clear true.' },
             clear: { type: 'boolean', description: 'true clears the default, so new apps start with no kit.' },
             organism: { type: 'string', description: 'The organism whose default this is. Omit for the person\'s own.' },
+            node: { type: 'boolean', description: 'true makes it the node\'s default (the operator only). Not together with organism.' },
+        },
+    },
+    {
+        name: 'aimeat_designbook_status',
+        description: "Move a Design Book part through its life: \"published\" puts a proposed part on the shared shelf for everyone (a kit with reach \"node\" waiting for the operator among them), \"aging\" marks one nobody takes, \"proposed\" takes one back off the shelf, \"retired\" ends it. Publishing, aging and demoting are the node operator's calls; a proposer may retire their own part, nothing more. The parts waiting for the operator are listed with aimeat_designbook_search { status: \"proposed\" }. The answer carries the part's new and previous status.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
+        annotations: { title: 'Design Book: publish or retire a part', idempotentHint: true },
+        scope: 'memory:write',
+        surfaces: ['agent'],
+        input: {
+            id: { type: 'string', required: true, description: 'The part id.' },
+            status: { type: 'string', required: true, enum: ['published', 'aging', 'proposed', 'retired'], description: 'The status the part moves to.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];
