@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.50.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
  *   v1.49.0 -- 2026-10-30 -- Several stores of one's own, and `store` on aimeat_storage_upload
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.48.0 -- 2026-10-29 -- Your owner's files in their own storage: the four aimeat_file_store_* tools.
@@ -143,7 +144,11 @@ save a file, \`store\` on \`aimeat_storage_upload\` puts it in a store you name:
 \`aimeat_file_store_get\`, their own stores and the node stores open to everyone. Without it the file goes
 to their default. \`aimeat_file_store_move\` moves their files to a store or back home, and
 \`aimeat_file_store_remove\` disconnects a store once nothing is left in it.
-Ask your owner before you connect or disconnect anything.
+Ask your owner before you connect or disconnect anything. Each store's \`browser_access\` says whether
+apps in their browser can send files straight to it; when they cannot, its \`rule\` is the CORS rule to
+add and where, which only the owner can add in their cloud console. Tell them, and after they have
+added it, call \`aimeat_file_store_set\` with the store's \`name\` alone to test it again. You need no rule
+yourself.
 
 **Making something public may wait for your owner.** When this node asks the owner first and you do
 not hold publish:public, a write that makes something public answers with \`publish_request\`: it is

@@ -6,9 +6,11 @@
  *   tools both call: the store the environment names and what is missing from its settings, the named
  *   stores and which is the default, how many files and bytes each place holds, a connection test, and
  *   the move of files from one place to another, one bounded batch per call.
- * @structure FileStoreResult · nodeFileStoreStatus · probeStore · testNodeFileStore · moveFilesToNodeStore
+ * @structure FileStoreResult · nodeFileStoreStatus · probeStore · testNodeFileStore · checkOf · moveFilesToNodeStore
  * @usage const status = await nodeFileStoreStatus({ storage, config });
  * @version-history
+ *   v1.2.0 — 2026-10-31 — A test also checks whether a browser may send to the store directly, and the
+ *     answer gives the CORS rule to add when it may not (browser-access.ts).
  *   v1.1.0 — 2026-10-30 — The named node stores in the status, a test of one by name, and a move from
  *     any node place (`from`) to a named store (`to`) (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -23,6 +25,7 @@ import { choiceIdOf, nodeTarget, ownerTarget, resolveChoice } from './file-store
 import { listOwnerStores, ownerStoreMode, readApprovals, type FileStoreCtx } from './owner-file-store.js';
 import { nodeEntryNamed, nodeEntrySpec, nodeEntryStoreId, nodeStoreView, readNodeStores, updateNodeStores } from './node-file-stores.js';
 import { placeOf, targetOfSpec, whereOf } from './store-target.js';
+import { browserAccessView, checkBrowserAccess } from './browser-access.js';
 
 export type FileStoreResult<T> = { ok: true; data: T } | { ok: false; status: number; code: string; message: string };
 
@@ -65,6 +68,7 @@ export async function nodeFileStoreStatus(ctx: FileStoreCtx) {
         owner: o.owner, name: e.name, store: `own:${e.name}`, default: o.default === e.name,
         kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target),
         connected_at: e.connectedAt, last_check: e.lastCheck ?? null, reason: o.reason ?? null,
+        browser_access: browserAccessView(e.browserAccess, e.target.kind),
         files: places.find(p => p.store === e.storeId) ?? NONE,
         approval: approvals.owners.find(a => a.owner === o.owner) ?? null,
       }))),
@@ -103,19 +107,20 @@ export async function probeStore(store: BlobStore, prefix: string): Promise<{ ok
 }
 
 /** Test the environment's store, or with `name` one of the named stores (its last test is kept). */
-export async function testNodeFileStore(ctx: FileStoreCtx, name?: unknown): Promise<FileStoreResult<{ where: string; ok: boolean; steps: { step: string; ok: boolean; message?: string }[] }>> {
+export async function testNodeFileStore(ctx: FileStoreCtx, name?: unknown): Promise<FileStoreResult<{
+  where: string; ok: boolean; steps: { step: string; ok: boolean; message?: string }[]; browser_access: ReturnType<typeof browserAccessView>;
+}>> {
   if (typeof name === 'string' && name) {
     const entry = nodeEntryNamed(await readNodeStores(ctx), name);
     if (!entry) return { ok: false, status: 404, code: 'NOT_FOUND', message: `There is no node store called "${name}".` };
     const s = nodeEntrySpec(ctx.config, entry);
     if (!s) return { ok: false, status: 409, code: 'STORE_NOT_REACHABLE', message: `The node cannot open the key of the node store "${name}". Enter its key again.` };
     const store = storeFor(s, 'trusted');
-    const r = await probeStore(store, entry.prefix);
-    const failed = r.steps.find(x => !x.ok);
-    const lastCheck = { at: new Date().toISOString(), ok: r.ok, message: r.ok ? 'write, read, read part, list and remove all worked' : `${failed?.step}: ${failed?.message ?? 'no answer'}` };
-    await updateNodeStores(ctx, cur => ({ ...cur, stores: cur.stores.map(e => (e.name === name ? { ...e, lastCheck } : e)) }));
+    const [r, browserAccess] = await Promise.all([probeStore(store, entry.prefix), checkBrowserAccess(ctx.config, s, entry.prefix, 'trusted')]);
+    const lastCheck = checkOf(r);
+    await updateNodeStores(ctx, cur => ({ ...cur, stores: cur.stores.map(e => (e.name === name ? { ...e, lastCheck, browserAccess } : e)) }));
     emitChange('file-store');
-    return { ok: true, data: { where: store.describe(), ...r } };
+    return { ok: true, data: { where: store.describe(), ...r, browser_access: browserAccessView(browserAccess, s.kind) } };
   }
   const spec = nodeStoreSpec(ctx.config);
   if (spec.kind === 'database') {
@@ -125,8 +130,14 @@ export async function testNodeFileStore(ctx: FileStoreCtx, name?: unknown): Prom
     return { ok: false, status: 409, code: 'FILE_STORE_INCOMPLETE', message: `The ${spec.kind} store is missing: ${spec.missing.join(', ')}.` };
   }
   const store = storeFor(spec.spec, 'trusted');
-  const r = await probeStore(store, spec.prefix);
-  return { ok: true, data: { where: store.describe(), ...r } };
+  const [r, browserAccess] = await Promise.all([probeStore(store, spec.prefix), checkBrowserAccess(ctx.config, spec.spec, spec.prefix, 'trusted')]);
+  return { ok: true, data: { where: store.describe(), ...r, browser_access: browserAccessView(browserAccess, spec.spec.kind) } };
+}
+
+/** The lastCheck a store keeps from one probe: the first failing step, or that every step worked. */
+export function checkOf(r: { ok: boolean; steps: { step: string; ok: boolean; message?: string }[] }): { at: string; ok: boolean; message: string } {
+  const failed = r.steps.find(x => !x.ok);
+  return { at: new Date().toISOString(), ok: r.ok, message: r.ok ? 'write, read, read part, list and remove all worked' : `${failed?.step}: ${failed?.message ?? 'no answer'}` };
 }
 
 /** The opaque position after one file, so a file that keeps failing does not hold back the rest. */

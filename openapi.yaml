@@ -36127,7 +36127,10 @@ paths:
         its writer names no store, `choices` the values a writer may give as `store` when saving a file
         (`own:<name>`, and `node:<name>` for node stores open to everyone), and `files` the count and
         bytes per place. Files in one's own storage do not count toward the node's storage quota.
-        Needs `storage:read`.
+        Each store carries `browser_access`: whether a browser on this node may send files straight
+        to it (`ready`, `cors` allowed, partial, missing, unknown or not_checked, `signs` false for an
+        Azure store connected with a SAS, `origins`, `message`) and, while it is not ready, `rule`:
+        the CORS rule to add and where. Needs `storage:read`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -36141,8 +36144,10 @@ paths:
         The node tests the storage (write, read, read part, list, remove under the folder) before it
         saves anything. A person may keep several named stores; the first is the default, and
         `make_default` makes another one the default. A new file of the person and their agents goes to
-        the default unless its writer names a store. Without `kind`, only `make_default` applies, to the
-        store `name` names. The keys are kept encrypted under the node key and never returned. On a node
+        the default unless its writer names a store. The node also checks whether a browser may send to
+        the store directly (its CORS rule) and keeps the answer as the store's `browser_access`; a store
+        without the rule is saved all the same and takes files through the node. Without `kind`, the
+        store `name` names is tested again with its kept key, and `make_default` applies. The keys are kept encrypted under the node key and never returned. On a node
         where operators approve, the answer is 202 with `outcome` waiting_for_operator and files keep
         going to the node until approved. Needs the person in person, or an agent with `secrets:manage`.
         400 INVALID_INPUT names what is missing (and asks for `name` when the person has several
@@ -36249,7 +36254,8 @@ paths:
       description: >-
         With `kind` the address and key are read, the store is tested (write, read, read part, list,
         remove under its folder) and kept, its key encrypted under the node key and never returned.
-        Without `kind` only `selectable` (every person may name it for a file) and `make_default` (new
+        The store's `browser_access` says whether a browser may send to it directly, with the CORS rule
+        to add when it may not. Without `kind` only `selectable` (every person may name it for a file) and `make_default` (new
         files go there; false on the default lets the environment's setting decide again) change. 400
         INVALID_INPUT (a reserved name: s3, azure, database), 409 FILES_IN_STORE when a store holding
         files would point at a different bucket, 409 STORE_ALREADY_CONNECTED, 422 STORE_TEST_FAILED, 503
@@ -36308,7 +36314,9 @@ paths:
       summary: Test a node file store
       description: >-
         Writes, reads, reads part of, lists and removes one small object under the store's folder, and
-        answers each step. With `name` one of the named stores (its last test is kept); without, the
+        answers each step, and `browser_access` (whether a browser may send to the store directly, with
+        the CORS rule to add when it may not). With `name` one of the named stores (its last test is
+        kept); without, the
         store the environment names: 409 NO_FILE_STORE when that is the database, 409
         FILE_STORE_INCOMPLETE with the missing settings. Reserved to the node operator.
       tags: [Admin]
@@ -36323,7 +36331,7 @@ paths:
               properties:
                 name: { type: string, maxLength: 40 }
       responses:
-        '200': { description: 'where, ok and the steps' }
+        '200': { description: 'where, ok, the steps and browser_access' }
         '404': { description: No such named store }
         '409': { description: No store, its settings are incomplete, or its key does not open }
   /v1/admin/file-store/move:

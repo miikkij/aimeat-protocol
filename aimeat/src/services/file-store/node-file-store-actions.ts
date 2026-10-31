@@ -13,6 +13,7 @@
  * @structure setNodeFileStore · removeNodeFileStore
  * @usage const r = await setNodeFileStore(ctx, principal, { name: 'archive', kind: 'azure', credential, container });
  * @version-history
+ *   v1.1.0 — 2026-10-31 — Adding a store also checks whether a browser may send to it directly (browser-access.ts).
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import { emitChange } from '../event-bus.js';
@@ -25,6 +26,7 @@ import {
   updateNodeStores, type NodeFileStores, type NodeStoreEntry,
 } from './node-file-stores.js';
 import { placeKey, readStoreInput, sameTarget, storeNameProblem, targetOfSpec, whereOf } from './store-target.js';
+import { checkBrowserAccess } from './browser-access.js';
 
 const fail = (status: number, code: string, message: string) => ({ ok: false as const, status, code, message });
 const str = (v: unknown, max = 2048) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
@@ -88,12 +90,15 @@ export async function setNodeFileStore(ctx: FileStoreCtx, actor: string, body: R
     const failed = test.steps.find(s => !s.ok);
     return fail(422, 'STORE_TEST_FAILED', `The store did not pass the test at step "${failed?.step}": ${failed?.message ?? 'no answer'}. Nothing was saved.`);
   }
+  // Not a condition for saving: a store without a CORS rule still takes files, through the node.
+  const browserAccess = await checkBrowserAccess(ctx.config, input.spec, input.prefix, 'trusted');
   const now = new Date().toISOString();
   const entry: NodeStoreEntry = {
     name, target: input.target, prefix: input.prefix, credential,
     selectable: selectable ?? current?.selectable ?? false,
     addedAt: current && sameTarget(current.target, input.target) ? current.addedAt : now, addedBy: actor,
     lastCheck: { at: now, ok: true, message: 'write, read, read part, list and remove all worked' },
+    browserAccess,
   };
   const saved = await updateNodeStores(ctx, cur => ({ ...cur, default: defaultAfter(cur), stores: [...cur.stores.filter(s => s.name !== name), entry] }));
   emitChange(FILE_STORE_DOMAIN);

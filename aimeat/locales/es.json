@@ -16921,6 +16921,36 @@
       "OWNER_FILE_STORES_OFF": "Quienes gestionan este servicio no permiten conectar un almacenamiento propio aquí.",
       "INVALID_INPUT": "Falta algo en el formulario, o algún valor no es válido. Abajo está el mensaje del servidor.",
       "NO_OWN_STORAGE": "No tienes un almacenamiento propio que reciba archivos. Conecta uno primero."
+    },
+    "browser": {
+      "label": "Directamente desde el navegador",
+      "state": {
+        "allowed": "Sí. Las apps de este servicio pueden enviar archivos directamente al almacenamiento.",
+        "partial": "Solo desde algunas direcciones de este servicio",
+        "missing": "No. El almacenamiento no tiene una regla CORS para este servicio.",
+        "unknown": "No se sabe. El almacenamiento no respondió a la comprobación.",
+        "not_checked": "Aún sin comprobar. Prueba el almacenamiento para saberlo."
+      },
+      "needsKey": "El almacenamiento está conectado con una URL SAS, que no puede firmar un enlace para un solo archivo, así que sus archivos pasan por este servicio. Para la transferencia directa, conéctalo con la clave de la cuenta o con una cadena de conexión.",
+      "notCovered": "La regla no cubre estas direcciones: {origins}.",
+      "throughService": "Mientras no haya regla, una app de este servicio envía los archivos a través de este servicio. Es más lento y limita el tamaño del archivo.",
+      "checkedAt": "Comprobado el {when}.",
+      "connectHint": "Una app de este servicio solo puede enviar un archivo grande directamente al almacenamiento si este tiene una regla CORS para este servicio. Al conectarlo, la prueba te dice si la regla existe y cuál debes añadir. Los agentes de IA y los scripts no la necesitan.",
+      "rule": {
+        "title": "Añade esta regla CORS al almacenamiento",
+        "whereAzure": "En el portal de Azure, abre la cuenta de almacenamiento. Luego abre Settings, Resource sharing (CORS) y la pestaña Blob service. Añade una fila con estos valores y guarda.",
+        "whereS3": "En la consola de AWS, abre el bucket. Luego abre Permissions, Cross-origin resource sharing (CORS) y Edit. Otros servicios S3 tienen el mismo ajuste en el bucket.",
+        "origins": "Allowed origins",
+        "methods": "Allowed methods",
+        "headers": "Allowed headers",
+        "exposed": "Exposed headers",
+        "maxAge": "Max age",
+        "whyAny": "El * admite todas las direcciones de este servicio, porque cada app tiene su propia dirección. La regla no da a nadie acceso a tus archivos: cada subida y cada descarga necesitan un enlace que este servicio firma para un solo archivo, y el enlace solo funciona unos minutos.",
+        "jsonLead": "Pega esto como la configuración CORS del bucket:",
+        "copy": "Copiar la regla",
+        "copied": "Copiada",
+        "after": "Cuando hayas guardado la regla, vuelve a probar el almacenamiento."
+      }
     }
   },
   "profile": {
@@ -17053,7 +17083,12 @@
         "disconnectHint": "Al desconectar, tus claves se eliminan de este servicio. Tu bucket o contenedor y lo que tiene se quedan como están.",
         "disconnectFirst": "{n} de tus archivos están en este almacenamiento. Primero muévelos a otro lugar. Después puedes desconectarlo.",
         "disconnectAsk": "¿Desconectar tu almacenamiento \"{name}\", el {where}? Tus claves se eliminan de aquí. Si es tu predeterminado, después los archivos nuevos se quedan en este servicio.",
-        "disconnected": "Tu almacenamiento \"{name}\" está desconectado."
+        "disconnected": "Tu almacenamiento \"{name}\" está desconectado.",
+        "testAgain": "Probar de nuevo",
+        "testing": "Probando…",
+        "testedReady": "Tu almacenamiento \"{name}\" pasó la prueba, y las apps pueden enviarle archivos directamente.",
+        "testedNotReady": "Tu almacenamiento \"{name}\" pasó la prueba. Las apps aún no pueden enviarle archivos directamente. Los datos del almacenamiento te dicen qué añadir.",
+        "testedFailed": "Tu almacenamiento \"{name}\" no pasó la prueba. Los datos del almacenamiento muestran el paso que falló."
       },
       "places": {
         "title": "Dónde están tus archivos",
@@ -25078,6 +25113,21 @@
     "high": "Valor alto",
     "examples": "Ejemplos",
     "when": "Cuándo cambiarlo",
+    "fileStore": {
+      "cors": {
+        "title": "Directamente desde el navegador (CORS)",
+        "short": "Si una app en tu navegador puede enviar archivos directamente a un bucket de S3 o a un contenedor de Azure, sin que pasen por este servicio.",
+        "what": "Una página web solo puede enviar datos a su propia dirección, salvo que la otra dirección lo permita. Ese permiso es una regla CORS, y se añade en el bucket o en la cuenta de almacenamiento. Con la regla, una app de este servicio puede enviar un archivo grande directamente a tu almacenamiento, y este servicio solo firma un enlace para ese archivo. Sin la regla, la app envía el archivo a este servicio, y este lo reenvía. Es más lento y limita el tamaño del archivo. Las descargas grandes llegan directamente del almacenamiento en ambos casos.",
+        "lowLabel": "Sin la regla",
+        "low": "Las apps envían los archivos al almacenamiento a través de este servicio. Las subidas son más lentas, y un archivo muy grande puede no caber.",
+        "highLabel": "Con la regla",
+        "high": "Las apps envían los archivos grandes directamente al almacenamiento, a su velocidad y hasta su propio límite de tamaño.",
+        "ex1": "Una app sube una imagen de disco de 600 MB: con la regla va directamente a Azure como un solo archivo.",
+        "ex2": "Tu agente de IA sube un archivo con un script: la regla no importa, porque los scripts no la piden.",
+        "tipLabel": "¿Es seguro?",
+        "tip": "Sí. La regla solo dice a los navegadores que las páginas de este servicio pueden hablar con el almacenamiento. La regla no da a nadie acceso a tus archivos: cada transferencia necesita un enlace que este servicio firma para un solo archivo, y el enlace solo funciona unos minutos. Un almacenamiento de Azure conectado con una URL SAS no puede firmar esos enlaces, así que sus archivos siempre pasan por este servicio. Conéctalo con la clave de la cuenta si quieres la transferencia directa."
+      }
+    },
     "ai": {
       "temperature": {
         "title": "Temperatura",
