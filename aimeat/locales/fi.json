@@ -17752,7 +17752,8 @@
     "lookLightOnly": "Tällä tyylillä on vain vaalea tila.",
     "lookDarkOnly": "Tällä tyylillä on vain tumma tila.",
     "lookThemes": "Teemat",
-    "lookStyles": "Tämän teeman tyylit"
+    "lookStyles": "Tämän teeman tyylit",
+    "menu": "Valikko"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Sanasto",

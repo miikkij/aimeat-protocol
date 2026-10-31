@@ -1087,6 +1087,7 @@
     import { useNews } from '/views/home/news-data.js';
     import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
+    import { Tooltip } from '/components/Tooltip.js';
     import { NodeUpdateNotice } from '/components/NodeUpdateNotice.js';
     import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
@@ -1712,8 +1713,24 @@
           </div>
 
           <div class="topnav-right">
-            <button class="topnav-burger" aria-label="Menu" aria-expanded=${menuOpen ? 'true' : 'false'}
-              onClick=${() => setMenuOpen(o => !o)}>☰</button>
+            ${/* The home in one press while the links are folded into the menu (Jouni, 2026-10-31).
+                  top-bar.css draws it only where it draws the burger; on the full row Home is a link. */''}
+            ${session && html`<${Tooltip} text=${t('nav.home') || 'Home'}>
+              <a href="/v1/home" class="topnav-home ${currentPath === '/v1/home' && !onAgentPage ? 'active' : ''}"
+                aria-label=${t('nav.home') || 'Home'}
+                onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                  <path d="M2.5 11.5 12 4l9.5 7.5" />
+                  <path d="M16 7.2V3.5h2.5v5.6" />
+                  <path d="M5 9.6V20h14V9.6" />
+                  <path d="M10 20v-5.5h4V20" />
+                </svg>
+              </a>
+            <//>`}
+            <${Tooltip} text=${t('nav.menu') || 'Menu'} quiet=${menuOpen}>
+              <button class="topnav-burger" aria-label=${t('nav.menu') || 'Menu'} aria-expanded=${menuOpen ? 'true' : 'false'}
+                onClick=${() => setMenuOpen(o => !o)}>☰</button>
+            <//>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
               <!-- Public links are operator-configurable (visibility + order) via the admin
                    Portal tab. Classic stays reachable deeper (landing card B "Start

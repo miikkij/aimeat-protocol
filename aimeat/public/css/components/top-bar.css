@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.6.0 — 2026-10-31 — The home button (.topnav-home, a cabin) beside the burger, drawn where the
+ *     burger is: the home in one press while the links are folded into the menu. The phone bar
+ *     tightens to make room for it (under 640px and again under 380px).
  *   v1.5.0 — 2026-10-18 — On the full row the login pill does not shrink (.header-auth-slot flex
  *     none), so a full bar goes compact instead of squeezing the pill; 1rem gap between the brand
  *     side and the links on the full row.
@@ -199,6 +202,21 @@
 .topnav-menu { display: flex; align-items: center; gap: 0.75rem; flex-wrap: nowrap; justify-content: flex-end; }
 .topnav-menu > a { white-space: nowrap; }
 .topnav-burger { display: none; }
+/* The home button: the burger's box, drawn only where the burger is (the two rule sets below).
+   The open home is marked the way the open link is on the full row, with the coral rule under it. */
+.topnav-home { display: none; }
+/* Both wear the shared Tooltip (components/Tooltip.js), whose wrapper is the flex item in this row:
+   it goes away with them, or the full row keeps an empty item and a gap for each. */
+.topnav-right > .tooltip-anchor:has(> .topnav-home),
+.topnav-right > .tooltip-anchor:has(> .topnav-burger) { display: none; }
+.topnav-right a.topnav-home {
+  align-items: center; justify-content: center;
+  width: 38px; height: 34px; padding: 0; box-sizing: border-box;
+  color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-xs);
+}
+.topnav-right a.topnav-home:hover { background: var(--bg-surface); }
+.topnav-right a.topnav-home.active { text-decoration: none; box-shadow: inset 0 -3px 0 var(--accent); }
+.topnav-home svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* Truncate a long GHII in the pill so it never blows out the bar (desktop). */
 .aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
@@ -243,6 +261,9 @@
 .topnav--compact .brand-morsels { display: none !important; }
 
 @media (max-width: 1180px) {
+  .topnav-right > .tooltip-anchor:has(> .topnav-home),
+  .topnav-right > .tooltip-anchor:has(> .topnav-burger) { display: inline-flex; }
+  .topnav-right a.topnav-home { display: inline-flex; }
   .topnav-burger {
     display: inline-flex; align-items: center; justify-content: center;
     width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
@@ -266,6 +287,9 @@
   .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
   .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
 }
+.topnav--compact .topnav-right > .tooltip-anchor:has(> .topnav-home),
+.topnav--compact .topnav-right > .tooltip-anchor:has(> .topnav-burger) { display: inline-flex; }
+.topnav--compact .topnav-right a.topnav-home { display: inline-flex; }
 .topnav--compact .topnav-burger {
   display: inline-flex; align-items: center; justify-content: center;
   width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
@@ -300,6 +324,19 @@
      compact case had been measured clean and mistaken for the whole story. The media query is the
      scope; the class was redundant where it worked and wrong where it did not. */
   .aimeat-auth-pill .aimeat-ctl { display: none !important; }
+  /* The home button took 46px of a bar that was full (2026-10-31, 360px with the open-items count:
+     396px of content). The 1rem gap above is for the full row and a phone bar is never one, though
+     it carries no .topnav--compact; the burger and the home give 4px each. */
+  .topnav:not(.topnav--compact) { column-gap: 0.5rem; }
+  .topnav .topnav-right { gap: 0.4rem; }
+  .topnav .topnav-right a.topnav-home, .topnav .topnav-burger { width: 34px; }
+}
+/* Under 380px with the open-items count the row is still about 20px too wide (measured at 360px).
+   The home and the burger give the rest, so every control stays on the bar. */
+@media (max-width: 380px) {
+  .topnav:not(.topnav--compact) { column-gap: 0.25rem; }
+  .topnav .topnav-right { gap: 0.25rem; }
+  .topnav .topnav-right a.topnav-home, .topnav .topnav-burger { width: 30px; }
 }
 
 /* The look on a phone (spa.html LookMenu): the controls the pill hides above live in the menu, in
