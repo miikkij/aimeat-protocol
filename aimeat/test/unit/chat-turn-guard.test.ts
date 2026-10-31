@@ -6,12 +6,14 @@
  *   counting the ceiling depends on; e2e-chat-agent holds the turn around it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chat-turn-guard.test.ts
  * @version-history
+ *   v1.2.0 — 2026-10-31 — Every genre the turn note names ships and comes in one part.
  *   v1.1.0 — 2026-10-31 — The app path in the turn note and the answer phase, the sign-in sentence,
  *     and the grace after a published app (v31 K35, K38).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import { TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, TURN_LIMITS } from '../../src/services/chat-turn-guard.js';
+import { nodeTemplateAnswer } from '../../src/services/node-templates.js';
 
 const call = (id: string, title: string, status = 'pending') => ({ kind: 'tool_call', id, title, status });
 const thought = { kind: 'thought' };
@@ -92,7 +94,17 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/finish it in this turn/);
         expect(note).toMatch(/no interview/);
         expect(note).toMatch(/tier "build-app-atelier"/);
-        expect(note).toMatch(/aimeat_app_template_get: id "genre-workbench"/);
+        expect(note).toMatch(/one that comes whole in one answer: id "genre-receipt"/);
+        expect(note).not.toMatch(/genre-workbench/);
+        expect(note).toMatch(/do not fetch them: build on the first part/);
+        // Each genre the note names ships and comes whole: a two-part one cost the crew33 check turn.
+        const named = [...note.matchAll(/"(genre-[a-z-]+)"/g)].map(m => m[1]);
+        expect(named.length).toBeGreaterThan(0);
+        for (const id of named) {
+            const answer = nodeTemplateAnswer(id) as Record<string, unknown> | null;
+            expect(answer, id).not.toBeNull();
+            expect(answer?.parts ?? 1, id).toBe(1);
+        }
         expect(note).toMatch(/never a reason to stop: write the page yourself/);
         expect(note).toMatch(/aimeat_app_publish/);
         expect(note).toMatch(/Give them `url`/);
