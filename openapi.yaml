@@ -1706,7 +1706,7 @@ components:
           type: string
           description: |
             Machine-readable error code. Common codes:
-            - AUTH_REQUIRED: Missing authentication
+            - AUTH_REQUIRED: Missing authentication. A browser's own top-level navigation to such a GET address (`Sec-Fetch-Mode: navigate`, `Sec-Fetch-Dest: document`) is answered `302` to the sign-in page `/v1/profile` instead; every other caller gets this 401.
             - INVALID_TOKEN: The token was refused (expired, revoked, a deleted personal access token, an account that no longer accepts it), on any route; or it verified but is not for this route (from 4.0.0, an MCP OAuth access token on a REST route)
             - ACCESS_DENIED: Insufficient permissions
             - NOT_FOUND: Resource not found
@@ -10256,7 +10256,7 @@ paths:
                           already_waiting: { type: boolean }
                           approval_url:
                             type: string
-                            description: The page where the owner approves it. A proposing agent hands this to the person.
+                            description: The page where the owner approves it, the proposal's own page on the home (`/v1/home?new-agent=1&proposal=<id>`), which shows it whole and starts it with one press. A proposing agent hands this to the person.
                           next_step:
                             type: string
                             description: One sentence for the person, naming approval_url.
@@ -36399,6 +36399,10 @@ paths:
       description: |
         Returns the app's HTML. Default (no `mode`) responds with `Content-Disposition: attachment`
         (programmatic download — never executed as a page). `mode=inline` returns runnable HTML.
+        Since 2026-10-31 a browser's own navigation to the bare address (`Sec-Fetch-Mode: navigate`
+        and `Sec-Fetch-Dest: document`, no `mode`) is answered `302` to the same address with
+        `mode=inline`, so a person who opens the link gets the app rather than a file to save;
+        `download=1` keeps the attachment for a browser too, and API clients are unchanged.
 
         **Encoding:** the response carries `Content-Type: text/html; charset=utf-8`. Until 2026-08-01
         the charset parameter was absent, so browsers fell back to the locale default (windows-1252
@@ -36477,6 +36481,7 @@ paths:
         - { in: path, name: filename, required: true, schema: { type: string } }
         - { in: query, name: mode, required: false, schema: { type: string, enum: [inline, frame] }, description: "inline: runnable. frame: runnable in an opaque-origin sandbox (the isolated frame's own request)." }
         - { in: query, name: format, required: false, schema: { type: string, enum: [md] }, description: "md forces the Agent Face markdown variant regardless of the Accept header" }
+        - { in: query, name: download, required: false, schema: { type: string, enum: ['1'] }, description: "The raw file as an attachment even for a browser's own navigation, which without it is redirected to mode=inline." }
         - { in: query, name: version, required: false, schema: { type: integer }, description: "An earlier version from the version list. It is served with the app's CURRENT copy protection (obfuscate, domainLock, watermark, noRawDownload), not the setting it was published with." }
         - in: query
           name: code

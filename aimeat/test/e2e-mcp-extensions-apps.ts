@@ -55,6 +55,7 @@
 
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
+import { get as httpGet } from 'node:http';
 import { ownerSignIn } from './helpers/owner-login.js';
 import { ZipArchive } from 'archiver';
 
@@ -588,6 +589,25 @@ await test('22. A real inline publish lands, and GET /v1/apps sees it', async ()
     const appList = await callTool(authorSession, 'aimeat_app_list', {});
     const row = (appList.data?.apps ?? appList.data ?? []).find?.((a: any) => a.filename === APP);
     assert(row?.url === r.data.url, `publish url ${r.data.url} is not the list's ${row?.url}`);
+
+    // K41: a browser's own navigation to the bare address gets the app; ?download=1 and an API
+    // client keep the attachment. The source was broken: the bare address always downloaded.
+    // node:http, because fetch() sets Sec-Fetch-Mode: cors itself and a browser's navigation cannot be sent.
+    const bare = `${BASE}/v1/apps/${encodeURIComponent(author.owner)}/${APP}`;
+    const nav = { 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', Accept: 'text/html' };
+    const head = (url: string, headers: Record<string, string>) => new Promise<{ status: number; location: string; disposition: string }>((ok, fail) => {
+        httpGet(url, { headers }, (res) => {
+            res.resume();
+            ok({ status: res.statusCode ?? 0, location: String(res.headers.location ?? ''), disposition: String(res.headers['content-disposition'] ?? '') });
+        }).on('error', fail);
+    });
+    const opened = await head(`${bare}?utm_source=chat`, nav);
+    assert(opened.status === 302 && opened.location.includes('mode=inline') && opened.location.includes('utm_source=chat') && !/^https?:/.test(opened.location),
+        `a browser opening the bare address is sent to the page: ${opened.status} ${opened.location}`);
+    const saved = await head(`${bare}?download=1`, nav);
+    assert(saved.status === 200 && /attachment/.test(saved.disposition), `download=1 keeps the file: ${saved.status}`);
+    const api = await head(bare, {});
+    assert(api.status === 200 && /attachment/.test(api.disposition), `an API client keeps the file: ${api.status}`);
 
     const listed = await json('/v1/apps', { headers: authed(author.token) });
     assert(listed.status === 200, `GET /v1/apps ${listed.status}`);
