@@ -16,6 +16,9 @@
  * @structure AiSettingsTab() — state + handlers (each a legacy call, and the provider call on a 410) → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.7.0 — 2026-10-31 — `extras`: the cards the AI tab shows below the page (decision model,
+ *     transparency, compliance), drawn by the page: after it, or inside "Lisäasetukset" in the simple
+ *     view (v31 K58).
  *   v1.6.0 — 2026-10-31 — advancedOpen: the simple view's "Lisäasetukset" fold on a node the store
  *     sold (ai/page.js renderSimple, v31 K58).
  *   v1.5.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
@@ -55,7 +58,7 @@ import { useRoles } from './ai/use-roles.js';
 
 const flashFor = (setter) => (text, error = false) => { setter({ text, error }); setTimeout(() => setter(null), 6000); };
 
-export default function AiSettingsTab({ navigate, showToast }) {
+export default function AiSettingsTab({ navigate, showToast, extras = null }) {
   const { confirm, ConfirmUI } = useConfirm();
   const [settings, setSettings] = useState(null);
   const [current, setCurrent] = useState(null);
@@ -251,7 +254,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
     keyed: keyedFor(settings), host,
     quotas: aiSettings?.app_quotas || {},
     roll: history ? rollup(history, usage, aiSettings?.app_quotas) : null,
-    navigate, ConfirmUI, pv, rl,
+    navigate, ConfirmUI, pv, rl, extras,
     setConn, setProvider, saveConnection, testConnection, removeKey,
     setBudgetEditing, setBudgetDraft, saveBudget, setCapsEditing, setCap, saveCaps, setShowAllApps, setMetric,
   };
