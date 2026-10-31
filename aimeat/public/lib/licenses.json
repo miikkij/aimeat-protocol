@@ -395,6 +395,23 @@
       "purl": "pkg:npm/%40toast-ui/editor@3.2.2"
     },
     {
+      "id": "swagger-ui-dist",
+      "name": "Swagger UI (swagger-ui-dist)",
+      "version": "5.34.1",
+      "spdx": "Apache-2.0",
+      "copyright": "Copyright 2020-2021 SmartBear Software Inc.",
+      "homepage": "https://github.com/swagger-api/swagger-ui",
+      "source": "https://registry.npmjs.org/swagger-ui-dist/-/swagger-ui-dist-5.34.1.tgz (swagger-ui-bundle.js, swagger-ui.css; tarball sha512-VSr8fXfI93obYaQicLJbLUKGRxDojj/SfRJDDLCioGTUBj4BK/Nj4eE9jCeCAnJxVLi7iS+08PbiZLyrQKBkJQ==)",
+      "licenseFile": "LICENSES/swagger-ui.txt",
+      "noticeFile": "LICENSES/swagger-ui-NOTICE.txt",
+      "files": [
+        "swagger-ui-dist@5.34.1/**"
+      ],
+      "modified": false,
+      "note": "The /v1/docs page loads these two files. The bundle carries third-party code (DOMPurify 3.4.17, React, Immutable and others, MIT, BSD-3-Clause and Apache-2.0 OR MPL-2.0); the notices the package ships for it are reproduced in the noticeFile.",
+      "purl": "pkg:npm/swagger-ui-dist@5.34.1"
+    },
+    {
       "id": "ffmpeg-core",
       "name": "@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)",
       "version": "0.12.6",
