@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:b9c0f15170fd0edbe340b570"
+      "digest": "sha256:42f828df4da0fc8ecebe65cf"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-28",
@@ -275,7 +275,7 @@
       "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -283,7 +283,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:bad736085d55f8c99cb07291"
+      "digest": "sha256:110c6f245eb0b9bc20268bd2"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-27",
@@ -617,7 +617,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "e0b1732247d1354a",
+      "aimeat/src/routes/agents/device-auth.ts": "6924e84ee00c9945",
       "aimeat/src/routes/ghii/register-login.ts": "1d5861b0de1ef56d",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -636,7 +636,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "e0b1732247d1354a",
+      "aimeat/src/routes/agents/device-auth.ts": "6924e84ee00c9945",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
