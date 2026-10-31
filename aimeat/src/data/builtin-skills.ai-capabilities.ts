@@ -18,6 +18,7 @@
  * @structure AI_CAPABILITIES_SKILL_ENTRY
  * @usage import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
  * @version-history
+ *   v1.5.3 — 2026-10-31 — The SDK table names genRules(), the rules for AI pictures and videos.
  *   v1.5.2 — 2026-10-22 — The extension paragraph: ctx.ai.start also answers SCOPE_DENIED for a private
  *     input the run may not read (services/ai-jobs/ext-capability.ts readAs; secaudit 2026-10, v75).
  *   v1.5.1 — 2026-10-18 — The extension paragraph: the on_done input carries the answer, and
@@ -183,6 +184,7 @@ Pass \`app_id\` on every call: the owner's usage shows spend per app, and a per-
 | \`embed({ app_id, input })\` | Vectors, at most 256 texts and 500 000 characters a call (section 4 first). |
 | \`models({ capability })\` | The model catalogue; each row's \`ref\` is what \`models=\` and \`prefer.\` take. |
 | \`roles()\` | This app's roles and whether the owner connected them (section 2b). |
+| \`genRules()\` | The rules for AI pictures and videos in force for this app, such as people only as art. \`image()\` follows them by itself; a prompt the app composes for a model elsewhere gets \`for_caller.image.directive\` or \`for_caller.video.directive\`. Skill: aimeat-gen-rules. |
 | \`job.start({ prompt, result_key })\`, \`job.waitFor(id)\` | Work that may take minutes: the answer waits at \`result_key\` even when the tab closed. |
 | \`disclose(r.provenance, { target })\`, \`declare(value, r.provenance)\`, \`chatNotice({ target })\` | The AI label a person sees, the record kept with stored content, and the notice a chat surface owes at its first message. Skill: ai-transparency. |
 

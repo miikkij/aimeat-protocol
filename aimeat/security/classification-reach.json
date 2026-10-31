@@ -916,6 +916,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: The owner's AI policy record."
     },
+    "src/services/ai/gen-rules-store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the owner's generation rules record (ai.policy.gen-rules), read to decide what a generation call or a provenance mint is given; it is a setting, not content, and nothing of it goes to a model but the built-in directive text."
+    },
     "src/services/ai/provider-store.ts": {
       "reads": {
         "getMemory": 15,
