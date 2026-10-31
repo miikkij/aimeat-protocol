@@ -9,6 +9,7 @@
   //   moduleResolution "bundler" tolerates extensionless + absolute-style specifiers.
   // @version-history
   //   v1.0.0 — 2026-06-19 — Initial frontend type-checking config (checkJs, non-strict baseline)
+  //   v1.1.0 — 2026-11-01 — The vendored DOMPurify UMD file maps to a stub (secaudit2026oct31w2 round 10b).
   "compilerOptions": {
     "target": "ES2022",
     "module": "ESNext",
@@ -25,6 +26,7 @@
       "preact": ["./public/types/vendored-libs.d.ts"],
       "preact/hooks": ["./public/types/vendored-libs.d.ts"],
       "htm": ["./public/types/vendored-libs.d.ts"],
+      "/lib/dompurify@3.4.17/purify.min.js": ["./public/types/dompurify-umd.d.ts"],
       "/*": ["./public/*"]
     },
     "types": []

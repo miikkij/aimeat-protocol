@@ -372,8 +372,8 @@
         ).catch(function() {
         }),
         loadScript(
-          "https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js",
-          "sha384-piCcpDdJ7qVeK4Tv8Z6Hpcr3ZBIgP16TxQTPVfsLFdZ5uDgwc3Y8Ho7oUnqf12qu"
+          "https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js",
+          "sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx"
         ),
         loadScript(
           "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js",
