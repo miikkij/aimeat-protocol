@@ -18,10 +18,13 @@
  * @structure passkeyButtonHtml(i) · wirePasskeyButton(ctx)
  * @usage import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
  * @version-history
+ *   v1.1.0 — 2026-10-31 — No button on a store-bought node that mails (LINK_FIRST): its buyer signs in
+ *     by link, and the word "pääsyavain" is not shown there (Jouni's v32 approval, 17.53).
  *   v1.0.0 — 2026-09-04 — Initial, with passkeys.
  */
 import { escHtml } from './theme.js';
 import { passkeySupported } from './passkey.js';
+import { LINK_FIRST } from './config.js';
 
 /** A key, drawn rather than typed: the modal carries no emoji. */
 const KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" '
@@ -31,6 +34,10 @@ const KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" str
 /** The button, or nothing at all when this browser cannot do it. */
 export function passkeyButtonHtml(i) {
   if (!passkeySupported()) return '';
+  // A store-bought node that mails signs its buyer in by link, and its sign-in shows one way in, the
+  // link, under one word ("kirjautumislinkki"; Jouni's v32 approval). The ceremony still works for
+  // anyone who calls signInWithPasskey; the dialog just does not offer it.
+  if (LINK_FIRST) return '';
   return '<button type="button" id="aimeat-passkey-btn" class="aimeat-oauth-btn">'
     + KEY_SVG + escHtml(i.passkeySignIn || 'Sign in with a passkey') + '</button>'
     + '<p id="aimeat-passkey-hint" class="aimeat-hint">'

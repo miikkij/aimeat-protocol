@@ -12,7 +12,12 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
- *   v1.34.0 -- 2026-10-31 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js); budget and consumers move to 07 and 08.
+ *   v1.38.0 -- 2026-11-01 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js), in the full page and under the simple view's fold; budget and consumers move to 07 and 08.
+ *   v1.37.0 -- 2026-10-31 -- Jouni's review of v31 (K58, K60): the credit shows once, on its own card, with "riittää noin N tavalliseen viestiin" when this place's 30-day average cost per call can tell (messagesLeft), and no tag; sums under a cent read "alle 1 snt" (creditWords); the daily limit says it protects the credit; under "Buy more credit" it says the same card pays and no new subscription is made; the decision model, transparency and compliance cards sit inside "Lisäasetukset" (ctx.extras); there the key section is "Oma tekoälytili (valinnainen)" and says that no own key is the usual way.
+ *   v1.37.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
+ *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
+ *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
+ *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
  *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
  *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
  *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
@@ -60,9 +65,10 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { customerNode } from '/js/site.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -78,6 +84,34 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
+import { creditEur, topupHref } from '/js/ai-credit.js';
+import { money as fmtMoney } from '/js/format.js';
+
+/** The allowance left on the node's key: euros of AI credit on a node the store sold, else dollars. */
+const allowanceMoney = (usd) => {
+  const eur = creditEur(usd);
+  return eur === null ? money(usd) : fmtMoney(eur, 'EUR');
+};
+
+/** The same in a buyer's words: a sum under a cent reads "alle 1 snt", not 0,0006 € (v31 K58). */
+const creditWords = (usd) => {
+  const eur = creditEur(usd);
+  if (eur !== null && eur > 0 && eur < 0.01) return x('simple.underCent');
+  return allowanceMoney(usd);
+};
+
+/**
+ * How many ordinary messages the credit left lasts, from THIS place's own average cost per AI call
+ * over the last 30 days; null without that history, so nothing is guessed (v31 K58, the choice
+ * reported to Jouni: "nykyisellä käytölläsi").
+ */
+function messagesLeft(ctx) {
+  const r = ctx.roll;
+  const left = Number(ctx.chat?.allowance_remaining_usd) || 0;
+  if (!r || !(r.calls > 0) || !(r.cost > 0) || !(left > 0)) return null;
+  const n = Math.floor(left / (r.cost / r.calls));
+  return n >= 1 ? n : null;
+}
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
@@ -90,7 +124,78 @@ const SHOWN = 8;
 /** The line a form says after it acted; a refusal in its error tone. */
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 
+/**
+ * A buyer on a node the store sold, with no key of their own, reads this page for one thing: how
+ * much AI credit is left and how fast it goes. So that is all the page shows up front, in euros, and
+ * everything a developer sets (the key, the providers, the routing, the roles, the model policy, the
+ * budget's edit, what spends the key) is one fold below, "Lisäasetukset" (v31 K58, K60).
+ */
+const simpleView = (ctx) => customerNode() && !ctx.keyed;
+
+function renderSimple(ctx) {
+  const loading = !ctx.settings;
+  return html`
+    <${SettingsPage} name="ai"
+      crumb=${crumb()}
+      ...${mast(ctx)}
+      strip=${strip(ctx)}
+      railTitle=${x('railTitle')}
+      sections=${[
+        { id: 'ai-today', num: '01', label: x('simple.todayTitle'), count: '' },
+        { id: 'ai-advanced', num: '02', label: x('simple.advanced'), count: '' },
+      ]}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks(ctx.navigate)}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        ${secToday(ctx)}
+        <${FoldSection} id="ai-advanced" num="02" title=${x('simple.advanced')} sub=${x('simple.advancedSub')}
+          lead=${x('simple.advancedLead')} open=${ctx.advancedOpen} onToggle=${() => ctx.setAdvancedOpen(!ctx.advancedOpen)}>
+          ${secConnection(ctx)}
+          ${secProviders(ctx, '02')}
+          ${secRouting(ctx, '03')}
+          ${secRoles(ctx, '04')}
+          ${secPolicy(ctx, '05')}
+          <${GenRulesSection} num="06" />
+          ${secBudget(ctx)}
+          ${secConsumers(ctx)}
+          ${ctx.extras || null}
+        <//>`}
+    <//>`;
+}
+
+/**
+ * Today's limit as a buyer can actually spend it: the daily limit, but never more than today's use
+ * plus the credit left, so the page does not promise more than the credit pays (Jouni, K58).
+ */
+function todayLimit(ctx) {
+  const budget = Number(ctx.usage?.daily_budget_usd) || 0;
+  if (!ctx.chat) return budget;
+  const left = Math.max(0, Number(ctx.chat.allowance_remaining_usd) || 0);
+  return Math.min(budget, (Number(ctx.usage?.spent_today_usd) || 0) + left);
+}
+
+/** Today's use against the daily limit, and this month's, in euros of AI credit (v31 K60). */
+function secToday(ctx) {
+  const u = ctx.usage;
+  const r = ctx.roll;
+  if (!u) return html`<${PageSection} id="ai-today" num="01" title=${x('simple.todayTitle')} count=${null} first=${true}><${Note} kind="loading">${x('loading')}<//><//>`;
+  const budget = todayLimit(ctx);
+  const spent = Number(u.spent_today_usd) || 0;
+  const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  return html`
+    <${PageSection} id="ai-today" num="01" title=${x('simple.todayTitle')} count=${null} first=${true}>
+      <${Facts} rows=${[
+        { key: 'today', k: x('simple.todayLabel'), v: html`
+          <${FactLine} sub=${x('simple.limitNote', { budget: creditWords(budget) })}>${x('simple.todayLine', { spent: creditWords(spent), budget: creditWords(budget) })}<//>
+          <${Meter} quota pct=${pct} figure=${`${creditWords(spent)} / ${creditWords(budget)} · ${pct} %`} />` },
+        { key: 'month', k: x('monthLabel'), v: r && r.days ? x('simple.monthLine', { cost: creditWords(r.cost) }) : x('monthNone') },
+      ]} />
+    <//>`;
+}
+
 export function renderPage(ctx) {
+  if (simpleView(ctx)) return renderSimple(ctx);
   const s = ctx.settings;
   const loading = !s;
   return html`
@@ -123,21 +228,36 @@ export function renderPage(ctx) {
         <${GenRulesSection} num="06" />
         ${secBudget(ctx)}
         ${secConsumers(ctx)}`}
-    <//>`;
+    <//>
+    ${ctx.extras || null}`;
 }
 
 /** The head: the title, its tags and line, the loud action and the doors, as SettingsPage props. */
 function mast(ctx) {
   const s = ctx.settings;
   const keyed = ctx.keyed;
-  const marks = !s ? [] : keyed
+  // The simple view's only tag is the low-credit warning: the credit itself is on its one card, and
+  // "no key" read as a fault (v31 K58).
+  const marks = !s ? [] : simpleView(ctx)
+    ? [ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null]
+    : keyed
     ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
-    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null,
+    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: allowanceMoney(ctx.chat.allowance_remaining_usd) }) } : null,
       // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
       ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null, { label: x('provider.openrouter') }];
   // On a customer's node the allowance is what the buyer paid for, not a starter gift (UX review C).
   const bought = customerNode();
-  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
+  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: allowanceMoney(ctx.chat?.allowance_remaining_usd || 0) });
+  // A buyer on the node's key buys more credit in the store, so that is the loud action, there at all
+  // times (v28 #19). The key, OpenRouter's pages and the rest are in Lisäasetukset (v31 K58).
+  if (simpleView(ctx)) {
+    const topup = topupHref(getLocale());
+    return {
+      title: t('profile.generator.openrouter.title'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
+      desc: !s ? '' : x('simple.desc'),
+      actions: topup ? html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Note} kind="meta">${x('simple.topupNote')}<//>` : null,
+    };
+  }
   const loud = keyed
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
     : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
@@ -154,12 +274,22 @@ function strip(ctx) {
   const s = ctx.settings;
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!s) return html`<${FigureStrip} loading=${4} />`;
+  if (!s) return html`<${FigureStrip} loading=${simpleView(ctx) ? 3 : 4} />`;
+  if (simpleView(ctx)) {
+    // The credit once, on its own card, with what it buys when this place's history can tell (K58).
+    const lasts = messagesLeft(ctx);
+    return html`<${FigureStrip} items=${[
+      { key: 'credit', n: ctx.chat ? creditWords(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit'),
+        sub: lasts ? x('simple.lasts', { n: lasts }) : '' },
+      { key: 'today', n: u ? creditWords(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: creditWords(todayLimit(ctx)) }) : '' },
+      { key: 'month', n: r ? creditWords(r.cost) : '…', label: x('stripMonth') },
+    ]} />`;
+  }
   const rl = ctx.rl;
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
   return html`<${FigureStrip} items=${[
     { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
-      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
+      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: allowanceMoney(ctx.chat.allowance_remaining_usd || 0) }) : '') },
     { key: 'today', n: u ? money(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : '' },
     { key: 'month', n: r ? money(r.cost) : '…', label: x('stripMonth'), sub: r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : '' },
     { key: 'roles', n: rl.view ? String(rl.roles.length) : '…', label: x('rl.title'), tone: rl.waiting ? 'coral' : undefined,
@@ -171,6 +301,9 @@ function strip(ctx) {
 
 function secConnection(ctx) {
   const s = ctx.settings;
+  // In the simple view this section sits in Lisäasetukset and is "Oma tekoälytili (valinnainen)",
+  // with no "ei avainta" count: having no key is the ordinary case there (v31 K58).
+  const simple = simpleView(ctx);
   const d = ctx.conn;   // the draft: provider, baseUrl, apiKey
   const isOr = d.provider === 'openrouter';
   const count = ctx.keyed ? x('secConnectionSub', { provider: x('provider.' + (s.provider || 'openrouter')) }) : x('secConnectionNone');
@@ -186,12 +319,14 @@ function secConnection(ctx) {
       actions=${html`<${Action} small disabled=${ctx.busy === 'conn'} onClick=${() => ctx.saveConnection()}>${x('save')}<//>`} />
     ${msg(ctx.connMsg)}`;
   return html`
-    <${PageSection} id="ai-connection" num="01" title=${x('secConnection')} count=${count} first=${true}>
+    <${PageSection} id="ai-connection" num="01" title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple ? null : count} first=${true}>
       <${Facts} rows=${[
         { k: x('providerLabel'), v: providers, sub: x('providerHint') },
         { k: x('keyLabel'), v: key, sub: s.hasApiKey ? x('keyStoredHint') : x('keyHint'), actions: keyDoors },
       ]} />
-      ${!ctx.keyed ? html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>` : null}
+      ${!ctx.keyed ? (simple
+        ? html`<${Note} kind="quiet">${x('simple.noKey')}<//>`
+        : html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>`) : null}
     <//>`;
 }
 
@@ -284,7 +419,7 @@ function secConsumers(ctx) {
         { k: x('consumer.agents'), v: x('consumerAgentsBody') },
         { k: x('consumer.media'), v: x('consumerMediaBody') },
         { k: x('consumer.chat'), v: chat
-          ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: money(chat.allowance_remaining_usd || 0) }))
+          ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: allowanceMoney(chat.allowance_remaining_usd || 0) }))
           : x('consumerChatUnknown'), ...(chatMissed ? { sub: x('consumerChatSub') } : {}) },
         crewsRow,
         { k: x('consumer.agentRule'), v: x('consumerAgentRuleBody') },

@@ -33,6 +33,10 @@
  *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
  *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
  * @version-history
+ *   v1.0.4 -- 2026-10-31 -- The language is chosen as the sign-in pill chooses it, and Spanish is one
+ *     of them; `<html lang>` (always "en" in a genre) no longer overrides the place's language.
+ *   v1.0.3 -- 2026-10-31 -- A page with no `lang` takes the language from readLang (the place's own
+ *     language before the browser), not English.
  *   v1.0.2 -- 2026-10-27 -- The "How this was made" link of disclose() and chatNotice() takes only an
  *     http(s), mailto or relative address (_core/safe-href.js, the rule AIMEAT.md applies); any other
  *     draws the label without a link (secaudit2026oct26).
@@ -40,7 +44,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { APEX_URL } from '../_core/config.js';
-import { storedLang } from '../_core/lang.js';
+import { readLocales, readLang } from '../_core/lang.js';
 import { sanitizeHref } from '../_core/safe-href.js';
 import { euIconFor } from '../../../../public/components/ai-label-icons.js';
 import LABEL_CSS from '../../../../public/css/components/ai-label.css';
@@ -93,10 +97,19 @@ function osDarkIcons(base) {
     + '}';
 }
 
-/** The reader's language, resolved the way every AIMEAT app resolves it. */
+/** The languages the label speaks (./strings.js). */
+const LABEL_LANGS = ['en', 'fi', 'es'];
+
+/**
+ * The reader's language, chosen as the sign-in pill chooses it: from the page's declared languages
+ * when it declares two or more, else from the ones the label speaks, through the one resolver
+ * (?lang, the stored choice, the cookie, the place's own language, the browser). `<html lang>` is not
+ * read: every genre ships `lang="en"`, so on a Finnish place the label read English beside a Finnish
+ * pill (crew34 check, 2026-10-31).
+ */
 function locale() {
-  const lang = storedLang() || document.documentElement.lang || 'en';
-  return lang.slice(0, 2) === 'fi' ? 'fi' : 'en';
+  const declared = readLocales().filter((c) => LABEL_LANGS.indexOf(c) >= 0);
+  return String(readLang(declared.length ? declared : LABEL_LANGS));
 }
 
 /** A platform string by its full dotted key, in the reader's language. See ./strings.js. */
