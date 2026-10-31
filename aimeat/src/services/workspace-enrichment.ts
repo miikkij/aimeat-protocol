@@ -23,10 +23,14 @@
  *     (`.latest`/bare) that has no `.version.N`, so direct writes (notebook docs pre-fix, agent/import
  *     writes that skip draft→publish) appear in the activity log/heatmap instead of going unnoticed.
  *   v1.1.1 -- 2026-09-26 -- An event's actor comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
+ *   2026-11-01 -- countWorkspaceInstances and deriveWorkspaceEvents read a record's id from the end of
+ *     its key within its declared space (spaceRowAt, recordRowAt), so a dotted id is counted once and
+ *     its events name its own space (secaudit2026oct31w2 round 10b, dotted record ids).
  */
 import type { MemoryRecord } from '../storage/interface.js';
 import { parseGaiiLoose, localAccountName } from '../utils/gaii.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
+import { recordRowAt, spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 
 type ObjectType = { name?: unknown; namespace?: unknown; mode?: unknown; kind?: unknown; backing?: unknown };
 
@@ -67,20 +71,31 @@ export function deriveWorkspaceEvents(readable: MemoryRecord[], manifest: Record
   // apart from a normal publish (which has `.version.N`).
   interface Slot { ns: string; instance: string; draft?: MemoryRecord; versions: MemoryRecord[]; current?: MemoryRecord }
   const slots = new Map<string, Slot>();
+  // A key of a declared space: the longest declared namespace it continues, and the record read from
+  // the end of the rest (recordRowAt), so a dotted id is one record under its own space. Read from the
+  // end alone, `notes.v1.2.draft` was record `2` of a space `notes.v1` (secaudit2026oct31w2 round 10b).
+  const declared = [...typeByNs.keys()].sort((a, b) => b.length - a.length);
   for (const r of readable) {
     const rel = r.key.slice(root.length + 1);
     if (rel.startsWith('meta.') || rel.startsWith('access.')) continue;
-    const parts = rel.split('.');
-    const last = parts[parts.length - 1];
-    const secondLast = parts[parts.length - 2];
+    const ns = declared.find(d => rel.startsWith(`${d}.`));
+    const row = ns ? recordRowAt(rel.slice(ns.length + 1)) : null;
     let role: 'draft' | 'version' | 'latest' | 'bare';
-    let core: string[];
-    if (last === 'draft') { role = 'draft'; core = parts.slice(0, -1); }
-    else if (secondLast === 'version' && /^\d+$/.test(last)) { role = 'version'; core = parts.slice(0, -2); }
-    else if (last === 'latest') { role = 'latest'; core = parts.slice(0, -1); }
-    else { role = 'bare'; core = parts; }
-    const instance = core[core.length - 1];
-    const namespace = core.slice(0, -1).join('.');
+    let instance: string | undefined;
+    let namespace: string;
+    if (ns && row) { role = row.copy; instance = row.id; namespace = ns; }
+    else {
+      const parts = rel.split('.');
+      const last = parts[parts.length - 1];
+      const secondLast = parts[parts.length - 2];
+      let core: string[];
+      if (last === 'draft') { role = 'draft'; core = parts.slice(0, -1); }
+      else if (secondLast === 'version' && /^\d+$/.test(last)) { role = 'version'; core = parts.slice(0, -2); }
+      else if (last === 'latest') { role = 'latest'; core = parts.slice(0, -1); }
+      else { role = 'bare'; core = parts; }
+      instance = core[core.length - 1];
+      namespace = core.slice(0, -1).join('.');
+    }
     if (!instance || !namespace) continue;
     const k = `${namespace}.${instance}`;
     let s = slots.get(k);
@@ -126,6 +141,7 @@ export function latestWorkspaceEvent(readable: MemoryRecord[], manifest: Record<
  */
 export function countWorkspaceInstances(readable: MemoryRecord[], manifest: Record<string, unknown> | null | undefined, root: string): { recs: number; docs: number } {
   let recs = 0, docs = 0;
+  const prefixes = spacePrefixesOf(root, objectTypesOf(manifest));
   for (const ot of objectTypesOf(manifest)) {
     const name = typeof ot.name === 'string' ? ot.name : undefined;
     const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
@@ -133,12 +149,12 @@ export function countWorkspaceInstances(readable: MemoryRecord[], manifest: Reco
     const nsPrefix = `${root}.${namespace}.`;
     const instances = new Map<string, boolean>();   // instanceId → has a current/draft record (vs version-only)
     for (const r of readable) {
-      if (!r.key.startsWith(nsPrefix)) continue;
-      const parts = r.key.slice(nsPrefix.length).split('.');
-      const instanceId = parts[0];
-      const role = parts.slice(1).join('.');
-      if (role.startsWith('version.')) { if (!instances.has(instanceId)) instances.set(instanceId, false); continue; }
-      instances.set(instanceId, true);   // bare / latest / draft → a real (countable) instance
+      // The id is read from the end of the key, so a dotted id is one instance under its whole id
+      // (secaudit2026oct31w2 round 10b); a key of a longer namespace is left to that space.
+      const row = spaceRowAt(r.key, nsPrefix, prefixes);
+      if (!row) continue;
+      if (row.copy === 'version') { if (!instances.has(row.id)) instances.set(row.id, false); continue; }
+      instances.set(row.id, true);   // bare / latest / draft → a real (countable) instance
     }
     let count = 0;
     for (const present of instances.values()) if (present) count++;

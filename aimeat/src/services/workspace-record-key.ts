@@ -4,9 +4,15 @@
  * SPDX-License-Identifier: MIT
  * @description Reading a workspace record's parts out of its memory key. Moved unchanged out of
  *   services/workspace-tool-ops.ts (max-file-lines), which re-exports it.
- * @structure instanceFromKey(root, namespaces, asked) · recordAt(rest)
+ * @structure instanceFromKey(root, namespaces, asked) · recordAt(rest) · recordRowAt(rest) ·
+ *   spaceRowAt(key, nsPrefix, prefixes) · declaredNamespaceOf(parsed, declared) · spacePrefixesOf(root, objectTypes)
  * @usage const named = instanceFromKey(`organism.${org}.w.${ws}`, ['shared.notes'], key);
+ *   const row = spaceRowAt(r.key, `${root}.notes.`, spacePrefixesOf(root, manifest.objectTypes));
  * @version-history
+ *   2026-11-01 — recordRowAt(), spaceRowAt() and spacePrefixesOf(): the record and copy of a row read
+ *     from the end of its key with the space's longer namespaces left to them, for the readers outside
+ *     the index; declaredNamespaceOf() for the write guard (secaudit2026oct31w2 round 10b, dotted
+ *     record ids).
  *   2026-10-31 — recordAt(): a record's id and role read from the end of its key, which the index
  *     and instanceFromKey use, so an id with a dot in it is one record (secaudit2026oct31w2 round 10,
  *     f-2026-10-23-dotted-id-breaks-index).
@@ -49,4 +55,47 @@ export function recordAt(rest: string): { id: string; role: 'latest' | 'draft' }
         }
     }
     return rest && !rest.includes('.') ? { id: rest, role: 'latest' } : null;
+}
+
+/** One stored copy of a record: its id and which copy the row is. */
+export interface RecordRow { id: string; copy: 'latest' | 'bare' | 'draft' | 'version' }
+
+/**
+ * The record and copy in what follows `<root>.<namespace>.` in a key, read from the end as recordAt
+ * reads it: `<id>.latest`, a bare `<id>` (the published copy written before roles), `<id>.draft`, or a
+ * `<id>.version.N` history row. A bare rest with a dot in it gives null, as in recordAt.
+ */
+export function recordRowAt(rest: string): RecordRow | null {
+    const version = /^(.+)\.version\.\d+$/.exec(rest);
+    if (version) return { id: version[1]!, copy: 'version' };
+    const at = recordAt(rest);
+    if (!at) return null;
+    return { id: at.id, copy: at.role === 'draft' ? 'draft' : rest.endsWith('.latest') ? 'latest' : 'bare' };
+}
+
+/**
+ * The record row a key holds in one space, or null when the key is not a row of that space.
+ * `nsPrefix` is the space's `<root>.<namespace>.`, and `prefixes` are those of every space the manifest
+ * declares: a key under a longer one that begins with `nsPrefix` (`notes.` and `notes.old.`) belongs to
+ * that longer space, as the workspace index reads it.
+ */
+export function spaceRowAt(key: string, nsPrefix: string, prefixes: readonly string[]): RecordRow | null {
+    if (!key.startsWith(nsPrefix)) return null;
+    if (prefixes.some(p => p.length > nsPrefix.length && p.startsWith(nsPrefix) && key.startsWith(p))) return null;
+    return recordRowAt(key.slice(nsPrefix.length));
+}
+
+/**
+ * The declared space of a key that was split with the last part before its role as the id
+ * (services/write-guards.ts parseWorkspaceRecordKey): `parsed` itself when it is declared, else the
+ * longest declared namespace it continues, because an id with a dot puts its first parts into
+ * `parsed` (`logs.e1` for the record `e1.2` of `logs`). Null when no declared space holds it.
+ */
+export function declaredNamespaceOf(parsed: string, declared: readonly string[]): string | null {
+    return declared.filter(ns => parsed === ns || parsed.startsWith(`${ns}.`)).sort((a, b) => b.length - a.length)[0] ?? null;
+}
+
+/** The `<root>.<namespace>.` prefix of every space a manifest declares, for spaceRowAt. */
+export function spacePrefixesOf(root: string, objectTypes: ReadonlyArray<{ namespace?: unknown }> | undefined): string[] {
+    return (objectTypes ?? []).flatMap(ot => (typeof ot?.namespace === 'string' && ot.namespace ? [`${root}.${ot.namespace}.`] : []));
 }

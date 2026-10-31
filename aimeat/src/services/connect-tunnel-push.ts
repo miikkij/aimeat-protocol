@@ -17,6 +17,9 @@
  * @structure PushContext · sendBacklog() · pushTaskCancellations() · onMemoryWrite()
  * @usage import { sendBacklog, pushTaskCancellations } from './connect-tunnel-push.js';
  * @version-history
+ *   2026-11-01 — onMemoryWrite reads a record's id from the end of its key (recordAt), so a published
+ *     record whose id holds a dot wakes its space's subscribers under its whole id; it woke nobody
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.3.0 — 2026-10-22 — A cancel marker pushes task.cancelled only for a task of the marker's own
  *     account or one the marker's writer created (markerMayCancel; secaudit 2026-10, r48).
  *   v1.2.0 — 2026-10-12 — A record is not sent to an agent whose engagements in that workspace
@@ -35,6 +38,7 @@ import { parseWorkspaceRecordKey, spaceKeyOf } from './connect-tunnel-wire.js';
 import { isStopped } from './agent-stop-rules.js';
 import { retiredFromWorkspace, type WorkspaceEngagement } from './workspace-engagements.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import { recordAt } from './workspace-record-key.js';
 
 /**
  * Just enough of a connection for a push: whose it is, whether its socket is still open, and whether
@@ -215,16 +219,21 @@ export async function onMemoryWrite(ctx: RecordPushContext, evt: MemoryWriteEven
     engagements ??= ctx.workspaceEngagements(parsed.organismId, parsed.ws);
     return retiredFromWorkspace(await engagements, principal);
   };
+  // The spaces this workspace's subscriptions name: a key of a longer one (`notes.old` beside `notes`)
+  // is that space's record, not a dotted id of the shorter one.
+  const subscribed = [...ctx.spaceSubscribers.keys()].filter(k => k.startsWith(wsPrefix)).map(k => k.slice(wsPrefix.length));
   for (const [sk, subs] of ctx.spaceSubscribers) {
     if (!sk.startsWith(wsPrefix) || subs.size === 0) continue;
     const namespace = sk.slice(wsPrefix.length);
     if (!(parsed.rest === namespace || parsed.rest.startsWith(`${namespace}.`))) continue;
+    if (subscribed.some(ns => ns.length > namespace.length && ns.startsWith(`${namespace}.`) && parsed.rest.startsWith(`${ns}.`))) continue;
     const tail = parsed.rest === namespace ? '' : parsed.rest.slice(namespace.length + 1);
     if (tail === '') continue;  // a write to the space root itself — no instance, not a record
-    const parts = tail.split('.');
-    const instanceId = parts[0];
-    const role = parts.slice(1).join('.');
-    if (role !== '' && role !== 'latest') continue;  // skip drafts + version history
+    // The id is read from the end (recordAt), so a record whose id holds a dot wakes its subscribers
+    // under its whole id; split on the first dot it woke nobody (secaudit2026oct31w2 round 10b).
+    const at = recordAt(tail);
+    if (!at || at.role !== 'latest') continue;  // skip drafts + version history (recordAt: bare or .latest)
+    const instanceId = at.id;
     for (const principal of [...subs]) {
       const conn = ctx.connections.get(principal);
       if (!conn || conn.ws.readyState !== WebSocket.OPEN) continue;
