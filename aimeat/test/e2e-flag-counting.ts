@@ -9,7 +9,8 @@
  *       the author still sees it.
  *     - A memory record: one unreviewed flag from another account leaves the record in its owner's
  *       discovery and librarian search, and the counter the owner sees still says 1. A flag the
- *       operator actions hides it; the same flag dismissed brings it back.
+ *       operator actions hides it; the same flag dismissed brings it back. The reporter cannot action
+ *       their own flag (403), so a review stays somebody else's decision.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-flag-counting
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (secaudit2026oct31w2 round 10, W2-8 and W2-9).
@@ -145,6 +146,13 @@ await test('one unreviewed flag from another account leaves the record in its ow
     const found = await ownerFinds();
     assert(found.discover, 'one unreviewed flag removed the record from its owner\'s discovery');
     assert(found.librarian, 'one unreviewed flag removed the record from its owner\'s librarian search');
+});
+
+await test('the reporter cannot action their own flag to hide the record: 403', async () => {
+    const r = await json(`/v1/flags/${encodeURIComponent(memoryFlagId)}`, { method: 'PUT', token: flagger.token, body: JSON.stringify({ status: 'actioned' }) });
+    assert(r.status === 403, `the reporter reviewing their own flag: ${r.status} ${short(r.body)}`);
+    const found = await ownerFinds();
+    assert(found.discover, 'the record left discovery after a refused review');
 });
 
 await test('usage: the counter on the record still says 1 to its owner', async () => {
