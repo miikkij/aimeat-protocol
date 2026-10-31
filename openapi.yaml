@@ -26785,6 +26785,12 @@ paths:
                 group_id:
                   type: string
                   description: 'For `visibility: group`.'
+                store:
+                  type: string
+                  maxLength: 100
+                  description: >-
+                    The store the bytes are kept in, as on POST /v1/storage. The answer and the list say
+                    each file's `store`.
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -27624,6 +27630,18 @@ paths:
                     'workspace').
                 federate:
                   type: boolean
+                store:
+                  type: string
+                  maxLength: 100
+                  description: >-
+                    The store the bytes are kept in: "own:<name>" for one of the owner's own stores,
+                    "node:<name>" for a node store open to everyone (an operator may name any). Omitted,
+                    the owner's default own store, else the node's. GET /v1/file-store lists the
+                    choices. Checked before any byte moves: 400 INVALID_INPUT, 403 STORE_NOT_SELECTABLE
+                    or NO_OWN_STORAGE, 404 UNKNOWN_STORE, 409 STORE_NOT_TAKING_FILES or
+                    STORE_NOT_REACHABLE. Honoured in both modes; with a raw body, `?store=`. The answer
+                    and GET /v1/storage say each file's `store` (`database`, `node:<name>`,
+                    `own:<name>`).
                 ai_provenance:
                   allOf:
                     - $ref: '#/components/schemas/AiProvenanceDeclaration'
@@ -33294,6 +33312,12 @@ paths:
                   items:
                     type: string
                   description: For a `workspace` file, the workspaces as a list of "<organismId>/<workspaceId>".
+                store:
+                  type: string
+                  maxLength: 100
+                  description: >-
+                    The store the bytes are kept in, as on POST /v1/storage. Checked here, before any
+                    chunk.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -35923,13 +35947,16 @@ paths:
   /v1/file-store:
     get:
       operationId: getOwnFileStore
-      summary: Where the caller's files keep their bytes, and their own storage
+      summary: Where the caller's files keep their bytes, their own stores, and the stores they may choose
       description: >-
         `mode` is the node's rule on storage of one's own (self, operator, off), `approval` the
-        operator's answer on an operator node, `store` the connected S3 bucket or Azure container
-        (null when none), `taking_new_files` whether a new file goes there now, and `files` the count
-        and bytes in it and elsewhere. Files in one's own storage do not count toward the node's
-        storage quota. Needs `storage:read`.
+        operator's answer on an operator node, `stores` each named store of one's own (where, folder,
+        `default`, last test, files in it), `default_store`, `store` the default one (null when none),
+        `taking_new_files` whether a new file goes to it now, `new_files_go_to` where a file goes when
+        its writer names no store, `choices` the values a writer may give as `store` when saving a file
+        (`own:<name>`, and `node:<name>` for node stores open to everyone), and `files` the count and
+        bytes per place. Files in one's own storage do not count toward the node's storage quota.
+        Needs `storage:read`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -35938,16 +35965,19 @@ paths:
         '403': { description: A session from another node }
     put:
       operationId: connectOwnFileStore
-      summary: Connect storage of one's own for one's files (S3 or Azure Blob)
+      summary: Connect a named store of one's own for one's files (S3 or Azure Blob), or make one the default
       description: >-
         The node tests the storage (write, read, read part, list, remove under the folder) before it
-        saves anything, then sends every new file of the person and their agents there. The keys are
-        kept encrypted under the node key and never returned. On a node where operators approve, the
-        answer is 202 with `outcome` waiting_for_operator and files keep going to the node until
-        approved. Needs the person in person, or an agent with `secrets:manage`. 400 INVALID_INPUT names
-        what is missing; 403 OWNER_FILE_STORES_OFF; 409 FILES_IN_STORE when a store holding files would
-        be replaced by a different bucket; 422 STORE_TEST_FAILED names the failing step; 503
-        NO_ENCRYPTION_KEY.
+        saves anything. A person may keep several named stores; the first is the default, and
+        `make_default` makes another one the default. A new file of the person and their agents goes to
+        the default unless its writer names a store. Without `kind`, only `make_default` applies, to the
+        store `name` names. The keys are kept encrypted under the node key and never returned. On a node
+        where operators approve, the answer is 202 with `outcome` waiting_for_operator and files keep
+        going to the node until approved. Needs the person in person, or an agent with `secrets:manage`.
+        400 INVALID_INPUT names what is missing (and asks for `name` when the person has several
+        stores); 403 OWNER_FILE_STORES_OFF; 409 FILES_IN_STORE when a store holding files would point at
+        a different bucket; 409 STORE_ALREADY_CONNECTED; 422 STORE_TEST_FAILED names the failing step;
+        503 NO_ENCRYPTION_KEY.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -35957,8 +35987,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [kind]
               properties:
+                name: { type: string, maxLength: 40, description: 'The store''s name; default "main" for the first.' }
+                make_default: { type: boolean }
                 kind: { type: string, enum: [s3, azure] }
                 endpoint: { type: string, description: 'S3: https address of the service; empty for Amazon S3.' }
                 region: { type: string }
@@ -35981,13 +36012,16 @@ paths:
         '503': { description: The node has no encryption key }
     delete:
       operationId: disconnectOwnFileStore
-      summary: Disconnect one's own storage
+      summary: Disconnect one of one's own stores
       description: >-
-        Refused with 409 FILES_IN_STORE while files are in it; move them home first. Needs the person in
+        `name` may be left out when the person has one store. Refused with 409 FILES_IN_STORE while files
+        are in it; move them elsewhere first. Removing the default leaves no default. Needs the person in
         person, or an agent with `secrets:manage`.
       tags: [Storage]
       security:
         - BearerAuth: []
+      parameters:
+        - { name: name, in: query, required: false, schema: { type: string } }
       responses:
         '200': { description: Disconnected }
         '404': { description: No storage connected }
@@ -35995,11 +36029,13 @@ paths:
   /v1/file-store/move:
     post:
       operationId: moveOwnFiles
-      summary: Move one's files into one's own storage, or back to the node
+      summary: Move one's files between stores
       description: >-
-        `direction` own moves the person's other files (theirs and their agents') into their storage;
-        home moves the files in it to where the node keeps files. Up to `limit` (1 to 200, default 50)
-        per call; call again while `remaining` is above 0. Needs `storage:write`.
+        `to` is a store the person may choose (`own:<name>`, `node:<name>`) or `home`, where the node
+        keeps files. `from` narrows to one place (`own:<name>`, `node:<name>`, `database`); without it,
+        home moves every file in their own stores and a store every file not yet in it. `direction` own
+        or home is the older form of `to`. Up to `limit` (1 to 200, default 50) per call; call again
+        while `remaining` is above 0. Needs `storage:write`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -36009,48 +36045,125 @@ paths:
           application/json:
             schema:
               type: object
-              required: [direction]
               properties:
+                to: { type: string, maxLength: 100 }
+                from: { type: string, maxLength: 100 }
                 direction: { type: string, enum: [own, home] }
                 limit: { type: integer, minimum: 1, maximum: 200 }
       responses:
-        '200': { description: 'moved, skipped, failed, remaining' }
-        '409': { description: Own storage is not taking files }
+        '200': { description: 'to, moved, skipped, failed, remaining' }
+        '400': { description: No target, or a malformed one }
+        '403': { description: A node store not open to everyone }
+        '404': { description: No such store }
+        '409': { description: The store is not taking files }
   /v1/admin/file-store:
     get:
       operationId: getNodeFileStore
       summary: Where this node keeps the bytes of stored files
       description: >-
-        `kind` (database, s3, azure), `ready` and `missing` (settings or environment variables still
-        needed), `where`, `prefix`, `files` (count and bytes in the database, the node's store and
-        people's own storage) and `owner_stores` (the rule, each person's storage, the requests that
-        wait). Reserved to the node operator.
+        The store the environment names (`kind` database, s3 or azure, `ready` and `missing` settings
+        or environment variables still needed, `where`, `prefix`), the named node stores (`stores`, each
+        with where, folder, `default`, `selectable`, last test and files), `default_store`,
+        `new_files_go_to`, `files` (count and bytes per place) and `owner_stores` (the rule, each
+        person's stores, the requests that wait). Reserved to the node operator.
       tags: [Admin]
       security:
         - BearerAuth: []
       responses:
         '200': { description: The status }
+  /v1/admin/file-store/stores/{name}:
+    put:
+      operationId: setNodeFileStore
+      summary: Add a named node store, give one a new key, or change its options
+      description: >-
+        With `kind` the address and key are read, the store is tested (write, read, read part, list,
+        remove under its folder) and kept, its key encrypted under the node key and never returned.
+        Without `kind` only `selectable` (every person may name it for a file) and `make_default` (new
+        files go there; false on the default lets the environment's setting decide again) change. 400
+        INVALID_INPUT (a reserved name: s3, azure, database), 409 FILES_IN_STORE when a store holding
+        files would point at a different bucket, 409 STORE_ALREADY_CONNECTED, 422 STORE_TEST_FAILED, 503
+        NO_ENCRYPTION_KEY. Reserved to the node operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, maxLength: 40 } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                kind: { type: string, enum: [s3, azure] }
+                endpoint: { type: string, description: 'S3: the service address; empty for Amazon S3. Azure: only for Azurite.' }
+                region: { type: string }
+                bucket: { type: string }
+                addressing: { type: string, enum: [auto, path, host] }
+                access_key_id: { type: string }
+                secret_access_key: { type: string }
+                account: { type: string }
+                container: { type: string }
+                credential: { type: string, description: 'Azure: account key, connection string or container SAS URL.' }
+                prefix: { type: string, description: 'The folder inside the bucket or container.' }
+                selectable: { type: boolean }
+                make_default: { type: boolean }
+      responses:
+        '200': { description: Changed }
+        '201': { description: Added }
+        '400': { description: Missing or not valid input }
+        '409': { description: Files are in it, or the same folder is another store }
+        '422': { description: The store did not pass the test }
+        '503': { description: The node has no encryption key }
+    delete:
+      operationId: removeNodeFileStore
+      summary: Remove a named node store
+      description: >-
+        Refused with 409 FILES_IN_STORE while files are in it; move them first. Removing the default
+        lets the environment's setting decide again. The bucket is not touched. Reserved to the node
+        operator.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string, maxLength: 40 } }
+      responses:
+        '200': { description: Removed }
+        '404': { description: No such store }
+        '409': { description: Files are still in it }
   /v1/admin/file-store/test:
     post:
       operationId: testNodeFileStore
-      summary: Test the node's file store
+      summary: Test a node file store
       description: >-
         Writes, reads, reads part of, lists and removes one small object under the store's folder, and
-        answers each step. 409 NO_FILE_STORE when files are kept in the database, 409
+        answers each step. With `name` one of the named stores (its last test is kept); without, the
+        store the environment names: 409 NO_FILE_STORE when that is the database, 409
         FILE_STORE_INCOMPLETE with the missing settings. Reserved to the node operator.
       tags: [Admin]
       security:
         - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name: { type: string, maxLength: 40 }
       responses:
         '200': { description: 'where, ok and the steps' }
-        '409': { description: No store, or its settings are incomplete }
+        '404': { description: No such named store }
+        '409': { description: No store, its settings are incomplete, or its key does not open }
   /v1/admin/file-store/move:
     post:
       operationId: moveFilesOutOfDatabase
-      summary: Move files from the database to where new files go
+      summary: Move files from one node place to another
       description: >-
-        Up to `limit` (1 to 500, default 100) files whose bytes are in the database move to their
-        owner's own storage when the node lets them use it, else to the node's store. Answers moved,
+        Up to `limit` (1 to 500, default 100) files of one place, `from` (database by default, or a
+        node store `node:<name>`), move to `to` (a node store) or, without it, to where a new file of
+        the same owner goes now: their own default store when the node lets them use it, else the
+        node's store for new files. A person's own stores are never a `from`. Answers from, to, moved,
         skipped, failed, moved_bytes_mb, remaining and `next`; pass `next` back as `after` to go on past
         files that failed. Reserved to the node operator.
       tags: [Admin]
@@ -36065,8 +36178,12 @@ paths:
               properties:
                 limit: { type: integer, minimum: 1, maximum: 500 }
                 after: { type: string }
+                from: { type: string, maxLength: 100 }
+                to: { type: string, maxLength: 100 }
       responses:
         '200': { description: The batch result }
+        '400': { description: A from or to that is not a node place }
+        '404': { description: No such store }
         '409': { description: No store set up }
   /v1/admin/file-store/owners/{owner}/decision:
     post:

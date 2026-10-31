@@ -23,6 +23,8 @@
  * @usage wrapStorageWithFileStores(storage, resolver);   // once, right after createStorage
  *   await relocateStorageFile(storage, owner, key, target);   // the move actions
  * @version-history
+ *   v1.1.0 — 2026-10-30 — A write may carry `storeChoice`, the store its writer named; it is handed to
+ *     the resolver and never stored (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { randomUUID } from 'node:crypto';
@@ -39,8 +41,9 @@ export interface FileStoreTarget {
 }
 
 export interface FileStoreResolver {
-  /** Where a new file of this identity goes; null keeps its bytes in the database. */
-  forWrite(ownerGaii: string): Promise<FileStoreTarget | null>;
+  /** Where a new file of this identity goes; null keeps its bytes in the database. `choice` is the
+   *  store its writer named (`own:<name>`, `node:<name>`); the resolver throws when it cannot take it. */
+  forWrite(ownerGaii: string, choice?: string): Promise<FileStoreTarget | null>;
   /** The store a reference names; null when this node can no longer reach it (it was disconnected). */
   forRead(storeId: string): Promise<BlobStore | null>;
 }
@@ -106,8 +109,11 @@ export function wrapStorageWithFileStores(storage: Storage, resolver: FileStoreR
     // object, made here from the bytes.
     const file = { ...incoming };
     delete file.blobRef;
+    // The store the writer chose rides on the record to here and is never stored.
+    const choice = file.storeChoice;
+    delete file.storeChoice;
     const previous = await meta(file.ownerGaii, file.key);
-    const target = await resolver.forWrite(file.ownerGaii);
+    const target = await resolver.forWrite(file.ownerGaii, choice);
     if (!target) {
       const written = await create(file);
       if (previous?.blobRef) await discard(previous.blobRef, 'replaced by a database write');

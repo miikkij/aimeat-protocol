@@ -17,6 +17,8 @@
  *   import { storageChunkedUploadRouter } from './storage-files-chunked.js';
  *   router.use(storageChunkedUploadRouter(config, storage));   // before the wildcard routes
  * @version-history
+ *   2026-10-30 -- Init takes `store`, the store the bytes are kept in, checked with the caller's rights
+ *     before any chunk; complete writes there (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-18 -- Init without a visibility stores visibility.file_default with the session; `visibility:
  *     'default'` is mapped before the body schema to visibility.app_upload_default for an app grant and
  *     to the file default for anyone else (plan doc-mvcn6c7e4e5q, V5.2).
@@ -63,6 +65,7 @@ import { pubEmbedUrl } from '../services/doc-images.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { callerOf } from '../middleware/caller.js';
 import { uploadVisibilityOf, isAppGrantRoles, NODE_DEFAULT_LEVEL } from '../services/content-defaults.js';
+import { resolveChoice } from '../services/file-store/file-store-resolver.js';
 
 /** Anonymous agents (shared#anonymous@...) may only use keys prefixed with "anonymous/" */
 function isAnonymousGaii(gaii: string): boolean {
@@ -102,7 +105,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
     // POST /v1/storage/upload/init — initiate chunked upload
     router.post('/v1/storage/upload/init', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), nodeDefaultLevel, validateBody(ChunkedUploadInitSchema, config.nodeId), async (req, res) => {
         const gaii = resolve(req);
-        const { key, mime_type, visibility, chunk_size, total_chunks, group_id, workspace_ref, workspace_refs } = req.body ?? {};
+        const { key, mime_type, visibility, chunk_size, total_chunks, group_id, workspace_ref, workspace_refs, store } = req.body ?? {};
         const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, workspace_ref) : undefined;
         // No visibility named: the file default (plan V5.2; 'default' was mapped before validation),
         // stored with the session; the publish gate asks about it at complete, as about a named one.
@@ -132,6 +135,15 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
         if (audience) {
             res.status(audience.status).json(error(config.nodeId, audience.code, audience.message));
             return;
+        }
+        // The store named for the bytes, checked with the caller's rights before any chunk; the
+        // shared write asks for the store's state again at complete.
+        if (typeof store === 'string') {
+            const chosen = await resolveChoice({ storage, config }, gaii, store, { operator: await callerOf(req, config.nodeId, storage).operator() });
+            if (!chosen.ok) {
+                res.status(chosen.status).json(error(config.nodeId, chosen.code, chosen.message));
+                return;
+            }
         }
 
         const uploadId = `upload-${randomBytes(12).toString('hex')}`;
@@ -163,6 +175,7 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             visibility: level,
             groupId: visibility === 'group' ? group_id : undefined,
             workspaceRef,
+            ...(typeof store === 'string' ? { storeChoice: store } : {}),
             chunkSize: chunk_size ?? 10 * 1024 * 1024, // 10MB default
             totalChunks: total_chunks,
             receivedChunks: new Map(),
@@ -319,6 +332,8 @@ export function storageChunkedUploadRouter(config: AimeatConfig, storage: Storag
             provenance: stated.provenance,
             // Making the file public asks the node's publish gate (plan doc-mvcn6c7e4e5q, V4).
             publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
+            // Who may choose the store was settled at init; the write asks for its state now.
+            ...(upload.storeChoice ? { store: { id: upload.storeChoice, operator: true } } : {}),
         });
         if (!written.ok) {
             // The write refused the file (a ceiling, the quota, the key), and trying the same bytes again

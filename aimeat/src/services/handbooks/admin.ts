@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.28.0 -- 2026-10-30 -- Named node stores: aimeat_admin_file_store_set and _remove, the default, the
+ *     stores everyone may choose, a move between node stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.27.0 -- 2026-10-29 -- The platform-fee incident's records are entries decided with "uncount" or
  *     "keep" (secaudit2026oct26 round 8c).
  *   v1.26.0 -- 2026-10-29 -- Where stored files keep their bytes: the node's S3 or Azure Blob store, people's own, the four admin tools.
@@ -185,10 +187,14 @@ opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any
 S3-compatible service) or one Azure Blob container: \`file_store.kind\` and the address settings with
 \`aimeat_admin_config_set\`, the keys in the environment only (AIMEAT_FILE_STORE_S3_ACCESS_KEY_ID and
-_SECRET_ACCESS_KEY, or AIMEAT_FILE_STORE_AZURE_CREDENTIAL). \`aimeat_admin_file_store\` says where files go,
-what is missing and how many files each place holds; \`aimeat_admin_file_store_test\` writes, reads,
-lists and removes one test object; \`aimeat_admin_file_store_move\` moves older files out of the
-database in batches (call it again while \`remaining\` is above 0). People may connect storage of their
+_SECRET_ACCESS_KEY, or AIMEAT_FILE_STORE_AZURE_CREDENTIAL). Beside it the operator can add named stores
+with \`aimeat_admin_file_store_set\`, whose keys the node keeps encrypted, so no server change is needed:
+\`make_default\` sends new files there, \`selectable\` lets every person choose it for a file (\`store:
+"node:<name>"\` on an upload), and \`aimeat_admin_file_store_remove\` removes one once it is empty.
+\`aimeat_admin_file_store\` says where files go, what is missing and how many files each place holds;
+\`aimeat_admin_file_store_test\` writes, reads, lists and removes one test object (\`name\` for a named
+store); \`aimeat_admin_file_store_move\` moves files out of the database, or with \`from\` and \`to\`
+from one node store to another, in batches (call it again while \`remaining\` is above 0). People may connect storage of their
 own as \`file_store.owner_stores\` allows (self, operator, off; auto is operator on a signed-in-only
 node); on an operator node \`aimeat_admin_file_store_decide\` approves, declines or revokes, as the
 operator says. A daily sweep removes, inside the store's folder only, objects no file names any more.

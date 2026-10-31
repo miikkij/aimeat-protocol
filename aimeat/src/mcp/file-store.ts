@@ -10,6 +10,9 @@
  * @structure registerFileStoreTools(mcp, storage, config, caller)
  * @usage import { registerFileStoreTools } from './file-store.js';
  * @version-history
+ *   v1.1.0 — 2026-10-30 — Named stores: name and make_default on set, name on remove, to and from on
+ *     move; aimeat_admin_file_store_set and aimeat_admin_file_store_remove; a test by name and a move
+ *     with from and to (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { McpServer } from '@modelcontextprotocol/server';
@@ -26,6 +29,7 @@ import { moveFilesToNodeStore, nodeFileStoreStatus, testNodeFileStore, type File
 import {
   connectOwnerFileStore, decideOwnerFileStore, moveOwnerFiles, ownerFileStoreView, removeOwnerFileStore,
 } from '../services/file-store/owner-file-store-actions.js';
+import { removeNodeFileStore, setNodeFileStore } from '../services/file-store/node-file-store-actions.js';
 
 const text = (value: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(value, null, 2) }] });
 const answer = <T>(r: FileStoreResult<T>) => (r.ok ? text(r.data) : toolError(r.code, r.message));
@@ -43,7 +47,7 @@ export function registerFileStoreTools(
   mcp.registerTool('aimeat_file_store_get', reg('aimeat_file_store_get'), async () => {
     const c = caller();
     if (c.visitor) return toolError('FORBIDDEN', VISITOR);
-    return text(await ownerFileStoreView(ctx, c.owner));
+    return text(await ownerFileStoreView(ctx, c.owner, { operator: await c.operator() }));
   });
 
   mcp.registerTool('aimeat_file_store_set', reg('aimeat_file_store_set'), async (input) => {
@@ -52,16 +56,16 @@ export function registerFileStoreTools(
     return answer(await connectOwnerFileStore(ctx, { account: c.owner, actor: c.principal, operator: await c.operator() }, input as Record<string, unknown>));
   });
 
-  mcp.registerTool('aimeat_file_store_remove', reg('aimeat_file_store_remove'), async () => {
+  mcp.registerTool('aimeat_file_store_remove', reg('aimeat_file_store_remove'), async ({ name }) => {
     const c = caller();
     if (c.visitor) return toolError('FORBIDDEN', VISITOR);
-    return answer(await removeOwnerFileStore(ctx, c.owner));
+    return answer(await removeOwnerFileStore(ctx, c.owner, name));
   });
 
-  mcp.registerTool('aimeat_file_store_move', reg('aimeat_file_store_move'), async ({ direction, limit }) => {
+  mcp.registerTool('aimeat_file_store_move', reg('aimeat_file_store_move'), async ({ to, from, direction, limit }) => {
     const c = caller();
     if (c.visitor) return toolError('FORBIDDEN', VISITOR);
-    return answer(await moveOwnerFiles(ctx, c.owner, { direction, limit }));
+    return answer(await moveOwnerFiles(ctx, { account: c.owner, operator: await c.operator() }, { to, from, direction, limit }));
   });
 
   mcp.registerTool('aimeat_admin_file_store', reg('aimeat_admin_file_store'), async () => {
@@ -69,14 +73,25 @@ export function registerFileStoreTools(
     return text(await nodeFileStoreStatus(ctx));
   });
 
-  mcp.registerTool('aimeat_admin_file_store_test', reg('aimeat_admin_file_store_test'), async () => {
-    if (!(await caller().operator())) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
-    return answer(await testNodeFileStore(ctx));
+  mcp.registerTool('aimeat_admin_file_store_set', reg('aimeat_admin_file_store_set'), async (input) => {
+    const c = caller();
+    if (!(await c.operator())) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
+    return answer(await setNodeFileStore(ctx, c.principal, input as Record<string, unknown>));
   });
 
-  mcp.registerTool('aimeat_admin_file_store_move', reg('aimeat_admin_file_store_move'), async ({ limit, after }) => {
+  mcp.registerTool('aimeat_admin_file_store_remove', reg('aimeat_admin_file_store_remove'), async ({ name }) => {
     if (!(await caller().operator())) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
-    return answer(await moveFilesToNodeStore(ctx, { limit, after }));
+    return answer(await removeNodeFileStore(ctx, name));
+  });
+
+  mcp.registerTool('aimeat_admin_file_store_test', reg('aimeat_admin_file_store_test'), async ({ name }) => {
+    if (!(await caller().operator())) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
+    return answer(await testNodeFileStore(ctx, name));
+  });
+
+  mcp.registerTool('aimeat_admin_file_store_move', reg('aimeat_admin_file_store_move'), async ({ limit, after, from, to }) => {
+    if (!(await caller().operator())) return toolError('FORBIDDEN', OPERATOR_AGENT_REFUSAL);
+    return answer(await moveFilesToNodeStore(ctx, { limit, after, from, to }));
   });
 
   mcp.registerTool('aimeat_admin_file_store_decide', reg('aimeat_admin_file_store_decide'), async ({ owner, decision, note }) => {

@@ -16,6 +16,8 @@
  *     principal asking for it named an agent record at the mint, `actor_agent`. verifyUploadToken
  *     returns both, so the PUT asks whether that agent and its account still stand
  *     (services/upload-principal.ts; secaudit 2026-10, PUT-v1-upload:no-live-principal-recheck).
+ *   v1.12.0 — 2026-10-30 — PRESIGNED_META_KEYS.storage carries `store`, the store the writer named for
+ *     the bytes and the mint checked (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.11.0 — 2026-10-18 — PRESIGNED_META_KEYS.storage carries `publish_ask`, the requester the publish
  *     gate asked about at the mint (plan doc-mvcn6c7e4e5q, V4).
  *   v1.10.0 — 2026-10-09 — Single use is durable: verifyUploadToken takes the storage and files the
@@ -195,7 +197,7 @@ export const PRESIGNED_META_KEYS = {
     // carry its statement too (2026-10-08).
     // `publish_ask`: the requester the publish gate asked about at the mint (services/storage-file-publish.ts),
     // set by the node, never by a client; the upload files the request when the bytes land.
-    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask'],
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],

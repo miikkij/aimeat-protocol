@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.13.0 -- 2026-10-30 -- POST takes `store`, the store the writer names for the bytes (inline and
+ *     presigned), and the upload answer and the list say each file's `store`
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.12.0 -- 2026-10-18 -- The presigned mint refuses a level wider than the file's label allows with
  *     409 LABEL_CAPS_AUDIENCE, as the shared mint does (plan doc-mvdipuyqraas, L3.2).
  *   v1.11.0 -- 2026-10-18 -- On a node that shows its content to signed-in accounts only, a file asked as
@@ -74,6 +77,8 @@ import type { MemoryRouteCtx } from './shared.js';
 import { readerFor } from '../../services/classification/reader.js';
 import { fileTarget } from '../../services/classification/labels.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../../services/content-defaults.js';
+import { choiceIdOf, resolveChoice } from '../../services/file-store/file-store-resolver.js';
+import { parseBlobRef } from '../../storage/blob/blob-types.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, resolve } = ctx;
@@ -83,7 +88,11 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // POST /v1/memory/files — upload file (presigned URL, or inline base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
     const gaii = resolve(req);
-    const { key, content, mime_type, visibility: named, tags, workspaceRef, workspace_refs, mode, group_id } = req.body ?? {};
+    const { key, content, mime_type, visibility: named, tags, workspaceRef, workspace_refs, mode, group_id, store: named_store } = req.body ?? {};
+    // The store the writer names for the bytes, checked with the caller's rights by the shared write
+    // (inline) or here before the mint (presigned), as on POST /v1/storage.
+    const store = typeof named_store === 'string' && named_store
+      ? { id: named_store.slice(0, 100), operator: await callerOf(req, config.nodeId, storage).operator() } : undefined;
     // The node's starting level (plan V5.2), decided before the validation, the presigned mint and the
     // publish gate below: 'default' (the SDK's word) is the app-upload default for an app grant, none
     // at all is the file default.
@@ -143,6 +152,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       // The requester rides in the token, so the upload files the request when the bytes land.
       const carry = await mintPublishCarry({ storage, config }, gaii, String(key), closed.visibility, publishGate);
       if (!carry.ok) { res.status(carry.status).json(error(config.nodeId, carry.code, carry.message)); return; }
+      if (store) {
+        const chosen = await resolveChoice({ storage, config }, gaii, store.id, { operator: store.operator });
+        if (!chosen.ok) { res.status(chosen.status).json(error(config.nodeId, chosen.code, chosen.message)); return; }
+      }
       const contentType = (mime_type as string) ?? 'application/octet-stream';
       const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
       const token = await generateUploadToken({
@@ -154,6 +167,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
           group_id, tags, workspace_refs: wsRefStr,
           ai_provenance: stated.provenance.wireBlock, ai_provenance_id: stated.provenance.declaredId,
           publish_ask: carry.requester,
+          store: store?.id,
         }),
         maxBytes,
         contentType,
@@ -190,6 +204,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       tags: parsedTags.length > 0 ? parsedTags : undefined,
       provenance: stated.provenance,
       publishGate,
+      ...(store ? { store } : {}),
     });
     if (!written.ok) {
       res.status(written.status).json(error(config.nodeId, written.code, written.message));
@@ -203,6 +218,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       ...(written.warnings?.length ? { warnings: written.warnings } : {}),
       ...await uploadProvenanceBlock(storage, config, file.aiProvenanceId),
       key: file.key,
+      // Where the bytes went: `database`, `node:<name>` or `own:<name>`.
+      store: choiceIdOf(parseBlobRef(file.blobRef)?.storeId),
       owner_gaii: file.ownerGaii,   // so a client can build the owner-addressed /v1/pub/<owner>/<key> embed URL
       size: file.size,
       mime_type: file.mimeType,
@@ -338,6 +355,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
         visibility: f.visibility,
         tags: f.tags || [],
         created_at: f.createdAt,
+        // Where the bytes are: `database`, `node:<name>` or `own:<name>`.
+        store: choiceIdOf(parseBlobRef(f.blobRef)?.storeId),
       })),
       total: files.length,
       // So a client can state the REAL limit instead of a hardcoded one. The upload form said

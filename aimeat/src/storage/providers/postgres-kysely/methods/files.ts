@@ -7,6 +7,8 @@
  *   create is upsert (re-upload replaces), sumStorageBytesForOwners is one cross-identity aggregate,
  *   listStorageFiles omits the bytes.
  * @version-history
+ *   2026-10-30 — listStorageFilesInDatabase is listStorageFilesIn: the files of the database or of one
+ *     store id (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — `blobRef` is written and read on every path (migration 0121): a row whose bytes are an
  *     object in an S3 or Azure Blob store holds an empty `data`. createStorageFile keeps the UTF-8
  *     verdict the caller settled for such a row, because the bytes it would measure are not here.
@@ -235,9 +237,14 @@ export const fileMethods = {
     return rows.map(r => r.blobRef).filter((x): x is string => !!x);
   },
 
-  async listStorageFilesInDatabase(this: PostgresKyselyStorage, opts: { limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
+  async listStorageFilesIn(this: PostgresKyselyStorage, opts: { store: string; limit: number; after?: { ownerGaii: string; key: string }; owners?: string[] }): Promise<StorageFileRecord[]> {
     if (opts.owners && opts.owners.length === 0) return [];
-    let q = this.db.selectFrom('StorageFile').select(META_COLUMNS).where('blobRef', 'is', null);
+    // A store id is compared as the reference's first part, never with LIKE: an owner's identity may
+    // hold `_`, which LIKE reads as any character.
+    const head = `${opts.store}|`;
+    let q = opts.store === 'database'
+      ? this.db.selectFrom('StorageFile').select(META_COLUMNS).where('blobRef', 'is', null)
+      : this.db.selectFrom('StorageFile').select(META_COLUMNS).where(sql<string>`left("blobRef", ${head.length})`, '=', head);
     if (opts.owners) q = q.where('ownerGaii', 'in', opts.owners);
     if (opts.after) {
       const a = opts.after;
