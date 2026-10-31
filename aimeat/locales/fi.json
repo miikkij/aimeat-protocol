@@ -15324,9 +15324,31 @@
     "notNow": "Ei nyt"
   },
   "homeConnect": {
-    "lead": "Yhdistä ChatGPT, Claude tai Grok tähän (MCP = pistoke, jolla tekoälysi saa muistin ja kädet), niin siitä tulee esikuntapäällikkösi. Valitse tekoälysi, niin näet vaiheet juuri sille.",
+    "lead": "Yhdistä ChatGPT, Claude tai Grok tähän, niin siitä tulee oikea kätesi: se muistaa asiasi ja hoitaa niitä puolestasi.",
     "button": "Yhdistä {ai}",
-    "other": "Muu tekoäly"
+    "other": "Muu tekoäly",
+    "mcpQ": "Mikä tämä on?",
+    "mcpWhat": "Yhteys toimii avoimella MCP-tekniikalla. Sinun ei tarvitse tietää siitä muuta."
+  },
+  "buyerSteps": {
+    "title": "Alkuun pääseminen: {done}/{total} tehty",
+    "lead": "Tee nämä järjestyksessä. Jokainen askel avaa seuraavan.",
+    "allDone": "Kaikki alkuaskeleet on tehty.",
+    "more": "Muuta, mitä voit tehdä",
+    "done": "✓ tehty",
+    "next": "Seuraavaksi: {step} →",
+    "connect": "Yhdistä tekoälysi (ChatGPT, Claude tai Grok)",
+    "connectShort": "Yhdistä tekoälysi",
+    "connectLine": "Tekoälysi saa muistin täältä ja voi hoitaa asioitasi puolestasi.",
+    "profile": "Kerro itsestäsi – tekoäly oppii, miten voi auttaa",
+    "profileShort": "Kerro itsestäsi",
+    "profileLine": "Muutama kysymys työstäsi. Vastauksista tulee profiilisi.",
+    "agent": "Anna ensimmäinen työ agentille",
+    "agentShort": "Anna työ agentille",
+    "agentLine": "Agentti tekee sovitun työn aikataululla, myös kun olet poissa.",
+    "app": "Tee ensimmäinen sovellus",
+    "appShort": "Tee sovellus",
+    "appLine": "Pyydä chatissa sovellusta, niin saat linkin valmiiseen sovellukseen."
   },
   "homeJourney": {
     "promptFold": "Lisäasetukset: valmis kehote tekoälylle, jota käytät muualla",
@@ -15450,28 +15472,24 @@
   "home": {
     "credit": {
       "line": "AI-saldo {amount}",
-      "ready": "tekoäly on valmis",
+      "ready": "oma tekoälysi on valmis käyttöön",
       "low": "saldo on vähissä",
       "empty": "saldo on loppu",
       "off": "tekoäly ei ole käytössä tällä sivustolla",
       "topup": "Osta lisää saldoa",
-      "what": "mikä tämä on?",
       "chatLine": "AI-saldoa jäljellä {amount}.",
       "chatElsewhere": "AI-saldoa jäljellä kaikkeen muuhun kuin tähän keskusteluun {amount}."
     },
     "welcome": "Tervetuloa uuteen kotiisi.",
     "buyerWelcome": {
-      "title": "Tervetuloa, {name}",
+      "titleNamed": "Tervetuloa omaan AIMEATiisi, {name}",
+      "titlePlain": "Tervetuloa omaan AIMEATiisi",
       "bought": "Ostit AIMEAT {plan} -tilauksen.",
       "boughtPackage": "Ostit AIMEAT {plan} -tilauksen ja paketin {package}.",
-      "lead": "Näin pääset alkuun.",
-      "stepsLabel": "Kolme askelta",
-      "step1": "Yhdistä tekoäly, jota jo käytät, esimerkiksi ChatGPT tai Claude. Ohje on heti alla.",
+      "stepsLabel": "Kaksi askelta",
       "step2": "Kerro yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee siihen agentin ja näyttää sen sinulle ennen kuin se aloittaa.",
-      "step3": "Tilauksesi ja laskusi ovat kaupassa. Löydät ne Asetuksista kohdasta Tilaus ja laskut.",
-      "sayLabel": "Mitä haluat saada tehdyksi?",
-      "sayField": "Kerro se yhdellä lauseella",
-      "sayGo": "Näytä agentti"
+      "step2Waits": "Tämä aukeaa, kun tekoälysi on yhdistetty.",
+      "settings": "Asetukset"
     },
     "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",
     "signInTitle": "Astu kotiisi",
@@ -17562,6 +17580,8 @@
     "themeLabel": "Teema",
     "lightMode": "Vaalea tila",
     "darkMode": "Tumma tila",
+    "autoMode": "Automaattinen: seuraa laitteesi asetusta",
+    "autoShort": "Auto",
     "chooseLook": "Valitse tyyli",
     "usernameLabel": "Käyttäjänimi",
     "passwordLabel": "Salasana",

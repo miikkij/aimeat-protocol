@@ -16,6 +16,8 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v2.0.3 — 2026-10-31 — Stage 6 is done when an agent the person made has finished a task other
+ *     than its onboarding test (journey-state.ts workersRun; Jouni, v31 K27).
  *   v2.0.2 — 2026-10-31 — Stage 6 says when it is done as journey-state.ts decides it: an agent the
  *     person made that works on its own; the basic agents do not count (Jouni v27 P6).
  *   v2.0.1 — 2026-10-11 — The prompt road names the Gemini app outside the United States only: it
@@ -219,8 +221,9 @@ is the first candidate. First ask what the agent should do, because that decides
 
 Propose the agent (skill \`add-a-crew-agent\`, or \`aimeat_agent_propose\`); the person approves it and
 its permissions on their page. The skill \`manage-my-agents\` has the picture of where agents run and
-who pays. The stage is done when an agent they made works on its own (it has a runtime or takes
-tasks by itself); the basic agents created with the account do not count. Experience Center: layer L3,
+who pays. The stage is done when an agent they made has finished a piece of work (a task other than
+the test task of its onboarding); an agent that exists but has not run yet does not count, and nor do
+the basic agents created with the account. Experience Center: layer L3,
 Agents in depth.
 
 ### 7. Shared with someone

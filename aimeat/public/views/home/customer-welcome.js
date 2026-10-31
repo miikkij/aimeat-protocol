@@ -2,30 +2,31 @@
  * @file public/views/home/customer-welcome.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description The welcome a buyer reads first on the node the store made for them: their name,
- *   what they bought, the three next steps, a field to say in one sentence what they want, and
- *   where their orders and invoices are.
+ * @description The welcome a buyer reads first on the node the store made for them: their name
+ *   (never the account id), the place's address, what they bought, the two first steps with the
+ *   first one the only loud action, and small links to their orders, support and settings.
  *
  *   ONLY ON A CUSTOMER'S NODE (site.js customerNode()), AND ONLY UNTIL THEIR AI IS CONNECTED. The
  *   UX review of the first purchase (2026-10-29, B) found a buyer landing on a page that said
  *   nothing about what they had bought or what to do first. The home's own steps (the AI road
  *   chooser below) stay as they are; this sits above them and says what they are for.
  *
- *   THE SENTENCE GOES WHERE THE AGENTS BAND'S DOES: the new-agent page, which shows the agent
- *   before anything exists (views/home/agents-band.js). One way in for one thing.
- *
  *   Composed from library components only (Band, BandNote, NamedRow, IndexList, IndexStep,
- *   TextField, Action, Actions); it has no sheet of its own.
- * @structure CustomerWelcome({ session, navigate })
- * @usage html`<${CustomerWelcome} session=${session} navigate=${navigate} />`
+ *   ChooserFold, Action, Loud, Actions); it has no sheet of its own.
+ * @structure CustomerWelcome({ session, initialized })
+ * @usage html`<${CustomerWelcome} session=${session} initialized=${state.initialized} />`
  * @version-history
+ *   v1.2.0 — 2026-10-31 — Jouni's review of v31 (K26): "Tervetuloa omaan AIMEATiisi, <nimi>" with a
+ *     real name only, never the account id; the address in small type; "oikea kätesi" in place of
+ *     "esikuntapäällikkö", and MCP only behind "Mikä tämä on?"; the connect buttons are the one loud
+ *     action; step 2 waits greyed until the AI is connected, and its sentence field is gone; step 3
+ *     (orders) left the list for a small link at the foot beside support and settings.
  *   v1.1.0 — 2026-10-31 — The first step says what connecting gives, in Jouni's words with MCP
  *     explained, and has one button each for ChatGPT, Claude and Grok that opens the connect guide on
  *     that AI, and one for another AI (v31 K26).
  *   v1.0.0 — 2026-10-29 — Initial (UX review 2026-10-29, B).
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
@@ -33,8 +34,9 @@ import { customerNode, siteLink, storeOrdersHref, contactHref } from '/js/site.j
 import { Band, BandNote } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
-import { TextField } from '/components/TextField.js';
 import { Action, Actions, Loud } from '/components/Action.js';
+import { ChooserFold } from '/components/Chooser.js';
+import { Note } from '/components/Note.js';
 import { rememberTool } from '/components/SetupGuide.js';
 
 /**
@@ -48,13 +50,14 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 
 /**
  * The welcome, or nothing: not a customer's node, or the person's AI is already connected.
- * @param {{ session: any, initialized: boolean, navigate?: (path: string) => void }} props
+ * @param {{ session: any, initialized: boolean }} props
  */
-export function CustomerWelcome({ session, initialized, navigate }) {
-  const [say, setSay] = useState('');
+export function CustomerWelcome({ session, initialized }) {
   if (!customerNode() || initialized) return null;
 
-  const name = session?.displayName || session?.owner || '';
+  // A real name only: a buyer the store named no one gets the account id as their name, and a machine
+  // id in the heading reads as a fault (v31 K26: "KOEUUSI417276" was the big heading).
+  const name = realName(session);
   const plan = siteLink('purchasePlan');
   const pkg = siteLink('purchasePackage');
   const orders = storeOrdersHref(getLocale());
@@ -63,43 +66,46 @@ export function CustomerWelcome({ session, initialized, navigate }) {
     ? tr('home.buyerWelcome.boughtPackage', 'You bought AIMEAT {plan} with the package {package}.')
     : tr('home.buyerWelcome.bought', 'You bought AIMEAT {plan}.')).replace('{plan}', plan).replace('{package}', pkg);
 
-  const make = () => {
-    const sentence = say.trim();
-    navigate?.('/v1/home?new-agent=1' + (sentence ? '&say=' + encodeURIComponent(sentence) : ''));
-  };
-
+  // Until the AI is connected, step 1 is the one thing to do: its buttons are the only loud ones, and
+  // step 2 waits greyed with why (v31 K26). Orders, support and settings are small links at the foot.
   return html`
-    <${Band} title=${tr('home.buyerWelcome.title', 'Welcome, {name}').replace('{name}', name)}>
-      <${BandNote}>${bought} ${tr('home.buyerWelcome.lead', 'Here is what to do first.')}<//>
+    <${Band} title=${name
+      ? tr('home.buyerWelcome.titleNamed', 'Welcome to your own AIMEAT, {name}').replace('{name}', name)
+      : tr('home.buyerWelcome.titlePlain', 'Welcome to your own AIMEAT')}>
+      <${BandNote}>${window.location.host}<//>
+      <${BandNote}>${bought}<//>
 
-      <${NamedRow} stack label=${tr('home.buyerWelcome.stepsLabel', 'Three steps')}>
+      <${NamedRow} stack label=${tr('home.buyerWelcome.stepsLabel', 'Two steps')}>
         <${IndexList} steps>
           <${IndexStep}>
-            ${tr('homeConnect.lead', 'Connect ChatGPT, Claude or Grok here, and it becomes your chief of staff.')}
+            ${tr('homeConnect.lead', 'Connect ChatGPT, Claude or Grok here, and it becomes your right hand.')}
             <${Actions}>
               ${CONNECT_TOOLS.map(([id, label]) => html`
-                <${Action} small key=${id} href="/v1/profile?tab=mcp" onClick=${() => rememberTool(id)}>${tr('homeConnect.button', 'Connect {ai}').replace('{ai}', label)}<//>`)}
+                <${Loud} key=${id} href="/v1/profile?tab=mcp" onClick=${() => rememberTool(id)}>${tr('homeConnect.button', 'Connect {ai}').replace('{ai}', label)}<//>`)}
               <${Action} small soft href="/v1/profile?tab=mcp">${tr('homeConnect.other', 'Another AI')} →<//>
             <//>
+            <${ChooserFold} summary=${tr('homeConnect.mcpQ', 'What is this?')}>
+              <p>${tr('homeConnect.mcpWhat', 'The connection uses the open MCP technology. You do not need to know more about it.')}</p>
+            <//>
           <//>
-          <${IndexStep}>${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
-          <${IndexStep}>${tr('home.buyerWelcome.step3', 'Your order and invoices are in the store, under Orders and invoices in Settings.')}<//>
+          <${IndexStep} line=${tr('home.buyerWelcome.step2Waits', 'This opens when your AI is connected.')}>
+            <${Note} kind="meta" inline>${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
+          <//>
         <//>
       <//>
 
-      <${NamedRow} stack label=${tr('home.buyerWelcome.sayLabel', 'What do you want done?')}>
-        <${TextField}
-          label=${tr('home.buyerWelcome.sayField', 'Say it in one sentence')}
-          placeholder=${tr('home.agents.askPlaceholder', 'For example: gather the industry news every weekday morning and write a summary')}
-          value=${say} onInput=${setSay} onEnter=${make}
-          actions=${html`<${Loud} control onClick=${make}>${tr('home.buyerWelcome.sayGo', 'Show me the agent')}<//>`} />
-      <//>
-
       <${Actions}>
-        ${orders && html`<${Action} small href=${orders} newTab>${tr('profile.landing.ordersInvoices', 'Orders and invoices')}<//>`}
-        <${Action} small href=${support}>${tr('profile.landing.contactSupport', 'Contact support')}<//>
+        ${orders && html`<${Action} small soft href=${orders} newTab>${tr('profile.landing.ordersInvoices', 'Orders and invoices')}<//>`}
+        <${Action} small soft href=${support}>${tr('profile.landing.contactSupport', 'Contact support')}<//>
+        <${Action} small soft href="/v1/profile">${tr('home.buyerWelcome.settings', 'Settings')}<//>
       <//>
     <//>`;
+}
+
+/** The person's own name, or '' when the only name is the account id. */
+function realName(session) {
+  const display = String(session?.displayName || '').trim();
+  return display && display !== session?.owner ? display : '';
 }
 
 export default CustomerWelcome;

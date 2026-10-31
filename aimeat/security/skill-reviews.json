@@ -74,7 +74,7 @@
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:f3068871ee68238881265eb8",
+      "digest": "sha256:4190d23b1026aef8524d008b",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -728,7 +728,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "1af9fab3da338d70",
+      "aimeat/src/services/journey-state.ts": "1938438c06df5c98",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
     },

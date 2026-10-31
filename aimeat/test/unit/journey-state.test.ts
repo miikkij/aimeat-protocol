@@ -5,6 +5,7 @@
  *   path is walked. The profile comes first, and the interview's answers reach the handbook.
  * @usage cd aimeat && pnpm exec vitest run test/unit/journey-state.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-31 — "Agents at work" needs an agent that has done work (workersRun, v31 K27).
  *   v1.2.0 — 2026-10-31 — The basic agents do not count as the person's workers (isOwnWorker).
  *   v1.1.0 — 2026-10-03 — The profile is the first stage; the interview's answers are read and shown.
  *   v1.0.0 — 2026-10-01 — Initial.
@@ -15,7 +16,7 @@ import {
 } from '../../src/services/journey-state.js';
 
 const nothing: JourneySignals = {
-    connected: false, ownKey: false, firstResult: false, organisms: 0, sharedWithSomeone: false, apps: 0, workers: 0,
+    connected: false, ownKey: false, firstResult: false, organisms: 0, sharedWithSomeone: false, apps: 0, workers: 0, workersRun: 0,
 };
 
 describe('the journey', () => {
@@ -59,8 +60,16 @@ describe('the journey', () => {
         expect(j.stages.find(s => s.id === 'apps')).toMatchObject({ done: true, declined: false });
     });
 
+    // v31 K27 (2026-10-31): "Agentit töissä" was ticked while no agent had done anything.
+    it('an agent that exists but has not done any work does not make "agents at work" done', () => {
+        const made = deriveJourney({ ...nothing, workers: 1, workersRun: 0 }, {});
+        expect(made.stages.find(s => s.id === 'agents')!.done).toBe(false);
+        const ran = deriveJourney({ ...nothing, workers: 1, workersRun: 1 }, {});
+        expect(ran.stages.find(s => s.id === 'agents')!.done).toBe(true);
+    });
+
     it('a walked path has no next stage and no handbook section', () => {
-        const all = { connected: true, ownKey: true, firstResult: true, organisms: 1, sharedWithSomeone: true, apps: 2, workers: 1 };
+        const all = { connected: true, ownKey: true, firstResult: true, organisms: 1, sharedWithSomeone: true, apps: 2, workers: 1, workersRun: 1 };
         const j = deriveJourney(all, {});
         expect(j.next).toBeNull();
         expect(journeyHandbookSection(j)).toBeNull();
