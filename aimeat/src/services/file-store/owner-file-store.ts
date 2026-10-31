@@ -28,6 +28,7 @@
  *   approvalOf · ownerMayUse · sealCredential · ownerStoreSpec
  * @usage const rec = await readOwnerStores(ctx, 'alice'); const entry = rec && defaultEntry(rec);
  * @version-history
+ *   v1.2.0 — 2026-10-31 — An entry keeps its last browser check (browserAccess).
  *   v1.1.0 — 2026-10-30 — Several named stores per person, one of them the default; a first-version
  *     record is read as one entry named `main` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -40,6 +41,7 @@ import { decryptBound, encryptBound, getEncryptionKey } from '../encryption.js';
 import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import { specFromTarget, type StoreTarget } from './store-target.js';
+import type { BrowserAccess } from './browser-access.js';
 
 export interface FileStoreCtx { storage: Storage; config: AimeatConfig }
 
@@ -68,6 +70,8 @@ export interface OwnerStoreEntry {
   connectedBy: string;
   /** The last connection test: written when connecting and by the test action. */
   lastCheck?: { at: string; ok: boolean; message: string };
+  /** Whether a browser on this node may send to it directly: written with lastCheck. */
+  browserAccess?: BrowserAccess;
 }
 
 export interface OwnerFileStores {

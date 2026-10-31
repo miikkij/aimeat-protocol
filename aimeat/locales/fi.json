@@ -18851,6 +18851,36 @@
       "OWNER_FILE_STORES_OFF": "Palvelun ylläpitäjät eivät salli kenenkään yhdistää omaa tallennustilaa täällä.",
       "INVALID_INPUT": "Lomakkeesta puuttuu jotain, tai jokin arvo ei kelpaa. Palvelimen viesti on alla.",
       "NO_OWN_STORAGE": "Sinulla ei ole omaa tallennustilaa, johon tiedostoja voi tallentaa. Yhdistä ensin sellainen."
+    },
+    "browser": {
+      "label": "Suoraan selaimesta",
+      "state": {
+        "allowed": "Kyllä. Tämän palvelun sovellukset voivat lähettää tiedostot suoraan tallennustilaan.",
+        "partial": "Vain osasta tämän palvelun osoitteista",
+        "missing": "Ei. Tallennustilassa ei ole CORS-sääntöä tälle palvelulle.",
+        "unknown": "Ei tiedossa. Tallennustila ei vastannut tarkistukseen.",
+        "not_checked": "Ei vielä tarkistettu. Testaa tallennustila, niin näet tuloksen."
+      },
+      "needsKey": "Tallennustila on yhdistetty SAS-URL:lla. Sillä ei voi allekirjoittaa linkkiä yhdelle tiedostolle, joten tiedostot kulkevat tämän palvelun kautta. Jos haluat suoran siirron, yhdistä tallennustila tilin avaimella tai yhteysmerkkijonolla.",
+      "notCovered": "Sääntö ei koske näitä osoitteita: {origins}.",
+      "throughService": "Kunnes sääntö on paikallaan, tämän palvelun sovellus lähettää tiedostot tämän palvelun kautta. Se on hitaampaa, ja tiedoston koko on rajattu.",
+      "checkedAt": "Tarkistettu {when}.",
+      "connectHint": "Tämän palvelun sovellus voi lähettää suuren tiedoston suoraan tallennustilaan vain, jos tallennustilassa on CORS-sääntö tälle palvelulle. Yhdistämisen jälkeen testi kertoo, onko sääntö paikallaan ja minkä säännön lisäät. Tekoälyagentit ja skriptit eivät tarvitse sääntöä.",
+      "rule": {
+        "title": "Lisää tämä CORS-sääntö tallennustilaan",
+        "whereAzure": "Avaa Azure-portaalissa tallennustili. Avaa sitten Settings, Resource sharing (CORS) ja välilehti Blob service. Lisää yksi rivi näillä arvoilla ja tallenna.",
+        "whereS3": "Avaa AWS-konsolissa bucket. Avaa sitten Permissions, Cross-origin resource sharing (CORS) ja Edit. Muissa S3-palveluissa sama asetus on bucketin asetuksissa.",
+        "origins": "Allowed origins",
+        "methods": "Allowed methods",
+        "headers": "Allowed headers",
+        "exposed": "Exposed headers",
+        "maxAge": "Max age",
+        "whyAny": "Tähti * päästää sisään kaikki tämän palvelun osoitteet, koska jokaisella sovelluksella on oma osoitteensa. Sääntö ei anna kenellekään pääsyä tiedostoihisi. Jokainen lähetys ja lataus tarvitsee silti linkin, jonka tämä palvelu allekirjoittaa yhdelle tiedostolle, ja linkki toimii vain muutaman minuutin.",
+        "jsonLead": "Liitä tämä bucketin CORS-asetukseksi:",
+        "copy": "Kopioi sääntö",
+        "copied": "Kopioitu",
+        "after": "Kun olet tallentanut säännön, testaa tallennustila uudestaan."
+      }
     }
   },
   "profile": {
@@ -18983,7 +19013,12 @@
         "disconnectHint": "Kun katkaiset yhteyden, avaimesi poistetaan tästä palvelusta. Bucketisi tai säilösi ja sen sisältö pysyvät ennallaan.",
         "disconnectFirst": "Tässä tallennustilassa on {n} tiedostoasi. Siirrä ne ensin toiseen paikkaan. Sen jälkeen voit katkaista yhteyden.",
         "disconnectAsk": "Katkaistaanko yhteys omaan tallennustilaasi \"{name}\"? Se on {where}. Avaimesi poistetaan täältä. Jos se on oletuksesi, uudet tiedostot jäävät sen jälkeen tähän palveluun.",
-        "disconnected": "Yhteys omaan tallennustilaasi \"{name}\" on katkaistu."
+        "disconnected": "Yhteys omaan tallennustilaasi \"{name}\" on katkaistu.",
+        "testAgain": "Testaa uudestaan",
+        "testing": "Testataan…",
+        "testedReady": "Tallennustilasi \"{name}\" läpäisi testin, ja sovellukset voivat lähettää tiedostot suoraan sinne.",
+        "testedNotReady": "Tallennustilasi \"{name}\" läpäisi testin. Sovellukset eivät vielä voi lähettää tiedostoja suoraan sinne. Tallennustilan tiedoissa lukee, mitä lisäät.",
+        "testedFailed": "Tallennustilasi \"{name}\" ei läpäissyt testiä. Tallennustilan tiedoissa näkyy vaihe, joka epäonnistui."
       },
       "places": {
         "title": "Missä tiedostosi ovat",
@@ -27438,6 +27473,21 @@
     "high": "Suuri arvo",
     "examples": "Esimerkkejä",
     "when": "Milloin arvoa kannattaa muuttaa",
+    "fileStore": {
+      "cors": {
+        "title": "Suoraan selaimesta (CORS)",
+        "short": "Voiko selaimessa toimiva sovellus lähettää tiedostot suoraan S3-buckettiin tai Azure-säilöön niin, etteivät ne kulje tämän palvelun kautta.",
+        "what": "Verkkosivu saa lähettää tietoa vain omaan osoitteeseensa, ellei toinen osoite salli sitä. Lupa on CORS-sääntö, ja lisäät sen buckettiin tai tallennustiliin. Kun sääntö on paikallaan, tämän palvelun sovellus voi lähettää suuren tiedoston suoraan tallennustilaasi, ja tämä palvelu vain allekirjoittaa linkin tälle yhdelle tiedostolle. Ilman sääntöä sovellus lähettää tiedoston tälle palvelulle, joka välittää sen eteenpäin. Se on hitaampaa, ja tiedoston koko on rajattu. Suuret lataukset tulevat suoraan tallennustilasta kummassakin tapauksessa.",
+        "lowLabel": "Ilman sääntöä",
+        "low": "Sovellukset lähettävät tiedostot tallennustilaan tämän palvelun kautta. Lähetys on hitaampaa, eikä kovin suuri tiedosto välttämättä mahdu.",
+        "highLabel": "Säännön kanssa",
+        "high": "Sovellukset lähettävät suuret tiedostot suoraan tallennustilaan, tallennustilan nopeudella ja sen omaan kokorajaan asti.",
+        "ex1": "Sovellus lähettää 600 Mt:n levykuvan. Säännön kanssa se menee suoraan Azureen yhtenä tiedostona.",
+        "ex2": "Tekoälyagenttisi lähettää tiedoston skriptillä. Säännöllä ei ole merkitystä, koska skriptit eivät kysy sitä.",
+        "tipLabel": "Onko se turvallista",
+        "tip": "On. Sääntö kertoo selaimille vain, että tämän palvelun sivut saavat puhua tallennustilan kanssa. Sääntö ei anna kenellekään pääsyä tiedostoihisi. Jokainen siirto tarvitsee linkin, jonka tämä palvelu allekirjoittaa yhdelle tiedostolle, ja linkki toimii vain muutaman minuutin. SAS-URL:lla yhdistetty Azure-tallennustila ei voi allekirjoittaa tällaisia linkkejä, joten sen tiedostot kulkevat aina tämän palvelun kautta. Yhdistä se tilin avaimella, jos haluat suoran siirron."
+      }
+    },
     "ai": {
       "temperature": {
         "title": "Lämpötila",
