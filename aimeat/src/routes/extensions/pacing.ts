@@ -16,11 +16,15 @@
  *   MCP run tools all reach settlement through `settleMeteredCoordinate` directly and were never paced at
  *   all. The rule this file encodes: money, metering and abuse limits belong at the chokepoint EVERY path
  *   shares, never on one surface. Adding a new metered surface must not mean re-deriving this.
- * @structure resolvePacingToll (re-exported) · burnPacingToll (express wrapper over chargePacing)
+ * @structure resolvePacingToll (re-exported) · burnPacingToll (express wrapper over chargePacing) ·
+ *   refusePacingShortfall (the same 402, asked before a money price without charging)
  * @usage
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.6.0 — 2026-10-31 — refusePacingShortfall: the raw-invoke paywall asks whether the caller covers
+ *     the pacing before it asks a money-priced call for its pay token, so a caller short of morsels is
+ *     told so before paying money for a call the pacing would refuse (secaudit 2026-10-31 inv-08).
  *   v1.5.0 — 2026-10-11 — Pacing is no longer a pure burn (decision-morseli-on-tahdistus-ei-hinta-
  *     tarjouksen-kaksi-arvoa): the burn rate's share burns and the rest is credited to the provider's
  *     owner, through chargePacing in services/metered-settlement.ts. The 402 says how to get more
@@ -48,7 +52,7 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { insufficientMorselsMessage } from '../../commerce/pacing-pack.js';
 import { chargePacing, type PacingCharge } from '../../services/metered-settlement.js';
-import { localAccountName } from '../../utils/gaii.js';
+import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
 
 export { resolvePacingToll } from '../../services/metered-settlement.js';
 
@@ -80,4 +84,28 @@ export async function burnPacingToll(args: {
     return { ok: false };
   }
   return { ok: true, charge };
+}
+
+/**
+ * Ask, without charging, whether the caller can cover the pacing burnPacingToll will charge, with the
+ * same exemptions. A money-priced call asks it before it asks for a pay token, so a caller short of
+ * morsels learns that first and does not pay money for a call the pacing then refuses.
+ *
+ * Returns `{ ok: false }` after sending the same 402 burnPacingToll sends. The charge itself stays in
+ * burnPacingToll, whose atomic debit is still the decision; this is only the earlier answer.
+ */
+export async function refusePacingShortfall(args: {
+  config: AimeatConfig; storage: Storage; callerGaii: string; providerOwner: string | null;
+  toll: number; res: PaywallResponder;
+}): Promise<{ ok: boolean }> {
+  const { config, storage, callerGaii, providerOwner, toll, res } = args;
+  if (toll <= 0) return { ok: true };
+  if (providerOwner && localAccountName(callerGaii) === providerOwner) return { ok: true };
+  const balance = Number((await storage.getGHII(ownerGhiiOf(callerGaii)))?.morselBalance ?? 0);
+  if (balance >= Math.trunc(toll)) return { ok: true };
+  res.status(402).json({
+    ...error(config.nodeId, 'INSUFFICIENT_MORSELS', insufficientMorselsMessage(config, toll)),
+    ...paymentChallenge(config),
+  });
+  return { ok: false };
 }

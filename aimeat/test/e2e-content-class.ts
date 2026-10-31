@@ -33,6 +33,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-10-31 — Test 9b: a correction whose fields are refused leaves the classes and the model's
+ *     decision record as they were (secaudit 2026-10-31 inv-16).
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -406,6 +408,21 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     assert(change?.result?.isError === true && toolText(change).includes('memory:write-reserved'), `settings change over MCP ${toolText(change).slice(0, 200)}`);
     const approve = await mcpCall(agent, 'aimeat_content_classes', { action: 'approve', id: 'prop-none' });
     assert(approve?.result?.isError === true && toolText(approve).includes('memory:write-reserved'), `approve over MCP ${toolText(approve).slice(0, 200)}`);
+  });
+
+  await test('9b. a correction whose fields are refused changes nothing: the classes stay and the model\'s decision is not reviewed', async () => {
+    const before = await json('/v1/content/facts?kind=file&key=docs%2Finvoice.pdf', { headers: auth(A.token) });
+    assert(before.status === 200, `facts ${before.status} ${JSON.stringify(before.body?.error)}`);
+    const decisionId = (before.body.data.facts.classes ?? []).find((m: any) => m.id === 'invoice' && m.by === 'model')?.decisionId;
+    assert(typeof decisionId === 'string' && decisionId.length > 0, `the model's class carries its decision ${JSON.stringify(before.body.data.facts.classes)}`);
+    // A new class list and a field the class does not have, in one call: the field is refused.
+    const r = await json('/v1/content/correct', { method: 'POST', headers: auth(A.token),
+      body: JSON.stringify({ source: { kind: 'file', key: 'docs/invoice.pdf' }, classes: ['receipt'], fields: { receipt: { no_such_property: 'x' } } }) });
+    assert(r.status === 400 && String(r.body.error?.message).includes('no_such_property'), `refused fields ${r.status} ${JSON.stringify(r.body?.error)}`);
+    const after = await json('/v1/content/facts?kind=file&key=docs%2Finvoice.pdf', { headers: auth(A.token) });
+    assert((after.body.data.facts.classes ?? []).some((m: any) => m.id === 'invoice' && m.by === 'model'), `the classes stay ${JSON.stringify(after.body.data.facts.classes)}`);
+    const d = await json(`/v1/ai/decisions/${decisionId}`, { headers: auth(A.token) });
+    assert(d.status === 200 && !JSON.stringify(d.body).includes('overridden'), `the decision record says nobody corrected it ${d.status} ${JSON.stringify(d.body)?.slice(0, 300)}`);
   });
 
   await test('10. a person corrects a class and a field; the decision says so, and a new extraction keeps the value', async () => {

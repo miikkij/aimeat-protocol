@@ -9,11 +9,13 @@
  *   + consumes it. Single-use (deleted on consume — the delete is the atomicity gate, so a replay
  *   loses the race) with a 5-minute TTL (storage auto-expiry). Money settlement itself is the EE
  *   payment rail; this generic token is the seam the paywall honours regardless of the rail.
- * @structure ExtPayGrant · mintExtPayToken · consumeExtPayToken · EXT_PAY_TOKEN_TTL_MS
+ * @structure ExtPayGrant · mintExtPayToken · checkExtPayToken · consumeExtPayToken · EXT_PAY_TOKEN_TTL_MS
  * @usage
  *   const { token } = await mintExtPayToken(storage, { buyerOwner, ext, action, currency, amount });
  *   const r = await consumeExtPayToken(storage, token, { buyerOwner, ext, action });
  * @version-history
+ *   v1.3.0 — 2026-10-31 — checkExtPayToken: consume's checks without the spend, so the paywall refuses an
+ *     unusable token before it charges the pacing (secaudit 2026-10-31 inv-08). consume is check + delete.
  *   v1.2.0 — 2026-10-18 — A token may carry the seller's net of its sale (`share`), and a spent token
  *     returns its grant, so the paywall splits that net by the payees the call names (Comicland v3 A-6).
  *   v1.1.0 — 2026-10-09 — consumeExtPayToken compares buyer, extension and action before it deletes,
@@ -92,17 +94,15 @@ export async function mintExtPayToken(storage: Storage, grant: ExtPayGrant): Pro
 }
 
 /**
- * Verify + CONSUME a token. The binding is checked FIRST: a token presented by anybody but its buyer,
- * or for another extension or action, is refused and left exactly as it was, so whoever holds the
- * string cannot burn the call the buyer paid for (secrets audit 2026-10-09, S-3). Only a matching
- * token is deleted, and the delete result is the single-use gate: a concurrent replay that loses the
- * delete race is refused. An expired token is deleted on sight, since nobody can spend it any more.
+ * The checks consumeExtPayToken makes, without spending the token: is it a live token of this buyer
+ * for this action. An expired token is deleted on sight, as consume deletes it. The paywall asks this
+ * before it charges the pacing and consumes the token after it (secaudit 2026-10-31 inv-08).
  */
-export async function consumeExtPayToken(
+export async function checkExtPayToken(
   storage: Storage,
   token: string | undefined,
   expect: { buyerOwner: string; ext: string; action: string },
-): Promise<{ ok: boolean; reason?: string; grant?: ExtPayGrant }> {
+): Promise<{ ok: true; grant: ExtPayGrant } | { ok: false; reason: string; grant?: undefined }> {
   if (!token) return { ok: false, reason: 'missing' };
   const rec = await storage.getMemory(NS, token);
   if (!rec) return { ok: false, reason: 'invalid_or_used' };
@@ -114,6 +114,24 @@ export async function consumeExtPayToken(
   if (g.buyerOwner !== expect.buyerOwner || g.ext !== expect.ext || g.action !== expect.action) {
     return { ok: false, reason: 'mismatch' };
   }
+  return { ok: true, grant: g };
+}
+
+/**
+ * Verify + CONSUME a token. The binding is checked FIRST: a token presented by anybody but its buyer,
+ * or for another extension or action, is refused and left exactly as it was, so whoever holds the
+ * string cannot burn the call the buyer paid for (secrets audit 2026-10-09, S-3). Only a matching
+ * token is deleted, and the delete result is the single-use gate: a concurrent replay that loses the
+ * delete race is refused. An expired token is deleted on sight, since nobody can spend it any more.
+ */
+export async function consumeExtPayToken(
+  storage: Storage,
+  token: string | undefined,
+  expect: { buyerOwner: string; ext: string; action: string },
+): Promise<{ ok: boolean; reason?: string; grant?: ExtPayGrant }> {
+  const checked = await checkExtPayToken(storage, token, expect);
+  if (!checked.ok || !token) return checked;
+  const g = checked.grant;
   // Single-use gate: whoever deletes it wins; a racing replay gets deleted=false.
   const deleted = await storage.deleteMemory(NS, token);
   if (!deleted) return { ok: false, reason: 'replayed' };

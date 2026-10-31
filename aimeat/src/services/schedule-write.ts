@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-31 — updateScheduleRecord writes a sibling's instruction hold before it stores the new
+ *     instruction, and stores nothing when the hold cannot be written, so no fire between the two runs
+ *     the instruction with the maker's reach (secaudit 2026-10-31 inv-27).
  *   2026-10-27 — A sibling agent's new prompt or input to an ai schedule that reads with more reach than
  *     the sibling has is stored and answered with a pending approval_request; the next fire waits for the
  *     owner (services/schedule-instruction-hold.ts; secaudit2026oct26, sibling-edit-fires-under-maker-reach).
@@ -668,16 +671,18 @@ export async function updateScheduleRecord(
     const instructed = job.type === 'ai' && updates.input !== undefined;
     const hold = instructed ? await instructionHoldNeeded(storage, caller, job, updates.input!) : null;
 
-    const updated = await storage.updateScheduledJob(id, updates);
+    // The hold is written before the instruction is stored, so no fire in between runs it with the
+    // maker's reach; a hold that cannot be written throws here and nothing is stored (secaudit
+    // 2026-10-31 inv-27).
     let asked: Awaited<ReturnType<typeof holdInstruction>> | null = null;
     if (hold) {
         asked = await holdInstruction(deps, {
             owner: caller.owner, requester: { principal: caller.identity, kind: 'agent', sub: caller.identity },
             job, maker: hold.maker, previousInput: (job.input ?? {}) as Record<string, unknown>, input: updates.input!,
         });
-    } else if (instructed) {
-        await clearInstructionHold(storage, config.nodeId, id);
     }
+    const updated = await storage.updateScheduledJob(id, updates);
+    if (!hold && instructed) await clearInstructionHold(storage, config.nodeId, id);
     await (deps.scheduler ?? getActiveScheduler())?.reschedule(id);
     emitChange('scheduler');
     return { ok: true, schedule: updated, ...(asked ?? {}) };
