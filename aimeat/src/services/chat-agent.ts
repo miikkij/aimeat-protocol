@@ -51,7 +51,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { scopesForProfile } from '../tool-catalog/scopes.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
-import { mcpResourceOf } from '../mcp/oauth-binding.js';
+import { mcpResourceOf } from '../utils/mcp-resource.js';
 import { logger } from '../utils/logger.js';
 import { agentListingTags } from './content-defaults.js';
 import { newAgentClearance } from './agent-clearance.js';
