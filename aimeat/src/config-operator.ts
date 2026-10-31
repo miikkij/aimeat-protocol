@@ -46,6 +46,7 @@ export function operatorFromEnv(env: NodeJS.ProcessEnv): OperatorConfig {
     dpoContact: env.AIMEAT_OPERATOR_DPO_CONTACT ?? '',
     signerName: env.AIMEAT_OPERATOR_SIGNER_NAME ?? '',
     signerRole: env.AIMEAT_OPERATOR_SIGNER_ROLE ?? '',
+    emailFooter: env.AIMEAT_OPERATOR_EMAIL_FOOTER ?? '',
   };
 }
 

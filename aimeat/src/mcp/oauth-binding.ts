@@ -27,6 +27,8 @@
  *   if (refusal) { res.status(400).json(refusal); return; }
  *   const aud = mcpAudienceRefusal(verified, config); // null when the MCP endpoint takes the token
  * @version-history
+ *   v1.0.2 — 2026-10-31 — mcpResourceOf lives in utils/mcp-resource.ts and is re-exported here, so the
+ *     chat's token mint (a service) reads it without importing src/mcp/.
  *   v1.0.1 — 2026-10-13 — namesMcpResource and apexOf take off trailing slashes in one pass
  *     (stripTrailingSlashes), not with a regex that runs in quadratic time on a client-supplied
  *     `resource` (code scanning alert 1733).
@@ -39,6 +41,7 @@ import { getSoftwareVersion, versionAtLeast } from '../utils/version.js';
 import { getStats } from '../services/stats.js';
 import { logger } from '../utils/logger.js';
 import { stripTrailingSlashes } from '../utils/url-validator.js';
+import { mcpResourceOf } from '../utils/mcp-resource.js';
 
 /** The release in which PKCE, the resource indicator and the token audience stop being optional. */
 export const MCP_OAUTH_LAX_REMOVED_IN = '4.0.0';
@@ -53,9 +56,7 @@ function apexOf(config: AimeatConfig): string {
 }
 
 /** The audience every MCP OAuth access token of this node carries: the canonical MCP endpoint. */
-export function mcpResourceOf(config: AimeatConfig): string {
-    return `${apexOf(config)}/v1/mcp`;
-}
+export { mcpResourceOf };
 
 /**
  * Does this resource identifier name this node's MCP endpoint? The canonical `/v1/mcp`, its `/mcp`

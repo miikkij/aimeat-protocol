@@ -24,6 +24,7 @@
  * @structure registerAgentV2TokenRoute(router, config, storage)
  * @usage registerAgentV2TokenRoute(router, config, storage);
  * @version-history
+ *   v1.3.0 — 2026-10-31 — The per-IP limit is the setting agentTokenRateLimitMax (default 600), not a fixed 60.
  *   v1.2.0 — 2026-10-11 — The two refusals of the key carry `details.reason: 'key_not_pinned'`. A
  *     connector whose agent had moved away could not tell them from a passing failure and minted
  *     again every 30 seconds for as long as it ran.
@@ -82,8 +83,10 @@ function decodeClaims(jws: string): AssertionClaims | null {
 
 export function registerAgentV2TokenRoute(router: Router, config: AimeatConfig, storage: Storage): void {
   // Unauthenticated by design: the assertion IS the credential. Rate-limited per IP because a
-  // signature check is the most expensive thing an anonymous caller can ask this node to do.
-  router.post('/v1/agents/v2/token', rateLimit({ max: 60, windowMs: 60_000 }), async (req, res) => {
+  // signature check is the most expensive thing an anonymous caller can ask this node to do. The
+  // number is a setting (default 600): every agent of one computer mints from the same address when
+  // its connector starts, and the 60 this was refused two of 74 on 2026-10-31.
+  router.post('/v1/agents/v2/token', rateLimit(() => ({ max: config.agentTokenRateLimitMax, windowMs: 60_000 })), async (req, res) => {
     const { grant_type, assertion } = (req.body ?? {}) as { grant_type?: unknown; assertion?: unknown };
 
     if (grant_type !== AGENT_KEY_GRANT) {

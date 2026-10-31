@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-10-31 — device-authorize verifies a return proof and writes its mark before the pending request,
+ *     not after it: in between, the pending list and the consent card read a proven return as a takeover,
+ *     and an approval there recorded one (nightly sweep, e2e-device-return-clients on PostgreSQL).
  *   2026-10-31 — The device-token answer's next_steps adds keep_your_key: keep privateKey, and how to sign
  *     the return proof with it, with this node's id. An agent connected from a pasted prompt got the key
  *     and no word of it, so its reconnect showed the owner a takeover (secaudit2026oct22,
@@ -291,6 +294,26 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       pollInterval: 5,
       mode: mode ?? 'interactive',
     };
+
+    // Whether this name is already an agent, and what that agent holds. A device-authorize on an
+    // existing name is a RE-APPROVAL: it rotates the agent's key, overwrites its stored scopes and
+    // mints a ninety-day token that the unauthenticated device-token poll hands to whoever started
+    // the request. So the two checks below need the target, not only the request.
+    const targetGaii = buildGAII(agent_name, ownerName, config.nodeId);
+    const existingTarget = await storage.getAgent(targetGaii);
+    const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
+    // An existing agent coming back proves it with a signature by its current key; the owner then
+    // sees a return, and otherwise a new device taking the agent over (services/device-return-proof.ts).
+    // The proof names this node (v2) or no node (v1), and is taken once (secaudit2026oct26). The mark
+    // is written BEFORE the request: the pending list and the consent card read it from the moment the
+    // row exists, and a mark written after it left an interval in which a proven return read as a
+    // takeover, and an approval in it recorded one (nightly sweep 2026-10-31).
+    const returnProof = existingTarget && req.body?.proof !== undefined
+      ? await proofVerifies(existingTarget.publicKey, String(owner), agent_name, req.body.proof, Date.now(), config.nodeId)
+        && await spendReturnProof(storage, `${ownerName}@${config.nodeId}`, req.body.proof)
+      : undefined;
+    if (returnProof) await markReturnProven(storage, `${ownerName}@${config.nodeId}`, userCode, targetGaii);
+
     await storage.createDeviceAuth(authRequest);
 
     // ── Same-owner auto-approval (Agent-Bundled Apps friction-killer) ──
@@ -309,21 +332,6 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     // default, because there is no owner here to choose. The ceiling was checked above, before the
     // record was written.
     const autoScopes: string[] = requestedScopes ?? config.defaultAgentScopes;
-    // Whether this name is already an agent, and what that agent holds. A device-authorize on an
-    // existing name is a RE-APPROVAL: it rotates the agent's key, overwrites its stored scopes and
-    // mints a ninety-day token that the unauthenticated device-token poll hands to whoever started
-    // the request. So the two checks below need the target, not only the request.
-    const targetGaii = buildGAII(agent_name, ownerName, config.nodeId);
-    const existingTarget = await storage.getAgent(targetGaii);
-    const targetScopes: string[] = existingTarget?.defaultScopes ?? [];
-    // An existing agent coming back proves it with a signature by its current key; the owner then
-    // sees a return, and otherwise a new device taking the agent over (services/device-return-proof.ts).
-    // The proof names this node (v2) or no node (v1), and is taken once (secaudit2026oct26).
-    const returnProof = existingTarget && req.body?.proof !== undefined
-      ? await proofVerifies(existingTarget.publicKey, String(owner), agent_name, req.body.proof, Date.now(), config.nodeId)
-        && await spendReturnProof(storage, `${ownerName}@${config.nodeId}`, req.body.proof)
-      : undefined;
-    if (returnProof) await markReturnProven(storage, `${ownerName}@${config.nodeId}`, userCode, targetGaii);
     const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
       // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'

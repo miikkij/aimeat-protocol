@@ -28,6 +28,8 @@
  *   const moved = await moveToArchive(storage, ownerGhii, filename, old);
  *   const all = await readAllEntries(storage, ownerGhii, filename, active);
  * @version-history
+ *   v1.0.1 — 2026-10-31 — moveToArchive's comment: the caller now swaps the active record first and
+ *     writes the archive after it in one transaction (secaudit 2026-10-31 inv-11). No code change here.
  *   v1.0.0 — 2026-10-01 — Initial (IAM round 2 leftover 7, the developer's revision of the proposal).
  */
 import type { AimeatConfig } from '../config.js';
@@ -155,8 +157,9 @@ export async function readAllEntries<E extends AppAuditEntry>(
 
 /**
  * Append entries (oldest first) to the archive, each into its own year, filling the year's last part
- * and opening a new part when it is full. Written before the caller shortens the active record, so a
- * failure loses nothing: the entries are then still in the active record.
+ * and opening a new part when it is full. The caller (app-audit.ts) shortens the active record with a
+ * compare-and-swap first and calls this after it in the same transaction, so a failure here rolls the
+ * swap back and loses nothing, and a lost swap writes nothing here.
  */
 export async function moveToArchive(storage: Storage, ownerGhii: string, filename: string, entries: AppAuditEntry[]): Promise<number> {
   if (!entries.length) return 0;

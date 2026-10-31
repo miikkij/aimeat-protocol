@@ -16,6 +16,10 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: The first load draws the conversations without waiting for the status line, which
+ *     can wait seconds on the AI provider on a fresh place (v27 P7).
+ *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
+ *     whose connection went silent ends with "The connection was lost" and the retry (v27 P2).
  *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
  *     keeps its own copy of the text (secaudit2026oct26 round 8c).
  *   2026-10-29: The phone suggestion and the install suggestion are not shown in the person's first
@@ -90,7 +94,7 @@ import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
 import { readIntake, clearIntake, intakeText } from '/js/intake.js';
-import { ThreadList } from '/components/ThreadList.js';
+import { ThreadList, threadTitle } from '/components/ThreadList.js';
 import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
 import { Composer } from '/components/Composer.js';
 import { StatusBar } from '/components/AgentStatus.js';
@@ -111,6 +115,15 @@ import { trackVisualViewport } from '/js/visual-viewport.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/**
+ * The words without the "[Calling: <tool>]" lines a model writes as text when it means a tool call.
+ * The work log shows the calls that ran; such a line is a duplicate or a call that never happened.
+ * The node strips the same pattern from what it keeps (services/chat-session.ts withoutToolMarkers).
+ */
+function withoutToolMarkers(text) {
+    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
+}
 
 /**
  * The conversation as plain text, in the order it happened.
@@ -271,16 +284,21 @@ export default function ChatView() {
         setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
     }, []);
 
-    // First load: what this node offers, and where the person left off.
+    // First load: what this node offers, and where the person left off. The conversations draw as
+    // soon as they arrive; the status line and the suggestions fill in when theirs do. GET
+    // /v1/chat/status can wait up to 5 s on the AI provider's balance on a fresh place, and the
+    // whole page used to wait with it (v27 P7).
     useEffect(() => {
         if (!hasSession()) { setLoading(false); return; }
+        chat.status()
+            .then((st) => setStatus(st?.data ?? null))
+            .catch((err) => console.warn('[chat] the status line was not loaded:', err.message));
+        chat.readNudges()
+            .then((nudges) => setNudgeDismissed(!!nudges?.mobile))
+            .catch((err) => console.warn('[chat] the dismissals were not loaded:', err.message));
         (async () => {
             try {
-                const [st, list, nudges] = await Promise.all([
-                    chat.status(), chat.listThreads(), chat.readNudges(),
-                ]);
-                setNudgeDismissed(!!nudges?.mobile);
-                setStatus(st?.data ?? null);
+                const list = await chat.listThreads();
                 const found = list?.data?.threads ?? [];
                 setThreads(found);
                 if (found.length > 0) await openThread(found[0].id);
@@ -415,7 +433,7 @@ export default function ChatView() {
                 if (!stillOpen()) continue;   // the person moved on; keep reading so the turn finishes
                 if (update.kind === 'text') {
                     answer += update.text;
-                    setLive((l) => ({ ...l, text: answer }));
+                    setLive((l) => ({ ...l, text: withoutToolMarkers(answer) }));
                 } else if (update.kind === 'thought') {
                     setLive((l) => ({ ...l, thought: update.text }));
                 } else if (update.kind === 'progress') {
@@ -660,10 +678,10 @@ export default function ChatView() {
                       answers and on whose money, and the two actions. In the rail on a desktop, in
                       the drawer on a phone, so the column keeps its height for the words. */''}
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
-                    name=${thread?.title ?? tr('chat.title', 'Chat')}>
+                    name=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
                     ${turns.length > 0 && html`<${ConversationCopy}
-                        text=${conversationAsText(thread?.title, turns)}
+                        text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
                         label=${tr('chat.copyAll', 'Copy conversation')}
                         copiedLabel=${'✓ ' + t('common.copied')}
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
@@ -671,18 +689,18 @@ export default function ChatView() {
                 <//>
                 <${ConversationFoot}>
                     <${AiNotice} compact=${true} />
-                    <${GooseCredit} />
+                    <${GooseCredit} model=${status?.model} />
                 <//>
             <//>
 
             <${ConversationMain}>
                 <${ConversationHead} backHref=${exitHref} backLabel=${tr('chat.back', 'Back')}
-                    title=${thread?.title ?? tr('chat.title', 'Chat')}>
+                    title=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <!-- The whole conversation as plain text: what you paste into a document, an
                          issue or another AI. Both sides, in order, with the work log left out —
                          it is a record of the conversation, not of the machinery. -->
                     ${turns.length > 0 && html`<${ConversationCopy} head
-                        text=${conversationAsText(thread?.title, turns)}
+                        text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
                         label="⧉"
                         copiedLabel="✓"
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}

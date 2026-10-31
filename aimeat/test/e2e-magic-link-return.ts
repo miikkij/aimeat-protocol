@@ -27,6 +27,8 @@
  *   it (default 28454, with the SMTP sink one port above).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=magic-link-return
  * @version-history
+ *   2026-10-31 — A link asked for from the consent page returns to it, and the mail is in the language
+ *     the page sent (`lang`), not the account's (v27 P1, the store's sign-in).
  *   2026-10-24 — POST /v1/ghii/verify-email refuses a sign-in link's token and leaves the link live (secaudit2026oct22, verify-email:no-purpose-binding).
  *   2026-10-16 — The node(s) this suite starts follow the run's backend (test/helpers/own-node-db.ts); they were SQLite on both runs (QA audit P1-02).
  *   v1.1.0 — 2026-10-09 — Two-step sign-in: the link, the code step and attach-email (secaudit
@@ -168,16 +170,22 @@ async function stopAll(): Promise<void> {
 const LINK_RE = /(https?:\/\/[^\s"<>]*\/v1\/ghii\/magic-link\/open\?token=[a-f0-9]{64}[^\s"<>]*)/;
 
 /** Ask for a link as the dialog does, and return the address the mail carries. */
-async function askLink(email: string, redirect?: string): Promise<string> {
+async function askLink(email: string, redirect?: string, lang?: string): Promise<string> {
+    return (await askLinkMail(email, redirect, lang)).link;
+}
+
+/** askLink(), with the mail's subject as well. */
+async function askLinkMail(email: string, redirect?: string, lang?: string): Promise<{ link: string; subject: string }> {
     smtp!.clear();
     const body: Record<string, string> = { email };
     if (redirect !== undefined) body.redirect = redirect;
+    if (lang !== undefined) body.lang = lang;
     const r = await json('/v1/ghii/magic-link', { method: 'POST', body: JSON.stringify(body) });
     assert(r.status === 200, `magic-link ${r.status}: ${JSON.stringify(r.body).slice(0, 300)}`);
     const mail = await smtp!.waitForMail(email, /magic-link\/open\?token=/);
     const m = LINK_RE.exec(mail.text);
     assert(!!m, `no link in the mail: ${mail.text.slice(0, 400)}`);
-    return m![1];
+    return { link: m![1], subject: mail.subject };
 }
 
 /** Open a link as a browser does, and say where it went and whether a session was opened. */
@@ -276,6 +284,26 @@ async function run() {
         const r = await open(await askLink(email, `${otherOrigin}/`));
         assert(r.status === 302 && r.location === `${BASE}/`, `expected the front page, got ${r.status} ${r.location}`);
         assert(r.session, 'the good token still signs the person in');
+    });
+
+    // v27 P1, the store's sign-in: the buyer asks for the link in the consent window of an app the
+    // account holds no grant for yet. The link returns to that window's page, a path of the node, and
+    // the mail is in the page's language, not the account's.
+    await test('a link asked for from the consent page of an app the account never used returns to that page, signed in', async () => {
+        const back = '/v1/app-grant?req=agr-e2e-store&lang=en';
+        const r = await open(await askLink(email, back, 'en'));
+        assert(r.status === 302 && r.location === `${BASE}${back}`, `expected ${BASE}${back}, got ${r.status} ${r.location}`);
+        assert(r.session, 'the link must open a session');
+    });
+
+    await test('the mail is written in the language of the page the link was asked from (v27 P1)', async () => {
+        // The source was broken: the request carried no language and the mail used the account's.
+        const fi = await askLinkMail(email, undefined, 'fi');
+        assert(fi.subject === 'AIMEAT-kirjautumislinkkisi', `asked in Finnish, got ${fi.subject}`);
+        const en = await askLinkMail(email, undefined, 'en');
+        assert(en.subject === 'Your AIMEAT Login Link', `asked in English, got ${en.subject}`);
+        const other = await askLinkMail(email, undefined, 'xx');
+        assert(other.subject === en.subject || other.subject === fi.subject, `an unknown language falls back to the account's, got ${other.subject}`);
     });
 
     await test('a link asked for with no return address still lands on the front page', async () => {

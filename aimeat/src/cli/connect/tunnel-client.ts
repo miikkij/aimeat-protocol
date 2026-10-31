@@ -30,6 +30,7 @@
  *   if (outcome === 'online') { const { status, body } = await client.forward('GET', '/v1/memory'); }
  *   await client.close();
  * @version-history
+ *   v1.16.0 -- 2026-10-31 -- An upgrade answered 429 or 5xx is 'unreachable' (a wait), not 'unsupported'.
  *   v1.15.0 -- 2026-10-12 -- The upgrade carries X-AIMEAT-Features when the crew runtime declared any (./run-modes.ts runtimeHeaders).
  *   v1.14.0 -- 2026-10-11 -- auth_revoked hands its `reason` to onAuthFailure, for a moved agent (./tunnel-client-types.ts).
  *   v1.13.0 -- 2026-10-10 -- The upgrade carries X-AIMEAT-Install-Name beside the id (./install-id.ts installHeaders).
@@ -107,7 +108,7 @@ import type {
   TunnelFrame, TunnelIdentity, TunnelStartOutcome, TunnelStatus,
 } from './tunnel-client-types.js';
 import {
-  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, TUNNEL_OFF_GUIDANCE, handlersFor, wsUrl,
+  ATTACH_REFUSAL_CODES, MAX_TIMER_CHUNK_MS, RE_AUTH_GUIDANCE, TUNNEL_OFF_GUIDANCE, handlersFor, upgradeVerdict, wsUrl,
 } from './tunnel-client-types.js';
 import { CredentialRecovery, errorCodeOf, errorFrameAnswer, isCredentialVerdict } from './tunnel-credential-verdict.js';
 
@@ -230,7 +231,8 @@ export class ConnectTunnelClient {
     // THIS IS WHERE THE BUDGET ACTUALLY RUNS OUT. Sixty-two identities joining one socket is
     // sixty-two mints inside a few seconds, so the node's per-minute limit is reached here before
     // it is reached anywhere else. Answering false leaves this identity off the shared socket and
-    // the caller opens it a private one, which retries with backoff instead of stopping.
+    // the caller opens it a private one; when that cannot connect either, the daemon polls for it
+    // and tries the shared socket again later (mcp/local-server.ts rejoinLater).
     let token: string | null;
     try {
       token = given ?? await identity.getToken();
@@ -472,14 +474,11 @@ export class ConnectTunnelClient {
       ws.on('unexpected-response', (_req, res) => {
         const code = res.statusCode ?? 0;
         try { ws.terminate(); } catch (err) { logger.warn('settle: ignore', { error: String(err) }); }
-        if (code === 401 || code === 403) {
-          this.authFailure(`Tunnel upgrade rejected (${code})`);
-          settle('auth_failed');
-        } else {
-          // 404 / anything else: node too old or tunnel disabled.
-          console.error(`[${this.label}] Tunnel not available on this node (upgrade ${code}). ${TUNNEL_OFF_GUIDANCE}`);
-          settle('unsupported');
-        }
+        const verdict = upgradeVerdict(code);
+        if (verdict === 'auth_failed') this.authFailure(`Tunnel upgrade rejected (${code})`);
+        else if (verdict === 'unsupported') console.error(`[${this.label}] Tunnel not available on this node (upgrade ${code}). ${TUNNEL_OFF_GUIDANCE}`);
+        else { console.error(`[${this.label}] Tunnel upgrade answered ${code}; the node is busy, trying again later.`); this.setStatus('offline'); }
+        settle(verdict);
       });
 
       ws.on('message', (data) => {

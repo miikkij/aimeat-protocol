@@ -8,6 +8,7 @@
  *   classification, forwarded-401 stop, proactive pre-expiry token reconnect,
  *   and the no-hot-loop guarantee on auth failure.
  * @version-history
+ *   v1.3.0 — 2026-10-31 — An upgrade answered 429 or 503 is unreachable (a wait), not unsupported.
  *   v1.2.0 — 2026-09-04 — A mint that failed is a wait, not a dead agent: `start()` degrades rather
  *     than stopping, nobody is told to re-run `aimeat connect` about a key that is fine, and one
  *     refused mint keeps its identity off the shared socket without taking the socket down.
@@ -301,6 +302,14 @@ describe('ConnectTunnelClient', () => {
     const server = await startServer({ rejectUpgrade: 404 });
     const { client } = makeClient(server);
     expect(await client.start()).toBe('unsupported');
+  });
+
+  it('classifies an upgrade 429 or 503 as unreachable, a wait, so the agent is not left off the tunnel', async () => {
+    for (const code of [429, 503]) {
+      const server = await startServer({ rejectUpgrade: code });
+      const { client } = makeClient(server);
+      expect(await client.start()).toBe('unreachable');
+    }
   });
 
   it('classifies a destroyed upgrade socket (tunnel disabled) as unreachable (degrade signal)', async () => {

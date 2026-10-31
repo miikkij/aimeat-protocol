@@ -8,6 +8,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
+ *   2026-10-31 -- GET /v1/app-grant is served with the static developer footer hidden (v27 follow-up B).
+ *   2026-10-31 -- GET /authorize carries `lang` (en, fi, es) to the consent page and drops any other (v27 P1).
  *   2026-10-20 -- A catalogue:read app gets no owner memory record from GET /v1/discover or its
  *     facets, with a query and without one; an app holding memory:read still finds it (secaudit
  *     2026-10, the F05b-01 rule on the master directory).
@@ -121,6 +123,35 @@ async function main() {
         const m = /\/v1\/app-grant\?req=([^&]+)/.exec(loc);
         assert(!!m, `expected consent redirect, got ${loc}`);
         requestId = decodeURIComponent(m![1]);
+    });
+
+    await test('GET /authorize carries the app\'s language to the consent page, and drops one it has no strings for (v27 P1)', async () => {
+        // The source was broken: the redirect dropped `lang`, so the consent page, its sign-in dialog
+        // and the mailed link spoke the browser's language rather than the store's.
+        const ask = async (lang: string) => {
+            const q = new URLSearchParams({
+                app: `${owner}/${FILENAME}`, response_type: 'code', scope: 'memory:read',
+                redirect_uri: REDIRECT, code_challenge: codeChallenge, code_challenge_method: 'S256', lang,
+            });
+            const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+            assert(res.status === 302, `expected 302, got ${res.status}`);
+            return res.headers.get('location') ?? '';
+        };
+        const fi = await ask('fi');
+        assert(/\/v1\/app-grant\?req=[^&]+&lang=fi$/.test(fi), `the language rides along, got ${fi}`);
+        const odd = await ask('xx"><script>');
+        assert(/\/v1\/app-grant\?req=[^&]+$/.test(odd), `an unknown language is left out, got ${odd}`);
+    });
+
+    await test('the consent page is served with the developer footer hidden; a reading page keeps it (v27 follow-up B)', async () => {
+        // The source was broken: the store's sign-in window showed the glossary, site map, llms.txt,
+        // AGENTS.md and API contract to a buyer signing in. The links stay in the markup for a
+        // reader without JavaScript.
+        const grant = await (await fetch(`${BASE}/v1/app-grant?req=x&lang=fi`)).text();
+        assert(grant.includes('<footer class="agent-footer" hidden>'), 'the consent page hides the developer footer');
+        assert(grant.includes('href="/llms.txt"'), 'the links stay in the markup');
+        const glossary = await (await fetch(`${BASE}/v1/glossary`)).text();
+        assert(glossary.includes('<footer class="agent-footer">'), 'a reading page on a node that shows the links keeps them');
     });
 
     await test('GET /request/:id shows the app + requested scopes', async () => {

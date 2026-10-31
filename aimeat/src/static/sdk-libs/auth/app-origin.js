@@ -15,6 +15,8 @@
  *   reportUngrantableScopes
  * @usage import { isAppOrigin, silentAppToken } from './app-origin.js';
  * @version-history
+ *   v1.4.0 — 2026-10-31 — requestConsentPopup sends the app's language as `lang`, which the authorize
+ *     route carries to the consent page (v27 P1: an English store path got a Finnish sign-in mail).
  *   v1.3.0 — 2026-10-04 — requestConsentPopup takes `prompt` ('create'), sent as `prompt=create` to the
  *     authorize route and to the isolated frame's host page, so a new person starts on the
  *     create-account form.
@@ -33,6 +35,7 @@ import { parseJwt } from './crypto.js';
 import { emit } from './events.js';
 import { b64url, pkce } from './pkce.js';
 import { inIsolatedFrame, askFrameHost } from './app-frame.js';
+import { readLang } from '../_core/lang.js';
 
 // ── App-origin seamless SSO (H-2) ──
 // When this SDK runs on an APP ORIGIN (a *.apps.<domain> host, different from the node/apex), the
@@ -151,6 +154,8 @@ export async function requestConsentPopup(app, scopeStr, manage, prompt) {
   var url = apexOrigin + '/v1/app-grants/authorize?response_type=code&response_mode=web_message'
     + (manage ? '&manage=1' : '')
     + (prompt === 'create' ? '&prompt=create' : '')
+    // The app's language, so the consent page, its sign-in dialog and a mailed link speak it (v27 P1).
+    + '&lang=' + encodeURIComponent(String(readLang(['en', 'fi', 'es'])))
     + '&app=' + encodeURIComponent(app)
     + '&scope=' + encodeURIComponent(scope)
     + '&redirect_uri=' + encodeURIComponent(redirectUri)

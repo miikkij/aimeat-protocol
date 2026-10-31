@@ -26,11 +26,16 @@
  *   - chatPayer() — who pays for this person's turns, and on which model, as the node decides it
  *   - chatRefusal() — the refusal /v1/llm would give this person's chat, as they read it
  *   - runChatTurn() — the whole turn, yielding updates as they happen and persisting both sides
+ *   - withoutToolMarkers() — the answer without the "[Calling: …]" lines a model writes as text
  *   - resetChatSession() / endChatSession() — a conversation's session ends, with its MCP token
  *   - shutdownChat() — stop every agent process
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.14.0 -- 2026-10-31 -- The session's MCP token names the MCP endpoint and the process's /v1/llm
+ *     token does not (chat-agent.ts). A session whose aimeat MCP server did not load ends the turn
+ *     with CHAT_TOOLS_NOT_CONNECTED in the person's language, and "[Calling: …]" lines a model wrote
+ *     as text are not kept in the record (v27 P2).
  *   v1.13.1 -- 2026-10-29 -- Attachments are read under the node's PDF read limits
  *     (secaudit2026oct26 round 8c, memory-b-09).
  *   v1.13.0 — 2026-10-29 — A refusal carries `choices` when the allowance the owner bought is spent,
@@ -86,12 +91,12 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { GooseAcpClient, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
+import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
 import {
     TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText,
     type GuardReason, type NodeUpdate, type ProgressStep,
 } from './chat-turn-guard.js';
-import { DEFAULT_LOCALE, type Locale } from '../i18n.js';
+import { DEFAULT_LOCALE, createT, type Locale } from '../i18n.js';
 import { CHAT_AGENT_NAME, ensureChatAgent, mintChatAgentToken } from './chat-agent.js';
 import { AgentPool, type AgentLease, type PoolStart } from './chat-agent-pool.js';
 import { chatUsesSharedKey } from './goose-env.js';
@@ -121,6 +126,16 @@ interface PhaseEnd { end: SessionUpdate | null; limit: GuardReason | null; stuck
 function paragraphBreak(answer: string): string {
     if (!answer || answer.endsWith('\n\n')) return '';
     return answer.endsWith('\n') ? '\n' : '\n\n';
+}
+
+/**
+ * The answer as the record keeps it: without the "[Calling: <tool>]" lines a model writes as text when
+ * it means a tool call. The work log shows the calls that really ran; a line like this is either a
+ * duplicate of one or a call that never happened (v27 P2, 2026-10-31). public/views/chat.js strips the
+ * same pattern while the turn streams.
+ */
+export function withoutToolMarkers(text: string): string {
+    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
 }
 
 /** How long a person's own agent process stays up with no turn in flight. */
@@ -175,7 +190,7 @@ async function startPersonalAgent(
 ): Promise<PoolStart<GooseAcpClient>> {
     const identity = await ensureChatAgent(storage, config, ownerName);
     await revokeEarlierRunTokens(storage, identity.gaii);
-    const { token, sessionId, expiresAt } = await mintChatAgentToken(storage, config, identity);
+    const { token, sessionId, expiresAt } = await mintChatAgentToken(storage, config, identity, 'rest');
     const revoke = () => {
         storage.revokeSession(sessionId).catch((e: Error) => {
             logger.warn(`[chat] could not revoke the model-call token of ${identity.gaii}: ${e.message}`);
@@ -339,7 +354,7 @@ async function sessionFor(
 
     const identity = await ensureChatAgent(storage, config, ownerName);
     await revokeEarlierRunTokens(storage, identity.gaii);
-    const { token, sessionId: row } = await mintChatAgentToken(storage, config, identity);
+    const { token, sessionId: row } = await mintChatAgentToken(storage, config, identity, 'mcp');
 
     let sessionId: string;
     try {
@@ -348,6 +363,9 @@ async function sessionFor(
             // An empty directory: in the node's own, goose read the repository's AGENTS.md into every
             // round as project hints (services/goose-chat-config.ts).
             cwd: ensureChatGooseConfig(config).cwd,
+            // A turn without the person's own tools is not this chat: it is refused here, and the
+            // person reads why, rather than watching a model pretend to call them.
+            required: ['aimeat'],
         });
     } catch (err) {
         await revokeRow(storage, row);
@@ -437,7 +455,9 @@ export async function* runChatTurn(
         lease.release();
         const message = (err as Error).message;
         logger.warn(`[chat] could not open a session for ${ownerName}: ${message}`);
-        yield { kind: 'error', message };
+        yield err instanceof McpServerNotLoadedError
+            ? { kind: 'error', code: 'CHAT_TOOLS_NOT_CONNECTED', message: createT(locale)('chatTurn.toolsNotConnected') }
+            : { kind: 'error', message };
         return;
     }
 
@@ -584,7 +604,7 @@ export async function* runChatTurn(
         // record than nothing, and it is what the person saw on screen.
         const turn: ChatTurn = {
             role: 'agent',
-            text: answer,
+            text: withoutToolMarkers(answer),
             at: new Date().toISOString(),
             ...(tools.size ? { tools: [...tools.values()] } : {}),
             ...(cards.size ? { cards: [...cards.values()] } : {}),

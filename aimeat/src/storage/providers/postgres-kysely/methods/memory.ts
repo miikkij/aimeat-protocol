@@ -9,6 +9,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
+ *     (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory: the TTL sweep as one DELETE (QA audit D4-01, E4-01). listAllMemory
@@ -356,9 +358,12 @@ export const memoryMethods = {
 
   /** Out of the bin, whole. False when nothing of that key is in it — including after the sweeper
    *  has been past, which is the honest answer to "can I have it back". */
-  async restoreMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string): Promise<boolean> {
+  async restoreMemory(this: PostgresKyselyStorage, ownerGaii: string, key: string, visibility?: string): Promise<boolean> {
+    // With a visibility, the level is part of the same UPDATE that clears the tombstone.
     const r = await this.db.updateTable('Memory')
-      .set({ deletedAt: null, deletedBy: null })
+      .set(visibility === undefined
+        ? { deletedAt: null, deletedBy: null }
+        : { deletedAt: null, deletedBy: null, visibility, groupId: null, version: sql<number>`"version" + 1`, updatedAt: new Date() })
       .where('ownerGaii', '=', ownerGaii).where('key', '=', key).where('deletedAt', 'is not', null)
       .executeTakeFirst();
     return Number(r.numUpdatedRows ?? 0) > 0;

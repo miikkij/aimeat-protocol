@@ -7,6 +7,7 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.2.0 — 2026-10-31 — The toggle in front of the model and the credit (v27 P7).
  *   v1.1.0 — 2026-09-24 — The link is the action link's more tone; the goose stays beside it.
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
  */
@@ -26,3 +27,15 @@
   gap: 6px;
 }
 .poster-credit-mark { font-size: var(--text-body-sm); }
+/* One toggle in front of the model and the credit (v27 P7): the summary is the action link's more
+   tone, without the browser's own triangle. */
+.poster-credit-toggle { cursor: pointer; list-style: none; }
+.poster-credit-toggle::-webkit-details-marker { display: none; }
+.poster-credit-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+.poster-credit-body .poster-turn-model { color: var(--text-dim); }

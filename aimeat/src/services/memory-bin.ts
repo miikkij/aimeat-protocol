@@ -18,9 +18,13 @@
  *   node had no delete at all before 2026-09-03 — a value could be emptied, never removed — and the
  *   grace window is how that principle survives having one.
  * @structure MemoryBinRefusal · appReservedKeyRefusal() · bulkDeleteKeyRefusal() · binRefusal() ·
- *   deleteMemoryRecord() · restoreLevel() · lowerRestored() · restoreMemoryRecord()
+ *   deleteMemoryRecord() · restoreLevel() · restoreMemoryRecord()
  * @usage const out = await deleteMemoryRecord({ storage, config }, { caller, ownerName, key });
  * @version-history
+ *   2026-10-31 — A restore lowered on a closed node stores its level in the same UPDATE that clears
+ *     the tombstone (storage.restoreMemory with a visibility). lowerRestored wrote it afterwards on the
+ *     record's version and gave up when every attempt lost, which left the record at the level it went
+ *     in at (secaudit 2026-10-31 inv-24).
  *   2026-10-27 — Delete and restore refuse a reserved owner key to an app grant with 403
  *     RESERVED_KEY, as PUT refuses to write it; bulkDeleteKeyRefusal gives POST /v1/memory/bulk-delete
  *     the bin's per-key rules (credential record, reserved key for an app, append-only event)
@@ -87,7 +91,6 @@ import { memoryCapRefusal, memoryWriterAsk } from './memory-publish-gate.js';
 import { isRaiseToPublic } from './publish-gate.js';
 import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel } from './closed-node-level.js';
-import { CAS_ATTEMPTS } from './record-cas.js';
 import type { MemoryRecord } from '../storage/interface.js';
 
 export interface MemoryBinDeps { storage: Storage; config: AimeatConfig }
@@ -413,23 +416,6 @@ async function restoreLevel(
 }
 
 /**
- * Store the record the restore just took out of the bin at `level`, when that is not the level it
- * went in at (the closed node's lowering above). Only the level changes, and it is written on the
- * version that was read, as the audience settle writes one (classification/audience-settle.ts).
- */
-async function lowerRestored(deps: MemoryBinDeps, ownerGaii: string, key: string, level: MemoryRecord['visibility']): Promise<void> {
-  for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
-    const full = await deps.storage.getMemory(ownerGaii, key);
-    if (!full || full.visibility === level) return;
-    const next = { ...full, key, visibility: level, groupId: undefined, workspaceRef: undefined, version: full.version + 1, updatedAt: new Date().toISOString() };
-    const stored = deps.storage.setMemoryIfVersion
-      ? await deps.storage.setMemoryIfVersion(next, full.version)
-      : await deps.storage.setMemory(next);
-    if (stored) return;
-  }
-}
-
-/**
  * Has the grace window of a record deleted at `deletedAt` closed? A grace of 0 is an immediate,
  * final delete, so the window is closed at once. An unreadable date or grace leaves the record
  * restorable: the sweep, not this check, is what removes rows.
@@ -478,13 +464,16 @@ export async function restoreMemoryRecord(deps: MemoryBinDeps, req: MemoryBinReq
     if ('ok' in decided) return decided;
     level = decided.level;
   }
-  if (!found || !(await deps.storage.restoreMemory(found, req.key))) {
+  // A level other than the one the record went in at (the closed node's lowering in restoreLevel)
+  // is stored by the same UPDATE that clears the tombstone, so the record is never readable at the
+  // level it went in at (secaudit 2026-10-31 inv-24).
+  const lowered = level && level !== visibility ? level : undefined;
+  if (!found || !(await deps.storage.restoreMemory(found, req.key, lowered))) {
     return {
       ok: false, code: 'NOT_RESTORABLE',
       message: 'There is nothing of that name waiting to be put back. Either it was never deleted, or it has already been removed for good.',
     };
   }
-  if (level && level !== visibility) await lowerRestored(deps, found, req.key, level);
   emitRecordChange('memory', found, level ?? visibility);
   return { ok: true, key: req.key, ownerGaii: found, restorableUntil: null, graceDays: deps.config.memoryDeleteGraceDays };
 }

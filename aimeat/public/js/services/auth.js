@@ -30,7 +30,7 @@
  *   - getSession/hasSession/getOwner/getGhii/getJwt/getNodeUrl/getStoredGhii: read the session
  *   - authHeaders: Authorization header for a raw fetch (empty object when signed out)
  *   - onAuthChange: subscribe to real session changes, returns unsubscribe
- *   - logout/showLoginModal/updateSessionMeta: the lifecycle actions a view may trigger
+ *   - logout/showLoginModal/updateSessionMeta/restoreSession: the lifecycle actions a view may trigger
  *   - passkeySupported/addPasskey: the passkey ceremony, run by the auth lib
  *   - getProfile/updateProfile/changePassword: the current user's GHII profile
  *
@@ -39,6 +39,8 @@
  *   // In a Preact view prefer the hook: import { useSession } from '/js/use-session.js';
  *
  * @version-history
+ *   v2.3.0 — 2026-10-31 — restoreSession(): pick up a session another tab of this origin opened (the
+ *     consent page while a mailed sign-in link opens in another tab; v27 P1).
  *   v2.2.0 — 2026-10-25 — PRIVATE_COPY_PREFIX: a page's browser copy of the person's own data is
  *     removed on the auth lib's 'logout' event (the Messages list keeps one to draw at once).
  *   v2.1.0 — 2026-09-27 — authLoaded(): whether the auth lib is there yet (appcat's ?add=1 waits for it).
@@ -168,6 +170,20 @@ export function showLoginModal(opts) {
   if (!a || typeof a.showLoginModal !== 'function') return false;
   a.showLoginModal(opts || {});
   return true;
+}
+
+/**
+ * Pick up a session another tab of this origin opened: the stored session and the refresh cookie,
+ * through the auth lib's own restore. Subscribers hear it through the lib's 'login' event. Resolves
+ * to whether this page is now signed in. Used by the consent page while a mailed sign-in link is
+ * opened in another tab (views/app-grant.js; v27 P1).
+ * @returns {Promise<boolean>}
+ */
+export async function restoreSession() {
+  const a = lib();
+  if (!a || typeof a.login !== 'function') return false;
+  try { await a.login(); } catch (err) { console.warn('[aimeat] the session from another tab was not restored:', err); }
+  return hasSession();
 }
 
 /**

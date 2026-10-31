@@ -1901,9 +1901,9 @@
     },
     "src/services/install-set-run.ts": {
       "reads": {
-        "getMemory": 2
+        "getMemory": 3
       },
-      "why": "Reviewed 2026-10-18 (atomic-write round), the node's own read: the applied install-set record in the install-sets system namespace, read to claim one run of a set and to write its end on the version read. The record reads moved here from install-set-apply.ts. No content."
+      "why": "Reviewed 2026-10-18 (atomic-write round), the node's own read: the applied install-set record in the install-sets system namespace, read to claim one run of a set and to write its end on the version read. The record reads moved here from install-set-apply.ts. 2026-10-31 (secaudit inv-22): releaseRun reads the same record to take back a claim that a refused apply made, on the version read. No content."
     },
     "src/services/install-set-trust.ts": {
       "reads": {
@@ -2048,10 +2048,10 @@
     },
     "src/services/memory-bin.ts": {
       "reads": {
-        "getMemory": 2,
+        "getMemory": 1,
         "listDeletedMemory": 1
       },
-      "why": "Reviewed 2026-10-20 (secaudit 2026-10, restoreMemoryRecord:skips-publish-gate-and-cap), the node's own read: whether a key exists before a delete, whether it is in the bin before a restore, and, on a closed node, the record the restore just took out of the bin so its level can be written back lower on the version that was read. No read on this path hands content to a caller; a restore answers the key and nothing else."
+      "why": "Reviewed 2026-10-20 (secaudit 2026-10, restoreMemoryRecord:skips-publish-gate-and-cap), the node's own read: whether a key exists before a delete, and whether it is in the bin before a restore. Since 2026-10-31 (secaudit inv-24) the restore writes the closed node's lower level in the same update that takes the record out of the bin, so the read-back of the restored record is gone. No read on this path hands content to a caller; a restore answers the key and nothing else."
     },
     "src/services/memory-ceilings.ts": {
       "reads": {

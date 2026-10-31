@@ -29,6 +29,8 @@
  *   router.put('/v1/agents/:name/offers', requireAuth(), requireRestScope('commerce:sell', { unlessSelf: config.nodeId }), handler)
  *   router.get('/v1/extensions/:name/instances', requireAuth(), requireRestScope('ext:invoke', { orScope: 'ext:write' }), handler)
  * @version-history
+ *   v1.0.2 — 2026-10-31 — Comment only: why the 401 reads the `anonymous` flag and not
+ *     isAnonymousPrincipal() (secaudit 2026-10-31 inv-01, not a defect).
  *   v1.0.1 — 2026-10-13 — Header only: names the third grant step (services/rest-scope-keep-working-migration.ts).
  *   v1.0.0 — 2026-10-12 — Initial (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  */
@@ -64,6 +66,11 @@ export interface RestScopeGateOptions {
 export function requireRestScope(word: string, opts: RestScopeGateOptions = {}) {
   const words = opts.orScope ? [word, opts.orScope] : [word];
   return (req: Request, res: Response, next: NextFunction) => {
+    // The flag, not isAnonymousPrincipal(), on purpose: this is a scope gate, and the token
+    // POST /v1/auth/anonymous mints is an agent holding ANONYMOUS_SCOPES, which the App Catalog's
+    // cortex popup and the anonymous.* memory routes behind this gate are for
+    // (test/e2e-purpose-visitors.ts). A route for signed-in members mounts refuseAnonymousPrincipal()
+    // before this gate (routes/knowledge/sharing.ts).
     if (!req.auth || req.auth.anonymous) {
       deny401(req, res, 'Authentication required');
       return;

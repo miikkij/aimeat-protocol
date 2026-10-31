@@ -9,6 +9,8 @@
  *   x402 test facilitator double stands in for the real one; nothing leaves the process.
  * @usage cd aimeat && pnpm exec vitest run test/unit/beneficiary-payout-arrived.test.ts
  * @version-history
+ *   2026-10-31 -- A provider's not-arrived close that lands while the operator's press is paying the
+ *     entries ends with the record arrived, the book paid and both parties told (secaudit 2026-10-31 inv-02).
  *   2026-10-29 -- Initial (secaudit2026oct26 round 8c, commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
  */
 import { describe, it, expect, beforeEach } from 'vitest';
@@ -88,6 +90,31 @@ describe('a held possible payout the operator marks as arrived', () => {
     await putRecord(storage, PROVIDER, key, { ...stored, amount: 9_000_000 });
     expect(await markPayoutHoldArrived(storage, { providerGhii: PROVIDER, nonce: NONCE, reference: 'r', by: OPERATOR })).toMatchObject({ ok: false, code: 'CONFLICT' });
     expect((await listBeneficiaryEntries(storage, BENEFICIARY))[0]!.status).toBe('released');
+  });
+
+  it('a not-arrived close that lands while the entries are being paid leaves the record, the book and the answer in agreement', async () => {
+    // The provider's close lands between the operator's book write and the record close
+    // (secaudit 2026-10-31 inv-02): the book already says paid on the operator's chain evidence.
+    const write = storage.setMemoryIfVersion!.bind(storage);
+    let closedMidway = false;
+    storage.setMemoryIfVersion = async (record, version) => {
+      const done = await write(record, version);
+      if (done && !closedMidway && record.ownerGaii === BENEFICIARY && record.key.startsWith('commerce.benefit.')) {
+        closedMidway = true;
+        const closed = await settleBeneficiaryPayout(storage, config, { providerGhii: PROVIDER, beneficiaryGhii: BENEFICIARY, notArrivedNonce: NONCE });
+        expect(closed).toMatchObject({ ok: true, closed: true });
+      }
+      return done;
+    };
+    const r = await markPayoutHoldArrived(storage, { providerGhii: PROVIDER, nonce: NONCE, reference: '0xabc123', by: OPERATOR });
+    expect(closedMidway).toBe(true);
+    expect(r).toMatchObject({ ok: true, entries: 1 });
+    expect((await listBeneficiaryEntries(storage, BENEFICIARY))[0]!.status).toBe('paid');
+    const kept = (await storage.getMemory(PROVIDER, `${PAYOUT_HOLD_PREFIX}${NONCE}`))?.value as { status: string; arrivedReference: string };
+    expect(kept).toMatchObject({ status: 'arrived', arrivedReference: '0xabc123' });
+    expect((await quoteBeneficiaryPayout(storage, config, { providerGhii: PROVIDER, beneficiaryGhii: BENEFICIARY })).reason).toBe('NOTHING_OWED');
+    expect(await notices(storage, BENEFICIARY)).toContain('payout_arrived');
+    expect(await notices(storage, PROVIDER)).toContain('payout_arrived_provider');
   });
 
   it('designed use: the provider still closes it as not arrived, and the entries are quoted again', async () => {

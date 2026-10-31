@@ -4,6 +4,7 @@
  *   used by the MCP storage_download handle flow (F11). Covers sign/verify roundtrip, expiry,
  *   wrong token type, and garbage input.
  * @version-history
+ *   v1.3.0 -- 2026-10-31 -- A mint that names no file version is refused (secaudit 2026-10-31 inv-18).
  *   v1.2.0 -- 2026-10-21 -- A token without a version (minted before 2026-10-20) is served as before
  *     until it expires; a version claim that is not a string is refused.
  *   v1.1.0 -- 2026-10-20 -- The token names the file version; a token without one is refused, and
@@ -94,5 +95,18 @@ describe('download-token', () => {
 
     it('rejects garbage input with TOKEN_INVALID', async () => {
         await expect(verifyDownloadToken('not-a-jwt')).rejects.toBeInstanceOf(DownloadTokenError);
+    });
+
+    // secaudit 2026-10-31 inv-18. A token without `ver` is served whatever the key holds (the case
+    // above, kept for tokens minted before 2026-10-20). Every mint passes the file's createdAt, so a
+    // mint that names no version is a caller's defect, and it is refused at the mint instead of
+    // producing a token that skips the version check.
+    it('refuses to mint a token that names no file version', async () => {
+        for (const version of [undefined, null, '', 42]) {
+            await expect(
+                generateDownloadToken({ sub: 'alice@node', key: 'k', mimeType: 'text/plain', size: 1, version: version as never }),
+                `minted with version ${JSON.stringify(version)}`,
+            ).rejects.toThrow(/names no file version/);
+        }
     });
 });
