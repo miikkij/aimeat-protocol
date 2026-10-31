@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — A publish stores no odps.yaml: the product sheet is projected when it is read, from the
+ *     version's audience (./odps-read.ts). The stored one said public and "No authentication" for every
+ *     package (plan doc-mvwxcas3dom3, D0.1).
  *   2026-10-21 — The descriptor file of a new version carries the version's audience as a tag, and an
  *     earlier version is opened and listed on that audience (capability-loss review of v42: an
  *     organism or members reader keeps the earlier versions after the newest goes public).
@@ -78,7 +81,6 @@ import {
 } from './contract.js';
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
 import { linkSourceImages } from './images.js';
-import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 import { checkAudienceWrite } from '../audience-write.js';
 import {
     DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable, versionOpenTo, withAudienceTag, type DatapackageReader,
@@ -357,20 +359,9 @@ export async function publishPackage(
     }
     await storeHeldProvenance(storage, held);
 
-    // The product sheet, projected from the descriptor and stored beside it. Generated rather than
-    // authored: every field traces to something the descriptor already holds, so it cannot drift from
-    // the package and needs no mapping layer to maintain. It rides with the version, so a buyer
-    // reading a pinned version reads the sheet that describes THAT one.
-    const odpsDoc = descriptorToOdps({
-        descriptor, ownerGhii, baseUrl: config.baseUrl, descriptorUrl,
-        resourceUrls: Object.fromEntries(resourceUrls.map(r => [r.name, r.url])),
-    });
-    await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
-        key: odpsYamlKey(input.name, contentHash),
-        data: Buffer.from(odpsToYamlDocument(odpsDoc), 'utf8'),
-        mimeType: 'text/yaml; charset=utf-8',
-        visibility: fileVisibility,
-    });
+    // The product sheet is NOT stored: it is projected from the descriptor and the version's audience
+    // when it is read (./odps-read.ts, GET /v1/datapackages/{owner}/{name}/odps), so it states the
+    // audience the version has now. A sheet stored at publish said public for every package.
 
     await writeLatest({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
     // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,

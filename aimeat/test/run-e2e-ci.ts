@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-datapackage-audience-fixes.ts joins the list (not the guard tier): the ODPS sheet tells the real access, a package is withdrawn, an organism package opens through /v1/pub (plan doc-mvwxcas3dom3, D0.1, D0.3, D0.4).
  *   2026-10-31 -- e2e-ai-openrouter-region.ts joins the list (not the guard tier): its own node on 28494,
  *     where an OpenRouter call on the node's key is processed (eu, us, any).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
@@ -1237,6 +1238,8 @@ const ALL_SUITES = [
     'test/e2e-audience-boards-skills.ts',
     // members and organism:<id> on knowledge packages, packages and data packages (plan V3.6 to V3.8).
     'test/e2e-audience-packages.ts',
+    // The ODPS sheet tells the real access, a package is withdrawn, an organism package opens through /v1/pub (plan doc-mvwxcas3dom3, D0).
+    'test/e2e-datapackage-audience-fixes.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,

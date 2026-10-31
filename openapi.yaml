@@ -27630,11 +27630,45 @@ paths:
         - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version.' }
       responses:
         '200':
-          description: The descriptor, its permanent URL, and the latest pointer when unpinned
+          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), and the latest pointer when unpinned
         '403':
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package or version
+
+  /v1/datapackages/{owner}/{name}/odps:
+    get:
+      operationId: getDataPackageOdps
+      summary: The ODPS product sheet of one version
+      description: |
+        The ODPS v4.1 product sheet of one version, projected when it is read from the descriptor and
+        the version's audience, so it states who reads the package now. `details.visibility` is
+        public, dataspace (every account of this node), organisation (the members of one organism) or
+        private, and `x-aimeat.audience` names the AIMEAT audience (public, members, organism:<id> or
+        private). `authenticationMethod` is `none` only for a public package and `Token` (an AIMEAT
+        bearer token) for the others.
+
+        YAML by default; `format=json` answers the envelope with the sheet under `odps`. Readable by
+        whoever may read the package, and refused as GET /v1/datapackages/{owner}/{name} refuses. A
+        version published before 2026-11-01 also has an `odps.yaml` stored beside its descriptor; its
+        /v1/pub address redirects here.
+      tags: [Data Packages]
+      security: [{}, { BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version. Without it, the newest.' }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [yaml, json], default: yaml } }
+      responses:
+        '200':
+          description: The sheet, as YAML (text/yaml) or, with format=json, `{ odps_version, content_hash, odps }`
+          content:
+            text/yaml:
+              schema: { type: string }
+        '403':
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
+        '404':
+          description: No such package or version, or the caller may not read it
 
   /v1/datapackages/{owner}/{name}/versions:
     get:
