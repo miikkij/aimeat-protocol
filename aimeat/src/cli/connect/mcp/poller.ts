@@ -21,6 +21,7 @@
  *   (CI/serverless) still polls unconditionally.
  *
  * @version-history
+ *   v1.2.0 -- 2026-10-31 -- startPollerForAgent answers a handle that stops the loop, for an agent that gets its tunnel back.
  *   v1.1.0 -- 2026-09-06 -- Review item 4.7: a throw inside the loop is logged and the next turn
  *     is still scheduled. It used to end the poller for good while the daemon reported online.
  *   v1.9.4 -- 2026-05-28 -- Name-based message inbox endpoint
@@ -57,7 +58,10 @@ function asString(v: unknown): string | undefined {
   return typeof v === 'string' ? v : undefined;
 }
 
-export function startPollerForAgent(agent: RegisteredAgent): void {
+/** Ends a poll loop. Called when an agent that polled because it had no tunnel gets one. */
+export interface PollerHandle { stop(): void }
+
+export function startPollerForAgent(agent: RegisteredAgent): PollerHandle {
   const interval = (agent.config.poll_interval ?? 30) * 1000;
   const enc = encodeURIComponent(agent.agent);
   // Owner-qualified: two owners on one daemon both have `concierge`, and two identical log tags
@@ -166,6 +170,7 @@ export function startPollerForAgent(agent: RegisteredAgent): void {
   void loop();
   const runnerNote = runnerEnabled ? ` (task-runner: ${agent.config.runner!.command})` : '';
   console.error(`[${tag}] polling every ${agent.config.poll_interval ?? 30}s${runnerNote}`);
+  return { stop: () => { stopped = true; } };
 }
 
 /**

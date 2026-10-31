@@ -35,6 +35,8 @@
  *     discovery-file lifecycle, signal handling.
  * @usage Called by mcp/server.ts `runServe()` when `--http`/`--daemon` is set.
  * @version-history
+ *   2026-10-31 -- An agent degraded to direct HTTP because the tunnel was 'unreachable' (a refused
+ *     credential mint) tries the shared socket again, waiting 1, 2, 4 … 15 minutes, and stops polling once on it.
  *   2026-10-20 -- The local MCP routes moved to ./local-mcp.ts unchanged, where a 2026-07-28 request
  *     is served statelessly beside the 2025 sessions (MCP SDK v2 migration step 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -155,7 +157,7 @@ import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
 import { AgentRegistry, type RegisteredAgent } from '../agent-registry.js';
 import { displayName } from '../agent-registry.js';
-import { startPollerForAgent } from './poller.js';
+import { startPollerForAgent, type PollerHandle } from './poller.js';
 import { AgentChannel, type SpaceRef } from './local-channel.js';
 import { InvokeChannel, registerLocalInvokeRoutes } from './local-invoke.js';
 import { registerLocalMcp } from './local-mcp.js';
@@ -182,6 +184,10 @@ export {
 import {
   serveDiscoveryPath, exitIfAnotherDaemonOwns, buildDiscoveryDoc, writeDiscoveryFile,
 } from './local-discovery.js';
+
+/** How long an agent left off the tunnel waits before trying again, doubling up to the cap. */
+const TUNNEL_REJOIN_FIRST_MS = 60_000;
+const TUNNEL_REJOIN_MAX_MS = 15 * 60_000;
 
 export interface ServeDaemonOptions {
   registry: AgentRegistry;
@@ -338,8 +344,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     // on the way it removes the restart: the tunnel set used to be built from the registry at
     // startup, so taking on a new agent meant restarting the daemon and briefly dropping every
     // other agent it served (measured 2026-08-31, 49 of them).
-    const joined = await hubs.join(entry, identity);
-    if (joined) {
+    const useShared = (joined: { client: ConnectTunnelClient; who?: string }): void => {
       ch.tunnel = joined.client;
       ch.transportMode = 'tunnel';
       // `joined.who` is what routes a frame to this identity on a socket someone else opened, and
@@ -348,8 +353,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       ch.forward = (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who);
       entry.client.setTransport({ request: (m, pth, o) => joined.client.forward(m, pth, o ?? {}, joined.who) });
       console.error(`[serve] ${entry.agent}@${entry.owner}: on the shared tunnel to ${entry.config.node_url} (${joined.client.identityCount()} identities, 1 socket)`);
-      return;
-    }
+    };
+    const joined = await hubs.join(entry, identity);
+    if (joined) { useShared(joined); return; }
 
     // NO SHARED SOCKET: an older node, or an attach the node refused. One socket for this identity,
     // exactly as before this change — the degradation is per agent and nobody else notices.
@@ -383,8 +389,37 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     } else {
       ch.transportMode = 'direct';
       console.error(`[serve] ${entry.agent}@${entry.owner}: tunnel ${outcome} — degraded to direct HTTP + poll loop`);
-      startPollerForAgent(entry);
+      const poller = startPollerForAgent(entry);
+      // 'unreachable' PASSES, so this agent goes back on the tunnel. It is what a refused credential
+      // mint answers, and on 2026-10-31 a restart of 74 agents met the node's per-minute mint limit:
+      // two were refused, and with nothing trying again they polled over direct HTTP for the daemon's
+      // whole life while the other 72 were on the tunnel. 'unsupported' is a node without one.
+      if (outcome === 'unreachable') rejoinLater(entry, ch, identity, useShared, poller);
     }
+  }
+
+  /**
+   * Try the shared socket again after a wait that doubles (1, 2, 4 … 15 minutes), until this agent is
+   * on it, has left this daemon, or got a transport some other way. On success the poll loop ends.
+   */
+  function rejoinLater(entry: RegisteredAgent, ch: AgentChannel, identity: TunnelIdentity, useShared: (j: { client: ConnectTunnelClient; who?: string }) => void, poller: PollerHandle, delayMs = TUNNEL_REJOIN_FIRST_MS): void {
+    setTimeout(() => {
+      if (channels.get(entry.gaii) !== ch || ch.transportMode !== 'direct') return;
+      void hubs.join(entry, identity).then((joined) => {
+        if (channels.get(entry.gaii) !== ch || ch.transportMode !== 'direct') return;
+        if (!joined) { rejoinLater(entry, ch, identity, useShared, poller, Math.min(delayMs * 2, TUNNEL_REJOIN_MAX_MS)); return; }
+        poller.stop();
+        useShared(joined);
+        // The record spaces it asked for while it had no socket go to the node now; until this they
+        // were only kept on the channel, and a records agent would hear nothing.
+        const subs = ch.getSubscriptions();
+        if (subs.length) joined.client.subscribe(subs, entry.gaii);
+        identityChanged();
+      }, (err: unknown) => {
+        console.error(`[serve] ${entry.agent}@${entry.owner}: rejoining the tunnel failed (${String(err)}); trying again later`);
+        rejoinLater(entry, ch, identity, useShared, poller, Math.min(delayMs * 2, TUNNEL_REJOIN_MAX_MS));
+      });
+    }, delayMs).unref();
   }
 
   /**

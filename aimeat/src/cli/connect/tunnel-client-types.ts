@@ -13,6 +13,7 @@
  *   decide whether a failure is a verdict or a hiccup, and the one pure function. What does not:
  *   anything that reads `this`. That line is what keeps the split a move rather than a rewrite.
  * @version-history
+ *   v1.5.0 -- 2026-10-31 -- upgradeVerdict: an upgrade answered 429 or 5xx is 'unreachable', a wait.
  *   v1.4.0 -- 2026-10-14 -- TUNNEL_OFF_GUIDANCE: tunnel-client.ts prints it after a refused upgrade, so the
  *     person reads what the operator must set and that the computer is not listed until then.
  *   v1.3.0 -- 2026-10-11 -- `reason` on the frame and on onAuthFailure: the node says when an identity was
@@ -51,6 +52,17 @@ export type TunnelStatus = 'idle' | 'connecting' | 'online' | 'offline' | 'stopp
  *                   is stopped.
  */
 export type TunnelStartOutcome = 'online' | 'unsupported' | 'auth_failed' | 'unreachable';
+
+/**
+ * What an upgrade refused with an HTTP status means. 401/403: the credential is dead. 429 and 5xx: a
+ * busy or restarting node, a wait; read as 'unsupported' they left an agent off the tunnel for the
+ * daemon's whole life (2026-10-31). Anything else (404): a node too old for the tunnel, or with it off.
+ */
+export function upgradeVerdict(code: number): Exclude<TunnelStartOutcome, 'online'> {
+  if (code === 401 || code === 403) return 'auth_failed';
+  if (code === 429 || code >= 500) return 'unreachable';
+  return 'unsupported';
+}
 
 export interface ConnectTunnelClientOptions {
   /** Base HTTP(S) URL of the AIMEAT node (e.g. https://aimeat.io). */
