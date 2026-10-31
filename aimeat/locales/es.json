@@ -13557,6 +13557,7 @@
   },
   "install": {
     "title": "Pon AIMEAT.IO detrás de su propio botón",
+    "titleBuyer": "Pon tu AIMEAT detrás de su propio botón",
     "body": "Instalada, se abre en su propia ventana, muestra lo no leído en su ícono y recibe lo que compartes directo en tu chat.",
     "iosBody": "En iPhone y iPad: abre el menú de compartir y elige \"Agregar a inicio\".",
     "install": "Instalar",

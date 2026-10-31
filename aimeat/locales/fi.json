@@ -15410,6 +15410,7 @@
   },
   "install": {
     "title": "Laita AIMEAT.IO oman napin taakse",
+    "titleBuyer": "Laita oma AIMEATisi oman napin taakse",
     "body": "Asennettuna se avautuu omaan ikkunaansa, näyttää lukemattomien määrän kuvakkeessa ja ottaa jaot suoraan chattiisi.",
     "iosBody": "iPhonella ja iPadilla: avaa jakovalikko ja valitse \"Lisää Koti-valikkoon\".",
     "install": "Asenna",
