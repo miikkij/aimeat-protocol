@@ -36,6 +36,9 @@
  *   cd aimeat && node --import tsx test/e2e-chat-agent.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=chat-agent
  * @version-history
+ *   2026-10-31 -- The session's token is called against the chat surface it names, and a session whose
+ *     aimeat MCP server did not load ends the turn with CHAT_TOOLS_NOT_CONNECTED (v27 P2). Both were
+ *     red on the code before: the first answered 401 "This token names no audience".
  *   2026-10-30 -- Setup no longer matched production: 3f read the refusal from the agent's model call,
  *     and since 34c646e2b the chat asks the AI gate first and ends the turn with the gate's code before
  *     the agent starts. 3f reads that error event and asserts no model call was made. 3g: another
@@ -55,7 +58,7 @@
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { once } from 'node:events';
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve as resolvePath } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -388,6 +391,23 @@ async function run(): Promise<void> {
             `the agent must not receive the node's own configuration, got ${JSON.stringify(started.leaked)}`);
     });
 
+    await test('the token the session carries is taken by the chat surface it names (v27 P2)', async () => {
+        // The source was broken: from 4.0.0 the MCP endpoint refuses an `mcp_client` token that names
+        // no audience, and the chat's token named none, so on every 4.x node goose got 401 at
+        // /v2/mcp/chat and ran the turn without AIMEAT tools. The test above only read the URL.
+        const server = (peerRequests('session/new').at(0)?.params.mcpServers ?? [])[0];
+        const auth = (server?.headers ?? []).find((h: any) => h.name === 'Authorization');
+        const res = await fetch(server.url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: auth.value },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+                protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e-chat-agent', version: '1' },
+            } }),
+        });
+        const text = await res.text();
+        assert(res.status === 200, `the chat surface takes the session's own token, got ${res.status} ${res.headers.get('www-authenticate') ?? ''} ${text.slice(0, 200)}`);
+    });
+
     await test('an MCP server that failed to load is said out loud, and a human line on stdout is not an error', async () => {
         const log = node!.output();
         assert(log.includes('extension "broken-mcp" failed to load: the node was not reachable'),
@@ -612,6 +632,25 @@ async function run(): Promise<void> {
         assert((thread.turns as any[]).length > 0, 'the conversation itself is untouched');
     });
 
+    await test('a session whose AIMEAT tools did not load ends the turn in the person\'s language, and runs nothing (v27 P2)', async () => {
+        // The source was broken: goose opened the session without the aimeat server, the model went on
+        // with no tools, and the person watched a turn that never ended.
+        const flag = `${node!.peerLog}.fail-aimeat`;
+        writeFileSync(flag, '1');
+        try {
+            const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title: 'no tools' }) }));
+            const prompts = peerRequests('session/prompt').length;
+            const events = await turn(created.body.data.thread.id, { text: 'list my organisms', lang: 'fi' });
+            const end = events.at(-1)!;
+            assert(end.kind === 'error' && end.code === 'CHAT_TOOLS_NOT_CONNECTED', `the turn ends with the refusal, got ${JSON.stringify(end)}`);
+            assert(end.message === 'En saanut yhteyttä AIMEAT-työkaluihisi, joten en aloittanut. Yritä hetken päästä uudelleen.',
+                `in Finnish, got ${end.message}`);
+            assert(peerRequests('session/prompt').length === prompts, 'and the agent was never asked to run the turn');
+        } finally {
+            rmSync(flag, { force: true });
+        }
+    });
+
     await test('an agent that dies mid-turn ends the turn with the reason', async () => {
         const events = await turn(threadId, { text: 'DIENOW: fall over please' });
         const last = events.at(-1)!;
@@ -644,8 +683,16 @@ async function run(): Promise<void> {
         return String(auth.value).slice('Bearer '.length);
     };
     /** 401 is the node saying the credential is no longer valid; anything else means it still is. */
-    const tokenStatus = async (bearer: string): Promise<number> =>
-        (await json('/v1/memory/chat.token-probe', { headers: { Authorization: `Bearer ${bearer}` } })).status;
+    // Asked where the token is for. Setup no longer matched production (v27 P2): a session's token names
+    // the MCP endpoint since 2026-10-31, and a REST route refuses such a token from 4.0.0 whether or
+    // not it is revoked, so a REST probe could no longer tell a live token from an ended one.
+    const tokenStatus = async (bearer: string): Promise<number> => (await fetch(`${BASE}/v2/mcp/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+            protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'e2e-chat-agent', version: '1' },
+        } }),
+    })).status;
     const newThread = async (title: string): Promise<string> => {
         const created = await json('/v1/chat/threads', authed({ method: 'POST', body: JSON.stringify({ title }) }));
         assert(created.status === 201, `create ${created.status}`);

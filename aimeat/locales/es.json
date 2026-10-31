@@ -5157,6 +5157,7 @@
   "chat.transcribeFailed": "Esa grabación no se pudo convertir en texto.",
   "chat.turnCount": "{n} mensajes",
   "chat.turnFailed": "No se pudo completar el turno.",
+  "chat.connectionLost": "Se perdió la conexión. Inténtalo de nuevo.",
   "chat.useOwnKeyLink": "Usa tu propia clave",
   "chat.welcomeBody": "Lee y escribe tus notas, tus lugares compartidos y tus aplicaciones aquí, y cada paso que da se ve en la pantalla. Pídele algo o empieza con una de estas opciones.",
   "chat.capTitle": "Esta conversación ya usó su viaje gratis.",
@@ -24670,7 +24671,8 @@
       "thinking": "Sigo pensando cuál es la mejor forma de hacerlo.",
       "wrappingUp": "Esto tarda, así que respondo ahora con lo que ya sé."
     },
-    "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas."
+    "stopped": "Me detuve aquí porque esto tardó demasiado y mi respuesta no está terminada. Di \"continúa\" y sigo desde aquí, o pregunta de nuevo por partes más pequeñas.",
+    "toolsNotConnected": "No pude conectar con tus herramientas de AIMEAT, así que no empecé. Inténtalo de nuevo en un momento."
   },
   "explain": {
     "open": "Explicación: {term}",

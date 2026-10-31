@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
+ *     whose connection went silent ends with "The connection was lost" and the retry (v27 P2).
  *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
  *     keeps its own copy of the text (secaudit2026oct26 round 8c).
  *   2026-10-29: The phone suggestion and the install suggestion are not shown in the person's first
@@ -111,6 +113,15 @@ import { trackVisualViewport } from '/js/visual-viewport.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/**
+ * The words without the "[Calling: <tool>]" lines a model writes as text when it means a tool call.
+ * The work log shows the calls that ran; such a line is a duplicate or a call that never happened.
+ * The node strips the same pattern from what it keeps (services/chat-session.ts withoutToolMarkers).
+ */
+function withoutToolMarkers(text) {
+    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
+}
 
 /**
  * The conversation as plain text, in the order it happened.
@@ -415,7 +426,7 @@ export default function ChatView() {
                 if (!stillOpen()) continue;   // the person moved on; keep reading so the turn finishes
                 if (update.kind === 'text') {
                     answer += update.text;
-                    setLive((l) => ({ ...l, text: answer }));
+                    setLive((l) => ({ ...l, text: withoutToolMarkers(answer) }));
                 } else if (update.kind === 'thought') {
                     setLive((l) => ({ ...l, thought: update.text }));
                 } else if (update.kind === 'progress') {
