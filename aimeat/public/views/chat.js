@@ -92,7 +92,7 @@ import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
 import { primeSpeech } from '/js/services/speech-reader.js';
 import { readIntake, clearIntake, intakeText } from '/js/intake.js';
-import { ThreadList } from '/components/ThreadList.js';
+import { ThreadList, threadTitle } from '/components/ThreadList.js';
 import { Turn, LiveTurn, TurnError } from '/components/Turn.js';
 import { Composer } from '/components/Composer.js';
 import { StatusBar } from '/components/AgentStatus.js';
@@ -671,10 +671,10 @@ export default function ChatView() {
                       answers and on whose money, and the two actions. In the rail on a desktop, in
                       the drawer on a phone, so the column keeps its height for the words. */''}
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
-                    name=${thread?.title ?? tr('chat.title', 'Chat')}>
+                    name=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
                     ${turns.length > 0 && html`<${ConversationCopy}
-                        text=${conversationAsText(thread?.title, turns)}
+                        text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
                         label=${tr('chat.copyAll', 'Copy conversation')}
                         copiedLabel=${'✓ ' + t('common.copied')}
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}
@@ -682,18 +682,18 @@ export default function ChatView() {
                 <//>
                 <${ConversationFoot}>
                     <${AiNotice} compact=${true} />
-                    <${GooseCredit} />
+                    <${GooseCredit} model=${status?.model} />
                 <//>
             <//>
 
             <${ConversationMain}>
                 <${ConversationHead} backHref=${exitHref} backLabel=${tr('chat.back', 'Back')}
-                    title=${thread?.title ?? tr('chat.title', 'Chat')}>
+                    title=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <!-- The whole conversation as plain text: what you paste into a document, an
                          issue or another AI. Both sides, in order, with the work log left out —
                          it is a record of the conversation, not of the machinery. -->
                     ${turns.length > 0 && html`<${ConversationCopy} head
-                        text=${conversationAsText(thread?.title, turns)}
+                        text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
                         label="⧉"
                         copiedLabel="✓"
                         title=${tr('chat.copyAllTitle', 'Copy the whole conversation as text')}

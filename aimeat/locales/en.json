@@ -23382,6 +23382,7 @@
   "chat.allowanceElsewhere": "{n} USD of your allowance left, for everything outside this chat.",
   "chat.ownKeyNotForChat": "Your own key does not pay for this chat. It pays for your apps and your other AI requests through this server.",
   "chat.poweredBy": "Powered by goose",
+  "chat.aboutEngine": "What answers here",
   "chat.back": "Back",
   "chat.busyThinking": "thinking",
   "chat.busyWriting": "writing the answer",
