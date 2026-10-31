@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 -- aimeat_agent_propose forwards `schedule` (v31 K47), and moves unchanged to
+ *     tool-call-defs-agent-propose.ts (max-file-lines).
  *   2026-10-29 -- The aimeat_operator_agent_configure comment names agent:permissions-add, which PATCH scopes now asks for an addition.
  *   2026-10-18 -- aimeat_operator_agent_configure forwards `clearance` to PATCH /v1/agents/:name/clearance (plan doc-mvdipuyqraas, L2.3).
  *   2026-10-17 -- aimeat_dm_send_as_owner posts to POST /v1/messages/as-owner: it sends in the owner's
@@ -69,6 +71,7 @@ import type { ApiResponse } from './api-client.js';
 import { agentCrewCliTools } from './tool-call-defs-agent-crew.js';
 import { agentStandingCliTools } from './tool-call-defs-agent-standing.js';
 import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
+import { agentProposeCliTools } from './tool-call-defs-agent-propose.js';
 import { query, optionalString, requiredString, optionalArray, requiredArray, optionalRecord, optionalNumber, optionalBoolean, taskTodoPayload, withProvenanceFields } from './tool-call-helpers.js';
 import { organizePatchBody } from './tool-call-helpers-organize.js';
 import { handbookTierPath } from './handbook-path.js';
@@ -279,30 +282,7 @@ export const agentTools: ConnectCliToolDefinition[] = [
         },
         handler: ({ client }, input) => client.post('/v1/agents/v2/basic-agents/request', { note: optionalString(input, 'note') }),
     },
-    {
-        name: 'aimeat_agent_propose',
-        description: "How a new agent is made on this node: when the person asks for one, propose it here, never through an outside agent builder or another product. First read what it will work on (aimeat_organism_list, aimeat_workspace_list) and name that data in purpose and crew_def. Scopes: what the job needs; the node adds memory:read and memory:write, which the crew runtime reads its definition and writes its result with; no agent:write unless the job is making or changing agents. Creates nothing: only their own press creates it, seeds its definition and hands it to their connector. Then give them approval_url from the answer. Send crew_def with it whenever you can: an agent approved without one exists and cannot run. The smallest crew_def that runs: {\"agents\":[{\"role\":\"Reader\",\"goal\":\"…\",\"backstory\":\"…\",\"tools\":[\"memory\"]}],\"tasks\":[{\"id\":\"main\",\"agent\":\"Reader\",\"description\":\"… {{ctx.prompt}} …\",\"expected_output\":\"…\"}]}; each task's `agent` is one of the agents' role (or name), and at least one task's description contains {{ctx.prompt}}, which becomes each run's own task text.",
-        input: {
-            name: { type: 'string', required: true, description: 'The agent name: 3 to 40 characters, lowercase letters, digits and hyphens, starting with a letter.' },
-            purpose: { type: 'string', required: true, description: 'What this agent is for, in a sentence the owner can decide from.' },
-            display_name: { type: 'string', description: 'The name shown to the person. Defaults to the agent name.' },
-            scopes: { type: 'array', description: 'Exactly what it may do. Never more than you hold yourself.' },
-            mode: { type: 'string', description: 'Task handling: task-runner, autonomous, interactive, coordinator or workstation.' },
-            run_mode: { type: 'string', description: "'spawn' (a worker per piece of work) or 'resident' (stays up)." },
-            crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape.' },
-            connector: { type: 'string', description: "Which of the account's connectors runs it, by name or id (aimeat_connector_list). Leave out when the person did not say." },
-        },
-        handler: ({ client }, input) => client.post('/v1/agents/v2/agent-proposals', {
-            connector: optionalString(input, 'connector'),
-            name: requiredString(input, 'name'),
-            purpose: requiredString(input, 'purpose'),
-            display_name: optionalString(input, 'display_name'),
-            scopes: input.scopes,
-            mode: optionalString(input, 'mode'),
-            run_mode: optionalString(input, 'run_mode'),
-            crew_def: input.crew_def,
-        }),
-    },
+    ...agentProposeCliTools,
     {
         name: 'aimeat_agent_console_set',
         description: "Record where an agent is managed by whatever HOSTS it (its settings or brain page in the fleet runtime it runs in), so the owner's profile can link straight to it. Absolute http(s) URL; '' clears it.",

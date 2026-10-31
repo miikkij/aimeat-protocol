@@ -34,6 +34,8 @@
  *     caller anywhere in src/.
  *   2026-10-25 -- sendNotification() renders through textNotificationEmailHtml(): the subject and
  *     body are escaped and line breaks kept (secaudit2026oct22).
+ *   2026-10-31 -- sendNotification() takes `replyTo`, which the owner's report mail sets from
+ *     email.reply_to (Jouni, 2026-10-31 20.14).
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -63,7 +65,8 @@ export interface EmailService {
   readonly enabled: boolean;
   sendVerificationCode(to: string, code: string, locale?: string): Promise<boolean>;
   sendMagicLink(to: string, loginUrl: string, locale?: string): Promise<boolean>;
-  sendNotification(to: string, subject: string, body: string): Promise<boolean>;
+  /** `replyTo`: where a reply goes, when not the From address (email.reply_to on an owner's report). */
+  sendNotification(to: string, subject: string, body: string, opts?: { replyTo?: string | null }): Promise<boolean>;
   sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
@@ -148,10 +151,10 @@ export function createEmailService(config: AimeatConfig): EmailService {
 
   const from = config.smtpFrom;
 
-  async function send(to: string, subject: string, html: string, text: string, type: string): Promise<boolean> {
+  async function send(to: string, subject: string, html: string, text: string, type: string, replyTo?: string | null): Promise<boolean> {
     try {
       await withRetry(
-        () => transporter.sendMail({ from, to, subject, html, text }),
+        () => transporter.sendMail({ from, to, subject, html, text, ...(replyTo ? { replyTo } : {}) }),
         subject,
         type,
       );
@@ -182,10 +185,10 @@ export function createEmailService(config: AimeatConfig): EmailService {
       return send(to, subject, html, text, 'magic_link');
     },
 
-    async sendNotification(to: string, subject: string, body: string): Promise<boolean> {
+    async sendNotification(to: string, subject: string, body: string, opts?: { replyTo?: string | null }): Promise<boolean> {
       // Plain text from an extension, an agent or a workflow: escaped, line breaks kept.
       const { html, text } = textNotificationEmailHtml(subject, body);
-      return send(to, subject, html, text, 'notification');
+      return send(to, subject, html, text, 'notification', opts?.replyTo);
     },
 
     async sendInvite(to: string, args: import('./email-templates.js').InviteEmailArgs, locale?: string): Promise<boolean> {

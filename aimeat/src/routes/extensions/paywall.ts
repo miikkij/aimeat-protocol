@@ -15,6 +15,12 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-10-31 — Step 3.5 runs before the uncontracted pacing at 3.1: a bad product name
+ *     (INVALID_APP_TOOL, APP_TOOL_MISMATCH) and the 402 for an action a money-priced app-tool sells are
+ *     answered with nothing charged, and a call settled on the caller's app-tool contract is paced once,
+ *     by the contract at the metered chokepoint, and not again at 3.1. They ran after 3.1, so a refused
+ *     call kept its pacing and a contracted one was paced twice (secaudit 2026-10-31,
+ *     f-secaudit2026oct31-extra-paywall-pacing-return).
  *   2026-10-31 — Step 3.05 also asks, without charging, whether the caller covers the pacing before it
  *     asks for the pay token (refusePacingShortfall in pacing.ts), so a caller short of morsels gets
  *     INSUFFICIENT_MORSELS first and does not pay money for a call the pacing refuses (secaudit
@@ -432,14 +438,6 @@ export async function enforcePaywall(args: {
     }
   }
 
-  // 3.1 Uncontracted call: pace it here. A legacy morsel price (`commercial.payMorsels`) is pacing
-  //     now and joins the toll in this one charge: part burns, the rest is credited to the owner (M1).
-  const paced = await burnPacingToll({
-    config, storage, callerGaii, providerOwner: ownerName,
-    label: `ext:${ext.name}:${action.id}`, toll: pacingToll, res,
-  });
-  if (!paced.ok) return { ok: false };
-
   // 3.5 Not commercial in its OWN right — but it may be what a priced app-tool sells. An app-tool
   //     binds an extension action and puts a price on it; the raw route is the same capability
   //     through a different door, and it was free. Every priced app on the node had a bypass beside
@@ -448,14 +446,19 @@ export async function enforcePaywall(args: {
   //     Charged on the APP-TOOL's coordinate, not this action's, because that is the coordinate the
   //     product is sold under: a contract holder settles once at the price they agreed, whichever
   //     door they came through, and anyone else is told which listing to contract.
-  // A morsel price alone is pacing (charged above), so only a money price makes an action commercial.
-  if (!action.commercial?.payMoney) {
-    // When the script throws, the pacing comes back: a failed use costs nothing.
-    const giveBack = paced.charge ? { refund: paced.charge.reverse } : {};
-    if (soldFreeUpstream) return { ok: true, upstream: true, ...giveBack };  // the door the caller used prices it at nothing
-    const sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
-    if (!sold.length) return { ok: true, ...giveBack };     // free: nothing sells it, only the pacing was charged
-
+  //
+  //     Decided BEFORE the uncontracted pacing at 3.1 (secaudit 2026-10-31,
+  //     f-secaudit2026oct31-extra-paywall-pacing-return). A bad product name and the 402 for a money
+  //     price write nothing, so a call they refuse is refused with nothing charged. A contract the
+  //     caller holds is settled at the metered chokepoint, which paces the call at the contract's own
+  //     pacing amount (pacing.ts v1.4.0), so a contracted call returns here and is not paced again at
+  //     3.1. All three came after 3.1: a refused call kept its pacing, a contracted one paid it twice.
+  // A morsel price alone is pacing (charged at 3.1), so only a money price makes an action commercial.
+  let sold: PricedBinding[] = [];
+  if (!payMoney && !soldFreeUpstream) {
+    sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
+  }
+  if (sold.length) {
     // WHICH product is this? The route sees an action; a price belongs to a product, and one action
     // can be sold as several. Resolved in the order a buyer would expect to be treated:
     //
@@ -489,49 +492,67 @@ export async function enforcePaywall(args: {
         config, storage, coordExt: `apptool:${ownerName}/${chosen.appId}`, coordAction: chosen.tool,
         label: `${chosen.appId}/${chosen.tool}`, callerGaii, res, session,
       });
-      if (viaTool) return viaTool;                          // contracted → settled once, right here
+      if (viaTool) return viaTool;                          // contracted → settled and paced once, right here
     }
 
-    // 3.6 No contract held. When every tool that sells it is FREE (a pacing amount, no money price),
-    //     nothing is asked for: the call is paced at the highest of those tools' amounts, less what 3.1
-    //     already charged, and runs, as aimeat_app_tool_invoke runs a tool with no money price. Until
-    //     2026-10-17 such a call answered 402 "take a contract", so a person could not use a free app's
-    //     own tools (Kehitysputki). A contract a caller does hold is still settled above.
+    // No contract held, and a tool that sells it carries a money price: the caller is told which
+    // listing to contract. A call to an action that only free tools sell goes on to 3.6.
     const moneySold = sold.filter(s => s.money);
-    if (!moneySold.length) {
-      const already = resolvePacingToll(config, toll, action.commercial?.payMorsels);
-      const extra = Math.min(Math.max(0, ...sold.map(s => s.tollMorsels)) - already, config.extensionMaxDebitPerCall);
-      if (extra <= 0) return { ok: true, ...giveBack };
-      const more = await burnPacingToll({
-        config, storage, callerGaii, providerOwner: ownerName, label: `ext:${ext.name}:${action.id}`, toll: extra, res,
+    if (moneySold.length) {
+      const first = moneySold[0]!;
+      res.status(402).json({
+        ...error(config.nodeId, 'PAYMENT_REQUIRED',
+          `This capability is sold as ${moneySold.length === 1 ? 'the app-tool' : 'the app-tools'} `
+          + moneySold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
+          + 'Take a contract on EXCHANGE (POST /v1/exchange/entitlements with the offering id) and '
+          + 'call it again — this route and the app-tool endpoint settle the same contract.'
+          + (moneySold.length > 1
+            ? ` They are separate products at separate prices; hold more than one and this route settles the `
+              + `cheapest unless you name it with "${APP_TOOL_HEADER}: {app_id}/{tool}".`
+            : '')),
+        ...paymentChallenge(config),
+        app_tool: { owner: ownerName, app_id: first.appId, tool: first.tool, coordinate: `apptool:${ownerName}/${first.appId}` },
+        app_tools: moneySold.map(s => ({
+          owner: ownerName, app_id: s.appId, tool: s.tool,
+          invoke: `/v1/apps/${ownerName}/${s.appId}/webmcp/tools/${s.tool}`,
+        })),
       });
-      if (!more.ok) {
-        await paced.charge?.reverse();
-        return { ok: false };
-      }
-      const both = async () => { await paced.charge?.reverse(); await more.charge?.reverse(); };
-      return { ok: true, refund: both };
+      return { ok: false };
     }
+  }
 
-    const first = moneySold[0]!;
-    res.status(402).json({
-      ...error(config.nodeId, 'PAYMENT_REQUIRED',
-        `This capability is sold as ${moneySold.length === 1 ? 'the app-tool' : 'the app-tools'} `
-        + moneySold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
-        + 'Take a contract on EXCHANGE (POST /v1/exchange/entitlements with the offering id) and '
-        + 'call it again — this route and the app-tool endpoint settle the same contract.'
-        + (moneySold.length > 1
-          ? ` They are separate products at separate prices; hold more than one and this route settles the `
-            + `cheapest unless you name it with "${APP_TOOL_HEADER}: {app_id}/{tool}".`
-          : '')),
-      ...paymentChallenge(config),
-      app_tool: { owner: ownerName, app_id: first.appId, tool: first.tool, coordinate: `apptool:${ownerName}/${first.appId}` },
-      app_tools: moneySold.map(s => ({
-        owner: ownerName, app_id: s.appId, tool: s.tool,
-        invoke: `/v1/apps/${ownerName}/${s.appId}/webmcp/tools/${s.tool}`,
-      })),
+  // 3.1 Uncontracted call: pace it here. A legacy morsel price (`commercial.payMorsels`) is pacing
+  //     now and joins the toll in this one charge: part burns, the rest is credited to the owner (M1).
+  const paced = await burnPacingToll({
+    config, storage, callerGaii, providerOwner: ownerName,
+    label: `ext:${ext.name}:${action.id}`, toll: pacingToll, res,
+  });
+  if (!paced.ok) return { ok: false };
+
+  if (!payMoney) {
+    // When the script throws, the pacing comes back: a failed use costs nothing.
+    const giveBack = paced.charge ? { refund: paced.charge.reverse } : {};
+    if (soldFreeUpstream) return { ok: true, upstream: true, ...giveBack };  // the door the caller used prices it at nothing
+    if (!sold.length) return { ok: true, ...giveBack };     // free: nothing sells it, only the pacing was charged
+
+    // 3.6 No contract held, and every tool that sells it is FREE (a pacing amount, no money price):
+    //     nothing is asked for. The call is paced at the highest of those tools' amounts, less what
+    //     3.1 already charged, and runs, as aimeat_app_tool_invoke runs a tool with no money price.
+    //     Until 2026-10-17 such a call answered 402 "take a contract", so a person could not use a
+    //     free app's own tools (Kehitysputki). A contract a caller does hold is settled at 3.5.
+    //     The second charge has its own atomic debit, which is the decision, so a caller who covers
+    //     3.1 and not this is refused after 3.1 and given the 3.1 pacing back.
+    const extra = Math.min(Math.max(0, ...sold.map(s => s.tollMorsels)) - pacingToll, config.extensionMaxDebitPerCall);
+    if (extra <= 0) return { ok: true, ...giveBack };
+    const more = await burnPacingToll({
+      config, storage, callerGaii, providerOwner: ownerName, label: `ext:${ext.name}:${action.id}`, toll: extra, res,
     });
-    return { ok: false };
+    if (!more.ok) {
+      await paced.charge?.reverse();
+      return { ok: false };
+    }
+    const both = async () => { await paced.charge?.reverse(); await more.charge?.reverse(); };
+    return { ok: true, refund: both };
   }
 
   // 3.9 The spend permission and the token were asked at 3.05, before the pacing.
@@ -541,7 +562,7 @@ export async function enforcePaywall(args: {
   const consumed = await consumeExtPayToken(storage, payToken, tokenFor);
   if (!consumed.ok) {
     await paced.charge?.reverse();
-    paymentRequired(action.commercial.payMoney, consumed.reason);
+    paymentRequired(payMoney, consumed.reason);
     return { ok: false };
   }
   // Token valid and consumed: money settled. When the script throws, the pacing comes back. A sale

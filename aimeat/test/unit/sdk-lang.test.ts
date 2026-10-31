@@ -7,6 +7,8 @@
  *   fallback. With a list a source counts only when it names a listed language; without one any
  *   source counts. Each case removes the source above it to show the next one answers.
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The node's own language (the prelude's defaultLocale) after the cookie and
+ *     before the browser.
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, M7).
  */
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -63,6 +65,24 @@ describe('readLang with a list: the documented order', () => {
   it('then the cookie', () => {
     page({ ...ALL, search: '', stored: undefined });
     expect(readLang(list)).toBe('sv');
+  });
+
+  it('then the node\'s own language, before the browser (2026-10-31)', () => {
+    // An app on a Finnish customer's place spoke English to an English browser. The source was broken.
+    page({ ...ALL, search: '', stored: undefined, cookie: '' });
+    g.window = { __AIMEAT_SDK_CFG__: { defaultLocale: 'fi' } };
+    try {
+      expect(readLang(list)).toBe('fi');
+      // A choice the person made still wins.
+      page({ ...ALL, search: '', stored: 'sv', cookie: '' });
+      expect(readLang(list)).toBe('sv');
+      // A language the list does not carry is passed over.
+      g.window = { __AIMEAT_SDK_CFG__: { defaultLocale: 'ja' } };
+      page({ ...ALL, search: '', stored: undefined, cookie: '' });
+      expect(readLang(list)).toBe('de');
+    } finally {
+      delete g.window;
+    }
   });
 
   it('then the browser, cut to two letters', () => {

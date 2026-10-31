@@ -14,6 +14,8 @@
  * @structure S · placeWords · ConnectForm({ mode, approved, names, onConnected, clearSignal }) · TestSteps
  * @usage html`<${ConnectForm} mode=${v.mode} approved=${approved} names=${v.stores.map((s) => s.name)} onConnected=${reload} />`
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Says before connecting that a direct browser upload needs a CORS rule, and after
+ *     connecting whether the store has it, with the rule to add when not (browser-access.js).
  *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
  *     the name field and "Make this the default"; `names` (the stores the person has) replaces
  *     `replacing`, and the form says when a name gives an existing store new keys. The address and key
@@ -38,6 +40,8 @@ import { Stack, Space } from '/components/Layout.js';
 import { swallowed } from '/js/swallowed.js';
 import { EMPTY_STORE, withoutSecrets, lackingOf, storeBody, StoreFields } from './store-fields.js';
 import { refusalWords, RefusalNote } from './store-words.js';
+import { Facts } from '/components/Facts.js';
+import { browserAccessRow, CorsHint, CorsRule } from './browser-access.js';
 
 const html = htm.bind(h);
 /** One word of the page "Your own storage". */
@@ -119,7 +123,11 @@ export function ConnectForm({ mode, approved, names = [], onConnected, clearSign
     try {
       const r = await connectMyFileStore(body);
       const view = r.data.view || {};
-      setResult({ outcome: r.data.outcome, steps: r.data.test?.steps || [], isDefault: view.default_store === `own:${name}` });
+      const saved = (view.stores || []).find((x) => x.name === name);
+      setResult({
+        outcome: r.data.outcome, steps: r.data.test?.steps || [], isDefault: view.default_store === `own:${name}`,
+        kind, access: saved ? saved.browser_access : null,
+      });
       // The keys leave the page once the node has them: the form never holds a saved secret.
       setF((cur) => ({ ...withoutSecrets(cur), access_key_id: '', reason: '', name: '' }));
       setMakeDefault(false);
@@ -138,6 +146,7 @@ export function ConnectForm({ mode, approved, names = [], onConnected, clearSign
   return html`
     <${Stack} gap="medium">
       <${Note} kind="lead">${first ? S('form.lead') : S('form.leadMore')}<//>
+      <${CorsHint} />
       <${Fields} cols=${2}>
         <${TextField} label=${S('form.name')} hint=${replacing ? S('form.nameReplaces', { name }) : S('form.nameHint')} value=${f.name}
           code size="medium" maxLength=${40} placeholder=${first ? FIRST_NAME : ''} onInput=${(v) => set('name')(v.toLowerCase())}
@@ -164,6 +173,9 @@ export function ConnectForm({ mode, approved, names = [], onConnected, clearSign
       ${result && result.refusal ? html`<${RefusalNote} refusal=${result.refusal} />` : null}
       ${result && !result.refusal ? html`
         <${Note} kind="message">${savedWords(result.outcome, result.isDefault)}<//>
-        <${TestSteps} steps=${result.steps} />` : null}
+        <${TestSteps} steps=${result.steps} />
+        ${result.access ? html`
+          <${Facts} rows=${[browserAccessRow(result.access)]} />
+          <${CorsRule} access=${result.access} kind=${result.kind} />` : null}` : null}
     <//>`;
 }

@@ -9,6 +9,7 @@
  * @structure registerNotifyTools(mcp, storage, config, getAgentGaii, caller)
  * @usage import { registerNotifyTools } from './notify.js';
  * @version-history
+ *   2026-10-31 — `email` mails the notification to the owner too; the answer carries `emailed` (v31 K46).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The caller is the session's CallerContext (services/caller-context.ts) instead of an object built here (secaudit 2026-10, C9).
@@ -42,9 +43,9 @@ export function registerNotifyTools(
             inputSchema: zodShapeFor('aimeat_notify'),
             annotations: annotationsFor('aimeat_notify'),
         },
-        async ({ title, body, link, type }) => {
+        async ({ title, body, link, type, email }) => {
             try {
-                const r = await createPrincipalNotification(storage, config, caller().auth, { title, body, link, type });
+                const r = await createPrincipalNotification(storage, config, caller().auth, { title, body, link, type, email });
                 if (r.muted) {
                     // Not a failure: the owner said "nothing from you" and the node honoured it. The
                     // sender is told plainly, and told what to do instead.
@@ -64,7 +65,7 @@ export function registerNotifyTools(
                         isError: true,
                     };
                 }
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'notified', link: r.link }, null, 2) }] };
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'notified', link: r.link, ...(email !== undefined ? { emailed: r.emailed } : {}) }, null, 2) }] };
             } catch (e) {
                 const text = e instanceof NotificationCreateError ? e.message : ((e as Error)?.message || 'Notification failed');
                 return { content: [{ type: 'text' as const, text }], isError: true };

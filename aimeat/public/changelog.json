@@ -4,6 +4,160 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-the-aimeat-you-buy-is-yours-at-once",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "The AIMEAT you buy is yours at once",
+        "fi": "Kaupasta ostettu AIMEAT on omasi heti"
+      },
+      "summary": {
+        "en": "Your own AIMEAT speaks to you in plain words, shows your AI allowance in euros and opens light.",
+        "fi": "Oma AIMEATisi puhuu selkeästi, näyttää tekoälysaldon euroina ja avautuu vaaleana."
+      },
+      "body": {
+        "en": "Home tells you the one thing to do first, connecting your own AI, and leaves once it is done. Your AI allowance shows in euros beside \"Buy more AI\", a one-off payment with no new subscription. You sign in with a link that comes to your email, and the sign-in window says why the demo, the store and your own AIMEAT each ask you to sign in. The help page, the chat and the AI page use the same plain words.",
+        "fi": "Koti kertoo, mitä teet ensin: liität oman tekoälysi. Kun se on tehty, ohje poistuu. Tekoälysaldo näkyy euroina, ja sen vieressä on Osta lisää tekoälyä. Se on kertamaksu, eikä uutta tilausta tarvita. Kirjaudut sähköpostiisi tulevalla linkillä, ja kirjautumisikkuna kertoo, miksi esittely, kauppa ja oma AIMEATisi pyytävät kukin kirjautumaan. Ohjesivu, chat ja tekoälysivu käyttävät samoja selkeitä sanoja."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-ask-the-chat-for-an-app-and-get-its-address-in-the-same-message",
+      "highlight": true,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "Ask the chat for an app and get its address in the same message",
+        "fi": "Pyydä chatissa sovellus, niin saat valmiin osoitteen samassa viestissä"
+      },
+      "summary": {
+        "en": "Say in one sentence what the app should do: the chat builds it, publishes it and gives you the link.",
+        "fi": "Kerro yhdellä lauseella, mitä sovelluksen pitää tehdä: chat rakentaa, julkaisee ja antaa linkin."
+      },
+      "body": {
+        "en": "Write what you need, for example a shopping list where you add and remove items. The chat starts from a ready design, publishes the app and gives you its address in the same answer, with no need to say \"continue\". Under the answer you see in a few words what it did, and you can open the steps.",
+        "fi": "Kirjoita, mitä tarvitset, esimerkiksi ostoslista, johon voit lisätä ja poistaa tuotteita. Chat aloittaa valmiista ulkoasusta, julkaisee sovelluksen ja antaa sen osoitteen samassa vastauksessa. Sinun ei tarvitse sanoa \"jatka\". Vastauksen alla näet muutamalla sanalla, mitä chat teki, ja voit avata vaiheet."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-your-agent-can-send-its-report-to-your-email",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Your agent can send its report to your email",
+        "fi": "Agenttisi voi lähettää raporttinsa sähköpostiisi"
+      },
+      "summary": {
+        "en": "A morning news summary, say, arrives in your mailbox, sent only to the address you verified.",
+        "fi": "Esimerkiksi aamun uutiskatsaus tulee postilaatikkoosi, vain vahvistamaasi osoitteeseen."
+      },
+      "body": {
+        "en": "An agent or an app can send what it made to your email as well as to the bell. It goes only to the address you verified, at most ten a day from one sender, and never from one you muted. The Email page lists each such mail, and a reply reaches a person when the operator named a reply address.",
+        "fi": "Agentti tai sovellus voi lähettää tekemänsä sähköpostiisi kellon lisäksi. Viesti menee vain vahvistamaasi osoitteeseen, yhdeltä lähettäjältä enintään kymmenen päivässä, eikä koskaan lähettäjältä, jonka olet mykistänyt. Sähköposti-sivu luettelee jokaisen tällaisen viestin. Vastauksesi menee ihmiselle, kun ylläpitäjä on antanut vastausosoitteen."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-approve-an-agent-with-one-press-its-schedule-included",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Approve an agent with one press, its schedule included",
+        "fi": "Hyväksy agentti yhdellä painalluksella, ajastus mukana"
+      },
+      "summary": {
+        "en": "A proposed agent waits with Approve and Decline, and starts on its clock when you approve it.",
+        "fi": "Ehdotettu agentti odottaa Hyväksy- ja Hylkää-napin kanssa ja aloittaa ajallaan, kun hyväksyt sen."
+      },
+      "body": {
+        "en": "When your AI proposes an agent, the link it gives you opens the proposal itself: what the agent does, when it works (every morning at 7, say) and one press that starts it. On the Agents page each waiting proposal has Approve and Decline on its row.",
+        "fi": "Kun tekoälysi ehdottaa agenttia, sen antama linkki avaa ehdotuksen: mitä agentti tekee, milloin se tekee työtä (esimerkiksi joka aamu klo 7) ja yhden napin, joka käynnistää sen. Agentit-sivulla jokaisen odottavan ehdotuksen rivillä on Hyväksy ja Hylkää."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-connecting-a-file-store-tells-you-which-cors-rule-to-add",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "agent"
+      ],
+      "title": {
+        "en": "Connecting a file store tells you which CORS rule to add",
+        "fi": "Tallennustilan yhdistäminen kertoo, minkä CORS-säännön lisäät"
+      },
+      "summary": {
+        "en": "The test of your S3 or Azure store says whether apps can send files straight to it, and which rule to add.",
+        "fi": "Tallennustilan testi kertoo, voivatko sovellukset lähettää tiedostot suoraan sinne ja minkä säännön lisäät."
+      },
+      "body": {
+        "en": "When you connect an S3 bucket or Azure container, the test also checks whether apps can send files straight to it. If the CORS rule is missing, the page shows the exact rule and where to add it, and Test again checks it once you have.",
+        "fi": "Kun yhdistät S3-bucketin tai Azure-säilön, testi tarkistaa myös, voivatko sovellukset lähettää tiedostot suoraan sinne. Jos sääntö puuttuu, sivu näyttää tarkan säännön ja paikan, johon lisäät sen. Testaa uudestaan -painike tarkistaa säännön, kun olet lisännyt sen."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-overview-map",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Overview map",
+        "fi": "Kokonaiskuva"
+      },
+      "summary": {
+        "en": "See your computers, agents, apps, knowledge and offerings on one page, with how much each is used.",
+        "fi": "Näet tietokoneesi, agenttisi, sovelluksesi, tietosi ja tarjoamasi yhdellä sivulla ja kuinka paljon kutakin käytetään."
+      },
+      "body": {
+        "en": "See your whole account on one page: which computers bring which agents, the apps and workspaces they use, what they offer and how much each is used. Open any card in place, and ask your own AI about anything in a help dialog with the facts included.",
+        "fi": "Näet koko tilisi yhdellä sivulla: mitkä tietokoneet tuovat mitkäkin agentit, mitä sovelluksia ja työtiloja ne käyttävät, mitä ne tarjoavat ja kuinka paljon kutakin käytetään. Avaat minkä tahansa kortin paikallaan. Ohjedialogista saat valmiin kysymyksen omalle tekoälyllesi, ja tiedot tulevat sen mukana."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-large-files-straight-to-your-file-store",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Large files straight to your file store",
+        "fi": "Suuret tiedostot suoraan tallennustilaan"
+      },
+      "summary": {
+        "en": "A file of hundreds of megabytes goes straight to your S3 or Azure storage and back, without passing through AIMEAT.",
+        "fi": "Satojen megatavujen tiedosto menee suoraan S3- tai Azure-tallennustilaasi ja takaisin kulkematta AIMEATin kautta."
+      },
+      "body": {
+        "en": "When your files are kept in S3 or Azure storage, an app or your AI can send a large file, up to several gigabytes, straight there, and a file of 64 MB or more downloads straight from there. AIMEAT checks who may write and read, records the file and counts it, but the bytes do not pass through it. For a browser, the storage needs a CORS rule.",
+        "fi": "Kun tiedostosi ovat S3- tai Azure-tallennustilassa, sovellus tai tekoälysi voi lähettää suuren tiedoston, jopa useita gigatavuja, suoraan sinne, ja vähintään 64 Mt:n tiedosto latautuu suoraan sieltä. AIMEAT tarkistaa, kuka saa kirjoittaa ja lukea, kirjaa tiedoston ja laskee sen kiintiöön, mutta tavut eivät kulje sen kautta. Selainta varten tallennustilaan tarvitaan CORS-sääntö."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-see-and-decide-what-your-computers-may-start",
       "highlight": false,
       "audience": [

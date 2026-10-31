@@ -33,6 +33,8 @@
  *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
  *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
  * @version-history
+ *   v1.0.3 -- 2026-10-31 -- A page with no `lang` takes the language from readLang (the place's own
+ *     language before the browser), not English.
  *   v1.0.2 -- 2026-10-27 -- The "How this was made" link of disclose() and chatNotice() takes only an
  *     http(s), mailto or relative address (_core/safe-href.js, the rule AIMEAT.md applies); any other
  *     draws the label without a link (secaudit2026oct26).
@@ -40,7 +42,7 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { APEX_URL } from '../_core/config.js';
-import { storedLang } from '../_core/lang.js';
+import { storedLang, readLang } from '../_core/lang.js';
 import { sanitizeHref } from '../_core/safe-href.js';
 import { euIconFor } from '../../../../public/components/ai-label-icons.js';
 import LABEL_CSS from '../../../../public/css/components/ai-label.css';
@@ -93,9 +95,13 @@ function osDarkIcons(base) {
     + '}';
 }
 
-/** The reader's language, resolved the way every AIMEAT app resolves it. */
+/**
+ * The reader's language: their stored choice, then the page's own `<html lang>`, then the one
+ * resolver (cookie, the place's own language, the browser). The last step was 'en', so a page with no
+ * `lang` showed the label in English on a Finnish place (crew33 check, 2026-10-31).
+ */
 function locale() {
-  const lang = storedLang() || document.documentElement.lang || 'en';
+  const lang = storedLang() || document.documentElement.lang || String(readLang(['en', 'fi']));
   return lang.slice(0, 2) === 'fi' ? 'fi' : 'en';
 }
 

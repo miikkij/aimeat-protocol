@@ -9,13 +9,15 @@
  *   against Azurite, Microsoft's local emulator, whose endpoint carries the account in its path.
  *   Also reads the two forms people copy out of the Azure portal: a connection string and a container
  *   SAS URL (parseAzureConnection).
- * @structure azureSharedKey · parseAzureConnection · createAzureStore
+ * @structure azureSharedKey · azureBlobSas · parseAzureConnection · createAzureStore
  * @usage const store = createAzureStore({ kind: 'azure', accountName: 'acct', container: 'files', accountKey }, fetch);
  * @version-history
+ *   v1.1.0 — 2026-10-31 — head() and signedUrl(): a service SAS for one blob, so a large file is written
+ *     and read straight from the container (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { createHmac } from 'node:crypto';
-import { BlobStoreError, type AzureSpec, type BlobFetch, type BlobListPage, type BlobStore } from './blob-types.js';
+import { BlobStoreError, attachmentDisposition, type AzureSpec, type BlobFetch, type BlobListPage, type BlobStore } from './blob-types.js';
 import { bodyBuffer, bodyText, drain, failure, uriEncode, xmlValue, xmlValues } from './blob-http.js';
 
 const API_VERSION = '2021-08-06';
@@ -43,6 +45,35 @@ export function azureSharedKey(input: {
   ].join('\n') + '\n' + msHeaders + resource;
   const sig = createHmac('sha256', Buffer.from(input.accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
   return `SharedKey ${input.accountName}:${sig}`;
+}
+
+/**
+ * The query of a service SAS for one blob (learn.microsoft.com/rest/api/storageservices/create-service-sas),
+ * signed with the account key: `r` to read it, `cw` to create or replace it, from five minutes ago (a
+ * client clock running behind) to `expiry`. A read SAS can name the content type and the
+ * Content-Disposition the store answers with. Exported so a unit test holds the string to sign.
+ */
+export function azureBlobSas(input: {
+  accountName: string; accountKey: string; container: string; blob: string;
+  permissions: 'r' | 'cw'; start: Date; expiry: Date; https: boolean;
+  contentType?: string; disposition?: string;
+}): string {
+  const iso = (d: Date) => d.toISOString().replace(/\.\d{3}Z$/, 'Z');
+  const st = iso(input.start);
+  const se = iso(input.expiry);
+  const spr = input.https ? 'https' : 'https,http';
+  const rscd = input.disposition ?? '';
+  const rsct = input.contentType ?? '';
+  const stringToSign = [
+    input.permissions, st, se, `/blob/${input.accountName}/${input.container}/${input.blob}`,
+    '', '', spr, API_VERSION, 'b', '', '', '', rscd, '', '', rsct,
+  ].join('\n');
+  const sig = createHmac('sha256', Buffer.from(input.accountKey, 'base64')).update(stringToSign, 'utf8').digest('base64');
+  const q: Array<[string, string]> = [['sv', API_VERSION], ['st', st], ['se', se], ['sr', 'b'], ['sp', input.permissions], ['spr', spr]];
+  if (rscd) q.push(['rscd', rscd]);
+  if (rsct) q.push(['rsct', rsct]);
+  q.push(['sig', sig]);
+  return q.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join('&');
 }
 
 /**
@@ -149,6 +180,31 @@ export function createAzureStore(spec: AzureSpec, send: BlobFetch): BlobStore {
       const res = await request('DELETE', key);
       if (!res.ok && res.status !== 404) throw await failure(res, 'Removing an object', label);
       await drain(res);
+    },
+
+    async head(key) {
+      const res = await request('HEAD', key);
+      await drain(res);
+      if (res.status === 404) return null;
+      if (!res.ok) throw await failure(res, 'Reading an object\'s size', label);
+      return { size: Number(res.headers.get('content-length') ?? 0), contentType: res.headers.get('content-type') ?? 'application/octet-stream' };
+    },
+
+    // Only the account key signs a SAS; a store connected with a container SAS has nothing to sign with,
+    // and handing that SAS out would give the client the whole container.
+    signedUrl(key, op) {
+      if (!spec.accountKey) return null;
+      const now = Date.now();
+      const sas = azureBlobSas({
+        accountName: spec.accountName, accountKey: spec.accountKey, container: spec.container, blob: key,
+        permissions: op.kind === 'write' ? 'cw' : 'r',
+        start: new Date(now - 5 * 60_000), expiry: new Date(now + op.expiresInSec * 1000),
+        https: base.protocol === 'https:',
+        ...(op.kind === 'read' && op.contentType ? { contentType: op.contentType } : {}),
+        ...(op.kind === 'read' && op.filename ? { disposition: attachmentDisposition(op.filename) } : {}),
+      });
+      const path = `${base.pathname.replace(/\/+$/, '')}/${uriEncode(spec.container, false)}/${uriEncode(key, true)}`;
+      return `${base.protocol}//${base.host}${path}?${sas}`;
     },
 
     async list(prefix, next): Promise<BlobListPage> {

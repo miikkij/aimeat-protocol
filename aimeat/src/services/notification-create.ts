@@ -11,6 +11,11 @@
  * @structure NotificationCreateError · createPrincipalNotification
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The report mail carries Reply-To from email.reply_to when it is set (Jouni, 20.14).
+ *   v1.3.0 — 2026-10-31 — `email: true` also mails the notification to the owner's verified address,
+ *     at most EMAIL_PER_DAY a sender, never when muted; `emailed` says what became of it. An agent
+ *     could reach the owner's bell and devices only, so "send me the summary by email" had no way
+ *     to happen (v31 K46).
  *   v1.2.0 — 2026-09-24 — The link is checked by isSameOriginPath, so `/\host`, which a browser reads
  *     as `//host`, is refused like any other address off this node.
  *   v1.1.0 — 2026-09-07 — `created` says whether it was created. It was the literal `true`, and
@@ -26,6 +31,9 @@ import { notify } from './notify.js';
 import type { NotifSource } from './notification-settings.js';
 import { emitChange } from './event-bus.js';
 import { isSameOriginPath } from '../utils/same-origin-path.js';
+import { getActiveEmailService } from './email.js';
+import { appendMailLog } from './notification-settings.js';
+import { logger } from '../utils/logger.js';
 
 export class NotificationCreateError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message); this.name = 'NotificationCreateError'; }
@@ -34,12 +42,35 @@ export class NotificationCreateError extends Error {
 /** The slice of req.auth this needs. */
 export interface CreatorAuth { owner: string; sub: string; roles: string[]; app_grant?: string | null }
 
-export interface CreateNotificationInput { title?: unknown; body?: unknown; link?: unknown; type?: unknown; actions?: unknown }
+export interface CreateNotificationInput { title?: unknown; body?: unknown; link?: unknown; type?: unknown; actions?: unknown; email?: unknown }
+
+/**
+ * What became of `email: true`: sent to the owner's verified address; `not_asked`; the owner has no
+ * verified address; this node sends no mail; the sender reached EMAIL_PER_DAY today; the transport
+ * refused it; or muted (the owner silenced this sender, so neither the bell nor the mail).
+ */
+export type NotificationEmailOutcome = 'sent' | 'not_asked' | 'no_address' | 'mail_off' | 'limit' | 'failed' | 'muted';
+
+/**
+ * Mails to the owner one sender may cause in 24 hours. Held in this process: a restart starts the
+ * count again, which costs at most one more day's worth; the owner's mute stops a sender for good.
+ */
+export const EMAIL_PER_DAY = 10;
+const emailsSent = new Map<string, number[]>();
+
+function underEmailLimit(key: string, now: number): boolean {
+  const recent = (emailsSent.get(key) ?? []).filter(at => now - at < 86_400_000);
+  emailsSent.set(key, recent);
+  return recent.length < EMAIL_PER_DAY;
+}
 
 export async function createPrincipalNotification(
   storage: Storage, config: AimeatConfig, auth: CreatorAuth, input: CreateNotificationInput,
-): Promise<{ created: boolean; link: string | null; muted: boolean }> {
+): Promise<{ created: boolean; link: string | null; muted: boolean; emailed: NotificationEmailOutcome }> {
   const { title, body, link, type } = input;
+  if (input.email !== undefined && typeof input.email !== 'boolean') {
+    throw new NotificationCreateError(400, 'VALIDATION_ERROR', 'email is true or false');
+  }
   if (typeof title !== 'string' || !title.trim() || title.length > 200) {
     throw new NotificationCreateError(400, 'VALIDATION_ERROR', 'title is required (string, max 200 chars)');
   }
@@ -99,5 +130,40 @@ export async function createPrincipalNotification(
   // A MUTED notification keeps `created: false` with `muted: true`, and that is not a failure: the
   // owner said "nothing from this one", the node honoured it, and the two fields together say so.
   emitChange('notifications', ghii);
-  return { created: result.stored, link: finalLink ?? null, muted: result.muted };
+  const emailed = input.email !== true ? 'not_asked'
+    : result.muted ? 'muted'
+    : await mailOwner(storage, config, ghii, `${source.kind}:${source.id ?? source.name}`, finalTitle, body as string | undefined, finalLink);
+  return { created: result.stored, link: finalLink ?? null, muted: result.muted, emailed };
+}
+
+/**
+ * The same notification by email to the owner, at the address they verified (GHIIRecord
+ * notificationEmail, as the digest uses). Self-targeted like the rest: the address is the owner's
+ * own and never an input. Written for an agent's report the owner asked to get by mail, such as a
+ * morning news summary (v31 K46): before this an agent could reach the owner's bell and devices only.
+ */
+async function mailOwner(
+  storage: Storage, config: AimeatConfig, ghii: string, sender: string,
+  title: string, body: string | undefined, link: string | undefined,
+): Promise<NotificationEmailOutcome> {
+  const email = getActiveEmailService();
+  if (!email?.enabled) return 'mail_off';
+  const owner = await storage.getGHII(ghii);
+  if (!owner?.notificationEmail || !owner.emailVerifiedAt) return 'no_address';
+  const now = Date.now();
+  const key = `${ghii} ${sender}`;
+  if (!underEmailLimit(key, now)) return 'limit';
+  const url = link ? `${config.baseUrl.replace(/\/+$/, '')}${link}` : '';
+  const text = [body?.trim(), url].filter(Boolean).join('\n\n');
+  try {
+    // A reply goes where somebody reads it (email.reply_to), not to the node's no-reply sender.
+    const ok = await email.sendNotification(owner.notificationEmail, title, text || title, { replyTo: config.smtpReplyTo });
+    if (!ok) return 'failed';
+    emailsSent.get(key)?.push(now);
+    await appendMailLog(storage, ghii, { kind: 'notification', subject: title });
+    return 'sent';
+  } catch (err) {
+    logger.warn('notification email: not sent', { ghii, error: String(err) });
+    return 'failed';
+  }
 }

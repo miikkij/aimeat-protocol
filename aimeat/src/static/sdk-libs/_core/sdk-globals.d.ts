@@ -10,6 +10,7 @@
  *   casts, and is shared by every lib (e.g. audio also needs webkitAudioContext).
  * @usage Picked up by tsconfig.sdk.json (its include globs the sdk-libs .d.ts files). No runtime effect.
  * @version-history
+ *   v1.3.0 — 2026-10-31 — __AIMEAT_SDK_CFG__.defaultLocale: the node's own language (site.default_locale).
  *   v1.2.0 — 2026-10-31 — __AIMEAT_AUTH_CFG__.linkFirst (v28 #7).
  *   v1.1.0 — 2026-09-02 — Motion, anime and Lenis globals, the three vendored animation packs
  *     the Atelier parts lazy-load (wish-atelier-motion-libraries-and-parts).
@@ -25,7 +26,7 @@ interface Window {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   AIMEATAgentFace?: Record<string, any>;
   /** Serve-time config prelude prepended to each bundle (see _core/config.js + libs/sdk-serve.ts). */
-  __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number };
+  __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number; defaultLocale?: string };
   /** aimeat-auth's extra serve-time prelude (server-computed, see routes/libs.ts): the OIDC providers
    *  enabled on the node, and whether the node's registration gate demands an email. */
   __AIMEAT_AUTH_CFG__?: {
