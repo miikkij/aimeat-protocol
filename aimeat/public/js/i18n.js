@@ -14,6 +14,9 @@
  *   - flatten(): internal — collapses nested translation objects to dot-notation keys
  *
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The locale files are keyed by the node's build id (from this module's own
+ *     ?v=) instead of the time of each page load, and English and the page's language are fetched
+ *     together: every page view had downloaded both files, one after the other (Jouni v27 P7).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-10-14 — tEn(): a key's English text, for the menu find's English words.
  *   v1.2.0 — 2026-10-18 — tn(): a count in the language's plural form, through Intl.PluralRules.
@@ -39,31 +42,44 @@ let currentLocale = 'en';
 let translations = {};
 let fallback = {};
 const listeners = new Set();
-const _v = typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : Date.now();
+/**
+ * The cache key of the locale files: the node's build id, which portal.ts stamps on this module's own
+ * address (`/js/i18n.js?v=<BUILD_ID>` through the importmap). The files are about 2 MB each and the
+ * page waits for them before its first render, so a key that changes on every load (it was
+ * Date.now(), because __APP_VERSION__ is defined nowhere) downloaded both on every page view: several
+ * blank seconds on a new place and on /v1/chat (Jouni v27 P7, 2026-10-31). A build id changes when
+ * the files can have changed, and the browser keeps them in between.
+ */
+const _v = (() => {
+  try {
+    const stamped = new URL(import.meta.url).searchParams.get('v');
+    if (stamped) return stamped;
+  } catch (err) {
+    swallowed('i18n: build id from the module address', err);
+  }
+  return typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : Date.now();
+})();
+
+/** Read one locale file, or null when it cannot be read. */
+async function readLocale(tag) {
+  const res = await fetch(`/locales/${tag}.json?v=${_v}`);
+  return res.ok ? res.json() : null;
+}
 
 /** Load translations for a locale. */
 export async function loadTranslations(locale) {
   currentLocale = locale || detectLocale();
 
-  // Always load English as fallback (cache-bust with version)
-  const enRes = await fetch(`/locales/en.json?v=${_v}`);
-  if (enRes.ok) {
-    const enData = await enRes.json();
-    fallback = flatten(enData);
-  }
-  translations = fallback;
-
-  if (currentLocale !== 'en') {
-    try {
-      const locRes = await fetch(`/locales/${currentLocale}.json?v=${_v}`);
-      const locData = await locRes.json();
-      translations = { ...fallback, ...flatten(locData) };
-    } catch (err) {
-      // Fall back to English
-      swallowed('i18n: loadTranslations', err);
-      translations = fallback;
-    }
-  }
+  // English is the fallback for every key a language does not carry yet. Both files are asked for at
+  // once: one after the other, the page waited for the sum of the two downloads.
+  const [enData, locData] = await Promise.all([
+    readLocale('en'),
+    currentLocale !== 'en'
+      ? readLocale(currentLocale).catch((err) => { swallowed('i18n: loadTranslations', err); return null; })
+      : Promise.resolve(null),
+  ]);
+  if (enData) fallback = flatten(enData);
+  translations = locData ? { ...fallback, ...flatten(locData) } : fallback;
 
   persistLocale(currentLocale);
   document.documentElement.lang = currentLocale;
