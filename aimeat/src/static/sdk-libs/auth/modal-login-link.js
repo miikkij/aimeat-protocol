@@ -22,9 +22,11 @@
  *   IT IS NOT RENDERED WHERE IT CANNOT WORK. On a node that sends no mail (EMAIL_LOGIN false) there
  *   is no link, because the request would answer 200 and nothing would ever arrive.
  *
- * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field) · hereAddress() · wireLoginLinkStep(ctx)
+ * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.2.0 — 2026-10-31 — The request carries the dialog's language (`lang`), so the mail is in it;
+ *     wireLoginLinkStep returns `open`, and opened first the way back reads "Use a password instead" (v27 P1).
  *   v1.1.0 — 2026-09-29 — The request carries `redirect`, so the link returns to this page or to
  *     the place the opener names.
  *   v1.0.0 — 2026-09-29 — Initial (install packages: users created at install sign in by link).
@@ -32,6 +34,7 @@
 import { escHtml } from './theme.js';
 import { EMAIL_LOGIN, APEX_URL, NODE_URL } from './config.js';
 import { inIsolatedFrame } from './app-frame.js';
+import { currentModalLang } from './i18n.js';
 
 /** The link in the sign-in form's link row, or nothing on a node that sends no mail. */
 export function loginLinkAskHtml(i) {
@@ -44,15 +47,17 @@ export function loginLinkAskHtml(i) {
  * @param {Record<string, string>} i Modal strings.
  * @param {(label: string, input: string, hint?: string, opt?: string) => string} field The modal's field wrapper.
  */
-export function loginLinkViewHtml(i, field) {
+export function loginLinkViewHtml(i, field, linkFirst) {
   if (!EMAIL_LOGIN) return '';
+  // Opened first, the way back is the password form, and the button says so.
+  var back = linkFirst ? (i.loginLinkUsePassword || 'Use a password instead') : (i.backToLogin || 'Back to Login');
   return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">'
     + '<h3 class="aimeat-sub-title">' + escHtml(i.loginLinkTitle || 'Sign in with an emailed link') + '</h3>'
     + '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkDesc || 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.') + '</p>'
     + field(i.emailLabel || 'Email', '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">')
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(i.loginLinkSend || 'Send the link') + '</button>'
-    + '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
+    + '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>'
     + '</div>'
     + '<p id="aimeat-ll-msg" class="aimeat-msg"></p>'
     + '</div>';
@@ -81,23 +86,28 @@ export function hereAddress() {
  * @param {(path: string, opts: any) => Promise<any>} ctx.api The modal's request helper.
  * @param {(view: string) => void} ctx.showView Shows one view of the modal.
  * @param {string} [ctx.redirect] The place the link returns to; this page when absent.
+ * @param {{ linkFirstOpened?: boolean } | null} [ctx.openFirst] The dialog's options, when it opens on this step.
+ * @returns {{ open: () => void }}
  */
 export function wireLoginLinkStep(ctx) {
   var i = ctx.i;
   var ask = document.getElementById('aimeat-login-link');
-  if (!ask) return;
+  if (!ask) return { open: function () { /* no mail on this node: nothing to open */ } };
   var emailEl = /** @type {any} */ (document.getElementById('aimeat-ll-email'));
   var sendBtn = /** @type {any} */ (document.getElementById('aimeat-ll-send'));
   var msgEl = document.getElementById('aimeat-ll-msg');
 
-  ask.addEventListener('click', function (e) {
-    e.preventDefault();
+  function open() {
     // An address already typed into the sign-in field comes along.
     var typed = /** @type {any} */ (document.getElementById('aimeat-username'));
     if (typed && typed.value.indexOf('@') > 0 && !emailEl.value) emailEl.value = typed.value.trim();
     msgEl.style.display = 'none';
     ctx.showView('login-link');
     setTimeout(function () { emailEl.focus(); }, 30);
+  }
+  ask.addEventListener('click', function (e) {
+    e.preventDefault();
+    open();
   });
   document.getElementById('aimeat-ll-back').addEventListener('click', function () { ctx.showView('login'); });
 
@@ -108,7 +118,7 @@ export function wireLoginLinkStep(ctx) {
     sendBtn.textContent = i.working || 'Working...';
     sendBtn.disabled = true;
     /** @type {Record<string, string>} */
-    var body = { email: email };
+    var body = { email: email, lang: currentModalLang() };
     var back = (typeof ctx.redirect === 'string' && ctx.redirect) ? ctx.redirect : hereAddress();
     if (back) body.redirect = back;
     try {
@@ -125,4 +135,11 @@ export function wireLoginLinkStep(ctx) {
     e.preventDefault();
     if (!sendBtn.disabled) send();
   });
+
+  // A caller whose people mostly have no password (the store's buyers, v27 P1) opens the dialog on
+  // this step, with the password one press away. Once per dialog: the flag lives on the dialog's
+  // own options, so a redraw of the same dialog does not pull the person back here.
+  var first = ctx.openFirst;
+  if (first && !first.linkFirstOpened) { first.linkFirstOpened = true; open(); }
+  return { open: open };
 }

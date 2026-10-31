@@ -73,6 +73,10 @@
  *     account published the live version (it names who) or the owner narrowed the grant by hand, with
  *     one line that says which (secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing).
  *     Its exact permissions open with the screen, and with no live grant each is marked new.
+ *   v1.10.0 — 2026-10-31 — The store's sign-in (v27 P1). The dialog opens on the emailed link, and the
+ *     link returns to this page, a path of the node, instead of the app, which the node refused for an
+ *     account with no grant yet. The popup hears the mail tab's sign-in as a storage event and goes on
+ *     to the consent; the mail tab, with no app waiting on it, says "You are signed in" and offers the app.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -80,7 +84,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { showLoginModal, getStoredGhii, getNodeUrl } from '/js/services/auth.js';
+import { showLoginModal, getStoredGhii, getNodeUrl, restoreSession } from '/js/services/auth.js';
 import { useSession } from '/js/use-session.js';
 import { scopeSentence, areaLine, boundaryLines } from '/js/consent-vocab.js';
 import { isOwnApp, autoApproves, ownAppAsks } from './app-grant-auto.js';
@@ -119,18 +123,33 @@ export default function AppGrant() {
   const loginOpened = useRef(false);
 
   async function doLogin() {
-    // An emailed sign-in link returns to the app that asked, not to this page (v1.6.0). An app that
-    // asked for the create-account form (prompt=create) gets the dialog open on it (v1.7.0).
-    let redirect = '';
+    // The dialog opens on the emailed link: a buyer from the store has no password (v1.10.0). The
+    // link returns to THIS page, a path of the node, which the node accepts for any account. It used
+    // to name the app, which the node refuses for an app the account holds no grant for yet, so a
+    // first-time buyer landed signed out (v27 P1). An app that asked for the create-account form
+    // (prompt=create) gets the dialog open on it (v1.7.0).
     let register = false;
     try {
       const res = await api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`);
-      redirect = res.data?.app_origin || '';
       register = res.data?.prompt === 'create';
-    } catch (err) { swallowed('app-grant: the app to return to', err); }
-    const opts = { ...(redirect ? { redirect } : {}), ...(register ? { tab: 'register' } : {}) };
-    if (!showLoginModal(opts)) window.location.href = '/v1/profile';
+    } catch (err) { swallowed('app-grant: the request before sign-in', err); }
+    if (!showLoginModal(register ? { tab: 'register' } : { linkFirst: true })) window.location.href = '/v1/profile';
   }
+
+  // The mailed link opens in another tab and signs the person in there. That tab stores the session,
+  // and this window (the popup the app is waiting on) hears it as a storage event and goes on to the
+  // consent, so the code still reaches the app that holds the PKCE verifier (v1.10.0).
+  useEffect(() => {
+    if (authed) return undefined;
+    const onStorage = (e) => {
+      if (e.key !== 'aimeat_session' || !e.newValue) return;
+      restoreSession()
+        .then((ok) => { if (ok) document.getElementById('aimeat-modal')?.remove(); })
+        .catch((err) => swallowed('app-grant: the session from the mail tab', err));
+    };
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, [authed]);
 
   useEffect(() => {
     if (!requestId) { setState({ status: 'error', error: tr('appGrant.missing', 'No authorization request.') }); return; }
@@ -145,6 +164,12 @@ export default function AppGrant() {
     api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`)
       .then(async (res) => {
         if (!live) return;
+        // Opened from the mail: signed in now, but no app is waiting on this tab, and only the
+        // window the app opened can hand it the code. Say where to go on (v1.10.0).
+        if (res.data?.response_mode === 'web_message' && !window.opener) {
+          setState({ status: 'returned', request: res.data });
+          return;
+        }
         // If this app already holds a grant, this is "manage mode": pre-check the currently granted
         // scopes and offer Revoke. Best-effort — a failed lookup just falls back to first-consent.
         let grant = null;
@@ -175,7 +200,12 @@ export default function AppGrant() {
         if (grant || (isOwnApp(res.data, myOwner) && ownAppAsks(res.data, grant))) setDetails(true);
         setState({ status: 'ready', request: res.data });
       })
-      .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
+      .catch((e) => {
+        if (!live) return;
+        // A link opened from the mail after the request's ten minutes: signed in all the same.
+        if (!window.opener) { setState({ status: 'returned', request: null }); return; }
+        setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') });
+      });
     return () => { live = false; };
     // doLogin reads only requestId, which is listed, and loginOpened keeps it to one call.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -254,6 +284,19 @@ export default function AppGrant() {
       <${AskPage} title=${tr('appGrant.loginTitle', 'Log in to continue')}
         doors=${html`<${Loud} onClick=${doLogin}>${tr('appGrant.loginCta', 'Log in')}<//>`}>
         <${Note} kind="lead">${tr('appGrant.loginBody', 'Log in with your account on {node}. If you use this app for the first time, you then choose what it can use. After that, you are back in the app, signed in.', { node: nodeHost })}<//>
+      <//>`;
+  }
+  if (state.status === 'returned') {
+    const appName = state.request?.app_name || '';
+    const origin = state.request?.app_origin || '';
+    return html`
+      <${AskPage} title=${tr('appGrant.returnedTitle', 'You are signed in')}
+        doors=${origin
+          ? html`<${Loud} onClick=${() => { window.location.href = origin; }}>${tr('appGrant.returnedCta', 'Open {app}', { app: appName })}<//>`
+          : html`<${Action} onClick=${() => { window.location.href = '/v1/profile'; }}>${tr('appGrant.returnedHome', 'Go to your account')}<//>`}>
+        <${Note} kind="lead">${origin
+          ? tr('appGrant.returnedBody', 'Go back to the window where you started to sign in. It goes on there by itself. If you closed it, open {app} and sign in again.', { app: appName })
+          : tr('appGrant.returnedBodyNoApp', 'Go back to the app and sign in again. You do not need a new link.')}<//>
       <//>`;
   }
   if (state.status === 'error') {

@@ -3555,6 +3555,14 @@ components:
             link then lands on the front page. The answer is the same either
             way.
           example: /v1/profile
+        lang:
+          type: string
+          enum: [en, fi, es]
+          description: |
+            The language of the page the link was asked from. The mail is
+            written in it; without it, or with a language this node has no
+            strings for, the mail uses the account's own language.
+          example: fi
 
     # === Phase 1.4: Directories ===
     DirectoryEntry:
@@ -9326,6 +9334,7 @@ paths:
         - { in: query, name: code_challenge_method, required: true, schema: { type: string, enum: [S256, plain] } }
         - { in: query, name: response_mode, required: false, schema: { type: string, enum: [query, web_message] }, description: 'web_message → consent page postMessages the code to the popup-opener' }
         - { in: query, name: prompt, required: false, schema: { type: string, enum: [create] }, description: 'The OIDC registration hint: a signed-out person meets the create-account form first (the SDK sends it for signIn({ register: true })).' }
+        - { in: query, name: lang, required: false, schema: { type: string, enum: [en, fi, es] }, description: 'The app page''s language. The consent page, its sign-in dialog and an emailed sign-in link asked from it use it.' }
       responses:
         '302': { description: Redirect to the apex consent page }
         '400': { $ref: '#/components/responses/BadRequest' }
