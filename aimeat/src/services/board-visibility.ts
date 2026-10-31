@@ -15,6 +15,9 @@
  *   const out = await setBoardVisibility({ storage, config }, { gaii, roles }, board, { visibility, federate, publishGate });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   2026-10-31 — The federation flag is written false for an organisation's board by the level that
+ *     is written, the board's own when the publish gate kept it; it was decided by the asked level
+ *     only, so a kept organisation level was stored federated (secaudit 2026-10-31 inv-13).
  *   v1.1.0 — 2026-10-18 — A level wider than the board's label allows is refused with 409
  *     LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   v1.0.0 — 2026-10-18 — Moved out of routes/boards.ts unchanged, with the publish gate added (plan doc-mvcn6c7e4e5q, V4).
@@ -80,8 +83,11 @@ export async function setBoardVisibility(
         const ceiling = await publicBoardCeiling(deps, caller, 'public');
         if (ceiling) return ceiling;
     }
-    const toOrganism = !!visibility && boardOrganismAudience(visibility) !== null;
-    const updated = await storage.updateBoardVisibility(board.id, (visibility || board.visibility) as BoardRecord['visibility'],
+    // The level written: the asked one, or the board's own when the gate kept it. An organisation's
+    // board is written never federated, whichever of the two it is (secaudit 2026-10-31 inv-13).
+    const stored = (visibility || board.visibility) as BoardRecord['visibility'];
+    const toOrganism = boardOrganismAudience(stored) !== null;
+    const updated = await storage.updateBoardVisibility(board.id, stored,
         toOrganism ? false : (typeof federate === 'boolean' ? federate : undefined));
     if (!updated) return { ok: false, status: 500, code: 'INTERNAL', message: 'Failed to update board visibility' };
     emitChange('boards');
