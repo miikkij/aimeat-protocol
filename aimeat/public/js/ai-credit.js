@@ -18,6 +18,8 @@
  * @structure eurPerUsd() · aiCredit(status) · creditEur(usd) · topupHref()
  * @usage const credit = aiCredit(chatStatus); // { eur, state } or null
  * @version-history
+ *   v1.2.0 — 2026-10-31 — topupHref(locale) adds the page's language, as the server's notice does
+ *     (ai-fix-words.ts balanceChoices); the Home and the AI page offer it at all times (v28 #19).
  *   v1.1.0 — 2026-10-31 — Euros come from site.ai_credit_eur_per_usd, the rate the store converted
  *     at, with 1 when it is not set; the fixed 1.2 showed the price paid, fee included, as credit
  *     (Jouni's C). creditEur() for the pages that hold a dollar figure of their own.
@@ -61,7 +63,21 @@ export function aiCredit(status) {
   return { eur, state };
 }
 
-/** Where more credit is bought for this node, or '' when the store named no address. */
-export function topupHref() {
-  return siteLink('storeTopup');
+/**
+ * Where more credit is bought for this node, in the page's language, or '' when the store named no
+ * address. The store keeps the address's own parameters (the place, the test lane's guestext).
+ * @param {string} [locale]
+ * @returns {string}
+ */
+export function topupHref(locale) {
+  const raw = siteLink('storeTopup');
+  if (!raw) return '';
+  try {
+    const url = new URL(raw);
+    if (locale) url.searchParams.set('lang', String(locale).slice(0, 2));
+    return url.toString();
+  } catch (err) {
+    console.warn('[ai-credit] the top-up address is not a URL:', err.message);
+    return '';
+  }
 }
