@@ -16,6 +16,9 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-10-31: The welcome takes no navigate: its sentence field went with v31 K26. It leaves once the
+ *     getting-started steps say the AI is connected, not only after the full first-connection proof:
+ *     the v32 shots showed "connect your AI" above a ticked "Yhdistä tekoälysi".
  *   2026-10-29: On a customer's node the first home opens with the welcome (customer-welcome.js):
  *     what they bought, three steps, one sentence, orders and support (UX review 2026-10-29, B).
  *   2026-10-18: The home opens with what is new since the person last looked (news-band.js), above
@@ -84,7 +87,10 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 
 export default function HomeView({ navigate }) {
   const session = useSession();
-  const { state, ready: stateReady } = useHomeState();
+  const { state, journey, ready: stateReady } = useHomeState();
+  // The welcome asks to connect an AI until one has: by the same test the getting-started steps tick
+  // "connected" with (any AI of theirs has reached this node), so the two never disagree.
+  const connected = !!state?.initialized || !!journey?.stages?.find((s) => s.id === 'connect')?.done;
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [toast, setToast] = useState('');
 
@@ -163,7 +169,7 @@ export default function HomeView({ navigate }) {
       <${NewsBand} session=${session} navigate=${navigate} />
       ${/* A buyer's first page on the node the store made for them says what they bought and what to
             do first (customer-welcome.js); it draws nothing anywhere else. */''}
-      <${CustomerWelcome} session=${session} initialized=${!!state?.initialized} navigate=${navigate} />
+      <${CustomerWelcome} session=${session} initialized=${connected} />
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}

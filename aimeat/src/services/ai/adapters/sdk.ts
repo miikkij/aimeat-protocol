@@ -21,6 +21,7 @@
  *   - OPENROUTER_ATTRIBUTION — the two headers OpenRouter's own address receives
  *   - COMPATIBLE_OPTIONS_KEY — where extra body fields for an OpenAI-compatible provider are filed
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The OpenRouter attribution headers go to the in-region hosts too (isOpenRouterApiUrl).
  *   v1.3.0 — 2026-10-08 — A missing key (NO_API_KEY), an operation the type does not serve here
  *     (INVALID_PROVIDER) and a misrouted extension (INTERNAL_ERROR) are the node's own refusals,
  *     AiCompletionError, so no caller reads them as a provider's status (aiprov plan, A8).
@@ -36,7 +37,7 @@ import { createAnthropic } from '@ai-sdk/anthropic';
 import { createXai } from '@ai-sdk/xai';
 import { createMistral } from '@ai-sdk/mistral';
 import type { EmbeddingModelV4, ImageModelV4, LanguageModelV4, TranscriptionModelV4 } from '@ai-sdk/provider';
-import { FIXED_BASE_URLS, type AiTarget } from '../types.js';
+import { isOpenRouterApiUrl, type AiTarget } from '../types.js';
 import { aiFetch } from '../fetch.js';
 import { AiCompletionError } from '../errors.js';
 
@@ -69,8 +70,8 @@ export function languageModel(target: AiTarget, modelId: string): LanguageModelV
     case 'openrouter':
       return createOpenRouter({
         apiKey: requireKey(target), ...common,
-        // The attribution headers go to OpenRouter's own address and nowhere else, as before.
-        headers: target.baseUrl === FIXED_BASE_URLS.openrouter ? OPENROUTER_ATTRIBUTION : {},
+        // The attribution headers go to OpenRouter's own addresses (global or in-region) and nowhere else.
+        headers: isOpenRouterApiUrl(target.baseUrl) ? OPENROUTER_ATTRIBUTION : {},
       }).chat(modelId) as LanguageModelV4;
     // Chat Completions, the protocol every other OpenAI-dialect provider here speaks as well.
     case 'openai': return createOpenAI({ apiKey: requireKey(target), ...common }).chat(modelId);
@@ -105,7 +106,7 @@ export function embeddingModel(target: AiTarget, modelId: string): EmbeddingMode
     case 'openrouter':
       return createOpenRouter({
         apiKey: requireKey(target), ...common,
-        headers: target.baseUrl === FIXED_BASE_URLS.openrouter ? OPENROUTER_ATTRIBUTION : {},
+        headers: isOpenRouterApiUrl(target.baseUrl) ? OPENROUTER_ATTRIBUTION : {},
       }).textEmbeddingModel(modelId) as EmbeddingModelV4;
     case 'openai': return createOpenAI({ apiKey: requireKey(target), ...common }).embedding(modelId);
     case 'mistral': return createMistral({ apiKey: requireKey(target), ...common }).embedding(modelId);

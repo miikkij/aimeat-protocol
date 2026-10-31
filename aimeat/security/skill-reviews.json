@@ -68,13 +68,13 @@
       "note": "It names the recommended models; the rest is how to talk, which no file decides."
     },
     "node:aimeat-guided-journey": {
-      "reviewedOn": "2026-10-19",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/services/journey-state.ts",
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:a88bfcdb1cb862bb31fbf646",
+      "digest": "sha256:4190d23b1026aef8524d008b",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -294,13 +294,13 @@
       "digest": "sha256:e889ce5039a1ecdeff09bd30"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:a9353f9277dbdcc453e93852"
+      "digest": "sha256:a0efe7e6312628c2224d8848"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -434,14 +434,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-29",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:d39d53efdbdc69f7277de2eb"
+      "digest": "sha256:bc5d42b77cfb094adde3e6df"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -512,12 +512,12 @@
       "note": "Its tools are gitignored and live on the developer's main machine only."
     },
     "project:aimeat-writing": {
-      "reviewedOn": "2026-10-02",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/i18n.ts",
         "aimeat/scripts/locale-merge.ts"
       ],
-      "digest": "sha256:f9c33bd52c86fea462a6a4a9"
+      "digest": "sha256:499ef91745132f6c5d1c65e6"
     },
     "project:security-audit": {
       "reviewedOn": "2026-10-20",
@@ -648,8 +648,8 @@
     },
     "node:configure-routing": {
       "aimeat/src/routes/ai.ts": "7628abf3c26aaa19",
-      "aimeat/src/routes/ai-providers.ts": "c228f456946d57d2",
-      "aimeat/src/services/ai/routing.ts": "1d653dd83370f0e8"
+      "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
+      "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "feaff1af3ffa487c"
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
-      "aimeat/src/services/ai/route-plan.ts": "7b7530020363a980"
+      "aimeat/src/services/ai/route-plan.ts": "f2543ca4d87e6281"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",
@@ -693,7 +693,7 @@
     },
     "project:aimeat-video": {},
     "project:aimeat-writing": {
-      "aimeat/src/i18n.ts": "d1dd54b01598e00c",
+      "aimeat/src/i18n.ts": "78c023371c2a7a79",
       "aimeat/scripts/locale-merge.ts": "e1c28235732aafa5"
     },
     "node:aimeat-recurring-work": {
@@ -728,8 +728,8 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "526be4aac8503a41",
-      "aimeat/public/views/home/journey-roads.js": "075d5b69523c143b",
+      "aimeat/src/services/journey-state.ts": "1938438c06df5c98",
+      "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
     },
     "node:aimeat-organisms": {

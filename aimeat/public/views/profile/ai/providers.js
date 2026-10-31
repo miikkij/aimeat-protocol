@@ -9,10 +9,13 @@
  *   for moving on) and the model policy (open, the recommended models, or the owner's own list, and
  *   whose calls it covers). Pure render over ctx.pv (ai/use-providers.js), on the page's existing
  *   components.
- * @structure secProviders · offLines · providerRow · providerOpen · addForm · classifierOptions · classifierRow ·
+ * @structure secProviders · offLines · providerRow · providerOpen · addForm · classifierOptions · classifierRow · regionRows ·
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.8.0 — 2026-10-31 — The routing rules end with where OpenRouter processes the server's-key calls
+ *     and what happens to a model the region does not offer (regionRows), a select each when the
+ *     operator lets people choose (Jouni, 2026-10-31).
  *   v1.7.0 — 2026-10-25 — The routing rules end with the free model as the last resort on the server's
  *     key (freeModelRow): the server's default, on or off for this account (secaudit2026oct22 follow-up).
  *   v1.6.0 — 2026-10-02 — With "Only tested providers" on, a capability's routing row says which provider
@@ -366,6 +369,45 @@ function freeModelRow(fm, r, e, pv) {
   return { key: 'free', k: named('ai.free_model_last_resort', x('rt.free')), v, sub: x(fm.in_effect ? 'rt.freeSubOn' : 'rt.freeSubOff', { model: fm.model || '' }) };
 }
 
+/**
+ * Where OpenRouter processes the server's-key calls (openrouter_region of GET /v1/ai/providers): the
+ * region and what happens to a model it does not offer. A select each when the operator lets people
+ * choose, among the regions the operator allows; otherwise what applies, and that the operator chose.
+ * Shown only where the server has its own OpenRouter key.
+ */
+function regionRows(reg, r, e, pv) {
+  if (!reg?.node_key) return [];
+  const node = reg.node || {};
+  const allowed = node.allowed || [];
+  const now = reg.in_effect?.node_key || {};
+  const mayChoose = !!node.person_may_choose && allowed.length > 1;
+  const regionWord = (k) => x('rt.region.' + k);
+  const fallbackWord = (k) => x('rt.regionFallback.' + k);
+  // In the editor the line under the select follows the choice not yet saved.
+  const shown = e && mayChoose ? (r.openrouterRegion || node.region) : now.region;
+  const region = {
+    key: 'region', k: named('ai.openrouter_region', x('rt.region')),
+    v: e && mayChoose
+      ? html`<${Select} fit ariaLabel=${x('rt.region')} value=${r.openrouterRegion || ''}
+          onChange=${(val) => pv.setRule({ openrouterRegion: val || null })}
+          options=${[['', x('rt.regionDefault', { node: regionWord(node.region) })], ...allowed.map((k) => [k, regionWord(k)])]} />`
+      : regionWord(now.region),
+    sub: mayChoose ? x('rt.regionSub.' + shown) : `${x('rt.regionSub.' + shown)} ${x('rt.regionByOperator')}`,
+  };
+  const fallbacks = ['off', ...(allowed.includes('us') ? ['us'] : []), ...(allowed.includes('any') ? ['any'] : [])];
+  const fallback = now.region === 'any' && !e ? null : {
+    key: 'region-fallback', k: named('ai.openrouter_region_fallback', x('rt.regionFallback')),
+    v: e && mayChoose
+      // Not `fit`: its words are long in some languages, and filling its row it stays inside a phone's row.
+      ? html`<${Select} ariaLabel=${x('rt.regionFallback')} value=${r.openrouterRegionFallback || ''}
+          onChange=${(val) => pv.setRule({ openrouterRegionFallback: val || null })}
+          options=${[['', x('rt.regionDefault', { node: fallbackWord(node.fallback) })], ...fallbacks.map((k) => [k, fallbackWord(k)])]} />`
+      : fallbackWord(now.fallback),
+    sub: x('rt.regionFallbackSub'),
+  };
+  return [region, fallback];
+}
+
 export function secRouting(ctx, num) {
   const pv = ctx.pv;
   if (!pv.view) return null;
@@ -408,6 +450,7 @@ export function secRouting(ctx, num) {
     { key: 'cost', k: named('ai.max_cost_per_call', x('rt.cost')), v: e ? html`<${TextField} type="number" size="short" min="0" step="0.01" value=${r.maxCostPerCallUsd ?? ''} placeholder=${x('rt.costNone')} ariaLabel=${x('rt.cost')} onInput=${(v) => pv.setRule({ maxCostPerCallUsd: v })} />`
       : (r.maxCostPerCallUsd != null ? `$${r.maxCostPerCallUsd}` : x('rt.costNone')), missing: !e && r.maxCostPerCallUsd == null },
     freeModelRow(pv.view.free_model, r, e, pv),
+    ...regionRows(pv.view.openrouter_region, r, e, pv),
   ];
   return html`
     <${PageSection} id="ai-routing" num=${num} title=${x('rt.title')} count=${x('rt.count', { n: set, total: CAPS.length })}>

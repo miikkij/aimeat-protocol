@@ -25,6 +25,8 @@
  *   const { layout, freeform, ready } = useSurfaceLayout('home');
  *   html`<${SurfaceRenderer} surface="home" layout=${layout} freeform=${freeform} ctx=${ctx} />`
  * @version-history
+ *   2026-10-31: useSurfaceLayout() returns the answer's `source` (default or stored), so the front
+ *     page of a store-sold node can tell an owner's own layout from the built-in one (v27 P3).
  *   2026-10-25: A group's named heading carries a question mark when the locale explains it
  *     (helpTermOf: `x.title` is explained under `explain.x.*`).
  *   2026-10-16: The layout read's `freeform_provenance` reaches each block as `provenance` (state
@@ -55,7 +57,7 @@ const loading = new Map();
  * so a caller never has to decide what an unconfigured node looks like.
  */
 export function useSurfaceLayout(surface) {
-  const [state, setState] = useState({ layout: null, freeform: {}, freeformProvenance: {}, ready: false, failed: false });
+  const [state, setState] = useState({ layout: null, freeform: {}, freeformProvenance: {}, source: null, ready: false, failed: false });
 
   const load = useCallback(async () => {
     try {
@@ -65,6 +67,9 @@ export function useSurfaceLayout(surface) {
         freeform: r?.data?.freeform ?? {},
         // Each passage's record, keyed like `freeform`: the AI label a passage owes.
         freeformProvenance: r?.data?.freeform_provenance ?? {},
+        // 'default' when nobody has saved a layout for this surface, 'stored' when someone has: the
+        // front page of a store-sold node shows the owner's start page only in the first case.
+        source: r?.data?.source ?? null,
         ready: true,
         failed: false,
       });
@@ -72,7 +77,7 @@ export function useSurfaceLayout(surface) {
       // The caller falls back to its own built-in tree. Recorded rather than swallowed: a layout
       // that silently never loads looks exactly like a node nobody has configured.
       swallowed(`surface: layout ${surface}`, err);
-      setState({ layout: null, freeform: {}, freeformProvenance: {}, ready: true, failed: true });
+      setState({ layout: null, freeform: {}, freeformProvenance: {}, source: null, ready: true, failed: true });
     }
   }, [surface]);
 

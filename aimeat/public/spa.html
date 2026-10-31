@@ -51,14 +51,14 @@
   <!-- __AIMEAT_THEMES__ -->
   <!-- No-flash theme boot: set data-theme on <html> before first paint.
        Plain inline JS (NOT a module — modules defer and reintroduce the flash).
-       Unset key = follow OS until the user makes an explicit choice. -->
+       Unset key = light, AIMEAT's own look (Jouni, v31 K65, 2026-10-31); 'auto' follows the OS. -->
   <script>
     (function () {
       try {
-        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | 'auto' | null
         var theme = (stored === 'light' || stored === 'dark')
           ? stored
-          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          : (stored === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = theme;
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
@@ -429,7 +429,8 @@
       function storedMode() {
         var m = get('aimeat-theme');
         if (m === 'light' || m === 'dark') return m;
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        // Light unless the person chose "automatic" (v31 K65).
+        return m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       function wear(L) {
         if (L.theme && L.theme !== HOUSE) root.setAttribute('data-aimeat-theme', L.theme); else root.removeAttribute('data-aimeat-theme');
@@ -547,6 +548,7 @@
       "/js/swallowed.js": "/js/swallowed.js",
       "/js/desktop-download.js": "/js/desktop-download.js",
       "/js/site.js": "/js/site.js",
+      "/js/ai-credit.js": "/js/ai-credit.js",
       "/js/visual-viewport.js": "/js/visual-viewport.js",
       "/js/closed-node-fetch.js": "/js/closed-node-fetch.js",
       "/js/session-src.js": "/js/session-src.js",
@@ -1308,6 +1310,37 @@
       return signInFirst(pathname, !!getSession()) ? SIGN_IN_FIRST : matchRoute(pathname, search);
     }
 
+    // A VIEW WHOSE MODULES DID NOT ARRIVE RELOADS THE PAGE ONCE. The settings page imports some sixty
+    // modules, and on store-sold places one to eight of them at random sometimes failed in the
+    // browser (net::ERR_FAILED) without the request ever reaching the server, so the page showed
+    // "Failed to load page" (aimeat-commercial, 2026-10-31). A module that failed stays failed in this
+    // page's module map, so importing it again here cannot succeed; a fresh page load can. One reload
+    // per address within a minute, so a view that is really broken still shows its error.
+    const VIEW_RELOAD_KEY = 'aimeat.viewReload';
+    const isModuleLoadFailure = (err) =>
+      /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i
+        .test(String(err?.message || err));
+    async function loadView(loader) {
+      try {
+        const mod = await loader();
+        try { sessionStorage.removeItem(VIEW_RELOAD_KEY); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+        return mod;
+      } catch (err) {
+        if (isModuleLoadFailure(err)) {
+          let last = null;
+          try { last = JSON.parse(sessionStorage.getItem(VIEW_RELOAD_KEY) || 'null'); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+          const here = location.pathname + location.search;
+          if (!last || last.path !== here || Date.now() - last.at > 60000) {
+            try { sessionStorage.setItem(VIEW_RELOAD_KEY, JSON.stringify({ path: here, at: Date.now() })); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+            console.warn('[spa] a view module did not load; reloading the page once:', err.message);
+            location.reload();
+            return new Promise(() => {});
+          }
+        }
+        throw err;
+      }
+    }
+
     // ── App Component ──
     function App() {
       const [View, setView] = useState(null);
@@ -1329,7 +1362,7 @@
         
         try {
           setViewError(null);
-          const mod = await loader();
+          const mod = await loadView(loader);
           setView(() => mod.default);
         } catch (err) {
           console.error('Failed to load view:', err);
@@ -1388,7 +1421,7 @@
         const onPopState = () => {
           window.__aimeatLook?.apply(location.pathname);
           const loader = viewFor(location.pathname, location.search);
-          loader().then(mod => {
+          loadView(loader).then(mod => {
             setViewError(null);
             setView(() => mod.default);
           }).catch(err => {
@@ -1460,9 +1493,12 @@
         if (signedInOnly()) navigate(location.pathname + location.search, true);
       }, [signedIn, navigate]);
 
+      // Retry after a module that did not arrive is a page load: this page's module map keeps the
+      // failure, so navigating again would fail the same way (loadView above).
       const retryView = useCallback(() => {
+        if (isModuleLoadFailure(viewError)) { location.reload(); return; }
         navigate(location.pathname + location.search, true);
-      }, [navigate]);
+      }, [navigate, viewError]);
 
       // The design lab's preview page is drawn inside a frame of the lab, so it carries no chrome.
       const bare = window.location.pathname === '/v1/design-lab/frame';
@@ -1710,9 +1746,12 @@
       // the nav entirely when this node has not configured one.
       // On a signed-in-only node a visitor without a session reaches no public page (each shows the
       // sign-in page), so the bar carries no links for them: the sign-in pill is the one way on.
+      // On a node the store sold, the bar is the owner's: no "how it works" or "for your business"
+      // marketing, only Help (Jouni v27 P3, 2026-10-31).
       const visibleLinks = (signedInOnly() && !session) ? [] : navConfig.order
         .map(id => linkById[id])
         .filter(l => l && !hiddenSet.has(l.id))
+        .filter(l => !customerNode() || l.id === 'help')
         .filter(l => (l.when === 'anon' ? !session : l.when === 'auth' ? !!session : true))
         .map(l => (l.siteKey ? { ...l, path: siteLink(l.siteKey) } : l))
         .filter(l => l.path);
@@ -1860,6 +1899,21 @@
       }
       const signedOutDoor = location.pathname === '/v1/profile' && !session;
       if (!FOOTER_ROUTES.has(location.pathname) && !signedOutDoor) return null;
+      // On a node the store sold, the footer carries what the owner and a visitor need: help, the
+      // AI transparency statement, the privacy policy and the terms. The marketing and developer
+      // pages belong to the public site (Jouni v27 P3, the v10 rule "kehittäjälinkit pois
+      // asiakkailta").
+      if (customerNode()) {
+        return html`
+          <footer class="site-footer">
+            <div class="site-footer-row">
+              <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
+              <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
+              <a href=${getLocale() === 'en' ? '/v1/privacy' : '/v1/privacy/' + getLocale()}>${tr('footer.privacy', 'Privacy')}</a>
+              <a href=${getLocale() === 'en' ? '/v1/terms' : '/v1/terms/' + getLocale()}>${tr('footer.terms', 'Terms')}</a>
+            </div>
+          </footer>`;
+      }
       return html`
         <footer class="site-footer">
           <div class="site-footer-row">
@@ -2045,6 +2099,10 @@
               // The header folds the pill itself on a phone (theme.css, ≤640px), so it keeps the full
               // row; compact became the pill's default everywhere on 2026-09-13.
               compact: false,
+              // A node the store sold has its owner already, so its sign-in offers no registration
+              // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
+              // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).
+              ...(customerNode() ? { buttonText: t('siteStart.signInPill'), signInOnly: true } : {}),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),

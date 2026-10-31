@@ -14,6 +14,8 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-10-31 — The privacy page's {{aiRegionNotice}}: where the node's OpenRouter key has a request
+ *     processed (services/privacy-ai-region.ts).
  *   2026-10-22 — /v1/eco-capability-allow joins the SPA routes: the owner allows another account's
  *     capability to run one action of their outside app (views/eco-capability-allow.js,
  *     services/eco-capability-approvals.ts).
@@ -125,6 +127,7 @@ import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { tagsInUseOnNode } from '../services/visibility/visibility-settings.js';
 import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
+import { aiRegionNotice } from '../services/privacy-ai-region.js';
 import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
 
 /**
@@ -198,6 +201,9 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
     // Section 8's paragraph about account holders' own analytics: written only while one of them
     // uses Clarity or Google Analytics on the pages they publish (services/visibility/privacy-notice.ts).
     ownerAnalyticsNotice: ownerAnalyticsNotice(locale, nodeName, tagsInUseOnNode()),
+    // Section 5.1's paragraph on where the node's AI key has a request processed: its OpenRouter
+    // region, the fallback and whether a person may choose (services/privacy-ai-region.ts).
+    aiRegionNotice: aiRegionNotice(config, locale),
     refreshIdleDays: String(config.refreshIdleDays),
     refreshAbsoluteDays: String(config.refreshAbsoluteDays),
     // What this node tells the AI-training crawlers in robots.txt, as a whole sentence rather than

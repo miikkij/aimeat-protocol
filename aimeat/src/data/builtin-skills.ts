@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-31 -- diagnose-a-workflow, step 7: a 400 AI_MODEL_NOT_IN_REGION is a model the owner's
+ *     OpenRouter region does not offer, with no allowed fallback region.
  *   2026-10-29 -- diagnose-a-workflow, step 7: a 402 AI_BALANCE_SPENT is the node's key at the limit
  *     it was bought with, with the three choices (UX review A1).
  *   2026-10-27 -- diagnose-a-workflow: a deactivated account's run in flight and goals wait, and an ai
@@ -670,6 +672,11 @@ metadata:
    node from the store keeps its owner's AI allowance as that limit). Its details carry \`choices\`:
    buy more in the store, the owner's own key, or the free model, which only the owner's own rule
    turns on here (\`freeModelLastResort: true\`). A top-up is seen within a minute.
+   A 400 \`AI_MODEL_NOT_IN_REGION\` means the step's model is not offered in the OpenRouter region the
+   owner's calls are processed in (EU, US or any country), and no fallback region the owner and the
+   node allow offers it; the message names models the region does offer. The fix is one of those
+   models, or the owner's own word on \`openrouterRegionFallback\` (\`openrouter_region\` on
+   \`GET /v1/ai/routing\` says what applies); never move the owner's data to another region for them.
    The run's ai steps ask the model as the run's \`aiCaller\`: the agent or app that started it, the
    saver for a trigger's run, or the owner for "Run as me". So the owner's model rules and daily cap
    for that agent or app apply, and they can refuse a step that the owner's own call would pass.

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.30.0 -- 2026-10-31 -- On a node the store sold, the usage card's AI line is the AI credit left in euros with no bar (js/ai-credit.js), the number the Home, the chat and the AI page show (v28 finding 9).
  *   v1.29.0 -- 2026-10-29 -- "Your own storage" under Account, after Data Wallet: a person keeps their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   v1.28.0 -- 2026-10-29 -- CUSTOMER_TAB_IDS: the menu on a node the store made for a buyer, the eight Jouni chose (UX review 2026-10-29, C). On such a node the profile card shows no node address, federation state, full identity, presence or pacer balance, and says "Your AI is connected" for MCP connected.
  *   v1.27.0 -- 2026-10-25 -- "Goals" under Automation, after Agents: the agents' goals and their rules.
@@ -69,6 +70,8 @@ import { t } from "/js/i18n.js";
 import { fmtMoney } from "/js/utils.js";
 import { getNodeUrl } from "/js/services/auth.js";
 import { customerNode } from "/js/site.js";
+import { creditEur } from "/js/ai-credit.js";
+import { money } from "/js/format.js";
 import { listAgents } from "/js/services/agents.js";
 import { listAllSchedules } from "/js/services/schedules.js";
 import * as orgService from "/js/services/organisms.js";
@@ -284,6 +287,14 @@ export function UsageCard({ switchTab, initialUsage }) {
         <${Action} small onClick=${() => switchTab('ai')}>${t('profile.landing.usageAiOwnKeyCta')}<//>
         <${Action} small onClick=${() => switchTab('agents')}>${t('profile.landing.usageAiConnectCta')}<//>
       <//>` : null;
+    // On a node the store sold the credit is euros, as on the Home and in the chat, and there is no
+    // bar: the node's own allowance is set high on purpose and the key's limit is the real one, so a
+    // share of the allowance would be a share of nothing (js/ai-credit.js, v28 finding 9).
+    const eur = creditEur(ai.remaining_usd ?? 0);
+    if (eur !== null) {
+      return line('ai', t('profile.landing.usageAi'),
+        t('home.credit.chatLine').replace('{amount}', money(eur, 'EUR')), null, exhausted);
+    }
     return line('ai', t('profile.landing.usageAi'),
       `$${(ai.remaining_usd ?? 0).toFixed(2)} ${t('profile.landing.usageAiLeftOf')} $${(ai.granted_usd ?? 0).toFixed(2)}`, ai, exhausted);
   };

@@ -7,6 +7,8 @@
  *   and the shell dispatch (src/tool-dispatch/tool-call-defs-ai-models.ts) all read their name,
  *   description and input from here.
  * @version-history
+ *   2026-10-31 — aimeat_ai_routing_set names rules.openrouterRegion and rules.openrouterRegionFallback, and
+ *     aimeat_ai_providers its openrouter_region (Jouni, 2026-10-31).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_ai_routing_set names rules.freeModelLastResort (secaudit2026oct22 follow-up).
  *   2026-10-06 —aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
@@ -70,7 +72,8 @@ export const aiModelTools = [
       + 'capabilities it serves (text, vision, files, image, speech, transcription, embed) with which model, whether the '
       + 'node may pick it by capability alone (pool), whether it is tested and working (health), where the data goes, and '
       + 'whether a key is set (never the key). Also the owner\'s routing: the ordered providers per capability and the '
-      + 'rules. Read this before naming a provider or model in a call, and to explain a refusal. A key is set only by the '
+      + 'rules, and openrouter_region: where OpenRouter calls are processed (EU, US or any country), what the operator '
+      + 'allows and what applies to the owner now. Read this before naming a provider or model in a call, and to explain a refusal. A key is set only by the '
       + 'owner on the AI settings page, never through a tool.',
     input: {},
   },
@@ -111,7 +114,11 @@ export const aiModelTools = [
       + 'maxAttempts (1-5), onlyTested, extendToPool, fallbackOn: [timeout, rate_limit, server_error, unavailable, auth], '
       + 'fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd, freeModelLastResort (true, false, or null for '
       + 'the node\'s default: whether a call on the node\'s key that named no model gets the free model when the allowance '
-      + 'cannot pay for the normal model) }, agent?: "<agent name>" to set that agent\'s '
+      + 'cannot pay for the normal model), openrouterRegion (eu, us, any, or null for the node\'s choice: where '
+      + 'OpenRouter calls are processed: eu.openrouter.ai, us.openrouter.ai or openrouter.ai in any country), '
+      + 'openrouterRegionFallback (off, us, any, or null for the node\'s default: what happens to a model the region '
+      + 'does not offer; off refuses it) }; the read\'s openrouter_region says what the node allows and what applies '
+      + 'now, agent?: "<agent name>" to set that agent\'s '
       + 'own defaults instead (an agent\'s record has no rules). A named capability\'s list replaces the old one.',
     input: {
       routing: { type: 'object', description: '{ defaults?: {capability: [provider ids]}, rules?: {...}, agent?: name }. Omit to read.' },

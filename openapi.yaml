@@ -19978,8 +19978,11 @@ paths:
             provider stopped: stop, length, content_filter…, or null when it did not say) and
             data.truncated (true when finish_reason is length: the answer was cut at a token limit).
             data.policy_chose_model is true when the owner's model policy chose the model. data.route
-            is { capability, chosenBy, answeredBy: { provider, model }, attempts: [{ provider, model,
-            ok | error, costUsd }], fellBack }. The provenance record rides in meta.provenance.
+            is { capability, chosenBy, answeredBy: { provider, model, region?, regionWanted? }, attempts:
+            [{ provider, model, region?, regionWanted?, ok | error, costUsd }], fellBack }. On an
+            OpenRouter call `region` is where it was processed (eu, us or any) and `regionWanted` the
+            region it was meant for, present only when the model was not offered there and the call
+            fell back. The provenance record rides in meta.provenance.
             data.classification_warnings (ClassificationWarnings) names the files the model was given
             whose classification carries a warning; absent when there were none.
           content:
@@ -19990,8 +19993,11 @@ paths:
           description: >
             Refused before anything was spent: INVALID_BODY (a malformed field; `role` that is not a
             string of 1 to 300 characters), AI_CAPABILITY_UNAVAILABLE, AI_ROLE_NOT_DECLARED (the app
-            does not declare the role), AI_ROLE_UNKNOWN (the owner has no such role) or
-            AI_ROLE_LACKS_CAPABILITY (the role has no provider for the capability).
+            does not declare the role), AI_ROLE_UNKNOWN (the owner has no such role),
+            AI_ROLE_LACKS_CAPABILITY (the role has no provider for the capability) or
+            AI_MODEL_NOT_IN_REGION (the model is not offered in the OpenRouter region the call runs in,
+            and no fallback region the account and the node allow offers it; error.details.region and
+            error.details.offered name the region and some of its models).
           content:
             application/json:
               schema:
@@ -20385,7 +20391,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }.
+          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }, data.openrouter_region { hosts, node_key, node { region, fallback, allowed, person_may_choose }, in_effect { node_key, own_key }, note }.
           content:
             application/json:
               schema:
@@ -20586,7 +20592,11 @@ paths:
             data.routing { defaults, rules, agent_defaults? }, data.providers (id, type, capabilities),
             data.free_model { available, model, node_default, in_effect }: whether the node's key has a
             free model, the operator's default for it as the last resort (ai.free_model_last_resort),
-            and what applies to this account now.
+            and what applies to this account now. data.openrouter_region: where OpenRouter calls are
+            processed (eu.openrouter.ai, us.openrouter.ai or openrouter.ai), the operator's choice
+            (ai.openrouter_region, ai.openrouter_region_fallback, ai.openrouter_regions,
+            ai.openrouter_region_person_choice) and what applies to this account now, on the node's
+            key and on its own OpenRouter key.
           content:
             application/json:
               schema:
@@ -20603,7 +20613,11 @@ paths:
         unavailable, auth), fallbackMayLeaveMachine, speechVoiceMayChange, maxCostPerCallUsd,
         freeModelLastResort (true, false, or null for the node's default: whether a text call on the
         node's key that named no model gets the free model when what is left of the allowance cannot
-        pay for the normal model and no other provider can answer; false refuses it with 402). `agent`
+        pay for the normal model and no other provider can answer; false refuses it with 402),
+        openrouterRegion (eu, us, any, or null for the node's choice: where OpenRouter calls are
+        processed; on the node's key only when the operator lets people choose and allows that
+        region) and openrouterRegionFallback (off, us, any, or null for the node's default: what
+        happens to a model the region does not offer; off refuses with AI_MODEL_NOT_IN_REGION). `agent`
         sets that agent's own defaults instead. The owner applies at once; an agent holding
         `memory:write-reserved` gets a proposal with a `confirm_token` bound to the exact change; an
         app is refused.
