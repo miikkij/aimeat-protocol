@@ -21,6 +21,9 @@
  * @structure TrustWorld · buildTrustWorld(baseUrl)
  * @usage const w = buildTrustWorld('http://127.0.0.1:31500'); w.files.get('/lotl.xml')
  * @version-history
+ *   2026-10-31 — secaudit2026oct31w2 round 10: `audit` documents timestamped by a signer without the
+ *     timeStamping EKU, by a TSA whose certificate had expired at genTime, and a document timestamp by
+ *     a signing key.
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: `audit` documents (an untrusted signature timestamp, a
  *     stale and a fresh embedded OCSP answer, no SignerInfo, no messageDigest) and the FI list
  *     signer's key for a test that builds a list of its own.
@@ -60,6 +63,12 @@ export interface TrustWorld {
     noSigner: Buffer;
     /** A SignerInfo whose signed attributes have no messageDigest. */
     noMessageDigest: Buffer;
+    /** Signed by the late-revoked certificate, timestamped before the revocation by its own key (no timeStamping EKU). */
+    nonTsaTimestamp: Buffer;
+    /** Signed by the late-revoked certificate, timestamped by a TSA under the FI CA whose certificate had expired at genTime. */
+    expiredTsaTimestamp: Buffer;
+    /** A document timestamp signed by a qualified signing key (no timeStamping EKU). */
+    docTimestampByNonTsa: Buffer;
   };
   /** The FI list's signer and the CA key, for a test that builds a list of its own. */
   keys: { fiListSigner: { key: KeyObject; cert: Buffer } };
@@ -172,6 +181,14 @@ export function buildTrustWorld(baseUrl: string): TrustWorld {
         freshEmbeddedOcspTimestamped: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'Fresh embedded OCSP', stamp, { unsignedOcsp: [freshGood] }),
         noSigner: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'No signer', undefined, { noSigner: true }),
         noMessageDigest: signPdfAs('ETSI.CAdES.detached', good.cert, good.key, [fiCa.cert], 'No message digest', undefined, { noMessageDigest: true }),
+        nonTsaTimestamp: signPdfAs('ETSI.CAdES.detached', lateRevoked.cert, lateRevoked.key, [fiCa.cert], 'Timestamped by the signing key',
+          (sig) => timestampToken(sig, lateRevoked.cert, lateRevoked.key, [fiCa.cert], timestampAt)),
+        expiredTsaTimestamp: (() => {
+          const old = issued(fiCa, 'Expired TSA FI', 'FI', { eku: [EKU_TIMESTAMPING], validity: { notBefore: new Date(now - 40 * 86400_000), notAfter: new Date(now - 20 * 86400_000) } });
+          return signPdfAs('ETSI.CAdES.detached', lateRevoked.cert, lateRevoked.key, [fiCa.cert], 'Timestamped by an expired TSA',
+            (sig) => timestampToken(sig, old.cert, old.key, [fiCa.cert], timestampAt));
+        })(),
+        docTimestampByNonTsa: docTimestampPdf(good.cert, good.key, [fiCa.cert], 'Document timestamp by a signing key', new Date(now - 60_000)),
       };
     })(),
     keys: { fiListSigner: { key: fiListSigner.key, cert: fiListSigner.cert } },

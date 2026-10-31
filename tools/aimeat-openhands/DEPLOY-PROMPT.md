@@ -161,7 +161,10 @@ internet and arbitrary code execution on this host.
    first, then start docker, then start containers). Live-restore skips the network reconfig if
    containers are up. After: `docker port <any-container>` shows binds as `172.17.0.1:<port>`.
    The docker0 host-IP is host-private (not reachable from the internet); nginx and other
-   containers reach it fine.
+   containers reach it fine. But the nginx `/runtime-<port>` route below forwards to it without
+   Basic Auth for ports 30000-59999, so run `ss -ltnp` and report every listener on `0.0.0.0` or
+   `172.17.0.1` in that range that is not an OpenHands runtime container: bind it to `127.0.0.1`,
+   or add an `if ($rt_port = <port>) { return 404; }` line for it in that location.
 2. **Bundle `.env`.** Set:
    ```
    OPENHANDS_PORT_BIND=127.0.0.1:13781
@@ -180,8 +183,8 @@ internet and arbitrary code execution on this host.
 5. **Site config:** copy `nginx/openhands.conf.example` from the bundle, replace `__DOMAIN__` with
    the subdomain, place it in `/etc/nginx/sites-available/openhands.conf`, symlink into
    `sites-enabled/`. It includes: WebSocket upgrade + long agent-stream timeouts, dynamic
-   `/runtime-<port>/*` proxy to `172.17.0.1:<port>` (auth off — runtime enforces its own
-   session_api_key), and `/mcp/mcp` proxy (auth off — session-api-key + conversation-ID validated
+   `/runtime-<port>/*` proxy to `172.17.0.1:<port>` for ports 30000-59999 only, with the AIMEAT
+   node's 40050 refused (auth off — runtime enforces its own session_api_key), and `/mcp/mcp` proxy (auth off — session-api-key + conversation-ID validated
    upstream).
 6. **TLS cert:** issue a certificate for the subdomain, for example `sudo certbot --nginx -d <subdomain>`
    (or match however the parent domain's certs are issued). Ensure the cert paths in the config match.
