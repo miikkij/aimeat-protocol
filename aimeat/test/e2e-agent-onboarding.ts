@@ -7,6 +7,8 @@
  *   progress tracking, DELETE cancellation, role enforcement, full 11-step
  *   completion flow, readiness score verification, and auto-check on GET.
  * @version-history
+ *   v1.5.0 -- 2026-10-31 -- 25b: the finished onboarding smoke test is not in the owner's home feed, a
+ *     finished real task is (Jouni v27 P6).
  *   v1.4.0 -- 2026-10-19 -- set_avatar, an optional step in every flow: 17 steps in the full flow,
  *                            8 for a task-runner, 5 for a workstation; optional_total 5.
  *   v1.3.1 -- 2026-10-13 -- The offer written through POST /v1/memory carries tollMorsels: from 4.0.0
@@ -503,6 +505,8 @@ await test('13. GET after delete returns not_started', async () => {
 console.log('\nPhase 7 -- Full Onboarding Flow to Completion');
 
 let fullTestTaskId = '';
+/** A plain task completed in test 14c, the positive half of test 25b. */
+let plainDoneTaskId = '';
 
 await test('14. POST start to get a fresh onboarding with test task', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/start`, {
@@ -581,6 +585,7 @@ await test('14c. A NORMAL task still completes with no todos', async () => {
     });
     assert(status === 200, `expected 200, got ${status}: ${JSON.stringify(body)}`);
     assert(body.data.task.status === 'done', `expected done, got ${body.data.task.status}`);
+    plainDoneTaskId = plainId;
 });
 
 await test('15. Step 1: authenticate is auto-passed', async () => {
@@ -803,6 +808,23 @@ await test('25. Step 10: complete_test_task -- triggers auto-complete with all s
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.step.status === 'passed', `expected passed, got ${body.data.step.status}`);
     assert(body.data.completed === true, `expected auto-complete, got completed=${body.data.completed}`);
+});
+
+await test('25b. The finished smoke test is not news on the owner\'s home; a finished real task is', async () => {
+    // Jouni v27 P6 (2026-10-31): a node bought a minute earlier opened with "concierge finished:
+    // Onboarding verification". The feed is written after the completion answers, so read until the
+    // real task's row is there, then look for the smoke test's.
+    let items: Array<{ kind: string; link?: string | null }> = [];
+    for (let i = 0; i < 20; i++) {
+        const { body } = await json('/v1/home/feed', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        items = body.data?.items ?? [];
+        if (items.some(it => it.kind === 'agent_task_done' && String(it.link).includes(plainDoneTaskId))) break;
+        await new Promise(r => setTimeout(r, 100));
+    }
+    assert(items.some(it => it.kind === 'agent_task_done' && String(it.link).includes(plainDoneTaskId)),
+        `the finished real task should be in the home feed: ${JSON.stringify(items)}`);
+    assert(!items.some(it => it.kind === 'agent_task_done' && String(it.link).includes(fullTestTaskId)),
+        `the finished onboarding smoke test must not be in the home feed: ${JSON.stringify(items)}`);
 });
 
 await test('26. GET onboarding shows completed status after all steps', async () => {

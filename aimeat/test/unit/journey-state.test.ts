@@ -5,16 +5,18 @@
  *   path is walked. The profile comes first, and the interview's answers reach the handbook.
  * @usage cd aimeat && pnpm exec vitest run test/unit/journey-state.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-31 — "Agents at work" needs an agent that has done work (workersRun, v31 K27).
+ *   v1.2.0 — 2026-10-31 — The basic agents do not count as the person's workers (isOwnWorker).
  *   v1.1.0 — 2026-10-03 — The profile is the first stage; the interview's answers are read and shown.
  *   v1.0.0 — 2026-10-01 — Initial.
  */
 import { describe, it, expect } from 'vitest';
 import {
-    deriveJourney, parseJourneyRecord, journeyHandbookSection, isWorker, JOURNEY_STAGES, type JourneySignals,
+    deriveJourney, parseJourneyRecord, journeyHandbookSection, isWorker, isOwnWorker, JOURNEY_STAGES, type JourneySignals,
 } from '../../src/services/journey-state.js';
 
 const nothing: JourneySignals = {
-    connected: false, ownKey: false, firstResult: false, organisms: 0, sharedWithSomeone: false, apps: 0, workers: 0,
+    connected: false, ownKey: false, firstResult: false, organisms: 0, sharedWithSomeone: false, apps: 0, workers: 0, workersRun: 0,
 };
 
 describe('the journey', () => {
@@ -58,8 +60,16 @@ describe('the journey', () => {
         expect(j.stages.find(s => s.id === 'apps')).toMatchObject({ done: true, declined: false });
     });
 
+    // v31 K27 (2026-10-31): "Agentit töissä" was ticked while no agent had done anything.
+    it('an agent that exists but has not done any work does not make "agents at work" done', () => {
+        const made = deriveJourney({ ...nothing, workers: 1, workersRun: 0 }, {});
+        expect(made.stages.find(s => s.id === 'agents')!.done).toBe(false);
+        const ran = deriveJourney({ ...nothing, workers: 1, workersRun: 1 }, {});
+        expect(ran.stages.find(s => s.id === 'agents')!.done).toBe(true);
+    });
+
     it('a walked path has no next stage and no handbook section', () => {
-        const all = { connected: true, ownKey: true, firstResult: true, organisms: 1, sharedWithSomeone: true, apps: 2, workers: 1 };
+        const all = { connected: true, ownKey: true, firstResult: true, organisms: 1, sharedWithSomeone: true, apps: 2, workers: 1, workersRun: 1 };
         const j = deriveJourney(all, {});
         expect(j.next).toBeNull();
         expect(journeyHandbookSection(j)).toBeNull();
@@ -99,6 +109,15 @@ describe('the journey', () => {
         expect(isWorker({})).toBe(false);
         expect(isWorker({ mode: 'interactive', runMode: 'resident' })).toBe(true);
         expect(isWorker({ mode: 'task-runner' })).toBe(true);
+    });
+
+    it('the basic agents made with the account do not tick "agents at work"; an agent the person made does', () => {
+        // The concierge as data/basic-agents.ts seeds it: resident, tagged crew.basic.
+        expect(isOwnWorker({ mode: 'interactive', runMode: 'resident', tags: ['crew.basic', 'role.concierge'] })).toBe(false);
+        expect(isOwnWorker({ mode: 'task-runner', runMode: 'spawn', tags: ['crew.basic'] })).toBe(false);
+        expect(isOwnWorker({ mode: 'task-runner', runMode: 'spawn', tags: ['news'] })).toBe(true);
+        expect(isOwnWorker({ mode: 'autonomous' })).toBe(true);
+        expect(isOwnWorker({ mode: 'interactive' })).toBe(false);
     });
 
     it('a record written by hand is read defensively', () => {

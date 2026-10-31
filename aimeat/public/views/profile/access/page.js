@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.33.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of the Access page): the sign-in row is the emailed sign-in link, in use; no "set by the store" password, no coral two-step chip, no warning that anyone with the password gets in; the recovery key and the public key rows are left out, and the words come from the `Place` variants (frame.js x), which say permission where the page said key.
  *   v1.32.0 -- 2026-10-29 -- On a customer's node the password reads as the one the store set, which the buyer signing in by email link does not need (UX review 2026-10-29, D).
  *   v1.31.0 -- 2026-10-25 -- Section 05 carries the switch "Ask me before my secret is sent to a new
  *     address for the first time" (secaudit2026oct22, Jouni 2026-10-25).
@@ -141,7 +142,10 @@ export function renderPage(ctx) {
       marks=${marks(ctx)}
       desc=${x('desc')}
       actions=${mastActions(ctx)}
-      start=${html`<${PageStart} id="access" action=${{ onClick: () => scrollToSection('ac-keys') }} />`}
+      start=${customerNode()
+        ? html`<${PageStart} id="access" purpose=${t('pageStart.access.purposePlace')} next=${t('pageStart.access.nextPlace')}
+            action=${{ onClick: () => scrollToSection('ac-keys'), label: t('pageStart.access.actionPlace') }} />`
+        : html`<${PageStart} id="access" action=${{ onClick: () => scrollToSection('ac-keys') }} />`}
       strip=${strip(ctx)}
       railTitle=${x('railTitle')}
       sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
@@ -167,7 +171,8 @@ function marks(ctx) {
   const s = ov.sign_in;
   return [
     { label: x('chipApps', { n: ov.appGrants.total }), tone: 'sun' },
-    s.two_factor.enabled ? { label: x('chipTwoStepOn') } : { label: x('chipTwoStepOff'), tone: 'coral' },
+    // Two-step off is a choice on a store-bought node, not an alarm: the buyer signs in by emailed link.
+    s.two_factor.enabled ? { label: x('chipTwoStepOn') } : { label: x('chipTwoStepOff'), tone: customerNode() ? undefined : 'coral' },
     { label: x('chipTokensAccounts', { tokens: ov.accessTokens.total, accounts: ov.connections?.connections?.length || 0 }) },
     { label: x('chipSessions', { n: s.sessions.mine.total }), tone: 'dim' },
   ];
@@ -203,7 +208,7 @@ function strip(ctx) {
     { key: 'apps', n: n(ov.appGrants.total), label: x('stripApps'), sub: ov.appGrants.total ? x('stripAppsSub', { day, unused: x('unusedN', { n: unused, days: 30 }), base: ctx.baseHolders }) : x('stripAppsNone') },
     { key: 'tokens', n: n(ov.accessTokens.total), label: x('stripTokens'), sub: tokenSub },
     secretTile(ctx),
-    { key: 'twoStep', n: s.two_factor.enabled ? x('twoStep.onWord') : x('twoStep.offWord'), tone: s.two_factor.enabled ? 'fine' : 'notice', label: x('stripTwoStep'), sub: x('stripTwoStepSub', { passkeys: s.passkeys.count, password: x('password' + passwordWords(s)) }) },
+    { key: 'twoStep', n: s.two_factor.enabled ? x('twoStep.onWord') : x('twoStep.offWord'), tone: s.two_factor.enabled ? 'fine' : customerNode() ? undefined : 'notice', label: x('stripTwoStep'), sub: x('stripTwoStepSub', { passkeys: s.passkeys.count, password: x('password' + passwordWords(s)) }) },
     { key: 'sessions', n: n(s.sessions.mine.total), label: x('stripSessions'), sub: x('stripSessionsSub', { devices: s.sessions.mine.by_device.length, agents: s.sessions.agents.total }) },
   ]} />`;
 }
@@ -213,7 +218,7 @@ function strip(ctx) {
  * and the buyer, who signs in with an email link, never chose one (UX review 2026-10-29: "salasana
  * käytössä" read as wrong). 'Store', 'Set' or 'None', the suffix of the locale keys.
  */
-const passwordWords = (s) => (!s.has_password ? 'None' : customerNode() ? 'Store' : 'Set');
+const passwordWords = (s) => (customerNode() ? 'Store' : !s.has_password ? 'None' : 'Set');
 
 /** The strip's third figure: how many secrets are kept, and how many of them anything names. */
 function secretTile(ctx) {
@@ -233,13 +238,14 @@ function secSignIn(ctx) {
   // so the row and its panel read as one thing and the rule falls under the panel.
   const row = (key, name, subText, doors, below) => html`
     <${Row} key=${key} below=${below || null}><${Name} meta=${subText}>${name}<//><${Doors}>${doors}<//><//>`;
-  const state = (fine, words) => html`<${Mark} kind="status" tone=${fine ? 'fine' : 'attention'}>${words}<//>`;
+  // On a store-bought node an option not taken is not an alarm: the buyer's sign-in link is in use.
+  const state = (fine, words) => html`<${Mark} kind="status" tone=${fine ? 'fine' : customerNode() ? 'off' : 'attention'}>${words}<//>`;
   return html`
     <${Section} id="ac-signin" num="01" title=${x('secSignIn')} count=${sub} first=${true}>
       <${Note} kind="lead">${tf.enabled || s.passkeys.count ? x('signInIntroOn') : x('signInIntro')}<//>
       ${s.managed_by ? html`<${Box}><b>${t('profile.security.managedTitle')}</b> ${t('profile.security.managedDesc').replace('{name}', s.managed_by.name)}<//>` : null}
       <${List} cols="name-state">
-        ${row('password', x('row.password'), x('row.password' + passwordWords(s)), state(s.has_password, passwordWords(s) === 'Store' ? x('byStore') : s.has_password ? x('inUse') : x('none')))}
+        ${row('password', x('row.password'), x('row.password' + passwordWords(s)), state(s.has_password || customerNode(), s.has_password || customerNode() ? x('inUse') : x('none')))}
         ${!s.managed_by && s.passkeys.available
           ? row('passkeys', x('row.passkeys'), s.passkeys.count ? x('row.passkeysN', { n: s.passkeys.count }) : x('row.passkeysNone'), state(s.passkeys.count, x('devicesN', { n: s.passkeys.count })),
             html`<${PasskeysSection} inRow showToast=${ctx.showToast} />`)
@@ -254,7 +260,7 @@ function secSignIn(ctx) {
         ${row('federation', x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'),
           html`<${Mark}>${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}<//><${Action} small disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}<//>`,
           federationBlock(ctx))}
-        ${row('recovery', x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'),
+        ${customerNode() ? null : row('recovery', x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'),
           ctx.ownerKey
             ? html`<${Action} small soft onClick=${() => ctx.setKeyShown(!ctx.keyShown)}>${ctx.keyShown ? x('hide') : x('show')}<//><${Action} small copy=${ctx.ownerKey} onCopied=${() => ctx.showToast(x('keyCopied'))}>${x('copy')}<//>`
             : html`<${Mark} tone="dim">${x('notHere')}<//>`,
@@ -447,8 +453,9 @@ function secAddresses(ctx) {
     ['ghii', ctx.ghii, x('addr.ghiiSub', { node: ctx.nodeId })],
     ['node', ctx.nodeUrl, x('addr.nodeSub')],
     ['mcp', ctx.nodeUrl + '/v1/mcp', x('addr.mcpSub')],
-    ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
-  ];
+    // A store buyer never needs the account's public key (Jouni 2026-11-01: no "key" words there).
+    customerNode() ? null : ['key', ov.publicKey || '', ov.publicKey ? x('addr.keySub', { n: ov.publicKey.length }) : x('addr.keyNone')],
+  ].filter(Boolean);
   return html`
     <${Section} id="ac-addresses" num="07" title=${x('secAddresses')} count=${x('secAddressesSub')}>
       <${Note} kind="lead">${x('addressesIntro')}<//>

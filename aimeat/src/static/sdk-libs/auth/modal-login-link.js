@@ -25,6 +25,15 @@
  * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — Opened first, the way to the password is a link under the notes that says
+ *     when it applies (modal.loginLinkPasswordWhy: "if you set a password yourself"), not a second
+ *     button beside Send (Jouni's review, K24 with K62: explain it or hide it).
+ *   v1.4.0 — 2026-10-31 — Opened first, the step also says that the demo, the store and the buyer's
+ *     own AIMEAT are three places with three sign-ins (modal.loginLinkPlacesFirst), which is why
+ *     this one asks again (Jouni's K62: no signed handover from the store; people are told instead).
+ *   v1.3.0 — 2026-10-31 — Opened first, the step uses the buyer's words when the page has them
+ *     (modal.loginLinkTitleFirst, …DescFirst, emailLabelFirst, …SendFirst and the note under the
+ *     button, …NoteFirst): "Kirjaudu omaan AIMEATiisi" (Jouni's review of v31, K24 with K25).
  *   v1.2.0 — 2026-10-31 — The request carries the dialog's language (`lang`), so the mail is in it;
  *     wireLoginLinkStep returns `open`, and opened first the way back reads "Use a password instead" (v27 P1).
  *   v1.1.0 — 2026-09-29 — The request carries `redirect`, so the link returns to this page or to
@@ -51,14 +60,27 @@ export function loginLinkViewHtml(i, field, linkFirst) {
   if (!EMAIL_LOGIN) return '';
   // Opened first, the way back is the password form, and the button says so.
   var back = linkFirst ? (i.loginLinkUsePassword || 'Use a password instead') : (i.backToLogin || 'Back to Login');
+  // Opened first (a node the store sold), it speaks to the buyer: their own AIMEAT, the address
+  // they bought with, how long the link lasts and that no password is needed (v31 K24).
+  var first = function (key, plain, fallback) { return (linkFirst && i[key]) || i[plain] || fallback; };
+  // With the buyer's words the dialog's own heading already says them (modal.js), so the step does
+  // not repeat its title and line under it.
+  var said = linkFirst && i.loginLinkTitleFirst;
   return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">'
-    + '<h3 class="aimeat-sub-title">' + escHtml(i.loginLinkTitle || 'Sign in with an emailed link') + '</h3>'
-    + '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkDesc || 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.') + '</p>'
-    + field(i.emailLabel || 'Email', '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">')
+    + (said ? '' : '<h3 class="aimeat-sub-title">' + escHtml(first('loginLinkTitleFirst', 'loginLinkTitle', 'Sign in with an emailed link')) + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(first('loginLinkDescFirst', 'loginLinkDesc', 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.')) + '</p>')
+    + field(first('emailLabelFirst', 'emailLabel', 'Email'), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">')
     + '<div class="aimeat-actions">'
-    + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(i.loginLinkSend || 'Send the link') + '</button>'
-    + '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>'
+    + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first('loginLinkSendFirst', 'loginLinkSend', 'Send the link')) + '</button>'
+    // Opened first, the password is not a second button beside Send: a buyer never chose one, so it
+    // is a link at the end that says when it applies (Jouni 2026-11-01, K24 with K62).
+    + (linkFirst ? '' : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>')
     + '</div>'
+    + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + '</p>' : '')
+    // Why this place asks again although the store already knows the buyer (K62).
+    + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + '</p>' : '')
+    + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + ' ' : '')
+      + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + '</a></p>' : '')
     + '<p id="aimeat-ll-msg" class="aimeat-msg"></p>'
     + '</div>';
 }
@@ -109,7 +131,7 @@ export function wireLoginLinkStep(ctx) {
     e.preventDefault();
     open();
   });
-  document.getElementById('aimeat-ll-back').addEventListener('click', function () { ctx.showView('login'); });
+  document.getElementById('aimeat-ll-back').addEventListener('click', function (e) { e.preventDefault(); ctx.showView('login'); });
 
   async function send() {
     var email = emailEl.value.trim();

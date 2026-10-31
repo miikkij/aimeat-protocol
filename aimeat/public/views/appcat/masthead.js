@@ -11,6 +11,10 @@
  * @structure CatMasthead({ own, me, loaded }) · portfolioPrompt(rows) · exportBackup() · openAdd()
  * @usage html`<${CatMasthead} own=${cat.own} me=${cat.me} loaded=${cat.loaded} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — On a node the store sold: one main action, "+ Pyydä uusi sovellus
+ *     chatissa", the rest in one "Lisää" menu (the "⋯" Jouni drew is left out: no symbol but
+ *     ✓ ✗ → ↩ in interface text), and no line under the title: the small line below says the count (Jouni's review
+ *     of v31, K39).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell).
  */
 import { h } from 'preact';
@@ -19,6 +23,7 @@ import htm from 'htm';
 import { PageHead } from '/components/PageHead.js';
 import { Loud, Action, Actions } from '/components/Action.js';
 import { CardMenu } from '/components/CardMenu.js';
+import { customerNode } from '/js/site.js';
 import { getSession, authHeaders } from '/js/services/auth.js';
 import { x } from '/views/appcat/i18n.js';
 import { notice } from '/views/appcat/store.js';
@@ -99,6 +104,29 @@ export function CatMasthead({ own, me, loaded }) {
     if (file) openDialog('backup-import', { file });
   };
   const line = loaded && own.length ? x('mast.line', { owner: (own[0] && own[0].owner) || me || '', n: own.length, host: host() }) : '';
+
+  // A buyer gets one main action, asking for an app in the chat, and everything else in one "More"
+  // menu (Jouni's review of v31, K39).
+  if (customerNode()) {
+    // The count is on the small line under the head (tools.js CatBand), so the head says it once.
+    return html`<${PageHead} low title=${x('header.title')} line="" actions=${html`
+      <${Loud} mark="+" href="/v1/chat">${x('action.askInChat')}<//>
+      <${Actions} end>
+        <${CardMenu} word=${x('action.more')} framed disabled=${busy} label=${x('action.more')}
+          actions=${[
+            { label: x('action.createApp'), run: () => openDialog('generate', { mode: 'new' }) },
+            { label: x('action.haveApp'), run: openAdd },
+            { label: x('action.portfolio'), run: portfolio },
+            { divider: true },
+            { label: x('backup.exportAll'), run: exportAll },
+            { label: x('backup.importFrom'), run: importPick },
+            { divider: true },
+            { label: x('action.help'), run: () => openDialog('help') },
+            { label: x('action.settings'), run: () => openDialog('settings') },
+          ]} />
+      <//>
+      <input type="file" hidden ref=${fileRef} accept=".zip,application/zip,application/x-zip-compressed" onChange=${picked} />`} />`;
+  }
 
   return html`<${PageHead} low title=${x('header.title')} line=${line} actions=${html`
     <${Loud} mark="+" title=${x('action.generate')} onClick=${() => openDialog('generate', { mode: 'new' })}>${x('action.createApp')}<//>

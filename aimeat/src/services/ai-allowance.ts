@@ -28,6 +28,8 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.5.1 — 2026-10-31 — debitAllowance drops the cached balance of the node's key
+ *     (markNodeKeyUsed), so a page after the call shows what the call left (v28 finding 9).
  *   v1.5.0 — 2026-10-29 — nodeKeyStanding asks first whether the node's key itself has money left
  *     (reason 'node-key-spent', ai/node-key-balance.ts): a customer node's balance is its key's limit
  *     on OpenRouter (UX review 2026-10-29, A1).
@@ -55,7 +57,7 @@ import type { Storage } from '../storage/interface.js';
 import { AiCompletionError, decryptOwnerKey } from './ai/completion.js';
 import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
-import { nodeKeySpent } from './ai/node-key-balance.js';
+import { nodeKeySpent, markNodeKeyUsed } from './ai/node-key-balance.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -316,6 +318,8 @@ export async function debitAllowance(
   storage: Storage, config: AimeatConfig, gaii: string, costUsd: number,
 ): Promise<AllowanceRecord | null> {
   if (!(costUsd > 0)) return null;
+  // The key's own balance moved too: the next page that shows it reads it again.
+  markNodeKeyUsed();
   try {
     const today = utcDay();
     const next = await oneAtATime(storage, gaii, async () => {
