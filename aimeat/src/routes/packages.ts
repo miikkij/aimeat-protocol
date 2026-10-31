@@ -21,6 +21,8 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-31 — The three package reads pass `config`, so the operator's read of a sold package is
+ *     written to the operator trail in the author's account (services/packages/compose/package-read.ts).
  *   2026-10-31 — A package its author sells to accounts (services/packages/sale/package-account-sale.ts):
  *     GET /v1/packages?for_sale=true lists them; GET /v1/packages/:groupId answers a reader with no
  *     purchase the listing, the price and the line that buys it, and everyone else the package with
@@ -505,7 +507,7 @@ export function packagesRouter(
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
 
-    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth);
+    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth, config);
     if (!pkg) {
       const unpaid = await listedSaleRefusal(storage, groupId);
       if (unpaid) { res.status(unpaid.status).json(error(config.nodeId, unpaid.code, unpaid.message)); return; }
@@ -541,8 +543,8 @@ export function packagesRouter(
       return;
     }
     const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : versionParam
-      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth)
-      : await getPackageFor(storage, groupId, req.auth);
+      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth, config)
+      : await getPackageFor(storage, groupId, req.auth, config);
 
     if (!pkg) {
       const unpaid = await listedSaleRefusal(storage, groupId);
@@ -607,7 +609,7 @@ export function packagesRouter(
   router.get('/v1/packages/:groupId', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
 
-    const pkg = await getPackageFor(storage, groupId, req.auth);
+    const pkg = await getPackageFor(storage, groupId, req.auth, config);
     // A package its author sells: a reader with no purchase gets its listing (no content but the
     // preview parts), the price and the line that buys it; a buyer, the author and the operator get
     // the package with the sale beside it (services/packages/sale/package-account-sale.ts).
