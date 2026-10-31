@@ -26,6 +26,9 @@
  *   resolveContactEmail; resolveOwnerByVerifiedEmail; promoteContactsForVerifiedEmail.
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v2.7.1 — 2026-10-31 — removeContact refuses a blocked contact (409 BLOCKED) before it removes
+ *     anything. A linked person's card and the app handles had been removed first and the 409 came
+ *     after, so the refusal left a removal half done (secaudit 2026-10-31 inv-15).
  *   v2.7.0 — 2026-10-26 — A fourth source on a node with members see each other on (services/colleagues.ts):
  *     every other person of the node, origin 'colleague', capped at 2000 and reported in `truncated`.
  *     listContactsFor takes the config instead of the node id, to read the setting.
@@ -600,10 +603,13 @@ export async function removeContact(
 ): Promise<void> {
   const person = await findPersonRecord(storage, ownerGhii, contactId);
   const consent = await storage.getContact(ownerGhii, contactId);
+  // A blocked contact is refused before anything is removed: the card of a linked person and the
+  // app handles go only when the whole removal is allowed (secaudit 2026-10-31 inv-15).
+  if (consent?.state === 'blocked') throw new ContactsError(409, 'BLOCKED', 'Blocked contacts are managed in Messages');
   // Whether the conversation has history decides between keeping the gate state and deleting the
   // row, so it is read BEFORE anything is removed, and a failed read stops the removal: an error
   // here is not an empty conversation.
-  const hasHistory = consent && consent.state !== 'blocked'
+  const hasHistory = consent
     ? (await storage.listConversation(ownerGhii, conversationIdFor(ownerGhii, contactId), { page: 1, perPage: 1 })).messages.length > 0
     : false;
 
@@ -623,7 +629,6 @@ export async function removeContact(
   }
 
   if (consent) {
-    if (consent.state === 'blocked') throw new ContactsError(409, 'BLOCKED', 'Blocked contacts are managed in Messages');
     if (hasHistory) {
       await storage.setContactState(ownerGhii, contactId, consent.state, undefined, 'message');
     } else {

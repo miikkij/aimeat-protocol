@@ -5,6 +5,8 @@
  *   contact never resets the DM first-contact gate), blocked-row handling, the q filter,
  *   cross-owner isolation, and exact-match email resolve (found / not-found / invalid / unauth).
  * @version-history
+ *   2026-10-31 — 44: removing a blocked person who has a card is refused before the card is removed;
+ *     after the block is lifted the card is there and the removal goes through (secaudit 2026-10-31 inv-15).
  *   2026-10-17 — 29, 33, 39: messages:read, messages:send and contacts:read are one-press, so the tool
  *     stays listed for an agent without the word (permission ask, mcp/permission-ask-gate.ts) and the
  *     call is asserted as SCOPE_DENIED with the allow address instead of "not offered".
@@ -886,6 +888,41 @@ await test('43. Cross-owner: another owner\'s agent holding messages:send remove
     const del = await json(`/v1/contacts/${encodeURIComponent(hPersonId)}`, { method: 'DELETE', headers: auth(theirs.token) });
     assert(del.status === 404, `B's agent acts on B's own book, where the person is not: ${del.status}`);
     assert((await contactsOf(H.token)).some(c => c.contact_id === hPersonId), 'H\'s saved person is still there');
+});
+
+await test('44. Removing a blocked person who has a card is refused before anything is removed (the card stays)', async () => {
+    // The card is saved first and the identity blocked later, as in 21. The removal answers 409
+    // BLOCKED, and the refusal removes nothing: once the owner lifts the block in Messages, the row
+    // carries the card's address and note again (secaudit 2026-10-31 inv-15).
+    const email = `blockedcard-${Date.now()}@example.com`;
+    const uname = `contxbc${Date.now()}`;
+    const made = await json('/v1/contacts', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Card Carla', email, note: 'keep me' }) });
+    assert(made.status === 201, `save: ${made.status}`);
+    const org = await json('/v1/organisms', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ name: 'Card Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+    assert(org.status === 201, `org ${org.status}`);
+    const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ email, username: uname, code: 'SuperSecret99', display_name: 'Carla Real' }),
+    });
+    assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+    await markEmailVerified(uname, email);
+    const ghii = `${uname}@${NODE_ID}`;
+    const block = await json(`/v1/messages/contacts/${encodeURIComponent(ghii)}/block`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(block.status === 200, `block ${block.status}: ${JSON.stringify(block.body.error)}`);
+
+    const del = await json(`/v1/contacts/${encodeURIComponent(ghii)}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(del.status === 409 && del.body.error?.code === 'BLOCKED', `expected 409 BLOCKED, got ${del.status} ${del.body.error?.code}`);
+    const held = (await contactsOf(A.token, '?state=blocked')).find(c => c.contact_id === ghii);
+    assert(!!held && held.state === 'blocked', `the block holds: ${JSON.stringify(held)}`);
+
+    const lifted = await json(`/v1/messages/requests/${encodeURIComponent(ghii)}/accept`, { method: 'POST', headers: auth(A.token), body: '{}' });
+    assert(lifted.status === 200, `lift the block: ${lifted.status}`);
+    const row = (await contactsOf(A.token)).find(c => c.contact_id === ghii);
+    assert(!!row && row.email === email && row.note === 'keep me', `the refused removal left the card: ${JSON.stringify(row)}`);
+    // And with the block lifted, the removal the owner asked for goes through.
+    const removed = await json(`/v1/contacts/${encodeURIComponent(ghii)}`, { method: 'DELETE', headers: auth(A.token) });
+    assert(removed.status === 200, `removal after the block is lifted: ${removed.status}`);
+    assert(!(await contactsOf(A.token)).some(c => c.email === email), 'the card is gone');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
