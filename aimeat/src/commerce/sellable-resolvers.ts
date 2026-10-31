@@ -16,6 +16,10 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   2026-10-31 — The app-tool resolver refuses an `action_id` whose capability the seller does not own
+ *     (CAPABILITY_NOT_OWNED_BY_APP) at the session's opening and at the completion re-resolve, before
+ *     the collect; it refused only in fulfil, after the collect, and relied on the refund
+ *     (secaudit 2026-10-31 inv-03). Fulfil keeps its own check.
  *   2026-10-25 — A tool's binding is read for the seller: their own extension by a bare name is still
  *     theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22). The pay token's retry
  *     line names a stored `<owner>/<name>` as one encoded path segment.
@@ -276,6 +280,18 @@ export function appToolSellableResolver(): SellableResolver {
       }
 
       const actionId = tool.action_id;
+      // The manifest NAMES a capability; it does not confer one. Asked here, at the session's opening
+      // and at the completion re-resolve, so a tool bound to a capability its seller does not own is
+      // refused before anything is collected. A capability that does not exist is left to fulfil, as
+      // before: the session opens and completion refunds (secaudit 2026-10-31 inv-03).
+      if (actionId) {
+        const bound = await findBackingCapability(storage, actionId, sellerOwner);
+        if (bound) {
+          const { appToolBindingRefusal } = await import('../services/capability-invoke.js');
+          const misbound = appToolBindingRefusal(bound, sellerOwner, appRef, toolName);
+          if (misbound) throw new CommerceError(misbound.code, misbound.statusCode, misbound.message);
+        }
+      }
       // Task-path assignee (phase B): the manifest-declared agent of the app owner, or the owner's
       // GHII itself when no agent is named (the task lands in the owner's own task space).
       const taskAssignee = tool.agent ? `${tool.agent}#${sellerOwner}@${config.nodeId}` : sellerGhii;
