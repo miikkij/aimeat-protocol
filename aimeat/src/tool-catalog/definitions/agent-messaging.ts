@@ -5,6 +5,7 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-31 — aimeat_overview: the account's overview (GET /v1/overview), on all three surfaces.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_contact_list's description names origin 'colleague', every other person of a company node (members see each other).
  *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
@@ -201,6 +202,22 @@ export const agentMessagingTools = [
             to: { type: 'string', description: 'Inclusive end day, YYYY-MM-DD. Defaults to today.' },
             grain: { type: 'string', enum: ['day', 'hour'], description: 'Bucket size, where the report has one.' },
             limit: { type: 'number', description: 'Maximum groups to return.' },
+        },
+    },
+    {
+        // GET /v1/overview, through the same service (services/overview/overview-read.ts).
+        name: 'aimeat_overview',
+        description: 'The whole account in one picture, read left to right: machines (computers running aimeat connect serve, and AI chat clients that bring agents in over MCP), the agents on each, the apps, the knowledge (organisms and their workspaces) and what the owner offers (app tools and agent offers, with whether each is a capability on the node and listed on EXCHANGE). Every item has its use in the period (calls, opens or writes), when it was last used, and quiet_days when unused for 30 days or more; edges say what ties two items and how much happened along the tie. Without focus it answers the busiest 10 of each lane; focus=<item id> follows one item and everything one line away. Use it when the person asks what their agents do, where something runs, what is used and what has gone quiet, then give them the overview page: /v1/home?overview=1&focus=<item id>.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Account Overview', readOnlyHint: true },
+        // The word GET /v1/overview asks: the answer lists the owner's agents, like GET /v1/agents.
+        scope: 'agent:read',
+        surfaces: ['agent', 'service'],
+        input: {
+            range: { type: 'string', enum: ['24h', '7d', '30d'], description: 'The period the counts cover. Default 7d.', zod: z.enum(['24h', '7d', '30d']).optional() },
+            focus: { type: 'string', description: 'An item id from an earlier answer (agent:<name>, app:<filename>, organism:<id>, workspace:<org>/<ws>, machine:<id>, chat:<client>, tools:<filename>, offer:<agent>/<id>).', zod: z.string().max(300).optional() },
+            limit: { type: 'number', description: 'The busiest n items of each lane, 1 to 50. Default 10 when focus is not given.', zod: z.number().int().min(1).max(50).optional() },
         },
     },
     {

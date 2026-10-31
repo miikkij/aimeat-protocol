@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
+ *   2026-10-31 — countTasksByOwner also returns done24h and done30d, done tasks of the last 24 hours
+ *     and 30 days, rolling.
  *   2026-10-01 — countTasksByOwner also returns doneWeek, done tasks of the last 7 days.
  *   2026-10-02 — startPolicy on insert, update and read (migration 0092).
  *   2026-08-15 — createdBy on insert and read (migration 0037).
@@ -16,6 +18,7 @@
 import type Database from 'better-sqlite3';
 import type { AgentTaskRecord, AgentTaskEventRecord } from '../../../interface.js';
 import { LIVE_TASK_STATUSES } from '../../../interface.js';
+import type { OwnerTaskCounts } from '../../../repositories/agent-task.repository.js';
 
 // ── Helpers ──
 
@@ -296,9 +299,11 @@ export function countTasksByAgent(
 export function countTasksByOwner(
   db: Database.Database,
   ownerGaii: string,
-): Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> {
+): Record<string, OwnerTaskCounts> {
   const dayStart = new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z';
   const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+  const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+  const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
   const rows = db.prepare(
     `SELECT agentGaii,
        SUM(CASE WHEN status='queued' THEN 1 ELSE 0 END) AS queued,
@@ -307,12 +312,14 @@ export function countTasksByOwner(
        SUM(CASE WHEN status='failed' THEN 1 ELSE 0 END) AS failed,
        SUM(CASE WHEN status='done' AND completedAt >= ? THEN 1 ELSE 0 END) AS doneToday,
        SUM(CASE WHEN status='done' AND completedAt >= ? THEN 1 ELSE 0 END) AS doneWeek,
+       SUM(CASE WHEN status='done' AND completedAt >= ? THEN 1 ELSE 0 END) AS done24h,
+       SUM(CASE WHEN status='done' AND completedAt >= ? THEN 1 ELSE 0 END) AS done30d,
        MAX(updatedAt) AS lastTaskUpdateAt,
        MAX(CASE WHEN status='failed' THEN updatedAt END) AS lastFailedAt
      FROM agent_tasks WHERE ownerGaii = ? GROUP BY agentGaii`
-  ).all(dayStart, weekStart, ownerGaii) as Array<Record<string, unknown>>;
+  ).all(dayStart, weekStart, last24h, last30d, ownerGaii) as Array<Record<string, unknown>>;
 
-  const out: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+  const out: Record<string, OwnerTaskCounts> = {};
   for (const r of rows) {
     out[r.agentGaii as string] = {
       queued: (r.queued as number) ?? 0,
@@ -321,6 +328,8 @@ export function countTasksByOwner(
       failed: (r.failed as number) ?? 0,
       doneToday: (r.doneToday as number) ?? 0,
       doneWeek: (r.doneWeek as number) ?? 0,
+      done24h: (r.done24h as number) ?? 0,
+      done30d: (r.done30d as number) ?? 0,
       lastTaskUpdateAt: (r.lastTaskUpdateAt as string) ?? null,
       lastFailedAt: (r.lastFailedAt as string) ?? null,
     };

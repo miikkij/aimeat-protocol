@@ -69126,6 +69126,55 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
 
+  /v1/overview:
+    get:
+      operationId: accountOverview
+      summary: The account's overview - machines, agents, apps, knowledge and offerings with their use
+      description: >-
+        One answer for the whole account behind the session: the machines (computers running
+        aimeat connect serve, and AI chat clients that bring agents in over MCP), the agents on
+        each, the owner's apps, the organisms and workspaces the owner belongs to, and what the
+        owner offers (each app's tool set, every tool a capability on the node; each agent offer,
+        a capability when public; EXCHANGE listings and their contracts). Every item carries its
+        use in the period (calls, opens or writes), when it was last used, and quiet_days when it
+        has been unused for 30 days or more. Edges say what ties two items and how much happened
+        along the tie. An agent's line to an app is the tie the app's data map states, with weight
+        0, until per-app agent use is counted (partial names it). Owner sessions read it in full;
+        an agent, ecosystem or app-grant session needs agent:read, and sees workspace names only
+        with organism:read as well. A session from another node is refused.
+      tags: [Usage]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: range
+          schema: { type: string, enum: ['24h', '7d', '30d'], default: '7d' }
+          description: >-
+            The period the counts cover. Day-grained usage counts whole days, so 24h there reaches
+            back to the start of yesterday; `since` in the answer is the instant rolling counts use.
+        - in: query
+          name: focus
+          schema: { type: string, maxLength: 300 }
+          description: >-
+            An item id from a previous answer (agent:<name>, app:<filename>, organism:<id>,
+            workspace:<org>/<ws>, machine:<id>, chat:<client>, tools:<filename>, offer:<agent>/<id>).
+            Keeps that item, its group, the items in it and everything one line away.
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 50 }
+          description: Keeps the busiest n items of each lane and the groups they sit in. Totals stay whole.
+      responses:
+        '200':
+          description: range, since, totals, items, edges and the parts that could not be counted (partial)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/admin/usage/summary:
     get:
       operationId: adminUsageSummary

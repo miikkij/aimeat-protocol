@@ -9,11 +9,12 @@
  *   (components/Field.js) draws a HelpTip after its row label when given `help`, so the controls of
  *   the field family take `help="ai.temperature"` and nothing else. On a touch screen a tap opens
  *   the dialog. The look is css/components/help-tip.css (the button's size, the label row).
- * @structure HelpTip({ term, label }) · HelpLabel({ term, label, children })
+ * @structure HelpTip({ term, label, mine }) · HelpLabel({ term, label, children })
  * @usage html`<${HelpTip} term="ai.temperature" />`
  *        html`<${TextField} label=${x('param.temperature')} help="ai.temperature" … />`
  *        Facts row: { k: html`<${HelpLabel} term="ai.fallback" label=${x('rt.fallback')}>${x('rt.fallback')}<//>`, v }
  * @version-history
+ *   v1.2.0 — 2026-10-31 — `mine`: the person's own figures, handed to the dialog and its prompt.
  *   v1.1.0 — 2026-10-02 — HelpLabel: a label with its question mark, for the places that are not a
  *     field (a Facts row's name, a Check, a SettingLine, a heading).
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille"): the AI fine-tuning
@@ -29,10 +30,10 @@ import { ExplainDialog, explainOf } from '/components/ExplainDialog.js';
 const html = htm.bind(h);
 
 /**
- * @param {{ term: string, label?: string }} props `term` names the explanation (`explain.<term>.*`);
+ * @param {{ term: string, label?: string, mine?: string }} props `term` names the explanation (`explain.<term>.*`);
  *   `label` is the setting's name on the page, used when the locale gives no title.
  */
-export function HelpTip({ term, label }) {
+export function HelpTip({ term, label, mine }) {
   const [open, setOpen] = useState(false);
   // The dialog hands the focus back to the button as it closes; that focus is not a request for the
   // tooltip, so the tooltip stays quiet for a moment after the dialog.
@@ -51,7 +52,7 @@ export function HelpTip({ term, label }) {
         <button type="button" class="poster-icon poster-icon--small help-tip-button"
           aria-label=${t('explain.open', { term: title })} onClick=${() => setOpen(true)}>?</button>
       <//>
-      <${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} />
+      <${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} mine=${mine} />
     </span>`;
 }
 

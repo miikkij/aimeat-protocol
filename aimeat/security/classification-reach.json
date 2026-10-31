@@ -816,6 +816,12 @@
       },
       "why": "Reviewed 2026-10-11, the node's own read: the owner's apps' data map documents (public by definition, apps.<id>.datamap), from which only the rows that name an agent are taken, and the owner's workplace records (agent-workplace.<name>, a reserved prefix only services/agent-workplace.ts writes). Shown to that owner on their home. No content anybody classified."
     },
+    "src/services/overview/overview-sources.ts": {
+      "reads": {
+        "listMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the owner's apps' data map documents (public by definition, tag datamap), from which only the organism and workspace ids in a row's whereExactly are taken, and kept only when they name a place the reader is already a member of. The overview shows the owner a line between their app and that place. No content anybody classified; the workspace activity is read through storage.listKeyActivity, which returns keys and times and never a value."
+    },
     "src/services/agent-workplace.ts": {
       "reads": {
         "getMemory": 2,
