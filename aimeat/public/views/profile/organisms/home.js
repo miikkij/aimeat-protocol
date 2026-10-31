@@ -13,6 +13,7 @@
  * @structure OrganismHome
  * @usage import { OrganismHome } from '/views/profile/organisms/home.js';
  * @version-history
+ *   v3.11.0 -- 2026-10-31 -- "Show in the overview" under the map: the Overview page opened on this organism (views/home/overview.js).
  *   v3.10.0 -- 2026-10-03 -- The question mark that explains a workspace, concept.workspace, after the line under the workspace list (components/HelpTip.js; guidance part B).
  *   v3.9.0 -- 2026-09-26 -- Every part is a kit component (page group G2a): the page is the SettingsPage (crumb, title, the tags as data, the description, the For your AI slab and the two ways, the FigureStrip, the rail as data whose folds open before they scroll), the sections the Section (open and folded), the hints the Note. The join policy and the creation date are the dim tag again, as main drew them (og-chip--dim). The page writes no class.
  *   v3.8.0 -- 2026-09-26 -- A way on is the action link's small tone, a soft one its lower-case tone, one at the end of a row its row cut (a unification: Jouni's decision "Action link in Settings").
@@ -249,6 +250,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       <${Section} fold id="og-map" num="07" title=${tr('organisms.mapAndToc', 'Map and table of contents')} open=${openMap} onToggle=${() => setOpenMap(o => !o)}>
         <${Note}>${tr('organisms.mapAndTocHint', 'The same structure two ways.')}<//>
         <${StructureMindmap} scope="organism" graph=${graph} onNavigate=${onMapNav} storageKey=${'org.' + org.id} defaultOpen />
+        <${Actions}><${Action} href=${`/v1/home?overview=1&focus=${encodeURIComponent(`organism:${org.id}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//><//>
         <${StructureOverview} label=${tr('organisms.structureOverviewOrg', 'Organism structure — table of contents')}
           load=${() => orgService.getOrganismOverview(org.id)} defaultOpen />
       <//>

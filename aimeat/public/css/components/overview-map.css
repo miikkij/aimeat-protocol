@@ -1,0 +1,371 @@
+/**
+ * @file overview-map.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The overview map (components/OverviewMap.js): five lanes with their heads, cards in
+ *   ink frames, open groups as a box with rows inside, the curves between cards, and the selected,
+ *   related and dimmed states. The sizes are the accepted canvas's (Kokonaiskuva, board 1), set in
+ *   views/home/overview-model.js SIZES; this sheet gives the look and the motion. Reads the theme's
+ *   tokens only. Cards and groups move with a short transition when a group opens or closes.
+ *   NOTE: this file must be linked in spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-10-31 — Initial (wish-kokonaiskuva-koneet-agentit-sovellukset-tieto-ja-tarjoukset-).
+ */
+
+.ovm {
+  width: var(--ovm-w);
+}
+.ovm-lanes {
+  display: grid;
+  grid-template-columns: repeat(5, var(--ovm-lane, 232px));
+  column-gap: 38px;
+  margin-bottom: 14px;
+}
+.ovm-lane {
+  border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+  padding-bottom: 8px;
+}
+.ovm-lane-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+/* The face, case and spacing are .poster-record-title's; the lane head is a smaller cut. */
+.ovm-lane-title {
+  margin: 0;
+  font-size: 1.4rem;
+}
+.ovm-lane-sub {
+  margin: 2px 0 0;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+
+.ovm-host {
+  position: relative;
+  width: var(--ovm-w);
+  transition: height .32s ease;
+}
+.ovm-edges {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.ovm-edge {
+  fill: none;
+  stroke: var(--text);
+  stroke-opacity: .3;
+  stroke-linecap: round;
+  transition: stroke-opacity .25s ease;
+}
+.ovm-edge--hl {
+  stroke: var(--accent);
+  stroke-opacity: 1;
+}
+.ovm-edge--dim {
+  stroke-opacity: .07;
+}
+
+.ovm-box {
+  position: absolute;
+  box-sizing: border-box;
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  background: var(--card-bg);
+  border-radius: var(--shape-corner);
+  transition: top .32s ease, height .32s ease, opacity .2s ease, box-shadow .2s ease;
+}
+.ovm-box.is-sel {
+  box-shadow: var(--shape-shadow-raised);
+}
+
+.ovm-node {
+  position: absolute;
+  box-sizing: border-box;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  text-align: left;
+  font-family: var(--font-body);
+  color: var(--text);
+  cursor: pointer;
+  border-radius: var(--shape-corner);
+  transition: top .32s ease, left .32s ease, height .32s ease, opacity .2s ease, box-shadow .2s ease;
+}
+.ovm-node:focus-visible {
+  outline: var(--shape-ring) solid var(--accent);
+  outline-offset: 2px;
+}
+.ovm-node--card {
+  padding: 10px 12px;
+  background: var(--card-bg);
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+}
+.ovm-node--head {
+  padding: 0 12px;
+  background: transparent;
+  border: 0;
+}
+.ovm-node--row {
+  padding: 0 10px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+.ovm-node.is-quiet {
+  color: var(--text-dim);
+}
+.ovm-node--card.is-quiet {
+  border-style: dashed;
+  border-color: var(--text-dim);
+}
+.ovm-node--card.is-sel {
+  box-shadow: var(--shape-shadow-raised);
+}
+.ovm-node--row.is-sel {
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  box-shadow: var(--shape-shadow-action);
+}
+.ovm-node.is-dim,
+.ovm-box.is-dim {
+  opacity: .35;
+}
+
+.ovm-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+.ovm-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: .95rem;
+  font-weight: 700;
+}
+.ovm-node--row .ovm-name {
+  font-size: .82rem;
+  font-weight: var(--font-poster-strong-weight, 600);
+}
+.ovm-sub {
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.ovm-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  background: var(--success-fg);
+}
+.ovm-sign {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border: var(--shape-frame) solid currentColor;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: .95rem;
+  line-height: 1;
+  background: var(--card-bg);
+}
+.ovm-sign.is-open {
+  background: var(--shape-chosen-ground);
+  color: var(--on-sun);
+  border-color: var(--on-sun);
+}
+.ovm-bar {
+  flex: 1;
+  height: 4px;
+  background: var(--border);
+  display: flex;
+}
+.ovm-bar-fill {
+  background: var(--text);
+}
+.ovm-node.is-sel .ovm-bar-fill {
+  background: var(--accent);
+}
+.ovm-node.is-quiet .ovm-bar-fill {
+  background: var(--text-dim);
+}
+.ovm-num {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: var(--text-2xs);
+  color: var(--text);
+}
+.ovm-node--row .ovm-num {
+  color: var(--text-dim);
+}
+
+/* ── The page around the map (views/home/overview.js) ─────────────────────────────────────── */
+.ovp-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 1rem;
+}
+.ovp-intro {
+  max-width: 760px;
+}
+.ovp-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.ovp-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+.ovp-ranges,
+.ovp-toggles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 18px;
+}
+.ovp-ranges { gap: 6px; }
+.ovp-range {
+  min-height: 36px;
+  padding: 0 12px;
+  cursor: pointer;
+}
+.ovp-totals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  margin: 1.2rem 0 0;
+  padding-top: 12px;
+  border-top: var(--shape-frame-heavy) solid var(--shape-rule-colour);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+}
+.ovp-detail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 28px;
+  min-height: 92px;
+  box-sizing: border-box;
+  margin: 1.2rem 0 1.6rem;
+  padding: 16px 20px;
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  background: var(--card-bg);
+  border-radius: var(--shape-corner);
+}
+.ovp-detail p { margin: 0; }
+.ovp-detail-what { flex: 1 1 300px; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.ovp-detail-kind { display: flex; align-items: center; gap: 8px; }
+.ovp-detail-kind .poster-label { color: var(--accent); }
+/* The face, case and spacing are .poster-record-title's. */
+.ovp-detail-name {
+  font-size: 1.6rem;
+  overflow-wrap: anywhere;
+}
+.ovp-detail-facts { flex: 1 1 260px; display: flex; flex-direction: column; gap: 6px; }
+.ovp-detail-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; }
+.ovp-dim { color: var(--text-dim); }
+.ovp-mono { font-family: var(--font-mono); font-size: var(--text-xs); }
+.ovp-scroll {
+  overflow-x: auto;
+  padding-bottom: 8px;
+}
+.ovp-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+  margin-top: 1rem;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.ovp-legend-item { display: inline-flex; align-items: center; gap: 8px; }
+.ovp-legend-dot { flex: none; width: 8px; height: 8px; background: var(--success-fg); }
+.ovp-legend-dash { width: 28px; border-top: var(--shape-frame) dashed var(--text-dim); }
+.ovp-legend-bar { width: 28px; height: 4px; background: var(--text); }
+
+/* A phone: nested lists (canvas board 4). */
+.ovp-lane { margin-top: 1.4rem; }
+.ovp-lane .ovm-lane-row { border-bottom: var(--shape-frame-heavy) solid var(--shape-rule-colour); padding-bottom: 4px; margin-bottom: 8px; }
+.ovp-ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.ovp-ul .ovp-ul { margin-top: 6px; padding-left: 16px; }
+.ovp-li-btn {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  box-sizing: border-box;
+  border: var(--shape-frame) solid var(--shape-frame-colour);
+  background: var(--card-bg);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  border-radius: var(--shape-corner);
+}
+.ovp-li--d1 .ovp-li-btn, .ovp-li--d2 .ovp-li-btn { min-height: 44px; border-width: 1px; border-color: var(--border); background: var(--bg); }
+.ovp-li.is-quiet > .ovp-li-btn { border-style: dashed; color: var(--text-dim); }
+.ovp-li.is-sel > .ovp-li-btn { border: var(--shape-frame) solid var(--shape-frame-colour); box-shadow: var(--shape-shadow-action); }
+.ovp-li-text { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ovp-li-text b { overflow-wrap: anywhere; }
+.ovp-li-tied { padding: 8px 12px; font-size: var(--text-sm, .9rem); }
+.ovp-li-tied ul { margin: .3rem 0 0; padding-left: 1.1rem; }
+
+/* ── The home's Overview band (views/home/overview-band.js) ───────────────────────────────── */
+.ovb-period {
+  margin: 0 0 12px;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text-dim);
+}
+.ovb-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px 24px;
+}
+.ovb-col { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.ovb-col .poster-label { color: var(--accent); }
+/* The face is .poster-stat-number's. */
+.ovb-num {
+  font-size: 2.6rem;
+  margin-right: 0;
+}
+.ovb-line { font-size: var(--text-sm, .9rem); overflow-wrap: anywhere; }
+.ovb-dim { color: var(--text-dim); }
+.ovb-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+.ovb-foot p { margin: 0; flex: 1 1 320px; }
+@media (max-width: 700px) {
+  .ovb-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ovm-host, .ovm-box, .ovm-node, .ovm-edge { transition: none; }
+}

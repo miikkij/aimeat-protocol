@@ -10,6 +10,8 @@
  *   groups by agent then folds status/doneToday/lastTaskUpdateAt/lastFailedAt, findStalledTasks compares
  *   lastEventAt to a now-threshold. Delete cascades the event log and refuses an 'active' task.
  * @version-history
+ *   2026-10-31 — countTasksByOwner also returns done24h and done30d, done tasks of the last 24 hours
+ *     and 30 days, rolling.
  *   2026-10-23 — findLiveTaskByDedupeKey reads with LIMIT 1 (check:unbounded-lists).
  *   2026-10-02 — startPolicy on insert, update and read (migration 0092).
  *   2026-10-01 — countTasksByOwner also returns doneWeek, done tasks of the last 7 days.
@@ -22,6 +24,7 @@ import type { AgentTaskRecord, AgentTaskEventRecord } from '../../../interface.j
 import { LIVE_TASK_STATUSES } from '../../../interface.js';
 import type { AgentTask, AgentTaskEvent } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
+import type { OwnerTaskCounts } from '../../../repositories/agent-task.repository.js';
 import { jsonb } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -221,11 +224,14 @@ export const agentTaskMethods = {
     return counts;
   },
 
-  async countTasksByOwner(this: PostgresKyselyStorage, ownerGaii: string): Promise<Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }>> {
+  async countTasksByOwner(this: PostgresKyselyStorage, ownerGaii: string): Promise<Record<string, OwnerTaskCounts>> {
     // One grouped pass per agent: status buckets via CASE sums, doneToday = done tasks completed on the
-    // current UTC day, lastTaskUpdateAt = MAX(updatedAt), lastFailedAt = MAX(updatedAt) of failed tasks.
+    // current UTC day, done24h / done30d = completed in the last 24 hours / 30 days (rolling),
+    // lastTaskUpdateAt = MAX(updatedAt), lastFailedAt = MAX(updatedAt) of failed tasks.
     const dayStart = new Date(new Date().toISOString().slice(0, 10) + 'T00:00:00.000Z');
     const weekStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const last24h = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const last30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const rows = await this.db.selectFrom('AgentTask')
       .select([
         'agentGaii',
@@ -235,11 +241,13 @@ export const agentTaskMethods = {
         sql<string>`sum(case when status = 'failed' then 1 else 0 end)`.as('failed'),
         sql<string>`sum(case when status = 'done' and "completedAt" >= ${dayStart} then 1 else 0 end)`.as('doneToday'),
         sql<string>`sum(case when status = 'done' and "completedAt" >= ${weekStart} then 1 else 0 end)`.as('doneWeek'),
+        sql<string>`sum(case when status = 'done' and "completedAt" >= ${last24h} then 1 else 0 end)`.as('done24h'),
+        sql<string>`sum(case when status = 'done' and "completedAt" >= ${last30d} then 1 else 0 end)`.as('done30d'),
         sql<Date | null>`max("updatedAt")`.as('lastTaskUpdateAt'),
         sql<Date | null>`max(case when status = 'failed' then "updatedAt" end)`.as('lastFailedAt'),
       ])
       .where('ownerGaii', '=', ownerGaii).groupBy('agentGaii').execute();
-    const out: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; doneWeek: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
+    const out: Record<string, OwnerTaskCounts> = {};
     for (const r of rows) {
       out[r.agentGaii] = {
         queued: Number(r.queued ?? 0),
@@ -248,6 +256,8 @@ export const agentTaskMethods = {
         failed: Number(r.failed ?? 0),
         doneToday: Number(r.doneToday ?? 0),
         doneWeek: Number(r.doneWeek ?? 0),
+        done24h: Number(r.done24h ?? 0),
+        done30d: Number(r.done30d ?? 0),
         lastTaskUpdateAt: isoOpt(r.lastTaskUpdateAt),
         lastFailedAt: isoOpt(r.lastFailedAt),
       };
