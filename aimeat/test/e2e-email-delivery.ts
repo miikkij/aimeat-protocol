@@ -41,6 +41,7 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-31 — The auth prelude says linkFirst only on a node with a purchase plan (v28 #7).
  *   2026-10-16 — A marketing newsletter: the sender footer from outbound.sender, the List-Unsubscribe
  *     and List-Unsubscribe-Post headers, the body vocabulary escaped, a lead image; the RFC 8058
  *     one-click POST to the header's address opts the reader out and the next newsletter is refused.
@@ -242,6 +243,25 @@ async function run(): Promise<void> {
     await test('the sign-in dialog is told this node sends mail, so it offers the emailed sign-in link', async () => {
         const lib = await fetch(`${BASE}/v1/libs/aimeat-auth.js`).then(r => r.text());
         assert(lib.includes('"emailLogin":true'), `the auth prelude must say emailLogin true: ${lib.slice(0, 400)}`);
+    });
+
+    await test('on a node bought from the store the sign-in dialog opens on the emailed link; elsewhere on the password (v28 #7)', async () => {
+        // The source was broken: a buyer's own node opened its top-bar sign-in on the password form,
+        // although the buyer has no password and the store promised none.
+        const prelude = async () => (await fetch(`${BASE}/v1/libs/aimeat-auth.js`).then(r => r.text())).slice(0, 2000);
+        assert((await prelude()).includes('"linkFirst":false'), 'a node with no purchase plan keeps the password first');
+        const set = (value: string) => json('/v1/admin/config', {
+            method: 'PUT', headers: { ...bearer(opToken), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes: [{ path: 'site.purchase_plan', value }] }),
+        });
+        const on = await set('Solo');
+        assert(on.status === 200, `setting site.purchase_plan: ${on.status} ${short(on.body)}`);
+        try {
+            assert((await prelude()).includes('"linkFirst":true'), 'a store-bought node opens on the emailed link');
+        } finally {
+            await set('');
+        }
+        assert((await prelude()).includes('"linkFirst":false'), 'clearing the plan restores the password first');
     });
 
     await test('the node authenticated to the SMTP server, so the transport built its auth branch', async () => {

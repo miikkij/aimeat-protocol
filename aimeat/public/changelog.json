@@ -2,6 +2,28 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does. Since 2026-10-18 every entry also carries: id (unique, date plus a slug of the English title; never changed once shipped, because a person's 'seen' record points at it), audience (one or more of user | agent | operator | developer: who the change reaches), highlight (true only for what most of that audience should notice now, about one entry in seven), summary ({ en, fi }, one sentence of what the person gets, at most about 110 characters: the home's news band shows only this), and for a fix or security entry impact ({ en, fi }, one sentence: does the person's use change, and must they do anything). The home's band (views/home/news-band.js) lists what a person has not confirmed yet; /v1/changelog is the whole history.",
   "entries": [
     {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-sell-your-own-package",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Sell your own package",
+        "fi": "Myy oma pakettisi"
+      },
+      "summary": {
+        "en": "Put a price on a package you made, and another user of the same AIMEAT can buy it.",
+        "fi": "Hinnoittele tekemäsi paketti, ja toinen saman AIMEATin käyttäjä voi ostaa sen."
+      },
+      "body": {
+        "en": "Put a price on a package you made. Another user of the same AIMEAT buys it on the Packages page or through their AI. The money goes to your own Stripe account, and the buyer can install the package and its later versions. You see every sale and can refund it.",
+        "fi": "Aseta hinta tekemällesi paketille. Toinen saman AIMEATin käyttäjä ostaa sen Paketit-sivulta tai tekoälynsä kautta. Raha menee omalle Stripe-tilillesi, ja ostaja voi asentaa paketin ja sen myöhemmät versiot. Näet jokaisen myynnin ja voit hyvittää sen."
+      }
+    },
+    {
       "date": "2026-10-30",
       "kind": "feature",
       "id": "2026-10-30-several-file-stores-and-you-choose-where-a-file-goes",

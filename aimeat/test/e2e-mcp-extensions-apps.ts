@@ -36,6 +36,8 @@
  *   - Phase 8: aimeat_app_delete, both refusal arms and the real delete
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=mcp-extensions-apps
  * @version-history
+ *   2026-10-31 — 22 and 25: the publish and draft-publish answers carry `url`, the list's address,
+ *     not the raw download (v28 #12).
  *   2026-10-17 — 3: the ext and app tools miss only one-press words, so a memory:read agent is listed
  *     them (permission ask, mcp/permission-ask-gate.ts) and each call is refused SCOPE_DENIED with the
  *     allow address.
@@ -579,6 +581,13 @@ await test('22. A real inline publish lands, and GET /v1/apps sees it', async ()
     assert(r.data.mode === 'inline' && r.data.filename === APP, `mode/filename: ${r.text.slice(0, 300)}`);
     assert(r.data.version_number === 1, `version_number: ${r.data.version_number}`);
     assert(r.data.is_update === false, `a first publish is not an update: ${r.data.is_update}`);
+    // v28 #12: the answer carries the address a person opens, the one aimeat_app_list gives. The node
+    // chat handed a buyer download_url, the raw file served as an attachment. The source was broken.
+    assert(typeof r.data.url === 'string' && /^https?:\/\//.test(r.data.url), `url: ${r.data.url}`);
+    assert(!r.data.url.endsWith(r.data.download_url), `url is the raw download: ${r.data.url}`);
+    const appList = await callTool(authorSession, 'aimeat_app_list', {});
+    const row = (appList.data?.apps ?? appList.data ?? []).find?.((a: any) => a.filename === APP);
+    assert(row?.url === r.data.url, `publish url ${r.data.url} is not the list's ${row?.url}`);
 
     const listed = await json('/v1/apps', { headers: authed(author.token) });
     assert(listed.status === 200, `GET /v1/apps ${listed.status}`);
@@ -666,6 +675,8 @@ await test('25. aimeat_app_draft_publish promotes it and clears the slot', async
     assert(!r.isError, `draft_publish refused: ${r.text}`);
     assert(r.data.version_number === 2, `version_number: ${r.text.slice(0, 300)}`);
     assert(r.data.is_update === true, `is_update: ${r.data.is_update}`);
+    assert(typeof r.data.url === 'string' && /^https?:\/\//.test(r.data.url) && !r.data.url.endsWith(r.data.download_url),
+        `the draft publish answers with the address to open, got ${r.data.url}`);
     assert(typeof r.data.note === 'string' && r.data.note.includes('draft slot is cleared'), `note: ${r.data.note}`);
 
     const live = await json(`/v1/apps/${encodeURIComponent(author.owner)}/${APP}?mode=inline`);
