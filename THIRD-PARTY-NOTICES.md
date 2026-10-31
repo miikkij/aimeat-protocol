@@ -88,6 +88,7 @@ tarball is. "Installed by the operator" means AIMEAT does not ship the file at a
 | [DuckDB-Wasm](https://duckdb.org) | 1.32.0 | MIT | Copyright 2018-2025 Stichting DuckDB Foundation | served by the node | notice only |
 | [Apache Arrow (JS)](https://arrow.apache.org) | 17.0.0 | Apache-2.0 | Copyright 2016-2026 The Apache Software Foundation | served by the node | notice only |
 | [TOAST UI Editor](https://ui.toast.com/tui-editor) | 3.2.2 | MIT | Copyright (c) 2020 NHN Cloud Corp. | served by the node | notice only |
+| [Swagger UI (swagger-ui-dist)](https://github.com/swagger-api/swagger-ui) | 5.34.1 | Apache-2.0 | Copyright 2020-2021 SmartBear Software Inc. | served by the node | notice only |
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.6 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)](https://ffmpeg.org) | 0.12.10 | GPL-2.0-or-later | Copyright (c) 2000-2022 the FFmpeg developers | installed by the operator | **see below** |
 | [world-atlas (Natural Earth 110m country shapes)](https://github.com/topojson/world-atlas) | 2.0.2 | ISC | Copyright 2013-2019 Michael Bostock; the underlying Natural Earth data is in the public domain | served by the node | notice only |
@@ -2804,7 +2805,7 @@ The above copyright notice and this permission notice shall be included in all c
 THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
-### Apache Arrow (JS) 17.0.0, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.10.0, @owf/identity-common 0.5.0, @prometheus-io/client 0.16.1, @sd-jwt/core 0.23.0, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.4, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.5, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
+### Apache Arrow (JS) 17.0.0, Swagger UI (swagger-ui-dist) 5.34.1, @a2a-js/sdk 1.3.0, @opentelemetry/api 1.10.0, @owf/identity-common 0.5.0, @prometheus-io/client 0.16.1, @sd-jwt/core 0.23.0, @trustnxt/c2pa-ts 0.14.1, b4a 1.9.0, bare-events 2.9.2, bare-fs 4.8.4, bare-path 3.1.2, bare-stream 2.13.4, bare-url 2.5.5, events-universal 1.0.1, schema-dts-lib 1.1.0, schema-dts 2.1.0, text-decoder 1.2.7
 
 ```text
 Apache License
@@ -12404,6 +12405,147 @@ its NOTICE file:
 
   This product includes software developed by Hewlett-Packard:
   (c) Copyright [2014-2015] Hewlett-Packard Development Company, L.P
+```
+
+### Swagger UI (swagger-ui-dist) 5.34.1
+
+```text
+swagger-ui
+Copyright 2020-2021 SmartBear Software Inc.
+
+The notices below are the ones swagger-ui-dist 5.34.1 ships as swagger-ui-bundle.js.LICENSE.txt, for the third-party code bundled into swagger-ui-bundle.js:
+
+/*!
+	Copyright (c) 2018 Jed Watson.
+	Licensed under the MIT License (MIT), see
+	http://jedwatson.github.io/classnames
+*/
+
+/*!
+ * @description Recursive object extending
+ * @author Viacheslav Lotsmanov <lotsmanov89@gmail.com>
+ * @license MIT
+ *
+ * The MIT License (MIT)
+ *
+ * Copyright (c) 2013-2018 Viacheslav Lotsmanov
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy of
+ * this software and associated documentation files (the "Software"), to deal in
+ * the Software without restriction, including without limitation the rights to
+ * use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
+ * the Software, and to permit persons to whom the Software is furnished to do so,
+ * subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+ * FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+ * COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
+ * IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
+/*!
+ * The buffer module from node.js, for the browser.
+ *
+ * @author   Feross Aboukhadijeh <https://feross.org>
+ * @license  MIT
+ */
+
+/*!
+ * https://github.com/Starcounter-Jack/JSON-Patch
+ * (c) 2017-2021 Joachim Wester
+ * MIT license
+ */
+
+/*!
+ * https://github.com/Starcounter-Jack/JSON-Patch
+ * (c) 2017-2022 Joachim Wester
+ * MIT licensed
+ */
+
+/*!
+ * repeat-string <https://github.com/jonschlinkert/repeat-string>
+ *
+ * Copyright (c) 2014-2015, Jon Schlinkert.
+ * Licensed under the MIT License.
+ */
+
+/*! @license DOMPurify 3.4.17 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.4.17/LICENSE */
+
+/*! ieee754. BSD-3-Clause License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+/*! regenerator-runtime -- Copyright (c) 2014-present, Facebook, Inc. -- license (MIT): https://github.com/babel/babel/blob/main/packages/babel-helpers/LICENSE */
+
+/*! safe-buffer. MIT License. Feross Aboukhadijeh <https://feross.org/opensource> */
+
+/**
+ * @license
+ * MIT License
+ * 
+ * Copyright (c) 2014-present, Lee Byron and other contributors.
+ * 
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
+/**
+ * @license React
+ * react-dom.production.min.js
+ *
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/**
+ * @license React
+ * react.production.min.js
+ *
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/**
+ * @license React
+ * scheduler.production.min.js
+ *
+ * Copyright (c) Facebook, Inc. and its affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
+
+/**
+ * @license React
+ * use-sync-external-store-with-selector.production.js
+ *
+ * Copyright (c) Meta Platforms, Inc. and affiliates.
+ *
+ * This source code is licensed under the MIT license found in the
+ * LICENSE file in the root directory of this source tree.
+ */
 ```
 
 ### Baloo 2, Bangers, Inter, Archivo, Archivo Black, Space Grotesk, Fraunces, JetBrains Mono, Fjalla One, DM Sans, VT323, Bungee, Instrument Serif, Instrument Sans, Schibsted Grotesk, Bricolage Grotesque, Syne, Unbounded, Gloock, Geist Mono, Martian Mono, Mona Sans, Hubot Sans, Press Start 2P, Selawik, IBM Plex Sans, IBM Plex Mono, Newsreader, Michroma see fonts/LICENSE.md
