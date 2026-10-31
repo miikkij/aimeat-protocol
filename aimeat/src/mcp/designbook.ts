@@ -5,11 +5,15 @@
  * @description The node-MCP door for the Design Book (TARGET-074 phase 5): search, read, propose,
  *   adopt. Calls the same DesignBookService the REST routes do — one capability, one
  *   implementation — and the bench refusals reach the agent in the validator's own words.
- * @structure registerDesignbookTools(mcp, storage, config, getAgentGaii)
+ * @structure registerDesignbookTools(mcp, storage, config, getAgentGaii, caller)
  * @usage
  *   import { registerDesignbookTools } from './designbook.js';
- *   registerDesignbookTools(mcp, storage, config, () => agentGaii);
+ *   registerDesignbookTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-10-30 — The node's default kit: aimeat_designbook_kit_default takes `node` (asks the session's
+ *     caller().operator(), as PUT /v1/designbook/kits/default asks isOperatorCaller), and
+ *     aimeat_designbook_kit takes view "defaults" (GET /v1/designbook/kits/defaults).
+ *     aimeat_designbook_status: a part's status from chat, as POST /v1/designbook/:id/status.
  *   2026-10-30 — Style kits: aimeat_designbook_kit (the kit a new app starts from) and
  *     aimeat_designbook_kit_default; the search names its reader, so a kit narrower than the node is
  *     listed only inside its reach.
@@ -55,6 +59,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import type { CallerContext } from '../services/caller-context.js';
 import { annotationsFor } from './annotations.js';
 import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -75,6 +80,7 @@ export function registerDesignbookTools(
     storage: Storage,
     config: AimeatConfig,
     getAgentGaii: () => string,
+    caller: () => CallerContext,
 ): void {
     const book = new DesignBookService(storage, config);
     const kits = new DesignBookKits(storage, config);
@@ -207,7 +213,9 @@ export function registerDesignbookTools(
             inputSchema: zodShapeFor('aimeat_designbook_kit'),
             annotations: annotationsFor('aimeat_designbook_kit'),
         },
-        async ({ organism }) => refuseAnonymous() ?? answer(() => kits.inForce(getAgentGaii(), organism || undefined)),
+        async ({ organism, view }) => refuseAnonymous() ?? answer(async () => view === 'defaults'
+            ? kits.defaults(getAgentGaii(), await caller().operator())
+            : kits.inForce(getAgentGaii(), organism || undefined)),
     );
 
     mcp.registerTool(
@@ -217,9 +225,23 @@ export function registerDesignbookTools(
             inputSchema: zodShapeFor('aimeat_designbook_kit_default'),
             annotations: annotationsFor('aimeat_designbook_kit_default'),
         },
-        async ({ kit, clear, organism }) => refuseAnonymous() ?? answer(async () => {
+        async ({ kit, clear, organism, node }) => refuseAnonymous() ?? answer(async () => {
             if (!clear && !kit) throw new DesignBookError('INVALID_INPUT', 'Name the kit ("kit"), or clear the default with "clear": true.', 400);
-            return kits.setDefault(getAgentGaii(), { ...(organism ? { organism } : {}), kit: clear ? null : kit! });
+            const isOperator = node === true ? await caller().operator() : false;
+            return kits.setDefault(getAgentGaii(), isOperator, { ...(organism ? { organism } : {}), ...(node === true ? { node: true } : {}), kit: clear ? null : kit! });
         }),
+    );
+
+    // A part's status, as POST /v1/designbook/:id/status: the operator publishes, ages and demotes;
+    // a proposer retires their own. The operator bit is the session's, asked the way the route asks it.
+    mcp.registerTool(
+        'aimeat_designbook_status',
+        {
+            description: descriptionFor('aimeat_designbook_status'),
+            inputSchema: zodShapeFor('aimeat_designbook_status'),
+            annotations: annotationsFor('aimeat_designbook_status'),
+        },
+        async ({ id, status }) => refuseAnonymous() ?? answer(async () =>
+            book.setStatus(getAgentGaii(), await caller().operator(), id, status)),
     );
 }

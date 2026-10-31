@@ -16,6 +16,9 @@
  *   for every directory, as before.
  * @usage cd aimeat && pnpm exec vitest run test/unit/connect-command-trust-binding.test.ts
  * @version-history
+ *   v1.0.1 -- 2026-10-30 -- The existing install's config is dated before ADOPTION_CUTOFF, as
+ *     5febd7873 did for the three other suites: a5af5a4d2 stamped the cut-off, and a config dated an
+ *     hour back became newer than it, so CI's unit job went red. Assertions unchanged.
  *   v1.0.0 -- 2026-10-29 -- Initial (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update and
  *     home-bound-not-resolution-directory).
  */
@@ -28,6 +31,7 @@ import { stringify } from 'yaml';
 import { loadAllAgents, saveConnectedAgentConfig } from '../../src/cli/connect/config.js';
 import { heldBackCommands, heldNotices, trustWrittenCommands, adoptExistingCommands } from '../../src/cli/connect/command-trust.js';
 import { isRunner } from '../../src/cli/connect/task-runner.js';
+import { ADOPTION_CUTOFF } from '../../src/cli/connect/adoption-cutoff.js';
 
 let sandbox: string;
 let home: string;
@@ -39,15 +43,22 @@ const b64 = (o: unknown) => Buffer.from(JSON.stringify(o)).toString('base64url')
 const fakeToken = (sub: string) => `${b64({ alg: 'none' })}.${b64({ sub })}.x`;
 const RUNNER = { command: 'node', args: ['./marker.js'] };
 
-/** A home that already has an agent with a runner, its config written an hour ago. */
+/**
+ * A time an existing install's config was written: an hour before the first release that keeps a
+ * record (ADOPTION_CUTOFF), since adoption takes only a file older than that, or an hour ago while
+ * the value is null.
+ */
+const beforeTheRelease = (): Date => new Date((ADOPTION_CUTOFF ? Date.parse(ADOPTION_CUTOFF) : Date.now()) - 3_600_000);
+
+/** A home that already has an agent with a runner, its config written before the release. */
 function homeWithRunner(): void {
   mkdirSync(join(home, 'agents', 'assistant'), { recursive: true });
   const cfg = join(home, 'agents', 'assistant', 'config.yaml');
   writeFileSync(cfg, stringify({ node_url: 'https://aimeat.io', runner: RUNNER }));
   mkdirSync(join(home, 'tokens'), { recursive: true });
   writeFileSync(join(home, 'tokens', 'assistant@me.token'), fakeToken('assistant#me@aimeat-test'));
-  const anHourAgo = new Date(Date.now() - 3_600_000);
-  utimesSync(cfg, anHourAgo, anHourAgo);
+  const then = beforeTheRelease();
+  utimesSync(cfg, then, then);
 }
 
 const readRecord = () => JSON.parse(readFileSync(trustFile, 'utf-8')) as { firstRunAt?: string; hashes: Record<string, { how: string }> };
@@ -212,8 +223,8 @@ describe('home-bound-not-resolution-directory: a relative program path binds the
     mkdirSync(join(home, 'agents', 'assistant'), { recursive: true });
     const cfg = join(home, 'agents', 'assistant', 'config.yaml');
     writeFileSync(cfg, stringify({ node_url: 'https://aimeat.io', runner: REL }));
-    const anHourAgo = new Date(Date.now() - 3_600_000);
-    utimesSync(cfg, anHourAgo, anHourAgo);
+    const then = beforeTheRelease();
+    utimesSync(cfg, then, then);
     writeFileSync(trustFile, JSON.stringify({ firstRunAt: new Date().toISOString(), hashes: {} }));
     adoptExistingCommands(home, process.env, dirA);
     expect(existsSync(trustFile)).toBe(true);

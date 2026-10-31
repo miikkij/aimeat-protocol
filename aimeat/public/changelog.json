@@ -27,6 +27,29 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-a-style-kit-for-the-whole-server-and-the-choices-on-screen",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "agent"
+      ],
+      "title": {
+        "en": "A style kit for the whole server, and the choices on screen",
+        "fi": "Tyylipohja koko palvelimelle ja valinnat näkyviin"
+      },
+      "summary": {
+        "en": "Choose your style kits in Settings › Apps; the operator chooses one for everyone in the admin Apps tab.",
+        "fi": "Valitset tyylipohjasi kohdassa Asetukset › Sovellukset. Ylläpitäjä valitsee pohjan kaikille hallintapaneelissa."
+      },
+      "body": {
+        "en": "You choose your own default kit and your shared places' kits in Settings & Controls › Apps. The operator chooses one kit for everyone and publishes the kits offered to everyone in the admin Apps tab. The gallery has its own shelves for ornaments and avatars.",
+        "fi": "Valitset oman oletuspohjasi ja yhteisten paikkojesi pohjat kohdassa Asetukset ja hallinta › Sovellukset. Ylläpitäjä valitsee pohjan kaikille käyttäjille ja julkaisee kaikille tarjotut pohjat hallintapaneelissa. Galleriassa on omat hyllyt koristeille ja avatareille."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-a-file-you-link-in-a-workspace-record-opens-to-its-members",
       "highlight": false,
       "audience": [

@@ -24,4 +24,4 @@
  */
 
 /** ISO 8601 time of the first release that keeps a trust record, or null until that release. */
-export const ADOPTION_CUTOFF: string | null = null;
+export const ADOPTION_CUTOFF: string | null = '2026-10-30T17:52:09.106Z';
