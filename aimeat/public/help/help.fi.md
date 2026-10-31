@@ -1,6 +1,8 @@
 ## Alkuun pääsy {#start}
 
-AIMEAT on sinun oma paikkasi, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.
+ChatGPT, Claude tai Grok on oikea kätesi: se muistaa ja hoitaa asiasi. Agentit tekevät sovitut työt jatkuvasti, myös kun olet poissa.
+
+AIMEAT on sinun oma paikkasi, jossa tämä kaikki tapahtuu. Kaikki tieto täällä on sinun.
 
 Aloita yhdellä lauseella. Avaa [Koti](/v1/home), joka on oma sivusi täällä, ja kirjoita kenttään, mitä haluat saada tehdyksi, esimerkiksi:
 
@@ -10,16 +12,18 @@ AIMEAT tekee lauseesta agentin. Agentti on tekoäly, joka tekee yhden työn puol
 
 Voit myös keskustella tekoälyn kanssa suoraan [chatissa](/v1/chat).
 
-Jos käytät jo Claudea, ChatGPT:tä tai muuta tekoälyä, voit yhdistää sen tänne. Yhteys käyttää MCP:tä. Se on avoin tapa, jolla tekoäly käyttää palvelua sinun luvallasi. Silloin tekoälysi näkee saman tiedon ja tekee samat asiat kuin chat. Ohje on Kodissa.
+Jos käytät jo ChatGPT:tä, Claudea tai Grokia, yhdistä se tänne, niin siitä tulee oikea kätesi: se näkee saman tiedon ja tekee samat asiat kuin chat. Napit yhdistämiseen ovat Kodissa.
+
+(Yhteys toimii avoimella MCP-tekniikalla. Sinun ei tarvitse tietää siitä muuta.)
 
 ## AI-saldo ja mitä tämä maksaa {#cost}
 
 <!--store-->
 Ostokseesi kuuluu AI-saldoa. AI-saldo on euromäärä, jolla maksetaan tekoälyn työ täällä. Näet jäljellä olevan saldon Kodissa nimesi alla, chatissa ja [Tekoäly-sivulla](/v1/profile?tab=ai).
 
-Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Kun haluat lisää, paina Kodissa saldon vieressä Osta lisää saldoa. Voit ostaa milloin tahansa. Lisäsaldon ostat kaupasta samalla tavalla kuin ostit tämän paikan.
+Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Kun haluat lisää, paina Kodissa saldon vieressä Osta lisää saldoa. Maksu tehdään samalla kortilla, eikä uutta tilausta tarvita. Voit ostaa milloin tahansa.
 
-Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa. Voit esimerkiksi ostaa lisää saldoa kaupasta. Jos tällä sivustolla on ilmainen malli, voit myös jatkaa sillä. Ilmainen malli vastaa heikommin.
+Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa.
 
 Kuukausimaksu ja laskut ovat kaupassa. Löydät ne Asetuksista kohdasta Tilaus ja laskut.
 <!--/store-->
@@ -45,7 +49,7 @@ Agentti on tekoäly, joka tekee yhden työn puolestasi, myös silloin kun et ole
 
 Kerro [Kodissa](/v1/home) yhdellä lauseella, mitä haluat. AIMEAT tekee agentin ja näyttää sen ennen kuin se aloittaa. Jos työ toistuu, sano se: esimerkiksi "joka arkiaamu kello 8". Silloin agentti tekee työn ajastetusti.
 
-Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/profile?tab=scheduler), josta näet, milloin kukin agentti tekee työtä seuraavaksi. Agentin valmiit työt näkyvät Kodissa. Voit pysäyttää agentin milloin tahansa.
+Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/profile?tab=scheduler), josta näet, milloin kukin agentti tekee työtä seuraavaksi. Valmiit työt näet Kodissa, ja halutessasi agentti lähettää ne sähköpostiisi. Voit pysäyttää agentin milloin tahansa.
 
 ## Sovellukset {#apps}
 

@@ -1,6 +1,8 @@
 ## Para empezar {#start}
 
-AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.
+ChatGPT, Claude o Grok es tu mano derecha: recuerda tus cosas y se ocupa de ellas. Los agentes hacen el trabajo acordado todo el tiempo, también cuando no estás.
+
+AIMEAT es tu propio sitio, donde ocurre todo esto. Todo lo que hay en él es tuyo.
 
 Empieza con una frase. Abre tu [Inicio](/v1/home), tu propia página aquí, y escribe en el campo lo que quieres conseguir, por ejemplo:
 
@@ -10,16 +12,18 @@ AIMEAT crea un agente con esa frase. Un agente es una IA que hace un trabajo por
 
 También puedes hablar con la IA directamente en el [chat](/v1/chat).
 
-Si ya usas Claude, ChatGPT u otra IA, puedes conectarla aquí. La conexión usa MCP, una forma abierta de que una IA use un servicio con tu permiso. Así tu IA ve la misma información y hace lo mismo que el chat. Las instrucciones están en tu Inicio.
+Si ya usas ChatGPT, Claude o Grok, conéctalo aquí y se convierte en tu mano derecha: ve la misma información y hace lo mismo que el chat. Los botones para conectarlo están en tu Inicio.
+
+(La conexión usa la tecnología abierta MCP. No necesitas saber nada más de ella.)
 
 ## Saldo de IA y cuánto cuesta {#cost}
 
 <!--store-->
 Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda en tu Inicio bajo tu nombre, en el chat y en la [página de IA](/v1/profile?tab=ai).
 
-El saldo se gasta cuando la IA responde o hace un trabajo. Para comprar más, pulsa Comprar más saldo junto al saldo en tu Inicio. Puedes hacerlo cuando quieras. El saldo se compra en la tienda, igual que compraste este sitio.
+El saldo se gasta cuando la IA responde o hace un trabajo. Para comprar más, pulsa Comprar más saldo junto al saldo en tu Inicio. El pago se hace con la misma tarjeta y no hace falta una suscripción nueva. Puedes hacerlo cuando quieras.
 
-Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir, por ejemplo: comprar más saldo en la tienda o, si este sitio tiene un modelo gratuito, seguir con él. El modelo gratuito responde peor.
+Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir.
 
 La cuota mensual y las facturas están en la tienda. Las encuentras en Ajustes, en Pedidos y facturas.
 <!--/store-->
@@ -45,7 +49,7 @@ Un agente es una IA que hace un trabajo por ti, también cuando no estás.
 
 Di en una frase en tu [Inicio](/v1/home) lo que quieres. AIMEAT crea el agente y te lo muestra antes de que empiece. Si el trabajo se repite, dilo: por ejemplo "cada mañana de lunes a viernes a las 8". Así el agente hace el trabajo con ese horario.
 
-Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Lo que el agente termina aparece en tu Inicio. Puedes detener un agente cuando quieras.
+Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Ves el trabajo terminado en tu Inicio y, si quieres, el agente te lo envía por correo. Puedes detener un agente cuando quieras.
 
 ## Aplicaciones {#apps}
 
