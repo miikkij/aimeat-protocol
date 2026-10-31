@@ -10,11 +10,12 @@
  *   the field family take `help="ai.temperature"` and nothing else. On a touch screen a tap opens
  *   the dialog. HelpLabel puts the same help on a label's own words instead (HelpWord). The look
  *   is css/components/help-tip.css (the button's size, the label row, the word).
- * @structure HelpTip({ term, label }) · HelpLabel({ term, label, children })
+ * @structure HelpTip({ term, label, mine }) · HelpLabel({ term, label, children })
  * @usage html`<${HelpTip} term="ai.temperature" />`
  *        html`<${TextField} label=${x('param.temperature')} help="ai.temperature" … />`
  *        Facts row: { k: html`<${HelpLabel} term="ai.fallback" label=${x('rt.fallback')}>${x('rt.fallback')}<//>`, v }
  * @version-history
+ *   v2.1.0 — 2026-10-31 — `mine`: the person's own figures, handed to the dialog and its prompt.
  *   v2.0.0 — 2026-10-31 — HelpLabel's words open the help themselves (HelpWord): a dotted line, the
  *     help cursor, the short help after the pointer rests 0.6 s (a setting turns that off), the
  *     explanation on a click or a tap; the question mark is drawn only for the keyboard (wish
@@ -35,10 +36,10 @@ import { helpHoverOn } from '/js/help-hover.js';
 const html = htm.bind(h);
 
 /**
- * @param {{ term: string, label?: string }} props `term` names the explanation (`explain.<term>.*`);
+ * @param {{ term: string, label?: string, mine?: string }} props `term` names the explanation (`explain.<term>.*`);
  *   `label` is the setting's name on the page, used when the locale gives no title.
  */
-export function HelpTip({ term, label }) {
+export function HelpTip({ term, label, mine }) {
   const [open, setOpen] = useState(false);
   // The dialog hands the focus back to the button as it closes; that focus is not a request for the
   // tooltip, so the tooltip stays quiet for a moment after the dialog.
@@ -57,7 +58,7 @@ export function HelpTip({ term, label }) {
         <button type="button" class="poster-icon poster-icon--small help-tip-button"
           aria-label=${t('explain.open', { term: title })} onClick=${() => setOpen(true)}>?</button>
       <//>
-      <${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} />
+      <${ExplainDialog} term=${term} label=${label} open=${open} onClose=${close} mine=${mine} />
     </span>`;
 }
 

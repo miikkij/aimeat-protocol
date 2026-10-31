@@ -25,6 +25,7 @@
  *   pnpm audit:security              # write the three files
  *   pnpm audit:security -- --dev     # include the build toolchain in the scan
  * @version-history
+ *  - 2026-10-31: findings in patch order, with CISA KEV and FIRST EPSS per finding (scripts/lib/exploit-signals.ts).
  *  - 2026-10-25: the browser-library table names the newest release on our own pinned line.
  *  - 2026-09-08: implement the A1-A6 audit reliability and sampling corrections.
  *   v1.0.0 — 2026-08-31 — Initial: both scanners, the licence gate, deprecations and the SBOM.
@@ -37,6 +38,7 @@ import { scanComponents, type Finding } from './lib/osv-scan.js';
 import { libFreshness } from './check-lib-freshness.js';
 import { cell } from './lib/md-table.js';
 import { parsePnpmAudit } from './lib/pnpm-audit.mjs';
+import { EPSS_LIKELY, fetchSignals, pct, priorityOf, rank } from './lib/exploit-signals.js';
 
 const SEVERITY_ORDER = ['CRITICAL', 'HIGH', 'MODERATE', 'MEDIUM', 'LOW'];
 
@@ -193,6 +195,11 @@ function main(): void {
   void (async () => {
     const scan = await scanComponents([...npm, ...served]);
 
+    console.log('Reading CISA KEV and FIRST EPSS for each finding…');
+    const signals = await fetchSignals(scan.findings.flatMap(f => f.cves));
+    const rankedOf = (f: Finding) => priorityOf(f.cves, signals);
+    const ordered = rank([...scan.findings].sort(bySeverity), rankedOf);
+
     console.log('Reading how old the served browser libraries are…');
     const libs = await libFreshness(served);
 
@@ -247,6 +254,15 @@ function main(): void {
     md.push('|---|---|---|');
     md.push(`| OSV.dev API — npm tree **and** browser libraries | yes | ${scan.findings.length === 0 ? `clean, ${scan.scanned} component versions` : `**${scan.findings.length} finding(s)**`} |`);
     md.push(`| \`pnpm audit\` — npm advisory database | ${audit.ok ? 'yes' : '**FAILED**'} | ${!audit.ok ? `**${audit.error}**` : auditTotal === 0 ? `clean, ${audit.total} packages` : `**${auditTotal} advisory(ies)**`} |`);
+    if (scan.findings.length > 0) {
+      const exploited = scan.findings.filter(f => rankedOf(f).priority === 'P1 exploited').length;
+      const likely = scan.findings.filter(f => rankedOf(f).priority === 'P2 likely').length;
+      const ran = signals.errors.length === 0 ? 'yes' : '**partly**';
+      const result = signals.errors.length > 0
+        ? `**not read: ${signals.errors.join('; ')}**`
+        : `${exploited} exploited, ${likely} likely (KEV ${signals.kevCatalog}, EPSS ${signals.epssDate})`;
+      md.push(`| CISA KEV + FIRST EPSS — is each finding used in attacks | ${ran} | ${exploited > 0 ? `**${result}**` : result} |`);
+    }
     for (const s of external) {
       const ran = s.status === 'not-installed' ? '**NO**' : 'yes';
       const result = s.status === 'not-installed'
@@ -278,14 +294,19 @@ function main(): void {
         md.push('');
       }
       if (scan.findings.length > 0) {
-        md.push('| Component | Where | Advisory | Severity | Fixed in |');
-        md.push('|---|---|---|---|---|');
-        for (const f of [...scan.findings].sort(bySeverity)) {
-          md.push(`| \`${f.component}\` | ${f.where} | ${f.id} | ${f.severity} | ${f.fixed} |`);
+        md.push('In the order to patch: used in attacks (CISA KEV) first, then likely to be (FIRST EPSS');
+        md.push(`at or above ${pct(EPSS_LIKELY)}), then severity.`);
+        md.push('');
+        md.push('| Priority | Component | Where | Advisory | Severity | EPSS | Fixed in |');
+        md.push('|---|---|---|---|---|---|---|');
+        for (const f of ordered) {
+          const r = rankedOf(f);
+          const priority = r.priority.startsWith('P1') || r.priority.startsWith('P2') ? `**${r.priority}**` : r.priority;
+          md.push(`| ${priority} | \`${f.component}\` | ${f.where} | ${f.id} | ${f.severity} | ${r.epss === null ? '–' : pct(r.epss)} | ${f.fixed} |`);
         }
         md.push('');
-        for (const f of [...scan.findings].sort(bySeverity)) {
-          md.push(`- **${f.id}** (${f.component}): ${f.summary}`);
+        for (const f of ordered) {
+          md.push(`- **${f.id}** (${f.component}): ${f.summary} (priority: ${cell(rankedOf(f).reason)})`);
         }
       }
     }
@@ -353,7 +374,8 @@ function main(): void {
     const jsonFile = join(REPO_ROOT, 'security-report.json');
     writeFileSync(mdFile, md.join('\n') + '\n', 'utf-8');
     writeFileSync(jsonFile, JSON.stringify({
-      version, date: stamp, scanned: scan.scanned, osv: scan.findings,
+      version, date: stamp, scanned: scan.scanned, osv: ordered.map(f => ({ ...f, ...rankedOf(f) })),
+      exploitSignals: { kevCatalog: signals.kevCatalog, epssDate: signals.epssDate, errors: signals.errors },
       pnpmAudit: audit.ok ? audit.counts : null,
       pnpmAuditStatus: audit.status, pnpmAuditError: audit.error,
       licencesPass: licences.ok, externalScanners: external,

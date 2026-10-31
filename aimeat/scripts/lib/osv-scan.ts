@@ -15,9 +15,11 @@
  *   full record for each hit
  * @usage  imported by scan-vulns.ts and security-report.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — Each finding carries its CVE aliases, which KEV and EPSS key on.
  *   v1.0.0 — 2026-08-31 — Extracted from scan-vulns.ts when the security report needed the same query.
  */
 import type { Component } from './license-inventory.js';
+import { cvesOf } from './exploit-signals.js';
 
 const OSV_BATCH = 'https://api.osv.dev/v1/querybatch';
 const OSV_VULN = 'https://api.osv.dev/v1/vulns/';
@@ -29,6 +31,8 @@ export interface Finding {
   /** npm dependency, or a library served straight to browsers. */
   where: 'npm dependency' | 'served to browsers (public/lib)';
   id: string;
+  /** The CVE ids the advisory is known by (its aliases); empty for a GHSA-only advisory. */
+  cves: string[];
   severity: string;
   summary: string;
   /** The versions OSV says carry the fix, or a note that none is published. */
@@ -70,6 +74,7 @@ export function queriesFor(components: Component[]): Target[] {
 
 interface Vuln {
   id: string;
+  aliases?: string[];
   summary?: string;
   severity?: Array<{ type: string; score: string }>;
   database_specific?: { severity?: string };
@@ -129,6 +134,7 @@ export async function scanComponents(components: Component[]): Promise<ScanResul
           ? 'served to browsers (public/lib)'
           : 'npm dependency',
         id,
+        cves: cvesOf(id, vuln.aliases),
         severity: vuln.database_specific?.severity ?? vuln.severity?.[0]?.score ?? 'unrated',
         summary: vuln.summary ?? '(no summary)',
         fixed: fixedIn(vuln),

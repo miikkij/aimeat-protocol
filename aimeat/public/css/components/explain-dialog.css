@@ -8,8 +8,28 @@
  *   the aside are the library's. Reads the theme's tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The glossary terms, the person's own figures and "Ask your AI more".
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
  */
+
+.explain-terms,
+.explain-ask {
+  margin-top: 1.2rem;
+}
+.explain-mine {
+  margin: 1rem 0 0;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--text);
+}
+.explain-ask-why {
+  margin: .3rem 0 .7rem;
+  color: var(--text-dim);
+}
+.explain-glossary {
+  display: inline-block;
+  margin-top: 1rem;
+}
 
 .explain-examples {
   margin-top: 1.1rem;

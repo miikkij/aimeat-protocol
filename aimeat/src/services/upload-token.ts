@@ -197,7 +197,9 @@ export const PRESIGNED_META_KEYS = {
     // carry its statement too (2026-10-08).
     // `publish_ask`: the requester the publish gate asked about at the mint (services/storage-file-publish.ts),
     // set by the node, never by a client; the upload files the request when the bytes land.
-    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store'],
+    // `object`: the store reference a direct upload's bytes go to, set by the node at the mint, never by
+    // a client; POST /v1/upload/{token}/complete records the file that names it.
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store', 'object'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],
