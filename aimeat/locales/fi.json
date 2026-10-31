@@ -15405,16 +15405,18 @@
   "siteStart": {
     "signInPill": "Kirjaudu sisään",
     "title": "Tämä on oma AIMEATisi {host}",
+    "intro": "AIMEAT on sinun oma paikkasi, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.",
     "signInNote": "Kirjaudu sisään sähköpostilinkillä. Kirjoita osoite, jolla ostit AIMEATin. Lähetämme siihen linkin, joka kirjaa sinut sisään ilman salasanaa.",
+    "next": "Kun olet kirjautunut, pääset Kotiin. Siellä kirjoitat yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee lauseesta agentin, ja näet agentin ennen kuin se aloittaa.",
     "signInLabel": "Kirjaudu sisään",
     "emailField": "Sähköpostiosoitteesi",
     "sendLink": "Lähetä kirjautumislinkki",
-    "linkSent": "Jos osoitteella on täällä tili, linkki on matkalla. Avaa se sähköpostistasi. Linkki toimii kerran ja 15 minuutin ajan.",
+    "linkSent": "Jos osoitteella on täällä tili, linkki on matkalla. Viesti tulee yleensä minuutin tai kahden kuluessa. Jos et näe sitä, katso roskapostikansio. Linkki toimii kerran ja 15 minuutin ajan.",
     "linkFailed": "Linkkiä ei voitu lähettää juuri nyt. Yritä hetken päästä uudelleen.",
-    "signedInNote": "Olet kirjautunut sisään.",
+    "signedInNote": "Olet kirjautunut sisään. Kodissa kerrot tekoälylle, mitä se tekee, ja näet, mitä agenttisi ovat tehneet.",
     "openHome": "Avaa oma Koti",
     "contentLabel": "Tämä sivu",
-    "contentNote": "Voit vaihtaa tämän sivuston sisällön suoraan hallinnasta:"
+    "contentNote": "Vierailijat näkevät tämän sivun, kunnes julkaiset oman etusivusi. Sisältöä muutat hallinnassa:"
   },
   "home": {
     "credit": {
@@ -15424,6 +15426,7 @@
       "empty": "saldo on loppu",
       "off": "tekoäly ei ole käytössä tällä sivustolla",
       "topup": "Osta lisää saldoa",
+      "what": "mikä tämä on?",
       "chatLine": "AI-saldoa jäljellä {amount}.",
       "chatElsewhere": "AI-saldoa jäljellä kaikkeen muuhun kuin tähän keskusteluun {amount}."
     },

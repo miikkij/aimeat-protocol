@@ -2,22 +2,24 @@
 
 AIMEAT is your own place where AI does work for you. It remembers what you tell it, makes agents and apps for you, and everything in it is yours.
 
-Start with one sentence. Open your [Home](/v1/home) and write in the field what you want done, for example:
+Start with one sentence. Open your [Home](/v1/home), your own page here, and write in the field what you want done, for example:
 
 > Gather the industry news every weekday morning and write a short summary.
 
-AIMEAT makes an agent from it and shows it to you before it starts. You can also talk with the AI directly in the [chat](/v1/chat).
+AIMEAT makes an agent from it. An agent is an AI that does one job for you, also while you are away. Making it takes a moment, because the AI first writes the agent's instructions. You see the agent on your Home before it starts, and you decide whether it starts.
 
-If you already use Claude, ChatGPT or another AI, you can connect it here. Then it sees the same information and does the same things as the chat. The instructions are on your Home.
+You can also talk with the AI directly in the [chat](/v1/chat).
+
+If you already use Claude, ChatGPT or another AI, you can connect it here. The connection uses MCP, an open way for an AI to use a service with your permission. Then your AI sees the same information and does the same things as the chat. The instructions are on your Home.
 
 ## What this costs {#cost}
 
 <!--store-->
-Your purchase includes AI credit. You see how much is left, in euros, on your Home under your name and in the chat.
+Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name and in the chat.
 
 The credit is used when the AI answers or does work. When it runs low, your Home shows a link where you buy more. You buy more credit in the store, the same way you bought this place.
 
-When the credit is used up, AIMEAT tells you and shows how to go on: buy more credit, use your own AI key (see Advanced below), or, if this site has a free model, go on with that. The free model answers less well.
+When the credit is used up, AIMEAT tells you and shows how to go on, for example: buy more credit in the store, or, if this site has a free model, go on with that. The free model answers less well.
 
 The monthly fee and the invoices are in the store. You find them in Settings, under Orders and invoices.
 <!--/store-->
@@ -31,7 +33,7 @@ When the credit is used up, AIMEAT tells you and shows how to go on, for example
 
 Everything you save is private at first. Only you see it.
 
-You decide what you share. You can share a workspace with the people you invite, or publish something for everyone. What you share is seen only by those you shared it with.
+You decide what you share. You can share a workspace, a collection of documents, with the people you invite, or publish something for everyone. What you share is seen only by those you shared it with.
 
 An agent or a connected AI may do only what you allow it. You see every permission, and can take it back, on the [Access page](/v1/profile?tab=access).
 
@@ -65,9 +67,9 @@ If something does not work, write to [support@aimeat.io](mailto:support@aimeat.i
 
 ## Advanced: your own AI {#advanced}
 
-You need this part only if you want to use an AI service of your own.
+You need this part only if you want to use an AI service you pay for yourself, for example OpenRouter.
 
-You can save your own AI key in the [AI settings](/v1/profile?tab=ai), for example an OpenRouter key. Then the AI use is billed to your own account at that service.
+Save that service's key in the [AI settings](/v1/profile?tab=ai). Then the AI work the key covers is billed to your account at that service. The AI settings show which parts the key covers.
 
 ## Knowledge and packages {#knowledge}
 

@@ -2,22 +2,24 @@
 
 AIMEAT on sinun oma paikkasi, jossa tekoäly tekee työtä puolestasi. Se muistaa, mitä kerrot, tekee sinulle agentteja ja sovelluksia, ja kaikki tieto on sinun.
 
-Aloita yhdellä lauseella. Avaa [Koti](/v1/home) ja kirjoita kenttään, mitä haluat saada tehdyksi, esimerkiksi:
+Aloita yhdellä lauseella. Avaa [Koti](/v1/home), joka on oma sivusi täällä, ja kirjoita kenttään, mitä haluat saada tehdyksi, esimerkiksi:
 
 > Kerää joka arkiaamu alan uutiset ja kirjoita niistä lyhyt tiivistelmä.
 
-AIMEAT tekee siitä agentin ja näyttää sen sinulle ennen kuin se aloittaa. Voit myös keskustella tekoälyn kanssa suoraan [chatissa](/v1/chat).
+AIMEAT tekee lauseesta agentin. Agentti on tekoäly, joka tekee yhden työn puolestasi, myös silloin kun et ole paikalla. Agentin tekeminen vie hetken, koska tekoäly kirjoittaa ensin sen ohjeet. Näet agentin Kodissa ennen kuin se aloittaa, ja sinä päätät, aloittaako se.
 
-Jos käytät jo Claudea, ChatGPT:tä tai muuta tekoälyä, voit yhdistää sen tänne. Silloin se näkee saman tiedon ja tekee samat asiat kuin chat. Ohje on Kodissa.
+Voit myös keskustella tekoälyn kanssa suoraan [chatissa](/v1/chat).
+
+Jos käytät jo Claudea, ChatGPT:tä tai muuta tekoälyä, voit yhdistää sen tänne. Yhteys käyttää MCP:tä. Se on avoin tapa, jolla tekoäly käyttää palvelua sinun luvallasi. Silloin tekoälysi näkee saman tiedon ja tekee samat asiat kuin chat. Ohje on Kodissa.
 
 ## Mitä tämä maksaa {#cost}
 
 <!--store-->
-Ostokseesi kuuluu AI-saldoa. Näet jäljellä olevan saldon euroina Kodissa nimesi alla ja chatissa.
+Ostokseesi kuuluu AI-saldoa. AI-saldo on euromäärä, jolla maksetaan tekoälyn työ täällä. Näet jäljellä olevan saldon Kodissa nimesi alla ja chatissa.
 
 Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Kun saldo on vähissä, Koti näyttää linkin, josta ostat lisää. Lisäsaldon ostat kaupasta samalla tavalla kuin ostit tämän paikan.
 
-Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa: osta lisää saldoa, käytä omaa tekoälyavaintasi (katso Lisäasetukset alla) tai, jos tällä sivustolla on ilmainen malli, jatka sillä. Ilmainen malli vastaa heikommin.
+Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa. Voit esimerkiksi ostaa lisää saldoa kaupasta. Jos tällä sivustolla on ilmainen malli, voit myös jatkaa sillä. Ilmainen malli vastaa heikommin.
 
 Kuukausimaksu ja laskut ovat kaupassa. Löydät ne Asetuksista kohdasta Tilaus ja laskut.
 <!--/store-->
@@ -31,7 +33,7 @@ Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa, esimerkiks
 
 Kaikki, mitä tallennat, on aluksi yksityistä. Vain sinä näet sen.
 
-Sinä päätät, mitä jaat. Voit jakaa työtilan ihmisille, jotka kutsut, tai julkaista jotain kaikille. Jaettu näkyy vain niille, joille jaoit.
+Sinä päätät, mitä jaat. Voit jakaa työtilan eli joukon asiakirjoja ihmisille, jotka kutsut, tai julkaista jotain kaikille. Jaettu näkyy vain niille, joille jaoit.
 
 Agentti tai yhdistetty tekoäly saa tehdä vain sen, minkä sille sallit. Näet ja voit perua jokaisen luvan [Pääsy-sivulla](/v1/profile?tab=access).
 
@@ -65,9 +67,9 @@ Jos jokin ei toimi, kirjoita osoitteeseen [support@aimeat.io](mailto:support@aim
 
 ## Lisäasetukset: oma tekoäly {#advanced}
 
-Tätä osaa tarvitset vain, jos haluat käyttää omaa tekoälypalveluasi.
+Tätä osaa tarvitset vain, jos haluat käyttää tekoälypalvelua, josta maksat itse, esimerkiksi OpenRouteria.
 
-Voit tallentaa oman tekoälyavaimen [tekoälyasetuksissa](/v1/profile?tab=ai), esimerkiksi OpenRouterin avaimen. Silloin tekoälyn käyttö laskutetaan sinun omalta tililtäsi siinä palvelussa.
+Tallenna sen palvelun avain [tekoälyasetuksissa](/v1/profile?tab=ai). Silloin palvelu laskuttaa sinun tililtäsi sen tekoälytyön, jonka avain kattaa. Tekoälyasetukset näyttävät, mitkä osat avain kattaa.
 
 ## Tieto ja paketit {#knowledge}
 

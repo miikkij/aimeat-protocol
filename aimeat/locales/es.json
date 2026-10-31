@@ -13552,16 +13552,18 @@
   "siteStart": {
     "signInPill": "Entrar",
     "title": "Este es tu propio AIMEAT, {host}",
+    "intro": "AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.",
     "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",
+    "next": "Cuando hayas entrado, llegas a tu Inicio. Allí escribes en una frase lo que quieres conseguir. AIMEAT crea con ella un agente, y ves el agente antes de que empiece.",
     "signInLabel": "Entrar",
     "emailField": "Tu dirección de correo",
     "sendLink": "Enviar el enlace de acceso",
-    "linkSent": "Si esta dirección tiene una cuenta aquí, el enlace va de camino. Ábrelo desde tu correo. Sirve una vez y durante 15 minutos.",
+    "linkSent": "Si esta dirección tiene una cuenta aquí, el enlace va de camino. El correo suele llegar en uno o dos minutos. Si no lo ves, mira en la carpeta de spam. El enlace sirve una vez y durante 15 minutos.",
     "linkFailed": "No se pudo enviar el enlace ahora. Vuelve a intentarlo dentro de un momento.",
-    "signedInNote": "Has entrado.",
+    "signedInNote": "Has entrado. En tu Inicio le dices a la IA lo que debe hacer y ves lo que han hecho tus agentes.",
     "openHome": "Abrir tu Inicio",
     "contentLabel": "Esta página",
-    "contentNote": "Puedes cambiar el contenido de este sitio directamente en la administración:"
+    "contentNote": "Los visitantes ven esta página hasta que publiques una portada propia. El contenido se cambia en la administración:"
   },
   "home": {
     "credit": {
@@ -13571,6 +13573,7 @@
       "empty": "se ha agotado",
       "off": "la IA está desactivada en este sitio",
       "topup": "Comprar más saldo",
+      "what": "¿qué es esto?",
       "chatLine": "Saldo de IA restante: {amount}.",
       "chatElsewhere": "Saldo de IA restante para todo lo que no sea esta conversación: {amount}."
     },
