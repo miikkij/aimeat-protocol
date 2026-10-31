@@ -17,13 +17,12 @@
  *   endpoint (routes/ghii/login-link-open.ts) spends it once, checks that the account is live and
  *   still has the login link on, and runs the second factor when the account has one.
  *
- *   WHOSE LINK. A named account, or, with none named, the one account on this node that can open a
- *   link (active, a verified email, the login link on). Two or more such accounts and no name is a
- *   refusal that lists them: the command never guesses between people.
+ *   WHOSE LINK. Always a named account: the caller knows the buyer's username from the order, and
+ *   the command never guesses between people or reads the whole account table to find one.
  *
  *   FRESH EACH TIME. Every call issues a new link; an earlier one stays valid until it is used or its
  *   ten minutes run out.
- * @structure issueHandoverLink(storage, config, { account?, lang? }) · HANDOVER_LINK_TTL_MS · HandoverResult
+ * @structure issueHandoverLink(storage, config, { account, lang? }) · HANDOVER_LINK_TTL_MS · HandoverResult
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P3: the store's button signs the buyer straight in).
  */
@@ -41,7 +40,7 @@ const LANGS = ['fi', 'en', 'es'];
 
 export type HandoverResult =
     | { ok: true; url: string; account: string; expires_at: string; lands_on: string }
-    | { ok: false; code: 'INVALID_INPUT' | 'NOT_FOUND' | 'ACCOUNT_DISABLED' | 'LOGIN_LINK_OFF' | 'NO_OWNER' | 'AMBIGUOUS'; message: string; candidates?: string[] };
+    | { ok: false; code: 'INVALID_INPUT' | 'NOT_FOUND' | 'ACCOUNT_DISABLED' | 'LOGIN_LINK_OFF'; message: string };
 
 /** An account a link can open for: live, with a verified email and the login link on. */
 function canOpen(ghii: GHIIRecord | null): ghii is GHIIRecord & { notificationEmail: string } {
@@ -49,7 +48,7 @@ function canOpen(ghii: GHIIRecord | null): ghii is GHIIRecord & { notificationEm
 }
 
 /**
- * Issue the link. `account` names the person; without it, the single account a link can open for.
+ * Issue the link. `account` names the person and is required.
  * `lang` (fi, en or es) is carried to the landing page as ?lang=, so the first screen speaks it.
  */
 export async function issueHandoverLink(
@@ -58,22 +57,9 @@ export async function issueHandoverLink(
     if (opts.lang !== undefined && !LANGS.includes(opts.lang)) {
         return { ok: false, code: 'INVALID_INPUT', message: `lang must be one of ${LANGS.join(', ')}.` };
     }
-    let name = opts.account?.trim() ?? '';
-    if (name) {
-        const nameError = validateOwnerName(name);
-        if (nameError) return { ok: false, code: 'INVALID_INPUT', message: `account: ${nameError}` };
-    } else {
-        const live = (await storage.listOwners()).filter(o => !o.disabledAt);
-        const openable: string[] = [];
-        for (const o of live) {
-            if (canOpen(await storage.getGHII(`${o.name}@${config.nodeId}`))) openable.push(o.name);
-        }
-        if (openable.length === 0) return { ok: false, code: 'NO_OWNER', message: 'This node has no account with a verified email and the login link on yet.' };
-        if (openable.length > 1) {
-            return { ok: false, code: 'AMBIGUOUS', message: 'More than one account can open a link. Name one with --account.', candidates: openable.sort() };
-        }
-        name = openable[0];
-    }
+    const name = opts.account?.trim() ?? '';
+    const nameError = name ? validateOwnerName(name) : 'name the person with --account <username>';
+    if (nameError) return { ok: false, code: 'INVALID_INPUT', message: `account: ${nameError}` };
 
     const owner = await storage.getOwner(name);
     const ghii = owner ? await storage.getGHII(`${name}@${config.nodeId}`) : null;
