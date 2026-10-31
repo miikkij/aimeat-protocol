@@ -6,6 +6,7 @@
  *   counting the ceiling depends on; e2e-chat-agent holds the turn around it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chat-turn-guard.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The turn note's plain-words line (v27 P7).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -76,6 +77,9 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/one short sentence to the person before your first tool call/);
         expect(note).toMatch(/aimeat_agent_propose/);
         expect(note).toMatch(/aimeat_workspace_list, which takes that organism's id/);
+        // A store buyer read "organismeja" and their own name@node-id in the first answer (v27 P7).
+        expect(note).toMatch(/say "shared place" for an organism/);
+        expect(note).toMatch(/never write an identity such as name@node-id/);
     });
     it('the request for an answer says why, and asks for the proposal once', () => {
         expect(wrapUpPrompt('rounds')).toMatch(/the rounds of tool calls/);
