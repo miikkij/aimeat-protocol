@@ -9569,6 +9569,9 @@
   "notiftext.approval_portfolio_memory_read.body": "{who} no puede leer tus entradas. Cuando abres tu página de bienvenida con tu sesión iniciada, la página podría leer tus entradas y enviarlas a otro lugar. Si lo permites, la página lee tus entradas como antes. Si no lo permites, la página se muestra sin tus entradas privadas. {who} recibe la respuesta en ambos casos.",
   "notiftext.approval_portfolio_memory_read_changed.title": "Tu página de bienvenida cambió. ¿Puede la página leer tus entradas cuando la abres?",
   "notiftext.approval_portfolio_memory_read_changed.body": "Tu página de bienvenida se cambió fuera del editor de páginas, así que el servidor no sabe quién la escribió. Cuando abres la página con tu sesión iniciada, la página podría leer tus entradas y enviarlas a otro lugar. Si lo permites, la página lee tus entradas como antes. Si no lo permites, la página se muestra sin tus entradas privadas.",
+  "notiftext.approval_connector_program.title": "La computadora {computer} encontró un programa para {agent}. ¿Puede iniciar el programa?",
+  "notiftext.approval_connector_program.body": "El programa es {command}. Llegó con la configuración de esa computadora y nadie lo conectó allí, así que la computadora no lo inicia. Si lo permites, la computadora lo pone en uso la próxima vez que se conecte, por lo general en menos de un minuto, y {agent} empieza a trabajar con él. Si no lo permites, no se inicia. Puedes cambiarlo más adelante en la página Tus computadoras.",
+  "notiftext.approval_change.computer_programs": "Cámbialo en la página Tus computadoras",
   "notiftext.approval_accountant_grant.title": "¿{name} todavía puede leer tu contabilidad?",
   "notiftext.approval_accountant_grant.body": "Le diste a {name} el derecho de leer tu contabilidad antes de que el servidor guardara la fecha de cada derecho. La cuenta llamada {name} se creó después de que empezaste a dar derechos, y otra persona puede registrar el nombre de una cuenta eliminada, así que el servidor no sabe si es la persona a la que le diste el derecho. Hasta que respondas, {name} lee tu contabilidad como antes. Si lo permites, {name} conserva el derecho. Si no, el derecho se quita.",
   "notiftext.approval_card_adult.title": "¿Pagaste con tu propia tarjeta?",
@@ -13974,7 +13977,34 @@
       "hostedTitle": "Tu propio AIMEAT",
       "hostedDesc": "Tu propio AIMEAT en la nube. Lo mantenemos encendido, ejecuta tus agentes y no instalas nada. Lo compras en la tienda.",
       "order": "Ir a la tienda →",
-      "orderSoon": "La tienda abre pronto."
+      "orderSoon": "La tienda abre pronto.",
+      "programs": {
+        "title": "Programas que puede iniciar",
+        "lede": "La computadora inicia un programa para un agente solo cuando tú lo permitiste, aquí o al conectarlo en la computadora. Tus agentes y tu IA leen esta lista cuando planifican el trabajo.",
+        "useRunner": "Inicia el agente para cada tarea",
+        "useWake": "Despierta al agente cuando llega trabajo nuevo",
+        "waiting": "Espera tu aprobación",
+        "allowed": "Permitido",
+        "declined": "No permitido",
+        "foundAt": "La computadora encontró el programa {when}. No se inicia hasta que lo permitas.",
+        "declinedNow": "No permitiste el programa. No se inicia.",
+        "fromConnect": "Conectaste el programa en esta computadora {when}.",
+        "fromInstall": "El programa ya estaba en la computadora y se puso en uso en el primer inicio.",
+        "fromYou": "Permitiste el programa aquí {when}.",
+        "allowedPlain": "La computadora inicia el programa.",
+        "notYet": "La computadora aplica tu decisión la próxima vez que se conecte.",
+        "allow": "Permitir",
+        "allowDoes": "La computadora pone el programa en uso la próxima vez que se conecte, por lo general en menos de un minuto. {agent} empieza a trabajar con él.",
+        "deny": "No permitir",
+        "denyDoes": "El programa no se inicia. {agent} espera hasta que lo permitas más adelante.",
+        "stop": "Dejar de permitirlo",
+        "stopDoes": "La computadora deja de usar el programa la próxima vez que se conecte. {agent} no hace el trabajo que lo necesita hasta que lo vuelvas a permitir aquí.",
+        "age": "La computadora actualizó esta lista {when}. La actualiza cada vez que se conecta.",
+        "neverReported": "Esta computadora no ha dicho qué programas puede iniciar. Su programa de AIMEAT es más antiguo que esta lista. Cuando lo actualices, los programas aparecen aquí.",
+        "ownAi": "Gestiona los programas desde tu propia IA",
+        "copyPrompt": "Copiar el prompt",
+        "prompt": "Lee mis computadoras con aimeat_connector_list. Para cada computadora, dime qué programas puede iniciar para mis agentes y cuáles esperan mi aprobación: el comando, el agente y para qué sirve el programa. No cambies nada antes de que yo lo diga. Cuando decida, llama a aimeat_connector_program_set con la computadora, el hash del programa y allow o deny."
+      }
     },
     "apps": {
       "title": "Tus aplicaciones",
@@ -24749,6 +24779,17 @@
         "high": "La página se muestra, pero sin tus entradas privadas. Las demás personas la ven como antes.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si sabes quién escribió la página y confías en ese agente o aplicación. Si un agente escribe tu página a menudo, dale el permiso de leer tus entradas en la página del agente, y así sus páginas ya no preguntan."
+      },
+      "approval_connector_program": {
+        "title": "¿Puede la computadora iniciar este programa?",
+        "short": "Un programa llegó con la configuración de una de tus computadoras y nadie lo conectó allí.",
+        "what": "Tu computadora inicia un programa para un agente, por ejemplo el programa que inicia el agente para cada tarea, solo cuando tú lo permitiste. Un programa que conectas en la computadora con aimeat connect queda permitido con ese paso. Este programa llegó de otra forma, por ejemplo en una carpeta copiada de otro lugar, así que la computadora lo retiene y te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "La computadora inicia el programa desde su próxima conexión y el agente trabaja con él. Puedes detenerlo más adelante en la página Tus computadoras.",
+        "highLabel": "Si no lo permites",
+        "high": "El programa no se inicia y el agente no hace el trabajo que lo necesita. Puedes permitirlo más adelante en la página Tus computadoras.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si conoces el comando y sabes de dónde vino. Si no lo reconoces, no lo permitas y revisa primero la carpeta en esa computadora."
       },
       "approval_goal_model_spend": {
         "title": "Un agente pide a la IA que haga una tarea a tu costo",

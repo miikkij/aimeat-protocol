@@ -10676,6 +10676,9 @@
   "notiftext.approval_portfolio_memory_read.body": "{who} may not read your entries itself. When you open your welcome page while signed in, the page could read your entries and send them elsewhere. If you allow it, the page reads your entries as before. If you do not, the page is shown without your private entries. {who} hears the answer either way.",
   "notiftext.approval_portfolio_memory_read_changed.title": "Your welcome page changed. May the page read your entries when you open it?",
   "notiftext.approval_portfolio_memory_read_changed.body": "Your welcome page was changed outside the page editor, so the server does not know who wrote it. When you open the page while signed in, the page could read your entries and send them elsewhere. If you allow it, the page reads your entries as before. If you do not, the page is shown without your private entries.",
+  "notiftext.approval_connector_program.title": "The computer {computer} found a program for {agent}. May it start the program?",
+  "notiftext.approval_connector_program.body": "The program is {command}. It came with the settings on that computer, and nobody connected it there, so the computer does not start it. If you allow it, the computer takes it into use at its next connection, usually within a minute, and {agent} starts working with it. If you do not, it does not start. You can change this later on the Your computers page.",
+  "notiftext.approval_change.computer_programs": "Change it on the Your computers page",
   "notiftext.approval_accountant_grant.title": "Does {name} still get to read your books?",
   "notiftext.approval_accountant_grant.body": "You gave {name} the right to read your books before the server kept the date of each right. The account named {name} was created after you began giving rights, and a deleted account's name can be registered again by someone else, so the server cannot tell whether this is the person you meant. Until you answer, {name} reads your books as before. If you allow it, {name} keeps the right. If you do not, the right is removed.",
   "notiftext.approval_card_adult.title": "Did you pay with your own card?",
@@ -15648,7 +15651,34 @@
       "hostedTitle": "An AIMEAT instance",
       "hostedDesc": "Your own AIMEAT in the cloud. We keep it switched on, it runs your agents, and you install nothing. You buy it in the store.",
       "order": "Go to the store →",
-      "orderSoon": "The store opens soon."
+      "orderSoon": "The store opens soon.",
+      "programs": {
+        "title": "Programs it may start",
+        "lede": "The computer starts a program for an agent only when you allowed it, here or by connecting it on the computer. Your agents and your AI read this list when they plan work.",
+        "useRunner": "Starts the agent for each task",
+        "useWake": "Wakes the agent when new work arrives",
+        "waiting": "Waits for your approval",
+        "allowed": "Allowed",
+        "declined": "Not allowed",
+        "foundAt": "The computer found it {when}. It does not start until you allow it.",
+        "declinedNow": "You did not allow it. It does not start.",
+        "fromConnect": "You connected it on this computer {when}.",
+        "fromInstall": "It was on the computer already and was taken into use at the first start.",
+        "fromYou": "You allowed it here {when}.",
+        "allowedPlain": "The computer starts it.",
+        "notYet": "The computer takes your decision into use at its next connection.",
+        "allow": "Allow",
+        "allowDoes": "The computer takes the program into use at its next connection, usually within a minute. {agent} starts working with it.",
+        "deny": "Don't allow",
+        "denyDoes": "The program does not start. {agent} waits until you allow it later.",
+        "stop": "Stop allowing it",
+        "stopDoes": "The computer stops using the program at its next connection. {agent} does no work that needs it until you allow it here again.",
+        "age": "The computer updated this list {when}. It updates it each time it connects.",
+        "neverReported": "This computer has not said which programs it may start. The AIMEAT program on it is older than this list. When you update it, the programs show here.",
+        "ownAi": "Manage the programs from your own AI",
+        "copyPrompt": "Copy the prompt",
+        "prompt": "Read my computers with aimeat_connector_list. For each computer, tell me which programs it may start for my agents and which wait for my approval: the command, the agent, and what the program is for. Change nothing before I say so. When I decide, call aimeat_connector_program_set with the computer, the program's hash and allow or deny."
+      }
     },
     "apps": {
       "title": "Your apps",
@@ -26945,6 +26975,17 @@
         "high": "The page is shown, but without your private entries. Other people see it as before.",
         "tipLabel": "When to allow",
         "tip": "Allow if you know who wrote the page and trust it. If an agent writes your page often, give it the permission to read your entries on the agent's page, and then its pages no longer ask."
+      },
+      "approval_connector_program": {
+        "title": "May the computer start this program?",
+        "short": "A program came with the settings on one of your computers, and nobody connected it there.",
+        "what": "Your computer starts a program for an agent, such as the program that starts the agent for each task, only when you allowed it. A program you connect on the computer with aimeat connect is allowed by that act. This program arrived another way, for example in a folder copied from somewhere else, so the computer holds it and asks you.",
+        "lowLabel": "If you allow",
+        "low": "The computer starts the program from its next connection, and the agent works with it. You can stop it later on the Your computers page.",
+        "highLabel": "If you do not allow",
+        "high": "The program does not start, and the agent does no work that needs it. You can allow it later on the Your computers page.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you know the command and where it came from. If you do not recognise it, do not allow it, and look at the folder on that computer first."
       },
       "approval_goal_model_spend": {
         "title": "An agent asks the AI to do a task at your cost",
