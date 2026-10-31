@@ -15,6 +15,10 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-10-31 — Step 3.05: a money-priced action asks the hosted-app spend permission and checks the
+ *     pay token before the pacing is charged at 3.1; they were asked after it, and the reversal of a
+ *     refused call gives back only what the owner still holds of its credit (secaudit 2026-10-31
+ *     inv-08). The token is still spent at step 4, after the pacing.
  *   2026-10-25 — A bare tool binding in the owner's manifest names their own namespaced extension when
  *     a pass is checked (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v2.2.0 — 2026-10-18 — Step 4: a spent pay token whose sale carries the seller's net (a dynamic
@@ -67,7 +71,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
-import { consumeExtPayToken, accrueTokenShare } from '../../services/ext-pay-token.js';
+import { checkExtPayToken, consumeExtPayToken, accrueTokenShare } from '../../services/ext-pay-token.js';
 import type { DynamicDesignation } from '../../commerce/beneficiary-split.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
 import { getCarryPlan } from '../../services/app-members.js';
@@ -390,6 +394,36 @@ export async function enforcePaywall(args: {
   const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res, session });
   if (viaEntitlement) return viaEntitlement;
 
+  // 3.05 A money-priced action's own refusals, BEFORE the pacing below is charged. The pacing is
+  //      credited to the owner as it is charged, and a reversal gives back only what the owner still
+  //      holds, so a call refused after it could cost the caller (secaudit 2026-10-31 inv-08). The
+  //      entitlement chokepoint checks the hosted-app spend permission when it settles a contract;
+  //      this uncontracted channel settles on its own, so it asks the same question, and only here: a
+  //      free action is answered below and must not need a money permission at all. The pay token is
+  //      only checked here; it is spent at step 4, after the pacing, so a caller short of morsels keeps
+  //      the call they paid for.
+  const payMoney = action.commercial?.payMoney;
+  const paymentRequired = (m: NonNullable<typeof payMoney>, reason?: string) => {
+    res.status(402).json({ ...error(config.nodeId, 'PAYMENT_REQUIRED',
+      `This call costs ${m.amount / 1_000_000} ${m.currency}. Settle it with a checkout `
+      + `{ kind:'ext-call', app:'${ext.name}', tool:'${action.id}', currency:'${m.currency}' }, then retry `
+      + `this call with header 'x-aimeat-pay-token: <token>'.${payToken && reason ? ` (token ${reason})` : ''}`),
+      ...paymentChallenge(config) });
+  };
+  const tokenFor = { buyerOwner: callerOwner, ext: ext.name, action: action.id };
+  if (payMoney) {
+    const spendRefusal = await appSpendRefusal(storage, session);
+    if (spendRefusal) {
+      respondMeteredRefusal(config, res, spendRefusal, `${ext.name}/${action.id}`);
+      return { ok: false };
+    }
+    const usable = await checkExtPayToken(storage, payToken, tokenFor);
+    if (!usable.ok) {
+      paymentRequired(payMoney, usable.reason);
+      return { ok: false };
+    }
+  }
+
   // 3.1 Uncontracted call: pace it here. A legacy morsel price (`commercial.payMorsels`) is pacing
   //     now and joins the toll in this one charge: part burns, the rest is credited to the owner (M1).
   const paced = await burnPacingToll({
@@ -492,28 +526,14 @@ export async function enforcePaywall(args: {
     return { ok: false };
   }
 
-  // 3.9 Everything below CHARGES. The entitlement chokepoint checks the hosted-app spend permission
-  //     when it settles a contract; this uncontracted channel settles on its own, so it has to ask
-  //     the same question or it is a way around the permission. Asked HERE and not earlier: a free
-  //     action is answered above and must not need a money permission at all.
-  const spendRefusal = await appSpendRefusal(storage, session);
-  if (spendRefusal) {
-    await paced.charge?.reverse();
-    respondMeteredRefusal(config, res, spendRefusal, `${ext.name}/${action.id}`);
-    return { ok: false };
-  }
-
-  // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout. The
-  //    pacing charged at 3.1 is given back when the money is missing, so a refused call costs nothing.
-  const consumed = await consumeExtPayToken(storage, payToken, { buyerOwner: callerOwner, ext: ext.name, action: action.id });
+  // 3.9 The spend permission and the token were asked at 3.05, before the pacing.
+  // 4. Money channel (D1/D3): spend the one-time token minted by a settled ext-call checkout. It was
+  //    checked at 3.05; a refusal here is a replay racing this call for the same token, and the
+  //    pacing charged at 3.1 is given back.
+  const consumed = await consumeExtPayToken(storage, payToken, tokenFor);
   if (!consumed.ok) {
     await paced.charge?.reverse();
-    const m = action.commercial.payMoney;
-    res.status(402).json({ ...error(config.nodeId, 'PAYMENT_REQUIRED',
-      `This call costs ${m.amount / 1_000_000} ${m.currency}. Settle it with a checkout `
-      + `{ kind:'ext-call', app:'${ext.name}', tool:'${action.id}', currency:'${m.currency}' }, then retry `
-      + `this call with header 'x-aimeat-pay-token: <token>'.${payToken ? ` (token ${consumed.reason})` : ''}`),
-      ...paymentChallenge(config) });
+    paymentRequired(action.commercial.payMoney, consumed.reason);
     return { ok: false };
   }
   // Token valid and consumed: money settled. When the script throws, the pacing comes back. A sale
