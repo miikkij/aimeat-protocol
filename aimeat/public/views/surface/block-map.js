@@ -40,6 +40,7 @@ export const BLOCKS = {
   'home.chat-door': () => import('/views/surface/blocks-home.js').then(m => m.ChatDoorBlock),
   'home.fleet': () => import('/views/surface/blocks-home.js').then(m => m.FleetBlock),
   'home.agents': () => import('/views/surface/blocks-home.js').then(m => m.AgentsBlock),
+  'home.overview': () => import('/views/surface/blocks-home.js').then(m => m.OverviewBlock),
   'home.things': () => import('/views/surface/blocks-home.js').then(m => m.ThingsBlock),
   'home.playbooks': () => import('/views/surface/blocks-home.js').then(m => m.PlaybooksBlock),
   'home.achievements': () => import('/views/surface/blocks-home.js').then(m => m.AchievementsBlock),
