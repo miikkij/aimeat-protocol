@@ -12844,6 +12844,7 @@
     "cfg_ai_tts_voice_default": "Puheen oletusääni",
     "cfg_ai_model_default_embed": "Upotusten oletusmalli",
     "cfg_ai_recommended_models": "Suositellut mallit",
+    "cfg_ai_gen_rules": "Säännöt tekoälyn kuville ja videoille",
     "cfg_ai_providers": "Palvelimen tekoälyn tarjoajat",
     "cfg_ai_builtin_providers": "Paikalliset tekoälypalvelimet",
     "cfg_ai_provider_egress": "Palvelimen omien paikallisten tekoälypalvelimien osoitteet",

@@ -11227,6 +11227,7 @@
     "cfg_ai_tts_voice_default": "Voz predeterminada",
     "cfg_ai_model_default_embed": "Modelo de incrustaciones predeterminado",
     "cfg_ai_recommended_models": "Modelos recomendados",
+    "cfg_ai_gen_rules": "Reglas para imágenes y vídeos de IA",
     "cfg_ai_providers": "Proveedores de IA del servidor",
     "cfg_ai_builtin_providers": "Servidores de IA locales",
     "cfg_ai_provider_egress": "Direcciones de los servidores de IA locales del servidor",

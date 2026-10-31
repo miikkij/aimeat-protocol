@@ -17,7 +17,7 @@
  *   with the node requiring the rule, the owner cannot switch it off.
  * @structure
  *   - the node under test: the runner's backend, its own port
- *   - 1-14: the cases, the designed uses first, then the refusals
+ *   - 1-15: the cases, the designed uses first, then the refusals
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-gen-rules
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial.
@@ -64,6 +64,13 @@ async function json(path: string, token: string, opts: RequestInit = {}): Promis
   try { body = JSON.parse(text); } catch { body = { _raw: text }; }
   return { status: res.status, body };
 }
+
+/** The rules as the holder of `token` sees them. */
+const rules = (token: string) => json('/v1/ai/gen-rules', token);
+/** Change the rules as the holder of `token`, with the confirm token when confirming. */
+const setRules = (token: string, genRules: Record<string, unknown>, confirm?: string) => json('/v1/ai/gen-rules', token, {
+  method: 'PUT', body: JSON.stringify({ gen_rules: genRules, ...(confirm ? { confirm_token: confirm } : {}) }),
+});
 
 /** The first provenance record anywhere in an answer. */
 function recordIn(v: unknown): any {
@@ -131,10 +138,6 @@ async function stopNode(child: ChildProcess): Promise<void> {
     }
     const image = (token: string, body: Record<string, unknown> = {}) =>
       json('/v1/ai/image', token, { method: 'POST', body: JSON.stringify({ prompt: 'A family at a lake.', ...body }) });
-    const rules = (token: string) => json('/v1/ai/gen-rules', token);
-    const setRules = (token: string, genRules: Record<string, unknown>, confirm?: string) => json('/v1/ai/gen-rules', token, {
-      method: 'PUT', body: JSON.stringify({ gen_rules: genRules, ...(confirm ? { confirm_token: confirm } : {}) }),
-    });
     const setNode = (value: string) => json('/v1/admin/config', operator.token, {
       method: 'PUT', body: JSON.stringify({ changes: [{ path: 'ai.gen_rules', value }] }),
     });
@@ -280,7 +283,14 @@ async function stopNode(child: ChildProcess): Promise<void> {
       assert(fields.includes('rules.no-such-rule') && fields.some((f: string) => f.endsWith('.reason')), `problems ${JSON.stringify(fields)}`);
     });
 
-    await test('14. A malformed bypass is 400 before anything is spent', async () => {
+    await test('14. Without a sign-in, reading and changing the rules are both refused 401', async () => {
+      const read = await rules('');
+      assert(read.status === 401, `GET without a token: ${read.status}`);
+      const change = await setRules('', { rules: { [RULE]: false } });
+      assert(change.status === 401, `PUT without a token: ${change.status}`);
+    });
+
+    await test('15. A malformed bypass is 400 before anything is spent', async () => {
       const before = stub.requestsFor('images').length;
       const r = await image(alice.token, { gen_rules_bypass: { rules: [RULE] } });
       assert(r.status === 400 && r.body.error?.code === 'INVALID_BODY', `got ${r.status} ${JSON.stringify(r.body?.error)}`);

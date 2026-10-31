@@ -22,6 +22,9 @@
  *   v1.0.0 — 2026-10-31 — Initial (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  */
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
@@ -35,6 +38,23 @@ import { aiCallerOf } from './ai-policy.js';
 
 /** The scope an agent needs to propose a change to its owner's rules. Outside the `*` bundle. */
 const GEN_RULES_WRITE_SCOPE = 'memory:write-reserved';
+
+/**
+ * The body's shape and bounds. What a rule id means and what a reason must say is the service's
+ * check (normaliseOwnerGenRules), so a person gets GEN_RULES_INVALID with every problem at once.
+ */
+const GenRulesBodySchema = z.object({
+  gen_rules: z.object({
+    rules: z.record(z.string().max(INPUT_LIMITS.id), z.boolean().nullable()).optional(),
+    exceptions: z.array(z.object({
+      rule: z.string().max(INPUT_LIMITS.id).optional(),
+      app: z.string().max(INPUT_LIMITS.name).optional(),
+      agent: z.string().max(INPUT_LIMITS.name).optional(),
+      reason: z.string().max(INPUT_LIMITS.title).optional(),
+    })).max(100).optional(),
+  }),
+  confirm_token: z.string().max(INPUT_LIMITS.line).optional(),
+});
 
 export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router {
   // Provenance is minted on write paths that carry no config; they read the levels from here.
@@ -65,14 +85,11 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
   });
 
   // ── PUT /v1/ai/gen-rules ── the owner applies; an agent proposes and then confirms.
-  router.put('/v1/ai/gen-rules', requireAuth(), requireScope(GEN_RULES_WRITE_SCOPE), async (req: Request, res: Response) => {
+  router.put('/v1/ai/gen-rules', requireAuth(), requireScope(GEN_RULES_WRITE_SCOPE), validateBody(GenRulesBodySchema, config.nodeId), async (req: Request, res: Response) => {
     const auth = req.auth!;
-    const body = (req.body ?? {}) as Record<string, unknown>;
     // One shape, the one both MCP twins send: { gen_rules, confirm_token }.
+    const body = (req as Request & { validated: z.infer<typeof GenRulesBodySchema> }).validated;
     const input = body.gen_rules;
-    if (!input || typeof input !== 'object' || Array.isArray(input)) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_BODY', 'Send { gen_rules: { rules?, exceptions? } }, and confirm_token when confirming a proposal.'));
-    }
     try {
       if (isOwnerPrincipal(auth)) {
         const r = await setOwnerGenRules(storage, config, resolveIdentity(auth, config.nodeId), input, { kind: 'owner' });
@@ -84,7 +101,7 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the generation rules.'));
       }
-      const token = typeof body.confirm_token === 'string' && body.confirm_token ? body.confirm_token : undefined;
+      const token = body.confirm_token || undefined;
       const r = await setOwnerGenRules(storage, config, payer, input, {
         kind: 'agent', principal, ...(token ? { confirmToken: token } : {}),
       });

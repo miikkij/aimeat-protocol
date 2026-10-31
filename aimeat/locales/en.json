@@ -12650,6 +12650,7 @@
     "cfg_ai_tts_voice_default": "Default speech voice",
     "cfg_ai_model_default_embed": "Default embedding model",
     "cfg_ai_recommended_models": "Recommended models",
+    "cfg_ai_gen_rules": "Rules for AI pictures and videos",
     "cfg_ai_providers": "Server's AI providers",
     "cfg_ai_builtin_providers": "Local AI servers",
     "cfg_ai_provider_egress": "Addresses of the server's own local AI servers",
