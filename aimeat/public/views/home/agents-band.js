@@ -18,9 +18,13 @@
  *
  *   Composed from library components only (Band, NamedRow, LineList, TextField, Action, Mark, Note);
  *   it has no sheet of its own.
- * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
+ * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · agentName(worker) ·
+ *   stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-31 — The computers row is "Where your agents run"; on a node the store sold, the place's
+ *     own runtime ("aim-solo-…-node (crew)") reads "Your own server" and the "concierge" agent "Your
+ *     assistant" (machineName, agentName; v31 K50). A connector is still a computer in every other word.
  *   2026-10-25 — The band's title carries the question mark that explains an agent, and its first rows
  *     are the goals (views/home/goals-part.js): the field that gives the agents a goal, the running
  *     goals, and what in them waits for the person (session cc-jouni-goals).
@@ -37,6 +41,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ago } from '/js/format.js';
+import { customerNode } from '/js/site.js';
 import { Band, BandNote } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { LineList } from '/components/LineList.js';
@@ -51,9 +56,21 @@ import { GoalsPart } from './goals-part.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** A machine's name as a person reads it; one nobody named says so. */
+/**
+ * A machine's name as a person reads it; one nobody named says so. On a node the store sold, the
+ * runtime the fleet service set up on the place's own server is named like "aim-solo-…-node (crew)",
+ * which a buyer cannot read: it is "Your own server" (v31 K50).
+ */
 export function machineName(connector) {
+  if (customerNode() && /\(crew\)\s*$/i.test(connector?.name || '')) return tr('home.agents.ownServer', 'Your own server');
   return connector?.name || tr('home.agents.unnamedMachine', 'Unnamed computer');
+}
+
+/** An agent's name as a person reads it: the node's own helper, "concierge", is "Your assistant" to a buyer (v31 K50). */
+export function agentName(worker) {
+  if (worker?.display_name) return worker.display_name;
+  if (customerNode() && worker?.name === 'concierge') return tr('home.agents.concierge', 'Your assistant');
+  return worker?.name;
 }
 
 /** When an agent works, in the words the proposal page offers. */
@@ -103,7 +120,7 @@ function workerLine(w) {
   if (w.connector && w.has_key && w.connector.online) parts.push(machineName(w.connector));
   parts.push(stateWords(w));
   // The agent's own picture before its name, when it has set one (components/AgentAvatar.js).
-  const name = w.display_name || w.name;
+  const name = agentName(w);
   return {
     id: w.name, text: parts.join(' · '), href: `/v1/home?agent=${encodeURIComponent(w.name)}`,
     name: avatarOf(w) ? html`<${AgentAvatar} agent=${w} size="small" />${name}` : name,

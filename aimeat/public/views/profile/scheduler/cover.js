@@ -13,6 +13,7 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.21.0 -- 2026-10-31 -- The week's rhythm, the continuous ones, the rarer ones and the agents' reported times are drawn only when they hold something (v31 K54); with no schedule at all, "next up" says where an approved agent's run will appear (K53); the head says in plain words what the page is (K55).
  *   v1.20.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the page frame is the SettingsPage, the strip the FigureStrip, the lists the List (the time a Figure, the countdown the Num's sign, the long words clipped), the week's rhythm the WeekRhythm, the continuous jobs the JobChips, the search the SearchLine, "show more" the More, the doors the Tab's fold tone. Main's grey tags come back: the paused count, and the failed count while it is 0, are the dim Mark (main's og-chip--dim).
  *   v1.19.0 -- 2026-09-26 -- What fires next, the rarer ones, the register and the agents' own jobs are the Listing (listing, listing-row and its head row, name, who, words, figure and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
  *   v1.18.0 -- 2026-09-26 -- The line under a schedule's or a job's name is the Listing's typewriter line (.listing-meta), a unification: Jouni's decision "Meta line".
@@ -95,6 +96,15 @@ export function renderSchedulerView(ctx) {
 function renderCover(ctx) {
   const m = ctx.model;
   const tag = (n, key, tone) => ({ label: c(key, { n }), tone });
+  // An empty section is not drawn: three headings with "nothing here" under them read as a page
+  // that does not work (v31 K54). Each comes back the moment it has a run; while the runs load they
+  // all stand, so the page does not jump.
+  const shown = {
+    rhythm: ctx.occLoading || m.rhythm.length > 0,
+    cont: ctx.occLoading || m.continuous.length > 0,
+    rare: ctx.occLoading || m.rare.length > 0,
+    agents: ctx.internal.length > 0,
+  };
   const latest = m.latest ? (m.latest.lastRunResult || 'success') : null;
   const strip = html`<${FigureStrip} items=${[
     m.next
@@ -121,19 +131,19 @@ function renderCover(ctx) {
     railTitle=${c('railTitle')}
     sections=${[
       { id: 'sc-next', num: '01', label: c('secNext'), count: m.agenda.length },
-      { id: 'sc-rhythm', num: '02', label: c('secRhythm'), count: m.rhythm.length },
-      { id: 'sc-cont', num: '03', label: c('secCont'), count: m.continuous.length },
-      { id: 'sc-rare', num: '04', label: c('secRare'), count: m.rare.length },
+      shown.rhythm && { id: 'sc-rhythm', num: '02', label: c('secRhythm'), count: m.rhythm.length },
+      shown.cont && { id: 'sc-cont', num: '03', label: c('secCont'), count: m.continuous.length },
+      shown.rare && { id: 'sc-rare', num: '04', label: c('secRare'), count: m.rare.length },
       { id: 'sc-all', num: '05', label: c('secAll'), count: m.all.length },
-      { id: 'sc-agents', num: '06', label: c('secAgents'), count: ctx.internal.length },
-    ]}
+      shown.agents && { id: 'sc-agents', num: '06', label: c('secAgents'), count: ctx.internal.length },
+    ].filter(Boolean)}
     pagesLabel=${c('pages')} pages=${pageLinks(ctx, null)}>
       ${secNext(ctx)}
-      ${secRhythm(ctx)}
-      ${secContinuous(ctx)}
-      ${secRare(ctx)}
+      ${shown.rhythm && secRhythm(ctx)}
+      ${shown.cont && secContinuous(ctx)}
+      ${shown.rare && secRare(ctx)}
       ${secAll(ctx)}
-      ${secAgents(ctx)}
+      ${shown.agents && secAgents(ctx)}
   <//>`;
 }
 
@@ -155,7 +165,7 @@ function secNext(ctx) {
   const doors = ctx.model.agenda.length > AGENDA_ROWS
     ? html`<${Action} tone="more" onClick=${() => ctx.setNextOpen(v => !v)}>${ctx.nextOpen ? c('showFewer') : c('showAllComing', { n: ctx.model.agenda.length })}<//>` : null;
   return html`<${PageSection} id="sc-next" num="01" title=${c('secNext')} count=${ctx.model.next ? dayLabel(ctx.model.next.at) : null} doors=${doors} first=${true}>
-    ${list.length ? agendaRows(ctx, list) : emptyOr(ctx.occLoading, c('noneNext'))}
+    ${list.length ? agendaRows(ctx, list) : emptyOr(ctx.occLoading, ctx.model.all.length ? c('noneNext') : c('emptyAll'))}
   <//>`;
 }
 
