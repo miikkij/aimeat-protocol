@@ -26977,6 +26977,7 @@
     "tag.all": "All",
     "empty.noApps": "No apps yet",
     "empty.noAppsDesc": "Add your first app using the + button above",
+    "empty.noAppsDescPlace": "Ask the chat for an app in one sentence. When it is ready, it shows here.",
     "empty.formats": "Supports: HTML files and ZIP packages",
     "empty.noMatch": "No matches",
     "empty.noMatchDesc": "No apps match the current filter. Try a different search term or tag.",

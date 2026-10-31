@@ -11,6 +11,9 @@
  * @structure LibraryList(props) · CommunityList(props) · FavouritesList(props) · BuildingList(props) · CatFoot({ loaded, n })
  * @usage html`<${LibraryList} rows=${rows} total=${own.length} … />`
  * @version-history
+ *   v1.3.0 — 2026-11-01 — With no apps the foot leaves out its count sentence ("Jokainen 0
+ *     sovelluksestasi…"), and on a node the store sold the empty list says to ask the chat for an app,
+ *     without the file formats (Jouni's review, K39).
  *   v1.2.0 — 2026-10-04 — BuildingList: the apps the person builds for somebody else (wish-appcatin-sovellussivulle-design-spec-roadmap-rakentajat-ja-l).
  *   v1.1.0 — 2026-09-27 — Parity with the old page: the foot line and the 6px under the own list's
  *     headline are PageSection's (`foot`, `spaced`); an open row closes when the old page drew its
@@ -26,6 +29,7 @@ import { List } from '/components/List.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { InkFoot } from '/components/InkFoot.js';
 import { x } from '/views/appcat/i18n.js';
+import { customerNode } from '/js/site.js';
 import { appRef } from '/views/appcat/store.js';
 import { AppRow } from '/views/appcat/rows.js';
 
@@ -80,14 +84,19 @@ export function LibraryList({ rows, total, loaded, filtering, favourites, closeO
   if (!rows.length) {
     if (!loaded) body = html`<${Loading} />`;
     else if (!filtering && total === 0) {
-      body = html`<${EmptyState} start icon="🚀" title=${x('empty.noApps')} text=${x('empty.noAppsDesc')} aside=${x('empty.formats')} />`;
+      // On a node the store sold the empty list says how an app is made there, in the chat, and
+      // leaves out the file formats a buyer never uploads (Jouni's review, K39).
+      body = customerNode()
+        ? html`<${EmptyState} start icon="🚀" title=${x('empty.noApps')} text=${x('empty.noAppsDescPlace')} />`
+        : html`<${EmptyState} start icon="🚀" title=${x('empty.noApps')} text=${x('empty.noAppsDesc')} aside=${x('empty.formats')} />`;
     } else body = html`<${EmptyState} start icon="🔍" title=${x('empty.noMatch')} text=${x('empty.noMatchDesc')} />`;
   } else {
     body = html`<${List} cols=${CUT} index>${rowsOf(rows, true, favourites, openRef, toggle)}<//>`;
   }
   // The headline shows only when the person has at least one app (F31).
   if (total > 0) return html`<${PageSection} list spaced title=${x('sec.local')} count=${'· ' + total} foot=${x('list.foot')}>${body}<//>`;
-  return html`<${PageSection} list plain foot=${x('list.foot')}>${body}<//>`;
+  // With no apps at all there are no rows for the foot to explain.
+  return html`<${PageSection} list plain foot=${loaded && total === 0 && !filtering ? null : x('list.foot')}>${body}<//>`;
 }
 
 /**
@@ -149,7 +158,7 @@ export function BuildingList({ rows, order, total, favourites, closeOn }) {
  */
 export function CatFoot({ loaded, n }) {
   return html`<${InkFoot} brand="AIMEAT">
-    <p>${loaded ? x('foot.p1', { n }) : ''}</p>
+    <p>${loaded && n ? x('foot.p1', { n }) : ''}</p>
     <p>${x('foot.p2')}</p>
   <//>`;
 }
