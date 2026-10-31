@@ -52,6 +52,7 @@
  *   v1.26.0 -- 2026-10-09 -- Signed documents: aimeat_docsign_validate, _lookup, _request_create and _sign.
  *   v1.25.0 -- 2026-10-04 -- aimeat_task_decline: a request the agent should not take is declined with
  *     the reason, not failed.
+ *   2026-10-31 -- Buying a package another person on this node sells: aimeat_package_buy without repository.
  *   v1.24.0 -- 2026-10-02 -- An AI that is off: tell the owner `fix` and give them `settingsUrl`;
  *     `agentFix` is the agent's; for UNTESTED offer to run aimeat_ai_provider_test with their yes.
  *   v1.23.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts): look at their
@@ -306,6 +307,11 @@ shows what this node sells it for, the renewal, the days of updates, the licence
 your owner before you buy. \`checkout\` opens the checkout (give \`node\` to have their AIMEAT granted at
 once, or get a claim code), then \`aimeat_checkout_complete\` pays. \`renew\`, \`subscriptions\` and
 \`auto_renew\` keep the update service going. Your owner needs no account on the package repository.
+A package another person on this node sells (\`aimeat_package_list\` with \`for_sale\` true) is bought
+without \`repository\`: \`offer\` shows the listing and the price, \`checkout\` opens it, and
+\`aimeat_checkout_complete\` pays within the daily limit your owner set on your card; the money goes to
+the author. Your owner's account may then install it (\`aimeat_package_install\`) and every later
+version; \`purchases\` lists what they bought. Tell your owner the price before you buy.
 
 **Organisms — collaborate.** \`aimeat_organism_list\` · \`_get\` · \`_members\` · \`_join\` · \`_leave\`.
 

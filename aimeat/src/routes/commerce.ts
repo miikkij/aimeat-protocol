@@ -17,6 +17,8 @@
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  *   - PUT    /v1/commerce/payout/invoice               invoice credit for items delivered at once
  * @version-history
+ *   2026-10-31 — A line item may be `{ kind: 'package-account', app: <group id> }`, a package its author
+ *     sells to accounts of this node (services/packages/sale/package-account-checkout.ts).
  *   2026-10-27 — The card page route keeps the Stripe session it opened on the checkout (rememberCardPage),
  *     so the webhook completes only from it (secaudit2026oct26).
  *   2026-10-18 — POST /v1/commerce/checkout-sessions/:id/card: Stripe's own card page for a person,
@@ -90,7 +92,7 @@ import { appSpendRefusal } from '../services/metered-access.js';
 import { listSubscriptions, cancelSubscription } from '../commerce/subscriptions.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'pacing-pack', 'subscription']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call', 'package', 'package-account', 'pacing-pack', 'subscription']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */
@@ -100,7 +102,7 @@ const ItemsSchema = z.array(z.object({
   /** app-tool: the buyer's tool input, forwarded to the capability invoke at completion. */
   input: z.record(z.string(), z.unknown()).optional(),
   quantity: z.number().int().positive().max(1000).optional(),
-}).refine((i) => i.kind === 'pacing-pack' || !!(i.offer_id || i.tool), { message: 'Each line item needs offer_id (offers) or tool (app-tools); a pacing pack needs neither' }))
+}).refine((i) => i.kind === 'pacing-pack' || (i.kind === 'package-account' && !!i.app) || !!(i.offer_id || i.tool), { message: 'Each line item needs offer_id (offers) or tool (app-tools); a pacing pack needs neither, and a package-account line needs only app' }))
   .min(1).max(20);
 
 const CreateSchema = z.object({

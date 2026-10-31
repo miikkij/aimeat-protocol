@@ -19,6 +19,11 @@
  *   import { getPackageFor } from './package-read.js';
  *   const pkg = await getPackageFor(storage, groupId, req.auth?.owner);
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The operator reads a sold package only on a path that passes `trail`, and
+ *     the read is written to the operator trail in the author's account (ruled by Jouni, 2026-10-31).
+ *   v1.3.0 — 2026-10-31 — packageVisibleTo: a private package its author sells to accounts is read by
+ *     an account holding an active purchase and by the operator (sale/package-account-entitlement.ts;
+ *     wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   v1.2.0 — 2026-10-17 — packageVisibleTo: 'members' and 'organism:<id>' are read by whom
  *     services/audience.ts admits; the caller may be the request's auth, so a visitor from another
  *     node is told apart from a local account (plan doc-mvcn6c7e4e5q, V3.7).
@@ -28,7 +33,17 @@
  *     unchanged; the node MCP surface gains list and get through it.
  */
 import type { Storage, PackageRecord, PackageFilter, PackageInstanceRecord } from '../../../storage/interface.js';
-import { parseAudience, audienceAllows, type AudienceAuth } from '../../audience.js';
+import { parseAudience, audienceAllows, isNodeAccount, type AudienceAuth } from '../../audience.js';
+import { readAccountSale, activePurchase } from '../sale/package-account-entitlement.js';
+import { operatorOverride, type OperatorAuth } from '../../operator-override.js';
+import type { AimeatConfig } from '../../../config.js';
+
+/**
+ * What the operator trail needs (services/operator-override.ts). A read path that passes it admits
+ * the operator to a sold private package and writes the read to the author's account; a path that
+ * does not pass it never admits the operator there (ruled by Jouni on 2026-10-31).
+ */
+export type OperatorTrailConfig = Pick<AimeatConfig, 'nodeId' | 'accountEventWindow'>;
 
 /**
  * Who is reading. A route passes the request's auth (or undefined), so a visitor from another node
@@ -47,14 +62,39 @@ function authorNameOf(caller: PackageReadCaller): string | undefined {
  * The one visibility rule (plan doc-mvcn6c7e4e5q, V3.7): public to anyone, everything to its author,
  * 'members' and 'organism:<id>' to whom services/audience.ts admits, and private to nobody else.
  */
-export async function packageVisibleTo(storage: Storage, pkg: PackageRecord, caller: PackageReadCaller): Promise<boolean> {
+export async function packageVisibleTo(
+    storage: Storage, pkg: PackageRecord, caller: PackageReadCaller, trail?: OperatorTrailConfig,
+): Promise<boolean> {
     if (pkg.visibility === 'public') return true;
     const name = authorNameOf(caller);
     if (name !== undefined && name === pkg.author) return true;
     const audience = parseAudience(pkg.visibility);
-    if (!audience || audience.level === 'private' || audience.level === 'public') return false;
+    if (audience?.level === 'private') return soldTo(storage, pkg, caller, name, trail);
+    if (!audience || audience.level === 'public') return false;
     const auth: AudienceAuth | undefined = typeof caller === 'string' ? { sub: caller, owner: caller } : caller;
     return audienceAllows(storage, audience, auth);
+}
+
+/**
+ * A private package its author sells to accounts (sale/package-account-entitlement.ts): read by an
+ * account of this node holding an active purchase, and by the node operator, who answers for what is
+ * sold here. The content is the author's property, so the operator's read is admitted only on a path
+ * that passes `trail`, and is written to the operator trail in the author's account
+ * (operatorOverride). A visitor from another node, the anonymous identity and an account without a
+ * purchase read nothing. A package that is not sold answers false without a second read.
+ */
+async function soldTo(
+    storage: Storage, pkg: PackageRecord, caller: PackageReadCaller, name: string | undefined, trail?: OperatorTrailConfig,
+): Promise<boolean> {
+    if (!name || name.includes('@')) return false;
+    if (typeof caller === 'object' && !isNodeAccount(caller)) return false;
+    const sale = await readAccountSale(storage, pkg.packageGroupId);
+    if (!sale) return false;
+    if (await activePurchase(storage, sale, name)) return true;
+    if (typeof caller !== 'object' || !trail) return false;
+    return operatorOverride(storage, trail, caller as OperatorAuth, {
+        ownerOf: pkg.author, area: 'package', action: 'read', subject: `${pkg.name} ${pkg.version}`,
+    });
 }
 
 export interface PackageListQuery {
@@ -110,20 +150,20 @@ export async function listPackagesFor(
 
 /** The latest published version of a group, or null when there is none the caller may see. */
 export async function getPackageFor(
-    storage: Storage, groupId: string, caller: PackageReadCaller,
+    storage: Storage, groupId: string, caller: PackageReadCaller, trail?: OperatorTrailConfig,
 ): Promise<PackageRecord | null> {
     const pkg = await storage.getLatestPublished(groupId);
     if (!pkg) return null;
-    return (await packageVisibleTo(storage, pkg, caller)) ? pkg : null;
+    return (await packageVisibleTo(storage, pkg, caller, trail)) ? pkg : null;
 }
 
 /** One named version of a group, or null when there is none the caller may see. */
 export async function getPackageVersionFor(
-    storage: Storage, groupId: string, version: string, caller: PackageReadCaller,
+    storage: Storage, groupId: string, version: string, caller: PackageReadCaller, trail?: OperatorTrailConfig,
 ): Promise<PackageRecord | null> {
     const pkg = await storage.getPackageByGroupAndVersion(groupId, version);
     if (!pkg) return null;
-    return (await packageVisibleTo(storage, pkg, caller)) ? pkg : null;
+    return (await packageVisibleTo(storage, pkg, caller, trail)) ? pkg : null;
 }
 
 /**

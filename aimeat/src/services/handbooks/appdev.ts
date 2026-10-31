@@ -32,6 +32,7 @@
  *     nothing on the node refuses a stranger without an extension, and aimeat_iam_define for the gate.
  *   2026-09-30 — Classified content in an app: one paragraph pointing at aimeat-labels.js (TARGET-082).
  *   2026-09-30 — The package line says a composed package carries your skills bound to its apps.
+ *   2026-10-31 — Selling your own package to people on this node: aimeat_package_price_set and aimeat_package_sales.
  *   2026-10-02 — aimeat_package_withdraw, and a shop's review of a version that can do more.
  *   2026-10-02 — aimeat_package_compose_set and the aimeat-workspace block with AIMEAT.data.appWorkspace().
  *   2026-10-02 — aimeat_package_offer: the terms a seller sells your private package on.
@@ -141,6 +142,15 @@ keeps the terms they accepted. A version that turns out bad is taken back with \
 and a reason: nothing serves it again, and every copy's extensions are switched off and its owner told.
 Publish a fixed version after it. A shop sells a new version that can do more only after its operator
 reviews it again.
+
+**Selling your own package to people on this node.** \`aimeat_package_price_set\` puts a price on a
+private package of yours (EUR or USD in micro-units; null ends the sale); your owner needs their own
+Stripe account connected first. Name up to three memory parts as \`preview\` (screenshots, a description):
+those and the name, description and price are what everyone sees, and only buyers read and install the
+rest, including every later version. Keep the app the package was made from out of public view, or
+its address gives the template away. \`aimeat_package_sales\` lists the sales and refunds one. A buyer
+buys it from their own AI or with Buy on the Packages page (\`/v1/profile?tab=packages&package=<group id>\`
+opens its row, which is where an app sends its person to buy).
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

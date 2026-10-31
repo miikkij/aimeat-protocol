@@ -12,6 +12,9 @@
  * @structure packagesTools[] -- catalog entries, folded into definitions.ts
  * @usage import { packagesTools } from './packages.js';
  * @version-history
+ *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
+ *     accounts of this node); aimeat_package_buy without `repository` buys such a package and takes
+ *     action "purchases"; aimeat_package_list takes `for_sale`.
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-18 — aimeat_package_publish, _compose and _compose_set say what a publish request answers
  *     when the node asks the owner before making a package public (plan doc-mvcn6c7e4e5q, V4).
@@ -95,6 +98,7 @@ export const packagesTools = [
             search: { type: 'string', description: 'Optional search over name, description and tags.' },
             author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
+            for_sale: { type: 'boolean', description: 'true: only the packages their authors sell to accounts of this node, each with its price and preview. Buy one with aimeat_package_buy.' },
         },
     },
     {
@@ -468,7 +472,7 @@ export const packagesTools = [
     },
     {
         name: 'aimeat_package_buy',
-        description: 'Buy a package this node sells, for your owner. This node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.',
+        description: 'Buy a package for your owner. WITHOUT `repository`: a package its author sells to accounts of this node (aimeat_package_list with for_sale true lists them). action "offer" answers the listing: what it is, its parts, the preview, the price and the author; tell your owner before buying. action "checkout" opens the checkout for `group_id`; pay with aimeat_checkout_complete within your daily purchase limit, and the money goes to the author\'s own payment account. Once paid, your owner\'s account may read and install the package and every later version of it: install it with aimeat_package_install. A refund ends that. action "purchases": what your owner bought this way. WITH `repository`, a package this node sells node to node: this node reads the author\'s terms from the package repository for you; you never need an account there. action "offer": what you would get and at what price (this node\'s price, the renewal price and period, how many days of updates come with it, the licence, how tax is to be read, the support and security contacts, the author and the seller of record). Tell your owner before buying. action "checkout": open the checkout; give `node` ({ node_id, url, public_key } from the receiving AIMEAT\'s /.well-known/aimeat) to have it granted at once, or leave it out to get a claim code the receiving node redeems with aimeat_package_claim; `auto_renew` true keeps the card for automatic renewals. action "renew": open the checkout of the next update period for `node_id`, at the renewal price your owner accepted. Then pay with aimeat_checkout_complete; the sale is carried out when it is paid, and a failure there refunds it. An offer granted on approval waits for the seller instead. action "subscriptions": what your owner holds here, and the requests they made. action "auto_renew": turn automatic renewal on or off for `node_id`. The same as GET /v1/package-sales/offer, POST /v1/commerce/checkout-sessions with a package line, and GET and PUT /v1/package-sales/subscriptions.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Buy a Package', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
@@ -476,12 +480,43 @@ export const packagesTools = [
         // On `agent`: Buying a package this node sells, for the person: the offer, the checkout, the renewals.
         surfaces: ['agent'],
         input: {
-            action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off.' },
-            repository: { type: 'string', description: 'The package repository\'s node id.' },
-            group_id: { type: 'string', description: 'The package group id on the repository.' },
+            action: { type: 'string', required: true, enum: ['offer', 'checkout', 'renew', 'subscriptions', 'auto_renew', 'purchases'], description: 'offer: what you would buy and at what price; checkout: open the checkout; renew: open the checkout of the next update period; subscriptions: what you hold and the requests you made; auto_renew: turn automatic renewal on or off; purchases: the packages your owner bought from their authors on this node.' },
+            repository: { type: 'string', description: 'The package repository\'s node id, for a package this node sells node to node. Leave out for a package its author sells on this node.' },
+            group_id: { type: 'string', description: 'The package group id (on the repository, when one is named).' },
             node: { type: 'object', description: 'For checkout: { node_id, url, public_key } of the AIMEAT that is to receive the package. Leave out to get a claim code instead.', zod: z.object({ node_id: z.string().max(INPUT_LIMITS.id), url: z.string().max(INPUT_LIMITS.url), public_key: z.string().max(INPUT_LIMITS.text) }) },
             node_id: { type: 'string', description: 'For renew and auto_renew: the node the package was bought for.' },
             auto_renew: { type: 'boolean', description: 'For checkout: keep the card for automatic renewals. For auto_renew: on or off.' },
+        },
+    },
+    {
+        name: 'aimeat_package_price_set',
+        description: 'Sell your own package to other accounts of this node, for money that goes to your own payment account. Set `price` { amount, currency } (EUR or USD in micro-units, 1 EUR = 1000000); null ends the sale. `state` on_sale (listed and sold), paused (listed, not sold) or ended. `preview`: up to three ids of the package\'s memory parts that anyone may read before buying (screenshots, a description). Every version must be private first (PRICE_NEEDS_PRIVATE), and you need your own Stripe account connected (NO_PAYMENT_ACCOUNT; aimeat_commerce_psp_set). While it is on sale, the package stays private: its listing (name, description, parts without content, the preview, the price, you as author) is public, and only buyers, you and the node operator read or install the content. A buyer\'s purchase covers every later version. A new price reaches only new buyers. The node\'s usual commerce fee applies. The same as PUT /v1/packages/:groupId/price.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Set a Package Price', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The seller's word, as the payout settings and the checkout's selling side ask it.
+        scope: 'commerce:sell',
+        surfaces: ['appdev', 'agent'],
+        input: {
+            group_id: { type: 'string', required: true, description: 'Your package group id.' },
+            price: { type: 'object', description: '{ amount, currency } in micro-units (1 EUR = 1000000), or null to end the sale. Leave out to keep the price.', zod: z.object({ amount: z.number(), currency: z.string().max(INPUT_LIMITS.id) }).nullable() },
+            state: { type: 'string', enum: ['on_sale', 'paused', 'ended'], description: 'on_sale, paused (listed, not sold) or ended. Defaults to on_sale when a price is given.' },
+            preview: { type: 'array', description: 'Up to three ids of the package\'s memory parts anyone may read before buying.', zod: z.array(z.string().max(INPUT_LIMITS.id)).max(3) },
+        },
+    },
+    {
+        name: 'aimeat_package_sales',
+        description: 'Your sales of a package you sell to accounts of this node. action "list": the price, the state, every purchase (buyer, order, amount, state paid, pending or refunded) and the totals. action "refund": give one purchase\'s money back on the payment method that collected it, on your own payment account; the buyer can then no longer read, install or update the package, and is told. Copies the buyer installed stay. The same as GET /v1/packages/:groupId/sales and POST /v1/packages/:groupId/sales/:order/refund.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        // Destructive: a refund ends a buyer's access to the package.
+        annotations: { title: 'Package Sales', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
+        scope: 'commerce:sell',
+        surfaces: ['appdev', 'agent'],
+        input: {
+            group_id: { type: 'string', required: true, description: 'Your package group id.' },
+            action: { type: 'string', required: true, enum: ['list', 'refund'], description: 'list the sales, or refund one.' },
+            order: { type: 'string', description: 'For refund: the purchase\'s order id (cs_…), from action list.' },
         },
     },
 ] as const satisfies readonly AimeatToolDefinition[];

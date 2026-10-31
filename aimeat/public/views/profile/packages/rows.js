@@ -12,6 +12,10 @@
  * @structure instanceRow · offerRow · ownRow · loadingRow
  * @usage import { instanceRow, offerRow, ownRow } from './rows.js';
  * @version-history
+ *   v1.24.0 — 2026-10-31 — A package its author sells: the offer row says its price and its door is Buy
+ *     until this account owns it, the opened row has the price and Buy (sale.js) in place of the install
+ *     field and the download; one of the owner's own has the price they set and its sales, and its
+ *     public choice is off while it is on sale.
  *   v1.23.0 — 2026-10-18 — A package you made says who can read it with the AudienceBadge (Private, Signed-in, "<organism> members", Public), where it said private for every level but public (plan doc-mvcn6c7e4e5q, V6.4).
  *   v1.22.0 — 2026-10-04 — An opened offer shows what its apps ask for, with the check that approves
  *     them at install when the package is someone else's (sheet.js appApprovalBlock).
@@ -67,8 +71,9 @@ import { Facts } from '/components/Facts.js';
 import { Tabs } from '/components/Tabs.js';
 import { TextField } from '/components/TextField.js';
 import { List, Row, Name, Desc, Who, Cell, Doors, Panel } from '/components/List.js';
-import { x, partWord, partTab, partCounts, categoryWord, listingWord, dateWord, versionDate, agentTextFor, openTab } from './frame.js';
+import { x, partWord, partTab, partCounts, categoryWord, listingWord, dateWord, versionDate, agentTextFor, openTab, priceWord } from './frame.js';
 import { sheetBlock, asksBlock, appApprovalBlock } from './sheet.js';
+import { offerSaleRow, ownSaleRows, ownSaleWord } from './sale.js';
 
 /** The kinds of part a package carries, as tags under its description ("app", "extension ×2"). */
 const partTags = (list) => partCounts(list).map(([type, n]) => `${partWord(type)}${n > 1 ? ` ×${n}` : ''}`);
@@ -175,16 +180,18 @@ export function offerRow(ctx, o) {
   const installed = ctx.instances.filter((i) => i.packageGroupId === o.group).length;
   const sub = [o.remote ? x('fromNode', { node: o.sourceNode }) : o.system ? x('bySystem') : x('byAuthor', { author: o.author }), categoryWord(o.category)].filter(Boolean).join(' · ');
   const toggle = () => ctx.toggle(key, o);
+  // A package its author sells: the price says what it costs, and its door is Buy until this account owns it.
+  const toBuy = !!o.sale && !o.owned && o.author !== ctx.ownerName;
   return html`
     <${Row} key=${key} open=${open} id=${'pk-row-' + (o.group || '').replace(/[^a-z0-9]/gi, '-')}>
       <${Name} tag=${o.version ? versionDate(o.version) : null} meta=${sub}>${o.title}<//>
       <${Desc} lines=${4} marks=${o.components.length ? partTags(o.components) : null}>${o.description}<//>
       <${Who} sub=${[o.components.length ? x('partsN', { n: o.components.length }) : '', o.listing?.installCount ? (o.listing.installCount === 1 ? x('installOne') : x('installsN', { n: o.listing.installCount })) : '', o.listing?.featured ? x('featured') : ''].filter(Boolean).join(' · ') || x('noInstallsYet')}>
-        ${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : x('installYours')}
+        ${o.sale ? (o.owned ? x('sale.ownedShort') : priceWord(o.sale)) : installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : x('installYours')}
       <//>
       <${Doors}>
         ${/* Opened, the row has one Close: both doors turned into the same word side by side. */''}
-        ${o.group && !open ? html`<${Action} small row onClick=${toggle}>${x('install')}<//>` : null}
+        ${o.group && !open ? html`<${Action} small row onClick=${toggle}>${toBuy ? x('sale.buyShort') : x('install')}<//>` : null}
         <${Action} small row soft expanded=${open} onClick=${toggle}>${open ? x('close') : x('open')}<//>
       <//>
       ${open ? offerOpen(ctx, o, key) : null}
@@ -223,8 +230,10 @@ function offerOpen(ctx, o, key) {
   const inst = ctx.installForm && ctx.installForm.key === key ? ctx.installForm : { label: '' };
   const l = o.listing;
   const close = () => ctx.toggle(key, o);
+  // A package on sale that this account does not own has no content to download or install yet.
+  const locked = !!o.sale && !o.owned && o.author !== ctx.ownerName;
   const doors = html`
-    ${o.group ? html`<${Action} small soft onClick=${() => ctx.download(o.group, o.name)}>${x('downloadZip')}<//>` : null}
+    ${o.group && !locked ? html`<${Action} small soft onClick=${() => ctx.download(o.group, o.name)}>${x('downloadZip')}<//>` : null}
     <${Action} small soft copy=${agentTextFor(o)} copiedLabel=${x('copied')}>${x('copyAgent')}<//>
     <${Action} small soft onClick=${close}>${x('close')}<//>`;
   return html`
@@ -236,9 +245,10 @@ function offerOpen(ctx, o, key) {
       <${Facts} rows=${[
         { k: x('makerK'), v: o.remote ? x('makerRemote', { node: o.sourceNode }) : o.system ? x('makerSystem') : x('makerAuthor', { author: o.author }), sub: [o.version ? x('versionOf', { date: versionDate(o.version) }) : '', categoryWord(o.category) ? x('categoryOf', { c: categoryWord(o.category) }) : '', o.tags.length ? x('tagsOf', { tags: o.tags.join(', ') }) : ''].filter(Boolean).join(' · ') },
         l && (l.installCount || l.reviewCount) && { k: x('galleryK'), v: [l.installCount ? x('installsN', { n: l.installCount }) : '', l.reviewCount ? x('reviewsN', { n: l.reviewCount, rating: Number(l.rating || 0).toFixed(1) }) : ''].filter(Boolean).join(' · ') },
-        o.group && asksBlock(ctx, o, key),
-        o.group && appApprovalBlock(ctx, o, key, !!ctx.ownByGroup?.[o.group]),
-        o.group && { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install(o, inst.label)), sub: x('installSub') },
+        offerSaleRow(ctx, o),
+        o.group && !locked && asksBlock(ctx, o, key),
+        o.group && !locked && appApprovalBlock(ctx, o, key, !!ctx.ownByGroup?.[o.group]),
+        o.group && !locked && { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install(o, inst.label)), sub: x('installSub') },
       ]} />
     <//>`;
 }
@@ -258,7 +268,7 @@ export function ownRow(ctx, p) {
       <${Desc} lines=${4} marks=${partTags(p.components)}>${p.description || ''}<//>
       <${Who} sub=${[
         p.status === 'published' ? '' : x('statusWord.' + p.status),
-        state ? listingWord(state) : x('notInGallery'),
+        ownSaleWord(ctx, p) || (state ? listingWord(state) : x('notInGallery')),
         installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) : '',
       ].filter(Boolean).join(' · ')}><${AudienceBadge} value=${p.visibility} /><//>
       <${Doors}>
@@ -288,7 +298,8 @@ function ownOpen(ctx, p, key, listing, state, installed) {
     <${Tabs} label=${x('vis.k')} value=${p.visibility} onSelect=${(v) => ctx.setVisibility(p, v)}
       items=${[
         { value: 'private', label: x('vis.private'), disabled: busy || p.visibility === 'private' },
-        { value: 'public', label: x('vis.public'), disabled: busy || p.visibility === 'public' },
+        // A package on sale stays private: the node refuses public (PACKAGE_PRICED), so the page does not offer it.
+        { value: 'public', label: x('vis.public'), disabled: busy || p.visibility === 'public' || (ctx.selling?.[p.packageGroupId]?.state ?? 'ended') !== 'ended' },
       ]} />
     ${p.status === 'published' && !state ? html`<${Action} small soft disabled=${busy} onClick=${() => ctx.propose(p)}>${x('propose')}<//>` : null}`;
   return html`
@@ -299,10 +310,12 @@ function ownOpen(ctx, p, key, listing, state, installed) {
         { k: x('versionsK'), v: versions ? x('versionsLine', { n: versions.length, latest: versionDate(p.version) }) : x('versionsLoading'), sub: x('versionsSub') },
         {
           k: x('vis.k'),
-          v: p.visibility === 'public' ? x('vis.publicLong') : x('vis.privateLong'),
-          sub: html`${state ? listingWord(state) : x('notInGalleryLong')}${p.rejectionReason || listing?.rejectionReason ? html` · ${x('rejectedBecause', { reason: p.rejectionReason || listing.rejectionReason })}` : null}`,
+          // On sale, private means its buyers too, and public waits until the sale ends.
+          v: p.visibility === 'public' ? x('vis.publicLong') : ownSaleWord(ctx, p) ? x('sale.privateSold') : x('vis.privateLong'),
+          sub: html`${ownSaleWord(ctx, p) ? x('sale.publicOff') : state ? listingWord(state) : x('notInGalleryLong')}${p.rejectionReason || listing?.rejectionReason ? html` · ${x('rejectedBecause', { reason: p.rejectionReason || listing.rejectionReason })}` : null}`,
           actions: visibility,
         },
+        ...ownSaleRows(ctx, p),
         { k: x('installK'), v: installField(ctx, key, inst.label, () => ctx.install({ group: p.packageGroupId, title: p.name }, inst.label)), sub: `${installed ? (installed === 1 ? x('installedOnce') : x('installedN', { n: installed })) + ' · ' : ''}${x('installOwnSub')}` },
       ]} />
     <//>`;

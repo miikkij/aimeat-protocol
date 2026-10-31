@@ -29,6 +29,8 @@
  *   import { applyInstanceMigration } from './package-migrate.js';
  *   const out = await applyInstanceMigration({ storage, config }, caller, { instanceId, targetVersion, actions });
  * @version-history
+ *   v1.9.0 — 2026-10-31 — applyInstanceMigration answers 402 PURCHASE_REQUIRED for a package its author
+ *     sells to accounts when the owner holds no paid purchase of it (sale/package-account-entitlement.ts).
  *   v1.8.0 — 2026-10-29 — With install role operator, a replaced, custom or new extension in an account
  *     that may not install extension code is stored switched off and waits for an operator; the outcome
  *     names it (`awaitingOperator`; services/extension-code-hold.ts; secaudit2026oct26 round 8c).
@@ -81,6 +83,7 @@ import { isOwnerInPerson } from '../../../utils/gaii.js';
 import { emitChange } from '../../event-bus.js';
 import { logger } from '../../../utils/logger.js';
 import { carryFirstUseKeep, keepsPreAuditFirstUse } from '../../extension-first-use-keep.js';
+import { purchaseRefusal } from '../sale/package-account-entitlement.js';
 import type { ExtensionCodeAwaiting } from './package-install.js';
 
 export const MIGRATION_ACTIONS = ['replace', 'skip', 'custom', 'install_new'] as const;
@@ -264,6 +267,10 @@ export async function applyInstanceMigration(
     }
     const forked = forkedUpdateRefusal(instance);
     if (forked) return forked;
+    // A package its author sells: another version is for an account holding a paid purchase, so a
+    // refunded buyer cannot apply one by naming it here (sale/package-account-entitlement.ts).
+    const unpaid = await purchaseRefusal(storage, instance.packageGroupId, owner);
+    if (unpaid) return { ok: false, ...unpaid };
     // A managed install takes the package's version of every component: `custom` would put the
     // owner's bytes in, and `skip` would leave an older component under the new version number.
     if (instance.mode === 'managed') {

@@ -17,7 +17,8 @@
  *     a line names a product of this seller's feed and Stripe reads the session as paid; any other
  *     checkout is left alone. checkout.session.async_payment_succeeded takes such an order once a
  *     delayed payment method has paid.
- *   - charge.refunded → expense voucher for the refunded amount.
+ *   - charge.refunded → expense voucher for the refunded amount; a full refund of a charge that paid
+ *     for a package the seller sells to accounts also ends that purchase.
  *   - payout.paid → TRANSFER voucher (Stripe balance → bank account; not revenue).
  *   Everything else acks 200 without booking — Stripe retries on non-2xx, and an
  *   unhandled event type is not an error.
@@ -31,6 +32,8 @@
  * @structure verifyStripeSignature · event mapping · commerceWebhooksRouter
  * @usage app.use(commerceWebhooksRouter(config, storage)) in routes-loader
  * @version-history
+ *   2026-10-31 — charge.refunded with `refunded: true` ends the package purchase that charge paid for
+ *     (refundByTrackingCode; wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   2026-10-25 — An agent order is taken only when Stripe reads the session as paid, and
  *     checkout.session.async_payment_succeeded takes a delayed one (secaudit2026oct22).
  *   2026-10-18 — checkout.session.completed for the node's hosted card page finishes the AIMEAT checkout
@@ -55,6 +58,7 @@ import { bookVoucher } from '../services/finance/vouchers.js';
 import { markPaid } from '../services/finance/invoice-service.js';
 import { intakeAgentOrder } from '../commerce/agent-order-intake.js';
 import { completeFromStripeCheckout } from '../commerce/stripe-checkout-complete.js';
+import { refundByTrackingCode } from '../services/packages/sale/package-account-sale.js';
 
 const TOLERANCE_SECONDS = 300;
 
@@ -196,6 +200,9 @@ export function commerceWebhooksRouter(config: AimeatConfig, storage: Storage): 
           });
           booked = { action: 'refund_booked', voucherId: voucher.id };
         }
+        // A FULL refund of a charge that paid for a package this seller sells to accounts ends that
+        // purchase (services/packages/sale/package-account-sale.ts). A partial refund leaves it.
+        if (intentId && object.refunded === true) await refundByTrackingCode(storage, config, ownerGhii, intentId);
       } else if (event.type === 'payout.paid') {
         const amount = Number(object.amount ?? 0);
         if (amount > 0) {

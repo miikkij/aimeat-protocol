@@ -21,6 +21,14 @@
  *   import { packagesRouter } from '../routes/packages.js';
  *   app.use(packagesRouter(config, storage));
  * @version-history
+ *   2026-10-31 — The three package reads pass `config`, so the operator's read of a sold package is
+ *     written to the operator trail in the author's account (services/packages/compose/package-read.ts).
+ *   2026-10-31 — A package its author sells to accounts (services/packages/sale/package-account-sale.ts):
+ *     GET /v1/packages?for_sale=true lists them; GET /v1/packages/:groupId answers a reader with no
+ *     purchase the listing, the price and the line that buys it, and everyone else the package with
+ *     `sale`; GET .../versions/:version and .../export answer 402 PURCHASE_REQUIRED where they answered
+ *     404 while it is listed for sale. The price, sales, refund and purchases routes are registered
+ *     here (routes/package-account-sales.ts).
  *   2026-10-18 — On a node that shows its content to signed-in accounts only, a package group asked
  *     public on POST /v1/packages, compose, compose-set or PATCH /v1/packages/:groupId is stored at
  *     'members' with the warning PUBLIC_IS_SIGNED_IN_HERE (package-publish-ask.ts, plan V1.6).
@@ -97,6 +105,10 @@ import { checkUpstream } from '../services/packages/peer/package-pull.js';
 import { resolveNodeRead } from '../services/packages/sale/package-entitlements.js';
 import { registerPackageEntitlementRoutes } from './package-entitlements.js';
 import { registerPackageSaleRoutes } from './package-sales.js';
+import { registerPackageAccountSaleRoutes } from './package-account-sales.js';
+import { listForSale, listingFor, saleView } from '../services/packages/sale/package-account-sale.js';
+import { readAccountSale, listedSaleRefusal } from '../services/packages/sale/package-account-entitlement.js';
+import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 import { readRemoteTemplates } from '../services/federation-remote-templates.js';
 
@@ -115,6 +127,8 @@ export function packagesRouter(
   registerPackageEntitlementRoutes(router, config, storage, peers);
   // Selling node to node: the author's seller nodes, their signed requests, and the selling side.
   registerPackageSaleRoutes(router, config, storage, peers);
+  // An author selling their own package to accounts of this node: price, sales, refund, purchases.
+  registerPackageAccountSaleRoutes(router, config, storage);
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
 
@@ -131,7 +145,9 @@ export function packagesRouter(
     const remote = config.packageFederationEnabled
       ? { enabled: true, ...(await readRemoteTemplates(storage, peers)) }
       : { enabled: false, templates: [], peers: [] };
-    res.json(success(config.nodeId, { ...data, remote }));
+    // `checkout.test_money`: the node runs the test payment handler, so the page offers to pay a
+    // package on sale with it (commerce/test-money-handler.ts; the Security page warns about it).
+    res.json(success(config.nodeId, { ...data, remote, checkout: { test_money: testMoneyHandlerActive(config) } }));
   });
 
   // POST /v1/packages/compose — build a package out of apps this owner already published.
@@ -318,6 +334,19 @@ export function packagesRouter(
 
   // GET /v1/packages — list packages
   router.get('/v1/packages', async (req, res) => {
+    // `for_sale=true`: the packages their authors sell to accounts here, as listings (no content but
+    // the preview parts), each with its price and the checkout line that buys it.
+    if (req.query.for_sale === 'true') {
+      const sold = await listForSale(storage, {
+        category: req.query.category as string | undefined,
+        author: req.query.author as string | undefined,
+        search: req.query.search as string | undefined,
+        limit: parseInt(req.query.limit as string ?? '50', 10),
+        offset: parseInt(req.query.offset as string ?? '0', 10),
+      });
+      res.json(success(config.nodeId, { packages: sold.packages, total: sold.total }));
+      return;
+    }
     const result = await listPackagesFor(storage, req.auth, {
       author: req.query.author as string | undefined,
       category: req.query.category as string | undefined,
@@ -478,8 +507,10 @@ export function packagesRouter(
     const groupId = decodeURIComponent(req.params.groupId as string);
     const version = req.params.version as string;
 
-    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth);
+    const pkg = await getPackageVersionFor(storage, groupId, version, req.auth, config);
     if (!pkg) {
+      const unpaid = await listedSaleRefusal(storage, groupId);
+      if (unpaid) { res.status(unpaid.status).json(error(config.nodeId, unpaid.code, unpaid.message)); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Version ${version} not found for package ${groupId}`));
       return;
     }
@@ -512,10 +543,12 @@ export function packagesRouter(
       return;
     }
     const pkg = nodeRead.kind === 'served' ? nodeRead.pkg : versionParam
-      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth)
-      : await getPackageFor(storage, groupId, req.auth);
+      ? await getPackageVersionFor(storage, groupId, versionParam, req.auth, config)
+      : await getPackageFor(storage, groupId, req.auth, config);
 
     if (!pkg) {
+      const unpaid = await listedSaleRefusal(storage, groupId);
+      if (unpaid) { res.status(unpaid.status).json(error(config.nodeId, unpaid.code, unpaid.message)); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
       return;
     }
@@ -576,15 +609,26 @@ export function packagesRouter(
   router.get('/v1/packages/:groupId', async (req, res) => {
     const groupId = decodeURIComponent(req.params.groupId as string);
 
-    const pkg = await getPackageFor(storage, groupId, req.auth);
+    const pkg = await getPackageFor(storage, groupId, req.auth, config);
+    // A package its author sells: a reader with no purchase gets its listing (no content but the
+    // preview parts), the price and the line that buys it; a buyer, the author and the operator get
+    // the package with the sale beside it (services/packages/sale/package-account-sale.ts).
+    const sale = await readAccountSale(storage, groupId);
     if (!pkg) {
+      const listed = await listingFor(storage, groupId);
+      if (listed) {
+        res.json(success(config.nodeId, listed.listing, [
+          { description: 'Buy it: open a checkout with this line', method: 'POST', url: '/v1/commerce/checkout-sessions' },
+        ]));
+        return;
+      }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Package not found: ${groupId}`));
       return;
     }
 
     // The "what you get" sheet travels with the record, so the page and an AI read the same thing
     // before installing (services/packages/compose/package-sheet.ts).
-    res.json(success(config.nodeId, { ...pkg, sheet: packageSheet(pkg, config) }, [
+    res.json(success(config.nodeId, { ...pkg, sheet: packageSheet(pkg, config), ...(sale ? { sale: saleView(sale), entitled: true } : {}) }, [
       { description: 'List all versions', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/versions` },
       { description: 'Export as ZIP', method: 'GET', url: `/v1/packages/${encodeURIComponent(groupId)}/export` },
     ]));
