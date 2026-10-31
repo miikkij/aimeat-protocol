@@ -38,6 +38,11 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   v1.11.1 — 2026-10-31 — A move between the active record and the archive (the roll on append, the
+ *     owner's archive-before and limit actions) writes the active record's compare-and-swap first and
+ *     the archive after it, in one transaction. A move that lost the swap had already written the
+ *     archive, so its entries were archived twice or the archive was trimmed while the answer said
+ *     nothing was removed (secaudit 2026-10-31 inv-11).
  *   v1.11.0 — 2026-10-25 — `internet.requested`, `internet.opened`, `internet.extended`, `internet.closed`: the
  *     app opened to the internet on a closed node (services/internet-opening/).
  *   v1.10.0 — 2026-10-18 — `marks.info` and `marks.tucked`: the app-info mark and the row's starting state.
@@ -248,19 +253,38 @@ async function appendAuditEntry(
   entry: AppAuditEntry,
 ): Promise<boolean> {
   const rec = existing ? asRecord(existing.value, args.filename) : emptyRecord(args.filename);
-  let entries = [...rec.entries, entry];
+  const entries = [...rec.entries, entry];
   // Nothing is deleted unless the owner (or the node default) set a limit; a long log rolls its
   // oldest entries into the archive for their year (services/app-audit-archive.ts).
   const { keep } = await effectiveKeep(storage, args.ownerGhii);
   if (keep > 0 && entries.length > keep) {
-    entries = entries.slice(entries.length - keep);
-  } else if (entries.length > ACTIVE_ROLL_AT) {
-    const old = entries.slice(0, entries.length - ACTIVE_KEEP);
-    await moveToArchive(storage, args.ownerGhii, args.filename, old);
-    entries = entries.slice(entries.length - ACTIVE_KEEP);
-    if (keep > 0) entries = (await applyKeep(storage, args.ownerGhii, args.filename, entries, keep)).active;
+    return writeActive(storage, args.ownerGhii, args.filename, entries.slice(entries.length - keep), existing);
   }
-  return writeActive(storage, args.ownerGhii, args.filename, entries, existing);
+  if (entries.length <= ACTIVE_ROLL_AT) return writeActive(storage, args.ownerGhii, args.filename, entries, existing);
+  const old = entries.slice(0, entries.length - ACTIVE_KEEP);
+  const active = entries.slice(entries.length - ACTIVE_KEEP);
+  // The compare-and-swap first, the archive after it, in one transaction: an attempt that loses the
+  // swap writes no archive entry, so its retry cannot archive the same entries a second time
+  // (secaudit 2026-10-31 inv-11). Here `keep` is 0 or at least entries.length, which is more than
+  // ACTIVE_KEEP, so applyKeep trims only the archive and `active` is what it would answer.
+  return moveInOneTransaction(storage, async () => {
+    if (!await writeActive(storage, args.ownerGhii, args.filename, active, existing)) return false;
+    await moveToArchive(storage, args.ownerGhii, args.filename, old);
+    if (keep > 0) await applyKeep(storage, args.ownerGhii, args.filename, active, keep);
+    return true;
+  });
+}
+
+/**
+ * Run one move between the active record and its archive as one transaction, with a savepoint so a
+ * caller that already holds a transaction gets the same all-or-nothing outcome. `fn` swaps the active
+ * record first and answers false, having written nothing, when another writer changed it since it was
+ * read; a failed archive write after a successful swap rolls the swap back. A storage without
+ * transactions (a unit-test double) runs `fn` as it is.
+ */
+async function moveInOneTransaction(storage: Storage, fn: () => Promise<boolean>): Promise<boolean> {
+  if (typeof storage.transaction !== 'function') return fn();
+  return storage.transaction(() => (typeof storage.savepoint === 'function' ? storage.savepoint(fn) : fn()));
 }
 
 /**
@@ -289,28 +313,43 @@ async function writeActive(
 
 /**
  * The owner's "archive entries before a date": move the active entries older than `before` into the
- * archive for their year. Written to the archive first, so a failure leaves them where they were.
+ * archive for their year. The active record is swapped first and the archive written in the same
+ * transaction, so a concurrent change refuses the move before anything is written, and a failed
+ * archive write leaves the entries where they were.
  */
 export async function archiveAppAuditBefore(storage: Storage, ownerGhii: string, filename: string, before: string): Promise<number> {
   const existing = await storage.getMemory(ownerGhii, appAuditKey(filename));
   const entries = existing ? asRecord(existing.value, filename).entries : [];
   const old = entries.filter(e => e.at < before);
   if (!old.length) return 0;
-  await moveToArchive(storage, ownerGhii, filename, old);
-  if (!await writeActive(storage, ownerGhii, filename, entries.filter(e => !(e.at < before)), existing)) {
-    throw new Error(AUDIT_CHANGED_MESSAGE);
-  }
+  const moved = await moveInOneTransaction(storage, async () => {
+    if (!await writeActive(storage, ownerGhii, filename, entries.filter(e => !(e.at < before)), existing)) return false;
+    await moveToArchive(storage, ownerGhii, filename, old);
+    return true;
+  });
+  if (!moved) throw new Error(AUDIT_CHANGED_MESSAGE);
   return old.length;
 }
 
-/** Apply a limit to one app's whole log now. Answers how many entries were deleted. */
+/**
+ * Apply a limit to one app's whole log now. Answers how many entries were deleted. The archives lose
+ * their oldest entries first, so the active record keeps its newest `keep`. The active record is
+ * swapped first (also when it keeps every entry, which orders this after any append that read it),
+ * and the archive is trimmed after it in the same transaction, so a refusal deletes nothing.
+ */
 export async function applyAppAuditKeep(storage: Storage, ownerGhii: string, filename: string, keep: number): Promise<number> {
   if (!keep) return 0;
   const existing = await storage.getMemory(ownerGhii, appAuditKey(filename));
   const entries = existing ? asRecord(existing.value, filename).entries : [];
-  const out = await applyKeep(storage, ownerGhii, filename, entries, keep);
-  if (out.active.length !== entries.length && !await writeActive(storage, ownerGhii, filename, out.active, existing)) {
-    throw new Error(AUDIT_CHANGED_MESSAGE);
-  }
-  return out.deleted;
+  const archived = (await listArchives(storage, ownerGhii, filename)).reduce((n, y) => n + y.entries, 0);
+  if (archived + entries.length <= keep) return 0;
+  const active = entries.slice(Math.max(0, entries.length - keep));
+  let deleted = 0;
+  const applied = await moveInOneTransaction(storage, async () => {
+    if (!await writeActive(storage, ownerGhii, filename, active, existing)) return false;
+    deleted = (entries.length - active.length) + (await applyKeep(storage, ownerGhii, filename, active, keep)).deleted;
+    return true;
+  });
+  if (!applied) throw new Error(AUDIT_CHANGED_MESSAGE);
+  return deleted;
 }

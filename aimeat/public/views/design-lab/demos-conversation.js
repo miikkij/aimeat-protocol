@@ -87,7 +87,7 @@ function Conversation({ list = false, empty = false, capped = false }) {
         <${ConversationAbout} label="This conversation" name="Make me a page">
           <${StatusBar} status=${STATUS} onReset=${noop} />
         <//>
-        <${ConversationFoot}><${AiNotice} compact=${true} /><${GooseCredit} /><//>
+        <${ConversationFoot}><${AiNotice} compact=${true} /><${GooseCredit} open=${true} /><//>
       <//>
       <${ConversationMain}>
         <${ConversationHead} backHref="/v1/home" backLabel="Back" title="Make me a page">
@@ -166,7 +166,7 @@ export const CONVERSATION_DEMOS = {
     { name: 'main: the copy in the conversation\'s column (shown on a phone only)', render: () => html`<${AiNotice} main compact=${true} />` },
   ] },
   'nudge': { variants: [{ name: 'default', render: () => html`<${MobileNudge} onDismiss=${noop} />` }] },
-  'credit': { variants: [{ name: 'default', render: () => html`<${GooseCredit} />` }] },
+  'credit': { variants: [{ name: 'default', render: () => html`<${GooseCredit} open=${true} />` }] },
   'composer': { variants: [
     { name: 'empty', render: () => html`<${Composer} value="" onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop} />` },
     { name: 'with text', render: (ex) => html`<${Composer} value=${ex.value} onInput=${noop} onSend=${noop} onStop=${noop} onAttach=${noop} onDropAttachment=${noop} />` },

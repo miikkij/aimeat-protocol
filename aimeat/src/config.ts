@@ -428,6 +428,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     membersSeeEachOther: process.env.AIMEAT_MEMBERS_SEE_EACH_OTHER === 'true',
     loginRateLimitMax: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_MAX ?? '15', 10),
     loginRateLimitWindowMs: parseInt(process.env.AIMEAT_LOGIN_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
+    agentTokenRateLimitMax: parseInt(process.env.AIMEAT_AGENT_TOKEN_RATE_LIMIT_MAX ?? '600', 10),
     registrationRateLimitMax: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '5', 10),
     registrationRateLimitWindowMs: parseInt(process.env.AIMEAT_REGISTRATION_RATE_LIMIT_WINDOW_MS ?? '60000', 10),
     adminAuthRateLimitMax: parseInt(process.env.AIMEAT_ADMIN_AUTH_RATE_LIMIT_MAX ?? '5', 10),

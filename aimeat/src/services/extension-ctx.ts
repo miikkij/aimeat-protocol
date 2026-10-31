@@ -28,6 +28,8 @@
  *   const ctx = buildExtensionCtx({ config, storage, extMemoryOwner, caller, extConfig, log, files });
  *   await executeExtensionAction(script, ctx, …);
  * @version-history
+ *   v1.20.4 — 2026-10-31 — ctx.fetch refuses an unknown responseType before resolveOutboundSecrets,
+ *     so the refused call does not bind a vault or shared secret to its host (secaudit 2026-10-31 inv-19).
  *   v1.20.3 — 2026-10-27 — ctx.memory.search runs one call at a time per run, queued, so a script that
  *     starts many at once holds one namespace copy in host memory, not one per call (secaudit2026oct26).
  *   v1.20.2 — 2026-10-25 — The in-flight fetch budget is the operator setting extensions.fetch_inflight_mb (secaudit2026oct22, lead 782).
@@ -644,6 +646,11 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
                         + `(network.hosts: ${declaredHosts.join(', ') || 'none'}${unset.length ? `; the owner has not set the host field ${unset.join(', ')}` : ''}).`);
                 }
             }
+            // Refused before the call goes out: an option ctx.fetch does not know was ignored until
+            // 2026-10-24, and the script then received a lossy text decode of a binary answer. Asked
+            // before resolveOutboundSecrets for the reason the https check above is: a refused call
+            // must not bind a secret to its host (secaudit 2026-10-31 inv-19).
+            const asBase64 = fetchResponseType(opts?.responseType) === 'base64';
             const outbound = await resolveOutboundSecrets(deps, opts?.headers, url);
             // The script's own deadline for this one call (`timeoutMs`), inside the run's. Without
             // it one address that never answers holds the call until the run's deadline, and the
@@ -654,9 +661,6 @@ export function buildExtensionCtx(deps: ExtensionCtxDeps): ExtensionCtx {
             // The caller's deadline when it has one — the sandbox road hands over the run's own
             // timeout and its teardown signal — and this file's ceiling when it does not.
             const outer = host?.signal ?? AbortSignal.timeout(FETCH_TIMEOUT_MS);
-            // Refused before the call goes out: an option ctx.fetch does not know was ignored until
-            // 2026-10-24, and the script then received a lossy text decode of a binary answer.
-            const asBase64 = fetchResponseType(opts?.responseType) === 'base64';
             let resp: Response;
             let text = '';
             let bytes: Buffer | null = null;

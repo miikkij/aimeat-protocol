@@ -39,6 +39,7 @@
  *   walletClient · parseDocumentWithSignature
  * @usage const s = await startWalletSignature(ctx, caller, id, { bytes });
  * @version-history
+ *   2026-10-31 -- receiveWalletResponse checks that the request is still open (checkWalletSignature) before any refusal keeps the returned PDF in the signer's files, and again before the signed PDF is stored; an answer for a cancelled or already signed request had its PDF kept as rejected-*.pdf and charged to the quota (secaudit 2026-10-31 inv-17).
  *   2026-10-25 -- The certificate's holder name is compared with the name the account's identity verification recorded, when there is one, not with the editable display name (walletNameBinding); an account without one seals on its display name with the caveat NAME_NOT_VERIFIED (secaudit2026oct22, lead 3924).
  *   2026-10-25 -- A wallet signature whose certificate's revocation status could not be established is sealed with the caveat REVOCATION_UNKNOWN, which the statement and the public lookup carry (walletCaveats; secaudit2026oct22, lead 3895).
  *   2026-10-25 — The seal rule is walletSealRefusal(); a certificate revoked now is refused (422 CERTIFICATE_REVOKED) whatever signing time the signature claims (secaudit2026oct22, eudi.ts:wallet-seal-accepts-indeterminate-revocation).
@@ -501,6 +502,21 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
   }
   const signed = fromBase64(docs[0]!);
 
+  // The request may have moved on while the person was in the wallet (cancelled, signed some other
+  // way, a newer wallet PDF). Checked before any refusal below keeps the returned PDF in the signer's
+  // files, so an answer for a request that is no longer open writes nothing and charges nothing to
+  // their quota (secaudit 2026-10-10 I14; secaudit 2026-10-31 inv-17). Checked again before the
+  // signed PDF is stored, because the validation between the two can take seconds.
+  const stillOpen = async (): Promise<void> => {
+    try {
+      await checkWalletSignature(ctx, s.requestId, s.signer, s.sha256);
+    } catch (err) {
+      await refuse(err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  };
+  await stillOpen();
+
   // The wallet appends its signature to the PDF it was given, so the given bytes come first,
   // unchanged. That is what proves the signed file is this request's document.
   if (signed.length <= original.length || !signed.subarray(0, original.length).equals(original)) {
@@ -530,15 +546,8 @@ export async function receiveWalletResponse(ctx: DocsignCtx, sessionId: string, 
     throw new DocsignError('NAME_MISMATCH', 422, 'The name in the wallet\'s certificate is not the name on your account, so nothing was sealed. Set your display name to the name on your identity document, then sign again.');
   }
 
-  // The request may have moved on while the person was in the wallet (cancelled, signed some other
-  // way, a newer wallet PDF). Checked before the PDF is stored, so such an answer writes nothing to
-  // the signer's files and charges nothing to their quota (secaudit 2026-10-10 I14).
-  try {
-    await checkWalletSignature(ctx, s.requestId, s.signer, s.sha256);
-  } catch (err) {
-    await refuse(err instanceof DocsignError ? err.code : 'DOCSIGN_ERROR', err instanceof Error ? err.message : String(err));
-    throw err;
-  }
+  // Again before the signed PDF is stored (see stillOpen above).
+  await stillOpen();
   const signedSha = documentHash(signed);
   const base = s.name.replace(/\.pdf$/i, '').replace(/[^\p{L}\p{N}._ -]+/gu, '_').slice(0, 120) || 'document';
   const key = `docsign/${s.requestId}/${base}-signed-${signedSha.slice(0, 8)}.pdf`;

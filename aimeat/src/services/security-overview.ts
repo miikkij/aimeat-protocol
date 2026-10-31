@@ -133,6 +133,8 @@ export interface SecurityOverview {
   apps: AppIsolationStatus;
   settings: {
     login_rate_limit: { max: number; window_ms: number };
+    /** Agent credentials minted per minute per IP (POST /v1/agents/v2/token). */
+    agent_token_rate_limit: { max: number; window_ms: number };
     registration_rate_limit: { max: number; window_ms: number };
     admin_auth_rate_limit: { max: number; window_ms: number };
     password_lockout: { attempts: number; minutes: number };
@@ -303,6 +305,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
     apps: await appIsolationStatus(config, storage),
     settings: {
       login_rate_limit: { max: config.loginRateLimitMax, window_ms: config.loginRateLimitWindowMs },
+      agent_token_rate_limit: { max: config.agentTokenRateLimitMax, window_ms: 60_000 },
       registration_rate_limit: { max: config.registrationRateLimitMax, window_ms: config.registrationRateLimitWindowMs },
       admin_auth_rate_limit: { max: config.adminAuthRateLimitMax, window_ms: config.adminAuthRateLimitWindowMs },
       password_lockout: { attempts: config.passwordLockoutAttempts, minutes: config.passwordLockoutMinutes },

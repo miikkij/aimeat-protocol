@@ -452,6 +452,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   membersSeeEachOther: boolean;
   loginRateLimitMax: number;
   loginRateLimitWindowMs: number;
+  /**
+   * Agent credentials minted per minute per IP (POST /v1/agents/v2/token). Every agent a connector
+   * serves mints on its start, from that computer's one address: on 2026-10-31 a restart of 74 agents
+   * met the 60 this was, two were refused and stayed off the tunnel. A mint is one signature check.
+   */
+  agentTokenRateLimitMax: number;
   registrationRateLimitMax: number;
   registrationRateLimitWindowMs: number;
   adminAuthRateLimitMax: number;

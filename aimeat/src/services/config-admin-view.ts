@@ -17,13 +17,16 @@
  * @usage const view = buildConfigView({ config, storage, provenance });
  *        const r = await changeNodeSettings({ config, storage, provenance }, req.auth!, changes);
  * @version-history
+ *   2026-10-31 — The classification switch check asks every change of classification.mode in the
+ *     batch, each from the mode the change before it leaves; it asked the first one only, and the
+ *     batch is applied in order (secaudit 2026-10-31 inv-14).
  *   v1.0.0 — 2026-10-25 — Moved from routes/admin-config.ts (GET's loop and PUT's checks), plus
  *     `appliesAt` on a row that takes effect at the next start and `set_path` on a secret the
  *     operator may set.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { CONFIG_FIELDS, readConfigField } from './config-schema.js';
+import { CONFIG_FIELDS, MUTABLE_CONFIG_MAP, readConfigField } from './config-schema.js';
 import { rangeKindOf } from './config-schema-validators.js';
 import { applyConfigChanges, type ConfigChange, type ConfigApplyResult } from './config-apply.js';
 import { isSealed, sealRefusal } from './config-sealing.js';
@@ -190,11 +193,15 @@ export async function changeNodeSettings(deps: ConfigViewDeps, caller: SwitchCal
 
     // The classification switch gives protection away when it goes off or from all to owner, and
     // an AI credential does not make that change (services/classification/switch.ts). Refused
-    // before any of the request is applied, as the sealed scan above.
-    const modeChange = (changes as Array<{ path?: unknown; value?: unknown }>).find(c => c?.path === CLASSIFICATION_MODE_PATH);
-    if (modeChange && typeof modeChange.value === 'string') {
-        const refusal = switchRefusal(caller, config.classificationMode, modeChange.value);
+    // before any of the request is applied, as the sealed scan above. Every change of the switch in
+    // the batch is asked, in the order applyConfigChanges writes them, each from the mode the one
+    // before it leaves (secaudit 2026-10-31 inv-14).
+    let modeAt: string = config.classificationMode;
+    for (const change of changes as Array<{ path?: unknown; value?: unknown }>) {
+        if (change?.path !== CLASSIFICATION_MODE_PATH || typeof change.value !== 'string') continue;
+        const refusal = switchRefusal(caller, modeAt, change.value);
         if (refusal) return { ok: false, status: refusal.status, code: refusal.code, message: `${refusal.message} Nothing in this request was applied.` };
+        if (MUTABLE_CONFIG_MAP[CLASSIFICATION_MODE_PATH]?.validate(change.value)) modeAt = change.value;
     }
     const modeBefore = config.classificationMode;
 

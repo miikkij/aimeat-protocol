@@ -22,6 +22,9 @@
  * @structure runModelWork() · settleModelJob() · checkModelWorks()
  * @usage runModelWork(deps, ownerGhii, goalId, workId);   // goals-advance.ts; settleModelJob from goals-sweep.ts's job listener
  * @version-history
+ *   v1.2.1 — 2026-10-31 — The take holds the model to the records the reach check read: a record named,
+ *     or a work opened, between the check and the take runs the check again (up to CHECK_ROUNDS) instead
+ *     of reaching the model unchecked (secaudit 2026-10-31 inv-21a).
  *   v1.2.0 — 2026-10-29 — A model work an agent without ai:use asked for waits for the owner's one
  *     press before it spends the AI allowance (goals-model-spend.ts; secaudit2026oct26 round 8c,
  *     goals:model-work-runs-as-owner-without-requesting-agent-authority).
@@ -47,6 +50,8 @@ import {
 export const GOALS_APP_ID = 'goals';
 const RESULTS_TAG = 'aimeat.goal.results';
 const ANSWER_MAX = 20_000;
+/** How many times the reach check and the take run again when the goal changed between them. */
+const CHECK_ROUNDS = 3;
 
 interface ResultsRecord {
   type: typeof RESULTS_TAG;
@@ -66,39 +71,54 @@ function modelWords(work: GoalWork): string {
 
 /** Take a model work and start its job. A second caller finds it taken and stops; nothing throws out. */
 export async function runModelWork(deps: GoalDeps, ownerGhii: string, goalId: string, workId: string): Promise<void> {
-  // Each record goes to the model with the reach of whoever named it in the goal. A private record an
-  // agent named and may not read waits for the owner's one press, before the work is taken and before
-  // any read (goals-model-reach.ts; secaudit2026oct26).
-  const before = await readGoal(deps, ownerGhii, goalId);
-  const open = before?.works.find(w => w.id === workId && w.status === 'open' && w.runner === 'model');
-  if (before && open) {
-    // The owner's AI allowance is spent under the permission of the agent that asked for the work,
-    // as POST /v1/ai/jobs asks it; without ai:use the work waits for the owner's one press
-    // (goals-model-spend.ts; secaudit2026oct26 round 8c).
-    const spender = await modelWorkSpendNeed(deps, ownerGhii, before, open);
-    if (spender) { await askOwnerForModelSpend(deps, ownerGhii, before, open, spender); return; }
-    const need = await modelWorkReadNeed(deps, ownerGhii, before, open, modelInputKeys(open, taskBody(before, open, true).memoryKeys));
-    if (need) { await askOwnerForModelRead(deps, ownerGhii, before, open, need); return; }
-  }
   const claimedAt = new Date().toISOString();
-  let taken: GoalRecord;
-  try {
-    taken = await updateGoal(deps, ownerGhii, goalId, cur => {
-      const work = cur.works.find(w => w.id === workId);
-      if (!work || work.status !== 'open' || work.runner !== 'model' || goalSettled(cur.status) || cur.status !== 'active') return UNCHANGED;
-      const counted = countTake(cur);
-      const deadlineAt = new Date(Date.now() + cur.limits.claimMinutes * 60_000).toISOString();
-      return {
-        ...counted,
-        works: counted.works.map(w => w.id === workId ? { ...w, status: 'claimed' as const, claimedBy: MODEL_TAKER, claimedAt, deadlineAt, jobId: undefined } : w),
-        log: [...counted.log, logEntry('node', 'claimed', `${modelWords(work)} started "${work.title}".`, { workId })],
-      };
-    });
-  } catch (err) {
-    // A limit refused the take: the work stays open, and the advance already told the owner.
-    logger.info('goal: a model work was not started', { goalId, workId, error: String(err) });
-    return;
+  let taken: GoalRecord | null = null;
+  for (let round = 0; round < CHECK_ROUNDS; round++) {
+    // Each record goes to the model with the reach of whoever named it in the goal. A private record an
+    // agent named and may not read waits for the owner's one press, before the work is taken and before
+    // any read (goals-model-reach.ts; secaudit2026oct26).
+    const before = await readGoal(deps, ownerGhii, goalId);
+    const open = before?.works.find(w => w.id === workId && w.status === 'open' && w.runner === 'model');
+    let checked: Set<string> | null = null;
+    if (before && open) {
+      // The owner's AI allowance is spent under the permission of the agent that asked for the work,
+      // as POST /v1/ai/jobs asks it; without ai:use the work waits for the owner's one press
+      // (goals-model-spend.ts; secaudit2026oct26 round 8c).
+      const spender = await modelWorkSpendNeed(deps, ownerGhii, before, open);
+      if (spender) { await askOwnerForModelSpend(deps, ownerGhii, before, open, spender); return; }
+      const keys = modelInputKeys(open, taskBody(before, open, true).memoryKeys);
+      const need = await modelWorkReadNeed(deps, ownerGhii, before, open, keys);
+      if (need) { await askOwnerForModelRead(deps, ownerGhii, before, open, need); return; }
+      checked = new Set(keys);
+    }
+    // The take holds the model to the records checked above: a record named after that read, or a work
+    // opened after it, sends the check round again rather than reaching the model unchecked (secaudit
+    // 2026-10-31 inv-21a).
+    let stale = false;
+    try {
+      const out = await updateGoal(deps, ownerGhii, goalId, cur => {
+        const work = cur.works.find(w => w.id === workId);
+        if (!work || work.status !== 'open' || work.runner !== 'model' || goalSettled(cur.status) || cur.status !== 'active') return UNCHANGED;
+        const allowed = checked;
+        if (!allowed || modelInputKeys(work, taskBody(cur, work, true).memoryKeys).some(k => !allowed.has(k))) { stale = true; return UNCHANGED; }
+        const counted = countTake(cur);
+        const deadlineAt = new Date(Date.now() + cur.limits.claimMinutes * 60_000).toISOString();
+        return {
+          ...counted,
+          works: counted.works.map(w => w.id === workId ? { ...w, status: 'claimed' as const, claimedBy: MODEL_TAKER, claimedAt, deadlineAt, jobId: undefined } : w),
+          log: [...counted.log, logEntry('node', 'claimed', `${modelWords(work)} started "${work.title}".`, { workId })],
+        };
+      });
+      if (!stale) taken = out;
+    } catch (err) {
+      // A limit refused the take: the work stays open, and the advance already told the owner.
+      logger.info('goal: a model work was not started', { goalId, workId, error: String(err) });
+      return;
+    }
+    if (!stale) break;
   }
+  // A goal that changed under every round stays open, and the next advance or the minute sweep runs it.
+  if (!taken) return;
   const work = taken.works.find(w => w.id === workId);
   if (!work || work.status !== 'claimed' || work.claimedBy !== MODEL_TAKER || work.claimedAt !== claimedAt) return;
 

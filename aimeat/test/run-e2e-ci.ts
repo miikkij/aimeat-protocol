@@ -1469,6 +1469,9 @@ const ALL_SUITES = [
     // The real daemon on a loopback address that is not the node's base URL (a hosted node's crew):
     // the basic-agents button and an approved proposal both enrol through it.
     'test/e2e-connect-enrol-loopback.ts',
+    // A key agent refused its credential at the connector's start (the per-IP mint limit) rejoins the
+    // tunnel by itself, and the limit is a node setting. About two and a half minutes: the rejoin waits a minute.
+    'test/e2e-connect-mint-limit.ts',
     // An agent the button made finishes its first task with the crew runtime's own node calls:
     // the tags call needs agent:write, and a run with any refused call ends as refused.
     'test/e2e-basic-agents-first-task.ts',

@@ -40,6 +40,7 @@ import { createTransport, type Transporter } from 'nodemailer';
 import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { getStats } from './stats.js';
+import { setNodeEmailFooter } from './email-templates.js';
 import {
   verificationEmailHtml,
   magicLinkEmailHtml,
@@ -125,6 +126,8 @@ function createDisabledService(): EmailService {
 // ── Factory ──────────────────────────────────────────────
 
 export function createEmailService(config: AimeatConfig): EmailService {
+  // The operator's own mail foot, read from the live config at each render (operator.email_footer).
+  setNodeEmailFooter(() => config.operator?.emailFooter ?? '');
   if (!config.emailEnabled) {
     logger.info('Email service disabled (no SMTP host configured)');
     return createDisabledService();

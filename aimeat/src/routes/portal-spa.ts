@@ -21,6 +21,8 @@
  *   const spaPath = resolvePublicFile('spa.html');
  *   if (spaPath) serveSpa(res, spaPath, config, '/v1/glossary');
  * @version-history
+ *   v1.13.0 — 2026-10-31 — A step of signing in (data/sign-in-steps.ts) is served with the static footer
+ *     hidden on every node: the store's sign-in window showed the developer links (v27 follow-up B).
  *   v1.12.0 — 2026-10-30 — The static footer follows site.dev_links (devLinksShown()): 'auto' keeps
  *     the customer's-node rule below, 'show' and 'hide' decide for the node.
  *   v1.11.0 — 2026-10-29 — On a customer's node (site.purchase_plan) the static agent-facing footer is
@@ -64,6 +66,7 @@ import { injectPageHead, injectSiteHead } from '../utils/page-head.js';
 import { injectPageBody } from '../utils/page-body.js';
 import { signedInOnly } from '../config-visibility.js';
 import { buildGlossaryBody } from './glossary.js';
+import { SIGN_IN_STEP_PATHS } from '../data/sign-in-steps.js';
 
 /**
  * The site-link block handed to the browser, with empty entries dropped so the injected
@@ -86,8 +89,13 @@ function publicSiteLinks(config: AimeatConfig): Record<string, unknown> {
   return out;
 }
 
-/** Whether the footer shows the developer links: site.dev_links, where 'auto' hides them on a customer's node. */
-function devLinksShown(config: AimeatConfig): boolean {
+/**
+ * Whether the footer shows the developer links: site.dev_links, where 'auto' hides them on a customer's
+ * node. A step of signing in never shows them, whatever the setting: the store's sign-in window showed
+ * them to a buyer who had come to sign in (Jouni, 2026-10-31, v27 follow-up B).
+ */
+function devLinksShown(config: AimeatConfig, routePath?: string): boolean {
+  if (routePath && SIGN_IN_STEP_PATHS.has(routePath)) return false;
   const mode = config.siteLinks.devLinks ?? 'auto';
   return mode === 'auto' ? !(config.siteLinks.purchasePlan ?? '').trim() : mode === 'show';
 }
@@ -186,8 +194,8 @@ export function serveSpa(
   // A node whose footer hides the developer links (site.dev_links; 'auto' hides them on a customer's
   // node, site.purchase_plan) keeps the agent-facing links in the markup for a reader without
   // JavaScript, and hidden from the person, who reads them as developer material at the foot of every
-  // page (UX review 2026-10-29, C, measured on crew26).
-  if (!devLinksShown(config)) html = html.replace('<footer class="agent-footer">', '<footer class="agent-footer" hidden>');
+  // page (UX review 2026-10-29, C, measured on crew26). A sign-in step hides them on every node.
+  if (!devLinksShown(config, routePath)) html = html.replace('<footer class="agent-footer">', '<footer class="agent-footer" hidden>');
 
   // Themes & Styles: which themes this node offers, their styles, the address of each theme's sheet
   // (stamped with its own hash, so an edit reaches the next page load without a restart) and who
