@@ -19,6 +19,8 @@
  * @structure NamedSection({ number, view, onDone }) (StoreBox) · AddStoreSection({ number, view, onDone })
  * @usage html`<${NamedSection} number="02" view=${view} onDone=${reload} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — A store box and the add form's result say whether a browser may send files
+ *     straight to the store, with the CORS rule to add while it may not (profile/storage/browser-access.js).
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import { h } from 'preact';
@@ -41,6 +43,7 @@ import { fileSize, setNodeStore, removeNodeStore, testNodeFileStore } from '/js/
 import { TestSteps, placeWords, STORE_NAME } from '../profile/storage/connect-form.js';
 import { EMPTY_STORE, withoutSecrets, lackingOf, storeBody, StoreFields } from '../profile/storage/store-fields.js';
 import { refusalWords, RefusalNote } from '../profile/storage/store-words.js';
+import { browserAccessRow, CorsHint, CorsRule } from '../profile/storage/browser-access.js';
 import { F } from './file-stores-tab.parts.js';
 
 const html = htm.bind(h);
@@ -118,10 +121,12 @@ function StoreBox({ s, onDone, confirm }) {
         s.prefix && { key: 'folder', k: F('place.folder'), v: s.prefix, mono: true },
         { key: 'files', k: F('named.files'), v: F('named.filesN', { n: num(s.files.count), size: fileSize(s.files.bytes) }) },
         { key: 'check', k: F('named.check'), v: checkWords(s.last_check), warn: !!(s.last_check && !s.last_check.ok) },
+        browserAccessRow(s.browser_access),
         { key: 'who', k: F('named.choose'), v: s.selectable ? F('named.chooseAll') : F('named.chooseOperators') },
         { key: 'added', k: F('named.added'), v: date(s.added_at), sub: s.added_by || undefined },
       ]} />
       ${s.reachable ? null : html`<${Note} kind="message" error>${F('named.unreachableWhy', { name: s.name })}<//>`}
+      <${Space} above="medium"><${CorsRule} access=${s.browser_access} kind=${s.kind} /><//>
       <${Note} kind="hint">${full ? F('named.removeFirst', { n: num(s.files.count) }) : F('named.removeHint')}<//>
       <${RefusalNote} refusal=${refusal} />
       ${test && test.steps ? html`
@@ -176,7 +181,7 @@ export function AddStoreSection({ number, view, onDone }) {
     setResult(null);
     try {
       const r = await setNodeStore(name, body);
-      setResult({ outcome: r.data.outcome, steps: r.data.test?.steps || [], name });
+      setResult({ outcome: r.data.outcome, steps: r.data.test?.steps || [], name, kind, access: r.data.store?.browser_access || null });
       // The keys leave the page once the server has them.
       setF({ ...EMPTY });
       setSelectable(false);
@@ -195,6 +200,7 @@ export function AddStoreSection({ number, view, onDone }) {
     <${Section} id="adm-fs-add" num=${number} title=${F('add.title')}>
       <${Stack} gap="medium">
         <${Note} kind="lead">${F('add.lead')}<//>
+        <${CorsHint} />
         <${Fields} cols=${2}>
           <${TextField} label=${F('add.name')} hint=${replacing ? F('add.nameReplaces', { name }) : F('add.nameHint')} value=${f.name}
             code size="medium" maxLength=${40} onInput=${(v) => set('name')(v.toLowerCase())}
@@ -220,7 +226,10 @@ export function AddStoreSection({ number, view, onDone }) {
         ${result && result.refusal ? html`<${RefusalNote} refusal=${result.refusal} />` : null}
         ${result && !result.refusal ? html`
           <${Note} kind="message">${result.outcome === 'added' ? F('add.added', { name: result.name }) : F('add.updated', { name: result.name })}<//>
-          <${TestSteps} steps=${result.steps} />` : null}
+          <${TestSteps} steps=${result.steps} />
+          ${result.access ? html`
+            <${Facts} rows=${[browserAccessRow(result.access)]} />
+            <${CorsRule} access=${result.access} kind=${result.kind} />` : null}` : null}
       <//>
     <//>`;
 }

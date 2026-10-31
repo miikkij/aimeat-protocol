@@ -21,6 +21,7 @@
  *   readNodeStores · updateNodeStores · nodeEntryNamed · sealNodeCredential · nodeStoreView · nodeEntrySpec
  * @usage const rec = await readNodeStores(ctx); const entry = nodeEntryNamed(rec, rec.default);
  * @version-history
+ *   v1.1.0 — 2026-10-31 — An entry keeps its last browser check, and the view answers it with the rule to add.
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -30,6 +31,7 @@ import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { logger } from '../../utils/logger.js';
 import { placeOf, specFromTarget, whereOf, type StoreTarget } from './store-target.js';
 import { FILE_STORE_PRINCIPAL, FILE_STORE_TAG, type FileStoreCtx } from './owner-file-store.js';
+import { browserAccessView, type BrowserAccess } from './browser-access.js';
 
 export const NODE_STORES_KEY = 'file-store.node-stores';
 /** The kinds the environment's store is named by, and the place a file in no store is in. */
@@ -47,6 +49,8 @@ export interface NodeStoreEntry {
   addedAt: string;
   addedBy: string;
   lastCheck?: { at: string; ok: boolean; message: string };
+  /** Whether a browser on this node may send to it directly: written with lastCheck. */
+  browserAccess?: BrowserAccess;
 }
 
 export interface NodeFileStores {
@@ -97,6 +101,7 @@ export function nodeStoreView(ctx: FileStoreCtx, rec: NodeFileStores, e: NodeSto
     name: e.name, store: nodeEntryStoreId(e.name), default: rec.default === e.name, selectable: e.selectable,
     kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target), prefix: e.prefix,
     added_at: e.addedAt, added_by: e.addedBy, last_check: e.lastCheck ?? null,
+    browser_access: browserAccessView(e.browserAccess, e.target.kind),
     // False when the node's key no longer opens the store's key: an operator enters it again.
     reachable: nodeEntrySpec(ctx.config, e) !== null,
     files,

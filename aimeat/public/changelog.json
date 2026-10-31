@@ -4,6 +4,51 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-connecting-a-file-store-tells-you-which-cors-rule-to-add",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator",
+        "agent"
+      ],
+      "title": {
+        "en": "Connecting a file store tells you which CORS rule to add",
+        "fi": "Tallennustilan yhdistäminen kertoo, minkä CORS-säännön lisäät"
+      },
+      "summary": {
+        "en": "The test of your S3 or Azure store says whether apps can send files straight to it, and which rule to add.",
+        "fi": "Tallennustilan testi kertoo, voivatko sovellukset lähettää tiedostot suoraan sinne ja minkä säännön lisäät."
+      },
+      "body": {
+        "en": "When you connect an S3 bucket or Azure container, the test also checks whether apps can send files straight to it. If the CORS rule is missing, the page shows the exact rule and where to add it, and Test again checks it once you have.",
+        "fi": "Kun yhdistät S3-bucketin tai Azure-säilön, testi tarkistaa myös, voivatko sovellukset lähettää tiedostot suoraan sinne. Jos sääntö puuttuu, sivu näyttää tarkan säännön ja paikan, johon lisäät sen. Testaa uudestaan -painike tarkistaa säännön, kun olet lisännyt sen."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-overview-map",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Overview map",
+        "fi": "Kokonaiskuva"
+      },
+      "summary": {
+        "en": "See your computers, agents, apps, knowledge and offerings on one page, with how much each is used.",
+        "fi": "Näet tietokoneesi, agenttisi, sovelluksesi, tietosi ja tarjoamasi yhdellä sivulla ja kuinka paljon kutakin käytetään."
+      },
+      "body": {
+        "en": "See your whole account on one page: which computers bring which agents, the apps and workspaces they use, what they offer and how much each is used. Open any card in place, and ask your own AI about anything in a help dialog with the facts included.",
+        "fi": "Näet koko tilisi yhdellä sivulla: mitkä tietokoneet tuovat mitkäkin agentit, mitä sovelluksia ja työtiloja ne käyttävät, mitä ne tarjoavat ja kuinka paljon kutakin käytetään. Avaat minkä tahansa kortin paikallaan. Ohjedialogista saat valmiin kysymyksen omalle tekoälyllesi, ja tiedot tulevat sen mukana."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-large-files-straight-to-your-file-store",
       "highlight": false,
       "audience": [

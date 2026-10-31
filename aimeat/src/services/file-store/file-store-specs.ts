@@ -12,9 +12,11 @@
  *   person connected may reach only the origins the operator listed in file_store.owner_private_origins:
  *   its address was typed by someone who is not the operator, and without the check it could point the
  *   node at its own metadata service or database port.
- * @structure NodeSpecResult · nodeStoreSpec · azureSpecFrom · storeFor · guardedFetch · ownerEndpointAllowed
+ * @structure NodeSpecResult · nodeStoreSpec · azureSpecFrom · storeFor · guardedFetch · ownerEndpointAllowed ·
+ *   endpointOrigin
  * @usage const r = nodeStoreSpec(config); if ('spec' in r) { const store = storeFor(r.spec, 'trusted'); }
  * @version-history
+ *   v1.0.1 — 2026-10-31 — endpointOrigin exported for the browser check (browser-access.ts).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { createHash } from 'node:crypto';
@@ -93,7 +95,7 @@ function bodyOf(data: Buffer | undefined): RequestInit['body'] {
 }
 
 /** The origin of a spec's own endpoint, which the operator named: allowed by safeFetch although it may be private. */
-function endpointOrigin(spec: BlobSpec): string[] {
+export function endpointOrigin(spec: BlobSpec): string[] {
   const e = spec.endpoint?.trim();
   return e && URL.canParse(e) ? [new URL(e).origin.toLowerCase()] : [];
 }
