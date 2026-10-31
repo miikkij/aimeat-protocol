@@ -31,10 +31,14 @@
  *   - resetTotpByOperator(storage, target, byOwner, byGaii): the act, its refusals, and the record
  * @usage const r = await resetTotpByOperator(storage, 'alice', req.auth!.owner, identity);
  * @version-history
+ *   v1.0.1 — 2026-10-31 — eraseTotp also clears the wrong-code count record and the lock it now
+ *     carries (password-check.ts clearTotpAttempts), so a factor armed again starts with no count
+ *     (secaudit2026oct31w2 round 10, W2-10).
  *   v1.0.0 — 2026-09-04 — Initial. Closes the lock-out the TOTP routes shipped with in July 2026.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { clearTotpAttempts } from './password-check.js';
 import { recordAccountEvent } from './account-events.js';
 import { logger } from '../utils/logger.js';
 
@@ -57,6 +61,7 @@ export async function eraseTotp(storage: Storage, ghii: string): Promise<void> {
     totpFailedAttempts: 0,
     totpLockedUntil: null,
   } as unknown as Parameters<typeof storage.updateGHII>[1]);
+  await clearTotpAttempts(storage, ghii);
 }
 
 export type TotpResetResult =
