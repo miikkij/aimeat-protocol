@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-31 — listKeyActivity: key, owner and updatedAt of the records under a key prefix changed
+ *     since a time, newest first, without the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory takes an optional visibility, stored in the same UPDATE that clears the
  *     tombstone (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory takes excludePrefixes, keys left out of the count (secaudit2026oct22).
@@ -349,4 +351,29 @@ export interface MemoryRepository {
   deleteExpiredMemory(nowIso: string): Promise<number>;
   /** Count active vs archived memory rows under a key prefix (for "N active, M archived" overview counts). */
   countArchivedByKeyPrefix(keyPrefix: string): Promise<{ active: number; archived: number }>;
+  /**
+   * KEY ACTIVITY — the records of ANY owner whose key starts with `prefix` (a literal, case-sensitive
+   * prefix) and whose updatedAt is at or after `sinceIso`, newest first, at most `limit` rows (clamped
+   * to 1..20000). Projects key, owner and updatedAt only: the value never leaves the database, so an
+   * overview can count thousands of workspace records cheaply. The same rows as the other bulk reads:
+   * no archived record, nothing in the bin, no expired TTL row, and no workspace `.version.N`
+   * history row. Owner-agnostic, so the caller fences the prefix to what the reader may see.
+   */
+  listKeyActivity(prefix: string, sinceIso: string, limit: number): Promise<KeyActivityRow[]>;
+}
+
+/** One row of listKeyActivity: no value, no metadata beyond what an activity count needs. */
+export interface KeyActivityRow {
+  key: string;
+  ownerGaii: string;
+  updatedAt: string;
+}
+
+/** The bounds listKeyActivity clamps its `limit` to, shared by both providers. */
+export const KEY_ACTIVITY_MAX_ROWS = 20_000;
+
+/** Clamp a listKeyActivity limit to 1..KEY_ACTIVITY_MAX_ROWS; a non-finite value takes the maximum. */
+export function clampKeyActivityLimit(limit: number): number {
+  if (!Number.isFinite(limit)) return KEY_ACTIVITY_MAX_ROWS;
+  return Math.min(KEY_ACTIVITY_MAX_ROWS, Math.max(1, Math.floor(limit)));
 }

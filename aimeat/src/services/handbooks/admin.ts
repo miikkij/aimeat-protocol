@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.29.0 -- 2026-10-31 -- A store test's browser_access and the CORS rule it gives.
  *   v1.28.0 -- 2026-10-30 -- Named node stores: aimeat_admin_file_store_set and _remove, the default, the
  *     stores everyone may choose, a move between node stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.27.0 -- 2026-10-29 -- The platform-fee incident's records are entries decided with "uncount" or
@@ -193,7 +194,8 @@ with \`aimeat_admin_file_store_set\`, whose keys the node keeps encrypted, so no
 "node:<name>"\` on an upload), and \`aimeat_admin_file_store_remove\` removes one once it is empty.
 \`aimeat_admin_file_store\` says where files go, what is missing and how many files each place holds;
 \`aimeat_admin_file_store_test\` writes, reads, lists and removes one test object (\`name\` for a named
-store); \`aimeat_admin_file_store_move\` moves files out of the database, or with \`from\` and \`to\`
+store) and says in \`browser_access\` whether a browser may send files straight to the store, with the
+CORS rule to add on the bucket or storage account when it may not; \`aimeat_admin_file_store_move\` moves files out of the database, or with \`from\` and \`to\`
 from one node store to another, in batches (call it again while \`remaining\` is above 0). People may connect storage of their
 own as \`file_store.owner_stores\` allows (self, operator, off; auto is operator on a signed-in-only
 node); on an operator node \`aimeat_admin_file_store_decide\` approves, declines or revokes, as the

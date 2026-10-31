@@ -13,10 +13,13 @@
  * @usage const s3 = await startFakeS3({ port, buckets: ['files'], accessKeyId, secretAccessKey });
  *   s3.objects('files');  s3.backdate('files', key, days);  await s3.close();
  * @version-history
+ *   v1.1.0 — 2026-10-31 — HEAD, and presigned addresses (SigV4 in the query, recomputed with
+ *     s3PresignedUrl, expiry checked) with response-content-type/-disposition on a GET, for the direct
+ *     upload and download suite (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { s3SignatureFor } from '../../src/storage/blob/s3-client.js';
+import { s3SignatureFor, s3PresignedUrl } from '../../src/storage/blob/s3-client.js';
 
 interface StoredObject { body: Buffer; type: string; modified: Date }
 
@@ -80,18 +83,45 @@ export async function startFakeS3(opts: { port: number; buckets: string[]; acces
     return expected.authorization === auth;
   }
 
+  /** A presigned address (SigV4 in the query): recompute it with s3PresignedUrl from the signed
+   *  parameters as they arrived, and refuse one that expired. */
+  function presignedValid(req: IncomingMessage, path: string, query: string): boolean {
+    const p = new URLSearchParams(query);
+    const amzDate = p.get('X-Amz-Date') ?? '';
+    const expires = Number(p.get('X-Amz-Expires') ?? 0);
+    if (!p.get('X-Amz-Credential')?.startsWith(`${opts.accessKeyId}/`)) return false;
+    const now = new Date(`${amzDate.slice(0, 4)}-${amzDate.slice(4, 6)}-${amzDate.slice(6, 8)}T${amzDate.slice(9, 11)}:${amzDate.slice(11, 13)}:${amzDate.slice(13, 15)}Z`);
+    if (Number.isNaN(now.getTime()) || Date.now() > now.getTime() + expires * 1000) return false;
+    const segments = path.split('/').filter(Boolean);
+    const bucket = decodeURIComponent(segments.shift() ?? '');
+    const key = segments.map(decodeURIComponent).join('/');
+    const extra: Record<string, string> = {};
+    for (const [k, v] of p) if (k.startsWith('response-')) extra[k] = v;
+    const method = req.method === 'PUT' ? 'PUT' : 'GET';
+    const expected = s3PresignedUrl({ kind: 's3', endpoint: `http://${req.headers.host}`, region, bucket, accessKeyId: opts.accessKeyId, secretAccessKey: opts.secretAccessKey },
+      { method, key, expiresInSec: expires, now, query: extra });
+    return new URL(expected).searchParams.get('X-Amz-Signature') === p.get('X-Amz-Signature');
+  }
+
   const server = createServer(async (req, res) => {
     const raw = req.url ?? '/';
     const qAt = raw.indexOf('?');
     const path = qAt >= 0 ? raw.slice(0, qAt) : raw;
     const query = qAt >= 0 ? raw.slice(qAt + 1) : '';
     const body = await readBody(req);
-    if (!req.headers.authorization?.includes(`Credential=${opts.accessKeyId}/`)) {
+    const presigned = new URLSearchParams(query).get('X-Amz-Signature');
+    if (presigned) {
+      if (!presignedValid(req, path, query)) {
+        refused++;
+        fail(res, 403, 'SignatureDoesNotMatch', 'The request signature we calculated does not match the signature you provided.');
+        return;
+      }
+    } else if (!req.headers.authorization?.includes(`Credential=${opts.accessKeyId}/`)) {
       refused++;
       fail(res, 403, 'InvalidAccessKeyId', 'The AWS access key Id you provided does not exist in our records.');
       return;
     }
-    if (!signed(req, path, query)) {
+    if (!presigned && !signed(req, path, query)) {
       refused++;
       fail(res, 403, 'SignatureDoesNotMatch', 'The request signature we calculated does not match the signature you provided.');
       return;
@@ -129,8 +159,21 @@ export async function startFakeS3(opts: { port: number; buckets: string[]; acces
       res.end();
       return;
     }
+    if (req.method === 'HEAD') {
+      if (!obj) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'content-type': obj.type, 'content-length': String(obj.body.length) });
+      res.end();
+      return;
+    }
     if (req.method !== 'GET') { fail(res, 405, 'MethodNotAllowed', 'Not supported here'); return; }
     if (!obj) { fail(res, 404, 'NoSuchKey', 'The specified key does not exist.'); return; }
+    const answered = new URLSearchParams(query);
+    const typeAsked = answered.get('response-content-type');
+    const dispositionAsked = answered.get('response-content-disposition');
+    if (typeAsked || dispositionAsked) {
+      if (typeAsked) res.setHeader('content-type', typeAsked);
+      if (dispositionAsked) res.setHeader('content-disposition', dispositionAsked);
+    }
     const range = /^bytes=(\d+)-(\d+)$/.exec(String(req.headers.range ?? ''));
     if (range) {
       const from = Number(range[1]);

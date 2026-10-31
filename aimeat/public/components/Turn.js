@@ -9,6 +9,7 @@
  *   TurnError({ message, onRetry, fixHref, choices, onFreeModel })
  * @usage html`<${Turn} key=${i} id=${`${thread.id}-${i}`} turn=${turn} />`
  * @version-history
+ *   v1.4.1 — 2026-10-31 — A saved turn's work log is drawn as ended (WorkLog `ended`).
  *   v1.4.0 — 2026-10-29 — TurnError takes `choices`: when the AI allowance is spent, the ways on
  *     (buy more, your own key, the free model) in place of Try again (UX review A1).
  *   v1.3.0 — 2026-10-29 — TurnError takes `fixHref`: a refusal the node can name a fix for links to
@@ -89,7 +90,7 @@ export function Turn({ turn, id }) {
                     ? html`<p class="poster-turn-said">${turn.text}</p>`
                     : html`<${Markdown} text=${stripChoices(turn.text)} />`}
                 <${ResultCards} cards=${turn.cards} />
-                <${WorkLog} tools=${turn.tools} />
+                <${WorkLog} tools=${turn.tools} ended=${true} />
             </div>
             <div class="poster-time poster-turn-meta">
                 <span>${timeShort(turn.at)}</span>

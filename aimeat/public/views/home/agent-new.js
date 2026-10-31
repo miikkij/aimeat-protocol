@@ -23,6 +23,10 @@
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>, and from a
  *   goal's proposal tag=<skill>&goal=<id>)
  * @version-history
+ *   v1.12.0 — 2026-10-31 — A proposal that names its clock (`schedule`) opens on "On a clock" at that
+ *     time, so the one press creates the agent and its schedule (v31 K47).
+ *   v1.11.0 — 2026-10-31 — Signed out, "Sign in" opens the dialog on this page, so the person returns
+ *     to the proposal the chat sent them to; it went to the front page (v31 K51).
  *   v1.10.0 — 2026-10-25 — From a goal's proposal (goal-new.js): `tag` is given to the new agent so it
  *     takes the goal's open work for that skill, and `goal` returns the person to the goal afterwards.
  *   v1.9.0 — 2026-10-14 — "Not sure what to ask? Start from an example": three examples from the
@@ -95,6 +99,7 @@ const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
+import { showLoginModal } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
 import { PageFrame } from '/components/PageFrame.js';
@@ -132,7 +137,7 @@ const n = (key, fallback) => tr('home.agentNew.' + key, fallback);
 const NAME_SHAPE = /^[a-z][a-z0-9-]{1,38}[a-z0-9]$/;
 const HOME = '/v1/home';
 
-/** When a stored proposal's agent would work, read from what it carries. A schedule is not part of one. */
+/** When a stored proposal's agent would work, read from what it carries. A clock (`schedule`) is read where the proposal loads. */
 function whenOfProposal(p) {
   if (p?.run_mode === 'resident') return 'always';
   if (recordSpacesOf(p?.crew_def).length > 0) return 'records';
@@ -230,6 +235,14 @@ export default function AgentNewView({ navigate }) {
       setProposal(p);
       setDraft(draftOfProposal(p));
       setWhen(whenOfProposal(p));
+      // A proposal that names its clock opens on it, so one press starts the agent on that clock
+      // (v31 K47: the chat asked the buyer to come back and say "continue" for the schedule).
+      const at = p.schedule ? timeOfCron(p.schedule) : null;
+      if (at) {
+        setWhen('clock');
+        setClock(at);
+        setDays(/\s1-5$/.test(p.schedule) ? 'weekdays' : 'daily');
+      }
       if (p.install_id) setMachine(p.install_id);
       setPhase('form');
     }).catch((err) => { setProblem(err?.message || String(err)); setPhase('gone'); });
@@ -408,7 +421,9 @@ export default function AgentNewView({ navigate }) {
     return html`
       <${PageFrame} width="narrow">
         <${PageIntro} title=${n('title', 'This is how it would work')} sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
-        <${FormActions}><${Loud} onClick=${() => navigate('/v1/portal')}>${tr('home.signIn', 'Sign in')}<//><//>
+        ${/* The dialog opens on this page, so the person comes back to the proposal they were sent to
+              (v31 K51); the front page lost it. Without the auth library, the front page still. */''}
+        <${FormActions}><${Loud} onClick=${() => { if (!showLoginModal({})) navigate('/v1/portal'); }}>${tr('home.signIn', 'Sign in')}<//><//>
       <//>`;
   }
 
@@ -520,8 +535,8 @@ export default function AgentNewView({ navigate }) {
             : n('whenRecordsOff', 'The agent program on this computer does not do this yet, or no agent on this computer is connected to say that it does.'),
     },
   ];
-  // A proposal's schedule is not part of the proposal, so its time cannot be read; every other
-  // choice a stored proposal carries is shown as it was proposed.
+  // Every choice a stored proposal carries, its clock included since 2026-10-31, is shown as it was
+  // proposed; the person's sentence is shown only for a draft written from one.
   const fromSentence = !proposal && !draft.template;
 
   return html`

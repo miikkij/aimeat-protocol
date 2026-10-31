@@ -19,6 +19,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   2026-10-31 — A proposal's approval_url is its own page on the home, /v1/home?new-agent=1&proposal=<id> (v31 K51).
  *   2026-10-19 — The public card's field list allows `avatar` and `avatar_problem`: the agent's picture is public by design.
  *   2026-10-15 — The approval's llm_choice carries the policy warning for a pinned model the owner's
  *     policy leaves out (feature-list audit #82).
@@ -1029,7 +1030,10 @@ async function run() {
         assert(r.body.data.created === false, 'a proposal must create nothing');
         // The agent relays this to a person, who needs a page to open, not "your profile somewhere".
         const approvalUrl = String(r.body.data.approval_url ?? '');
-        assert(/^https?:\/\/.+\/v1\/profile\?tab=agents$/.test(approvalUrl), `approval_url should be the Agents page, got ${approvalUrl}`);
+        // v31 K51: the proposal's own page, where it is shown whole with the press that starts it.
+        // The Agents page listed it in its third section, and a buyer found nothing to press.
+        assert(approvalUrl.endsWith(`/v1/home?new-agent=1&proposal=${encodeURIComponent(r.body.data.proposal.id)}`) && /^https?:\/\//.test(approvalUrl),
+            `approval_url should be the proposal's own page, got ${approvalUrl}`);
         assert(String(r.body.data.next_step).includes(approvalUrl), `next_step should name the address, got ${r.body.data.next_step}`);
         assert(r.body.data.already_waiting === false, 'a first proposal is not already waiting');
         proposalId = r.body.data.proposal.id;
@@ -1038,6 +1042,22 @@ async function run() {
         const list = await json('/v1/agents?owner=' + a.owner, { headers: authA });
         assert(!(list.body.data.agents as any[]).some(x => x.name === 'proposed-reader'),
             'the proposed agent must not exist before the owner approves');
+    });
+
+    await test('a proposal keeps the clock it names, and a malformed clock is refused (v31 K47)', async () => {
+        // The source was broken: a proposal could not carry a schedule, so the chat asked the person
+        // to come back and say "continue" for it after approving.
+        const post = (schedule: unknown, name: string) => json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name, purpose: 'Gathers the morning news into five points.', scopes: ['memory:read'], crew_def: PROPOSED_DEF, schedule }),
+        });
+        const ok = await post('0 7 * * *', 'morning-news');
+        assert(ok.status === 201 && ok.body.data.proposal.schedule === '0 7 * * *', `the clock is kept: ${ok.status} ${JSON.stringify(ok.body.data?.proposal?.schedule ?? ok.body.error)}`);
+        for (const bad of ['every morning', '0 7 * *', 7]) {
+            const r = await post(bad, 'bad-clock');
+            assert(r.status === 400 && r.body.error.code === 'INVALID_INPUT', `${JSON.stringify(bad)} is refused: ${r.status}`);
+        }
+        await json(`/v1/agents/v2/agent-proposals/${ok.body.data.proposal.id}/decline`, { method: 'POST', headers: authA });
     });
 
     await test('the owner sees it waiting', async () => {

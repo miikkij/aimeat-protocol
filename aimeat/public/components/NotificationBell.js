@@ -13,6 +13,11 @@
  *   - NotificationBell({ t, onNavigate }) — t = i18n fn, onNavigate(path) = SPA navigate.
  * @usage import { NotificationBell } from '/components/NotificationBell.js';  html`<${NotificationBell} t=${t} onNavigate=${navigate} />`
  * @version-history
+ *   v1.12.0 — 2026-10-31 — A link on another origin (an extension's notice that leads into its app,
+ *     `https://<app>.apps.<apex>/…`) is opened as that address. It was cut to its path, so the SPA
+ *     routed `/?…` and the click landed on the home page (Jouni, 2026-10-31).
+ *   v1.11.0 — 2026-10-31 — The bell's name shows in the shared Tooltip instead of the browser's title
+ *     text, and stays hidden while the list is open (Jouni, 2026-10-31).
  *   v1.10.0 — 2026-10-27 — A notice whose kind has an explanation shows a question mark under it that
  *     opens the explanation (helpTermOf; Jouni, 2026-10-27).
  *   v1.9.0 — 2026-10-25 — A decided notice shows who decided what and when, and where to change it,
@@ -48,6 +53,7 @@ import { swallowed } from '/js/swallowed.js';
 import { getJwt } from '/js/services/auth.js';
 import { titleOf, bodyOf, sourceName, isRunnableActionEndpoint, actionTextOf, markAnswered, alreadyDecided, answerTextOf, answerChangeOf, helpTermOf } from '/js/services/notifications.js';
 import { HelpTip } from '/components/HelpTip.js';
+import { Tooltip } from '/components/Tooltip.js';
 import { ago } from '/js/format.js';
 const html = htm.bind(h);
 
@@ -101,7 +107,14 @@ export function openNotificationLink(link, onNavigate) {
   if (!link) return;
   let url;
   try { url = new URL(link, window.location.origin); } catch { return; }
-  if (url.origin === window.location.origin && url.pathname === '/v1/profile') {
+  // Another origin is a page of its own, never an SPA route: an extension's notice leads into its
+  // app on the app's origin (services/extension-notify.ts safeNotificationLink, which is also what
+  // limits such a link to this node's own app origins). Only http(s), so no other scheme runs.
+  if (url.origin !== window.location.origin) {
+    if (url.protocol === 'https:' || url.protocol === 'http:') window.location.assign(url.href);
+    return;
+  }
+  if (url.pathname === '/v1/profile') {
     const hashMatch = /^#([a-z]+)(?:\/(.+))?$/i.exec(url.hash || '');
     const rawTab = url.searchParams.get('tab') || (hashMatch ? hashMatch[1] : '');
     if (rawTab) {
@@ -287,9 +300,11 @@ export function NotificationBell({ t, onNavigate }) {
 
   return html`
     <div class="notif-bell" ref=${ref}>
-      <button class="notif-bell-btn" aria-label=${tr('notif.title', 'Notifications')} title=${tr('notif.title', 'Notifications')} onClick=${toggle}>
-        ${'🔔'}${unread > 0 ? html`<span class="poster-count poster-count--waiting poster-count--small notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
-      </button>
+      <${Tooltip} text=${tr('notif.title', 'Notifications')} quiet=${open}>
+        <button class="notif-bell-btn" aria-label=${tr('notif.title', 'Notifications')} onClick=${toggle}>
+          ${'🔔'}${unread > 0 ? html`<span class="poster-count poster-count--waiting poster-count--small notif-badge">${unread > 99 ? '99+' : unread}</span>` : null}
+        </button>
+      <//>
       ${open ? html`
         <div class="notif-dropdown">
           <div class="notif-dropdown-head">

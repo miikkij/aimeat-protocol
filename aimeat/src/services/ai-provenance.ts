@@ -44,6 +44,9 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.4.2 — 2026-10-31 — provenanceForWrite and stampAgentWrite take no content for a file a client put
+ *     straight in an object store; the record then names no hash
+ *     (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.4.1 — 2026-10-28 — An agent admitted to declare is noted as having used provenance:write
  *     (services/scope-use.ts): the record had not seen this inline check, and a narrowing built on it
  *     took the word from an agent that used it.
@@ -109,7 +112,7 @@ export interface MediaStatement {
  * The medium a write path states when its caller said nothing: text for a string, unstated for
  * bytes. A path that stores structured values passes mediaKindOfValue() instead.
  */
-function mediaOf(content: string | Uint8Array, ...said: (MediaStatement | undefined)[]): MediaStatement {
+function mediaOf(content: string | Uint8Array | undefined, ...said: (MediaStatement | undefined)[]): MediaStatement {
   const pick = <K extends keyof MediaStatement>(k: K): MediaStatement[K] => said.find((s) => s?.[k] !== undefined)?.[k];
   const mediaKind = pick('mediaKind') ?? (typeof content === 'string' ? 'text' : undefined);
   const mediaType = pick('mediaType');
@@ -318,8 +321,10 @@ export async function stampAgentWrite(
   input: {
     /** The resolved identity of the writer — GHII, GAII or GEAI. Never `req.auth!.sub`. */
     principal: string;
-    /** The exact bytes written, hashed here so a detection query can find them later. */
-    content: string | Uint8Array;
+    /** The exact bytes written, hashed here so a detection query can find them later. Absent only for a
+     *  file a client put straight in an object store: the node never held its bytes, and the record
+     *  then names no hash. */
+    content?: string | Uint8Array;
     /** What kind of thing the bytes are. Absent: text for a string, unstated for bytes. */
     mediaKind?: AiMediaKind;
     mediaType?: string;
@@ -500,8 +505,9 @@ export async function provenanceForWrite(
     principal: string;
     /** The session's own words, when the caller has them: a declaration needs the word there too. */
     scopes?: readonly string[];
-    /** The exact bytes written, hashed so a detection query can find them later. */
-    content: string | Uint8Array;
+    /** The exact bytes written, hashed so a detection query can find them later. Absent only for a
+     *  file a client put straight in an object store (see stampAgentWrite). */
+    content?: string | Uint8Array;
     /** What kind of thing the bytes are, as the write path knows it. A declaration's own wins. */
     mediaKind?: AiMediaKind;
     mediaType?: string;

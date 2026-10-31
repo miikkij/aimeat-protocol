@@ -157,6 +157,7 @@
   <link rel="stylesheet" href="/css/components/hint.css">
   <link rel="stylesheet" href="/css/components/tooltip.css">
   <link rel="stylesheet" href="/css/components/explain-dialog.css">
+  <link rel="stylesheet" href="/css/components/overview-map.css">
   <link rel="stylesheet" href="/css/components/help-tip.css">
   <link rel="stylesheet" href="/css/components/page-start.css">
   <link rel="stylesheet" href="/css/components/masthead.css">
@@ -552,6 +553,7 @@
       "/js/closed-node-fetch.js": "/js/closed-node-fetch.js",
       "/js/session-src.js": "/js/session-src.js",
       "/js/margin-pattern.js": "/js/margin-pattern.js",
+      "/js/help-hover.js": "/js/help-hover.js",
       "/js/theme-choice.js": "/js/theme-choice.js",
       "/js/dialog.js": "/js/dialog.js",
       "/js/theme.js": "/js/theme.js",
@@ -559,6 +561,7 @@
       "/js/app-sandbox.js": "/js/app-sandbox.js",
       "/js/display-prefs.js": "/js/display-prefs.js",
       "/js/format.js": "/js/format.js",
+      "/js/ask-ai-prompt.js": "/js/ask-ai-prompt.js",
       "/js/amount.js": "/js/amount.js",
       "/js/api.js": "/js/api.js",
       "/js/input-limits.js": "/js/input-limits.js",
@@ -796,6 +799,9 @@
       "/views/home/agent-watch-parts.js": "/views/home/agent-watch-parts.js",
       "/js/services/agent-ties.js": "/js/services/agent-ties.js",
       "/views/home/machines.js": "/views/home/machines.js",
+      "/views/home/overview.js": "/views/home/overview.js",
+      "/views/home/overview-model.js": "/views/home/overview-model.js",
+      "/views/home/overview-band.js": "/views/home/overview-band.js",
       "/views/home/news-data.js": "/views/home/news-data.js",
       "/js/services/news.js": "/js/services/news.js",
       "/views/home/news-band.js": "/views/home/news-band.js",
@@ -833,6 +839,7 @@
       "/components/PageStart.js": "/components/PageStart.js",
       "/components/Tooltip.js": "/components/Tooltip.js",
       "/components/ExplainDialog.js": "/components/ExplainDialog.js",
+      "/components/OverviewMap.js": "/components/OverviewMap.js",
       "/components/InkFoot.js": "/components/InkFoot.js",
       "/components/LineList.js": "/components/LineList.js",
       "/components/LinkLine.js": "/components/LinkLine.js",
@@ -1083,12 +1090,14 @@
     import { siteLink, signInFirst, signedInOnly, customerNode, devLinksShown } from '/js/site.js';
     import { getSession } from '/js/services/auth.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
+    import { applyHelpHover, helpHoverOf } from '/js/help-hover.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { Mark } from '/components/Mark.js';
     import { useNews } from '/views/home/news-data.js';
     import { isRunnableActionEndpoint } from '/js/services/notifications.js';
     import { OpenItemsButton } from '/components/OpenItemsButton.js';
+    import { Tooltip } from '/components/Tooltip.js';
     import { NodeUpdateNotice } from '/components/NodeUpdateNotice.js';
     import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
@@ -1239,6 +1248,11 @@
       // The home's agent pages: a new agent before it exists (/v1/home?new-agent=1), one agent at
       // work (/v1/home?agent=<name>), and the computers agents run on (/v1/home?computers=1; the
       // address it had first, ?machines=1, still opens it).
+      // The account's overview (/v1/home?overview=1[&focus=<item id>]), checked first: a focus
+      // value names an agent or an app and must not open that page instead.
+      if (pathname === '/v1/home' && /[?&]overview=/.test(search)) {
+        return () => import('/views/home/overview.js' + B);
+      }
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
         return () => import('/views/home/agent-new.js' + B);
       }
@@ -1751,8 +1765,24 @@
           </div>
 
           <div class="topnav-right">
-            <button class="topnav-burger" aria-label="Menu" aria-expanded=${menuOpen ? 'true' : 'false'}
-              onClick=${() => setMenuOpen(o => !o)}>☰</button>
+            ${/* The home in one press while the links are folded into the menu (Jouni, 2026-10-31).
+                  top-bar.css draws it only where it draws the burger; on the full row Home is a link. */''}
+            ${session && html`<${Tooltip} text=${t('nav.home') || 'Home'}>
+              <a href="/v1/home" class="topnav-home ${currentPath === '/v1/home' && !onAgentPage ? 'active' : ''}"
+                aria-label=${t('nav.home') || 'Home'}
+                onClick=${(e) => { handleNav(e, '/v1/home'); setMenuOpen(false); }}>
+                <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+                  <path d="M2.5 11.5 12 4l9.5 7.5" />
+                  <path d="M16 7.2V3.5h2.5v5.6" />
+                  <path d="M5 9.6V20h14V9.6" />
+                  <path d="M10 20v-5.5h4V20" />
+                </svg>
+              </a>
+            <//>`}
+            <${Tooltip} text=${t('nav.menu') || 'Menu'} quiet=${menuOpen}>
+              <button class="topnav-burger" aria-label=${t('nav.menu') || 'Menu'} aria-expanded=${menuOpen ? 'true' : 'false'}
+                onClick=${() => setMenuOpen(o => !o)}>☰</button>
+            <//>
             <div class="topnav-menu ${menuOpen ? 'open' : ''}">
               <!-- Public links are operator-configurable (visibility + order) via the admin
                    Portal tab. Classic stays reachable deeper (landing card B "Start
@@ -1825,7 +1855,7 @@
     // person uses every day, and the header is the scarcer surface.
     //
     // Two rows, two readers. The first is for people. The second is the same five links the
-    // static <footer class="agent-footer"> in this document carries for anything that does not
+    // static agent-facing footer element in this document carries for anything that does not
     // run JavaScript — that block sits OUTSIDE #app, and since #app is 100dvh and the body
     // never scrolls, a human has never been able to reach it. The static one stays where it is
     // (a crawler needs it in the markup); this is the copy a person can click.
@@ -1968,9 +1998,11 @@
       }
 
       // The margin pattern is the person's own choice: read once the session is known, again
-      // whenever the sign-in changes (a sign-out takes it away).
-      loadMarginPattern();
-      window.addEventListener('aimeat-auth-change', () => { loadMarginPattern(); });
+      // whenever the sign-in changes (a sign-out takes it away). The help on a word comes from the
+      // same record and the same request.
+      const loadHomePrefs = () => loadMarginPattern().then((prefs) => applyHelpHover(helpHoverOf(prefs)));
+      loadHomePrefs();
+      window.addEventListener('aimeat-auth-change', () => { loadHomePrefs(); });
 
       // The reader's own date format and clock, read the same way and for the same reason: AFTER
       // the session is restored, because the request carries a bearer from localStorage and the

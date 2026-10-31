@@ -45,6 +45,7 @@
  *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 28991 (secaudit2026oct22).
  *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 28458 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
+ *   2026-10-31 -- e2e-file-store-direct.ts joins the list (not the guard tier): a large file straight to the S3 store and back.
  *   2026-10-30 -- e2e-file-store-named.ts joins the list (not the guard tier): several file stores, one default each, and the writer's choice.
  *   2026-10-29 -- e2e-file-store.ts joins the list (not the guard tier): stored files in an S3 store, the node's and a person's own.
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
@@ -582,6 +583,9 @@ const ALL_SUITES = [
     // Self-spawns its own node (block 30600) with several stores in an S3 service inside the test
     // process (block 30900): named node stores, a person's several own, and the writer's choice.
     'test/e2e-file-store-named.ts',
+    // Self-spawns its own node (block 30500) and an S3 service (block 30900), as e2e-file-store does:
+    // a large file straight to the store and back through presigned addresses.
+    'test/e2e-file-store-direct.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.
@@ -750,6 +754,10 @@ const ALL_SUITES = [
     // What an agent's work is tied to: the apps whose data map names it, the workspace its finished
     // work is shared with, the first run a new agent gets, and the build instructions about one agent.
     'test/e2e-agent-ties.ts',
+    // The account's overview (GET /v1/overview, aimeat_overview): every lane, an agent's writes into
+    // a workspace and its line, focus and limit, and the refusals (another owner, no agent:read, no
+    // organism:read for workspace names).
+    'test/e2e-overview.ts',
     // Agent v2 V2: the two primitives (discover + invoke) and, as much of the suite as the feature
     // itself, the proof that the old door is unchanged — the same call refused by scope directly is
     // refused through invoke, and nothing reachable before stopped being reachable.

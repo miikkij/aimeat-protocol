@@ -630,7 +630,8 @@ export const capabilitiesGroupsSkillsTools = [
         annotations: { title: 'Read App Template Proposal', readOnlyHint: true },
         // The words GET /v1/appdev/templates/:id asks (secaudit 2026-10 follow-up, A4).
         scope: 'memory:read',
-        surfaces: ['appdev', 'agent'],
+        // On `chat`: the genre an app starts from, so "build me an app" finishes in the first message (v31 K35).
+        surfaces: ['appdev', 'agent', 'chat'],
         input: {
             id: { type: 'string', required: true, description: 'Template id: a proposal, or one the node ships.', zod: z.string().min(1).max(64) },
             part: { type: 'number', description: 'Only for a template the node ships whose file is too large for one answer: which part to return (1-based). The first answer says how many parts there are.', zod: z.number().int().min(1) },

@@ -22,6 +22,8 @@
  * @usage
  *   import { deny401, deny403 } from './deny.js';
  * @version-history
+ *   v1.7.0 — 2026-10-31 — deny401 sends a browser's own top-level navigation to the sign-in page
+ *     (/v1/profile) instead of the JSON 401; every other caller keeps the 401 (v31 K52).
  *   v1.6.0 — 2026-10-17 — denyScope403 hands an agent `details.allow_url` and a next action: the
  *     address where its person allows the permission (services/permission-ask.ts)
  *     (wish-puuttuva-lupa-ai-neuvoo-ihmist-yhdell-salli-painikkeella-eik).
@@ -101,6 +103,15 @@ export function deny401(req: Request, res: Response, message: string): void {
   const config = sessionConfig();
   if (config && !res.headersSent) {
     res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, config)}"`);
+  }
+  // A person who opens an API address in the browser bar gets the sign-in page, not raw JSON (v31
+  // K52: /v1/agents opened in a browser showed AUTH_REQUIRED). Only a browser's own top-level
+  // navigation says Sec-Fetch-Mode navigate with Sec-Fetch-Dest document; an API client, a fetch()
+  // and an MCP client keep the 401. The refusal above is counted and logged either way, and the
+  // address is a fixed page of this node.
+  if (req.method === 'GET' && !res.headersSent && req.headers?.['sec-fetch-mode'] === 'navigate' && req.headers?.['sec-fetch-dest'] === 'document') {
+    res.redirect(302, '/v1/profile');
+    return;
   }
   res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
 }

@@ -285,6 +285,34 @@
       return null;
     }
   }
+  function readLang(locales) {
+    const list = Array.isArray(locales) ? locales : null;
+    const pick2 = list ? function(v) {
+      return v && list.indexOf(v) >= 0 ? v : null;
+    } : function(v) {
+      return v ? String(v).slice(0, 2) : null;
+    };
+    try {
+      const u = pick2(new URLSearchParams(location.search).get("lang"));
+      if (u) return u;
+      const s = pick2(localStorage.getItem(LANG_KEY));
+      if (s) return s;
+      const c = document.cookie.match(/(?:^|;\s*)aimeat-lang=([a-z]{2})(?:;|$)/);
+      const cv = c ? pick2(c[1]) : null;
+      if (cv) return cv;
+    } catch {
+    }
+    const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
+    const node = pick2(cfg2 && cfg2.defaultLocale);
+    if (node) return node;
+    let nav = null;
+    try {
+      nav = pick2(String(navigator.language || "").slice(0, 2).toLowerCase());
+    } catch {
+    }
+    if (nav) return nav;
+    return list ? list[0] : "en";
+  }
 
   // src/static/sdk-libs/_core/safe-href.js
   var SAFE = /^(https?:|mailto:)/i;
@@ -889,7 +917,7 @@
     return `@media (prefers-color-scheme: dark){` + ["ai-basic", "ai-generated", "ai-modified"].map((s) => `:root:not([data-theme="light"]) .ai-label__icon--${s}{background-image:url('${url(s)}')}`).join("") + "}";
   }
   function locale() {
-    const lang2 = storedLang() || document.documentElement.lang || "en";
+    const lang2 = storedLang() || document.documentElement.lang || String(readLang(["en", "fi"]));
     return lang2.slice(0, 2) === "fi" ? "fi" : "en";
   }
   function t(key) {

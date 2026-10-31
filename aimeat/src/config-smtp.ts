@@ -10,6 +10,8 @@
  *   import { smtpDefaults } from './config-smtp.js';
  *   const config = { ...smtpDefaults(), ... };
  * @version-history
+ *   v1.1.0 — 2026-10-31 — smtpReplyTo (AIMEAT_SMTP_REPLY_TO): the Reply-To of an agent's or app's report
+ *     mail to its owner (Jouni, 2026-10-31 20.14).
  *   v1.0.0 — 2026-10-20 — Moved from config.ts, unchanged.
  */
 
@@ -21,6 +23,8 @@ export function smtpDefaults() {
     smtpUser: process.env.AIMEAT_SMTP_USER ?? null,
     smtpPass: process.env.AIMEAT_SMTP_PASS ?? null,
     smtpFrom: process.env.AIMEAT_SMTP_FROM ?? 'AIMEAT <noreply@localhost>',
+    // Where a reply goes to the report an agent or an app mails its owner (Reply-To); null: the From.
+    smtpReplyTo: process.env.AIMEAT_SMTP_REPLY_TO?.trim() || null,
     smtpSecure: process.env.AIMEAT_SMTP_SECURE === 'true',
     smtpRejectUnauthorized: process.env.AIMEAT_SMTP_REJECT_UNAUTHORIZED !== 'false',
     emailConfirmationRequired: process.env.AIMEAT_EMAIL_CONFIRMATION_REQUIRED === 'true',

@@ -18,10 +18,12 @@
  *   (connect-form.js), and the aside for the person's own AI. Every part is a library component; the
  *   page passes data and writes no class.
  * @structure StorageTab({ showToast }) — load · RuleSection · PlacesSection · StoresSection
- *   (storage/store-sections.js) · moveAll · makeDefault · disconnect · ConnectForm · AiAside
+ *   (storage/store-sections.js) · moveAll · makeDefault · testAgain · disconnect · ConnectForm · AiAside
  * @usage Registered in views/profile.js TABS as { id: 'storage', key: 'profile.tabs.storage' }; menu
  *   entry in landing-page.cards.js (the Account group, after Data Wallet).
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Each store says whether a browser may send files straight to it, shows the CORS
+ *     rule to add while it may not, and has Test again (storage/browser-access.js).
  *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
  *     the section "Where your files are" (where new files go, files per place, the service's stores
  *     the person may choose, a move from any place to any store they may choose or home), one box per
@@ -40,7 +42,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { date, num } from '/js/format.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
-import { getMyFileStore, moveMyFiles, removeMyFileStore, makeMyStoreDefault, fileSize } from '/js/services/file-store.js';
+import { getMyFileStore, moveMyFiles, removeMyFileStore, makeMyStoreDefault, testMyStore, fileSize } from '/js/services/file-store.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { Section } from '/components/Section.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -152,6 +154,22 @@ export default function StorageTab({ showToast }) {
     }
   };
 
+  // The test answers the browser check too, which is what a person waits for after adding a CORS rule.
+  const testAgain = async (s) => {
+    try {
+      const r = (await testMyStore(s.name)).data;
+      const after = (r.view.stores || []).find((x) => x.name === s.name);
+      const ready = after && after.browser_access && after.browser_access.ready;
+      showToast?.(r.test && r.test.ok
+        ? (ready ? S('store.testedReady', { name: s.name }) : S('store.testedNotReady', { name: s.name }))
+        : S('store.testedFailed', { name: s.name }));
+      await load();
+    } catch (e) {
+      swallowed('storage-tab: test again', e);
+      setRefusal(refusalWords(e));
+    }
+  };
+
   const disconnect = (s) => confirm(
     S('store.disconnectAsk', { name: s.name, where: placeWords(s.place, s.where) }),
     async () => {
@@ -200,7 +218,7 @@ export default function StorageTab({ showToast }) {
         <${RuleSection} v=${v} />
         ${showPlaces ? html`<${PlacesSection} number=${placesNum} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} />` : null}
         ${showStores ? html`
-          <${StoresSection} number=${storesNum} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} onDefault=${makeDefault} onDisconnect=${disconnect} />` : null}
+          <${StoresSection} number=${storesNum} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} onDefault=${makeDefault} onTest=${testAgain} onDisconnect=${disconnect} />` : null}
         ${off ? null : html`
           <${Section} id="fs-connect" num=${connectNum} title=${stores.length ? S('connect.titleMore') : S('connect.title')}>
             <${ConnectForm} mode=${v.mode} approved=${approved} names=${stores.map((s) => s.name)} onConnected=${() => load()} clearSignal=${clearSignal} />

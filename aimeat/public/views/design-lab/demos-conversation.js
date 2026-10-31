@@ -9,6 +9,7 @@
  * @structure CONVERSATION_DEMOS — { [id]: { variants: [{ name, render(ex) }], height? } }
  * @usage import { CONVERSATION_DEMOS } from './demos-conversation.js';
  * @version-history
+ *   v1.8.0 — 2026-10-31 — work-log: a variant for a saved turn with a call whose last word never came.
  *   v1.7.0 — 2026-10-02 — agent-status: a variant for a saved own key on the shared chat key.
  *   v1.6.0 — 2026-09-27 — The cap's ways (no hand-written button), ConversationCopy, AiNotice main, Panes framed and a
  *     board notice whose title opens nothing; the operator pages' parts in the operator's frame.
@@ -159,6 +160,8 @@ export const CONVERSATION_DEMOS = {
   'work-log': { variants: [
     { name: 'every status', render: () => html`<${WorkLog} tools=${[{ title: 'aimeat_app_publish', status: 'completed' },
         { title: 'aimeat_memory_write', status: 'failed' }, { title: 'aimeat_storage_upload', status: 'pending' }]} />` },
+    { name: 'a saved turn, one call with no last word', render: () => html`<${WorkLog} ended=${true} tools=${[{ title: 'aimeat_app_template_get', status: 'pending' },
+        { title: 'aimeat_app_publish', status: 'completed' }]} />` },
   ] },
   'ai-notice': { variants: [
     { name: 'full', render: () => html`<${AiNotice} compact=${false} />` },

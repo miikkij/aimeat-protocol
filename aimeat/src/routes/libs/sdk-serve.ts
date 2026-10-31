@@ -11,6 +11,7 @@
  * @structure configPrelude(config) · readSdkBundle(name) · sdkLibSource(config, name)
  * @usage import { sdkLibSource } from './libs/sdk-serve.js';  sendJavascriptLibrary(res, sdkLibSource(config, 'speech'));
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The prelude carries `defaultLocale` (site.default_locale) when the node names one.
  *   v1.0.0 — 2026-07-19 — Initial: prelude + committed-bundle serving (SDK-libs migration Phase 0).
  */
 import { readFileSync, existsSync } from 'node:fs';
@@ -38,10 +39,15 @@ const bundleCache = new Map<string, string>();
  * carries exactly the values the old inline bootstrap baked in: node id, apex base URL, heartbeat.
  */
 export function configPrelude(config: AimeatConfig): string {
+  const defaultLocale = (config.siteLinks?.defaultLocale ?? '').trim();
   const cfg = {
     nodeId: config.nodeId,
     baseUrl: config.baseUrl,
     heartbeatMs: config.personalNodeHeartbeatIntervalMs || 30000,
+    // The node's own language (site.default_locale), which the libraries read before the browser's,
+    // as the node's own pages do: an app on a Finnish customer's place spoke English to an English
+    // browser (crew32 check, 2026-10-31).
+    ...(defaultLocale ? { defaultLocale } : {}),
   };
   return `window.__AIMEAT_SDK_CFG__=${JSON.stringify(cfg)};\n`;
 }

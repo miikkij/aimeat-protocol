@@ -8,6 +8,7 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-31 — listKeyActivity, over repos/memory.ts (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory passes excludePrefixes (secaudit2026oct22).
@@ -36,7 +37,9 @@ import {
   archiveMemoryByKey as archiveMemoryByKeyRepo, unarchiveMemoryByRoot as unarchiveMemoryByRootRepo,
   unarchiveMemoryByKey as unarchiveMemoryByKeyRepo, countArchivedByKeyPrefix as countArchivedByKeyPrefixRepo,
   NOT_DELETED_SQL, LIVE_SQL, deleteExpiredMemory as deleteExpiredMemoryRepo,
+  listKeyActivity as listKeyActivityRepo,
 } from '../repos/memory.js';
+import type { KeyActivityRow } from '../../../repositories/memory.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
 
 /** The projected columns, in one place so the three reads below cannot drift apart on what META means. */
@@ -445,6 +448,10 @@ export const memoryMethods = {
 
   async countArchivedByKeyPrefix(this: SqliteStorage, keyPrefix: string): Promise<{ active: number; archived: number }> {
     return countArchivedByKeyPrefixRepo(this.db, keyPrefix);
+  },
+
+  async listKeyActivity(this: SqliteStorage, prefix: string, sinceIso: string, limit: number): Promise<KeyActivityRow[]> {
+    return listKeyActivityRepo(this.db, prefix, sinceIso, limit);
   },
 
   deserializeMemory(this: SqliteStorage, row: Record<string, unknown>): MemoryRecord {

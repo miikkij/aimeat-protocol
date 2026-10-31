@@ -16,6 +16,9 @@
  *   removeOwnerFileStore · moveOwnerFiles · decideOwnerFileStore · FILE_STORE_DOMAIN · placeOf (re-export)
  * @usage const r = await connectOwnerFileStore(ctx, { account: 'alice', actor: principal, operator: false }, body);
  * @version-history
+ *   v1.2.0 — 2026-10-31 — Connecting a store also checks whether a browser may send to it directly, and
+ *     the view gives the CORS rule to add while it may not; a call without `kind` tests the store again
+ *     with its kept key (browser-access.ts).
  *   v1.1.0 — 2026-10-30 — Several named stores per person with one default; a move goes to any store
  *     the person may choose, or home; the view lists the stores a file may be put in
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -29,11 +32,12 @@ import { emitChange } from '../event-bus.js';
 import { listOperatorGhiis } from '../operators.js';
 import { storeFor } from './file-store-specs.js';
 import { choiceIdOf, nodeTarget, ownerTarget, resolveChoice } from './file-store-resolver.js';
-import { probeStore, type FileStoreResult } from './file-store-admin.js';
+import { checkOf, probeStore, type FileStoreResult } from './file-store-admin.js';
 import { readNodeStores } from './node-file-stores.js';
 import { placeKey, placeOf, readStoreInput, sameTarget, storeNameProblem, whereOf } from './store-target.js';
+import { browserAccessView, checkBrowserAccess } from './browser-access.js';
 import {
-  approvalOf, defaultEntry, entryNamed, LEGACY_STORE_NAME, ownerEntryStoreId, ownerMayUse, ownerStoreMode,
+  approvalOf, defaultEntry, entryNamed, LEGACY_STORE_NAME, ownerEntryStoreId, ownerMayUse, ownerStoreMode, ownerStoreSpec,
   readApprovals, readOwnerStores, sealCredential, UNCHANGED, updateApprovals, updateOwnerStores,
   type FileStoreCtx, type OwnerFileStores, type OwnerStoreEntry,
 } from './owner-file-store.js';
@@ -70,6 +74,7 @@ function entryView(rec: OwnerFileStores, e: OwnerStoreEntry, files: { file: Stor
     name: e.name, choice: `own:${e.name}`, default: rec.default === e.name,
     kind: e.target.kind, where: whereOf(e.target), place: placeOf(e.target), prefix: e.prefix,
     connected_at: e.connectedAt, connected_by: e.connectedBy, last_check: e.lastCheck ?? null,
+    browser_access: browserAccessView(e.browserAccess, e.target.kind),
     files: sizeOf(files.filter(f => f.storeId === e.storeId)),
   };
 }
@@ -151,12 +156,21 @@ export async function connectOwnerFileStore(ctx: FileStoreCtx, who: OwnerActor, 
   const current = entryNamed(rec, name);
   const makeDefault = body.make_default === true;
 
-  // No kind: only the store's options change (which one is the default), and nothing is tested.
+  // No kind: the store is tested again with the key it was connected with, and `make_default` applies.
+  // That is how a person learns whether the CORS rule they just added works, without typing the key again.
   if (!str(body.kind)) {
     if (!current) return fail(400, 'INVALID_INPUT', `Missing or not valid: kind (s3 or azure). You have no store called "${name}" to change.`);
-    if (makeDefault) await updateOwnerStores(ctx, who.account, cur => (cur ? { ...cur, default: name } : UNCHANGED));
+    const spec = ownerStoreSpec(ctx.config, who.account, current);
+    const test = spec ? await probeStore(storeFor(spec, 'guarded', ctx.config), current.prefix) : null;
+    const browserAccess = spec ? await checkBrowserAccess(ctx.config, spec, current.prefix, 'guarded') : undefined;
+    const lastCheck = test ? checkOf(test) : { at: new Date().toISOString(), ok: false, message: 'the node cannot open this store\'s key: connect it again with its key' };
+    await updateOwnerStores(ctx, who.account, cur => (cur ? {
+      ...cur,
+      default: makeDefault ? name : cur.default,
+      stores: cur.stores.map(s => (s.name === name ? { ...s, lastCheck, ...(browserAccess ? { browserAccess } : {}) } : s)),
+    } : UNCHANGED));
     emitChange(FILE_STORE_DOMAIN);
-    return { ok: true, data: { outcome: 'updated', test: null, view: await ownerFileStoreView(ctx, who.account, { operator: who.operator }) } };
+    return { ok: true, data: { outcome: 'updated', test, view: await ownerFileStoreView(ctx, who.account, { operator: who.operator }) } };
   }
 
   const ghii = `${who.account}@${ctx.config.nodeId}`;
@@ -182,12 +196,15 @@ export async function connectOwnerFileStore(ctx: FileStoreCtx, who: OwnerActor, 
     const failed = test.steps.find(s => !s.ok);
     return fail(422, 'STORE_TEST_FAILED', `The storage did not pass the test at step "${failed?.step}": ${failed?.message ?? 'no answer'}. Nothing was saved.`);
   }
+  // Not a condition for saving: a store without a CORS rule still takes files, through the node.
+  const browserAccess = await checkBrowserAccess(ctx.config, input.spec, input.prefix, 'guarded');
   const now = new Date().toISOString();
   const entry: OwnerStoreEntry = {
     name, storeId: current?.storeId ?? ownerEntryStoreId(ghii, name),
     target: input.target, prefix: input.prefix, credential,
     connectedAt: current && sameTarget(current.target, input.target) ? current.connectedAt : now,
     connectedBy: who.actor, lastCheck: { at: now, ok: true, message: 'write, read, read part, list and remove all worked' },
+    browserAccess,
   };
   await updateOwnerStores(ctx, who.account, cur => {
     const base: OwnerFileStores = cur ?? { spec: 'aimeat.owner-file-stores/v2', owner: who.account, default: null, stores: [] };

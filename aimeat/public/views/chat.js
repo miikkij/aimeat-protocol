@@ -16,6 +16,7 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: withoutToolMarkers also removes a tool call written in the model's own syntax (v31 K36).
  *   2026-10-31: Jouni's review of v31 (K32), on a node the store sold: the empty chat says "Kerro, mitä
  *     haluat – tekoälysi tekee sen.", one line on seeing every step and owning it, the Atelier line,
  *     and three concrete chips (the news one fills the box); the rail's AI notice, "what does that
@@ -128,10 +129,15 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 /**
  * The words without the "[Calling: <tool>]" lines a model writes as text when it means a tool call.
  * The work log shows the calls that ran; such a line is a duplicate or a call that never happened.
- * The node strips the same pattern from what it keeps (services/chat-session.ts withoutToolMarkers).
+ * The node strips the same patterns from what it keeps (services/chat-session.ts withoutToolMarkers),
+ * the pieces of a tool call the model wrote in its own syntax included (v31 K36).
  */
 function withoutToolMarkers(text) {
-    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
+    return text
+        .replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '')
+        .replace(/<\/?｜?DSML｜[^>\n]*>?/g, '')
+        .replace(/(?:[^\s"]*="[^"\n]*"|[^\s"]+")\s+string="[^\n]*/g, '')
+        .replace(/\n{3,}/g, '\n\n');
 }
 
 /**

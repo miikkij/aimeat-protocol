@@ -5,6 +5,8 @@
  * @description Handbook/onboarding, agent self-management (capabilities, activity, telemetry, tags, mode), owner-agent messaging, and federated direct-message (DM) tool definitions, plus aimeat_agents_list.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-31 — aimeat_overview: the account's overview (GET /v1/overview), on all three surfaces.
+ *   2026-10-31 — aimeat_agent_propose takes `schedule` (v31 K47); aimeat_notify takes `email` (v31 K46).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_contact_list's description names origin 'colleague', every other person of a company node (members see each other).
  *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
@@ -204,6 +206,22 @@ export const agentMessagingTools = [
         },
     },
     {
+        // GET /v1/overview, through the same service (services/overview/overview-read.ts).
+        name: 'aimeat_overview',
+        description: 'The whole account in one picture, read left to right: machines (computers running aimeat connect serve, and AI chat clients that bring agents in over MCP), the agents on each, the apps, the knowledge (organisms and their workspaces) and what the owner offers (app tools and agent offers, with whether each is a capability on the node and listed on EXCHANGE). Every item has its use in the period (calls, opens or writes), when it was last used, and quiet_days when unused for 30 days or more; edges say what ties two items and how much happened along the tie. Without focus it answers the busiest 10 of each lane; focus=<item id> follows one item and everything one line away. Use it when the person asks what their agents do, where something runs, what is used and what has gone quiet, then give them the overview page: /v1/home?overview=1&focus=<item id>.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Account Overview', readOnlyHint: true },
+        // The word GET /v1/overview asks: the answer lists the owner's agents, like GET /v1/agents.
+        scope: 'agent:read',
+        surfaces: ['agent', 'service'],
+        input: {
+            range: { type: 'string', enum: ['24h', '7d', '30d'], description: 'The period the counts cover. Default 7d.', zod: z.enum(['24h', '7d', '30d']).optional() },
+            focus: { type: 'string', description: 'An item id from an earlier answer (agent:<name>, app:<filename>, organism:<id>, workspace:<org>/<ws>, machine:<id>, chat:<client>, tools:<filename>, offer:<agent>/<id>).', zod: z.string().max(300).optional() },
+            limit: { type: 'number', description: 'The busiest n items of each lane, 1 to 50. Default 10 when focus is not given.', zod: z.number().int().min(1).max(50).optional() },
+        },
+    },
+    {
         // Connector-only convenience (not on the node MCP): the loopback serve daemon / a no-LLM crew
         // reads its own rollups over `aimeat connect call` instead of a periodic node GET. Excluded
         // from the v2 MCP surfaces (V2_EXCLUDED). The connector MCP registers it too, as it does
@@ -342,7 +360,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_agent_propose',
-        description: "How a new agent is made on this node. When the person asks you for an agent (\"an agent that every morning…\", \"something that watches…\", a helper for one job the basic agents do not cover), propose it here: this node creates it, gives it its instructions, credentials it and runs it on the person's own connector, so never point them to an outside agent builder or another product for this. BEFORE you propose, read what of theirs it will work on: aimeat_organism_list and aimeat_workspace_list (or aimeat_discover with scope \"shared\") show the organisms and workspaces they keep, such as their CRM or their notes. Name that data in `purpose` and in the `crew_def` tasks. Scopes: what the job needs. The node adds memory:read and memory:write itself, because a crew runtime reads its own definition and writes its result with them. It needs no agent:write to report about itself, and agent:write lets an agent approve new agents, so add it only when that is the job. CREATES NOTHING: the proposal waits for the person, and only their own press creates the agent, because adding a principal to an account is theirs to decide. AFTER: give the person `approval_url` from the answer and say `next_step`. Send `crew_def` whenever you can: an agent approved without one exists and cannot run, and a new agent has no runtime to publish one to, so the definition you attach here is the one it starts with. It is checked before the proposal is written, so a broken one is refused now. The smallest crew_def that runs: {\"agents\":[{\"role\":\"Reader\",\"goal\":\"…\",\"backstory\":\"…\",\"tools\":[\"memory\"]}],\"tasks\":[{\"id\":\"main\",\"agent\":\"Reader\",\"description\":\"… {{ctx.prompt}} …\",\"expected_output\":\"…\"}]}; each task's `agent` is one of the agents' role (or name), and at least one task's description contains {{ctx.prompt}}, which becomes each run's own task text. `scopes` may not exceed what you hold yourself. A word that ends in -as-owner is outside every wildcard, so leave it out of the proposal and tell the owner to tick it on the agent's page in Profile, Agents, after approving. A name already waiting returns the standing proposal. For work on a clock, propose the agent first and schedule its task (aimeat_schedule_create, kind agent_task) once it exists.",
+        description: "How a new agent is made on this node. When the person asks you for an agent (\"an agent that every morning…\", \"something that watches…\", a helper for one job the basic agents do not cover), propose it here: this node creates it, gives it its instructions, credentials it and runs it on the person's own connector, so never point them to an outside agent builder or another product for this. BEFORE you propose, read what of theirs it will work on: aimeat_organism_list and aimeat_workspace_list (or aimeat_discover with scope \"shared\") show the organisms and workspaces they keep, such as their CRM or their notes. Name that data in `purpose` and in the `crew_def` tasks. Scopes: what the job needs. The node adds memory:read and memory:write itself, because a crew runtime reads its own definition and writes its result with them. It needs no agent:write to report about itself, and agent:write lets an agent approve new agents, so add it only when that is the job. CREATES NOTHING: the proposal waits for the person, and only their own press creates the agent, because adding a principal to an account is theirs to decide. AFTER: give the person `approval_url` from the answer and say `next_step`. Send `crew_def` whenever you can: an agent approved without one exists and cannot run, and a new agent has no runtime to publish one to, so the definition you attach here is the one it starts with. It is checked before the proposal is written, so a broken one is refused now. The smallest crew_def that runs: {\"agents\":[{\"role\":\"Reader\",\"goal\":\"…\",\"backstory\":\"…\",\"tools\":[\"memory\"]}],\"tasks\":[{\"id\":\"main\",\"agent\":\"Reader\",\"description\":\"… {{ctx.prompt}} …\",\"expected_output\":\"…\"}]}; each task's `agent` is one of the agents' role (or name), and at least one task's description contains {{ctx.prompt}}, which becomes each run's own task text. `scopes` may not exceed what you hold yourself. A word that ends in -as-owner is outside every wildcard, so leave it out of the proposal and tell the owner to tick it on the agent's page in Profile, Agents, after approving. A name already waiting returns the standing proposal. For work on a clock, send `schedule` (a five-field cron): the approval page opens on that time and the person's one press starts the agent on it.",
         caller: 'agent',
         visibility: agentEverywhere,
         // Idempotent because proposing a name that is already waiting returns the standing proposal
@@ -362,6 +380,7 @@ export const agentMessagingTools = [
             run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for an agent that answers people as they write, at a few seconds of cold start saved)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
             connector: { type: 'string', description: "Which of the account's connectors (computers) runs it, by name or id from aimeat_connector_list. Send it when the person said where the agent is to run. Leave it out otherwise: the person chooses when approving, and an account with one connector has nothing to choose.", zod: z.string().max(80) },
+            schedule: { type: 'string', description: 'When it works on a clock, as a five-field cron in the person\'s time zone: "0 7 * * *" every morning at 7, "0 7 * * 1-5" on weekdays. The approval page starts with this time, and the person\'s one press starts the agent on it. Leave it out for an agent that works when asked.', zod: z.string().max(60) },
         },
     },
     {
@@ -467,6 +486,7 @@ export const agentMessagingTools = [
             body: { type: 'string', description: 'The detail, a few lines at most.', zod: z.string().max(10_000) },
             link: { type: 'string', description: 'Where a click leads: a path on this AIMEAT starting with "/". Default: the Agents page.', zod: z.string().max(500) },
             type: { type: 'string', description: 'A short machine word for the kind of event, e.g. report_ready.', zod: z.string().max(64) },
+            email: { type: 'boolean', description: 'Also email it to your owner at the address they verified, for a report they asked to get by mail. At most 10 a day from you; never when they muted you. The answer\'s `emailed` says what happened (sent, no_address, mail_off, limit, failed, muted).' },
         },
     },
     {

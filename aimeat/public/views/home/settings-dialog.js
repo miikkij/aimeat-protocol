@@ -20,6 +20,10 @@
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} />`
  * @version-history
+ *   2026-10-31: The switch for the help on a word (HelpHoverToggle, home.prefs.helpOnHover), in the
+ *     appearance section (wish-ohje-sanan-p-ll-kysymysmerkkikursori-viiveell-tooltip-ja-kli). Every
+ *     setting here writes through writeHomePrefs, which starts from the stored record, so one switch
+ *     no longer writes away what another changed while the dialog was open.
  *   2026-09-27: The dialog writes no class: the account's links are the Action component, the
  *     appearance section is SettingsSection, the pattern preview is SwatchPicker `pattern`, the
  *     start page is StartPageSetting `dialog`; the markup is the same (page group G9, a move).
@@ -55,6 +59,7 @@ import { Modal } from '/components/Modal.js';
 import { StartPageSetting } from '/components/StartPageSetting.js';
 import { EditProfileModal, ChangePasswordModal } from '../profile/landing-page.modals.js';
 import { MARGIN_PATTERNS, applyMarginPattern, marginPatternOf } from '/js/margin-pattern.js';
+import { helpHoverOf, applyHelpHover } from '/js/help-hover.js';
 import { SettingsStack, SettingsSection } from '/components/SettingsStack.js';
 import { Action } from '/components/Action.js';
 import { SettingsAccount } from '/components/SettingsAccount.js';
@@ -64,6 +69,21 @@ import { SettingsDoor } from '/components/SettingsDoor.js';
 import { Hint } from '/components/Hint.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+const PREFS_PATH = '/v1/memory/home.prefs?soft=1';
+const prefsOf = (r) => (r?.data?.exists === false ? {} : (r?.data?.value ?? {}));
+
+/**
+ * Write one change to the home.prefs record. The record is written whole and each setting in this
+ * dialog keeps the copy it read when the dialog opened, so the write starts from what is stored now:
+ * a change another switch made a moment ago stays (until 2026-10-31 the next switch wrote it away).
+ */
+async function writeHomePrefs(patch, fallback) {
+  const stored = await apiGet(PREFS_PATH).then(prefsOf)
+    .catch((e) => { swallowed('home settings: prefs re-read', e); return fallback; });
+  await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: { ...stored, ...patch }, visibility: 'private' }) })
+    .catch((e) => swallowed('home settings: prefs write', e));
+}
 
 /**
  * The margin pattern: which figure sits on the empty margins of the home, the chat and the
@@ -80,11 +100,9 @@ function MarginPatternSetting() {
   if (prefs === null) return null;
   const current = marginPatternOf(prefs);
   const choose = async (value) => {
-    const next = { ...prefs, marginPattern: value };
-    setPrefs(next);
+    setPrefs({ ...prefs, marginPattern: value });
     applyMarginPattern(value);
-    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
-      .catch((e) => swallowed('home settings: prefs write', e));
+    await writeHomePrefs({ marginPattern: value }, prefs);
   };
   // The preview: the same variables the page's strips read, so it shows what the margin will show,
   // fading to the right the way the left strip fades toward the middle.
@@ -115,15 +133,38 @@ function AchievementsToggle() {
   if (prefs === null) return null;
   const hidden = !!prefs.hideAchievements;
   const flip = async () => {
-    const next = { ...prefs, hideAchievements: !hidden };
-    setPrefs(next);
-    await api('/v1/memory', { method: 'POST', body: JSON.stringify({ key: 'home.prefs', value: next, visibility: 'private' }) })
-      .catch((e) => swallowed('home settings: prefs write', e));
+    setPrefs({ ...prefs, hideAchievements: !hidden });
+    await writeHomePrefs({ hideAchievements: !hidden }, prefs);
     window.dispatchEvent(new Event('aimeat-live-update'));
   };
   return html`
     <${SettingsSwitch} checked=${!hidden} onChange=${flip}>
       ${tr('home.settings.showAch', 'Show achievements on the home')}
+    <//>`;
+}
+
+/**
+ * Whether the help on a word opens while the pointer rests on it (components/HelpTip.js HelpWord).
+ * Kept in the same home.prefs record, applied to the page the moment the switch moves; clicking the
+ * word opens the explanation either way.
+ */
+function HelpHoverToggle() {
+  const [prefs, setPrefs] = useState(null);
+  useEffect(() => {
+    apiGet('/v1/memory/home.prefs?soft=1')
+      .then((r) => setPrefs(r?.data?.exists === false ? {} : (r?.data?.value ?? {})))
+      .catch((e) => { swallowed('home settings: prefs', e); setPrefs({}); });
+  }, []);
+  if (prefs === null) return null;
+  const on = helpHoverOf(prefs);
+  const flip = async () => {
+    setPrefs({ ...prefs, helpOnHover: !on });
+    applyHelpHover(!on);
+    await writeHomePrefs({ helpOnHover: !on }, prefs);
+  };
+  return html`
+    <${SettingsSwitch} checked=${on} onChange=${flip}>
+      ${tr('home.settings.helpOnHover', 'Show the help when I rest the pointer on a word')}
     <//>`;
 }
 
@@ -150,6 +191,7 @@ export function HomeSettingsDialog({ open, onClose, session, showToast }) {
         <//>
         <${SettingsSection} title=${t('homeJourney.appearance')}>
           <${AchievementsToggle} />
+          <${HelpHoverToggle} />
           <${MarginPatternSetting} />
           <${StartPageSetting} dialog />
         <//>

@@ -41,6 +41,8 @@
  *   cd aimeat && pnpm exec node --import tsx test/e2e-email-delivery.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=email-delivery
  * @version-history
+ *   2026-10-31 — A notification with email: true is mailed to the owner, at most ten a day (v31 K46),
+ *     with Reply-To from email.reply_to when it is set, and an address that does not parse is refused.
  *   2026-10-31 — The auth prelude says linkFirst only on a node with a purchase plan (v28 #7).
  *   2026-10-16 — A marketing newsletter: the sender footer from outbound.sender, the List-Unsubscribe
  *     and List-Unsubscribe-Post headers, the body vocabulary escaped, a lead image; the RFC 8058
@@ -262,6 +264,20 @@ async function run(): Promise<void> {
             await set('');
         }
         assert((await prelude()).includes('"linkFirst":false'), 'clearing the plan restores the password first');
+
+        // The node's own language travels in the libraries' prelude, which reads it before the
+        // browser's (crew32 check: the pill spoke English on a Finnish place). The source was broken.
+        assert(!(await prelude()).includes('"defaultLocale"'), 'no node language named, none in the prelude');
+        const lang = (value: string) => json('/v1/admin/config', {
+            method: 'PUT', headers: { ...bearer(opToken), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes: [{ path: 'site.default_locale', value }] }),
+        });
+        assert((await lang('fi')).status === 200, 'setting site.default_locale');
+        try {
+            assert((await prelude()).includes('"defaultLocale":"fi"'), 'the prelude names the node\'s language');
+        } finally {
+            await lang('');
+        }
     });
 
     await test('the node authenticated to the SMTP server, so the transport built its auth branch', async () => {
@@ -285,6 +301,47 @@ async function run(): Promise<void> {
         });
         assert(verify.status === 200, `verify-email ${verify.status}: ${short(verify.body)}`);
         assert(verify.body.data.verification_level === 1, `expected level 1, got ${verify.body.data.verification_level}`);
+    });
+
+    await test('a notification with email: true is mailed to the owner\'s verified address, at most 10 a day from one sender (v31 K46)', async () => {
+        // The source was broken: a notification reached the bell and the devices only, so an agent
+        // asked to send its morning summary by email had no way to do it.
+        const post = (b: Record<string, unknown>) => json('/v1/notifications', {
+            method: 'POST', headers: { ...bearer(opToken), 'Content-Type': 'application/json' }, body: JSON.stringify(b),
+        });
+        smtp!.clear();
+        const quiet = await post({ title: 'No mail for this one' });
+        assert(quiet.status === 201 && quiet.body.data.emailed === 'not_asked', `without email: ${quiet.status} ${short(quiet.body)}`);
+        const r = await post({ title: 'Aamun uutiskatsaus on valmis', body: 'Viisi kohtaa lähteineen.', link: '/v1/home', email: true });
+        assert(r.status === 201 && r.body.data.emailed === 'sent', `with email: ${r.status} ${short(r.body)}`);
+        const mail = await smtp!.waitForMail(opEmail, /Aamun uutiskatsaus/);
+        assert(/Viisi kohtaa/.test(mail.text) && mail.text.includes('/v1/home'), `the mail carries the body and the link: ${mail.text.slice(0, 300)}`);
+        assert(smtp!.mailTo(opEmail).length === 1, `one mail, for the one that asked: ${smtp!.mailTo(opEmail).length}`);
+        assert(!mail.headers['reply-to'], `no Reply-To while email.reply_to is empty: ${mail.headers['reply-to']}`);
+        // email.reply_to (Jouni, 2026-10-31 20.14): the owner's reply to an agent's report goes where
+        // somebody reads it. The source was broken: the node's sends carried no Reply-To at all.
+        const setReplyTo = (value: string) => json('/v1/admin/config', {
+            method: 'PUT', headers: { ...bearer(opToken), 'Content-Type': 'application/json' },
+            body: JSON.stringify({ changes: [{ path: 'email.reply_to', value }] }),
+        });
+        const badAddr = await setReplyTo('not an address');
+        assert(badAddr.status === 400, `an address that does not parse is refused: ${badAddr.status} ${short(badAddr.body)}`);
+        const on = await setReplyTo('support@example.org');
+        assert(on.status === 200, `setting email.reply_to: ${on.status} ${short(on.body)}`);
+        try {
+            smtp!.clear();
+            const r2 = await post({ title: 'Toinen katsaus', email: true });
+            assert(r2.body.data.emailed === 'sent', `second report: ${short(r2.body)}`);
+            const replied = await smtp!.waitForMail(opEmail, /Toinen katsaus/);
+            assert(replied.headers['reply-to'] === 'support@example.org', `Reply-To is the setting: ${replied.headers['reply-to']}`);
+        } finally {
+            await setReplyTo('');
+        }
+        const bad = await post({ title: 'x', email: 'yes' });
+        assert(bad.status === 400, `a non-boolean email is refused: ${bad.status}`);
+        let last = '';
+        for (let i = 0; i < 9; i++) last = (await post({ title: `report ${i}`, email: true })).body.data.emailed;
+        assert(last === 'limit', `the eleventh in a day is not mailed: ${last}`);
     });
 
     let magicToken = '';

@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Indexing, personal-node, site, consent, push, email, TOTP, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-10-31 — AIMEAT_SMTP_REPLY_TO in the email section.
  *   v1.3.1 — 2026-10-11 — The cookie categories are read through consentCategories(): the value could
  *     be text typed in Config, which has no join().
  *   v1.3.0 — 2026-08-01 — AI Transparency section gains AIMEAT_AI_LABEL_PUBLIC and
@@ -223,6 +224,12 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'From address',
           value: config.smtpFrom,
           defaultVal: 'AIMEAT <noreply@localhost>',
+        },
+        {
+          envVar: 'AIMEAT_SMTP_REPLY_TO',
+          description: 'Reply-To of an agent\'s or app\'s report mail to its owner',
+          value: config.smtpReplyTo ?? '(not set)',
+          defaultVal: '(the From address)',
         },
         {
           envVar: 'AIMEAT_SMTP_SECURE',
