@@ -14366,6 +14366,7 @@
       "open": "Configuración del hogar",
       "title": "Configuración del hogar",
       "showAch": "Mostrar los logros en el inicio",
+      "helpOnHover": "Mostrar la ayuda cuando dejo el puntero sobre una palabra",
       "pattern": "Patrón de los márgenes",
       "patternHint": "Una figura en los márgenes vacíos del hogar, el chat y la configuración, que se desvanece hacia el centro. Solo se ve en pantallas anchas.",
       "patternOff": "Sin patrón",
@@ -15838,7 +15839,8 @@
     "lookLightOnly": "Este estilo solo tiene modo claro.",
     "lookDarkOnly": "Este estilo solo tiene modo oscuro.",
     "lookThemes": "Temas",
-    "lookStyles": "Estilos de este tema"
+    "lookStyles": "Estilos de este tema",
+    "menu": "Menú"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glosario",
@@ -25073,6 +25075,7 @@
       }
     },
     "more": "Haz clic para ver ejemplos.",
+    "moreWord": "Haz clic en la palabra para ver la explicación completa.",
     "range": "Rango",
     "low": "Valor bajo",
     "high": "Valor alto",

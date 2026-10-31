@@ -9,6 +9,8 @@
  *   tokens only.
  *   NOTE: this file must be linked in spa.html.
  * @version-history
+ *   v1.2.0 — 2026-10-31 — The word that carries its own explanation (.help-word): the dotted line,
+ *     the help cursor, the keyboard's question mark out of sight until it has the focus.
  *   v1.1.0 — 2026-10-03 — The wrapper resets the inherited text styles, so the tooltip and the dialog
  *     read as body text inside an uppercase coral label (a Facts row's name, a column head).
  *   v1.0.0 — 2026-10-02 — Initial (wish "Ohjenappi ja vihjeteksti asetuksille").
@@ -60,4 +62,42 @@
   display: flex;
   align-items: center;
   gap: .4rem;
+}
+
+/* A word that carries its own explanation (components/HelpTip.js HelpWord): a dotted line under it
+   and the help cursor over it, on the word's own face. The line is set on the word's own element as
+   well, because a label drawn as a flex or inline-block box takes no decoration from its parent. */
+.help-word { display: inline-flex; align-items: center; }
+.help-word-text,
+.help-word-text > * {
+  cursor: help;
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-thickness: 1px;
+  text-underline-offset: .22em;
+}
+.help-word-text * { cursor: help; }
+/* The question mark is for the keyboard: out of sight until it has the focus, then drawn after the
+   word as the HelpTip button is. */
+.help-word-key:not(:focus-visible) {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.help-word-key:focus-visible { margin-left: .4rem; }
+/* The dialog sits inside the label and a native <dialog> inherits its face (an uppercase coral
+   Facts name); it reads as body text, as it does beside a HelpTip. The tooltip sets its own. */
+.help-word-dialog {
+  display: contents;
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: var(--text-body);
+  font-weight: var(--weight-regular);
+  line-height: 1.6;
+  letter-spacing: normal;
+  text-transform: none;
+  text-align: left;
 }

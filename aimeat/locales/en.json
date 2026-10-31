@@ -16026,6 +16026,7 @@
       "open": "Home settings",
       "title": "Home settings",
       "showAch": "Show achievements on the home",
+      "helpOnHover": "Show the help when I rest the pointer on a word",
       "pattern": "Margin pattern",
       "patternHint": "A figure on the empty margins of the home, the chat and the settings, fading toward the middle. Shows on wide screens only.",
       "patternOff": "Off",
@@ -17569,7 +17570,8 @@
     "lookLightOnly": "This style has a light mode only.",
     "lookDarkOnly": "This style has a dark mode only.",
     "lookThemes": "Themes",
-    "lookStyles": "Styles in this theme"
+    "lookStyles": "Styles in this theme",
+    "menu": "Menu"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glossary",
@@ -27254,6 +27256,7 @@
       }
     },
     "more": "Click for examples.",
+    "moreWord": "Click the word for the full explanation.",
     "range": "Range",
     "low": "Lower value",
     "high": "Higher value",
