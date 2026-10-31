@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: The first load draws the conversations without waiting for the status line, which
+ *     can wait seconds on the AI provider on a fresh place (v27 P7).
  *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
  *     whose connection went silent ends with "The connection was lost" and the retry (v27 P2).
  *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
@@ -282,16 +284,21 @@ export default function ChatView() {
         setLive({ text: '', thought: '', progress: '', tools: [], cards: [] });
     }, []);
 
-    // First load: what this node offers, and where the person left off.
+    // First load: what this node offers, and where the person left off. The conversations draw as
+    // soon as they arrive; the status line and the suggestions fill in when theirs do. GET
+    // /v1/chat/status can wait up to 5 s on the AI provider's balance on a fresh place, and the
+    // whole page used to wait with it (v27 P7).
     useEffect(() => {
         if (!hasSession()) { setLoading(false); return; }
+        chat.status()
+            .then((st) => setStatus(st?.data ?? null))
+            .catch((err) => console.warn('[chat] the status line was not loaded:', err.message));
+        chat.readNudges()
+            .then((nudges) => setNudgeDismissed(!!nudges?.mobile))
+            .catch((err) => console.warn('[chat] the dismissals were not loaded:', err.message));
         (async () => {
             try {
-                const [st, list, nudges] = await Promise.all([
-                    chat.status(), chat.listThreads(), chat.readNudges(),
-                ]);
-                setNudgeDismissed(!!nudges?.mobile);
-                setStatus(st?.data ?? null);
+                const list = await chat.listThreads();
                 const found = list?.data?.threads ?? [];
                 setThreads(found);
                 if (found.length > 0) await openThread(found[0].id);
