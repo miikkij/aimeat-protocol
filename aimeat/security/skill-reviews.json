@@ -398,14 +398,14 @@
       "digest": "sha256:f7465674aff12a3ecb43197a"
     },
     "node:aimeat-bookkeeping": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/finance.ts",
         "aimeat/src/routes/finance-ledger.ts",
         "aimeat/src/services/finance/invoice-service.ts",
         "aimeat/src/routes/odata.ts"
       ],
-      "digest": "sha256:4dcd0bf4d817fb7f9dfed34e",
+      "digest": "sha256:fa40d7f14b74d840f48936ef",
       "note": "The skill says bookkeeping has no MCP tool; a finance tool family means this skill is rewritten."
     },
     "node:aimeat-ai-capabilities": {
@@ -781,7 +781,7 @@
       "aimeat/src/routes/finance.ts": "2a244a50c800bc9f",
       "aimeat/src/routes/finance-ledger.ts": "92a2df61c5f84666",
       "aimeat/src/services/finance/invoice-service.ts": "2d767cd1bf8fa3a0",
-      "aimeat/src/routes/odata.ts": "fc920574f840ce8f"
+      "aimeat/src/routes/odata.ts": "c8452efa5ad88464"
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",

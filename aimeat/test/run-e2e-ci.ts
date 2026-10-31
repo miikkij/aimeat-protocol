@@ -12,6 +12,8 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-datapackage-trusted-reads.ts joins the list (not the guard tier): what a data package
+ *     read trusts (secaudit2026oct31w2 round 10, W2-14, W2-15, W2-20).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
  *     may start for its agents, and the owner's decision on them.
  *   2026-10-31 -- e2e-package-account-sale.ts joins the list (not the guard tier): an author sells their own package to another account (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
@@ -1243,6 +1245,9 @@ const ALL_SUITES = [
     'test/e2e-publish-gate-files.ts',
     // The same gate on packages, knowledge packages and data packages (plan doc-mvcn6c7e4e5q, V4).
     'test/e2e-publish-gate-packages.ts',
+    // What a data package read trusts: the audience the service wrote, the classification reader, and
+    // the OData cache header by the package's audience (secaudit2026oct31w2 round 10).
+    'test/e2e-datapackage-trusted-reads.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',

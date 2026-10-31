@@ -27660,6 +27660,10 @@ paths:
         A paginated read for a UI or an agent that wants to look rather than download. For anything
         larger, read the resource's CSV from its permanent address — that is what it is for, and it
         answers byte ranges. A non-public package answers 404 to a caller its visibility does not admit.
+        The package's visibility is the one its publish recorded, never what a file under `datapkg/`
+        written through the storage routes says. The rows pass the classification reader that
+        `GET /v1/pub` runs on the same CSV: a resource whose label hides it from the caller (an agent's
+        clearance, a label that hides content from AI) answers 404, as `/v1/pub` does.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }]
       parameters:
@@ -27781,6 +27785,13 @@ paths:
         reduced by what this page carried, and `version` pinned to the content hash the page was
         read from, so every page of one answer comes from the same rows. Excel, Power BI and
         Tableau follow it by themselves; a client that does not reads only the first page.
+
+        CACHING. An answer without `version` is `Cache-Control: no-cache`. A pinned answer is
+        `public, max-age=300` when anyone opens that version (a public package), and
+        `private, max-age=300` with `Vary: Authorization` otherwise, so a shared cache never hands a
+        members, organism or private package's answer to another caller. The service document and
+        `$metadata` answer the same way. The rows pass the classification reader `GET /v1/pub` runs
+        on the same CSV: a resource whose label hides it from the caller answers 404.
       tags: [Data Packages]
       security: []
       parameters:
