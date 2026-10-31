@@ -76,7 +76,9 @@ export const appPublishTools = [
         visibility: agentEverywhere,
         annotations: { title: 'Publish App', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
         scope: 'app:write',
-        surfaces: ['appdev'],
+        // On `chat`: "build me an app" finishes in the first message (v31 K35); goose refuses a
+        // switched-off tool called by name, and the turn ran out looking for this one.
+        surfaces: ['appdev', 'chat'],
         input: {
             owner: { type: 'string', description: 'App owner. Omit for your own apps; another owner requires a development grant.' },
             roadmap: { type: 'string', description: 'What this version changes. Required when the app is shared with another developer.' },

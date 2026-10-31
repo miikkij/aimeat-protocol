@@ -16,6 +16,7 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: withoutToolMarkers also removes a tool call written in the model's own syntax (v31 K36).
  *   2026-10-31: The first load draws the conversations without waiting for the status line, which
  *     can wait seconds on the AI provider on a fresh place (v27 P7).
  *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
@@ -119,10 +120,15 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 /**
  * The words without the "[Calling: <tool>]" lines a model writes as text when it means a tool call.
  * The work log shows the calls that ran; such a line is a duplicate or a call that never happened.
- * The node strips the same pattern from what it keeps (services/chat-session.ts withoutToolMarkers).
+ * The node strips the same patterns from what it keeps (services/chat-session.ts withoutToolMarkers),
+ * the pieces of a tool call the model wrote in its own syntax included (v31 K36).
  */
 function withoutToolMarkers(text) {
-    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
+    return text
+        .replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '')
+        .replace(/<\/?｜?DSML｜[^>\n]*>?/g, '')
+        .replace(/(?:[^\s"]*="[^"\n]*"|[^\s"]+")\s+string="[^\n]*/g, '')
+        .replace(/\n{3,}/g, '\n\n');
 }
 
 /**

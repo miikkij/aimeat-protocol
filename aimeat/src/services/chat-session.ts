@@ -32,6 +32,8 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.15.0 -- 2026-10-31 -- withoutToolMarkers also removes a tool call the model wrote in its own
+ *     syntax and goose could not parse: DeepSeek's DSML tags and a `name="…" string="…"` fragment (v31 K36).
  *   v1.14.0 -- 2026-10-31 -- The session's MCP token names the MCP endpoint and the process's /v1/llm
  *     token does not (chat-agent.ts). A session whose aimeat MCP server did not load ends the turn
  *     with CHAT_TOOLS_NOT_CONNECTED in the person's language, and "[Calling: …]" lines a model wrote
@@ -132,10 +134,19 @@ function paragraphBreak(answer: string): string {
  * The answer as the record keeps it: without the "[Calling: <tool>]" lines a model writes as text when
  * it means a tool call. The work log shows the calls that really ran; a line like this is either a
  * duplicate of one or a call that never happened (v27 P2, 2026-10-31). public/views/chat.js strips the
- * same pattern while the turn streams.
+ * same patterns while the turn streams.
+ *
+ * Also the pieces of a tool call a model wrote in its own syntax and goose could not parse, which
+ * reached the person as text on grokkoe3110b (v31 K36, deepseek-v4-pro): DeepSeek's `<｜DSML｜…>` tags,
+ * and a parameter fragment such as `="id" string="true">genre-receipt` or `name="filename" string="`,
+ * removed with the rest of its line, which is the call's argument and never words for the person.
  */
 export function withoutToolMarkers(text: string): string {
-    return text.replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '').replace(/\n{3,}/g, '\n\n');
+    return text
+        .replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '')
+        .replace(/<\/?｜?DSML｜[^>\n]*>?/g, '')
+        .replace(/(?:[^\s"]*="[^"\n]*"|[^\s"]+")\s+string="[^\n]*/g, '')
+        .replace(/\n{3,}/g, '\n\n');
 }
 
 /** How long a person's own agent process stays up with no turn in flight. */
