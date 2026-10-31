@@ -23,6 +23,8 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-31 — aimeat_package_get passes `config`: the operator's read of a sold package is written
+ *     to the operator trail in the author's account.
  *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
  *     accounts of this node); aimeat_package_buy without `repository` lists, opens the checkout of and
  *     reports the purchases of such a package; aimeat_package_list takes `for_sale`
@@ -287,7 +289,7 @@ export function registerPackageTools(
     mcp.registerTool('aimeat_package_get', { description: descriptionFor('aimeat_package_get'), inputSchema: zodShapeFor('aimeat_package_get'), annotations: annotationsFor('aimeat_package_get') }, async ({ group_id }) => {
         // The session's own auth, so audience.ts sees the agent (an organism that admits only listed
         // agents refuses the rest) for a 'members' or 'organism:<id>' package (plan V3.7).
-        const pkg = await getPackageFor(storage, group_id, caller().auth);
+        const pkg = await getPackageFor(storage, group_id, caller().auth, config);
         // A package its author sells: without a purchase, its listing and price, as GET /v1/packages/:groupId answers.
         const sale = await readAccountSale(storage, group_id);
         if (!pkg) {

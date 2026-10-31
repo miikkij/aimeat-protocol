@@ -56624,7 +56624,8 @@ paths:
         have. Derived from the package's own components on every read.
 
         A package its author sells to accounts of this node: a reader holding a paid purchase, the
-        author and the operator get the package with `sale` and `entitled: true`. Any other reader,
+        author and the operator get the package with `sale` and `entitled: true`; the operator's read
+        is written to the operator trail in the author's account. Any other reader,
         signed in or not, gets its listing while it is on sale or paused: `listing_only: true`,
         `entitled: false`, the parts without content (a preview part carries its content), `sale`
         { group_id, author, state, price, buyable, preview } and `buy`, the line for POST
@@ -56909,8 +56910,8 @@ paths:
         version made up to the entitlement's `updates_until`. A version made after it answers 403
         UPDATES_ENDED; a node with no entitlement 404. An unsigned request is decided on visibility.
         A package its author sells to accounts of this node is exported to its author, the operator
-        and an account holding a paid purchase; anyone else gets 402 PURCHASE_REQUIRED while it is
-        listed for sale.
+        (the read written to the operator trail in the author's account) and an account holding a
+        paid purchase; anyone else gets 402 PURCHASE_REQUIRED while it is listed for sale.
       tags: [Packages]
       parameters:
         - name: groupId

@@ -80,11 +80,11 @@ async function checkout(token: string, group: string, handler = 'test.money') {
 const purchases = async (token: string) => (await json('/v1/package-purchases', { headers: auth(token) })).body.data?.purchases as any[];
 
 console.log('\n=== A package an author sells to accounts of this node ===\n');
-let A = { name: '', token: '' }, B = { name: '', token: '' }, C = { name: '', token: '' };
+let OP = { name: '', token: '' }, A = { name: '', token: '' }, B = { name: '', token: '' }, C = { name: '', token: '' };
 let group = '', second = '', publicGroup = '', order = '', instanceId = '';
 
 await test('Setup: an operator, the author A, the buyer B and another owner C; A publishes two private packages and a public one', async () => {
-    await mkOwner('op');   // on a fresh database the first account is the operator
+    OP = await mkOwner('op');   // on a fresh database the first account is the operator
     A = await mkOwner('a'); B = await mkOwner('b'); C = await mkOwner('c');
     const p = await publish(A.token, `tpl${stamp}`);
     assert(p.status === 201, `publish: ${show(p)}`);
@@ -132,6 +132,19 @@ await test('3. A sets 12 EUR with the listing part as preview; anyone sees the l
         assert(g.status === 200 && g.body.data.listing_only === true && g.body.data.entitled === false, `listing read: ${show(g)}`);
         assert(!JSON.stringify(g.body.data).includes('The paid template'), 'the app content leaked into the listing');
     }
+});
+
+await test('3b. The operator reads the sold package, and the read is written to the operator trail in A\'s account', async () => {
+    const trail = async () => {
+        const r = await json('/v1/account/events?limit=200', { headers: auth(A.token) });
+        assert(r.status === 200, `account events: ${show(r)}`);
+        return (r.body.data.events as any[]).filter((e) => e.kind === 'operator_acted' && e.data?.area === 'package' && e.data?.action === 'read');
+    };
+    const before = (await trail()).length;
+    const g = await json(`/v1/packages/${encodeURIComponent(group)}`, { headers: auth(OP.token) });
+    assert(g.status === 200 && g.body.data.listing_only !== true && JSON.stringify(g.body.data).includes('The paid template'), `operator read: ${show(g)}`);
+    const after = await trail();
+    assert(after.length === before + 1, `one operator_acted line for the read, got ${after.length - before}`);
 });
 
 await test('4. FAILURE: B reads a version, exports or installs before paying: 402 PURCHASE_REQUIRED, and the anonymous reader too', async () => {
