@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — openPackage answers null for a withdrawn package (./withdraw.ts), so every read path
+ *     refuses it; a publish of the same bytes after a withdrawal writes the catalogue entry back, and
+ *     any publish writes a pointer without the withdrawal (plan doc-mvwxcas3dom3, D0.3).
  *   2026-11-01 — A publish stores no odps.yaml: the product sheet is projected when it is read, from the
  *     version's audience (./odps-read.ts). The stored one said public and "No authentication" for every
  *     package (plan doc-mvwxcas3dom3, D0.1).
@@ -317,8 +320,9 @@ export async function publishPackage(
         // The same bytes under another audience: the version's files, the pointer and (when the
         // audience changed) the catalogue entry take the one asked for. Only the pointer moved
         // before, so the files kept the tier they were first written at (./version-audience.ts).
+        // A withdrawn package lost its catalogue entry, so publishing it again writes the entry back.
         const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
-            catalogue: (previous?.visibility ?? 'public') !== visibility,
+            catalogue: (previous?.visibility ?? 'public') !== visibility || previous?.status === 'withdrawn',
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
@@ -517,6 +521,8 @@ export async function openPackage(
     const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
     const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
     if (!(await datapackageReadable(deps.storage, ownerGhii, pointer?.visibility, reader))) return null;
+    // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
+    if (pointer?.status === 'withdrawn') return null;
 
     let hash = contentHash;
     let latest: LatestPointer | undefined;

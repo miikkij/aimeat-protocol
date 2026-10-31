@@ -1465,6 +1465,13 @@
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.1), the node's own read: the tags of a version's descriptor file, for the audience the ODPS sheet states. No bytes are read and nothing read is answered; the package itself is opened through openPackage, which asks the package's audience."
     },
+    "src/services/datapackage/withdraw.ts": {
+      "reads": {
+        "listStorageFiles": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.3), the node's own read: the owner's own package files listed to delete them on a purge, and the package's catalogue manifest read for the entry keys to remove. Nothing read is answered; the caller is the owner or the owner's principal with storage:write."
+    },
     "src/services/datapackage/store.ts": {
       "reads": {
         "getStorageFile": 8,

@@ -18,24 +18,28 @@
  *   `datapkg/` (a key the owner uploaded by hand, a file with no pointer or no descriptor beside it) is
  *   'not-package' and keeps the ordinary file rules, so the package's audience opens nothing it did
  *   not publish. A 'closed' file also keeps the ordinary rules, so a consent grant that admitted it
- *   before still does.
+ *   before still does. A withdrawn package's file is 'withdrawn' for a reader the audience admits, and
+ *   /v1/pub answers it 410 (./withdraw.ts).
  * @structure PackageFileVerdict · packageFileVerdict
  * @usage
  *   const verdict = await packageFileVerdict(storage, gaii, key, req.auth);
  *   if (verdict.kind === 'open' && file.visibility !== 'public') { ...serve... }
  * @version-history
+ *   v1.1.0 — 2026-11-01 — 'withdrawn': a withdrawn package's own file (plan doc-mvwxcas3dom3, D0.3).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.4).
  */
 import type { Storage } from '../../storage/interface.js';
 import { logger } from '../../utils/logger.js';
 import { descriptorKey, latestKey, resourceKey, type Descriptor, type LatestPointer } from './contract.js';
 import { datapackageReadable, versionOpenTo, type DatapackageReader } from './audience.js';
+import { withdrawalOf } from './withdraw.js';
 
 /** What a /v1/pub read of a key under `datapkg/` is, for one reader. */
 export type PackageFileVerdict =
     | { kind: 'not-package' }
     | { kind: 'open' }
-    | { kind: 'closed' };
+    | { kind: 'closed' }
+    | { kind: 'withdrawn'; withdrawnAt: string };
 
 /** `datapkg/{name}/latest.json` or `datapkg/{name}/{hash}/{rest}`. */
 const PACKAGE_FILE_RE = /^datapkg\/([a-z0-9][a-z0-9-]{0,62}[a-z0-9])\/(?:latest\.json|([a-f0-9]{64})\/(.+))$/;
@@ -77,6 +81,10 @@ export async function packageFileVerdict(
     }
 
     if (!(await datapackageReadable(storage, ownerGhii, pointer.visibility, reader))) return { kind: 'closed' };
+    // A withdrawn package's files are served to nobody (./withdraw.ts); a reader the audience admits
+    // learns it was withdrawn, anyone else gets the ordinary refusal.
+    const withdrawn = withdrawalOf(pointer);
+    if (withdrawn) return { kind: 'withdrawn', withdrawnAt: withdrawn.withdrawnAt };
     if (hash && versionFile && !(await versionOpenTo(storage, ownerGhii, reader, pointer, hash, versionFile))) return { kind: 'closed' };
     return { kind: 'open' };
 }
