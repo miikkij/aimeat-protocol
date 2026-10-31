@@ -22,6 +22,8 @@
  *   v1.3.0 — 2026-10-11 — A contract holder short of morsels hears the daily allowance and, when the
  *                         operator sells one, the pacing pack and its money price (insufficientMorselsMessage),
  *                         as every other INSUFFICIENT_MORSELS answer says.
+ *   v1.4.0 — 2026-10-31 — `refused_product` is sent with the status, code and sentence the door's
+ *                         productRefusal wrote (secaudit 2026-10-31 inv-05).
  */
 import type { AimeatConfig } from '../../config.js';
 import { error } from '../../middleware/envelope.js';
@@ -89,6 +91,9 @@ export function meteredRefusalText(outcome: Refusal, label: string, config?: Aim
     case 'settlement_failed':
       return { status: 500, code: 'SETTLEMENT_FAILED',
         message: `Payment for ${label} could not be settled (${outcome.reason}); you were not charged.` };
+    case 'refused_product':
+      // The door wrote this refusal itself (MeteredCallArgs.productRefusal); it is sent as written.
+      return { status: outcome.refusal.statusCode, code: outcome.refusal.code, message: outcome.refusal.message };
   }
 }
 

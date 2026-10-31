@@ -13,6 +13,8 @@
  * @structure setup (provider ext + priced manifest + consumer contract) · one test per (surface × principal)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=money-audit
  * @version-history
+ *   2026-10-31 — BROKEN BINDING: a contracted call to a tool bound to a missing capability, or to another
+ *     owner's, costs nothing on the REST door and its MCP twin (secaudit 2026-10-31 inv-05).
  *   2026-10-24 — CHAIN: the supplier's action reports the reseller as its caller, not the end user
  *     (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -1750,6 +1752,57 @@ await test('LINEAGE · the consumer list of a listing is the PROVIDER\'s, and no
     assert(mine.status === 200, `the provider reads their own lineage: ${mine.status}`);
     const theirs = await json(`/v1/exchange/offerings/${offeringSolo}/consumers`, { headers: auth(consumer.token) });
     assert(theirs.status === 404, `another owner read the provider's consumer list: ${theirs.status}`);
+});
+
+// ── A contracted call to a tool that cannot run is refused before it is charged ──────────────────
+// The binding was resolved after the settle: a capability that is missing kept the charge, and one
+// the app's owner does not own was charged and refunded (secaudit 2026-10-31 inv-05).
+const APP_BROKEN = `moneyaudit-broken-${Date.now()}.html`;
+let offeringGone = '';
+let offeringBorrowed = '';
+
+await test('Setup: a priced manifest whose tools bind a missing capability and another owner\'s', async () => {
+    const borrowedId = `ma-borrowed-${Date.now()}`;
+    const cap = await json('/v1/capabilities', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({
+        id: borrowedId, name: 'Consumer capability', summary: 'owned by the consumer', visibility: 'private',
+        source: { type: 'manual', ref: 'manual', version: '1.0.0' }, callable: true,
+    }) });
+    assert(cap.status === 201, `capability ${cap.status}: ${JSON.stringify(cap.body?.error)}`);
+    const base = { inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS, tollMorsels: 4, exchange: true };
+    const put = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+        key: `apps.${APP_BROKEN}.tools`, visibility: 'public', value: { version: 1, tools: [
+            { ...base, name: 'gone', description: 'Bound to an action nobody installed', action_id: `ext:${EXT}:nosuch` },
+            { ...base, name: 'borrowed', description: 'Bound to the consumer\'s capability', action_id: borrowedId },
+        ] } }) });
+    // A new key: POST /v1/memory answers 201 for a record it creates.
+    assert(put.status === 201, `manifest ${put.status}: ${JSON.stringify(put.body?.error)}`);
+    const offs = await json('/v1/exchange/offerings', { headers: auth(consumer.token) });
+    const listed = (offs.body.data.offerings as any[]).filter(o => o.providerOwner === provider.name && o.ext === `apptool:${provider.name}/${APP_BROKEN}`);
+    offeringGone = listed.find(o => o.action === 'gone')?.offeringId ?? '';
+    offeringBorrowed = listed.find(o => o.action === 'borrowed')?.offeringId ?? '';
+    assert(!!offeringGone && !!offeringBorrowed, `both tools are listed: ${JSON.stringify(listed.map(o => o.action))}`);
+    for (const id of [offeringGone, offeringBorrowed]) {
+        const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ offering_id: id, cap_units: 100 }) });
+        assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+    }
+});
+
+await test('BROKEN BINDING · a contracted call to a missing or borrowed capability costs nothing, on both doors', async () => {
+    const cExt = `apptool:${provider.name}/${APP_BROKEN}`;
+    const mcp = captureTools(consumer.gaii, consumer.token)['aimeat_app_tool_invoke'];
+    for (const [tool, code] of [['gone', 'CAPABILITY_NOT_FOUND'], ['borrowed', 'CAPABILITY_NOT_OWNED_BY_APP']] as const) {
+        const cb = await balance(consumer.token);
+        const before = await contract(consumer.token, cExt, tool);
+        const r = await json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP_BROKEN)}/webmcp/tools/${tool}`,
+            { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ input: { q: 'hi' } }) });
+        assert(r.body?.error?.code === code, `REST ${tool}: expected ${code}, got ${r.status} ${JSON.stringify(r.body?.error)}`);
+        const m = parse(await mcp({ owner: provider.name, app: APP_BROKEN, tool, input: { q: 'hi' } }));
+        assert(String(m.error ?? '').startsWith(`${code}:`), `MCP ${tool}: expected ${code}, got ${JSON.stringify(m)}`);
+        const after = await contract(consumer.token, cExt, tool);
+        assert(await balance(consumer.token) === cb, `REST + MCP ${tool}: the consumer was charged ${cb - await balance(consumer.token)} morsels`);
+        assert(after.budget.calls === before.budget.calls && after.budget.spent_units === before.budget.spent_units,
+            `REST + MCP ${tool}: the contract meter moved by ${after.budget.calls - before.budget.calls} calls, ${after.budget.spent_units - before.budget.spent_units} units`);
+    }
 });
 
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);
