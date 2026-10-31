@@ -12,6 +12,7 @@
  *   the library sources names one exact version.
  * @usage cd aimeat && pnpm exec vitest run test/unit/sdk-libs-cdn-pins.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — DOMPurify is loaded at 3.4.17 or newer (secaudit2026oct31w2 round 10b).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { describe, it, expect } from 'vitest';
@@ -64,5 +65,17 @@ describe('the served libraries load third-party scripts by exact version', () =>
   it('every CDN address names one exact version, never a range', () => {
     const floating = cdnRefs().filter(r => !r.version || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(r.version));
     expect(floating.map(r => `${r.file}: ${r.url}`)).toEqual([]);
+  });
+
+  // secaudit2026oct31w2 round 10b: DOMPurify 3.4.12 has five published advisories that 3.4.17 fixes
+  // (GHSA-55q2-fjhq-7xh7, GHSA-6688-9rhm-gjv2, GHSA-c6gr-qvv4-5v3f, GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr).
+  it('DOMPurify is loaded at 3.4.17 or newer', () => {
+    const purify = cdnRefs().filter(r => r.url.includes('/dompurify'));
+    expect(purify.length).toBeGreaterThan(0);
+    const older = purify.filter(r => {
+      const [a, b, c] = (r.version ?? '0.0.0').split(/[.-]/).map(Number);
+      return a! * 1e6 + b! * 1e3 + c! < 3 * 1e6 + 4 * 1e3 + 17;
+    });
+    expect(older.map(r => `${r.file}: ${r.url}`)).toEqual([]);
   });
 });
