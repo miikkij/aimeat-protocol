@@ -23,17 +23,7 @@
  */
 import type { SiteContact, SiteLinksConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
-
-/**
- * Euros per US dollar as the fleet service writes it: empty, or a plain positive decimal up to 10
- * ("0.8634"). Ten is far above any EUR/USD rate there has been; a larger number is a typo.
- */
-export function isEurPerUsd(v: unknown): boolean {
-  if (v === '') return true;
-  if (typeof v !== 'string' || !/^\d{1,2}(\.\d{1,8})?$/.test(v)) return false;
-  const n = Number(v);
-  return n > 0 && n <= 10;
-}
+import { isEurPerUsd } from './utils/eur-per-usd.js';
 
 /**
  * The people printed on the public pages, from `AIMEAT_SITE_CONTACTS` (a JSON array of

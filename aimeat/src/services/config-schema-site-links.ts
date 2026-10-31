@@ -26,7 +26,7 @@
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validators.js';
-import { isEurPerUsd } from '../config-site-contacts.js';
+import { isEurPerUsd } from '../utils/eur-per-usd.js';
 
 /** A note is one sentence on the front page: plain text, short. */
 const isStoreNote = (v: unknown) => typeof v === 'string' && v.length <= 300;
