@@ -13469,6 +13469,11 @@
     "install": "Instalar",
     "notNow": "Ahora no"
   },
+  "homeConnect": {
+    "lead": "Conecta aquí ChatGPT, Claude o Grok (MCP es el enchufe que da a tu IA memoria y manos), y se convierte en tu jefe de gabinete. Elige tu IA para ver los pasos para ella.",
+    "button": "Conectar {ai}",
+    "other": "Otra IA"
+  },
   "homeJourney": {
     "promptFold": "Avanzado: una instrucción lista para una IA que usas en otro sitio",
     "title": "¿Qué quieres hacer?",
@@ -13509,6 +13514,8 @@
     "destinationTitle": "Tu propia IA hace tu trabajo aquí",
     "destinationLead": "Recuerda lo que sabes, usa aplicaciones hechas para ella, mantiene agentes trabajando mientras no estás y comparte con las personas que elijas. Todo es tuyo, y vienes a esta página para aprobar, pagar o mirar.",
     "path": "Tu camino",
+    "pathCount": "Tu puesta en marcha: {done}/{total} hecho",
+    "pathNext": "Siguiente:",
     "stage": {
       "ai": "Una buena IA",
       "connect": "Conectada aquí",
@@ -13516,7 +13523,14 @@
       "organise": "Un lugar para tu trabajo",
       "apps": "Aplicaciones",
       "agents": "Agentes trabajando",
-      "share": "Compartido con otros"
+      "share": "Compartido con otros",
+      "aiWhat": "La IA con la que trabajas: el chat de este sitio, o tu propio Claude, ChatGPT o Grok.",
+      "connectWhat": "Conecta aquí tu propia IA, para que vea tu información y pueda trabajar por ti.",
+      "firstResultWhat": "Cuéntale a la IA sobre ti y tu trabajo, para que sepa ayudarte a ti en concreto.",
+      "organiseWhat": "Reúne la información de tu trabajo en un lugar que luego puedes compartir con otros.",
+      "appsWhat": "Pide a la IA una aplicación que haga una cosa por ti.",
+      "agentsWhat": "Da a un agente un trabajo que hace con un horario, también cuando no estás.",
+      "shareWhat": "Comparte un lugar o una aplicación con las personas con las que trabajas."
     },
     "roadsTitle": "¿Qué IA usas?",
     "roadSubscription": "Pago por una IA",

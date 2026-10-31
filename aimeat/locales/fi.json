@@ -15322,6 +15322,11 @@
     "install": "Asenna",
     "notNow": "Ei nyt"
   },
+  "homeConnect": {
+    "lead": "Yhdistä ChatGPT, Claude tai Grok tähän (MCP = pistoke, jolla tekoälysi saa muistin ja kädet), niin siitä tulee esikuntapäällikkösi. Valitse tekoälysi, niin näet vaiheet juuri sille.",
+    "button": "Yhdistä {ai}",
+    "other": "Muu tekoäly"
+  },
   "homeJourney": {
     "promptFold": "Lisäasetukset: valmis kehote tekoälylle, jota käytät muualla",
     "title": "Mitä haluat saada aikaan?",
@@ -15362,6 +15367,8 @@
     "destinationTitle": "Oma tekoälysi tekee työsi täällä",
     "destinationLead": "Se muistaa, mitä tiedät, käyttää sille tehtyjä sovelluksia, pitää agentit töissä silloinkin, kun olet poissa, ja jakaa työsi niiden kanssa, jotka valitset. Kaikki on sinun. Tälle sivulle tulet hyväksymään, maksamaan tai katsomaan.",
     "path": "Polkusi",
+    "pathCount": "Käyttöönottosi: {done}/{total} tehty",
+    "pathNext": "Seuraavaksi:",
     "stage": {
       "ai": "Hyvä tekoäly",
       "connect": "Yhdistetty tänne",
@@ -15369,7 +15376,14 @@
       "organise": "Paikka työllesi",
       "apps": "Sovellukset",
       "agents": "Agentit töissä",
-      "share": "Jaettu muille"
+      "share": "Jaettu muille",
+      "aiWhat": "Tekoäly, jolla teet työtä: tämän paikan chat tai oma Claude, ChatGPT tai Grok.",
+      "connectWhat": "Yhdistä oma tekoälysi tänne, niin se näkee tietosi ja saa tehdä työtä puolestasi.",
+      "firstResultWhat": "Kerro tekoälylle itsestäsi ja työstäsi, niin se osaa auttaa juuri sinua.",
+      "organiseWhat": "Kokoa työsi tiedot yhteen paikkaan, jonka voit myöhemmin jakaa muille.",
+      "appsWhat": "Pyydä tekoälyä tekemään sovellus, joka hoitaa yhden asian puolestasi.",
+      "agentsWhat": "Anna agentille työ, jonka se tekee aikataululla myös silloin, kun et ole paikalla.",
+      "shareWhat": "Jaa paikka tai sovellus ihmisille, joiden kanssa teet työtä."
     },
     "roadsTitle": "Mitä tekoälyä käytät?",
     "roadSubscription": "Maksan tekoälystä",

@@ -16,6 +16,8 @@
  * @structure JourneyPath · RoadChooser · ConnectBox (moved from journey.js) · PromptRoad
  * @usage html`<${JourneyPath} journey=${journey} />  <${RoadChooser} journey=${journey} />`
  * @version-history
+ *   v1.4.0 — 2026-10-31 — The path says how many stages are done and which is next, with what it is
+ *     in one sentence; each stage says what it is on hover (v31 K27).
  *   v1.3.1 — 2026-10-16 — The road is saved only on top of a strict read of journey.state: a failed read
  *     writes nothing instead of replacing what the person's AI wrote there (QA audit F6-04).
  *   v1.3.0 — 2026-10-03 — The road for an AI that cannot connect makes the profile: it offers the
@@ -71,14 +73,23 @@ export const refreshHome = () => {
   invalidateShared('home-first-note', `/v1/memory/${FIRST_NOTE_KEY}?soft=1`);
 };
 
-/** The seven stages, done or open, each a link to where it is looked after. */
+/**
+ * The seven stages, done or open, each a link to where it is looked after, with how many are done
+ * and the next one in words: "Käyttöönottosi: 3/7 tehty. Seuraavaksi: Yhdistä tekoälysi →" (v31
+ * K27; the bare tiles read as a riddle). Each stage says what it is in one sentence on hover, and
+ * the next one says it out loud.
+ */
 export function JourneyPath({ journey }) {
   if (!journey?.stages?.length) return null;
+  const stages = journey.stages;
+  const done = stages.filter((s) => s.done).length;
+  const next = stages.find((s) => !s.done && !s.declined);
   return html`
-    <${NamedRow} label=${t('homeJourney.path')}>
-      ${journey.stages.map((s) => html`
-        <${CheckItem} key=${s.id} done=${s.done} href=${STAGE_HREF[s.id]}>${t(stageKey(s.id))}<//>`)}
-    <//>`;
+    <${NamedRow} label=${t('homeJourney.pathCount', { done, total: stages.length })}>
+      ${stages.map((s) => html`
+        <${CheckItem} key=${s.id} done=${s.done} href=${STAGE_HREF[s.id]} title=${t(stageKey(s.id) + 'What')}>${t(stageKey(s.id))}<//>`)}
+    <//>
+    ${next && html`<${Hint}>${t('homeJourney.pathNext')} <${Action} href=${STAGE_HREF[next.id]}>${t(stageKey(next.id))} →<//> ${t(stageKey(next.id) + 'What')}<//>`}`;
 }
 
 /** Write the chosen road into the person's record, keeping whatever their AI wrote there. The read is
