@@ -21,10 +21,18 @@
  *   - POST /v1/datapackages            publish a version (refuses before writing)
  *   - POST /v1/datapackages/validate   the same gate, no write — infer + check and report
  *   - GET  /v1/datapackages            the caller's own packages, newest version each
- *   - GET  /v1/datapackages/:owner/:name         the descriptor (public packages: no auth)
+ *   - GET  /v1/datapackages/:owner/:name         the descriptor (public packages: no auth), with odps_url
+ *   - GET  /v1/datapackages/:owner/:name/odps    the ODPS sheet, projected from the version's audience
+ *   - DELETE /v1/datapackages/:owner/:name       withdraw (?purge=true deletes the files too)
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.6.0 -- 2026-11-01 -- DELETE /v1/datapackages/:owner/:name withdraws a package (?purge=true deletes
+ *     its files and pointer); the reads answer 410 GONE for a withdrawn package to a reader its audience
+ *     admits (plan doc-mvwxcas3dom3, D0.3).
+ *   v1.5.0 -- 2026-11-01 -- GET /v1/datapackages/:owner/:name/odps answers the ODPS sheet projected at
+ *     read time from the version's audience, and the descriptor read names it as `odps_url`; the sheet
+ *     stored at publish said public and "No authentication" for every package (plan doc-mvwxcas3dom3, D0.1).
  *   v1.4.1 -- 2026-10-24 -- POST /v1/datapackages refuses the shared anonymous principal with 401
  *     AUTH_REQUIRED (refuseAnonymousPrincipal): a package is written outside the anonymous namespaces
  *     (secaudit2026oct22).
@@ -55,7 +63,7 @@ import { requireAuth, requireScope, optionalAuth } from '../auth/middleware.js';
 import { refuseAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
-import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf, localAccountName } from '../utils/gaii.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import { inferSchema, validateRows, type ValidationIssue } from '../services/datapackage/table.js';
 import type { PublishInput, TableSchema } from '../services/datapackage/contract.js';
@@ -63,8 +71,11 @@ import { publishPackage, openPackage, readRows, listPackages, listVersions, pars
 import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapackage/publish-ask.js';
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
-import { denyScope403 } from '../auth/deny.js';
+import { denyScope403, deny403 } from '../auth/deny.js';
+import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
+import { odpsSheetFor, odpsAddress } from '../services/datapackage/odps-read.js';
+import { ODPS_VERSION } from '../services/exchange-odps.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -84,6 +95,13 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * package or version is there for its owner, so a missing one or a missing resource stays 404.
      */
     const refusedForScope = async (req: Request, res: Response, ref: string): Promise<boolean> => {
+        // A withdrawn package answers 410 to a reader its audience admits; anyone else gets the 404
+        // below, so a withdrawn non-public package does not reveal that it existed.
+        const withdrawn = await withdrawalOfRef(store, ref, config.nodeId, req.auth);
+        if (withdrawn) {
+            res.status(410).json(error(config.nodeId, 'GONE', withdrawnMessage(ref, withdrawn.withdrawnAt), undefined, { withdrawn_at: withdrawn.withdrawnAt }));
+            return true;
+        }
         const parsed = parseRef(ref, config.nodeId);
         if (!parsed || !lacksPackageReadScope(parsed.ownerGhii, req.auth)) return false;
         if (await openPackage(store, ref, config.nodeId, req.auth)) return false;
@@ -179,6 +197,7 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             package_id: out.descriptor.aimeat.packageId,
             content_hash: out.contentHash,
             descriptor_url: out.descriptorUrl,
+            odps_url: odpsAddress(config.baseUrl, localAccountName(ownerGhii), input.name, out.contentHash),
             // NOT a new version: the same bytes were already at this address. A deterministic
             // producer proving it is deterministic should not be reported as an update.
             unchanged: out.unchanged,
@@ -237,15 +256,66 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${ref}`));
             return;
         }
+        const odpsUrl = odpsAddress(config.baseUrl, req.params.owner as string, req.params.name as string, opened.descriptor.aimeat.contentHash);
         res.json(success(config.nodeId, {
             descriptor: opened.descriptor,
             descriptor_url: opened.descriptorUrl,
+            // The ODPS product sheet of this version, projected from its audience when it is read.
+            odps_url: odpsUrl,
             // Present only on an unpinned read, and it is where a consumer learns that the LATEST
             // attempt failed while the version they are reading is the last good one.
             ...(opened.latest ? { latest: opened.latest } : {}),
         }, [
             { description: 'The permanent address of these bytes', method: 'GET', url: opened.descriptorUrl },
+            { description: 'The ODPS product sheet of this version (YAML)', method: 'GET', url: odpsUrl },
         ]));
+    });
+
+    /**
+     * Withdraw a package (services/datapackage/withdraw.ts): every read answers 410 after it and the
+     * catalogue no longer lists it; the version files stay unless `?purge=true`, which deletes them and
+     * the pointer. The owner in person, or the owner's principal with storage:write; every refusal comes
+     * before any write. The shared anonymous principal is refused with 401 as on the publish.
+     */
+    // requireScope answers a principal without storage:write before the service; the service asks the
+    // same word again for the MCP tool, which reaches it without this middleware.
+    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope(DATAPACKAGE_WITHDRAW_SCOPE), async (req, res) => {
+        const purge = req.query.purge === 'true' || req.query.purge === '1';
+        const out = await withdrawPackage(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string, { purge });
+        if (!out.ok) {
+            if (out.code === 'SCOPE_DENIED') { denyScope403(req, res, [DATAPACKAGE_WITHDRAW_SCOPE], out.message); return; }
+            if (out.code === 'FORBIDDEN') { deny403(req, res, out.code, out.message); return; }
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            package_id: out.packageId, name: out.name, status: 'withdrawn', withdrawn_at: out.withdrawnAt,
+            purged: out.purged, already_withdrawn: out.alreadyWithdrawn, files_deleted: out.filesDeleted,
+            catalogue_removed: out.catalogueRemoved,
+        }, [
+            { description: 'Your packages, with this one marked withdrawn (or gone, when purged)', method: 'GET', url: '/v1/datapackages' },
+            ...(out.purged ? [] : [{ description: 'Publish a version again to restore it', method: 'POST', url: '/v1/datapackages' }]),
+        ]));
+    });
+
+    /**
+     * The ODPS v4.1 product sheet of one version, projected now from the descriptor and the version's
+     * audience (services/datapackage/odps-read.ts): YAML, or the envelope with `?format=json`. Readable
+     * by whoever may read the package, refused as the descriptor read refuses.
+     */
+    router.get('/v1/datapackages/:owner/:name/odps', optionalAuth(), async (req, res) => {
+        const ref = buildRef(req.params.owner as string, req.params.name as string, req.query.version);
+        const sheet = await odpsSheetFor(store, ref, config.nodeId, req.auth);
+        if (!sheet) {
+            if (await refusedForScope(req, res, ref)) return;
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No such data package: ${ref}`));
+            return;
+        }
+        if (req.query.format === 'json') {
+            res.json(success(config.nodeId, { odps_version: ODPS_VERSION, content_hash: sheet.contentHash, odps: sheet.doc }));
+            return;
+        }
+        res.type('text/yaml; charset=utf-8').send(sheet.yaml);
     });
 
     /**

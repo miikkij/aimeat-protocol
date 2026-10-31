@@ -10,6 +10,8 @@
  * @usage
  *   import { coreTools } from './tool-call-defs-core.js';
  * @version-history
+ *   2026-11-01 -- aimeat_datapackage_withdraw: a proxy over DELETE /v1/datapackages/{owner}/{name}
+ *     (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-25 -- The aimeat_admin_incident_resolve comment names an incident's entries too ("clear" /
  *     "delete" / "keep"; secaudit2026oct22); the handler is unchanged.
  *   2026-10-25 — aimeat_admin_config forwards section and q; aimeat_admin_config_set proxies PUT /v1/admin/config.
@@ -309,6 +311,17 @@ export const coreTools: ConnectCliToolDefinition[] = [
                 limit: optionalNumber(input, 'limit'),
                 offset: optionalNumber(input, 'offset'),
                 select: select?.length ? select.join(',') : undefined,
+            })}`);
+        },
+    },
+    {
+        name: 'aimeat_datapackage_withdraw',
+        // A proxy over DELETE /v1/datapackages/{owner}/{name}, which decides who may withdraw.
+        handler: ({ client }, input) => {
+            const m = /^pkg:([^/@]+)\/([^@]+)(?:@sha256:[a-f0-9]{64})?$/.exec(requiredString(input, 'ref'));
+            if (!m) throw new Error('ref must look like "pkg:owner/name"');
+            return client.delete(`/v1/datapackages/${encodeURIComponent(m[1])}/${encodeURIComponent(m[2])}${query({
+                purge: optionalBoolean(input, 'purge') ? 'true' : undefined,
             })}`);
         },
     },

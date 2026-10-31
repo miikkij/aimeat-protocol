@@ -63,6 +63,8 @@ Kirjaudut kirjautumislinkillä. Kirjoita osoitteesi kirjautumisikkunaan, niin sa
 
 <!--store-->
 Esittely ([aimeat.io](https://aimeat.io)), kauppa ([store.aimeat.io](https://store.aimeat.io)) ja oma AIMEATisi ovat kolme erillistä tiliä. Jos yhdessä sattuu jotain, se ei vaikuta muihin.
+
+![Esittely, kauppa ja oma AIMEATisi ovat kolme erillistä tiliä](/help/img/three-accounts-fi.png)
 <!--/store-->
 
 <!--nostore-->
