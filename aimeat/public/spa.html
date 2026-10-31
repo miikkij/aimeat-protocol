@@ -1293,6 +1293,37 @@
       return signInFirst(pathname, !!getSession()) ? SIGN_IN_FIRST : matchRoute(pathname, search);
     }
 
+    // A VIEW WHOSE MODULES DID NOT ARRIVE RELOADS THE PAGE ONCE. The settings page imports some sixty
+    // modules, and on store-sold places one to eight of them at random sometimes failed in the
+    // browser (net::ERR_FAILED) without the request ever reaching the server, so the page showed
+    // "Failed to load page" (aimeat-commercial, 2026-10-31). A module that failed stays failed in this
+    // page's module map, so importing it again here cannot succeed; a fresh page load can. One reload
+    // per address within a minute, so a view that is really broken still shows its error.
+    const VIEW_RELOAD_KEY = 'aimeat.viewReload';
+    const isModuleLoadFailure = (err) =>
+      /dynamically imported module|Importing a module script failed|error loading dynamically imported module/i
+        .test(String(err?.message || err));
+    async function loadView(loader) {
+      try {
+        const mod = await loader();
+        try { sessionStorage.removeItem(VIEW_RELOAD_KEY); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+        return mod;
+      } catch (err) {
+        if (isModuleLoadFailure(err)) {
+          let last = null;
+          try { last = JSON.parse(sessionStorage.getItem(VIEW_RELOAD_KEY) || 'null'); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+          const here = location.pathname + location.search;
+          if (!last || last.path !== here || Date.now() - last.at > 60000) {
+            try { sessionStorage.setItem(VIEW_RELOAD_KEY, JSON.stringify({ path: here, at: Date.now() })); } catch (e) { console.warn('[spa] view reload flag:', e.message); }
+            console.warn('[spa] a view module did not load; reloading the page once:', err.message);
+            location.reload();
+            return new Promise(() => {});
+          }
+        }
+        throw err;
+      }
+    }
+
     // ── App Component ──
     function App() {
       const [View, setView] = useState(null);
@@ -1314,7 +1345,7 @@
         
         try {
           setViewError(null);
-          const mod = await loader();
+          const mod = await loadView(loader);
           setView(() => mod.default);
         } catch (err) {
           console.error('Failed to load view:', err);
@@ -1373,7 +1404,7 @@
         const onPopState = () => {
           window.__aimeatLook?.apply(location.pathname);
           const loader = viewFor(location.pathname, location.search);
-          loader().then(mod => {
+          loadView(loader).then(mod => {
             setViewError(null);
             setView(() => mod.default);
           }).catch(err => {
@@ -1445,9 +1476,12 @@
         if (signedInOnly()) navigate(location.pathname + location.search, true);
       }, [signedIn, navigate]);
 
+      // Retry after a module that did not arrive is a page load: this page's module map keeps the
+      // failure, so navigating again would fail the same way (loadView above).
       const retryView = useCallback(() => {
+        if (isModuleLoadFailure(viewError)) { location.reload(); return; }
         navigate(location.pathname + location.search, true);
-      }, [navigate]);
+      }, [navigate, viewError]);
 
       // The design lab's preview page is drawn inside a frame of the lab, so it carries no chrome.
       const bare = window.location.pathname === '/v1/design-lab/frame';
