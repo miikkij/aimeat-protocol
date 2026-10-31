@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description The handover link the fleet's control service asks for inside a place's container
  *   (services/handover-link.ts, `aimeat handover-link`): it signs the one person in, once, and lands
- *   on their Home; it refuses to guess between two people, and it never issues a link for an account
+ *   on their Home; it needs the account named, and it never issues a link for an account
  *   whose login link is off or that is deactivated.
  * @version-history
  *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P3).
@@ -41,7 +41,7 @@ describe('the handover link', () => {
 
   it('signs the one person in, once, and lands on their Home in their language', async () => {
     await person('buyer');
-    const out = await issueHandoverLink(storage, config, { lang: 'fi' });
+    const out = await issueHandoverLink(storage, config, { account: 'buyer', lang: 'fi' });
     expect(out.ok).toBe(true);
     if (!out.ok) return;
     expect(out.account).toBe('buyer');
@@ -56,14 +56,10 @@ describe('the handover link', () => {
     expect((await redeemLoginLink(storage, config, token)).ok).toBe(false);
   });
 
-  it('refuses to choose between two people, and names them', async () => {
+  it('never guesses whose link: the account is required, and the named one gets it', async () => {
     await person('anna');
     await person('bert');
-    const out = await issueHandoverLink(storage, config);
-    expect(out.ok).toBe(false);
-    if (out.ok) return;
-    expect(out.code).toBe('AMBIGUOUS');
-    expect(out.candidates).toEqual(['anna', 'bert']);
+    expect(await issueHandoverLink(storage, config)).toMatchObject({ ok: false, code: 'INVALID_INPUT' });
     const named = await issueHandoverLink(storage, config, { account: 'bert' });
     expect(named.ok && named.account).toBe('bert');
   });
@@ -71,7 +67,6 @@ describe('the handover link', () => {
   it('issues nothing for an account whose login link is off, or that is deactivated', async () => {
     await person('quiet', false);
     expect(await issueHandoverLink(storage, config, { account: 'quiet' })).toMatchObject({ ok: false, code: 'LOGIN_LINK_OFF' });
-    expect(await issueHandoverLink(storage, config)).toMatchObject({ ok: false, code: 'NO_OWNER' });
     await person('gone');
     await storage.updateOwner('gone', { disabledAt: new Date().toISOString() });
     expect(await issueHandoverLink(storage, config, { account: 'gone' })).toMatchObject({ ok: false, code: 'ACCOUNT_DISABLED' });
