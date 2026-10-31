@@ -30,6 +30,9 @@
  * @usage
  *   const visible = await publiclyResolvableWithShares(storage, config, [row.id]);
  * @version-history
+ *   2026-11-01 — sharedPublishedProvenanceIds reads a record's id from the end of its key
+ *     (spaceRowAt), so a page whose id holds a dot owes its label in the member read when the share
+ *     opens it (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.3.0 — 2026-10-18 — publiclyResolvableWithShares also counts a welcome page or a company front
  *     page served while it is on (services/served-page-provenance.ts): their files are owner-only
  *     since plan doc-mvcn6c7e4e5q V0.3, and the record of a served page answered 404.
@@ -52,6 +55,7 @@ import { createPublicCollectors } from './workspace-public-collectors.js';
 import { readerFor } from './classification/reader.js';
 import { shareIsOpen, isDocPublicAt, readShareMetaOf } from './workspace-share.js';
 import { servedPageProvenanceIds } from './served-page-provenance.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 import type { ResolvedShare } from '../routes/organisms/share-types.js';
 
 /** `organism.{org}.w.{ws}.` — the workspace a published record key belongs to. */
@@ -168,17 +172,20 @@ export async function sharedPublishedProvenanceIds(
   const share = await readShareMetaOf(storage, config, orgId, ws);
   if (!shareIsOpen(share)) return new Set();
   const root = `organism.${orgId}.w.${ws}.`;
-  const spaces = ((manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [])
+  const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
+  const spaces = objectTypes
     .filter(ot => typeof ot.name === 'string' && typeof ot.namespace === 'string')
     .map(ot => ({ name: ot.name as string, prefix: `${root}${ot.namespace as string}.` }));
+  const prefixes = spacePrefixesOf(root.slice(0, -1), objectTypes);
   const items: Array<{ type: string; id: string; aiProvenanceId: string }> = [];
   for (const r of rows) {
     if (!r.aiProvenanceId) continue;
-    const space = spaces.find(s => r.key.startsWith(s.prefix));
-    if (!space) continue;
-    const [instanceId, ...role] = r.key.slice(space.prefix.length).split('.');
-    const which = role.join('.');
-    if (instanceId && (which === 'latest' || which === '')) items.push({ type: space.name, id: instanceId, aiProvenanceId: r.aiProvenanceId });
+    // The record's id is read from the end of the key (spaceRowAt), so a page whose id holds a dot
+    // owes its label under its whole id (secaudit2026oct31w2 round 10b); the longest space wins.
+    for (const space of spaces) {
+      const row = spaceRowAt(r.key, space.prefix, prefixes);
+      if (row && (row.copy === 'latest' || row.copy === 'bare')) { items.push({ type: space.name, id: row.id, aiProvenanceId: r.aiProvenanceId }); break; }
+    }
   }
   return shareOpenedIdsOf(share, items);
 }

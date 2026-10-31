@@ -56,6 +56,9 @@
  *     item carries `_writtenBy`, the account that holds it, for a member to read who made a page.
  *   v1.15.0 — 2026-10-27 — POST /v1/organisms/:id/comments checks its body with validateBody
  *     (models/write-body-schemas.ts): a too-long or junk value is a 400 naming the field.
+ *   2026-11-01 — GET /v1/organisms/:id/workspace reads a record's id from the end of its key
+ *     (spaceRowAt), so a record or page whose id holds a dot is listed under its whole id; it was
+ *     left out (secaudit2026oct31w2 round 10b, dotted record ids).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -67,6 +70,7 @@ import { requireAuth, requireScope } from '../../auth/middleware.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { isMemoryBackedSpace, readWorkspaceSchemas, normalizeMemberChangeRule, DEFAULT_MEMBER_CHANGE_RULE } from '../../services/workspace-meta.js';
 import { readStoredSections } from '../../services/workspace-sections.js';
+import { spacePrefixesOf, spaceRowAt } from '../../services/workspace-record-key.js';
 import { workspaceRowIndex } from '../../services/workspace-rows/row-service.js';
 import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
@@ -174,6 +178,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const objectTypes = (manifest?.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
     const objects: Record<string, unknown[]> = {};
     const drafts: Record<string, unknown[]> = {};
+    const prefixes = spacePrefixesOf(nsRoot.slice(0, -1), objectTypes);
     for (const ot of objectTypes) {
       const name = typeof ot.name === 'string' ? ot.name : undefined;
       const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
@@ -181,18 +186,18 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       const nsPrefix = `${nsRoot}${namespace}.`;
       const instances = new Map<string, { bare?: MemoryRecord; latest?: MemoryRecord; draft?: MemoryRecord }>();
       for (const r of readable) {
-        if (!r.key.startsWith(nsPrefix)) continue;
-        const parts = r.key.slice(nsPrefix.length).split('.');
-        const instanceId = parts[0];
-        const role = parts.slice(1).join('.');
-        const slot = instances.get(instanceId) ?? {};
+        // The id is read from the end of the key (spaceRowAt), so a record whose id holds a dot is
+        // read under its whole id; split on the first dot it was an empty slot and left out
+        // (secaudit2026oct31w2 round 10b). A key of a longer namespace is left to that space.
+        const row = spaceRowAt(r.key, nsPrefix, prefixes);
+        if (!row || row.copy === 'version') continue;   // history, skip
+        const slot = instances.get(row.id) ?? {};
         // Keep the FRESHEST per (instance, role): a key forked into duplicate-owner copies (a GHII + a
         // legacy agent GAII) must surface the current value, never a stale lower-version duplicate.
-        if (role === '') slot.bare = fresherRec(slot.bare, r);
-        else if (role === 'draft') slot.draft = fresherRec(slot.draft, r);
-        else if (role === 'latest') slot.latest = fresherRec(slot.latest, r);
-        // role startsWith 'version.' → history, skip
-        instances.set(instanceId, slot);
+        if (row.copy === 'bare') slot.bare = fresherRec(slot.bare, r);
+        else if (row.copy === 'draft') slot.draft = fresherRec(slot.draft, r);
+        else slot.latest = fresherRec(slot.latest, r);
+        instances.set(row.id, slot);
       }
       // Surface the record's timestamps on the returned value (when it's an object) as `_createdAt`/
       // `_updatedAt`/`_version` — so a client can show "created / last saved / published" without an
