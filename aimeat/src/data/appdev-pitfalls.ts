@@ -124,6 +124,18 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     ...CHECKED,
   }),
   E({
+    id: 'atelier-kit-not-loaded',
+    title: 'Calling AIMEAT.atelier without loading the kit stops the whole script',
+    symptom: 'The page renders its static HTML and then nothing works: the buttons do nothing and no sign-in pill appears. The console says "Cannot read properties of undefined (reading \'i18n\')" or the same for app, copy or section. Only /v1/libs/aimeat-atelier.js defines AIMEAT.atelier, so the first call throws. Publishing REFUSES such a page (APP_ARTIFACT_BROKEN).',
+    fix: 'Load the kit in the head, after aimeat-auth.js and aimeat-data.js: `<link rel="stylesheet" href="/lib/aimeat-atelier.css">` and `<script src="/v1/libs/aimeat-atelier.js"></script>`.',
+    appliesTo: ['app', 'publish'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-10-31',
+    verifiedAt: '2026-10-31',
+    verifiedVersion: '4.2.0',
+  }),
+  E({
     id: 'app-meta-declarations',
     title: 'The three head declarations an app is expected to make',
     symptom: 'The language switch never appears in the login pill, sign-in asks for less than the app needs (ai:use is unavailable, deletes 403), sign-in does nothing at all, or AIMEATAgentFace.publish cannot work out which app it belongs to on a per-app subdomain.',

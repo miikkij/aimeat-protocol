@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.17.0 — 2026-10-31 — Without opts.linkFirst the node decides (LINK_FIRST): a store-bought node that mails opens on the link (v28 #7).
  *   v1.16.0 — 2026-10-31 — opts.linkFirst opens on the emailed-link step (modal-login-link.js; v27 P1).
  *   v1.15.0 — 2026-10-19 — Opens nothing while a first-time provider sign-up is choosing its username
  *     (signup-state.js): the app-open page's sign-in dialog replaced that step on load.
@@ -78,7 +79,7 @@ import { auth, api, restoreSessionFromCookie } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
-import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
+import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST } from './config.js';
 import { MODAL_CSS, HEART_SVG, RULE_MARKS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
@@ -115,7 +116,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // A caller that already knows which job the person came to do can say so: a button reading
   // "Register your home" opening a sign-in form is a small lie, and the person has to find the
   // tab themselves. Anything other than 'register' keeps the previous behaviour.
-  var tab = opts.tab === 'register' ? 'register' : 'signin', linkFirst = !!opts.linkFirst;
+  var tab = opts.tab === 'register' ? 'register' : 'signin', linkFirst = opts.linkFirst === undefined ? LINK_FIRST : !!opts.linkFirst;
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
