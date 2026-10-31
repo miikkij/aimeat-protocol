@@ -33,6 +33,11 @@
  *   const need = await instructionHoldNeeded(storage, caller, job, nextInput);   // schedule-write.ts
  *   const held = await instructionHoldAtFire({ storage, config }, job);           // scheduler-ai-job.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The edit writes the hold before it stores the new instruction
+ *     (schedule-write.ts), so holdInstruction throws when the hold cannot be written instead of
+ *     answering a stored edit that has none; and a fire whose hold names an instruction that is not the
+ *     stored one runs the earlier instruction and keeps the hold, instead of putting it back and
+ *     clearing the hold while the edit is still being stored (secaudit 2026-10-31 inv-27).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import type { AimeatConfig } from '../config.js';
@@ -125,8 +130,8 @@ export async function holdInstruction(
     return { approval_request: publishRequestedBody(ctx, filed) };
   } catch (err) {
     logger.warn('schedule instruction hold: the question could not be filed', { id: args.job.id, error: String(err) });
-    await writeHold(storage, config.nodeId, args.job.id, { request_id: '', by: args.requester.principal, at: new Date().toISOString(), input: fingerprint, previous_input: previous })
-      .catch(e => logger.warn('schedule instruction hold: the hold could not be written', { id: args.job.id, error: String(e) }));
+    // A hold that cannot be written throws to the edit, which then stores nothing (schedule-write.ts).
+    await writeHold(storage, config.nodeId, args.job.id, { request_id: '', by: args.requester.principal, at: new Date().toISOString(), input: fingerprint, previous_input: previous });
     return { warnings: [{ code: 'APPROVAL_NOT_ASKED', message: 'The edit is stored, and the schedule goes back to its earlier instruction at its next run, because the owner could not be asked. Try the edit again in a moment.' }] };
   }
 }
@@ -168,6 +173,10 @@ export async function instructionHoldAtFire(
     await clearInstructionHold(storage, config.nodeId, job.id);
     return { job };
   }
+  // The held instruction is not the stored one: its edit is still being stored (the hold is written
+  // first), or that write failed. The fire runs the instruction the schedule goes back to, and the hold
+  // stays for the edit it belongs to.
+  if (aiScheduleInputFingerprint(job.input) !== hold.input) return { job: { ...job, input: hold.previous_input } };
   // Not allowed, expired, outdated or never asked: the instruction the schedule had before comes back.
   const restored = await storage.updateScheduledJob(job.id, { input: hold.previous_input, updatedAt: new Date().toISOString() });
   await clearInstructionHold(storage, config.nodeId, job.id);

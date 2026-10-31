@@ -47,12 +47,20 @@
  *   install made after that release adopts nothing it did not write; its other commands are held as
  *   in 3 (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update; Jouni, 2026-10-30, option A).
  *
+ *   THE OWNER ON THE NODE (2026-10-31). The connector reports each agent's commands to the node, and the
+ *   owner allows or stops them there (program-report.ts). An allowed hash is recorded `approved`; a
+ *   stopped one stays recorded as `stopped`, so the adoption does not take it back, and is not trusted.
+ *   The node sends no command: the machine acts only on a hash it computed for its own commands.
+ *
  *   KNOWN RESIDUAL. Adoption reads file times. An archive that keeps the times of its files, older
  *   than that release and than this machine's first start, is adopted as an existing install would be.
- * @structure HeldCommands · commandTrustFile · commandHash · isTrustedCommand · trustWrittenCommands ·
- *   adoptExistingCommands · heldBackCommands · heldNotices
+ * @structure HeldCommands · TrustHow · commandTrustFile · commandHash · isTrustedCommand · trustEntryOf ·
+ *   recordOwnerDecision · trustWrittenCommands · adoptExistingCommands · heldBackCommands · heldNotices
  * @usage adoptExistingCommands(home); const { config, held } = heldBackCommands(perAgent, home);
  * @version-history
+ *   v2.4.0 -- 2026-10-31 -- The owner allows or stops a command on the node: trustEntryOf and
+ *     recordOwnerDecision, and a `stopped` hash is recorded but not trusted
+ *     (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v2.3.0 -- 2026-10-30 -- Adoption also requires a config file older than ADOPTION_CUTOFF, the
  *     release time of the first version that keeps a record, so a fresh install after that release
  *     adopts nothing it did not write (secaudit2026oct26 round 8c, mtime-cutoff-not-bound-to-update;
@@ -96,7 +104,13 @@ export interface HeldCommands {
   programs?: { runner?: string; wake?: string };
 }
 
-interface TrustRecord { firstRunAt?: string; hashes: Record<string, { at: string; how: 'connected' | 'adopted' }> }
+/**
+ * How a hash came to be recorded. `approved`: the owner allowed it on the node. `stopped`: the owner
+ * stopped it on the node; the hash stays recorded so the once-only adoption does not take it back
+ * into use, and it is not trusted (program-report.ts).
+ */
+export type TrustHow = 'connected' | 'adopted' | 'approved' | 'stopped';
+interface TrustRecord { firstRunAt?: string; hashes: Record<string, { at: string; how: TrustHow }> }
 
 /** Where the trusted commands are recorded: outside every connector home. */
 export function commandTrustFile(env: NodeJS.ProcessEnv = process.env): string {
@@ -217,7 +231,25 @@ function writeTrust(file: string, record: TrustRecord): void {
 }
 
 export function isTrustedCommand(hash: string, env: NodeJS.ProcessEnv = process.env): boolean {
-  return Object.prototype.hasOwnProperty.call(readTrust(commandTrustFile(env))?.hashes ?? {}, hash);
+  const entry = readTrust(commandTrustFile(env))?.hashes ?? {};
+  return Object.prototype.hasOwnProperty.call(entry, hash) && entry[hash].how !== 'stopped';
+}
+
+/** How and when this machine recorded `hash`, or null when it has no record of it. */
+export function trustEntryOf(hash: string, env: NodeJS.ProcessEnv = process.env): { at: string; how: TrustHow } | null {
+  const hashes = readTrust(commandTrustFile(env))?.hashes ?? {};
+  return Object.prototype.hasOwnProperty.call(hashes, hash) ? hashes[hash] : null;
+}
+
+/**
+ * The owner decided on the node (program-report.ts): `approved` trusts the hash, `stopped` keeps it
+ * recorded and untrusted. Only a hash this machine computed for its own commands is ever passed here.
+ */
+export function recordOwnerDecision(hash: string, how: 'approved' | 'stopped', env: NodeJS.ProcessEnv = process.env): void {
+  const file = commandTrustFile(env);
+  const record = readTrust(file) ?? { firstRunAt: new Date().toISOString(), hashes: {} };
+  record.hashes[hash] = { at: new Date().toISOString(), how };
+  writeTrust(file, record);
 }
 
 /** Record that the connect flow wrote these commands in `home`: the person who connected approved them. */
@@ -227,7 +259,8 @@ export function trustWrittenCommands(config: AimeatPerAgentConfig, home: string,
   const file = commandTrustFile(env);
   const record = readTrust(file) ?? { firstRunAt: new Date().toISOString(), hashes: {} };
   const hash = commandHash(home, c.runner, c.wakeCommand, dir);
-  if (record.hashes[hash]) return;
+  // A command the owner stopped on the node is taken into use again by a connect at the machine: the later act wins.
+  if (record.hashes[hash] && record.hashes[hash].how !== 'stopped') return;
   record.hashes[hash] = { at: new Date().toISOString(), how: 'connected' };
   writeTrust(file, record);
 }

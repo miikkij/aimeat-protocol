@@ -23,6 +23,12 @@
  *   aimeat_package_check_updates, aimeat_package_repository, aimeat_package_entitlements.
  * @usage import { registerPackageTools } from './packages.js';
  * @version-history
+ *   2026-10-31 — aimeat_package_get passes `config`: the operator's read of a sold package is written
+ *     to the operator trail in the author's account.
+ *   2026-10-31 — aimeat_package_price_set and aimeat_package_sales (an author sells their own package to
+ *     accounts of this node); aimeat_package_buy without `repository` lists, opens the checkout of and
+ *     reports the purchases of such a package; aimeat_package_list takes `for_sale`
+ *     (services/packages/sale/package-account-sale.ts).
  *   2026-10-29 — aimeat_package_install names each extension component installed switched off and
  *     waiting for an operator, `extension_code_awaiting_operator` (secaudit2026oct26 round 8c).
  *   2026-10-27 — The grant tool passes config.securityProfile to the node link (secaudit2026oct26,
@@ -108,6 +114,9 @@ import { readOffer, setOffer, publicOffer } from '../services/packages/sale/pack
 import { buyerOfferView } from '../services/packages/sale/package-sale-checkout.js';
 import { subscriptionsOf, readRequests, setAutoRenew } from '../services/packages/sale/package-sale-catalogue.js';
 import { createSession } from '../commerce/session-service.js';
+import { setAccountPrice, saleView, salesOf, refundPurchase, purchasesOf, listForSale, listingFor, buyLine } from '../services/packages/sale/package-account-sale.js';
+import { readAccountSale } from '../services/packages/sale/package-account-entitlement.js';
+import { PACKAGE_ACCOUNT_KIND } from '../services/packages/sale/package-account-checkout.js';
 import { bundleInstallOf, installSetForOwner } from '../services/install-bundle-owner.js';
 import { withdrawVersion } from '../services/packages/compose/package-withdrawals.js';
 import { INSTALL_CODE_SCOPE } from '../services/packages/install/package-approvals.js';
@@ -162,6 +171,30 @@ function registerPackageSaleTools(
             const subs = await subscriptionsOf(storage, owner);
             return text({ subscriptions: subs.map(s => ({ ...s, payment: s.payment ? { handler: s.payment.handler } : undefined })), requests: (await readRequests(storage)).filter(r => r.buyer === owner) });
         }
+        // No repository: a package its author sells to accounts of this node (package-account-sale.ts).
+        if (input.action === 'purchases') return text({ purchases: await purchasesOf(storage, owner) });
+        if (!repository && (input.action === 'offer' || input.action === 'checkout')) {
+            if (!groupId) return { ...toolError('INVALID_INPUT', 'group_id names the package to buy.') };
+            const listed = await listingFor(storage, groupId);
+            if (!listed) return { ...toolError('NOT_FOR_SALE', `${groupId} is not sold by its author on this node. With a repository, name it in \`repository\`.`) };
+            if (input.action === 'offer') return text(listed.listing);
+            const line = buyLine(listed.sale);
+            if (!line) return { ...toolError('NOT_FOR_SALE', `${groupId} is listed and not sold now.`) };
+            try {
+                const session = await createSession(storage, config, {
+                    buyerOwner: owner, buyerIdentity: getAgentGaii(), currency: line.currency as string,
+                    attribution: agentAttribution({ gaii: getAgentGaii() }),
+                    items: [{ kind: PACKAGE_ACCOUNT_KIND, app: groupId }],
+                });
+                return text({
+                    session_id: session.id, total: session.total, currency: session.currency, expires_at: session.expiresAt,
+                    next_step: `Complete the payment with aimeat_checkout_complete (session_id ${session.id}). Once paid, install it with aimeat_package_install { group_id: "${groupId}" }.`,
+                });
+            } catch (err) {
+                const e = err as { code?: string; message?: string };
+                return withCaughtError(toolError(e.code ?? 'CHECKOUT_FAILED', e.message ?? String(err)), err);
+            }
+        }
         if (input.action === 'auto_renew') {
             // Every MCP session is an agent: it is named on the subscription, and each renewal is its purchase.
             const out = await setAutoRenew(storage, owner, { repository, group_id: groupId, node_id: input.node_id, auto_renew: input.auto_renew }, getAgentGaii());
@@ -192,6 +225,23 @@ function registerPackageSaleTools(
             return withCaughtError(toolError(e.code ?? 'CHECKOUT_FAILED', e.message ?? String(err)), err);
         }
     });
+
+    // The author's side of a sale to accounts of this node: the same services PUT /v1/packages/:groupId/price,
+    // GET /v1/packages/:groupId/sales and POST .../sales/:order/refund call (package-account-sale.ts).
+    mcp.registerTool('aimeat_package_price_set', { description: descriptionFor('aimeat_package_price_set'), inputSchema: zodShapeFor('aimeat_package_price_set'), annotations: annotationsFor('aimeat_package_price_set') }, async ({ group_id, price, state, preview }) => {
+        const out = await setAccountPrice({ storage, config }, { owner: ownerOf() }, group_id, { price, state, preview });
+        return out.ok ? text({ sale: saleView(out.sale) }) : { ...toolError(out.code, out.message) };
+    });
+
+    mcp.registerTool('aimeat_package_sales', { description: descriptionFor('aimeat_package_sales'), inputSchema: zodShapeFor('aimeat_package_sales'), annotations: annotationsFor('aimeat_package_sales') }, async ({ group_id, action, order }) => {
+        if (action === 'refund') {
+            if (!order) return { ...toolError('INVALID_INPUT', 'order names the purchase to refund (from action list).') };
+            const out = await refundPurchase({ storage, config }, { owner: ownerOf() }, group_id, order);
+            return out.ok ? text(out.refund) : { ...toolError(out.code, out.message) };
+        }
+        const out = await salesOf(storage, { owner: ownerOf() }, group_id);
+        return out.ok ? text(out.view) : { ...toolError(out.code, out.message) };
+    });
 }
 
 export function registerPackageTools(
@@ -218,7 +268,12 @@ export function registerPackageTools(
         return { roles: [...session.roles], scopes: [...session.scopes] };
     };
 
-    mcp.registerTool('aimeat_package_list', { description: descriptionFor('aimeat_package_list'), inputSchema: zodShapeFor('aimeat_package_list'), annotations: annotationsFor('aimeat_package_list') }, async ({ search, author, status }) => {
+    mcp.registerTool('aimeat_package_list', { description: descriptionFor('aimeat_package_list'), inputSchema: zodShapeFor('aimeat_package_list'), annotations: annotationsFor('aimeat_package_list') }, async ({ search, author, status, for_sale }) => {
+        // The packages their authors sell to accounts here, as listings with the price (GET /v1/packages?for_sale=true).
+        if (for_sale === true) {
+            const sold = await listForSale(storage, { search, author });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ total: sold.total, packages: sold.packages }, null, 2) }] };
+        }
         const result = await listPackagesFor(storage, ownerOf(), { search, author, status });
         return {
             content: [{
@@ -234,15 +289,19 @@ export function registerPackageTools(
     mcp.registerTool('aimeat_package_get', { description: descriptionFor('aimeat_package_get'), inputSchema: zodShapeFor('aimeat_package_get'), annotations: annotationsFor('aimeat_package_get') }, async ({ group_id }) => {
         // The session's own auth, so audience.ts sees the agent (an organism that admits only listed
         // agents refuses the rest) for a 'members' or 'organism:<id>' package (plan V3.7).
-        const pkg = await getPackageFor(storage, group_id, caller().auth);
+        const pkg = await getPackageFor(storage, group_id, caller().auth, config);
+        // A package its author sells: without a purchase, its listing and price, as GET /v1/packages/:groupId answers.
+        const sale = await readAccountSale(storage, group_id);
         if (!pkg) {
+            const listed = await listingFor(storage, group_id);
+            if (listed) return { content: [{ type: 'text' as const, text: JSON.stringify(listed.listing, null, 2) }] };
             return {
                 content: [{ type: 'text' as const, text: `NOT_FOUND: Package not found: ${group_id}` }],
                 isError: true,
             };
         }
         // The "what you get" sheet, the same one GET /v1/packages/:groupId answers (services/packages/compose/package-sheet.ts).
-        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config) }, null, 2) }] };
+        return { content: [{ type: 'text' as const, text: JSON.stringify({ ...packageSummary(pkg), sheet: packageSheet(pkg, config), ...(sale ? { sale: saleView(sale), entitled: true } : {}) }, null, 2) }] };
     });
 
     mcp.registerTool('aimeat_package_compose', { description: descriptionFor('aimeat_package_compose'), inputSchema: zodShapeFor('aimeat_package_compose'), annotations: annotationsFor('aimeat_package_compose') }, async (args) => {

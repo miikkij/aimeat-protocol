@@ -12,6 +12,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
+ *     may start for its agents, and the owner's decision on them.
+ *   2026-10-31 -- e2e-package-account-sale.ts joins the list (not the guard tier): an author sells their own package to another account (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   2026-10-31 -- e2e-portfolio-read-hold.ts joins the list (not the guard tier): its own node on 28461 with the portfolio origin on (audit H-9).
  *   2026-10-30 -- e2e-designbook-kits.ts joins the list (not the guard tier): style kits (wish-omat-tyylipohjat-yrityksen-ja-k-ytt-j-n-jaettavissa).
  *   2026-10-29 -- e2e-designbook-ornaments.ts joins the list (not the guard tier): the ornament kind and the kit's ornaments (wish-kasvavat-koristeet-atelieriin-ja-design-bookiin).
@@ -741,6 +744,9 @@ const ALL_SUITES = [
     // The owner's connectors as named, remembered machines: listed, renamed and forgotten, a proposal
     // that names one, and an agent that waits for the machine it was ordered to. Opens real tunnels.
     'test/e2e-agent-connectors.ts',
+    // The programs a computer may start for its agents: reported by each agent, asked of the owner,
+    // allowed and stopped on REST and MCP, and the decision delivered over the tunnel. Opens real tunnels.
+    'test/e2e-connector-programs.ts',
     // What an agent's work is tied to: the apps whose data map names it, the workspace its finished
     // work is shared with, the first run a new agent gets, and the build instructions about one agent.
     'test/e2e-agent-ties.ts',
@@ -1432,6 +1438,9 @@ const ALL_SUITES = [
     // A package sold through a selling node's own checkout: the author's offer, the seller's price, a
     // claim code, a grant with the terms, renewal by hand and automatic, a refund, approval requests.
     'test/e2e-package-sale.ts',
+    // An author selling their own package to another account of this node: the price, the listing, the
+    // purchase through the checkout, the reads it opens, the agent's limit, the refund and the end of the sale.
+    'test/e2e-package-account-sale.ts',
     // The set composer: the workspace an app declares, one package per app and an install bundle, a
     // quiet mistake refused, and the buyer installing the set with each app told where its workspace is.
     'test/e2e-package-sets.ts',

@@ -41,6 +41,9 @@
  *     is served statelessly beside the 2025 sessions (MCP SDK v2 migration step 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-12 -- `GET /local/departed` (./local-departed.ts): who left on the node's word, and why. An identity the node refuses is not counted as carried.
+ *   2026-10-31 -- Each agent's programs are reported to the node after it attaches, on every reconnect
+ *     and on a `connector.programs_decided` delivery, and the owner's decision is acted on without a
+ *     restart (../program-report.ts; wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   2026-10-11 -- An agent the node says was DELETED is removed from this home too (key, token and
  *     config), on the same word from the node as a moved one. It stayed listed, with its key on disk.
  *   2026-10-11 -- An identity whose credential the node refuses: the others on a socket it opened get a new
@@ -155,6 +158,7 @@ import { refusedCredential, noteCredentialAnswer } from '../refused-credentials.
 import { type AimeatPerAgentConfig } from '../config.js';
 import { AimeatClient } from '../api-client.js';
 import { handleEnrolOffer, ENROL_CAPABILITY } from '../enrolment.js';
+import { reportPrograms } from '../program-report.js';
 import { AgentRegistry, type RegisteredAgent } from '../agent-registry.js';
 import { displayName } from '../agent-registry.js';
 import { startPollerForAgent, type PollerHandle } from './poller.js';
@@ -312,6 +316,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         else if (kind === 'crew.def_updated') ch.handleRecord(payload);
         else if (kind === 'dm.inbound') ch.handleDm(payload);
         else if (kind === 'task.cancelled') ch.handleCancelled(payload);
+        // The owner allowed or stopped a program on the node: report again and act on the answer.
+        else if (kind === 'connector.programs_decided') void reportPrograms(entry);
       },
       onBacklog: ({ tasks, messages }) => {
         for (const t of tasks) ch.handleTask(t, 'backlog');
@@ -322,6 +328,9 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         ch.reconnects = connectCount;
         const subs = ch.getSubscriptions();
         if (subs.length) ch.tunnel?.subscribe(subs, entry.gaii);
+        // Every connection tells the node what this machine may start for the agent, and picks up a
+        // decision the owner made while it was away (../program-report.ts).
+        if (connectCount > 1) void reportPrograms(entry);
       },
       onAuthFailure: (_message, reason) => {
         // Token died mid-session: fall back to direct fetch so already-running
@@ -464,6 +473,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
     const entry: RegisteredAgent = { gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config };
     registry.add(entry);
     await attachRegistered(entry);
+    void reportPrograms(entry);
     writeDiscovery();
     console.error(`[serve] ${a.agent}@${a.owner}: attached without a restart (${registry.size()} agents served)`);
   }
@@ -472,6 +482,8 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   for (const entry of registry.list()) {
     await attachRegistered(entry);
   }
+  // Each agent's programs, once every agent is on its socket (../program-report.ts).
+  for (const entry of registry.list()) void reportPrograms(entry);
 
   // ── Loopback HTTP server ──
   // Admission FIRST, before the body parser and every route: nothing below is reachable without a

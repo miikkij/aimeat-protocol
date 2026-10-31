@@ -17,6 +17,10 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for a money price; auth + pacing for free)
  * @version-history
+ *   v1.11.2 — 2026-10-31 — The metered path resolves the binding of a contracted or granted call inside
+ *     the chokepoint (productRefusal), before it charges: TOOL_NOT_INVOKABLE and CAPABILITY_NOT_FOUND
+ *     answered after the settle with no refund, and a mis-bound capability was charged and refunded
+ *     although the comment said it was refused before anything was settled (secaudit 2026-10-31 inv-05).
  *   v1.11.1 — 2026-10-25 — A tool's binding is read for the app's owner: their own extension by a bare
  *     name is still theirs (findBackingCapability; owner namespaces wish, secaudit2026oct22).
  *   v1.11.0 — 2026-10-22 — The invoke asks exchange:write of an agent or an ecosystem app on both paths,
@@ -71,7 +75,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppRecord } from '../storage/interface.js';
+import type { Storage, AppRecord, CapabilityRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { callAuthority } from '../auth/effective-scopes.js';
 import { success, error } from '../middleware/envelope.js';
@@ -86,7 +90,8 @@ import { pacingReceipt } from '../services/metered-settlement.js';
 import { publicManifestTools, toolPacing, paceFreeToolUse } from '../commerce/app-tool-catalog.js';
 import { checkAppToolInput } from '../services/app-tool-input.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
-import { authoriseMeteredCall } from '../services/metered-access.js';
+import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
+import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { refuseAppToolInvokeWithoutWord } from './webmcp-invoke-gate.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
@@ -102,6 +107,9 @@ import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-prove
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
+
+/** An app tool's binding, resolved for one call: the capability it runs and the interface version it was pinned at. */
+interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; providerGhii: string }
 
 /**
  * True when an app must not be described on a public surface (gated, priced, or moderated away).
@@ -280,43 +288,55 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(403).json(error(config.nodeId, 'MEMBERS_ONLY', MEMBERS_ONLY_MESSAGE));
         return;
       }
-      const outcome = await authoriseMeteredCall({
-        config, storage, caller: meteredCaller,
-        session: { roles: req.auth.roles, scopes: req.auth.scopes, appGrantId: req.auth.app_grant ?? null },
-        product: { ext: coordExt, action: toolName, label: `${filename}/${toolName}`, providerOwner: ownerName },
-      });
-
-      if (outcome.kind !== 'no_right') {
-        const ent = outcome.kind === 'settled' ? outcome.entitlement : null;
-        if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
-          respondMeteredRefusal(config, res, outcome, `${filename}/${toolName}`);
-          return;
-        }
-        // A CONTRACT is pinned to the interface version it was signed at, so the provider can ship a
-        // newer app without breaking a live integration. The owner's own call has nothing to pin —
-        // they get their current binding, which is theirs to change.
+      // A CONTRACT is pinned to the interface version it was signed at, so the provider can ship a
+      // newer app without breaking a live integration. The owner's own call has nothing to pin —
+      // they get their current binding, which is theirs to change. The manifest NAMES a capability;
+      // it does not confer one (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
+      const bindingFor = async (ent: MeteredEntitlement | null): Promise<BoundTool | ProductRefusal> => {
         const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
         const providerGhii = ent?.providerGhii ?? `${ownerName}@${config.nodeId}`;
         const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, filename, toolName, pinnedVersion) : null;
         const binding = iface?.binding ?? tool.action_id ?? null;
-        if (!binding) {
-          res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool is not wired to anything that can run, so there is nothing to call yet.'));
-          return;
-        }
+        if (!binding) return { statusCode: 422, code: 'TOOL_NOT_INVOKABLE', message: 'This tool is not wired to anything that can run, so there is nothing to call yet.' };
         const cap = await findBackingCapability(storage, binding, ownerName);
-        if (!cap) {
-          res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${binding}`));
-          return;
-        }
-        // The manifest NAMES a capability; it does not confer one. Refused after the price was
-        // decided and before anything is settled, so a mis-bound tool takes no money it has to give
-        // back (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
+        if (!cap) return { statusCode: 404, code: 'CAPABILITY_NOT_FOUND', message: `Backing capability not found: ${binding}` };
         const misbound = appToolBindingRefusal(cap, ownerName, appRef, toolName);
-        if (misbound) {
-          if (outcome.kind === 'settled') await outcome.refund();
-          res.status(misbound.statusCode).json(error(config.nodeId, misbound.code, misbound.message));
+        if (misbound) return misbound;
+        return { cap, pinnedVersion, providerGhii };
+      };
+      // Under a contract or a grant the binding is resolved INSIDE the chokepoint, from the
+      // entitlement it found and before it charges, so a tool that cannot run takes nothing it has to
+      // give back (refused_product). It was resolved after the settle: a mis-bound capability was
+      // refunded and a missing one kept the charge (secaudit 2026-10-31 inv-05).
+      let bound = null as BoundTool | null;
+      const outcome = await authoriseMeteredCall({
+        config, storage, caller: meteredCaller,
+        session: { roles: req.auth.roles, scopes: req.auth.scopes, appGrantId: req.auth.app_grant ?? null },
+        product: { ext: coordExt, action: toolName, label: `${filename}/${toolName}`, providerOwner: ownerName },
+        productRefusal: async (ent) => {
+          const b = await bindingFor(ent);
+          if ('code' in b) return b;
+          bound = b;
+          return null;
+        },
+      });
+
+      if (outcome.kind !== 'no_right') {
+        if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
+          respondMeteredRefusal(config, res, outcome, `${filename}/${toolName}`);
           return;
         }
+        // The owner's own call charges nothing, so its binding is resolved now.
+        if (!bound) {
+          const b = await bindingFor(outcome.kind === 'settled' ? outcome.entitlement : null);
+          if ('code' in b) {
+            if (outcome.kind === 'settled') await outcome.refund();
+            res.status(b.statusCode).json(error(config.nodeId, b.code, b.message));
+            return;
+          }
+          bound = b;
+        }
+        const { cap, pinnedVersion, providerGhii } = bound;
         const jwt = (req.headers.authorization || '').replace('Bearer ', '');
         try {
           const { invokeCapability } = await import('../services/capability-invoke.js');

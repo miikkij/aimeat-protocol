@@ -13,9 +13,12 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
- *   v1.16.0 — 2026-10-31 — opts.signInOnly: no register tab, and the dialog opens on signing in
- *     whatever opts.tab says (a node the store sold, v31 K24). The fixed values (the two identifier
- *     rules and the two marks) moved to modal-constants.js unchanged (max-file-lines).
+ *   v1.18.0 — 2026-10-31 — opts.signInOnly: no register tab, and the dialog opens on signing in
+ *     whatever opts.tab says (a node the store sold, v31 K24), headed "Kirjaudu omaan AIMEATiisi"
+ *     with no "Forgot username?". The two identifier rules moved to
+ *     modal-constants.js unchanged (max-file-lines).
+ *   v1.17.0 — 2026-10-31 — Without opts.linkFirst the node decides (LINK_FIRST): a store-bought node that mails opens on the link (v28 #7).
+ *   v1.16.0 — 2026-10-31 — opts.linkFirst opens on the emailed-link step (modal-login-link.js; v27 P1).
  *   v1.15.0 — 2026-10-19 — Opens nothing while a first-time provider sign-up is choosing its username
  *     (signup-state.js): the app-open page's sign-in dialog replaced that step on load.
  *   v1.14.0 — 2026-10-09 — opts.secondFactorLink opens the dialog on the code view in link mode (secaudit 2026-10-09, S1).
@@ -80,15 +83,15 @@ import { auth, api, restoreSessionFromCookie } from './session.js';
 import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
-import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
-import { MODAL_CSS } from './modal-styles.js';
+import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED, LINK_FIRST } from './config.js';
+import { MODAL_CSS, HEART_SVG, RULE_MARKS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
-import { EMAIL_RE, OWNER_NAME_RE, HEART_SVG, RULE_MARKS } from './modal-constants.js';
+import { EMAIL_RE, OWNER_NAME_RE } from './modal-constants.js';
 
 /** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
  *  domain there and the wordmark beside it says what the software is. */
@@ -112,7 +115,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // signInOnly: the caller's node takes no new accounts here, so the dialog has no register tab
   // (a node the store sold has its owner already, and others come in by invitation: v31 K24).
   var signInOnly = !!opts.signInOnly;
-  var tab = opts.tab === 'register' && !signInOnly ? 'register' : 'signin';
+  var tab = opts.tab === 'register' && !signInOnly ? 'register' : 'signin', linkFirst = opts.linkFirst === undefined ? LINK_FIRST : !!opts.linkFirst;
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
@@ -165,8 +168,11 @@ export function showLoginModal(opts, renderBtn, onClosed) {
 
   /** True when the person has left the two tabs for a step, or a button is waiting on a request. */
   function busyOrAway() {
-    var body = document.getElementById('aimeat-modal-body');
-    return (!!body && body.style.display === 'none') || !!modal.querySelector('button:disabled');
+    var body = document.getElementById('aimeat-modal-body'), away = !!body && body.style.display === 'none';
+    // The emailed-link step a linkFirst dialog opened by itself is not "away": it is redrawn in the
+    // page's words and opened again, once (v27 P1; it stayed English on a Finnish page).
+    if (away && linkFirst && !opts.linkFirstRedrawn) { opts.linkFirstRedrawn = true; opts.linkFirstOpened = false; away = false; }
+    return away || !!modal.querySelector('button:disabled');
   }
 
   function render(anim) {
@@ -243,12 +249,13 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       // The masthead: one sentence in the poster face, and the line under it. Which tab is open
       // decides both.
       + '<h2 class="aimeat-headline">'
-      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (i.headlineReturning || 'Welcome back.'))
+      // A buyer (signInOnly) is signing in to the AIMEAT they bought, with the address they bought it with.
+      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : ((signInOnly && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
       + '</h2>'
       + '<p class="aimeat-line">'
       + escHtml(isReg
         ? (i.lineNew || 'Pick a username and password.')
-        : (i.descReturning || 'Enter the username or email you signed up with.'))
+        : ((signInOnly && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.'))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
       + (signInOnly ? '' : '<div class="aimeat-tabs" role="tablist">'
@@ -275,7 +282,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '<p id="aimeat-error" class="aimeat-err"></p>'
       + '<div class="aimeat-links">'
       + '<a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i.forgotPassword || 'Forgot password?') + '</a>'
-      + '<a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
+      + '<a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly ? ' style="display:none"' : '') + '>' + escHtml(i.forgotUsername || 'Forgot username?') + '</a>'
       + loginLinkAskHtml(i)
       + '</div>'
       + '</div>'
@@ -321,7 +328,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '</div>'
       // The forgot-password, forgot-username and complete-account sub-views (all hidden here).
       + recoveryViewsHtml(i, field)
-      + loginLinkViewHtml(i, field)
+      + loginLinkViewHtml(i, field, linkFirst)
       // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
       + totpViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
@@ -449,7 +456,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
 
     // "Email me a sign-in link": absent on a node that sends no mail.
-    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect });
+    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect, openFirst: linkFirst && tab === 'signin' ? opts : null });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({

@@ -24,6 +24,11 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   v1.7.0 — 2026-10-31 — updatePackageGroup refuses any visibility but private while the group is on
+ *     sale to accounts (409 PACKAGE_PRICED; sale/package-account-entitlement.ts saleVisibilityRefusal).
+ *   2026-10-31 — updatePackageGroup checks every visibility it writes (`!== undefined`), so an empty
+ *     string, false or null is 400 INVALID_INPUT; only a non-empty one was checked and any other was
+ *     written to every version (secaudit 2026-10-31 inv-25).
  *   v1.6.0 — 2026-10-18 — updatePackageGroup: the body of PATCH /v1/packages/:groupId, moved here so an
  *     approved publish request makes a group public through the same function (plan doc-mvcn6c7e4e5q, V4).
  *   v1.5.0 — 2026-10-17 — Two more visibilities: 'members' (every account of this node) and
@@ -62,6 +67,7 @@ import type {
 import { resolveGhii } from '../../../utils/ghii-resolver.js';
 import { checkAudienceWrite, writerAuthOf } from '../../audience-write.js';
 import { emitChange } from '../../event-bus.js';
+import { saleVisibilityRefusal } from '../sale/package-account-entitlement.js';
 
 /** The per-author ceiling when config carries none. config.packageMaxPerAuthor normally wins. */
 const MAX_PACKAGES_PER_AUTHOR = 100;
@@ -467,8 +473,12 @@ export async function updatePackageGroup(
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the package author can update group metadata' };
     }
     // private, members, organism:<id> or public; an organism the author is not in is 400 before any write.
-    const refused = input.visibility ? await packageVisibilityRefusal(storage, input.visibility, caller.owner) : null;
+    // Asked of every visibility the write below stores, an empty or false one included (secaudit 2026-10-31 inv-25).
+    const refused = input.visibility !== undefined ? await packageVisibilityRefusal(storage, input.visibility, caller.owner) : null;
     if (refused) return refused;
+    // A package on sale to accounts stays private, or its content reaches readers who did not buy it.
+    const priced = await saleVisibilityRefusal(storage, groupId, input.visibility);
+    if (priced) return priced;
 
     const updates: Partial<PackageRecord> = { updatedAt: new Date().toISOString() };
     if (input.description !== undefined) updates.description = input.description as string;

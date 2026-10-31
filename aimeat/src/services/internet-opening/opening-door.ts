@@ -11,11 +11,15 @@
  * @structure actorOf · openingDoor
  * @usage const r = await openingDoor(ctx, caller, { filename, reason, days });
  * @version-history
+ *   v1.0.1 — 2026-10-31 — The owner's question an agent's opening files checks `days` with the opening's
+ *     own rule (opening-service.ts checkDays) before it is filed, and carries the checked number: a value
+ *     that is no whole number, or past the node's longest opening, was filed and refused only once the
+ *     owner had approved it (secaudit 2026-10-31 inv-23).
  *   v1.0.0 — 2026-10-25 — Initial (wish-corp-moodissa-julkaistu-app-ulosp-in-vahdittuna-ja-listattun).
  */
 import type { CallerContext } from '../caller-context.js';
 import { publishAskOf, fileAsk, publishRequestedBody } from '../publish-requests/ask.js';
-import { requestOpening, ineligible, type OpeningActor, type OpeningResult, type OpeningOutcome } from './opening-service.js';
+import { requestOpening, ineligible, checkDays, type OpeningActor, type OpeningResult, type OpeningOutcome } from './opening-service.js';
 import { openingMode } from './opening-policy.js';
 import type { OpeningCtx } from './opening-store.js';
 import type { InternetOpening } from './opening-types.js';
@@ -45,6 +49,11 @@ export async function openingDoor(
       if (mode === 'off') return { ok: false, status: 403, code: 'OPENING_OFF', message: 'The operators of this node have switched opening apps to the internet off.' };
       const reason = typeof input.reason === 'string' ? input.reason.trim() : '';
       if (reason.length < 3) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'Give the reason the app is opened to the internet: who it is for and what they do there.' };
+      // The opening's own rule for days, before the owner is asked: the request carries the checked
+      // number, so an approval cannot fail on it (secaudit 2026-10-31 inv-23).
+      const given = input.days !== undefined && input.days !== null;
+      const days = checkDays(ctx, input.days);
+      if (typeof days !== 'number') return days;
       const app = await ctx.storage.getApp(`${caller.owner}@${ctx.config.nodeId}`, input.filename);
       const bad = ineligible(app);
       if (bad) return bad;
@@ -52,7 +61,7 @@ export async function openingDoor(
         kind: 'internet-opening',
         target: {
           owner: caller.owner, filename: input.filename, version: app!.versionNumber, reason: reason.slice(0, 500),
-          ...(input.days !== undefined && input.days !== null ? { days: Number(input.days) } : {}),
+          ...(given ? { days } : {}),
         },
         title: `the app ${input.filename} open to the internet`,
         name: input.filename,

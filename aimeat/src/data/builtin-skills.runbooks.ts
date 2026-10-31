@@ -12,6 +12,9 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-31 — manage-my-agents: each computer's `programs` in aimeat_connector_list, and
+ *     aimeat_connector_program_set only on the owner's answer
+ *     (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   2026-10-28 — manage-my-agents: an agent holding all permissions keeps them; the node never narrows
  *     it by itself, and the AI narrows it only on the owner's word, saying what it takes away.
  *   2026-10-25 — aimeat-node-operations: aimeat_admin_config lists every node setting (section, q), and
@@ -182,7 +185,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     never the answer. When they have more than one connector (a home computer and a server, say),
     \`aimeat_connector_list\` names the computers and says which are connected; pass the one they
     mean as \`connector\`, and say its name to them, never its id. \`aimeat_connector_rename\` gives
-    a computer the name they use for it. When \`aimeat_connector_list\` answers
+    a computer the name they use for it. Each computer's \`programs\` says which programs it may
+    start for its agents (status \`allowed\`) and which wait for them (\`waiting\`): before planning
+    work that needs one that waits or was stopped, ask them in plain words, naming the command and
+    the computer, and decide with \`aimeat_connector_program_set\` only on their answer. When \`aimeat_connector_list\` answers
     \`tunnel_enabled: false\`, this AIMEAT takes no computers yet and theirs is not at fault: say that
     the people who run it must turn on computer connections and restart it, and offer to ask them at
     \`support@operators\`. With its model choice set to this node (\`aimeat_crew_llm_set\` with
