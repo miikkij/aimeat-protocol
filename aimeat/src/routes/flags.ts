@@ -11,6 +11,8 @@
  *   - flagsRouter(config, storage): POST /v1/flags plus flag listing/review routes
  *
  * @version-history
+ *   2026-10-31 — The public summary's `hidden` counts active flags once per reporting account, as the
+ *     board hide does (secaudit2026oct31w2 round 10, W2-8).
  *   v1.3.1 — 2026-10-16 — PUT /v1/flags/:id: the organism-admin branch compares admins[] with the bare owner name as well as the GHII. admins[] holds bare names, so the branch matched nobody and an organism admin in person got 403 on their organism's flags (QA audit F13-03, test/e2e-flag-review.ts).
  *   v1.3.0 — 2026-10-05 — Operator checks ask isOperatorCaller/operatorOverride: the operator's agent holding operator:admin passes as on MCP, and a pass in another person's account writes the operator trail. The operator routes ask requireOperator (askOperator with operator:admin) (secaudit 2026-10, C2).
  *   v1.2.1 — 2026-09-24 — The federated test is isForeignPrincipal(), the one question (secaudit 2026-09, F-1).
@@ -34,6 +36,7 @@ import {
     FLAG_TARGET_TYPES,
     createModerationFlag,
     resolveOrganismForFlag,
+    activeReporterCount,
 } from '../services/moderation-flags.js';
 import { isOperatorCaller } from '../services/operator-override.js';
 
@@ -92,9 +95,10 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        // Phase 2.4 — include hidden status based on active flag count (per-organism threshold)
+        // Phase 2.4 — include hidden status based on active flag count (per-organism threshold).
+        // Counted once per reporting account, as the board hide enforces it (W2-8).
         const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
-        const activeFlagCount = activeFlags.filter(f => f.status === 'active').length;
+        const activeFlagCount = activeReporterCount(activeFlags, config.nodeId);
         const organism = await resolveOrganismForFlag(storage, targetType, targetId);
         const autoHideThreshold = organism
             ? organism.moderationConfig.autoHideThreshold
