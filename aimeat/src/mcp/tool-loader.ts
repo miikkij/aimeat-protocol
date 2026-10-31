@@ -28,6 +28,9 @@
  *     aimeat_invoke runs the session's own tools
  * @usage in createMcpServer, for role 'chat' only
  * @version-history
+ *   2026-10-31 — The finder's next step leads with aimeat_invoke: goose refused a found tool called by
+ *     name ("was not advertised for this model turn") twice in one turn on grokkoe3110b, and the
+ *     buyer's app was not built in that turn (v31 K35).
  *   2026-10-21 — On a 2026-07-28 request the finder names the tools and says to call them by name;
  *     it no longer says they were added to a list that lasts only for that request.
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -155,7 +158,7 @@ export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean }
                 return {
                     content: [{ type: 'text' as const, text: JSON.stringify({
                         tools: named,
-                        next_step: 'Call any of these by name now: they run although your tool list does not show them, and your list stays as it is. If your client calls only the tools its list names, run one with aimeat_invoke: its name as `capability`, its inputs as `input`.',
+                        next_step: 'Run one now with aimeat_invoke: its name as `capability`, its inputs as `input`. That works in every client. A client that calls tools its list does not show can also call one by name.',
                     }, null, 2) }],
                 };
             }
@@ -169,7 +172,7 @@ export function registerToolLoader(mcp: McpServer, opts: { stateless?: boolean }
                 content: [{ type: 'text' as const, text: JSON.stringify({
                     added,
                     tools: named,
-                    next_step: 'These are in your tool list for the rest of this conversation. If one is not in your list yet (some clients read the list again only on the next message), run it now with aimeat_invoke: its name as `capability`, its inputs as `input`.',
+                    next_step: 'Run one now with aimeat_invoke: its name as `capability`, its inputs as `input`. A call by name is refused until your client reads its tool list again, which some do only on the next message. From then on these are in your list for the rest of this conversation.',
                 }, null, 2) }],
             };
         },
