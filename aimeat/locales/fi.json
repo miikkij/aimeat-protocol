@@ -15403,6 +15403,7 @@
     "profileAnswersSaved": "Tallensimme haastattelun vastauksesi niin, että vain sinä näet ne."
   },
   "siteStart": {
+    "signInPill": "Kirjaudu sisään",
     "title": "Tämä on oma AIMEATisi {host}",
     "signInNote": "Kirjaudu sisään sähköpostilinkillä. Kirjoita osoite, jolla ostit AIMEATin. Lähetämme siihen linkin, joka kirjaa sinut sisään ilman salasanaa.",
     "signInLabel": "Kirjaudu sisään",

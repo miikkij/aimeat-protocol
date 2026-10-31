@@ -1695,9 +1695,12 @@
       // the nav entirely when this node has not configured one.
       // On a signed-in-only node a visitor without a session reaches no public page (each shows the
       // sign-in page), so the bar carries no links for them: the sign-in pill is the one way on.
+      // On a node the store sold, the bar is the owner's: no "how it works" or "for your business"
+      // marketing, only Help (Jouni v27 P3, 2026-10-31).
       const visibleLinks = (signedInOnly() && !session) ? [] : navConfig.order
         .map(id => linkById[id])
         .filter(l => l && !hiddenSet.has(l.id))
+        .filter(l => !customerNode() || l.id === 'help')
         .filter(l => (l.when === 'anon' ? !session : l.when === 'auth' ? !!session : true))
         .map(l => (l.siteKey ? { ...l, path: siteLink(l.siteKey) } : l))
         .filter(l => l.path);
@@ -1829,6 +1832,21 @@
       }
       const signedOutDoor = location.pathname === '/v1/profile' && !session;
       if (!FOOTER_ROUTES.has(location.pathname) && !signedOutDoor) return null;
+      // On a node the store sold, the footer carries what the owner and a visitor need: help, the
+      // AI transparency statement, the privacy policy and the terms. The marketing and developer
+      // pages belong to the public site (Jouni v27 P3, the v10 rule "kehittäjälinkit pois
+      // asiakkailta").
+      if (customerNode()) {
+        return html`
+          <footer class="site-footer">
+            <div class="site-footer-row">
+              <a href="/v1/help" onClick=${(e) => go(e, '/v1/help')}>${tr('nav.help', 'Help')}</a>
+              <a href="/v1/transparency" onClick=${(e) => go(e, '/v1/transparency')}>${tr('footer.transparency', 'AI transparency')}</a>
+              <a href=${getLocale() === 'en' ? '/v1/privacy' : '/v1/privacy/' + getLocale()}>${tr('footer.privacy', 'Privacy')}</a>
+              <a href=${getLocale() === 'en' ? '/v1/terms' : '/v1/terms/' + getLocale()}>${tr('footer.terms', 'Terms')}</a>
+            </div>
+          </footer>`;
+      }
       return html`
         <footer class="site-footer">
           <div class="site-footer-row">
@@ -2012,6 +2030,9 @@
               // The header folds the pill itself on a phone (theme.css, ≤640px), so it keeps the full
               // row; compact became the pill's default everywhere on 2026-09-13.
               compact: false,
+              // A node the store sold has its owner already, so its sign-in offers no registration
+              // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
+              ...(customerNode() ? { buttonText: t('siteStart.signInPill') } : {}),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),

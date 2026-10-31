@@ -15224,6 +15224,7 @@
     "profileAnswersSaved": "We saved your interview answers where only you can see them."
   },
   "siteStart": {
+    "signInPill": "Sign in",
     "title": "This is your own AIMEAT, {host}",
     "signInNote": "Sign in with an email link. Write the address you bought your AIMEAT with, and we send you a link that signs you in. It needs no password.",
     "signInLabel": "Sign in",
