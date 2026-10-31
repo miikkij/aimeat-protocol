@@ -41,6 +41,7 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.6.0 — 2026-10-31 — toDeclaredProvenance maps `rules_followed` (the generation rules a declarer followed).
  *   v1.5.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   v1.4.0 — 2026-10-08 — toDeclaredProvenance maps `media_kind`, `media_type` and `resembles_real`.
  *   v1.3.0 — 2026-10-05 — AiProvenanceBlockSchema moved unchanged to src/tool-catalog/ai-provenance-schema.ts,
@@ -138,6 +139,7 @@ export function toDeclaredProvenance(
     ...(input.media_kind ? { mediaKind: input.media_kind } : {}),
     ...(input.media_type ? { mediaType: input.media_type } : {}),
     ...(input.resembles_real ? { resemblesReal: input.resembles_real } : {}),
+    ...(input.rules_followed?.length ? { rulesFollowed: input.rules_followed } : {}),
     sources: input.sources?.map((s) => ({
       url: s.url,
       ...(s.title ? { title: s.title } : {}),

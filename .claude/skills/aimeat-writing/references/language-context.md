@@ -134,6 +134,8 @@ everywhere at once, and say so in the Changes section.
 | something an AI call can do | write text, read an image, read a file, make an image, speak, transcribe, make an embedding; an app asks for this, not for a model | capability | kyky | capacidad |
 | which models the owner's calls may use | open, the node's recommended models, or the owner's own list; every layer only tightens | model policy | mallirajaus | restricción de modelos |
 | the models the operator recommends | a list per capability, set by whoever runs this AIMEAT; it restricts nobody until the owner chooses it | recommended models | suositellut mallit | modelos recomendados |
+| an instruction the node gives to every AI picture and video of an owner | built in (the first: people only as art, never like a photograph of a real person); the operator sets it off, on or required, the owner switches it within that and makes an exception with a reason; an instruction, never a check. In a sentence to a person, say what it does: "rules for AI pictures and videos" | generation rule (to a person: rule for AI pictures and videos) | kuvasääntö (henkilölle: sääntö tekoälyn kuville ja videoille) | regla de generación (para una persona: regla para imágenes y vídeos de IA) |
+| AI-made image, audio or video that would pass for a real person, place or event | the AI Act's term (Art. 50(4)); the established word in each language, never a calque | deep fake | syväväärennös | ultrasuplantación |
 | turning speech into text (the act) | what a model does to a recording; the verb is transcribe | transcription | litterointi; verbi litteroida | transcripción |
 | the text a transcription produces | the result, kept or shown | transcript | transkriptio | transcripción |
 | text turned into numbers for search by meaning | a vector a model makes from text, so search finds what means the same; first use says so in the same sentence | embedding (model: embedding model) | upotus; malli: upotusmalli | incrustación |
@@ -616,3 +618,9 @@ service, the directory, the token, the identifier and the username: the test nam
   sentence about a typed value names the value ("Y-tunnuksen muoto"). *Täydennä tai korjaa ensin*
   covers a field left empty and a field filled in wrong; *täytä ensin* covered only the first, and the
   browser check on 2026-10-05 showed the line naming a field that was filled in but did not match.
+- **2026-10-31** — generation rule and deep fake, with the AI page's rules section
+  (wish-image-and-video-generation-people-only-in-an-artistic-non-ph). *Kuvasääntö* is short and
+  Finnish, and a video is a moving picture; on screen the section says what it covers ("Säännöt
+  tekoälyn kuville ja videoille"). The exception and its reason take the classification words
+  (*poikkeus*, *perustelu*; *excepción*, *motivo*). *Syväväärennös* and *ultrasuplantación* are the
+  words the Finnish and Spanish texts of the AI Act use.

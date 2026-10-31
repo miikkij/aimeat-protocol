@@ -14,13 +14,14 @@
  *   call. Until V5 it read the owner-only /v1/openrouter/models, which answered 403 to every app.
  *   Each row keeps the catalogue's own fields and adds `context_length` and `pricing` in the form the
  *   old OpenRouter listing had, so a picker written against that listing still reads it.
- * @structure capabilities(opts) · models(opts) · roles() · priceEstimate(state, units) · clearCaches()
+ * @structure capabilities(opts) · models(opts) · roles() · genRules() · priceEstimate(state, units) · clearCaches()
  * @usage const caps = await AIMEAT.ai.capabilities({ app_id: 'my-app' });
  *   const img = caps.capabilities.image;
  *   if (!img.on) showNotice(img.fix, img.settingsUrl);   // the sentence, and a link to where it is fixed
  * @version-history
  *   v1.2.0 - 2026-10-02 - Documents `settingsUrl` and `agentFix` beside `fix`, which is now the
  *     person's sentence in their language.
+ *   v1.2.0 - 2026-10-31 - genRules(): GET /v1/ai/gen-rules, the generation rules and their directive text.
  *   v1.1.0 - 2026-09-28 - roles(): GET /v1/ai/roles, the owner's AI roles and the apps' role bindings.
  *   v1.0.0 - 2026-09-28 - System 2 plan, V5. Initial: capabilities(), and models() moved from
  *     /v1/openrouter/models to /v1/ai/models.
@@ -139,6 +140,21 @@ export async function models(opts) {
 export async function roles() {
   const r = await authFetch('/v1/ai/roles');
   if (!r || !r.ok) throw aiError(r, 'Could not read the AI roles');
+  return r.data;
+}
+
+/**
+ * The generation rules for the signed-in person's AI pictures and videos: the data of
+ * GET /v1/ai/gen-rules, { rules, exceptions, updatedAt, for_caller: { image, video } }. Each
+ * for_caller entry is { rules: [ids], directive }: the rules in force for THIS app and the sentence
+ * to put into a prompt the app composes for a model outside the node (a prompt the person copies
+ * into another tool, for example). AIMEAT.ai.image() needs nothing: the node adds the directive
+ * itself. Not cached: a rule the owner just switched should apply at once.
+ * @returns {Promise<any>}
+ */
+export async function genRules() {
+  const r = await authFetch('/v1/ai/gen-rules');
+  if (!r || !r.ok) throw aiError(r, 'Could not read the generation rules');
   return r.data;
 }
 

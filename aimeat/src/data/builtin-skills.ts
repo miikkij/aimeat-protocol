@@ -11,6 +11,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-10-31 -- aimeat-gen-rules joins the list after aimeat-ai-model-policy.
  *   2026-10-29 -- diagnose-a-workflow, step 7: a 402 AI_BALANCE_SPENT is the node's key at the limit
  *     it was bought with, with the three choices (UX review A1).
  *   2026-10-27 -- diagnose-a-workflow: a deactivated account's run in flight and goals wait, and an ai
@@ -240,7 +241,7 @@ import { CONTENT_CLASSES_SKILL_ENTRY } from './builtin-skills.content-classes.js
 import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
 import { CREW_AGENT_SKILL_ENTRY } from './builtin-skills.crew-agent.js';
 import { CONTENT_PIPELINE_SKILL_ENTRY } from './builtin-skills.content-pipeline.js';
-import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY } from './builtin-skills.ai.js';
+import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY, AI_MODEL_POLICY_SKILL_ENTRY, AI_GEN_RULES_SKILL_ENTRY } from './builtin-skills.ai.js';
 import { AI_CAPABILITIES_SKILL_ENTRY } from './builtin-skills.ai-capabilities.js';
 import { WORKSPACE_CONTRACTS_SKILL_ENTRY } from './builtin-skills.workspace-contracts.js';
 import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
@@ -462,6 +463,7 @@ Everything is MEMORY records under the owner's identity (GHII) or their agents' 
   CONTENT_PIPELINE_SKILL_ENTRY,
   CONFIGURE_ROUTING_SKILL_ENTRY,
   AI_MODEL_POLICY_SKILL_ENTRY,
+  AI_GEN_RULES_SKILL_ENTRY,
   AI_CAPABILITIES_SKILL_ENTRY,
   WORKSPACE_CONTRACTS_SKILL_ENTRY,
   EXTENSION_BUILDER_SKILL_ENTRY,

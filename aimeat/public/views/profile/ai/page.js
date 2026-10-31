@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.34.0 -- 2026-10-31 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js); budget and consumers move to 07 and 08.
  *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
  *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
  *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
@@ -80,6 +81,7 @@ import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
+import { GenRulesSection } from './gen-rules-section.js';
 import { HelpLabel } from '/components/HelpTip.js';
 import { PageStart } from '/components/PageStart.js';
 import { scrollToSection, openTab } from '/components/Rail.js';
@@ -105,8 +107,9 @@ export function renderPage(ctx) {
         { id: 'ai-routing', num: '03', label: x('rt.title'), count: '' },
         { id: 'ai-roles', num: '04', label: x('rl.title'), count: ctx.rl.view ? String(ctx.rl.roles.length) : '' },
         { id: 'ai-policy', num: '05', label: x('pol.title'), count: ctx.pv.policy ? x('pol.mode.' + (ctx.pv.policy.policy?.mode || 'open')) : '' },
-        { id: 'ai-budget', num: '06', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
-        { id: 'ai-consumers', num: '07', label: x('secConsumers'), count: '' },
+        { id: 'ai-gen-rules', num: '06', label: x('gr.title'), count: '' },
+        { id: 'ai-budget', num: '07', label: x('secBudget'), count: ctx.usage ? x('perDayShort', { n: money(ctx.usage.daily_budget_usd) }) : '' },
+        { id: 'ai-consumers', num: '08', label: x('secConsumers'), count: '' },
       ]}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.navigate)}
@@ -117,6 +120,7 @@ export function renderPage(ctx) {
         ${secRouting(ctx, '03')}
         ${secRoles(ctx, '04')}
         ${secPolicy(ctx, '05')}
+        <${GenRulesSection} num="06" />
         ${secBudget(ctx)}
         ${secConsumers(ctx)}`}
     <//>`;
@@ -196,7 +200,7 @@ function secConnection(ctx) {
 function secBudget(ctx) {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
+  if (!u) return html`<${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -219,7 +223,7 @@ function secBudget(ctx) {
     ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
     : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
-    <${PageSection} id="ai-budget" num="06" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
+    <${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
         { key: 'budget', k: html`<${HelpLabel} term="ai.daily_budget" label=${x('dailyBudget')}>${x('dailyBudget')}<//>`, v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
@@ -273,7 +277,7 @@ function secConsumers(ctx) {
     v: !crewsMissed ? x('consumerCrewsNodeBody') : onNode.length ? x('consumerCrewsMixed', { agents: onNode.join(', ') }) : x('consumerCrewsBody'),
   };
   return html`
-    <${PageSection} id="ai-consumers" num="07" title=${x('secConsumers')} count=${null}>
+    <${PageSection} id="ai-consumers" num="08" title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },

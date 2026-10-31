@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-10-31 — aiGenRules: the operator's level per generation rule (services/ai/gen-rules.ts).
  *   2026-10-25 — aiFreeModelLastResort (secaudit2026oct22 follow-up, the developer's ruling on the free model).
  *   2026-10-25 — aiNodeKeyMaxOutputTokens (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.5.1 — 2026-10-12 — aiLegacySettingsRoutes no longer names /v1/ai/settings, which stays in 4.0.0.
@@ -142,6 +143,12 @@ export interface AiCapabilityConfig extends DecideConfig {
    * an owner chooses it as their model policy (`ai.policy.models` mode `recommended`).
    */
   aiRecommendedModels: string;
+  /**
+   * The operator's level for each generation rule (services/ai/gen-rules.ts), as
+   * `<rule>=off|on|required` pairs separated by commas. A rule not named is `off`: an owner may
+   * switch it on. Empty on a fresh node.
+   */
+  aiGenRules: string;
   /**
    * More AI providers of the operator's, as a JSON array of provider records (services/ai/
    * providers.ts, System 2 plan V3). `auth` is `none` or the NAME of an environment variable, never a
