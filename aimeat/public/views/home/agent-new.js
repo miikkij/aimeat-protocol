@@ -23,6 +23,8 @@
  * @usage routed at /v1/home?new-agent=1 by spa.html (optional say=<sentence>, proposal=<id>, and from a
  *   goal's proposal tag=<skill>&goal=<id>)
  * @version-history
+ *   v1.11.0 — 2026-10-31 — Signed out, "Sign in" opens the dialog on this page, so the person returns
+ *     to the proposal the chat sent them to; it went to the front page (v31 K51).
  *   v1.10.0 — 2026-10-25 — From a goal's proposal (goal-new.js): `tag` is given to the new agent so it
  *     takes the goal's open work for that skill, and `goal` returns the person to the goal afterwards.
  *   v1.9.0 — 2026-10-14 — "Not sure what to ask? Start from an example": three examples from the
@@ -95,6 +97,7 @@ const html = htm.bind(h);
 import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
+import { showLoginModal } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 import { areaLine } from '/js/consent-vocab.js';
 import { PageFrame } from '/components/PageFrame.js';
@@ -408,7 +411,9 @@ export default function AgentNewView({ navigate }) {
     return html`
       <${PageFrame} width="narrow">
         <${PageIntro} title=${n('title', 'This is how it would work')} sub=${tr('home.signInDesc', 'Sign in to see where you left off.')} />
-        <${FormActions}><${Loud} onClick=${() => navigate('/v1/portal')}>${tr('home.signIn', 'Sign in')}<//><//>
+        ${/* The dialog opens on this page, so the person comes back to the proposal they were sent to
+              (v31 K51); the front page lost it. Without the auth library, the front page still. */''}
+        <${FormActions}><${Loud} onClick=${() => { if (!showLoginModal({})) navigate('/v1/portal'); }}>${tr('home.signIn', 'Sign in')}<//><//>
       <//>`;
   }
 

@@ -10921,6 +10921,9 @@
   "notiftext.approval_portfolio_memory_read.body": "{who} ei itse saa lukea merkintöjäsi. Kun avaat tervetulosivusi kirjautuneena, sivu voisi lukea merkintäsi ja lähettää ne muualle. Jos sallit, sivu lukee merkintäsi kuten ennenkin. Jos et salli, sivu näytetään ilman yksityisiä merkintöjäsi. {who} saa vastauksen kummassakin tapauksessa.",
   "notiftext.approval_portfolio_memory_read_changed.title": "Tervetulosivusi muuttui. Saako sivu lukea merkintöjäsi, kun avaat sen?",
   "notiftext.approval_portfolio_memory_read_changed.body": "Tervetulosivuasi muutettiin sivueditorin ulkopuolella, joten palvelin ei tiedä, kuka sen kirjoitti. Kun avaat sivun kirjautuneena, sivu voisi lukea merkintäsi ja lähettää ne muualle. Jos sallit, sivu lukee merkintäsi kuten ennenkin. Jos et salli, sivu näytetään ilman yksityisiä merkintöjäsi.",
+  "notiftext.approval_connector_program.title": "Tietokone {computer} löysi ohjelman agentille {agent}. Saako se käynnistää ohjelman?",
+  "notiftext.approval_connector_program.body": "Ohjelma on {command}. Se tuli tietokoneen asetusten mukana, eikä kukaan yhdistänyt sitä tietokoneella, joten tietokone ei käynnistä sitä. Jos sallit, tietokone ottaa ohjelman käyttöön, kun se on seuraavan kerran yhteydessä, yleensä minuutin sisällä. Agentti {agent} alkaa silloin tehdä työtä sen avulla. Jos et salli, ohjelma ei käynnisty. Voit muuttaa päätöstä myöhemmin Tietokoneesi-sivulla.",
+  "notiftext.approval_change.computer_programs": "Muuta päätöstä Tietokoneesi-sivulla",
   "notiftext.approval_accountant_grant.title": "Saako {name} yhä lukea kirjojasi?",
   "notiftext.approval_accountant_grant.body": "Annoit käyttäjälle {name} oikeuden lukea kirjojasi ennen kuin palvelin alkoi tallentaa jokaisen oikeuden päivämäärän. Tili nimeltä {name} on luotu sen jälkeen, kun aloit antaa oikeuksia, ja poistetun tilin nimen voi rekisteröidä joku toinen. Siksi palvelin ei tiedä, onko tämä se henkilö, jolle annoit oikeuden. Kunnes vastaat, {name} lukee kirjojasi kuten ennenkin. Jos sallit, {name} saa pitää oikeuden. Jos et salli, oikeus poistetaan.",
   "notiftext.approval_card_adult.title": "Maksoitko omalla kortillasi?",
@@ -15893,7 +15896,34 @@
       "hostedTitle": "Oma AIMEAT",
       "hostedDesc": "Oma AIMEAT pilvessä. Me pidämme sen päällä, se ajaa agenttisi, eikä sinun tarvitse asentaa mitään. Ostat sen kaupasta.",
       "order": "Astu kauppaan →",
-      "orderSoon": "Kauppa avautuu pian."
+      "orderSoon": "Kauppa avautuu pian.",
+      "programs": {
+        "title": "Ohjelmat, jotka se saa käynnistää",
+        "lede": "Tietokone käynnistää agentille vain ohjelman, jonka olet sallinut täällä tai yhdistämällä sen tietokoneella. Agenttisi ja tekoälysi lukevat tämän luettelon, kun ne suunnittelevat työtä.",
+        "useRunner": "Käynnistää agentin jokaista tehtävää varten",
+        "useWake": "Herättää agentin, kun uutta työtä tulee",
+        "waiting": "Odottaa hyväksyntääsi",
+        "allowed": "Sallittu",
+        "declined": "Ei sallittu",
+        "foundAt": "Tietokone löysi ohjelman {when}. Se ei käynnisty, ennen kuin sallit sen.",
+        "declinedNow": "Et sallinut ohjelmaa. Se ei käynnisty.",
+        "fromConnect": "Yhdistit ohjelman tällä tietokoneella {when}.",
+        "fromInstall": "Ohjelma oli tietokoneella jo valmiina, ja se otettiin käyttöön ensimmäisellä käynnistyksellä.",
+        "fromYou": "Sallit ohjelman täällä {when}.",
+        "allowedPlain": "Tietokone käynnistää ohjelman.",
+        "notYet": "Tietokone ottaa päätöksesi käyttöön, kun se on seuraavan kerran yhteydessä.",
+        "allow": "Salli",
+        "allowDoes": "Tietokone ottaa ohjelman käyttöön, kun se on seuraavan kerran yhteydessä, yleensä minuutin sisällä. Agentti {agent} alkaa tehdä työtä sen avulla.",
+        "deny": "Älä salli",
+        "denyDoes": "Ohjelma ei käynnisty. Agentti {agent} odottaa, kunnes sallit ohjelman myöhemmin.",
+        "stop": "Älä salli enää",
+        "stopDoes": "Tietokone lopettaa ohjelman käytön, kun se on seuraavan kerran yhteydessä. Agentti {agent} ei tee työtä, joka tarvitsee ohjelmaa, ennen kuin sallit sen täällä uudelleen.",
+        "age": "Tietokone päivitti luettelon {when}. Se päivittää luettelon aina, kun se on yhteydessä.",
+        "neverReported": "Tietokone ei ole kertonut, mitä ohjelmia se saa käynnistää. Sen AIMEAT-ohjelma on tätä luetteloa vanhempi. Kun päivität sen, ohjelmat näkyvät tässä.",
+        "ownAi": "Hoida ohjelmia omalla tekoälylläsi",
+        "copyPrompt": "Kopioi kehote",
+        "prompt": "Lue tietokoneeni työkalulla aimeat_connector_list. Kerro jokaisesta tietokoneesta, mitä ohjelmia se saa käynnistää agenteilleni ja mitkä odottavat hyväksyntääni: komento, agentti ja mihin ohjelmaa käytetään. Älä muuta mitään, ennen kuin sanon. Kun päätän, kutsu työkalua aimeat_connector_program_set ja anna sille tietokone, ohjelman hash ja valinta allow tai deny."
+      }
     },
     "apps": {
       "title": "Sovelluksesi",
@@ -27175,6 +27205,17 @@
         "high": "Sivu näytetään, mutta ilman yksityisiä merkintöjäsi. Muut näkevät sen kuten ennenkin.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos tiedät, kuka sivun kirjoitti, ja luotat siihen. Jos agentti kirjoittaa sivuasi usein, anna sille agentin sivulla lupa lukea merkintäsi. Silloin sen sivut eivät enää kysy."
+      },
+      "approval_connector_program": {
+        "title": "Saako tietokone käynnistää tämän ohjelman?",
+        "short": "Ohjelma tuli yhden tietokoneesi asetusten mukana, eikä kukaan yhdistänyt sitä tietokoneella.",
+        "what": "Tietokoneesi käynnistää agentille ohjelman, esimerkiksi ohjelman, joka käynnistää agentin jokaista tehtävää varten, vain silloin, kun olet sallinut sen. Ohjelma, jonka yhdistät tietokoneella komennolla aimeat connect, on sallittu jo sillä. Tämä ohjelma tuli tietokoneelle muuta kautta, esimerkiksi muualta kopioidun kansion mukana. Siksi tietokone pitää sen odottamassa ja kysyy sinulta.",
+        "lowLabel": "Jos sallit",
+        "low": "Tietokone käynnistää ohjelman seuraavasta yhteydestä alkaen, ja agentti tekee työtä sen avulla. Voit pysäyttää ohjelman myöhemmin Tietokoneesi-sivulla.",
+        "highLabel": "Jos et salli",
+        "high": "Ohjelma ei käynnisty, eikä agentti tee työtä, joka tarvitsee sitä. Voit sallia ohjelman myöhemmin Tietokoneesi-sivulla.",
+        "tipLabel": "Milloin sallia",
+        "tip": "Salli, jos tunnet komennon ja tiedät, mistä se tuli. Jos et tunnista sitä, älä salli, ja katso ensin kansio, joka on sillä tietokoneella."
       },
       "approval_goal_model_spend": {
         "title": "Agentti pyytää tekoälyä tekemään tehtävän sinun kustannuksellasi",

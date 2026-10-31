@@ -6,6 +6,8 @@
  *   the source and the credential KIND but never a credential value — and that the list
  *   itself is operator-only.
  * @version-history
+ *   v1.2.0 -- 2026-10-31 -- A browser's own navigation to /v1/agents without a session is sent to
+ *     /v1/profile; an API client and a framed load keep the 401 (v31 K52).
  *   v1.1.0 -- 2026-10-09 -- A download token presented as a Bearer answers 401 on three routes, not
  *     500 (secrets audit 2026-10-09, S-1).
  *   v1.0.0 -- 2026-08-17 -- Initial: refusals recorded, listed newest-first, gate enforced.
@@ -29,6 +31,7 @@ async function json(path: string, opts: RequestInit = {}) {
 }
 
 import { registerOwner } from './helpers/owner-login.js';
+import { get as httpGet } from 'node:http';
 
 async function registerAndToken(name: string): Promise<string> {
     return (await registerOwner(BASE, name)).token;
@@ -96,6 +99,23 @@ await test('The list itself is operator-only', async () => {
     assert(nonOp.status === 403, `non-operator expected 403, got ${nonOp.status}`);
     const anon = await json('/v1/admin/auth-refusals');
     assert(anon.status === 401, `anonymous expected 401, got ${anon.status}`);
+});
+
+await test('A browser opening a signed-in API address gets the sign-in page; every other caller the 401 (v31 K52)', async () => {
+    // The source was broken: /v1/agents opened in a browser showed the raw AUTH_REQUIRED JSON.
+    // node:http, because fetch() sets Sec-Fetch-Mode: cors itself.
+    const get = (headers: Record<string, string>) => new Promise<{ status: number; location: string; type: string }>((ok, fail) => {
+        httpGet(`${BASE}/v1/agents`, { headers }, (res) => {
+            res.resume();
+            ok({ status: res.statusCode ?? 0, location: String(res.headers.location ?? ''), type: String(res.headers['content-type'] ?? '') });
+        }).on('error', fail);
+    });
+    const browser = await get({ 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'document', Accept: 'text/html' });
+    assert(browser.status === 302 && browser.location === '/v1/profile', `a browser is sent to the sign-in page: ${browser.status} ${browser.location}`);
+    const api = await get({});
+    assert(api.status === 401 && api.type.includes('json'), `an API client keeps the JSON 401: ${api.status} ${api.type}`);
+    const framed = await get({ 'Sec-Fetch-Mode': 'navigate', 'Sec-Fetch-Dest': 'iframe' });
+    assert(framed.status === 401, `a framed load is not a person at the address bar: ${framed.status}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

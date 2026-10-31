@@ -19,6 +19,7 @@
  *
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-v2
  * @version-history
+ *   2026-10-31 — A proposal's approval_url is its own page on the home, /v1/home?new-agent=1&proposal=<id> (v31 K51).
  *   2026-10-19 — The public card's field list allows `avatar` and `avatar_problem`: the agent's picture is public by design.
  *   2026-10-15 — The approval's llm_choice carries the policy warning for a pinned model the owner's
  *     policy leaves out (feature-list audit #82).
@@ -1029,7 +1030,10 @@ async function run() {
         assert(r.body.data.created === false, 'a proposal must create nothing');
         // The agent relays this to a person, who needs a page to open, not "your profile somewhere".
         const approvalUrl = String(r.body.data.approval_url ?? '');
-        assert(/^https?:\/\/.+\/v1\/profile\?tab=agents$/.test(approvalUrl), `approval_url should be the Agents page, got ${approvalUrl}`);
+        // v31 K51: the proposal's own page, where it is shown whole with the press that starts it.
+        // The Agents page listed it in its third section, and a buyer found nothing to press.
+        assert(approvalUrl.endsWith(`/v1/home?new-agent=1&proposal=${encodeURIComponent(r.body.data.proposal.id)}`) && /^https?:\/\//.test(approvalUrl),
+            `approval_url should be the proposal's own page, got ${approvalUrl}`);
         assert(String(r.body.data.next_step).includes(approvalUrl), `next_step should name the address, got ${r.body.data.next_step}`);
         assert(r.body.data.already_waiting === false, 'a first proposal is not already waiting');
         proposalId = r.body.data.proposal.id;

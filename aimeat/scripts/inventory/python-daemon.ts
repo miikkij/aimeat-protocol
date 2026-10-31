@@ -51,8 +51,12 @@ import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { parse as parseYaml } from 'yaml';
 
-/** The number of allowlisted differences. Deleting an entry lowers it; raising it is the developer's decision. */
-export const DAEMON_CEILING = 40;
+/**
+ * The number of allowlisted differences. Deleting an entry lowers it; raising it is the developer's decision.
+ * 41 on 2026-10-31: PUT /v1/agents/{}/programs, the serve daemon's report of the commands it holds
+ * (Jouni, 2026-10-31: "hyväksyn").
+ */
+export const DAEMON_CEILING = 41;
 export const DAEMON_ALLOWLIST = 'security/python-daemon-parity.json';
 
 /** One call or route: `METHOD path`, the method `*` when the source does not show it. */
