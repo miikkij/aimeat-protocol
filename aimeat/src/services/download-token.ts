@@ -17,6 +17,9 @@
  * @usage
  *   import { generateDownloadToken, verifyDownloadToken } from '../services/download-token.js';
  * @version-history
+ *   v1.2.2 -- 2026-10-31 -- generateDownloadToken refuses a payload without a version (a non-empty
+ *     string). A mint without one produced a token with no `ver`, which the transition rule of v1.2.1
+ *     serves without the version check (secaudit 2026-10-31 inv-18). No current caller mints one.
  *   v1.2.1 -- 2026-10-21 -- A token minted before v1.2.0 (no `ver`) is served as before until it
  *     expires, so a download URL handed out before the upgrade keeps working for its hour. Every
  *     token minted from v1.2.0 on carries `ver` and keeps the version check.
@@ -85,6 +88,13 @@ export class DownloadTokenError extends Error {
 
 export async function generateDownloadToken(payload: DownloadTokenPayload, ttlSeconds: number = 3600): Promise<string> {
     if (!_privateKey) throw new Error('Download token keys not initialized');
+    // A token without `ver` is served whatever the key holds (verifyDownloadToken keeps that for
+    // tokens minted before 2026-10-20), so a mint that names no version would mint one that skips
+    // the version check. Every caller passes the stored file's createdAt; one that does not is a
+    // defect, refused here before anything is signed (secaudit 2026-10-31 inv-18).
+    if (typeof payload.version !== 'string' || !payload.version) {
+        throw new Error('A download token names no file version: pass the stored file\'s createdAt as `version`.');
+    }
 
     return new SignJWT({
         typ: 'download',
