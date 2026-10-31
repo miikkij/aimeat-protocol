@@ -249,6 +249,25 @@ await test('11. FAILURE: B\'s agent buys nothing without a daily limit, nor past
     assert(!got.isError && got.data.entitled === true, `the agent reads the bought package: ${got.text.slice(0, 300)}`);
 });
 
+await test('11b. The author\'s agent prices and reads the sales over MCP; B\'s agent is refused both on A\'s package', async () => {
+    const seller = await makeAgent(BASE, A, ['commerce:sell', 'packages:write']);
+    const s = await openSession(BASE, seller.token);
+    const set = await callTool(s, 'aimeat_package_price_set', { group_id: second, price: { amount: 4_000_000, currency: 'EUR' } });
+    assert(!set.isError && set.data.sale?.price?.amount === 4_000_000, `MCP price: ${set.text.slice(0, 300)}`);
+    const back = await callTool(s, 'aimeat_package_price_set', { group_id: second, price: { amount: 3_000_000, currency: 'EUR' } });
+    assert(!back.isError, `MCP price back: ${back.text.slice(0, 300)}`);
+    const sales = await callTool(s, 'aimeat_package_sales', { group_id: second, action: 'list' });
+    assert(!sales.isError && sales.data.sales.some((x: any) => x.buyer === B.name && x.state === 'paid'), `MCP sales: ${sales.text.slice(0, 300)}`);
+    const other = await makeAgent(BASE, B, ['commerce:sell', 'packages:write']);
+    const o = await openSession(BASE, other.token);
+    const p = await callTool(o, 'aimeat_package_price_set', { group_id: second, price: { amount: 1_000_000, currency: 'EUR' } });
+    assert(p.isError && /FORBIDDEN/.test(p.text), `B's agent prices A's: ${p.text.slice(0, 300)}`);
+    const l = await callTool(o, 'aimeat_package_sales', { group_id: second, action: 'list' });
+    assert(l.isError && /FORBIDDEN/.test(l.text), `B's agent reads A's sales: ${l.text.slice(0, 300)}`);
+    const r = await callTool(o, 'aimeat_package_sales', { group_id: second, action: 'refund', order: 'cs_none' });
+    assert(r.isError && /FORBIDDEN/.test(r.text), `B's agent refunds on A's: ${r.text.slice(0, 300)}`);
+});
+
 await test('12. A refunds B: B is told, reads only the listing again, cannot export, update or migrate the copy; a second refund is ALREADY_REFUNDED', async () => {
     const r = await json(`/v1/packages/${encodeURIComponent(group)}/sales/${order}/refund`, { method: 'POST', headers: auth(A.token), body: '{}' });
     assert(r.status === 200 && r.body.data.state === 'refunded' && r.body.data.outcome === 'refunded', `refund: ${show(r)}`);

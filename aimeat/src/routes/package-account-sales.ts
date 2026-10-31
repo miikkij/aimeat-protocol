@@ -25,13 +25,24 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireScope, requireLocalSession } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { z } from 'zod';
+import { validateBody } from '../models/schemas.js';
+import { INPUT_LIMITS } from '../models/input-limits.js';
 import { setAccountPrice, saleView, salesOf, refundPurchase, purchasesOf } from '../services/packages/sale/package-account-sale.js';
+
+/** PUT /v1/packages/:groupId/price: the price or null, the state, the preview part ids. */
+const PriceBodySchema = z.object({
+    price: z.object({ amount: z.number(), currency: z.string().max(INPUT_LIMITS.id) }).nullable().optional(),
+    state: z.enum(['on_sale', 'paused', 'ended']).optional(),
+    preview: z.array(z.string().max(INPUT_LIMITS.id)).max(3).optional(),
+}).strict();
 
 export function registerPackageAccountSaleRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
     const group = (p: unknown): string => decodeURIComponent(p as string);
 
-    router.put('/v1/packages/:groupId/price', requireAuth(), requireLocalSession(), requireScope('commerce:sell'), async (req, res) => {
-        const body = (req.body ?? {}) as Record<string, unknown>;
+    router.put('/v1/packages/:groupId/price', requireAuth(), requireLocalSession(), requireScope('commerce:sell'), validateBody(PriceBodySchema, config.nodeId), async (req, res) => {
+        // The shape is checked here; the money rules (a positive amount, EUR or USD) in setAccountPrice.
+        const body = (req as unknown as { validated: z.infer<typeof PriceBodySchema> }).validated;
         const out = await setAccountPrice({ storage, config }, { owner: req.auth!.owner }, group(req.params.groupId), {
             price: body.price, state: body.state, preview: body.preview,
         });
