@@ -4,6 +4,28 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-see-and-decide-what-your-computers-may-start",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "See and decide what your computers may start",
+        "fi": "Näet ja päätät, mitä tietokoneesi saavat käynnistää"
+      },
+      "summary": {
+        "en": "Each computer lists the programs it may start for your agents, and you allow or stop each one.",
+        "fi": "Jokainen tietokone näyttää ohjelmat, jotka se saa käynnistää, ja sinä sallit tai pysäytät ne."
+      },
+      "body": {
+        "en": "Each computer on the Your computers page lists the programs it may start for your agents. A program that came with a computer's settings waits for you, and you allow or stop any program on the page, from your own AI, or over the API.",
+        "fi": "Tietokoneesi-sivu näyttää jokaisesta tietokoneesta ohjelmat, jotka se saa käynnistää agenteillesi. Ohjelma, joka tuli tietokoneen asetusten mukana, odottaa hyväksyntääsi. Sallit tai pysäytät minkä tahansa ohjelman sivulla, omalla tekoälylläsi tai rajapinnan kautta."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-sell-your-own-package",
       "highlight": false,
       "audience": [

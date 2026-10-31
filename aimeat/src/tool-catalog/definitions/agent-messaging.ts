@@ -19,6 +19,9 @@
  *   2026-10-12 — aimeat_usage_report, aimeat_notify and the five aimeat_contact_* tools declare all three
  *     interfaces (agentEverywhere): each has a CLI dispatch definition and the connector MCP registers it.
  *     aimeat_agent_statistics declares the connector MCP too (connectorOnly), which registers it.
+ *   2026-10-31 — aimeat_connector_program_set, and aimeat_connector_list names each computer's programs:
+ *     what a computer may start for its agents, and the person's decision on each
+ *     (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   2026-10-14 — aimeat_connector_list's description says what `tunnel_enabled: false` means and what to tell the person.
  *   2026-10-11 — The word a person reads for a connector is "computer" (laptop, server, cloud, AIMEAT instance), never "machine" (Jouni, 2026-10-11).
  *   2026-10-10 — aimeat_connector_list and aimeat_connector_rename, and `connector` on
@@ -363,7 +366,7 @@ export const agentMessagingTools = [
     },
     {
         name: 'aimeat_connector_list',
-        description: "The computers this account's agents run on. A connector is the program (`aimeat connect serve`) that holds a person's agents on one computer: their own laptop or computer, a server, a computer in the cloud, or the one that comes with an AIMEAT instance bought from the store. Returns each connector with its id, its name (the person's own name for it, else the name the computer reported), whether it is connected right now, when it was last seen, the run modes it presented, the agents that live on it, and the agents that wait for it. Call this before aimeat_agent_propose when the person says where an agent is to run (\"on my home computer\"), and pass that connector's name or id as `connector`. When the person asks why an agent does nothing, look here: an agent on a connector that is not connected starts when that computer comes back. `tunnel_enabled: false` means this node takes no computers at all: `aimeat connect serve` cannot join it, no computer will ever show here, and the person's own computer is not the fault. Tell them that the people who run this node must turn on computer connections and restart it, and send that request to `support@operators` when they agree. To the person, say \"computer\" and its name; never say \"machine\" or \"connector\", and never its id.",
+        description: "The computers this account's agents run on. A connector is the program (`aimeat connect serve`) that holds a person's agents on one computer: their own laptop or computer, a server, a computer in the cloud, or the one that comes with an AIMEAT instance bought from the store. Returns each connector with its id, its name (the person's own name for it, else the name the computer reported), whether it is connected right now, when it was last seen, the run modes it presented, the agents that live on it, the agents that wait for it, and the programs it may start for its agents (`programs`: agent, command, runner or wake, status allowed, waiting or declined; `programs_reported_at` says how old the list is). Before planning work that needs an agent's program, check that its status is allowed; a waiting one starts only after the person allows it, with aimeat_connector_program_set. Call this before aimeat_agent_propose when the person says where an agent is to run (\"on my home computer\"), and pass that connector's name or id as `connector`. When the person asks why an agent does nothing, look here: an agent on a connector that is not connected starts when that computer comes back. `tunnel_enabled: false` means this node takes no computers at all: `aimeat connect serve` cannot join it, no computer will ever show here, and the person's own computer is not the fault. Tell them that the people who run this node must turn on computer connections and restart it, and send that request to `support@operators` when they agree. To the person, say \"computer\" and its name; never say \"machine\" or \"connector\", and never its id.",
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'List the Account\'s Connectors', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -386,6 +389,21 @@ export const agentMessagingTools = [
         input: {
             connector: { type: 'string', required: true, description: 'The connector to name: its id, or its present name, from aimeat_connector_list.', zod: z.string().max(80) },
             name: { type: 'string', required: true, description: 'The new name, 1 to 60 characters.', zod: z.string().max(60) },
+        },
+    },
+    {
+        name: 'aimeat_connector_program_set',
+        description: "Allow or stop a program one of the account's computers may start for an agent. aimeat_connector_list shows each computer's `programs`: the agent, the command, whether it is the runner (started for each task) or the wake command (started on new work), its `hash`, and its `status`: allowed, waiting (the person has not decided) or declined. A computer starts only programs that are allowed; one that came with the settings on that computer waits for the person. Use it when the person tells you to allow or stop a program, or when work they ask for needs a program that waits: then ask them first, in plain words, naming the command and the computer. `decision` 'allow' lets the computer start it from its next connection; 'deny' stops it there, and the computer keeps it until it is allowed again. The runner and the wake command of one agent share one hash and are decided together. Say \"computer\" and its name to the person, never its id or the hash.",
+        caller: 'agent',
+        visibility: agentEverywhere,
+        annotations: { title: 'Allow or Stop a Program on a Computer', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The word PUT /v1/agents/v2/connectors/:id/programs/:hash asks.
+        scope: 'agent:write',
+        surfaces: ['admin'],
+        input: {
+            connector: { type: 'string', required: true, description: 'The computer: its id, or its present name, from aimeat_connector_list.', zod: z.string().max(80) },
+            hash: { type: 'string', required: true, description: "The program's `hash` from aimeat_connector_list.", zod: z.string().max(64) },
+            decision: { type: 'string', required: true, description: "'allow' or 'deny'.", zod: z.enum(['allow', 'deny']) },
         },
     },
     {

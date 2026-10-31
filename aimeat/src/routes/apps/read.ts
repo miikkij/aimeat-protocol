@@ -9,6 +9,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-31 — A browser's own navigation to the bare app address is redirected to `?mode=inline`;
+ *     `?download=1` and API clients keep the raw file (v28 #12, K41).
  *   2026-10-25 — A runnable request on the bare app host is redirected to the app's own origin like one on the apex (secaudit2026oct22, read.ts:bare-app-host-runs-any-app).
  *   2026-10-25 — `?format=md&lang=<tag>` passes the reader's language to the app's own format-md action (formatMdLang).
  *   2026-10-25 — accessCodeUnlockPage moved unchanged to routes/apps/access-code-page.ts (max-file-lines).
@@ -555,6 +557,18 @@ export function registerReadRoutes(
         // `frame` is the isolated frame's own request for the bytes (inline-frame.ts). It is as
         // runnable as `inline`, so every rule below that is about a runnable app applies to it.
         const runnable = mode === 'inline' || mode === 'frame';
+
+        // A person who opens the bare address in a browser gets the app, not a file to save. The node
+        // chat handed a buyer this address and the app downloaded (v28 #12, K41). A browser's own
+        // navigation says so in Sec-Fetch-Mode and Sec-Fetch-Dest; an API client, a fetch() and a
+        // download link send neither pair, and `?download=1` asks for the raw file outright.
+        if (mode === undefined && req.query.download === undefined
+            && req.get('sec-fetch-mode') === 'navigate' && req.get('sec-fetch-dest') === 'document') {
+            const here = new URL(req.originalUrl, 'http://node.invalid');
+            here.searchParams.set('mode', 'inline');
+            res.redirect(302, here.pathname + here.search);
+            return;
+        }
 
         // H-2: never serve RUNNABLE app HTML from the apex (authenticated SPA) origin. When the app
         // origin is provisioned (flag on) and this request arrived on the apex, an inline (runnable)

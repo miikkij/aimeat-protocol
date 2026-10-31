@@ -31,6 +31,8 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.9.0 — 2026-10-31 — proposalApprovalUrl(baseUrl, id) is the proposal's own page on the home,
+ *     where it is shown whole and started with one press (v31 K51).
  *   v1.8.0 — 2026-10-18 — proposalNextStep takes the proposal's permissions and adds one sentence when
  *     they cover organism:invite: the agent may invite people, and an invitation can create an account
  *     (wish-datakarttaan-ja-agentin-kuvaukseen-tieto-kutsuista-ja-tilien).
@@ -75,11 +77,15 @@ import { withInvitesSentence } from './agent-invites.js';
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
 
 /**
- * Where the person approves a proposal: the Agents page, which lists what waits for them. The same
- * address the basic-agents answer gives, because it is the same page and the same press.
+ * Where the person approves a proposal: the proposal's own page on the home, which shows it whole
+ * with when it works and the one press that starts it. Without an id, the Agents page that lists
+ * what waits. The Agents page was the address for every proposal until 2026-10-31; a buyer opened it
+ * from the chat and found the proposal in the page's third section, with nothing at the top to press
+ * (v28 #15, v31 K51).
  */
-export function proposalApprovalUrl(baseUrl: string): string {
-  return basicAgentsApprovalUrl(baseUrl);
+export function proposalApprovalUrl(baseUrl: string, proposalId?: string): string {
+  if (!proposalId) return basicAgentsApprovalUrl(baseUrl);
+  return `${baseUrl.replace(/\/+$/, '')}/v1/home?new-agent=1&proposal=${encodeURIComponent(proposalId)}`;
 }
 
 /**
