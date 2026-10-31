@@ -28,6 +28,8 @@
  *     node that is not a seller, an agent without operator:admin and a replayed signature are refused
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-install-sets
  * @version-history
+ *   2026-10-31 — Phase 6b: `owner.welcome: false` sends a shop-made owner no mail at any apply, keeps the
+ *     sign-in link on, and a non-boolean value is refused (v28 #8).
  *   2026-10-29 — A set naming the node it is applied on as its repository is refused with 400
  *     SELF_NODE_ID (secaudit2026oct26 round 8c, federation-07).
  *   2026-10-24 — The start-up apply is awaited until its run claim is gone, not until its record
@@ -588,6 +590,25 @@ await test('An owner the shop\'s crew image already signed in as is still welcom
     });
     assert(w.status === 201 && !(w.body.data.record.welcomed ?? []).length && mailsTo(wrong).length === 0 && mailsTo(other).length === 0,
         `no mail when the verified address differs: ${w.status} ${JSON.stringify({ welcomed: w.body.data?.record?.welcomed, a: mailsTo(wrong).length, b: mailsTo(other).length })}`);
+});
+
+const QUIETCO = `quietco${ts}@example.org`;
+await test('owner.welcome false: a shop-made owner gets no welcome at any apply, and its sign-in link is on (v28 #8)', async () => {
+    // The store mails its own ready message with the sign-in link, so the set's welcome was a second,
+    // near-identical mail to the buyer. The source was broken.
+    const made = await provisionOwner(C.storage, C.config, { via: 'provisioning', username: 'quietco', displayName: 'Quietco', verifiedEmail: QUIETCO });
+    const body = JSON.stringify({ install_set: installSet({ owner: { name: 'quietco', email: QUIETCO, welcome: false }, members: [], organism_names: { team: 'Quietco' } }) });
+    for (const round of [1, 2]) {
+        const r = await C.json('/v1/install-sets/apply', { method: 'POST', headers: auth(opsToken), body });
+        assert(r.status === 201 && !(r.body.data.record.welcomed ?? []).includes(QUIETCO), `apply ${round}: ${r.status} ${JSON.stringify(r.body.data?.record?.welcomed)}`);
+    }
+    assert(mailsTo(QUIETCO).length === 0, `no mail to the owner: ${JSON.stringify(mailsTo(QUIETCO).map(m => [m.method, m.args[0]]))}`);
+    assert((await C.storage.getGHII(made.ghii.ghii))?.magicLinkEnabled === true, 'the owner can still sign in by emailed link');
+    const bad = await C.json('/v1/install-sets/apply', {
+        method: 'POST', headers: auth(opsToken),
+        body: JSON.stringify({ dry_run: true, install_set: installSet({ owner: { name: 'quietco', email: QUIETCO, welcome: 'no' }, members: [], organism_names: { team: 'Quietco' } }) }),
+    });
+    assert(bad.status === 400 && JSON.stringify(bad.body).includes('owner.welcome'), `a non-boolean welcome is refused: ${bad.status} ${JSON.stringify(bad.body).slice(0, 300)}`);
 });
 
 console.log('\nPhase 7 — A new node applies its set at start-up');
