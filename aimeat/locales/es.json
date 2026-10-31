@@ -24796,6 +24796,7 @@
     "tag.all": "Todas",
     "empty.noApps": "Todavía no hay aplicaciones",
     "empty.noAppsDesc": "Agrega tu primera aplicación con el botón + de arriba",
+    "empty.noAppsDescPlace": "Pide una aplicación en el chat con una sola frase. Cuando esté lista, aparecerá aquí.",
     "empty.formats": "Admite: archivos HTML y paquetes ZIP",
     "empty.noMatch": "Sin resultados",
     "empty.noMatchDesc": "Ninguna aplicación coincide con el filtro actual. Prueba con otra palabra o etiqueta.",

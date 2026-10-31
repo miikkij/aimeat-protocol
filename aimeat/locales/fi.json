@@ -27156,6 +27156,7 @@
     "tag.all": "Kaikki",
     "empty.noApps": "Ei vielä sovelluksia",
     "empty.noAppsDesc": "Lisää ensimmäinen sovellus yllä olevalla +-painikkeella",
+    "empty.noAppsDescPlace": "Pyydä chatissa sovellus yhdellä lauseella. Kun se on valmis, se näkyy tässä.",
     "empty.formats": "Tukee: HTML-tiedostot ja ZIP-paketit",
     "empty.noMatch": "Ei osumia",
     "empty.noMatchDesc": "Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta.",
