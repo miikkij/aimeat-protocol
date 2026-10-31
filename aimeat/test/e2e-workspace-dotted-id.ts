@@ -22,6 +22,8 @@
  *   read, and the labels' cap on a space shared whole. Each "Refused:" test of that section fails on
  *   the tree before round 10b; each "Usage:" test there passes on both trees.
  * @version-history
+ *   2026-11-01 — The write side: a memory write of a dotted record key in a declared space is stored,
+ *     and an undeclared space is still refused (secaudit2026oct31w2 round 10b).
  *   2026-11-01 — The readers outside the index: a second and a third workspace with plain and dotted
  *     ids, one Refused and one Usage test per reader (secaudit2026oct31w2 round 10b).
  *   v1.0.0 — 2026-10-31 — Initial (secaudit2026oct31w2 round 10).
@@ -392,6 +394,27 @@ await test('Cleanup 10b: classification off and the node policy restored', async
         const back = await put('/v1/classification/policy', owner.token, { level: 'node', policy: policyBefore });
         assert(back.status === 200, `restore ${back.status}: ${JSON.stringify(back.body?.error)}`);
     }
+});
+
+// Round 10b, the write side: a memory write of a workspace record key is checked against the
+// manifest's spaces (undeclaredSpaceForKey). The key's parser takes the last part before the role as
+// the id, so a dotted id put its first parts into the namespace and was refused as UNDECLARED_SPACE.
+await test('Usage: a memory write of a plain record key in a declared space is stored, as before', async () => {
+    const w = await post('/v1/memory', owner.token, { key: `${root()}.${NS}.direct.draft`, value: { title: 'Direct' }, visibility: 'private' });
+    assert(w.status === 201, `plain key ${w.status}: ${JSON.stringify(w.body?.error)}`);
+});
+
+await test('Refused: a memory write of a dotted record key in a declared space is no longer refused as UNDECLARED_SPACE', async () => {
+    const w = await post('/v1/memory', owner.token, { key: `${root()}.${NS}.d1.5.draft`, value: { title: 'Direct dotted' }, visibility: 'private' });
+    assert(w.status === 201, `dotted key ${w.status}: ${JSON.stringify(w.body?.error)}`);
+    const r = await json(`/v1/organisms/${orgId}/workspace/index?ws=${WS}`, { headers: auth(owner.token) });
+    const ids = (r.body.data.index.note as any[]).map(n => n.id);
+    assert(ids.includes('d1.5'), `the index lists it under its whole id: ${JSON.stringify(ids)}`);
+});
+
+await test('Usage: a memory write into a space the manifest does not declare is still refused', async () => {
+    const w = await post('/v1/memory', owner.token, { key: `${root()}.undeclared.x1.draft`, value: { title: 'Nowhere' }, visibility: 'private' });
+    assert(w.status === 422 && w.body?.error?.code === 'UNDECLARED_SPACE', `undeclared ${w.status}: ${JSON.stringify(w.body?.error)}`);
 });
 
 console.log(`\n${passed} passed, ${failed} failed`);
