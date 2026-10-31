@@ -24,6 +24,11 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.8.0 — 2026-10-31 — An attestation without the metadata signature is refused (400
+ *     METADATA_UNSIGNED) from a peer whose signed heartbeat named 4.2.1 or newer, and from every peer
+ *     once this node runs 4.3.0 (unsignedPackageMetadataAccepted in config-federation.ts); before
+ *     4.3.0 an older peer or one of unknown version pulls as before (decision Jouni 2026-10-31;
+ *     secaudit 2026-10-31 inv-26).
  *   v1.7.2 — 2026-10-27 — A pull also checks the signed component metadata (verifyComponentMetadata)
  *     where the source signs it, and stops before any write on a mismatch (secaudit2026oct26).
  *   v1.7.1 — 2026-10-27 — checkUpstream strips the stored upstream address with stripTrailingSlashes
@@ -72,6 +77,9 @@ import { importParsedPackage } from '../compose/package-import.js';
 import { getPackageFor } from '../compose/package-read.js';
 import { signedPackageHeaders } from './package-node-auth.js';
 import { logger } from '../../../utils/logger.js';
+import {
+    PACKAGE_METADATA_SIGNATURE_PEER_FROM, UNSIGNED_PACKAGE_METADATA_REMOVED_IN, unsignedPackageMetadataAccepted,
+} from '../../../config-federation.js';
 
 export interface PackagePullDeps {
     storage: Storage;
@@ -371,6 +379,24 @@ export async function pullPackage(
     const metadata = await verifyComponentMetadata(source.publicKey, doc, parsed.components);
     if (!metadata.ok) {
         return { ok: false, status: 400, code: 'DIGEST_MISMATCH', message: metadata.reason };
+    }
+    // 8c. An attestation without the metadata signature is taken only inside the window
+    //     (config-federation.ts): from a peer whose signed heartbeat named a release older than
+    //     PACKAGE_METADATA_SIGNATURE_PEER_FROM, or of unknown version, and only before this node runs
+    //     UNSIGNED_PACKAGE_METADATA_REMOVED_IN (secaudit 2026-10-31 inv-26).
+    if (!metadata.checked) {
+        // The version the peer's own signed heartbeat named; a source that is not a peer has none.
+        const peerVersion = [...peers.values()].find(p => p.nodeId === source.nodeId)?.softwareVersion ?? null;
+        const window = unsignedPackageMetadataAccepted(peerVersion);
+        if (!window.accepted) {
+            const why = window.reason === 'peer-new'
+                ? `${source.nodeId} runs AIMEAT ${String(peerVersion)}, and every release from ${PACKAGE_METADATA_SIGNATURE_PEER_FROM} signs it.`
+                : `From AIMEAT ${UNSIGNED_PACKAGE_METADATA_REMOVED_IN} this node pulls a package only when its metadata is signed.`;
+            return {
+                ok: false, status: 400, code: 'METADATA_UNSIGNED',
+                message: `${source.nodeId} served this package without a signature over its metadata (app tools, data map, names, icons, labels, dependencies). ${why} Ask the operator of ${source.nodeId} to update it to AIMEAT ${PACKAGE_METADATA_SIGNATURE_PEER_FROM} or newer and publish the package again, then pull it again.`,
+            };
+        }
     }
 
     const upstream: UpstreamRef = {
