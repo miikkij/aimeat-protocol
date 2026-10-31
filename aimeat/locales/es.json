@@ -21454,6 +21454,7 @@
   "chat.allowanceElsewhere": "Te quedan {n} USD de saldo, para todo lo que no sea este chat.",
   "chat.ownKeyNotForChat": "Tu propia clave no paga este chat. Paga tus aplicaciones y tus demás peticiones de IA a través de este servidor.",
   "chat.poweredBy": "Con tecnología de goose",
+  "chat.aboutEngine": "Qué responde aquí",
   "chat.back": "Atrás",
   "chat.busyThinking": "pensando",
   "chat.busyWriting": "escribiendo la respuesta",
