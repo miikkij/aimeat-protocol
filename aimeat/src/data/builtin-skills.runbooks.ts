@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-10-31 — manage-my-agents: approval_url is the proposal's own page, and a proposal may carry
+ *     its clock (`schedule`), which the approval starts it on (v31 K47, K51).
  *   2026-10-31 — manage-my-agents: each computer's `programs` in aimeat_connector_list, and
  *     aimeat_connector_program_set only on the owner's answer
  *     (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
@@ -179,9 +181,10 @@ Ask what the agent should do, then name the kind, where it runs and who pays:
     this AIMEAT (\`npx aimeat connect --url <this node> --owner <them>\`, then
     \`npx aimeat connect serve\`), and the computer stays on while it works. Read the organisms and
     workspaces it will work on first (\`aimeat_workspace_list\`), then propose the agent with
-    \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition); the owner
-    approves it at the \`approval_url\` the answer gives (the Agents page, also in their open
-    items), and approving creates it. This node makes and runs it, so an outside agent builder is
+    \`aimeat_agent_propose\` (a name, its purpose naming that data, a crew definition, and
+    \`schedule\` when it works on a clock); the owner approves it at the \`approval_url\` the answer
+    gives (the proposal's own page, also in their open items), and approving creates it, on its
+    clock when the proposal named one. This node makes and runs it, so an outside agent builder is
     never the answer. When they have more than one connector (a home computer and a server, say),
     \`aimeat_connector_list\` names the computers and says which are connected; pass the one they
     mean as \`connector\`, and say its name to them, never its id. \`aimeat_connector_rename\` gives
