@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: The empty chat says what the Atelier is: the workshop where the AI builds an app,
+ *     asked for here, ending in a link (v31 K32).
  *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
  *     whose connection went silent ends with "The connection was lost" and the retry (v27 P2).
  *   2026-10-29: Deleting a conversation the chat tool has seen says, in the rail, that the chat tool
@@ -714,7 +716,7 @@ export default function ChatView() {
                     ${turns.length === 0 && !busy ? html`
                         <${ConversationWelcome}
                             title=${t('chat.welcomeTitle')}
-                            body=${t('chat.welcomeBody')}
+                            body=${`${t('chat.welcomeBody')} ${tr('chat.welcomeAtelier', '')}`.trim()}
                             trust=${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
