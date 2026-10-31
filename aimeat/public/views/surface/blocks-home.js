@@ -17,6 +17,9 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-31: On a node the store sold, NameplateBlock carries the AI credit in euros under the
+ *     name, with whether the AI is ready and the store's top-up link when it runs low; the "this is
+ *     a demo" block draws nothing there (Jouni v27 P3, P6).
  *   2026-10-29: NameplateBlock leaves out the full identity on a customer's node: it carries the
  *     node's id, which a buyer never needs to read (UX review 2026-10-29, C).
  *   2026-10-25: YourTurnBlock passes each thread's last message time and the person's window
@@ -64,6 +67,8 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { storeHref, storeOpensSoon, storeSoonCode, customerNode } from '/js/site.js';
+import { aiCredit, topupHref } from '/js/ai-credit.js';
+import { money } from '/js/format.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
 
@@ -75,6 +80,30 @@ const identityOf = (session) =>
 
 // ── The person ──
 
+/**
+ * The AI credit under a buyer's name, in euros, with whether their AI is ready, and where to buy
+ * more when it runs low (Jouni v27 P6). Nothing on a node the store did not sell (ai-credit.js).
+ */
+function CreditPlate() {
+  const customer = customerNode();
+  const { data } = useShared('chat-status', customer ? '/v1/chat/status' : null, ['chat']);
+  const credit = aiCredit(data);
+  if (!credit) return null;
+  const amount = money(credit.eur, 'EUR');
+  const stateText = {
+    ready: tr('home.credit.ready', 'your AI is ready'),
+    low: tr('home.credit.low', 'running low'),
+    empty: tr('home.credit.empty', 'used up'),
+    off: tr('home.credit.off', 'the AI is switched off on this site'),
+  }[credit.state];
+  const topup = credit.state === 'low' || credit.state === 'empty' ? topupHref() : '';
+  return html`
+    <span class="poster-masthead-status">
+      ${tr('home.credit.line', 'AI credit {amount}').replace('{amount}', amount)} · ${stateText}
+      ${topup && html` · <a href=${topup} target="_blank" rel="noopener">${tr('home.credit.topup', 'Buy more credit')}</a>`}
+    </span>`;
+}
+
 export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
   const { state } = useHomeState();
   if (!state) return null;
@@ -82,6 +111,7 @@ export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, an
     name=${state.displayName}
     owner=${state.owner}
     identity=${customerNode() ? '' : identityOf(ctx?.session) ?? state.ghii}
+    plate=${html`<${CreditPlate} />`}
     onOpenSettings=${ctx?.openSettings} />`;
 }
 

@@ -34,6 +34,8 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.3.0 — 2026-10-31 — The "agents at work" stage counts the workers the person made (isOwnWorker):
+ *     the basic agents created with the account no longer tick it (Jouni v27 P6).
  *   v1.2.1 — 2026-10-19 — mergeJourneyProfile() writes on the version it read (expectedVersion) and
  *     merges again on a conflict (wish-ei-atomisen-kirjoituksen-107-avointa-kohtaa-korjataan-raha-j).
  *   v1.2.0 — 2026-10-03 — mergeJourneyProfile(): the welcome-mat paste (the copy-prompt road) writes
@@ -199,6 +201,16 @@ export function isWorker(a: { mode?: string; runMode?: string | null }): boolean
     return !!a.runMode || a.mode === 'task-runner' || a.mode === 'autonomous' || a.mode === 'coordinator';
 }
 
+/**
+ * A worker the person made, for the "agents at work" stage. The basic agents (tag `crew.basic`,
+ * data/basic-agents.ts) are created with the account and run from the start, so counting them ticked
+ * the stage on a node bought a minute earlier, before the person had asked any agent for anything
+ * (Jouni v27 P6, 2026-10-31: "Agentit töissä" must not be pre-ticked).
+ */
+export function isOwnWorker(a: { mode?: string; runMode?: string | null; tags?: readonly string[] | null }): boolean {
+    return isWorker(a) && !(Array.isArray(a.tags) && a.tags.includes('crew.basic'));
+}
+
 /** The account's facts. `home` is passed when the caller already read it. */
 export async function readJourneySignals(
     storage: Storage, config: AimeatConfig, owner: string, home?: HomeState,
@@ -225,7 +237,7 @@ export async function readJourneySignals(
         organisms: organisms.length,
         sharedWithSomeone,
         apps,
-        workers: agents.filter(isWorker).length,
+        workers: agents.filter(isOwnWorker).length,
     };
 }
 

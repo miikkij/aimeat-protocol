@@ -13453,6 +13453,7 @@
     "notNow": "Ahora no"
   },
   "homeJourney": {
+    "promptFold": "Avanzado: una instrucción lista para una IA que usas en otro sitio",
     "title": "¿Qué quieres hacer?",
     "returning": "Dale una tarea a tu IA conectada. Tu trabajo queda en tu propio AIMEAT.",
     "note": "Guardar una nota",
@@ -13559,6 +13560,16 @@
     "contentNote": "Puedes cambiar el contenido de este sitio directamente en la administración:"
   },
   "home": {
+    "credit": {
+      "line": "Saldo de IA {amount}",
+      "ready": "tu IA está lista",
+      "low": "queda poco",
+      "empty": "se ha agotado",
+      "off": "la IA está desactivada en este sitio",
+      "topup": "Comprar más saldo",
+      "chatLine": "Saldo de IA restante: {amount}.",
+      "chatElsewhere": "Saldo de IA restante para todo lo que no sea esta conversación: {amount}."
+    },
     "welcome": "Te damos la bienvenida a tu nuevo hogar.",
     "buyerWelcome": {
       "title": "Te damos la bienvenida, {name}",
