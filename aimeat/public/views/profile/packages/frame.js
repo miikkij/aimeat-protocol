@@ -5,10 +5,12 @@
  * @description What the Packages page's views share: the words (x), the join of template listings
  *   and public packages into one offer per group, the words for a component type, a category and
  *   a listing status, the text an agent gets, the crumb and the cross-page rail links.
- * @structure x · joinOffers · partWord · categoryWord · listingWord · dateWord · agentRule ·
+ * @structure x · joinOffers · partWord · categoryWord · listingWord · priceWord · dateWord · agentRule ·
  *   agentTextFor · crumb · pageLinks · openTab
  * @usage import { x, joinOffers } from './frame.js';
  * @version-history
+ *   v1.4.0 — 2026-10-31 — joinOffers takes the packages their authors sell to accounts here and the
+ *     owner's purchases: such an offer carries `sale`, `buy` and `owned`. priceWord says a sale's price.
  *   v1.3.0 — 2026-09-30 — A `skill` part has its own word and lives on the Skills tab.
  *   v1.2.0 — 2026-09-26 — On the component kit (page group G7): the crumb and the rail's sibling pages
  *     are data (components/Crumb.js, Rail.js draw them); openTab is Rail.js's.
@@ -18,7 +20,7 @@
  */
 import { t } from '/js/i18n.js';
 import { openTab } from '/components/Rail.js';
-import { date as fmtDate } from '/js/format.js';
+import { date as fmtDate, money as fmtMoney } from '/js/format.js';
 
 export const x = (key, vars) => t('pkpage.' + key, vars);
 
@@ -44,8 +46,14 @@ export function partCounts(list) {
  * counts. A listing whose package is not in the public list (unlisted, private) still shows, since
  * the gallery is what it was listed in; a remote listing from another node joins with its source.
  */
-export function joinOffers(available, templates, remote) {
+export function joinOffers(available, templates, remote, forSale, purchases) {
   const byGroup = new Map();
+  // A package its author sells to accounts here: the listing (no content), its sale and the line that
+  // buys it; `owned` when this account holds a paid purchase of it.
+  const owned = new Set((purchases || []).filter((p) => p.entitled).map((p) => p.group_id));
+  for (const p of forSale || []) {
+    byGroup.set(p.packageGroupId, { group: p.packageGroupId, name: p.name, title: p.name, author: p.author, version: p.version, description: p.description || '', category: p.category, tags: p.tags || [], components: p.components || [], manifest: '', updatedAt: p.updatedAt || p.createdAt, pkg: null, listing: null, remote: false, system: isSystem(p.author), sale: p.sale || null, buy: p.buy || null, owned: owned.has(p.packageGroupId) });
+  }
   for (const p of available || []) {
     // `manifest` rides along because a composed package records in it what the installing node has
     // to supply itself; the offer row reads it to say so before anybody presses install.
@@ -68,6 +76,12 @@ export function joinOffers(available, templates, remote) {
     byGroup.set(key, { group: r.packageGroupId || '', name: r.name || r.title, title: r.title || r.name, author: r.author || '', version: '', description: r.description || '', category: r.category, tags: [], components: [], updatedAt: r.updatedAt || '', pkg: null, listing: null, remote: true, sourceNode: r.sourceNode || '', installCount: r.installCount, system: false });
   }
   return [...byGroup.values()].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+}
+
+/** A sale's price in the page's language ("12,00 €"), from micro-units. */
+export function priceWord(sale) {
+  const p = sale?.price;
+  return p ? fmtMoney(p.amount / 1e6, p.currency) : '';
 }
 
 export function dateWord(iso) {

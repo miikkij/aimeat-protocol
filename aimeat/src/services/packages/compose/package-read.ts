@@ -19,6 +19,9 @@
  *   import { getPackageFor } from './package-read.js';
  *   const pkg = await getPackageFor(storage, groupId, req.auth?.owner);
  * @version-history
+ *   v1.3.0 — 2026-10-31 — packageVisibleTo: a private package its author sells to accounts is read by
+ *     an account holding an active purchase and by the operator (sale/package-account-entitlement.ts;
+ *     wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
  *   v1.2.0 — 2026-10-17 — packageVisibleTo: 'members' and 'organism:<id>' are read by whom
  *     services/audience.ts admits; the caller may be the request's auth, so a visitor from another
  *     node is told apart from a local account (plan doc-mvcn6c7e4e5q, V3.7).
@@ -28,7 +31,9 @@
  *     unchanged; the node MCP surface gains list and get through it.
  */
 import type { Storage, PackageRecord, PackageFilter, PackageInstanceRecord } from '../../../storage/interface.js';
-import { parseAudience, audienceAllows, type AudienceAuth } from '../../audience.js';
+import { parseAudience, audienceAllows, isNodeAccount, type AudienceAuth } from '../../audience.js';
+import { readAccountSale, activePurchase } from '../sale/package-account-entitlement.js';
+import { isOperatorCaller, type OperatorAuth } from '../../operator-override.js';
 
 /**
  * Who is reading. A route passes the request's auth (or undefined), so a visitor from another node
@@ -52,9 +57,25 @@ export async function packageVisibleTo(storage: Storage, pkg: PackageRecord, cal
     const name = authorNameOf(caller);
     if (name !== undefined && name === pkg.author) return true;
     const audience = parseAudience(pkg.visibility);
-    if (!audience || audience.level === 'private' || audience.level === 'public') return false;
+    if (audience?.level === 'private') return soldTo(storage, pkg, caller, name);
+    if (!audience || audience.level === 'public') return false;
     const auth: AudienceAuth | undefined = typeof caller === 'string' ? { sub: caller, owner: caller } : caller;
     return audienceAllows(storage, audience, auth);
+}
+
+/**
+ * A private package its author sells to accounts (sale/package-account-entitlement.ts): read by an
+ * account of this node holding an active purchase, and by the node operator, who answers for what is
+ * sold here. A visitor from another node, the anonymous identity and an account without a purchase
+ * read nothing. A package that is not sold answers false without a second read.
+ */
+async function soldTo(storage: Storage, pkg: PackageRecord, caller: PackageReadCaller, name: string | undefined): Promise<boolean> {
+    if (!name || name.includes('@')) return false;
+    if (typeof caller === 'object' && !isNodeAccount(caller)) return false;
+    const sale = await readAccountSale(storage, pkg.packageGroupId);
+    if (!sale) return false;
+    if (await activePurchase(storage, sale, name)) return true;
+    return typeof caller === 'object' && isOperatorCaller(storage, caller as OperatorAuth);
 }
 
 export interface PackageListQuery {

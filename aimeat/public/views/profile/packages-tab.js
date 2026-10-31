@@ -13,6 +13,9 @@
  * @structure PackagesTab() — state (data, remote, expanded, versions, updates, installForm, filter) + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'packages'
  * @version-history
+ *   v2.7.0 — 2026-10-31 — A package its author sells to accounts: Buy (a checkout paid on Stripe's card
+ *     page, finished when the page comes back, or with test money where the node runs it), and on the
+ *     owner's own package the price, pause, end, the sales and a refund (packages/sale.js).
  *   v2.6.0 — 2026-10-16 — The other nodes' listings come from GET /v1/packages/tab (`remote`, what the
  *     last sync stored), not from the peer-signed GET a browser session cannot open; the sync toast
  *     names each server that did not answer (QA audit F1-04).
@@ -78,6 +81,9 @@ export default function PackagesTab({ session, showToast }) {
   const [busy, setBusy] = useState(false);
   const [compose, setCompose] = useState({ open: false, name: '', picked: [] });
   const [myApps, setMyApps] = useState(null);   // null until the compose road is opened
+  // group → the price typed on an own package's row; group → its sales (GET /v1/packages/:group/sales).
+  const [priceForm, setPriceForm] = useState({});
+  const [sales, setSales] = useState({});
 
   const fail = (e, fallback) => showToast?.(e?.error?.message || e?.response?.error?.message || e?.message || (typeof e === 'string' ? e : '') || fallback || t('profile.error'), true);
 
@@ -96,7 +102,10 @@ export default function PackagesTab({ session, showToast }) {
   const instances = data?.instances?.instances ?? [];
   const own = data?.packages?.packages ?? [];
   const templates = data?.templates?.templates ?? [];
-  const offers = data ? joinOffers(data.available?.packages ?? [], templates, remote) : [];
+  // The owner's own package on sale is shown once, among their own, where its sale and sales are.
+  const forSale = (data?.forSale?.packages ?? []).filter((p) => p.author !== ownerName);
+  const offers = data ? joinOffers(data.available?.packages ?? [], templates, remote, forSale, data.purchases?.purchases ?? []) : [];
+  const selling = data?.selling ?? {};
   const offerByGroup = Object.fromEntries(offers.map((o) => [o.group, o]));
   const ownByGroup = Object.fromEntries(own.map((p) => [p.packageGroupId, p]));
   const listingByGroup = Object.fromEntries(templates.map((l) => [l.packageGroupId, l]));
@@ -104,6 +113,7 @@ export default function PackagesTab({ session, showToast }) {
   const toggle = (key, item) => {
     if (expanded === key) { setExpanded(null); return; }
     setExpanded(key);
+    if (key.startsWith('p:') && selling[item.packageGroupId]) loadSales(item.packageGroupId);
     if (key.startsWith('p:') && !versions[item.packageGroupId]) {
       pkgService.getPackageVersions(item.packageGroupId).then((r) => setVersions((m) => ({ ...m, [item.packageGroupId]: r?.data?.versions ?? [] }))).catch((e) => swallowed('packages: versions', e));
     }
@@ -264,6 +274,97 @@ export default function PackagesTab({ session, showToast }) {
     } catch (e) { fail(e); } finally { setBusy(false); }
   };
 
+  /* ── A package its author sells to accounts here: buy, price, sales, refund ──────────────── */
+
+  // Buy: a checkout with the listing's line, paid on Stripe's own card page on the author's account
+  // (the page comes back here with aimeat_checkout and stripe_session), or with the node's test money
+  // where the operator turned it on. The node decides everything; the page only carries the answer.
+  const buy = async (o, how) => {
+    if (!o.buy) return;
+    setBusy('buy:' + o.group);
+    try {
+      const s = await pkgService.openCheckout({ items: [o.buy], currency: o.buy.currency });
+      const id = s?.data?.session?.id;
+      if (!s?.ok || !id) { fail(s); return; }
+      if (how === 'test') {
+        const done = await pkgService.completeCheckout(id, { handler: 'test.money', instrument: 'card-ok' });
+        if (!done?.ok) { fail(done); return; }
+        showToast?.(x('sale.boughtToast', { name: o.title }));
+        // The "what you get" sheet was the listing's (none); read it again now that the package is this account's.
+        setSheets((m) => ({ ...m, [o.group]: null }));
+        pkgService.getPackage(o.group).then((g) => setSheets((m) => ({ ...m, [o.group]: g?.data?.sheet ?? false })))
+          .catch((e) => { swallowed('packages: sheet', e); setSheets((m) => ({ ...m, [o.group]: false })); });
+        load();
+        return;
+      }
+      const back = `${location.origin}/v1/profile?tab=packages`;
+      const card = await pkgService.cardPage(id, back);
+      if (!card?.ok || !card.data?.url) { fail(card); return; }
+      location.assign(card.data.url);
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  // Back from the card page: finish the checkout the payment was for (the webhook does it when nobody comes back).
+  useEffect(() => {
+    const q = new URLSearchParams(location.search);
+    const id = q.get('aimeat_checkout');
+    if (!id) return;
+    const clean = () => { q.delete('aimeat_checkout'); q.delete('stripe_session'); q.delete('cancelled'); history.replaceState(null, '', `${location.pathname}?${q.toString()}`); };
+    if (q.get('cancelled')) { showToast?.(x('sale.cancelledToast')); clean(); return; }
+    const stripeSession = q.get('stripe_session');
+    if (!stripeSession) { clean(); return; }
+    pkgService.completeCheckout(id, { handler: 'com.stripe.checkout', instrument: stripeSession })
+      .then((r) => { if (r?.ok) showToast?.(x('sale.paidToast')); else fail(r); load(); })
+      .catch((e) => fail(e))
+      .finally(clean);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the card page sent the person back
+  }, []);
+  // `?package=<group id>`: an app or a link opens that package's row (an app sends its person here to buy).
+  const [linked, setLinked] = useState(() => new URLSearchParams(location.search).get('package'));
+  useEffect(() => {
+    if (!data || !linked) return;
+    setLinked(null);
+    // Opened the way its Open button opens it, so its "what you get" sheet is read too, then scrolled to.
+    const offer = !ownByGroup[linked] ? offerByGroup[linked] : null;
+    if (offer) { toggle('o:' + linked, offer); setTimeout(() => document.getElementById('pk-row-' + linked.replace(/[^a-z0-9]/gi, '-'))?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50); }
+    else if (ownByGroup[linked]) jumpTo(linked);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- once, when the data the link names has arrived
+  }, [data, linked]);
+  const loadSales = (group) => {
+    pkgService.getSales(group).then((r) => setSales((m) => ({ ...m, [group]: r?.ok ? r.data : { sales: [], totals: {} } }))).catch((e) => swallowed('packages: sales', e));
+  };
+  const savePrice = async (p, body, toast) => {
+    setBusy(true);
+    try {
+      const r = await pkgService.setPrice(p.packageGroupId, body);
+      if (!r?.ok) { fail(r); return; }
+      showToast?.(toast);
+      setPriceForm((m) => ({ ...m, [p.packageGroupId]: undefined }));
+      load();
+      loadSales(p.packageGroupId);
+    } catch (e) { fail(e); } finally { setBusy(false); }
+  };
+  const setPrice = (p, form) => {
+    const amount = Number(String(form.amount).replace(',', '.'));
+    if (!Number.isFinite(amount) || amount <= 0) { showToast?.(x('sale.amountInvalid'), true); return; }
+    savePrice(p, { price: { amount: Math.round(amount * 1e6), currency: form.currency } }, x('sale.priceSavedToast', { name: p.name }));
+  };
+  const setSaleState = (p, state) => {
+    if (state !== 'ended') { savePrice(p, { state }, x('sale.stateToast.' + state, { name: p.name })); return; }
+    confirm(x('sale.confirmEnd', { name: p.name }), () => savePrice(p, { price: null }, x('sale.stateToast.ended', { name: p.name })), { title: x('sale.end'), danger: true });
+  };
+  const refund = (p, s) => {
+    confirm(x('sale.confirmRefund', { buyer: s.buyer, name: p.name }), async () => {
+      setBusy(true);
+      try {
+        const r = await pkgService.refundSale(p.packageGroupId, s.order);
+        if (!r?.ok) { fail(r); return; }
+        showToast?.(x('sale.refundedToast', { buyer: s.buyer }));
+        loadSales(p.packageGroupId);
+        load();
+      } catch (e) { fail(e); } finally { setBusy(false); }
+    }, { title: x('sale.refund'), danger: true });
+  };
+
   /* ── A new package: from your own apps, the request, or a zip ────────────────────────────── */
 
   // The owner's own apps, read once and only when the compose road is opened. `own=true` is what
@@ -340,6 +441,9 @@ export default function PackagesTab({ session, showToast }) {
     data, instances, own, offers, offerByGroup, ownByGroup, listingByGroup,
     expanded, versions, updates, installForm, filter, query, shown, busy,
     compose, myApps, sheets, installConfig, grantApps,
+    selling, sales, priceForm, testMoney: !!data?.checkout?.test_money,
+    setPriceForm: (group, form) => setPriceForm((m) => ({ ...m, [group]: form })),
+    buy, setPrice, setSaleState, refund,
     setGrantApps: (key, on) => setGrantApps((m) => ({ ...m, [key]: on })),
     setConfigValue: (key, componentId, field, value) => setInstallConfig((m) => ({
       ...m, [key]: { ...(m[key] || {}), [componentId]: { ...((m[key] || {})[componentId] || {}), [field]: value } },
