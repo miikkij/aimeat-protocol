@@ -8,6 +8,7 @@
  * @version-history
  *   v1.3.0 — 2026-10-31 — The publish ends the turn, and the node knows the published app's address
  *     only from a publish (crew34 K35).
+ *   v1.2.1 — 2026-10-31 — The turn note's plain-words line (v27 P7).
  *   v1.2.0 — 2026-10-31 — Every genre the turn note names ships and comes in one part.
  *   v1.1.0 — 2026-10-31 — The app path in the turn note and the answer phase, the sign-in sentence,
  *     and the grace after a published app (v31 K35, K38).
@@ -90,6 +91,9 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/one short sentence to the person before your first tool call/);
         expect(note).toMatch(/aimeat_agent_propose/);
         expect(note).toMatch(/aimeat_workspace_list, which takes that organism's id/);
+        // A store buyer read "organismeja" and their own name@node-id in the first answer (v27 P7).
+        expect(note).toMatch(/say "shared place" for an organism/);
+        expect(note).toMatch(/never write an identity such as name@node-id/);
     });
     it('the turn note builds an app in one turn and never asks the person to sign in (v31 K35, K38)', () => {
         const note = turnNote();

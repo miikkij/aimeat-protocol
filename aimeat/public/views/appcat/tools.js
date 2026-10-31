@@ -11,6 +11,8 @@
  * @structure CatBand({ counts, n }) · CatTools({ q, onQuery, sort, onSort }) · CortexBar() · loadCortex()
  * @usage html`<${CatBand} …/><${CatTools} …/><${CortexBar} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — On a node the store sold the band is one small line, "n sovellusta ·
+ *     avattu m kertaa" (Jouni's review of v31, K39).
  *   v1.0.0 — 2026-09-27 — Initial (appcat, the shell).
  */
 import { h } from 'preact';
@@ -28,6 +30,8 @@ import { x } from '/views/appcat/i18n.js';
 import { openDialog } from '/views/appcat/dialogs/host.js';
 import { anonymousToken } from '/views/appcat/dialogs/app-io.js';
 import { fmtNum } from '/views/appcat/model.js';
+import { Note } from '/components/Note.js';
+import { customerNode } from '/js/site.js';
 
 const html = htm.bind(h);
 
@@ -40,6 +44,8 @@ export const SEARCH_ID = 'appcat-search';
  * @param {{ counts: { listed: number, draft: number, opens: number }, n: number }} props
  */
 export function CatBand({ counts, n }) {
+  // A buyer reads one small line, not a red band of figures (Jouni's review of v31, K39).
+  if (customerNode()) return html`<${Note} kind="meta">${x('band.buyerLine', { n, opens: fmtNum(counts.opens) })}<//>`;
   return html`<${NumberBand} fitted items=${[
     { key: 'apps', n: String(n), label: x('band.apps') },
     { key: 'listed', n: String(counts.listed), label: x('band.listed') },

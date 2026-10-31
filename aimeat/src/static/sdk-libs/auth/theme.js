@@ -9,6 +9,10 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.9.0 — 2026-10-31 — aimeatReadTheme() is light when nothing is chosen; the OS preference
+ *     counts only when the stored choice is 'auto' (Jouni, v31 K65). The mode switch has a third
+ *     button, "Auto", which stores 'auto' and follows the device, live; aimeatThemeChoice() reads the
+ *     choice, and the change event carries `choice` beside the mode shown.
  *   v1.8.1 — 2026-10-05 — escHtml escapes all five characters, quotes included, for the attributes
  *     the sign-in form fills (secaudit 2026-10, C8).
  *   v1.8.0 — 2026-09-26 — The pill's frames, its label's and its actions' letter case and spacing read the
@@ -70,16 +74,36 @@ export function aimeatReadTheme() {
     var u = new URLSearchParams(location.search).get('mode');
     if (u === 'light' || u === 'dark') return u;
   } catch { /* no location */ }
-  try { var s = localStorage.getItem(AIMEAT_THEME_KEY); if (s === 'light' || s === 'dark') return s; } catch { /* storage blocked */ }
+  var s = aimeatThemeChoice();
+  if (s === 'light' || s === 'dark') return s;
   var attr = document.documentElement.dataset.theme;
   if (attr === 'light' || attr === 'dark') return attr;
+  // Light unless the person chose "automatic" ('auto'): AIMEAT's own look (Jouni, v31 K65).
+  return (s === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+}
+
+/** The device's own mode, for the "automatic" choice. */
+function osMode() {
   return (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
 }
 
+/** The person's stored choice: 'light', 'dark', 'auto', or '' when they have not chosen. */
+export function aimeatThemeChoice() {
+  var s = null;
+  try { s = localStorage.getItem(AIMEAT_THEME_KEY); } catch { /* storage blocked */ }
+  return s === 'light' || s === 'dark' || s === 'auto' ? s : '';
+}
+
+/**
+ * Apply a choice: 'light', 'dark', or 'auto' ("automatic"), which stores 'auto' and shows the
+ * device's mode. The page attribute and the event carry the mode actually shown, so every listener
+ * keeps reading 'light' or 'dark'; `choice` says what was chosen (v31 K65).
+ */
 export function aimeatApplyTheme(t) {
-  document.documentElement.dataset.theme = t;
-  try { localStorage.setItem(AIMEAT_THEME_KEY, t); } catch { /* storage blocked */ }
-  try { window.dispatchEvent(new CustomEvent('aimeat-theme-change', { detail: { theme: t } })); } catch { /* no window */ }
+  var shown = t === 'auto' ? osMode() : (t === 'dark' ? 'dark' : 'light');
+  document.documentElement.dataset.theme = shown;
+  try { localStorage.setItem(AIMEAT_THEME_KEY, t === 'auto' ? 'auto' : shown); } catch { /* storage blocked */ }
+  try { window.dispatchEvent(new CustomEvent('aimeat-theme-change', { detail: { theme: shown, choice: t === 'auto' ? 'auto' : shown } })); } catch { /* no window */ }
 }
 
 /**
@@ -146,9 +170,11 @@ export function aimeatFixedLight() {
  * shell's iris interceptor still recognises (and harmlessly ignores) them.
  */
 export function modeSwitchHtml(i) {
-  var cur = aimeatReadTheme();
+  // The pressed button is the person's choice: "Auto" when they chose automatic, else the mode shown.
+  var cur = aimeatThemeChoice() === 'auto' ? 'auto' : aimeatReadTheme();
   var light = i.lightMode || 'Light mode';
   var dark = i.darkMode || 'Dark mode';
+  var auto = i.autoMode || 'Automatic: follows your device';
   var fixed = aimeatFixedLight();
   var why = i.fixedRegister || 'This register keeps its own light';
   // A style with one mode only (Themes & Styles): the node's look script says which mode it keeps.
@@ -168,6 +194,9 @@ export function modeSwitchHtml(i) {
     + '<span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord('light') + '</button>'
     + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '"' + (fixed ? off : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '">'
     + '<span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord('dark') + '</button>'
+    // "Automatic": the device decides. The only way the OS setting is followed (v31 K65).
+    + (fixed || only ? '' : '<button type="button" data-mode="auto" aria-pressed="' + (cur === 'auto') + '" title="' + escHtml(auto) + '" aria-label="' + escHtml(auto) + '">'
+      + '<span class="seg-ico" aria-hidden="true">' + escHtml(i.autoShort || 'Auto') + '</span></button>')
     + '</span>';
 }
 
@@ -189,11 +218,18 @@ export function wireModeSwitch(container) {
       sync(m);
     });
   });
-  // Follow out-of-band changes (the app's own logic, another control instance, the SPA).
+  // Follow out-of-band changes (the app's own logic, another control instance, the SPA). The choice
+  // decides which button is pressed: "Auto" stays pressed while the device flips the mode.
   window.addEventListener('aimeat-theme-change', function (ev) {
     var e = /** @type {CustomEvent} */ (ev);
-    if (e && e.detail && e.detail.theme) sync(e.detail.theme);
+    if (e && e.detail && e.detail.theme) sync(aimeatThemeChoice() === 'auto' ? 'auto' : e.detail.theme);
   });
+  // On "automatic", a change of the device's setting changes the page at once.
+  if (window.matchMedia) {
+    var mq = window.matchMedia('(prefers-color-scheme: dark)');
+    var onOs = function () { if (aimeatThemeChoice() === 'auto') aimeatApplyTheme('auto'); };
+    if (mq.addEventListener) mq.addEventListener('change', onOs);
+  }
 }
 
 // ── The pill's stylesheet (signed in, signed out, and the compact form) ──
