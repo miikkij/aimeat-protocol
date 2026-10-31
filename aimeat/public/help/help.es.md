@@ -63,6 +63,8 @@ Entras con un enlace de acceso. Escribe tu dirección en la ventana de entrada y
 
 <!--store-->
 La demo ([aimeat.io](https://aimeat.io)), la tienda ([store.aimeat.io](https://store.aimeat.io)) y tu propio AIMEAT son tres cuentas distintas. Si pasa algo en una, no afecta a las demás.
+
+![La demo, la tienda y tu propio AIMEAT son tres cuentas distintas](/help/img/three-accounts-es.png)
 <!--/store-->
 
 <!--nostore-->
