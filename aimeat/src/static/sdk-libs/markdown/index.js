@@ -13,6 +13,10 @@
  *   renderToString/renderRich; rich CDN loaders; live memory embeds; attach('md', …).
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
+ *   v1.2.4 — 2026-11-01 — The rich pipeline loads DOMPurify 3.4.17 instead of 3.4.12, which has five
+ *     published advisories (GHSA-55q2-fjhq-7xh7, GHSA-6688-9rhm-gjv2, GHSA-c6gr-qvv4-5v3f,
+ *     GHSA-cg2g-xh64-v4q7, GHSA-mrv2-3pqr-j5jr); the sha384 is the tarball's dist/purify.min.js and
+ *     equals what jsDelivr serves (secaudit2026oct31w2 round 10b).
  *   v1.2.3 — 2026-10-27 — The five jsDelivr scripts carry their sha384 integrity and load with
  *     crossorigin anonymous; a script the browser refuses falls back as a missing one does (secaudit2026oct26).
  *   v1.2.2 — 2026-10-27 — The rich pipeline loads markdown-it, its two plugins, DOMPurify and
@@ -312,8 +316,8 @@ function ensureRich() {
   if (window.markdownit && window.DOMPurify) return Promise.resolve();
   if (_richP) return _richP;
   // Exact versions, never a range: a range loads whatever the newest release in it is on the day a
-  // visitor opens the app, into the app's origin (secaudit2026oct26). DOMPurify is the version the
-  // node's vendored Mermaid 12 bundles.
+  // visitor opens the app, into the app's origin (secaudit2026oct26). DOMPurify is 3.4.17, the
+  // release that fixes the five advisories 3.4.12 (the one Mermaid 12 bundles) has.
   _richP = loadScript('https://cdn.jsdelivr.net/npm/markdown-it@14.1.0/dist/markdown-it.min.js',
     'sha384-wLhprpjsmjc/XYIcF+LpMxd8yS1gss6jhevOp6F6zhiIoFK6AmHtm4bGKtehTani').then(function () {
     return Promise.all([
@@ -321,8 +325,8 @@ function ensureRich() {
         'sha384-FKY5Inm02LmR+QgGl8g9DxuTQ+UuOo3tWGSVd7ZmWSPl9DyYsmi7kE3tTjC3ZEow').catch(function () {}),
       loadScript('https://cdn.jsdelivr.net/npm/markdown-it-footnote@4.0.0/dist/markdown-it-footnote.min.js',
         'sha384-7mE/Iobn0ulfWG/11wQHPJLIV11r3mVxTdSnuNIL71f/DM1wFjtMREh+nxliUVdY').catch(function () {}),
-      loadScript('https://cdn.jsdelivr.net/npm/dompurify@3.4.12/dist/purify.min.js',
-        'sha384-piCcpDdJ7qVeK4Tv8Z6Hpcr3ZBIgP16TxQTPVfsLFdZ5uDgwc3Y8Ho7oUnqf12qu'),
+      loadScript('https://cdn.jsdelivr.net/npm/dompurify@3.4.17/dist/purify.min.js',
+        'sha384-P0JNneQf81HOl9VwNXK76cQ9VMD6Nfsnepxb0cCOg8+UzEdzgPHAPV4wVQrvYQSx'),
       loadScript('https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js',
         'sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU').catch(function () {}),
     ]);

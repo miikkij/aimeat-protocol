@@ -14,6 +14,8 @@
  *   installed Google Chrome) and is skipped, with a line saying so, on a machine that has neither.
  * @usage cd aimeat && pnpm exec vitest run test/unit/editor-html-sanitizer.test.ts
  * @version-history
+ *   2026-11-01 — The test page also serves /lib/dompurify@3.4.17/, which the sanitizer module now
+ *     imports; no assertion changed (secaudit2026oct31w2 round 10b).
  *   2026-10-31 — Initial (secaudit2026oct31w2 round 10).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -82,7 +84,8 @@ describe.skipIf(!browser)('in a real browser, with Toast UI 3.2.2', () => {
     await page.route(`${ORIGIN}/**`, (route) => {
       const p = new URL(route.request().url()).pathname;
       if (p === '/') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><html><head></head><body><div id="ed"></div></body></html>' });
-      if (!/^\/(lib\/toastui|js)\/[\w.@-]+$/.test(p)) return route.fulfill({ status: 404, body: '' });
+      // The sanitizer module imports the vendored DOMPurify (secaudit2026oct31w2 round 10b).
+      if (!/^\/(lib\/toastui|lib\/dompurify@3\.4\.17|js)\/[\w.@-]+$/.test(p)) return route.fulfill({ status: 404, body: '' });
       return route.fulfill({ contentType: p.endsWith('.css') ? 'text/css' : 'text/javascript', body: readFileSync(join(PUBLIC, p)) });
     });
     await page.goto(`${ORIGIN}/`);
