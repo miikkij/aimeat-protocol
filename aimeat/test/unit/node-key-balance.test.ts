@@ -13,6 +13,7 @@
  *   sandbox does (AIMEAT_AI_FIXED_BASEURL_OVERRIDES).
  * @usage cd aimeat && pnpm vitest run test/unit/node-key-balance.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — A paid call drops the cached balance (v28 finding 9).
  *   v1.0.0 — 2026-10-29 — Initial.
  */
 import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
@@ -27,6 +28,7 @@ import { providerStatusError, isNoCreditFailure } from '../../src/services/ai/er
 import { classifyFailure } from '../../src/services/ai/route-run.js';
 import { allowanceShown, markNodeKeySpent, nodeKeySpent, readNodeKeyBalance, resetNodeKeyBalanceForTests } from '../../src/services/ai/node-key-balance.js';
 import { setRouting } from '../../src/services/ai/routing.js';
+import { debitAllowance } from '../../src/services/ai-allowance.js';
 
 const NODE = 'node-balance';
 const KEY_LIMIT_WORDS = 'Key limit exceeded (total limit). Manage it using https://openrouter.ai/workspaces/default/keys/abc123 $0.02 of $0.01 used; does not reset.';
@@ -161,6 +163,19 @@ describe('the balance a page shows', () => {
     resetNodeKeyBalanceForTests();
     key.limit = null;   // a key with no limit: the allowance is the answer
     expect(await allowanceShown(base, 3)).toEqual({ remainingUsd: 3, low: false });
+  });
+
+  // v28 finding 9 (2026-10-31): the chat said 0.30 USD while the AI page, opened after the turns,
+  // said 0,03 $. The balance was cached for five minutes and a paid call did not drop it.
+  it('is read again after a call the node\'s key paid for, not served from the cache', async () => {
+    key.limit = 0.3; key.usage = 0;
+    const { storage, gaii } = await owner();
+    expect(await allowanceShown(base, 1000)).toEqual({ remainingUsd: 0.3, low: false });
+    key.usage = 0.27;
+    // Without a paid call the cached answer stands, which is what the cache is for.
+    expect((await allowanceShown(base, 1000)).remainingUsd).toBe(0.3);
+    await debitAllowance(storage, base, gaii, 0.27);
+    expect((await allowanceShown(base, 1000)).remainingUsd).toBeCloseTo(0.03, 6);
   });
 
   it('marks the key spent when nothing is left', async () => {

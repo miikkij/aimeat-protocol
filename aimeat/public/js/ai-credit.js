@@ -3,24 +3,45 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description The AI credit a buyer paid for, in euros, and whether their AI is ready, read from
- *   GET /v1/chat/status. One place for the sum, so the Home's nameplate and the chat's status line
- *   say the same number (Jouni v27 P6, 2026-10-31: "AI-saldo 10 €" on the Home, not "8.33 USD").
+ *   GET /v1/chat/status. One place for the sum, so every page that shows the credit (the Home's
+ *   nameplate, the chat's status line, the AI page and the profile's usage card) says the same
+ *   number (Jouni v27 P6 and v28 finding 9, 2026-10-31: the credit in euros, and consistent).
  *
- *   HOW EUROS ARE COUNTED. The store mints a sold node's OpenRouter key with a dollar limit of the
- *   euros paid divided by 1.2: the 20 % is the service fee, and a euro is counted as a dollar
- *   (aimeat-commercial, 2026-10-31). So what is left in euros is what is left of the key times 1.2,
- *   which is the honest number for what the buyer paid, and a top-up keeps the same rule. Only on a
- *   node the store sold (site.js customerNode()); elsewhere the allowance stays in dollars, as the
- *   node's own key reports it.
- * @structure STORE_CREDIT_FACTOR · aiCredit(status) · topupHref()
+ *   HOW EUROS ARE COUNTED. The store takes its 20 % fee from what the buyer paid, converts the rest
+ *   to dollars at the day's rate and makes the node's OpenRouter key with that dollar limit: a 10 €
+ *   starter is 8,33 € of AI credit (Jouni's C, 2026-10-31). The fleet service writes the rate it
+ *   used as site.ai_credit_eur_per_usd, and again as a total on every top-up, so what is left in
+ *   euros is what is left of the key times that rate. A node without the setting counts a dollar
+ *   as a euro, which is how the keys before 2026-10-31 were made. Only on a node the store sold
+ *   (site.js customerNode()); elsewhere the allowance stays in dollars, as the node's own key
+ *   reports it.
+ * @structure eurPerUsd() · aiCredit(status) · creditEur(usd) · topupHref()
  * @usage const credit = aiCredit(chatStatus); // { eur, state } or null
  * @version-history
+ *   v1.1.0 — 2026-10-31 — Euros come from site.ai_credit_eur_per_usd, the rate the store converted
+ *     at, with 1 when it is not set; the fixed 1.2 showed the price paid, fee included, as credit
+ *     (Jouni's C). creditEur() for the pages that hold a dollar figure of their own.
  *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P6).
  */
 import { customerNode, siteLink } from '/js/site.js';
 
-/** Euros paid per dollar of the key's limit: the store's 20 % service fee on a euro counted as a dollar. */
-export const STORE_CREDIT_FACTOR = 1.2;
+/** Euros of AI credit per dollar of the node's key: the store's rate, or 1 when it wrote none. */
+export function eurPerUsd() {
+  const n = Number(siteLink('aiCreditEurPerUsd'));
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+/**
+ * A dollar figure of the node's key as euros of AI credit, or null when this is not a node the
+ * store sold and the figure stays in dollars.
+ * @param {number} usd
+ * @returns {number | null}
+ */
+export function creditEur(usd) {
+  if (!customerNode()) return null;
+  const n = Number(usd);
+  return Number.isFinite(n) ? Math.max(0, n * eurPerUsd()) : 0;
+}
 
 /**
  * The buyer's AI credit, or null when it is not the subject: not a node the store sold, no status
@@ -32,8 +53,7 @@ export const STORE_CREDIT_FACTOR = 1.2;
  */
 export function aiCredit(status) {
   if (!customerNode() || !status || status.pays === 'own') return null;
-  const usd = Number(status.allowance_remaining_usd ?? 0);
-  const eur = Number.isFinite(usd) ? Math.max(0, usd * STORE_CREDIT_FACTOR) : 0;
+  const eur = creditEur(status.allowance_remaining_usd ?? 0) ?? 0;
   const state = status.enabled === false ? 'off'
     : eur < 0.005 ? 'empty'
       : status.allowance_low ? 'low'
