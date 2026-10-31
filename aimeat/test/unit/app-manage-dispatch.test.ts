@@ -6,6 +6,7 @@
  *   end by test/e2e-app-manage.ts.
  * @usage pnpm test -- app-manage-dispatch
  * @version-history
+ *   2026-10-31 — settings' screenshot_public field (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.0 — 2026-10-30 — structure_set's proposals field.
  *   v1.10.0 — 2026-10-29 — structure, structure_set and plans, and the purpose, data, choices and now fields.
  *   v1.9.0 — 2026-10-25 — subdomain_set carries origin (secaudit2026oct22).
@@ -59,7 +60,7 @@ const VALUE: Record<string, unknown> = {
     image: 'https://x/zqximg.png', lang: 'fi', badge: false, install: true, aiUse: false, info: false, tucked: true, kind: 'privacy', format: 'markdown',
     content: 'zqxcontent', remove: true, limit: 7, playtest: true, days: 9, on: true, geo: 'region', detail: ['zqxdetail'],
     layout: { v: 1, blocks: [] }, note: 'zqxnote', version: 3, name: 'zqxname', descriptions: { fi: 'zqxfi' }, listing: 'unlisted', parked: true,
-    forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
+    forkable: true, access_code: 'zqxcode', open_to: 'organism:zqxopen', screenshot_public: true, protection: { obfuscate: true }, screenshot: 'zqxb64', screenshot_mime_type: 'image/webp',
     subdomain: 'zqxsub', target: 'alice/shop.html', subdomain_kind: 'redirect', enabled: false, origin: 'publisher', bundled_agent: 'zqxagent',
     runner_agent: 'zqxrunner', organism_id: 'zqxorg', values: { zqxfield: 'zqxvalue' },
     account: 'zqxacct', role: 'zqxrole', level: 4, offerings: ['zqxoff'], expires_at: '2027-01-02T03:04:05Z',

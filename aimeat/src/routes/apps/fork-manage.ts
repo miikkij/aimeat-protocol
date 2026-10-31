@@ -6,6 +6,8 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — PATCH takes `screenshot_public` through services/app-settings.ts, and the answer
+ *     carries it; the "at least one field" message names it and `open_to` (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-18 — A PATCH that would give the app a level wider than its label allows is refused with
  *     409 LABEL_CAPS_AUDIENCE before the publish gate (plan doc-mvdipuyqraas, L3.5).
  *   2026-10-18 — The publish gate (services/app-publish-gate.ts): a PATCH that makes the app public
@@ -504,7 +506,7 @@ export function registerForkManageRoutes(
         if (gate.kind === 'ask') notes.push(appAskedNote(gate.change));
 
         if (notes.length === 0) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, listing, parked, forkable, protection, seo, marks, author or legal).'));
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide at least one field to update (name, description, access_code, open_to, screenshot_public, listing, parked, forkable, protection, seo, marks, author or legal).'));
             return;
         }
 

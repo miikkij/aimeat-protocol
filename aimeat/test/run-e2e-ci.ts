@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-app-screenshot-access.ts joins the list (not the guard tier): an access-limited app's screenshot follows who may open it, and the owner's screenshot_public (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-31 -- e2e-flag-counting.ts joins the list (not the guard tier): a board hide counts one person once, a memory flag hides only on review or the threshold (secaudit2026oct31w2 round 10, W2-8 and W2-9).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
  *     may start for its agents, and the owner's decision on them.
@@ -1687,6 +1688,9 @@ const ALL_SUITES = [
     // What a flag changes for readers: one person and their agents count once toward a board hide, and
     // a memory record leaves discovery only on review or the threshold (secaudit2026oct31w2 round 10).
     'test/e2e-flag-counting.ts',
+    // The screenshot of an app that opens for fewer people follows who may open it, unless its owner
+    // shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
+    'test/e2e-app-screenshot-access.ts',
     'test/e2e-maintenance-access.ts',
     'test/e2e-package-update-widening.ts',
     'test/e2e-memory-bin-purge.ts',
