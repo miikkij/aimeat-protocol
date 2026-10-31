@@ -8,6 +8,8 @@
  * @structure memoryMethods
  * @usage Object.assign(SqliteStorage.prototype, memoryMethods) in ../index.ts
  * @version-history
+ *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
+ *     (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory passes excludePrefixes (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one SELECT (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01); listAllMemory and
@@ -350,10 +352,16 @@ export const memoryMethods = {
 
   /** Out of the bin, whole. Returns false when nothing of that key is in it — including when the
    *  sweeper has already been past, which is the honest answer to "can I have it back". */
-  async restoreMemory(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {
-    const result = this.db.prepare(
-      'UPDATE memory SET deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ? AND deletedAt IS NOT NULL'
-    ).run(ownerGaii, key);
+  async restoreMemory(this: SqliteStorage, ownerGaii: string, key: string, visibility?: string): Promise<boolean> {
+    // With a visibility, the level is part of the same UPDATE that clears the tombstone.
+    const result = visibility === undefined
+      ? this.db.prepare(
+        'UPDATE memory SET deletedAt = NULL, deletedBy = NULL WHERE ownerGaii = ? AND key = ? AND deletedAt IS NOT NULL'
+      ).run(ownerGaii, key)
+      : this.db.prepare(
+        'UPDATE memory SET deletedAt = NULL, deletedBy = NULL, visibility = ?, groupId = NULL, version = version + 1, updatedAt = ? '
+        + 'WHERE ownerGaii = ? AND key = ? AND deletedAt IS NOT NULL'
+      ).run(visibility, new Date().toISOString(), ownerGaii, key);
     return result.changes > 0;
   },
 

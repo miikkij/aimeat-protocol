@@ -14,6 +14,8 @@
  *   - listMemoryVersions/listAllMemory: trackable-key history and admin-wide enumeration
  *
  * @version-history
+ *   2026-10-31 — restoreMemory takes an optional visibility, stored in the same UPDATE that clears the
+ *     tombstone (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory takes excludePrefixes, keys left out of the count (secaudit2026oct22).
  *   2026-10-19 — getMemoryForOwners: one key under many owners in one read (agent avatars on a list).
  *   2026-10-16 — deleteExpiredMemory, the TTL sweep (QA audit D4-01, E4-01). A prefix in every filter
@@ -240,8 +242,10 @@ export interface MemoryRepository {
    */
   deleteMemory(ownerGaii: string, key: string, deletedBy?: string): Promise<boolean>;
   /** Out of the bin, whole. False when nothing of that key is in it — including after the sweeper
-   *  has been past, which is the honest answer to "can I have it back". */
-  restoreMemory(ownerGaii: string, key: string): Promise<boolean>;
+   *  has been past, which is the honest answer to "can I have it back". With `visibility`, the record
+   *  comes back at that level in the same UPDATE (version + 1, groupId cleared), so it is never
+   *  readable at the level it went in at (services/memory-bin.ts, a closed node's lowering). */
+  restoreMemory(ownerGaii: string, key: string, visibility?: string): Promise<boolean>;
   /** What is in this owner's bin, newest first. The one read allowed to see it: every other memory
    *  read hides deleted rows, by key and in bulk alike. */
   listDeletedMemory(ownerGaii: string): Promise<MemoryRecord[]>;
