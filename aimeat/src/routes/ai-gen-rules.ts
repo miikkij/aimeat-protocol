@@ -87,9 +87,8 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
   // ── PUT /v1/ai/gen-rules ── the owner applies; an agent proposes and then confirms.
   router.put('/v1/ai/gen-rules', requireAuth(), requireScope(GEN_RULES_WRITE_SCOPE), validateBody(GenRulesBodySchema, config.nodeId), async (req: Request, res: Response) => {
     const auth = req.auth!;
-    // One shape, the one both MCP twins send: { gen_rules, confirm_token }.
-    const body = (req as Request & { validated: z.infer<typeof GenRulesBodySchema> }).validated;
-    const input = body.gen_rules;
+    // One shape, the one both MCP twins send: { gen_rules, confirm_token }; validateBody checked it.
+    const { gen_rules: input, confirm_token } = req.body as z.infer<typeof GenRulesBodySchema>;
     try {
       if (isOwnerPrincipal(auth)) {
         const r = await setOwnerGenRules(storage, config, resolveIdentity(auth, config.nodeId), input, { kind: 'owner' });
@@ -101,7 +100,7 @@ export function aiGenRulesRouter(config: AimeatConfig, storage: Storage): Router
         return res.status(403).json(error(config.nodeId, 'OWNER_ONLY',
           'Only the owner, or an agent of theirs proposing a change the owner confirms, may change the generation rules.'));
       }
-      const token = body.confirm_token || undefined;
+      const token = confirm_token || undefined;
       const r = await setOwnerGenRules(storage, config, payer, input, {
         kind: 'agent', principal, ...(token ? { confirmToken: token } : {}),
       });
