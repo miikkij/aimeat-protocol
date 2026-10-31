@@ -34,11 +34,16 @@
  *     the right: a hint beside the send action).
  * @structure Field({ label, help, hint, message, error, wide, invalid, group, named, id, labelId, hintId, children }) ·
  *   Fields({ cols, errors, children }) · FormActions({ end, apart, children }) · useFieldIds(id) · messageOf(m, error) ·
- *   WithFieldErrors({ errors, children }) · useFieldMessage(props) · describedBy(props, ids) · hasFieldWords(props) · inField(props, ids, control, named)
+ *   WithFieldErrors({ errors, children }) · useFieldMessage(props) · describedBy(props, ids) · hasFieldWords(props) · inField(props, ids, control, named) ·
+ *   typedByPerson(e, current) (a find field drops input a password manager dispatched)
  * @usage html`<${Fields} cols=${2}><${TextField} label=${t('x.name')} value=${v} onInput=${setV} /><//>`
  *        html`<${Field} label=${t('x.who')} hint=${t('x.whoHint')} group>…<//>`
  *        html`<${FormActions}><${Loud} control onClick=${save}>${t('x.save')}<//><//>`
  * @version-history
+ *   v1.11.0 — 2026-10-31 — typedByPerson(e, current): the find fields (MenuFind, SearchBar,
+ *     TextField `search`, the time zone search) drop an input event no person made. LastPass still
+ *     filled the owner's sign-in name into the Settings & Controls find after 849c5578c told it to
+ *     keep out; its content script dispatches the event, so `isTrusted` is false. Additive.
  *   v1.10.0 — 2026-10-27 — Fields `errors`: a refused write's per-field messages (js/field-errors.js),
  *     each shown under the field whose `name` is its path, through useFieldMessage(), until the person
  *     changes that field's value; the message has an id the control names in aria-describedby (msgId).
@@ -126,6 +131,21 @@ export function messageOf(message, error) {
     return message.text ? { text: message.text, error: !!message.error } : null;
   }
   return { text: message, error: !!error };
+}
+
+/**
+ * True when a field's input event came from the person: typing, pasting, dictation, an IME and the
+ * browser's own autofill all have `isTrusted` true. An event a page script or an extension dispatched
+ * has it false, and then the field is set back to `current` (the value the component holds) and the
+ * caller drops the event. A find field calls it: LastPass wrote the owner's sign-in name into the
+ * Settings & Controls find and dispatched `input` for it, although the field carried autocomplete="off",
+ * data-lpignore, data-1p-ignore, data-bwignore and data-form-type="other".
+ */
+export function typedByPerson(e, current = '') {
+  if (e.isTrusted) return true;
+  const el = e.currentTarget || e.target;
+  if (el && el.value !== current) el.value = current;
+  return false;
 }
 
 /**

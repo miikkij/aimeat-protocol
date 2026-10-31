@@ -19,6 +19,9 @@
  * @usage html`<${MenuFind} label=${t('menuFind.labelSettings')} placeholder=${t('menuFind.placeholderSettings')}
  *   groups=${groups} other=${adminGroups} otherTitle=${t('menuFind.otherOperator')} onOpen=${openRow}>${menu}<//>`
  * @version-history
+ *   v1.1.2 — 2026-10-31 — The field drops an input event no person made (typedByPerson, Field.js):
+ *     LastPass still wrote the owner's sign-in name into it on /v1/profile?tab=ai, a page with a key
+ *     field, despite the attributes of v1.1.1.
  *   v1.1.1 — 2026-10-29 — Password managers skip the field (data-lpignore, data-1p-ignore,
  *     data-bwignore, data-form-type="other"): LastPass filled the owner's sign-in name into the admin
  *     menu find at page load, and the menu showed "No place matches" for it. autocomplete="off"
@@ -32,6 +35,7 @@ import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { findInMenu } from '/js/menu-find.js';
+import { typedByPerson } from '/components/Field.js';
 
 const html = htm.bind(h);
 let seq = 0;
@@ -175,7 +179,7 @@ export function MenuFind({ tone = 'settings', label, placeholder, groups, other,
           <input id=${id} ref=${inputRef} class="menu-find-input" type="text" value=${q} placeholder=${placeholder}
             autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
             spellcheck=${false} aria-describedby=${searching ? `${id}-count` : undefined}
-            onInput=${(e) => setQ(e.currentTarget.value)} onKeyDown=${onKeyDown} />
+            onInput=${(e) => { if (typedByPerson(e, q)) setQ(e.currentTarget.value); }} onKeyDown=${onKeyDown} />
           ${q
             ? html`<button type="button" class="poster-icon poster-icon--small menu-find-clear" aria-label=${t('menuFind.clear')} onClick=${clear}>✗</button>`
             : html`<kbd class="poster-chip menu-find-key" title=${t('menuFind.slashHint')}>/</kbd>`}
