@@ -9,6 +9,8 @@
  * @structure CatRail(props)
  * @usage html`<${CatRail} view=${view} onView=${setView} … />`
  * @version-history
+ *   v1.5.0 — 2026-10-31 — Jouni's review of v31 (K39): the fold reads "Ylläpito (kehittäjille)" with no
+ *     number, and holds the state filters too.
  *   v1.4.0 — 2026-10-31 — On a node the store sold, the "Something missing" rows wait behind one
  *     "Advanced settings" row until opened, and stay open while one of them filters the list (v31 K39).
  *   v1.3.0 — 2026-10-12 — The state rows are model.js STATES: Listed, Community, Unlisted, Draft.
@@ -54,8 +56,9 @@ export function CatRail(p) {
   // On a node the store sold, "what your apps lack" (a data map, the build guide, search engines, a
   // skill) is a builder's list, so it waits behind one row until opened (v31 K39). Open while one of
   // its filters is the one in use, or the reader cannot see why the list is short.
-  const folded = customerNode() && !KUNTO_KEYS.includes(p.stateFilter || '') && !kuntoOpen;
-  const kuntoTotal = kuntoRows.reduce((n, k) => n + p.states.kunto[k], 0);
+  // The state filters (listed, community, unlisted, draft) wait in the same fold for a buyer, which
+  // reads "Ylläpito (kehittäjille)" with no number: a count there looked like an alarm (v31 K39).
+  const folded = customerNode() && !KUNTO_KEYS.includes(p.stateFilter || '') && !STATES.includes(p.stateFilter || '') && !kuntoOpen;
   return html`
     <${SideMenu} index label=${x('header.title')}>
       <${SideMenuHome} href="/v1/home">← ${x('rail.home')}<//>
@@ -65,14 +68,14 @@ export function CatRail(p) {
           onClick=${() => p.onView(v.value)}>${v.label}<//>`)}
       <//>
       ${p.states ? html`
-        <${SideMenuGroup} title=${x('rail.state')}>
-          ${STATES.map((s) => html`<${SideMenuItem} key=${s} tally active=${p.stateFilter === s}
-            count=${p.states[s]} onClick=${() => p.onState(s)}>${x('state.' + s)}<//>`)}
-          ${kuntoRows.length && folded ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(true)}>${x('rail.kuntoShow', { n: kuntoTotal })}<//>` : null}
-          ${kuntoRows.length && !folded ? html`<${SideMenuLabel}>${x('rail.kunto')}<//>` : null}
-          ${folded ? null : kuntoRows.map((k) => html`<${SideMenuItem} key=${k} tally active=${p.stateFilter === k}
-            count=${p.states.kunto[k]} onClick=${() => p.onState(k)}>${x('kunto.' + k)}<//>`)}
-          ${kuntoRows.length && kuntoOpen ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(false)}>${x('rail.kuntoHide')}<//>` : null}
+        <${SideMenuGroup} title=${folded ? null : x('rail.state')}>
+          ${folded ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(true)}>${x('rail.kuntoShow')}<//>` : html`
+            ${STATES.map((s) => html`<${SideMenuItem} key=${s} tally active=${p.stateFilter === s}
+              count=${p.states[s]} onClick=${() => p.onState(s)}>${x('state.' + s)}<//>`)}
+            ${kuntoRows.length ? html`<${SideMenuLabel}>${x('rail.kunto')}<//>` : null}
+            ${kuntoRows.map((k) => html`<${SideMenuItem} key=${k} tally active=${p.stateFilter === k}
+              count=${p.states.kunto[k]} onClick=${() => p.onState(k)}>${x('kunto.' + k)}<//>`)}
+            ${kuntoOpen ? html`<${SideMenuMore} onClick=${() => setKuntoOpen(false)}>${x('rail.kuntoHide')}<//>` : null}`}
         <//>` : null}
       <${SideMenuGroup} title=${x('rail.tags')}>
         <${SideMenuItem} tally small active=${p.tag === null} count=${p.tagRows.length} onClick=${() => p.onTag(null)}>${x('tag.all')}<//>
