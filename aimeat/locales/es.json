@@ -9286,6 +9286,7 @@
   "emailpage.kind.invitation": "una invitación",
   "emailpage.kind.agent_ask": "la solicitud de tu agente",
   "emailpage.kind.agent_narrowed": "los permisos limitados de tu agente",
+  "emailpage.kind.notification": "un informe de tu agente o tu aplicación",
   "emailpage.chatTitle": "Correo desde un chat",
   "emailpage.chatSub": "buscar, leer, enviar a un contacto guardado · la delegación de una aplicación · el prompt",
   "emailpage.copyPrompt": "Copiar el prompt",
@@ -14365,6 +14366,7 @@
       "open": "Configuración del hogar",
       "title": "Configuración del hogar",
       "showAch": "Mostrar los logros en el inicio",
+      "helpOnHover": "Mostrar la ayuda cuando dejo el puntero sobre una palabra",
       "pattern": "Patrón de los márgenes",
       "patternHint": "Una figura en los márgenes vacíos del hogar, el chat y la configuración, que se desvanece hacia el centro. Solo se ve en pantallas anchas.",
       "patternOff": "Sin patrón",
@@ -25073,6 +25075,7 @@
       }
     },
     "more": "Haz clic para ver ejemplos.",
+    "moreWord": "Haz clic en la palabra para ver la explicación completa.",
     "range": "Rango",
     "low": "Valor bajo",
     "high": "Valor alto",

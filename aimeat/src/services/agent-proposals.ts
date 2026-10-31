@@ -31,6 +31,8 @@
  * @usage
  *   const out = await proposeAgent({ config, storage }, principal, { name, purpose, scopes });
  * @version-history
+ *   v1.10.0 — 2026-10-31 — A proposal may carry `schedule`, a five-field cron the proposal's page
+ *     starts with, so the owner's one press creates the agent and its clock together (v31 K47).
  *   v1.9.0 — 2026-10-31 — proposalApprovalUrl(baseUrl, id) is the proposal's own page on the home,
  *     where it is shown whole and started with one press (v31 K51).
  *   v1.8.0 — 2026-10-18 — proposalNextStep takes the proposal's permissions and adds one sentence when
@@ -72,6 +74,7 @@ import { crewDefWarnings, type CrewDefWarning } from './crew-def-warnings.js';
 import { offerSignalError } from './agent-default-offer.js';
 import { browserDomainsError } from './crew-browser-domains.js';
 import { withInvitesSentence } from './agent-invites.js';
+import { isValidCron } from './schedule-gate.js';
 
 /** Where one proposal lives. The prefix is listable, so the owner's tools can find them all. */
 export const PROPOSAL_KEY_PREFIX = 'agents.proposals.';
@@ -173,6 +176,13 @@ export interface AgentProposal {
   /** What it would BE. Optional: an owner may approve a proposal and seed it later. */
   crew_def: CrewDefDoc | null;
   /**
+   * When it would work on a clock, as a five-field cron in the owner's time zone ("0 7 * * *" every
+   * morning at 7, "0 7 * * 1-5" on weekdays). The proposal's page starts with this time chosen, and
+   * the owner's one press creates the agent and its schedule together. Absent or null: no clock.
+   * Added 2026-10-31: the chat asked a buyer to come back and say "continue" for the schedule (v31 K47).
+   */
+  schedule?: string | null;
+  /**
    * What the definition would do that its author very likely did not intend
    * (services/crew-def-warnings.ts). Empty when there is nothing to say; absent on a proposal
    * stored before 2026-10-11.
@@ -230,9 +240,16 @@ export async function proposeAgent(
     mode?: string; run_mode?: string; crew_def?: CrewDefDoc | null; for_owner?: string;
     /** One of the owner's connectors, by install id or by name. */
     connector?: string;
+    /** A five-field cron the proposal's page starts with (AgentProposal.schedule). */
+    schedule?: string | null;
   },
 ): Promise<{ ok: true; proposal: AgentProposal; alreadyWaiting?: boolean } | Fail> {
   const { config, storage } = ctx;
+  const schedule = typeof input.schedule === 'string' ? input.schedule.trim() : '';
+  if (input.schedule != null && (typeof input.schedule !== 'string'
+    || (schedule !== '' && (schedule.split(/\s+/).length !== 5 || !isValidCron(schedule))))) {
+    return fail(400, 'INVALID_INPUT', 'schedule is a five-field cron such as "0 7 * * *" (every morning at 7) or "0 7 * * 1-5" (weekdays at 7).');
+  }
 
   // An app grant is consent to USE this account; an ecosystem app is a different principal class
   // with its own onboarding. Neither has any business adding a principal to somebody's account.
@@ -377,6 +394,7 @@ export async function proposeAgent(
     install_id: installId,
     connector_name: connectorName,
     crew_def: input.crew_def ?? null,
+    ...(schedule ? { schedule } : {}),
     warnings: crewDefWarnings(input.crew_def),
     proposed_by: principal.sub,
     proposed_at: now,

@@ -42,6 +42,8 @@
  *          actions=${html`<${Action} small onClick=${save}>${x('save')}<//>`} />`
  *        html`<${TextArea} label=${t('x.body')} rows=${4} value=${body} onInput=${setBody} />`
  * @version-history
+ *   v1.8.2 — 2026-10-31 — A `search` field drops an input event no person made (typedByPerson,
+ *     Field.js): LastPass ignored the attributes of v1.8.1 and still wrote the sign-in name in.
  *   v1.8.1 — 2026-10-29 — A `search` field is kept out of password managers too (autocomplete off,
  *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the owner's
  *     sign-in name into a find field. The other kept-out fields get data-bwignore and data-form-type.
@@ -81,7 +83,7 @@ import { h } from 'preact';
 import { useState, useRef, useEffect, useLayoutEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { useFieldIds, inField, messageOf, useFieldMessage, describedBy } from '/components/Field.js';
+import { useFieldIds, inField, messageOf, useFieldMessage, describedBy, typedByPerson } from '/components/Field.js';
 import { INPUT_LIMITS } from '/js/input-limits.js';
 
 const html = htm.bind(h);
@@ -169,7 +171,7 @@ export function TextField(given) {
     required=${required} disabled=${disabled} readOnly=${readOnly}
     aria-label=${ariaLabel} aria-invalid=${bad ? 'true' : undefined}
     aria-describedby=${describedBy(props, ids)}
-    onInput=${onInput ? (e) => onInput(e.currentTarget.value, e) : undefined}
+    onInput=${onInput ? (e) => { if (!search || typedByPerson(e, value ?? '')) onInput(e.currentTarget.value, e); } : undefined}
     onChange=${onChange ? (e) => onChange(e.currentTarget.value, e) : undefined}
     onBlur=${onBlur ? (e) => onBlur(e.currentTarget.value, e) : undefined}
     onFocus=${onFocus} onClick=${onClick}
