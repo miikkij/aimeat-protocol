@@ -8,6 +8,9 @@
  *   - A2: a space declared `versioned:false` (e.g. a request queue) keeps only .latest — publishing it
  *     (even with real changes) never writes a .version.N.
  * @version-history
+ *   v1.3.0 — 2026-10-31 — A viewer and a member with no grant cannot reopen a record by moving the
+ *     first part of its namespace into ws (or the workspace into the namespace), on REST or over MCP
+ *     (secaudit 2026-10-31 inv-06).
  *   v1.2.0 — 2026-10-24 — A member's workspace role decides who publishes and reopens: a viewer and a
  *     member with no grant are refused on REST, over MCP and through the batch route; the contributor,
  *     an admin and the creator's agent still publish (secaudit2026oct22).
@@ -274,6 +277,24 @@ await test('A viewer cannot reopen a published record into a draft, on REST or o
     const m = await callTool(session, 'aimeat_workspace_revert_to_draft', { organism_id: orgId, ws: WS, namespace: 'shared.notes', id: 'c1' });
     assert(m.isError, `MCP revert by a viewer's agent: expected a refusal, got ${m.text.slice(0, 200)}`);
     assert(!(await draftOwnedBy(V, 'c1')), 'no draft may land under the viewer');
+});
+
+await test('A viewer and a member with no grant cannot reopen the record by moving part of its namespace into ws, on REST or over MCP', async () => {
+    // The record's key is organism.<id>.w.<WS>.shared.notes.c1. A ws of `<WS>.shared` with the
+    // namespace `notes`, or no ws with the namespace `w.<WS>.shared.notes`, builds the same key.
+    for (const m of [N, V]) {
+        const who = m === V ? 'viewer' : 'no-grant member';
+        const dotted = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: as(m), body: JSON.stringify({ ws: `${WS}.shared`, namespace: 'notes', id: 'c1' }) });
+        // No workspace has the id `<WS>.shared`, so the read check answers as for a record not there.
+        assert(dotted.status === 404, `${who} REST revert with a dotted ws: expected 404, got ${dotted.status} ${JSON.stringify(dotted.body).slice(0, 200)}`);
+        const noWs = await json(`/v1/organisms/${orgId}/revert`, { method: 'POST', headers: as(m), body: JSON.stringify({ namespace: `w.${WS}.shared.notes`, id: 'c1' }) });
+        assert(noWs.status === 422 && noWs.body.error?.code === 'UNDECLARED_SPACE', `${who} REST revert with the workspace in the namespace: expected 422 UNDECLARED_SPACE, got ${noWs.status} ${JSON.stringify(noWs.body).slice(0, 200)}`);
+        const agent = await makeAgent(BASE, m, ['organism:read', 'organism:write']);
+        const session = await openSession(BASE, agent.token, `e2e-publish-guard-dotted-${m === V ? 'v' : 'n'}`);
+        const t = await callTool(session, 'aimeat_workspace_revert_to_draft', { organism_id: orgId, ws: `${WS}.shared`, namespace: 'notes', id: 'c1' });
+        assert(t.isError, `${who}'s agent MCP revert with a dotted ws: expected a refusal, got ${t.text.slice(0, 200)}`);
+        assert(!(await draftOwnedBy(m, 'c1')), `no draft may land under the ${who}`);
+    }
 });
 
 await test('POSITIVE CONTROL: the contributor reopens, the admin publishes, the creator\'s agent publishes', async () => {
