@@ -691,6 +691,51 @@
     return out;
   }
 
+  // src/static/sdk-libs/auth/i18n.js
+  var MODAL_LANGS = ["en", "fi", "es"];
+  function currentModalLang() {
+    return (
+      /** @type {string} */
+      readLang(MODAL_LANGS)
+    );
+  }
+  function flattenModalI18n(obj, prefix, out) {
+    out = out || {};
+    prefix = prefix || "";
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var key = prefix ? prefix + "." + k : k;
+      var v = obj[k];
+      if (v && typeof v === "object" && !Array.isArray(v)) flattenModalI18n(v, key, out);
+      else out[key] = v;
+    }
+    return out;
+  }
+  async function loadModalI18n(lang) {
+    var v = Date.now();
+    var t = {};
+    try {
+      var enRes = await fetch(NODE_URL + "/locales/en.json?v=" + v);
+      if (enRes.ok) t = flattenModalI18n(await enRes.json());
+    } catch {
+    }
+    if (lang !== "en") {
+      try {
+        var locRes = await fetch(NODE_URL + "/locales/" + lang + ".json?v=" + v);
+        if (locRes.ok) {
+          var loc = flattenModalI18n(await locRes.json());
+          for (var lk in loc) if (Object.prototype.hasOwnProperty.call(loc, lk)) t[lk] = loc[lk];
+        }
+      } catch {
+      }
+    }
+    var out = {};
+    for (var k in t) {
+      if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf("modal.") === 0) out[k.slice(6)] = t[k];
+    }
+    return out;
+  }
+
   // src/static/sdk-libs/auth/palette.js
   var AIMEAT_PALETTE_KEY = "aimeat-palette";
   var PALETTES = [
@@ -1010,7 +1055,8 @@
     }
     const locales = readLocales(opts);
     if (locales.length) aimeatRestoreLang({ locales });
-    let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+    const labelLangs = locales.length ? locales : MODAL_LANGS;
+    let i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
     const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
     function wireCompactTrigger() {
       var compactBtn = document.getElementById("aimeat-auth-compact");
@@ -1028,7 +1074,7 @@
       });
     }
     function render() {
-      i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+      i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
         var pillHtml = '<div class="aimeat-auth-pill"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
@@ -1152,51 +1198,6 @@
         } else render();
       });
     }
-  }
-
-  // src/static/sdk-libs/auth/i18n.js
-  var MODAL_LANGS = ["en", "fi", "es"];
-  function currentModalLang() {
-    return (
-      /** @type {string} */
-      readLang(MODAL_LANGS)
-    );
-  }
-  function flattenModalI18n(obj, prefix, out) {
-    out = out || {};
-    prefix = prefix || "";
-    for (var k in obj) {
-      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
-      var key = prefix ? prefix + "." + k : k;
-      var v = obj[k];
-      if (v && typeof v === "object" && !Array.isArray(v)) flattenModalI18n(v, key, out);
-      else out[key] = v;
-    }
-    return out;
-  }
-  async function loadModalI18n(lang) {
-    var v = Date.now();
-    var t = {};
-    try {
-      var enRes = await fetch(NODE_URL + "/locales/en.json?v=" + v);
-      if (enRes.ok) t = flattenModalI18n(await enRes.json());
-    } catch {
-    }
-    if (lang !== "en") {
-      try {
-        var locRes = await fetch(NODE_URL + "/locales/" + lang + ".json?v=" + v);
-        if (locRes.ok) {
-          var loc = flattenModalI18n(await locRes.json());
-          for (var lk in loc) if (Object.prototype.hasOwnProperty.call(loc, lk)) t[lk] = loc[lk];
-        }
-      } catch {
-      }
-    }
-    var out = {};
-    for (var k in t) {
-      if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf("modal.") === 0) out[k.slice(6)] = t[k];
-    }
-    return out;
   }
 
   // src/static/sdk-libs/auth/modal-styles.js
