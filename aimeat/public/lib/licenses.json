@@ -412,6 +412,22 @@
       "purl": "pkg:npm/swagger-ui-dist@5.34.1"
     },
     {
+      "id": "dompurify",
+      "name": "DOMPurify",
+      "version": "3.4.17",
+      "spdx": "(MPL-2.0 OR Apache-2.0)",
+      "copyright": "Copyright (c) Cure53 and other contributors",
+      "homepage": "https://github.com/cure53/DOMPurify",
+      "source": "https://registry.npmjs.org/dompurify/-/dompurify-3.4.17.tgz (dist/purify.min.js; tarball sha512-B/pSlYVHQ58kqISD/yDjuJ1yfzI34m1gF4lAod2bwSRhiN4K5Cl3H8Af7hqB2PmTL911tdEudnnXn5FnhRoz0w==)",
+      "licenseFile": "LICENSES/dompurify.txt",
+      "files": [
+        "dompurify@3.4.17/**"
+      ],
+      "modified": false,
+      "note": "Used under Apache-2.0. The licence file carries both texts the package ships.",
+      "purl": "pkg:npm/dompurify@3.4.17"
+    },
+    {
       "id": "ffmpeg-core",
       "name": "@ffmpeg/core (ffmpeg 5.1.4 compiled to WebAssembly)",
       "version": "0.12.6",
