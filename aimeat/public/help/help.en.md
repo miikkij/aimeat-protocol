@@ -61,6 +61,10 @@ Ask for an app in the [chat](/v1/chat), for example: "Make me an app to follow m
 
 You sign in with a sign-in link. Write your address in the sign-in window, and the link comes to your email. The link works once and for 15 minutes, and you need no password.
 
+<!--store-->
+The AIMEAT demo ([aimeat.io](https://aimeat.io)), the store ([store.aimeat.io](https://store.aimeat.io)) and your own AIMEAT are three separate places, and you sign in to each one separately. That way the sign-in of one place does not open the others.
+<!--/store-->
+
 <!--nostore-->
 If you want, you can also sign in with your fingerprint, your face or your device's screen lock (a passkey). You turn it on on the [Access and security page](/v1/profile?tab=access).
 <!--/nostore-->
