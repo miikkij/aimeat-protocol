@@ -29,8 +29,13 @@
  *   - turnNote() / wrapUpPrompt(reason) — what the node tells the model
  *   - TurnWatch — counts one phase of a turn and says when its limit is reached
  *   - withTicks(updates, everyMs) — the update stream with a clock in it, so a limit fires in silence
- *   - progressText(locale, step) / stoppedText(locale) — the person's language, from locales/
+ *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
+ *     language, from locales/
  * @version-history
+ *   v1.2.4 — 2026-10-31 — The app path says the publish ends the turn and their data is not read
+ *     after it, and appReadyText gives the address of an app the turn published. On crew34 gpt-oss
+ *     published, then called aimeat_discover to look at the person's data, ran out of time, and the
+ *     turn ended in "say continue" with no address in the words (v31 K35).
  *   v1.2.3 — 2026-10-31 — The app path names only genres that come whole in one answer (genre-receipt
  *     9.9 kB, genre-almanac, genre-departures) and says not to fetch further parts. genre-workbench,
  *     named first before, comes in two parts (22 kB): on crew33 gpt-oss fetched the second and ran out
@@ -107,6 +112,7 @@ export function turnNote(): string {
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
         'An agent can read the web: give a news agent the tools ["news", "article_fetch", "notify"] (Finnish publishers\' feeds; topics politiikka, kotimaa, paauutiset) and any other subject ["web", "article_fetch", "notify"]. When it works on a clock, send `schedule` with the proposal as a five-field cron ("0 7 * * *" every morning at 7), so their one press starts it on that clock. Its result goes to them by email unless they said otherwise: its last task sends the result with the notify tool, and the proposal\'s scopes include notifications:send. Tell them that, and that they can ask for it in their AIMEAT instead.',
         'When the person asks for an app: finish it in this turn, with their sentence as the whole brief and no interview. Read the build specification once, aimeat_handbook_get with tier "build-app-atelier", and no other part unless the app cannot work without it. Then take a genre with aimeat_app_template_get, one that comes whole in one answer: id "genre-receipt" for a list, "genre-almanac" for a calendar or a log, "genre-departures" for a board of items. Every AIMEAT ships these, so one is always there. When an answer says it has more parts, do not fetch them: build on the first part. Build the page from its `content` and keep every script tag it has, and publish with aimeat_app_publish. A template you did not find is never a reason to stop: write the page yourself from the specification and publish it. Give them `url` from the answer.',
+        'When aimeat_app_publish has answered, the app is done: give them its `url` in your next words and end the turn. Their own data is not part of building it, so do not read it after the publish.',
         'The person is signed in here, and an app of their own signs them in by itself when they open it, so never ask them to sign in.',
     ].join('\n');
 }
@@ -231,4 +237,18 @@ export function progressText(locale: Locale, step: ProgressStep): string {
 /** The line the node writes when even the answer phase ran out. */
 export function stoppedText(locale: Locale): string {
     return createT(locale)('chatTurn.stopped');
+}
+
+/**
+ * The address of the app a finished tool call published, or undefined. Only a publish counts: a list
+ * of apps also answers with an app card, and that app was not made in this turn.
+ */
+export function publishedAppUrl(title: string, card: { kind: string; url?: string } | null | undefined): string | undefined {
+    if (card?.kind !== 'app' || !card.url) return undefined;
+    return /\bapp (draft )?publish\b/.test(title.toLowerCase().replace(/[_:]+/g, ' ')) ? card.url : undefined;
+}
+
+/** The line the node writes for an app the turn published, when the agent ran out before saying so. */
+export function appReadyText(locale: Locale, url: string): string {
+    return createT(locale)('chatTurn.appReady', { url });
 }

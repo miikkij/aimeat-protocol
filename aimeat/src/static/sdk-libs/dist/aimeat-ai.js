@@ -278,12 +278,29 @@
 
   // src/static/sdk-libs/_core/lang.js
   var LANG_KEY = "aimeat-lang";
-  function storedLang() {
-    try {
-      return localStorage.getItem(LANG_KEY) || null;
-    } catch {
-      return null;
+  function readLocales(opts) {
+    let list = opts && Array.isArray(opts.locales) ? opts.locales : null;
+    if (!list) {
+      try {
+        const m = (
+          /** @type {HTMLMetaElement|null} */
+          document.querySelector('meta[name="aimeat-locales"]')
+        );
+        if (m && m.content) list = m.content.split(/[\s,]+/);
+      } catch {
+      }
     }
+    if (!list) return [];
+    const seen = {};
+    const out = [];
+    for (let i = 0; i < list.length; i++) {
+      const c = String(list[i] || "").trim().toLowerCase();
+      if (/^[a-z]{2}$/.test(c) && !seen[c]) {
+        seen[c] = 1;
+        out.push(c);
+      }
+    }
+    return out.length > 1 ? out : [];
   }
   function readLang(locales) {
     const list = Array.isArray(locales) ? locales : null;
@@ -916,9 +933,10 @@
     const url = (stem) => `${base}/assets/eu-ai-icons/svg/${stem}_white.svg`;
     return `@media (prefers-color-scheme: dark){` + ["ai-basic", "ai-generated", "ai-modified"].map((s) => `:root:not([data-theme="light"]) .ai-label__icon--${s}{background-image:url('${url(s)}')}`).join("") + "}";
   }
+  var LABEL_LANGS = ["en", "fi", "es"];
   function locale() {
-    const lang2 = storedLang() || document.documentElement.lang || String(readLang(["en", "fi"]));
-    return lang2.slice(0, 2) === "fi" ? "fi" : "en";
+    const declared = readLocales().filter((c) => LABEL_LANGS.indexOf(c) >= 0);
+    return String(readLang(declared.length ? declared : LABEL_LANGS));
   }
   function t(key) {
     return pick(key, locale());
