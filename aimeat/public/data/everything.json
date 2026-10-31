@@ -93,6 +93,15 @@
      "plain": "What this node can do, for your AI This list, in parts your AI can read: the areas first, then one area with every feature, what it gives and where it is reached. Your AI reads it once it knows what you need, to offer the one thing that fits. aimeat_handbook_get { tier: \"features\" }, /v1/prompts/features/sections"
     },
     {
+     "slug": "g-1-help-on-the-word-itself",
+     "cells": [
+      "<strong>Help on the word itself</strong>",
+      "A setting's name, a field's name and a row name that has an explanation carry a dotted line and show the help cursor. Rest the pointer on the word for a moment and its short help opens; click or tap the word and the full explanation opens. A check box keeps its question mark, because pressing its words ticks the box. On the keyboard, the question mark appears when it has the focus. You turn the help under the pointer off in Home settings, or have your AI set <code>helpOnHover</code> false in your <code>home.prefs</code> record; clicking the word still opens the explanation. Limits: the question marks a page draws on its own (a page title, a notice) stay as they were.",
+      "Home settings, <code>home.prefs.helpOnHover</code>"
+     ],
+     "plain": "Help on the word itself A setting's name, a field's name and a row name that has an explanation carry a dotted line and show the help cursor. Rest the pointer on the word for a moment and its short help opens; click or tap the word and the full explanation opens. A check box keeps its question mark, because pressing its words ticks the box. On the keyboard, the question mark appears when it has the focus. You turn the help under the pointer off in Home settings, or have your AI set helpOnHover false in your home.prefs record; clicking the word still opens the explanation. Limits: the question marks a page draws on its own (a page title, a notice) stay as they were. Home settings, home.prefs.helpOnHover"
+    },
+    {
      "slug": "g-1-what-a-setting-means-for-your-ai",
      "cells": [
       "<strong>What a setting means, for your AI</strong>",
@@ -880,6 +889,15 @@
       "<code>GET /v1/librarian/search</code> (<code>scope</code>, <code>prefix</code>)"
      ],
      "plain": "Librarian One ranked natural-language search across everything you and your agents wrote, including what you put in organisms, with the organism and workspace each hit belongs to. A public scope searches what anyone has made public. Limits: what other members wrote in your organisms is not searched. GET /v1/librarian/search (scope, prefix)"
+    },
+    {
+     "slug": "g-5-home-in-one-press",
+     "cells": [
+      "<strong>Home in one press</strong>",
+      "While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them.",
+      "Top bar"
+     ],
+     "plain": "Home in one press While the top bar's links are folded into the menu (a phone, or a window too narrow for them), a cabin button beside the menu takes you to your home, marked while you are there. The bar's buttons say their name when the pointer rests on them. Top bar"
     },
     {
      "slug": "g-5-find-a-place-in-the-menus",
@@ -4541,6 +4559,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 461
+  "rows": 463
  }
 }
