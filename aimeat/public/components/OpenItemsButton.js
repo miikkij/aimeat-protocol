@@ -20,6 +20,8 @@
  * @structure OpenItemsButton({ t, onNavigate })
  * @usage html`<${OpenItemsButton} t=${t} onNavigate=${(p) => navigate(p)} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The name shows in the shared Tooltip instead of the browser's title text
+ *     (Jouni, 2026-10-31).
  *   v1.0.0 — 2026-08-09 — Initial (P14: the button is in the header, and P7's rejection of the
  *     header is overruled — if it does not fit, the header gets fixed).
  */
@@ -28,6 +30,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { openItemsCount } from '/js/services/open-items.js';
 import { swallowed } from '/js/swallowed.js';
+import { Tooltip } from '/components/Tooltip.js';
 
 const html = htm.bind(h);
 
@@ -62,11 +65,13 @@ export function OpenItemsButton({ t, onNavigate }) {
   // that class is not defined in this stylesheet, so the text rendered at full size and pushed the
   // header 70px past a 390px screen — measured, and exactly the crowding P7 warned about.
   return html`
-    <button type="button" class="open-items-btn" title=${label} aria-label=${`${label}: ${count}`}
-      onClick=${(e) => { e.preventDefault(); onNavigate?.(LIST_PATH); }}>
-      <span class="open-items-btn-mark" aria-hidden="true">○</span>
-      <span class="open-items-btn-count">${count}</span>
-    </button>`;
+    <${Tooltip} text=${label}>
+      <button type="button" class="open-items-btn" aria-label=${`${label}: ${count}`}
+        onClick=${(e) => { e.preventDefault(); onNavigate?.(LIST_PATH); }}>
+        <span class="open-items-btn-mark" aria-hidden="true">○</span>
+        <span class="open-items-btn-count">${count}</span>
+      </button>
+    <//>`;
 }
 
 export default OpenItemsButton;

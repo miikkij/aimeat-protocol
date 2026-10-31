@@ -56633,7 +56633,9 @@ paths:
         never from this request. `source_url` reaches a node that is not a peer, is operator-only,
         and requires `trust: "tofu"`, which accepts the key that node publishes at
         /.well-known/aimeat and PINS it: a later pull from the same source under a different key is
-        refused rather than applied.
+        refused rather than applied. A copy that holds no pinned key (a ZIP import that landed
+        unverified) is pinned by a pull from the peer it names, verified against that peer's
+        federation key, and that pull applies even when the version is the one already here.
 
 
         The package lands private, and its ownership is the caller's. The publishing author's GHII
@@ -56661,7 +56663,12 @@ paths:
         '200':
           description: Nothing newer there, so nothing was written
         '400':
-          description: Bad group id, a missing signature, or a component that does not match its signed digest
+          description: >-
+            Bad group id, a missing signature, a component or its metadata that does not match what
+            was signed, or `METADATA_UNSIGNED`: the attestation carries no signature over the
+            component metadata (app tools, data map, names, icons, labels, dependencies) and the
+            source is a peer whose signed heartbeat named node 4.2.1 or newer, or this node runs
+            4.3.0 or newer. Before 4.3.0 a peer on an older or unknown version pulls as before.
         '401':
           description: The signature does not check out against the source node's key
         '403':
@@ -56776,7 +56783,13 @@ paths:
     post:
       operationId: importPackage
       summary: Import package from ZIP
-      description: Import a package from a ZIP bundle uploaded as multipart/form-data.
+      description: >-
+        Import a package from a ZIP bundle uploaded as multipart/form-data. A ZIP signed by a peer
+        this node knows lands with a verified `upstream` (its `verifiedAt` set and the peer's key
+        pinned) only when the signature, every component digest and the signature over the
+        component metadata check out. A ZIP whose attestation carries no metadata signature, or
+        whose signer this node does not know, is imported with an unverified `upstream`. A signature
+        from a known peer that does not check out is refused (400 INVALID_SIGNATURE).
       tags: [Packages]
       security:
         - BearerAuth: []
