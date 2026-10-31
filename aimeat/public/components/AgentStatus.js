@@ -8,6 +8,8 @@
  * @structure StatusBar({ status, onReset })
  * @usage html`<${StatusBar} status=${status} onReset=${reset} />`
  * @version-history
+ *   v1.3.0 — 2026-10-31 — The model name moved behind the credit's "What answers here" toggle
+ *     (components/Credit.js, v27 P7).
  *   v1.2.0 — 2026-10-02 — A person with a key of their own, on the shared chat key, is told the key
  *     does not pay for this chat (the server's own_key.not_covered names the chat).
  *   v1.1.0 — 2026-09-24 — "Use your own key →" is the action link's more tone (Jouni's decision
@@ -69,8 +71,6 @@ export function StatusBar({ status, onReset }) {
             ${elsewhere && html`<span class="poster-agent-status-note">${elsewhere}</span>`}
             ${ownKeyMissesChat && html`<span class="poster-agent-status-note">${ownKeyMissesChat}</span>`}
             ${ownKeyLink && html`<a class="poster-action poster-action--more poster-agent-status-link" href="/v1/profile?tab=ai">${ownKeyLink} →</a>`}
-            ${status.model && html`<span class="poster-turn-model poster-agent-status-model"
-                title=${tr('chat.modelTitle', 'The model that answered this turn')}>${status.model}</span>`}
             ${onReset && html`
                 <button type="button" class="poster-action poster-action--quiet poster-rail-action"
                     title=${tr('chat.resetTitle', 'Start a fresh agent session for this conversation. Needed after changing what the agent may do.')}

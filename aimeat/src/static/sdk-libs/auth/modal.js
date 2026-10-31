@@ -13,6 +13,7 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.16.0 — 2026-10-31 — opts.linkFirst opens on the emailed-link step (modal-login-link.js; v27 P1).
  *   v1.15.0 — 2026-10-19 — Opens nothing while a first-time provider sign-up is choosing its username
  *     (signup-state.js): the app-open page's sign-in dialog replaced that step on load.
  *   v1.14.0 — 2026-10-09 — opts.secondFactorLink opens the dialog on the code view in link mode (secaudit 2026-10-09, S1).
@@ -78,7 +79,7 @@ import { escHtml } from './theme.js';
 import { currentModalLang, loadModalI18n, MODAL_LANGS } from './i18n.js';
 import { writeLang } from '../_core/lang.js';
 import { NODE_URL, NODE_ID, AUTH_PROVIDERS, PROVIDER_ICONS, EMAIL_REQUIRED } from './config.js';
-import { MODAL_CSS } from './modal-styles.js';
+import { MODAL_CSS, HEART_SVG, RULE_MARKS } from './modal-styles.js';
 import { totpViewHtml, wireTotpStep } from './modal-totp.js';
 import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
 import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
@@ -101,10 +102,6 @@ const NODE_HOST = (function () {
   try { return new URL(NODE_URL).host; } catch { return (typeof location !== 'undefined' && location.host) || ''; }
 })();
 
-const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
-const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg>'
-  + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
-
 export function showLoginModal(opts, renderBtn, onClosed) {
   // A first-time provider sign-in is choosing its username in the same #aimeat-modal; opening the
   // sign-in dialog now would replace that step and send the person round to the provider again
@@ -118,7 +115,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // A caller that already knows which job the person came to do can say so: a button reading
   // "Register your home" opening a sign-in form is a small lie, and the person has to find the
   // tab themselves. Anything other than 'register' keeps the previous behaviour.
-  var tab = opts.tab === 'register' ? 'register' : 'signin';
+  var tab = opts.tab === 'register' ? 'register' : 'signin', linkFirst = !!opts.linkFirst;
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
@@ -171,8 +168,11 @@ export function showLoginModal(opts, renderBtn, onClosed) {
 
   /** True when the person has left the two tabs for a step, or a button is waiting on a request. */
   function busyOrAway() {
-    var body = document.getElementById('aimeat-modal-body');
-    return (!!body && body.style.display === 'none') || !!modal.querySelector('button:disabled');
+    var body = document.getElementById('aimeat-modal-body'), away = !!body && body.style.display === 'none';
+    // The emailed-link step a linkFirst dialog opened by itself is not "away": it is redrawn in the
+    // page's words and opened again, once (v27 P1; it stayed English on a Finnish page).
+    if (away && linkFirst && !opts.linkFirstRedrawn) { opts.linkFirstRedrawn = true; opts.linkFirstOpened = false; away = false; }
+    return away || !!modal.querySelector('button:disabled');
   }
 
   function render(anim) {
@@ -327,7 +327,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       + '</div>'
       // The forgot-password, forgot-username and complete-account sub-views (all hidden here).
       + recoveryViewsHtml(i, field)
-      + loginLinkViewHtml(i, field)
+      + loginLinkViewHtml(i, field, linkFirst)
       // Second-factor sub-view (hidden) — opened when the login answers TOTP_REQUIRED.
       + totpViewHtml(i, field)
       // Features footer — an argument FOR creating an account, so it rides with the Register tab.
@@ -455,7 +455,7 @@ export function showLoginModal(opts, renderBtn, onClosed) {
     });
 
     // "Email me a sign-in link": absent on a node that sends no mail.
-    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect });
+    wireLoginLinkStep({ i: i, api: api, showView: showView, redirect: opts.redirect, openFirst: linkFirst && tab === 'signin' ? opts : null });
 
     // The second-factor step. It holds the password for its own call and drops it when it closes.
     var totpStep = wireTotpStep({

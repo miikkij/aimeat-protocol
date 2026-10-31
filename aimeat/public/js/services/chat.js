@@ -17,6 +17,9 @@
  *   import * as chat from '/js/services/chat.js';
  *   for await (const u of chat.streamTurn(threadId, 'build me pong')) { … }
  * @version-history
+ *   v1.5.0 — 2026-10-31 — streamTurn ends the turn with CONNECTION_LOST, in the page's language, when
+ *     45 s pass with no frame and no keepalive, and when the stream closes without a verdict. A turn
+ *     whose node was recreated waited forever (v27 P2).
  *   v1.4.0 — 2026-10-02 — streamTurn sends the page's language, so the node's own lines in the turn
  *     (progress, and the stopped line) are in it.
  *   v1.3.0 — 2026-08-16 — uploadAttachment(): any file, not only a picture.
@@ -27,9 +30,13 @@
  */
 import { api, apiGet } from '/js/api.js';
 import { authHeaders, getNodeUrl } from '/js/services/auth.js';
-import { getLocale } from '/js/i18n.js';
+import { getLocale, t } from '/js/i18n.js';
 
 const enc = encodeURIComponent;
+const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/** Three keepalives missed in a row: the turn's connection is gone. */
+const STREAM_SILENCE_MS = 45_000;
 
 /** Does this node have a chat agent, what is it called, and what is left to spend. */
 export async function status() {
@@ -109,10 +116,19 @@ export async function* streamTurn(id, text, signal, attachments = [], starter) {
     const decoder = new TextDecoder();
     let buffer = '';
     let sawVerdict = false;
+    let silent = false;
 
     try {
         for (;;) {
-            const { done, value } = await reader.read();
+            // The node writes `:keepalive` every 15 s (routes/chat.ts), so a live turn is never
+            // silent this long. A stream that is, lost its node: a restart or a dropped network that
+            // closed nothing, and without this read the page waited forever (v27 P2, 2026-10-31).
+            let timer;
+            const quiet = new Promise((resolve) => { timer = setTimeout(() => resolve(null), STREAM_SILENCE_MS); });
+            const next = await Promise.race([reader.read(), quiet]);
+            clearTimeout(timer);
+            if (next === null) { silent = true; break; }
+            const { done, value } = next;
             if (done) break;
             buffer += decoder.decode(value, { stream: true });
 
@@ -144,7 +160,8 @@ export async function* streamTurn(id, text, signal, attachments = [], starter) {
     }
 
     if (!sawVerdict) {
-        yield { kind: 'error', message: 'The connection closed before the answer finished.' };
+        if (silent) console.warn(`[chat] no frame and no keepalive for ${STREAM_SILENCE_MS / 1000} s; the turn is ended here`);
+        yield { kind: 'error', code: 'CONNECTION_LOST', message: tr('chat.connectionLost', 'The connection was lost. Try again.') };
     }
 }
 

@@ -20,6 +20,7 @@
  *     routes/app-grants-manage.ts.
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   2026-10-31 — GET /v1/app-grants/authorize carries the app's `lang` (en, fi, es) to the consent page (v27 P1).
  *   2026-10-31 — The owner's own portfolio origin gets its memory:read token, on the silent bridge and on refresh, only while the page served now was written by a writer with memory:read or allowed by the owner; otherwise consent_required with reason portfolio_read_waits and the request id, and 403 PORTFOLIO_READ_WAITS on refresh (services/portfolio-read-hold.ts; audit H-9, f-2026aug-h-9).
  *   2026-10-27 — A version another author's app published through its grant (`manifest.publishedByApp`) asks like one another account published: the silent bridge adds `published_by_app`, and `published_by_other` names that app (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — The owner's own app asks the owner for the words the grant lacks when another account published the live version or the owner narrowed the grant by hand: the silent bridge answers consent_required (reason app_updated, `why`, `added`, `published_by`) and the request answers `published_by_other` so the consent page shows the screen (services/own-app-consent.ts; secaudit2026oct22, own-app-silent-ignores-publisher-and-owner-narrowing). The portfolio ceiling moved unchanged to services/app-grant-portfolio.ts (line limit).
@@ -164,6 +165,7 @@ import { logger } from '../utils/logger.js';
 
 import { APP_GRANTABLE_SCOPES } from './app-grant-vocabulary.js';
 import { isPackageApp } from '../services/packages/install/package-approvals.js';
+import { LOCALES } from '../i18n.js';
 export { APP_GRANTABLE_SCOPES, PORTFOLIO_GRANT_SCOPES };
 
 /**
@@ -444,8 +446,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
-    // Send the owner to the trusted apex consent page (SPA route) to review + approve.
-    res.redirect(302, `${config.baseUrl}/v1/app-grant?req=${encodeURIComponent(requestId)}`);
+    // Send the owner to the trusted apex consent page (SPA route) to review + approve. The app's
+    // language rides along, so the page, its sign-in dialog and the mailed link are in it (v27 P1).
+    const lang = typeof req.query.lang === 'string' && (LOCALES as readonly string[]).includes(req.query.lang) ? `&lang=${req.query.lang}` : '';
+    res.redirect(302, `${config.baseUrl}/v1/app-grant?req=${encodeURIComponent(requestId)}${lang}`);
   });
 
   // ── GET /v1/app-grants/request/:requestId ── consent UI fetches what's being requested (display).

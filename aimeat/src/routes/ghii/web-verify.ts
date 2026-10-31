@@ -6,6 +6,8 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — POST /v1/ghii/magic-link takes `lang`, the language of the page the link was asked
+ *     from, and the mail is written in it (v27 P1).
  *   2026-10-27 — register-web reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — register-web reads fromLoopback through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-27 — POST /v1/ghii/verify-email answers 409 EMAIL_CHANGED, and marks nothing, when the account's
@@ -78,6 +80,7 @@ import type { Router, RequestHandler } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { EmailService } from '../../services/email.js';
+import { LOCALES, type Locale } from '../../i18n.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { fromNodeMachine } from '../../auth/loopback-pass.js';
 import { success, error } from '../../middleware/envelope.js';
@@ -557,7 +560,9 @@ export function registerWebVerifyRoutes(
     // Sending a sign-in link is sending mail on request. Unlimited, it is a way to use this node
     // to post at somebody else's address.
     router.post('/v1/ghii/magic-link', rateLimit({ max: 5, windowMs: 10 * 60 * 1000, keyBy: 'ip' }), async (req, res) => {
-        const { email, redirect } = req.body ?? {};
+        const { email, redirect, lang } = req.body ?? {};
+        // The page's language, for the mail (v27 P1). Anything this node has no strings for is ignored.
+        const locale = (LOCALES as readonly string[]).includes(lang) ? lang as Locale : undefined;
 
         if (!email || typeof email !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'email is required'));
@@ -574,7 +579,7 @@ export function registerWebVerifyRoutes(
         // points at the browser endpoint GET /v1/ghii/magic-link/open (login-link-open.ts), with
         // `redirect` when it is a place the link may return to (sendLoginLink drops any other).
         // Always return 200 to not reveal if user exists
-        if (ghiiRecord) await sendLoginLink(storage, config, ghiiRecord, email, LOGIN_LINK_TTL_MS, emailService, redirect);
+        if (ghiiRecord) await sendLoginLink(storage, config, ghiiRecord, email, LOGIN_LINK_TTL_MS, emailService, redirect, locale);
 
         res.json(success(config.nodeId, {
             sent: true,

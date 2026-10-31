@@ -37,6 +37,8 @@
  *   NODE_OPTIONS="--import tsx --import file:///…/test/helpers/fake-goose-acp.ts"
  *   FAKE_GOOSE_LOG=<path to a JSONL file>
  * @version-history
+ *   v1.4.0 — 2026-10-31 — A file `<FAKE_GOOSE_LOG>.fail-aimeat` makes session/new report the aimeat
+ *     MCP server as failed to load, for the chat's CHAT_TOOLS_NOT_CONNECTED refusal (v27 P2).
  *   v1.3.0 — 2026-10-02 — `session/cancel` is obeyed as the notification ACP defines and refused as a
  *     request, as goose 1.50.0 refuses it. LOOPTOOLS and LOOPALL are a model that reads until it is
  *     stopped, for the chat's turn ceiling.
@@ -45,7 +47,7 @@
  *   v1.1.0 — 2026-09-16 — The started record lists any AIMEAT_* or DATABASE_URL it was given.
  *   v1.0.0 — 2026-09-08 — Initial, with test/e2e-chat-agent.ts.
  */
-import { appendFileSync, writeSync } from 'node:fs';
+import { appendFileSync, existsSync, writeSync } from 'node:fs';
 import { basename } from 'node:path';
 import { createInterface } from 'node:readline';
 
@@ -332,8 +334,12 @@ async function runPeer(): Promise<void> {
                     sessionId,
                     // A session is created even when a server failed to load, and the failure shows
                     // only here. The node is supposed to say so out loud.
+                    // `<log>.fail-aimeat` beside the log makes the aimeat server fail, as goose
+                    // reported it on 2026-10-31 when the node refused the session's token.
                     extensionLoadResults: [
-                        { name: 'aimeat', success: true },
+                        existsSync(`${LOG}.fail-aimeat`)
+                            ? { name: 'aimeat', success: false, error: 'Transport channel closed, when AuthRequired' }
+                            : { name: 'aimeat', success: true },
                         { name: 'broken-mcp', success: false, error: 'the node was not reachable' },
                     ],
                 },

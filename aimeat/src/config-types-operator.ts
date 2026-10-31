@@ -66,4 +66,9 @@ export interface OperatorConfig {
   /** Who signs data processing agreements for the operator, and in which role. Annex I prints both. */
   signerName?: string;
   signerRole?: string;
+  /**
+   * The line at the foot of every mail this node sends, in place of "Sent by AIMEAT Protocol" and the
+   * profile note under it ("AIMEAT · aimeat.io", a shop's own name). Empty keeps the default.
+   */
+  emailFooter?: string;
 }
