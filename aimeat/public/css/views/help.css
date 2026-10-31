@@ -5,6 +5,8 @@
  * @description Styles for the AI Help Prompt page — warm white aesthetic,
  *   DM Sans body text, JetBrains Mono for the prompt code block.
  * @version-history
+ *   v3.2.0 -- 2026-10-31 -- The title row with the language choice, the section links and the sections
+ *       of the page read from public/help/help.<lang>.md (Jouni v27 P4).
  *   v3.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
  *   v3.0.1 — 2026-08-29 — The prompt block reads var(--font-mono) instead of naming five monospace families.
  *   v3.0.0 — 2026-08-29 — The showroom face (design canvas "AIMEAT Index Pages"): no card, the title in
@@ -179,3 +181,14 @@
 .hlp-prompt-rendered table { display: block; overflow-x: auto; max-width: 100%; }
 .hlp-endpoints { margin: .9rem 0 0; padding-left: 1.2rem; display: grid; gap: .4rem; color: var(--text-dim); font-size: .88rem; }
 .hlp-endpoints code { background: var(--code-bg); padding: .1rem .4rem; border-radius: .25rem; }
+
+/* ── The page for a person, from one markdown file per language (v3.2.0, 2026-10-31) ──
+   The title and the language choice share a row and wrap on a phone; the section links are a
+   wrapping row of plain links; each section keeps the display-face headline above. */
+.hlp-head { display: flex; align-items: center; justify-content: space-between; gap: .75rem 1.5rem; flex-wrap: wrap; }
+.hlp-langs { display: flex; gap: .25rem; }
+.hlp-toc { display: flex; flex-wrap: wrap; gap: .4rem 1.25rem; margin: 0 0 .5rem; font-size: .95rem; }
+.hlp-toc a { color: var(--text); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.hlp-toc a:hover { color: var(--accent); }
+.hlp-section { scroll-margin-top: 5rem; }
+.hlp-section .md-body blockquote { margin: .75rem 0; }
