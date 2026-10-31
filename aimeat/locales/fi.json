@@ -6411,6 +6411,16 @@
   "chat.work.pending": "alkaa",
   "chat.work.title": "Mitä tehtiin",
   "chat.work.untitled": "työkalukutsu",
+  "chat.work.step.guide": "Luen ohjeet",
+  "chat.work.step.template": "Haen pohjan",
+  "chat.work.step.publish": "Julkaisen",
+  "chat.work.step.propose": "Ehdotan agenttia",
+  "chat.work.step.schedule": "Ajastan",
+  "chat.work.step.find": "Etsin työkalun",
+  "chat.work.step.read": "Katson tietojasi",
+  "chat.work.step.write": "Tallennan",
+  "chat.work.step.work": "Teen vaiheen",
+  "chat.work.stuck": "Yksi vaihe ei onnistunut.",
   "chat.working": "Työn alla…",
   "classic": {
     "nav": {
