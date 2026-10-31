@@ -9,6 +9,8 @@
  * @version-history
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-25 — aimeat_ai_routing_set names rules.freeModelLastResort (secaudit2026oct22 follow-up).
+ *   2026-10-31 — aimeat_ai_gen_rules (read, ai:use) and aimeat_ai_gen_rules_set (propose-then-confirm,
+ *     memory:write-reserved): the generation rules (services/ai/gen-rules.ts).
  *   2026-10-06 —aimeat_ai_policy_set and aimeat_ai_routing_set ask ai:use as well, the word the read
  *     they make when given nothing asks (secaudit 2026-10 follow-up, A4).
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
@@ -54,6 +56,42 @@ export const aiModelTools = [
       + 'Suggest mode recommended when the owner has a provider and no policy.',
     input: {
       policy: { type: 'object', description: '{ mode: open|recommended|custom, allow?: [refs], appliesTo?: {owner, chat, agents, apps}, apps?: {"owner/file.html": {allow}}, agents?: {name: {allow}} }. Omit to read.' },
+      confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
+    },
+  },
+  {
+    name: 'aimeat_ai_gen_rules',
+    caller: 'agent',
+    visibility: agentEverywhere,
+        annotations: { title: 'Read the Generation Rules', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // Read by every agent that makes or brings in a picture or a video: the same word as GET /v1/ai/gen-rules.
+        scope: 'ai:use',
+        surfaces: ['appdev', 'agent'],
+    description: 'Read the generation rules that apply to the owner\'s AI images and videos, for example people-artistic '
+      + '(people only in an artistic, non-photorealistic style, never like a photograph of a real person). Returns every rule '
+      + 'with its level (node: off | on | required; owner: true | false | null), the owner\'s exceptions, and for_caller: per '
+      + 'medium (image, video) the rules in force for YOU and the directive text. The node puts the directive into its own '
+      + 'image generation itself. Before you generate a picture or a video ANYWHERE ELSE (another model, another service) '
+      + 'for this owner, put for_caller.<medium>.directive into your prompt, and when you store the result declare '
+      + 'ai_provenance.rules_followed with the rule ids you followed; content without it is recorded as unknown.',
+    input: {},
+  },
+  {
+    name: 'aimeat_ai_gen_rules_set',
+    caller: 'agent',
+    visibility: agentEverywhere,
+        annotations: { title: 'Set the Generation Rules (Propose-then-Confirm)', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        // The owner's rule over their own apps and agents, as the model policy is.
+        scope: ['memory:write-reserved', 'ai:use'],
+        surfaces: ['agent', 'admin'],
+    description: 'Change which generation rules apply to the owner\'s AI images and videos, with PROPOSE-THEN-CONFIRM. '
+      + 'With gen_rules and no confirm_token: changes NOTHING and returns the current and proposed rules with a single-use '
+      + 'token (10 min) bound to exactly that change; show it to the owner. With the same gen_rules plus the token: applies it. '
+      + 'gen_rules: { rules?: { "<rule id>": true | false | null }, exceptions?: [{ rule, app: "<owner>/<file>.html" | agent: '
+      + '"<name>", reason }] }. rules is merged (null: follow the node again); exceptions, when given, replaces the list. A rule '
+      + 'the node requires cannot be switched off or exempted. Read the rules first (aimeat_ai_gen_rules).',
+    input: {
+      gen_rules: { type: 'object', required: true, description: '{ rules?: { "<rule id>": true | false | null }, exceptions?: [{ rule, app | agent, reason }] }.' },
       confirm_token: { type: 'string', description: 'Token from the propose step; omit to propose.' },
     },
   },

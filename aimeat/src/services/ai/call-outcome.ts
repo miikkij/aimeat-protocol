@@ -7,10 +7,11 @@
  * @structure AiCallOutcome · AiCallSettlement
  * @usage import type { AiCallOutcome } from './completion.js';
  * @version-history
+ *   v1.1.0 -- 2026-10-31 -- media.genRules: what the generation rules did for an image call.
  *   v1.0.0 -- 2026-10-27 -- Moved here from completion.ts unchanged (max-file-lines; secaudit2026oct26).
  */
 import type { AiProvenanceRecordRow } from '../../storage/interface.js';
-import type { AiMediaKind, AiProvenanceMethod } from '../../models/ai-provenance-schemas.js';
+import type { AiGenRuleMark, AiMediaKind, AiProvenanceMethod } from '../../models/ai-provenance-schemas.js';
 import type { SurfaceContext } from '../ai-disclosure.js';
 import type { UsageRecord } from '../ai-usage-record.js';
 import type { CostSource } from './types.js';
@@ -33,7 +34,11 @@ export interface AiCallOutcome {
   units?: { seconds?: number; images?: number };
   /** The output's medium for the record (text when there is `content` and nobody says), its IANA
    *  type, a method other than fully-generated (`transcribed`), and the surface it lands on. */
-  media?: { mediaKind?: AiMediaKind; mediaType?: string; method?: AiProvenanceMethod; surface?: SurfaceContext };
+  media?: {
+    mediaKind?: AiMediaKind; mediaType?: string; method?: AiProvenanceMethod; surface?: SurfaceContext;
+    /** What the generation rules did for this call (services/ai/gen-rules.ts), for the record. */
+    genRules?: AiGenRuleMark[];
+  };
   /** Where `costUsd` came from (services/ai/types.ts). Logged with the settlement. */
   costSource?: CostSource;
   /** What the ledger cites for the price: the catalogue snapshot, `estimate`, … (services/ai/catalog/price.ts). */

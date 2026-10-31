@@ -13,6 +13,7 @@
  *   const caps = await AIMEAT.ai.capabilities({ app_id });
  *   if (caps.capabilities.text.on) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.9.0 - 2026-10-31 - genRules(): the generation rules and their directive text (GET /v1/ai/gen-rules).
  *   v1.8.1 - 2026-10-12 - isAvailable() drops its fallback to GET /v1/openrouter/settings: node 4.0.0
  *     removes that route, and every node that serves this lib answers GET /v1/ai/available (since
  *     2026-06-25), so the fallback could only ever be reached by a refusal.
@@ -57,7 +58,7 @@ import { attachSpend } from '../_core/spend.js';
 import { disclose, chatNotice, declare } from './disclose.js';
 import { job } from './job.js';
 import { paid, postJson, isBlob, blobToDataUrl } from './call.js';
-import { capabilities, models, roles, clearCaches } from './capabilities.js';
+import { capabilities, models, roles, genRules, clearCaches } from './capabilities.js';
 import { stream, speak } from './stream.js';
 import { image, transcribe, embed, routing } from './media.js';
 
@@ -338,6 +339,14 @@ const ai = {
    * once boundTo is set; until then a call with that `role` is refused AI_ROLE_NOT_BOUND.
    */
   roles,
+
+  /**
+   * The generation rules for the person's AI pictures and videos (GET /v1/ai/gen-rules), such as
+   * people only in an artistic, non-photorealistic style. image() needs nothing: the node adds the
+   * directive itself. When the app composes a prompt for a model OUTSIDE the node, add
+   * for_caller.image.directive or for_caller.video.directive to it.
+   */
+  genRules,
 
   /**
    * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".

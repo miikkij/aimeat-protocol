@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-ai-gen-rules.ts joins the list (not the guard tier): the generation rules for AI pictures.
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
  *     may start for its agents, and the owner's decision on them.
  *   2026-10-31 -- e2e-package-account-sale.ts joins the list (not the guard tier): an author sells their own package to another account (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
@@ -1669,6 +1670,9 @@ const ALL_SUITES = [
     // Reference pictures and a mask on the image AI: what OpenRouter, the OpenAI type and an
     // OpenAI-compatible server receive, and the refusals that send nothing (Comicland v3 A-1, A-2).
     'test/e2e-ai-image-references.ts',
+    // The generation rules (people only in an artistic style): node, owner, exception, the owner's
+    // one-picture bypass, an agent's refused bypass, and the rules in every picture's record.
+    'test/e2e-ai-gen-rules.ts',
     'test/e2e-mcp-mail-connection-tools.ts',
     'test/e2e-mcp-proxy-tools.ts',
     'test/e2e-mcp-owner-only-parity.ts',

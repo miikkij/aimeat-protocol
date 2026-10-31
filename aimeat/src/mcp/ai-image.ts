@@ -15,6 +15,7 @@
  *   import { registerAiImageTool } from './ai-image.js';
  *   registerAiImageTool(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   2026-10-31 — The result names the generation rules in force (gen_rules), when any.
  *   2026-10-21 — `public: true` asks the node's publish gate with the session's caller, as
  *     aimeat_storage_upload does: an agent without publish:public gets the picture stored private and
  *     a file request for its owner (`publish_request` in the result), whose approval makes it public
@@ -114,6 +115,8 @@ export function registerAiImageTool(
                             url: `${base}${path}`,
                             reference_count: r.referenceCount,
                             ...(r.maskMode ? { mask_mode: r.maskMode } : {}),
+                            // The generation rules in force: an applied rule's directive went into the prompt.
+                            ...(r.genRules.length ? { gen_rules: r.genRules } : {}),
                             cost_usd: r.usage.costUsd,
                             cost_exact: r.usage.costExact,
                             remaining_today_usd: r.budget.remainingUsd,

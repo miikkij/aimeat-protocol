@@ -6,9 +6,11 @@
  *   read (ai-transparency), and how AI routing and budget are inspected and changed
  *   (configure-routing). Their own file because builtin-skills.ts reached the 800-line ceiling; the
  *   entries are unchanged and keep their place in BUILTIN_SKILLS.
- * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
+ * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-10-31 — aimeat-gen-rules: the generation rules for AI pictures and videos; ai-transparency
+ *     names `rules_followed`.
  *   2026-10-31 — ai-transparency: a file uploaded straight to its store has a record with no hash.
  *   2026-10-25 — configure-routing: the rule freeModelLastResort and `free_model` on the read
  *     (secaudit2026oct22 follow-up, the free model as the last resort).
@@ -85,6 +87,11 @@ picture's label says "this image" and not "this text". For image, audio or video
 or sound like a real person, place or event, answer \`resembles_real\` (\`yes\`, \`no\` or
 \`unknown\`). Public image, audio and video is labelled whatever you answer; the answer decides
 only which rule the record cites.
+
+**For an image or a video you made elsewhere, say which generation rules you followed** in
+\`rules_followed\` (for example \`["people-artistic"]\`). \`aimeat_ai_gen_rules\` lists the rules in
+force and the directive to put into your prompt. A rule in force you do not name is recorded as
+\`unknown\`; the skill \`aimeat-gen-rules\` covers the rest.
 
 Declaring needs the \`provenance:write\` scope, because a declaration can assert that a
 person wrote or reviewed something. You must hold it in your grant AND in the session you write
@@ -298,5 +305,68 @@ When the owner has an AI provider and no policy, and the node recommends models,
 Ask for a capability, not a model. Name a model only when the app truly needs that one, and then
 declare it in the meta (\`models=openrouter:anthropic/claude-opus-5.5\`) so the app states its own
 rule. Handle \`AI_MODEL_NOT_ALLOWED\` visibly: show the person the message, never an empty result.
+`,
+};
+
+export const AI_GEN_RULES_SKILL_ENTRY: BuiltinSkillEntry = {
+    name: 'aimeat-gen-rules',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-gen-rules
+description: The generation rules an AIMEAT node and its owners switch on for AI pictures and videos, such as people-artistic (people only in an artistic, non-photorealistic style). Covers reading the rules (aimeat_ai_gen_rules), putting the directive into a prompt for a model outside the node, declaring rules_followed, the owner's exceptions, proposing a change (aimeat_ai_gen_rules_set), and the refusal GEN_RULE_BYPASS_REFUSED. Use before you make or bring in a picture or a video for an owner, and when the owner asks to switch such a rule on or off.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Rules for AI pictures and videos
+
+A generation rule is an instruction the node gives to every AI picture or video made for an owner.
+The first one is **people-artistic**: people only in an artistic, non-photorealistic style, so that
+nothing made here can pass for a photograph or footage of a real person. A picture that cannot pass
+for real is not a deep fake under the EU AI Act (Article 50(4)), and that is why owners switch it on.
+
+A rule is a directive, not a check: the node tells the model, it does not inspect the result.
+
+## Who decides
+
+- **The node** sets each rule \`off\` (each owner may switch it on), \`on\` (on for everyone, an owner
+  may switch it off) or \`required\` (nobody switches it off or skips it).
+- **The owner** switches a rule on or off within that, and may exempt one app or one agent with a
+  reason.
+- **One picture** may skip a rule only when the owner makes the call in person, with a reason. You
+  cannot skip a rule, and neither can an app: ask the owner for an exception.
+
+## Before you make a picture or a video
+
+- **On this node** (\`aimeat_image_generate\`, \`AIMEAT.ai.image()\`, an AI job): nothing to do. The
+  node adds the directive and the answer's \`gen_rules\` says which rules applied.
+- **Anywhere else** (another model, another service, a video tool): call \`aimeat_ai_gen_rules\` and
+  put \`for_caller.image.directive\` or \`for_caller.video.directive\` into your prompt. It is empty
+  when no rule is in force for you.
+
+## When you bring it in
+
+Store or send the result with \`ai_provenance\` and \`rules_followed\`, for example
+\`{ level: "ai-generated", media_kind: "video", model: "<your model>", rules_followed: ["people-artistic"] }\`.
+The record lists every rule in force: \`declared\` for those you named, \`unknown\` for the rest. The
+content is never refused for it; an app decides how to label \`unknown\`. Name only rules whose
+directive you put into the prompt.
+
+## Changing the rules
+
+\`aimeat_ai_gen_rules_set { gen_rules }\` changes nothing at first: it returns the proposal and a
+token. Tell the owner what changes in their words ("people in pictures only as drawings, for all
+your apps"), then call again with the same \`gen_rules\` and \`confirm_token\` (ten minutes, one use).
+\`gen_rules\` is \`{ rules?: { "people-artistic": true | false | null }, exceptions?: [{ rule, app:
+"<owner>/<file>.html" | agent: "<name>", reason }] }\`; \`null\` gives the choice back to the node,
+and a given \`exceptions\` replaces the list. The owner also switches them on the AI settings page.
+
+## Refusals
+
+- **403 \`GEN_RULE_BYPASS_REFUSED\`**: a call asked to skip a rule and was not the owner in person,
+  or the node requires the rule. Nothing was spent. Make the call without the bypass.
+- **400 \`GEN_RULES_INVALID\`**: the change names a rule that does not exist, or tries to switch off
+  or exempt a rule the node requires. \`error.details.problems\` lists every problem.
 `,
 };

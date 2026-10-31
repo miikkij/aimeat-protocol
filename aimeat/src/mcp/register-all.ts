@@ -24,6 +24,7 @@
  * @usage
  *   registerAllServerTools(mcp, { storage, config, agentGaii: () => gaii, ... });
  * @version-history
+ *   2026-10-31 — registerAiGenRulesTools (aimeat_ai_gen_rules, aimeat_ai_gen_rules_set).
  *   2026-10-27 — registerAppsTools receives the app a role-'app' bearer names, so a publish through an app's grant names that app (secaudit2026oct26).
  *   2026-10-25 — registerSecretHostAskTools: aimeat_secret_host_ask (secaudit2026oct22).
  *   2026-10-29 — registerFileStoreTools: where stored files keep their bytes, the node's store and a person's own (eight tools).
@@ -157,6 +158,7 @@ import { registerAiJobTools } from './ai-jobs.js';
 import { registerDecideTools } from './decide.js';
 import { registerAiVoiceTools } from './ai-voice.js';
 import { registerAiPolicyTools } from './ai-policy.js';
+import { registerAiGenRulesTools } from './ai-gen-rules.js';
 import { registerAiProviderTools } from './ai-providers.js';
 import { registerAiCapabilityTools } from './ai-capabilities.js';
 import { registerAgentCapabilityTools } from './agent-capabilities.js';
@@ -300,6 +302,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerDecideTools(mcp, storage, config, agentGaii, caller);
     registerAiVoiceTools(mcp, storage, config, agentGaii);
     registerAiPolicyTools(mcp, storage, config, agentGaii);
+    registerAiGenRulesTools(mcp, storage, config, agentGaii);
     registerAiProviderTools(mcp, storage, config, agentGaii);
     registerAiCapabilityTools(mcp, storage, config, agentGaii);
     registerAgentCapabilityTools(mcp, storage, config, agentGaii, emitResourceUpdated, emitResourceListChanged);
