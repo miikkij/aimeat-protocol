@@ -24,6 +24,10 @@
  *   // inside an extension action
  *   const r = await ctx.buy('alice/data.html', 'lookup', { id: '123' });
  * @version-history
+ *   v1.6.1 — 2026-10-31 — An extension-backed capability whose ref names no installed action in the
+ *     seller's namespace is refused EXTENSION_NOT_FOUND before the settle. It ran after the settle as
+ *     written, and the run read the bare name in the buyer's namespace, so the buyer's own extension
+ *     of that name could run with the seller's locked input (secaudit 2026-10-31 inv-20).
  *   v1.6.0 — 2026-10-27 — An extension-backed capability's ref is resolved in the seller's namespace
  *     before the settle, and the run takes that stored name; a ref that lands on the buyer's own
  *     extension is refused EXTENSION_CAPABILITY_NOT_YOURS with nothing charged, the rule the
@@ -101,21 +105,20 @@ async function runSellerExtensionForBuyer(args: {
   buyerOwner: string;
   internalPass: string;
   runSellerAction: SellerActionRunner;
-  /** The extension the ref names in the seller's namespace (sellerExtensionTarget), when it resolved. */
-  target?: { extRef: string; actionId: string } | null;
+  /** The extension the ref names in the seller's namespace (sellerExtensionTarget). */
+  target: { extRef: string; actionId: string };
 }): Promise<{ result: unknown }> {
   const { assertCapabilityRunnable } = await import('./capability-invoke.js');
   assertCapabilityRunnable(args.cap);
-  const [, rawExt, rawAction] = args.cap.source.ref.split(':');
   // The stored name the seller's namespace resolved, so the run reads that record and never the
-  // buyer's own of the same short name. A ref that resolved to nothing runs as written, as before.
-  const sellerExt = args.target?.extRef ?? rawExt;
-  const actionId = args.target?.actionId ?? rawAction;
+  // buyer's own of the same short name. A ref that resolves to nothing is refused before the settle.
+  const sellerExt = args.target.extRef;
+  const actionId = args.target.actionId;
   // The paywall writes a refusal into a responder; this keeps it to report in the thrown error.
   let refusal: { status: number; body: unknown } | null = null;
   const res = { status(code: number) { return { json(body: unknown) { refusal = { status: code, body }; return body; } }; } };
   const out = await args.runSellerAction({
-    extRef: sellerExt ?? '', actionId: actionId ?? '', input: args.input,
+    extRef: sellerExt, actionId, input: args.input,
     caller: {
       gaii: args.buyer, metered: args.buyer, owner: args.buyerOwner,
       kind: 'ecosystem', roles: ['ecosystem'], scopes: [], appGrantId: null,
@@ -243,6 +246,14 @@ export async function buyForExtension(args: {
   // route refuses it (EXTENSION_CAPABILITY_NOT_YOURS), and so does this, before anything is charged
   // (secaudit2026oct26).
   const sellerTarget = cap.source.type === 'extension' ? await sellerExtensionTarget(storage, cap.source.ref, sellerOwner) : null;
+  // A ref that names no installed action in the seller's namespace has nothing of the seller's to run,
+  // and the run would read its bare name in the buyer's namespace. Refused before the settle, as the
+  // capability invoke route refuses it (secaudit 2026-10-31 inv-20).
+  if (cap.source.type === 'extension' && !sellerTarget) {
+    return { ok: false, code: 'EXTENSION_NOT_FOUND',
+      message: `Tool "${tool}" on app "${appRef}" is bound to "${cap.source.ref}", which names no installed action of "${sellerOwner}". Ask the seller to fix the binding. Nothing was charged.`,
+      correlation };
+  }
   if (sellerTarget && ownerNameOf(sellerTarget.installedBy) === extOwner) {
     return { ok: false, code: 'EXTENSION_CAPABILITY_NOT_YOURS',
       message: `Tool "${tool}" on app "${appRef}" would run your own extension "${sellerTarget.extRef}", and another account published it. Call your extension directly. Nothing was charged.`,
@@ -283,7 +294,8 @@ export async function buyForExtension(args: {
     // code ran as that person, with their wallet, files and namespace, although they never chose the
     // seller (secaudit2026oct22, ext-purchase:buy-forwards-outer-caller-bearer). An extension-backed
     // capability therefore runs in-process for the buyer; every other source takes no bearer.
-    const invoked = cap.source.type === 'extension'
+    // An extension-backed capability has its seller target: one without it was refused above.
+    const invoked = cap.source.type === 'extension' && sellerTarget
       ? await runSellerExtensionForBuyer({
         cap, input: lockedInput, buyer, buyerOwner: extOwner, internalPass: pass,
         runSellerAction: args.runSellerAction, target: sellerTarget,

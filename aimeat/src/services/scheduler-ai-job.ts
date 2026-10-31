@@ -15,6 +15,11 @@
  * @structure runAiJob(storage, config, job)
  * @usage scheduler.registerKindExecutor('ai', (job) => runAiJob(storage, config, job));
  * @version-history
+ *   v1.4.0 -- 2026-10-31 -- What the memory write refuses whatever the answer is (an organism audience the
+ *     maker is not a member of, an organism.* output key the maker may not write) is asked before the
+ *     reads and the model call, and the run fails with the reason, so a schedule stored before the
+ *     create and edit doors checked it no longer pays for an answer that is then refused (secaudit
+ *     2026-10-31 inv-28). Valid schedules run as before.
  *   v1.3.0 -- 2026-10-27 -- A fire waits while a sibling agent's new instruction waits for the owner, and
  *     runs the earlier instruction when the owner did not allow it (services/schedule-instruction-hold.ts;
  *     secaudit2026oct26, sibling-edit-fires-under-maker-reach).
@@ -50,6 +55,34 @@ import { aiScheduleFireViewer } from './schedule-ai-read.js';
 import { instructionHoldAtFire } from './schedule-instruction-hold.js';
 import { noteAgentRefusal } from './agent-refusals.js';
 import { agentSessionCaller, callerFromAuth } from './caller-context.js';
+import { organismVisibilityRefusal } from './organism-visibility.js';
+import { checkOrganismNamespaceAccess } from './organism-namespace-access.js';
+
+/** A workspace's manifest record, whose write rule compares the value it stores (services/fenced-space.ts). */
+const MANIFEST_KEY = /^organism\.[^.]+\.w\.[^.]+\.meta\.manifest$/;
+
+/**
+ * The refusal the memory write (services/memory-write.ts) gives this answer's writer, key and
+ * visibility whatever the answer is, or null. The same two calls, with the same arguments, as its
+ * steps 1b' (an organism audience) and 1c (the organism namespace rule); the write asks both again.
+ * The publish gate is not asked here: it refuses only an anonymous or visiting writer
+ * (publish-gate.ts), and a schedule's maker is neither. A manifest record is left to the write,
+ * because its rule reads the value.
+ */
+async function answerWriteRefusal(
+  storage: Storage, config: AimeatConfig,
+  writer: { principal: string; roles: string[]; scopes: string[] }, key: string, visibility: unknown,
+): Promise<string | null> {
+  const audience = await organismVisibilityRefusal(storage, visibility, { identity: writer.principal });
+  if (audience) return audience.message;
+  if (key.startsWith('organism.') && !MANIFEST_KEY.test(key)) {
+    const refusal = await checkOrganismNamespaceAccess({ storage, config }, {
+      principal: writer.principal, owner: localAccountName(writer.principal), roles: writer.roles, scopes: writer.scopes,
+    }, key, 'write');
+    if (refusal) return refusal.message;
+  }
+  return null;
+}
 
 /**
  * `ai` kind: gather predefined input memory keys, compose the prompt, run a
@@ -105,6 +138,22 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
   if (!actor.isOwner && !scopeIsCovered(actor.scopes, 'ai:use')) {
     throw new Error('What made this schedule no longer holds ai:use, so it does not run. Approve it again, or delete this schedule.');
   }
+  // The writer of the answer, and where it lands. Asked here, before the reads and the model call, for
+  // what the memory write below refuses whatever the answer says: a schedule stored before the create
+  // and edit doors checked these was refused only after the owner's key had paid for the answer
+  // (secaudit 2026-10-31 inv-28).
+  const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;
+  const writer = {
+    principal: actor.principal,
+    targetGaii: owner,
+    scopes: [...actor.scopes],
+    roles: [...actor.roles],
+    ...(actor.appRef ? { app: actor.appRef } : {}),
+  };
+  const unwritable = await answerWriteRefusal(storage, config, writer, outputKey, cfg.outputVisibility || 'private');
+  if (unwritable) {
+    throw new Error(`AI job "${job.id}": ${unwritable} The model was not called. Change where this schedule stores its answer, or delete the schedule.`);
+  }
 
   // The one loader of what a model reads (services/ai-inputs.ts): the credential mask and the
   // classification check. A schedule fires with nobody present, so it reads as an AI (TARGET-082 V4,
@@ -156,7 +205,6 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
     ...(actor.ai.verifiedApp ? { verifiedApp: actor.ai.verifiedApp } : {}),
   });
 
-  const outputKey = cfg.outputKey || `scheduler.${job.id}.output`;
   // THROUGH THE SHARED MEMORY WRITE SERVICE, as the schedule's maker. A raw storage.setMemory here
   // skipped every audience rule a memory write has: an agent's schedule stored the answer at
   // `organism:<id>` for an organism the owner is not a member of, with no publish gate, no label
@@ -173,13 +221,7 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, stored: S
   // reject it upgrades humanInvolvement. Clicking publish is not that step. A workflow human-input
   // step that reviews substance MAY upgrade it. Nothing else may. There is no such step anywhere on
   // this path, which is why nothing here touches the record's `humanInvolvement: 'none'`.
-  const written = await writeMemoryRecord({ storage, config }, {
-    principal: actor.principal,
-    targetGaii: owner,
-    scopes: [...actor.scopes],
-    roles: [...actor.roles],
-    ...(actor.appRef ? { app: actor.appRef } : {}),
-  }, {
+  const written = await writeMemoryRecord({ storage, config }, writer, {
     key: outputKey,
     value: result.content,
     visibility: cfg.outputVisibility || 'private',

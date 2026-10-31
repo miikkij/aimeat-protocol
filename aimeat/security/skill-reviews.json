@@ -50,14 +50,14 @@
       "digest": "sha256:e7d6e96dedba4f85193d1706"
     },
     "node:aimeat-recurring-work": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/services/schedule-gate.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/services/schedule-write.ts"
       ],
-      "digest": "sha256:57972afa02eede0a122a6fff"
+      "digest": "sha256:a87734498fd09feb9c9b0cb2"
     },
     "node:aimeat-first-conversation": {
       "reviewedOn": "2026-10-30",
@@ -236,13 +236,13 @@
       "digest": "sha256:03e6a1ea7cae56de132ca606"
     },
     "node:aimeat-node-guide": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/routes/ghii/register-login.ts",
         "aimeat/src/services/first-steps.ts"
       ],
-      "digest": "sha256:b9c0f15170fd0edbe340b570"
+      "digest": "sha256:42f828df4da0fc8ecebe65cf"
     },
     "node:ai-transparency": {
       "reviewedOn": "2026-10-28",
@@ -275,7 +275,7 @@
       "digest": "sha256:d78eaf80767d1827ba9352b7"
     },
     "node:add-a-crew-agent": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/agents/device-auth.ts",
         "aimeat/src/tool-catalog/scopes.ts",
@@ -283,7 +283,7 @@
         "aimeat/src/routes/agents-v2/agent-proposals.ts",
         "aimeat/src/data/basic-agents.ts"
       ],
-      "digest": "sha256:bad736085d55f8c99cb07291"
+      "digest": "sha256:110c6f245eb0b9bc20268bd2"
     },
     "node:set-up-content-pipeline": {
       "reviewedOn": "2026-10-27",
@@ -312,7 +312,7 @@
       "digest": "sha256:e05a3f1ce04108721d635f0b"
     },
     "node:aimeat-extension-builder": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/services/build-extension-prompt.ts",
         "aimeat/src/services/extension-ctx-contract.ts",
@@ -322,7 +322,7 @@
         "aimeat/src/routes/extensions/instances.ts",
         "aimeat/src/services/extension-schedules.ts"
       ],
-      "digest": "sha256:a0214074e308735a47c9cca5"
+      "digest": "sha256:f3ab73fb69a2c80654be8779"
     },
     "node:aimeat-workspace-contracts": {
       "reviewedOn": "2026-10-31",
@@ -362,7 +362,7 @@
       "digest": "sha256:7f23722fdd48a478960f79e7"
     },
     "node:aimeat-data-ownership": {
-      "reviewedOn": "2026-10-29",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/memory/bulk.ts",
         "aimeat/src/routes/memory/key.ts",
@@ -373,7 +373,7 @@
         "aimeat/src/services/archive.ts",
         "aimeat/src/mcp/organisms.ts"
       ],
-      "digest": "sha256:cf6eeaaa95246de78763e1ae",
+      "digest": "sha256:a92c17d662dc32436a999751",
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
@@ -617,7 +617,7 @@
       "aimeat/src/static/sdk-libs/phaser/chiptune.js": "4305c95f9370f982"
     },
     "node:aimeat-node-guide": {
-      "aimeat/src/routes/agents/device-auth.ts": "e0b1732247d1354a",
+      "aimeat/src/routes/agents/device-auth.ts": "6924e84ee00c9945",
       "aimeat/src/routes/ghii/register-login.ts": "1d5861b0de1ef56d",
       "aimeat/src/services/first-steps.ts": "3d25cbe8390e71b4"
     },
@@ -636,7 +636,7 @@
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
     },
     "node:add-a-crew-agent": {
-      "aimeat/src/routes/agents/device-auth.ts": "e0b1732247d1354a",
+      "aimeat/src/routes/agents/device-auth.ts": "6924e84ee00c9945",
       "aimeat/src/tool-catalog/scopes.ts": "16e85c165aa78c1e",
       "aimeat/src/tool-catalog/definitions/crew.ts": "2592f67f9c0ec158",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
@@ -700,7 +700,7 @@
       "aimeat/src/services/schedule-gate.ts": "6f39d8b8560e1e2b",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/routes/agents-v2/agent-proposals.ts": "afc9a08e7b05fafa",
-      "aimeat/src/services/schedule-write.ts": "d3e0c4fdb82458a9"
+      "aimeat/src/services/schedule-write.ts": "8a66df75627633a0"
     },
     "node:aimeat-decide": {
       "aimeat/src/static/sdk-libs/decide/index.js": "70648a36df720ca1",
@@ -749,7 +749,7 @@
       "aimeat/src/services/build-extension-prompt.ts": "159097e45ad36db1",
       "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/extension-manifest.ts": "09e04a048b7c541f",
-      "aimeat/src/routes/extensions/paywall.ts": "11ff2227c7028795",
+      "aimeat/src/routes/extensions/paywall.ts": "43e2160caae0113f",
       "aimeat/src/routes/extensions/crud.ts": "723ee89afa7b5c7f",
       "aimeat/src/routes/extensions/instances.ts": "d7ace6eb026fee79",
       "aimeat/src/services/extension-schedules.ts": "b5cc21b0ae244ccc"
@@ -757,7 +757,7 @@
     "node:aimeat-data-ownership": {
       "aimeat/src/routes/memory/bulk.ts": "77045c44fa2e1d81",
       "aimeat/src/routes/memory/key.ts": "0879c21bf9ad1241",
-      "aimeat/src/services/memory-bin.ts": "7b4a28a9cdc84171",
+      "aimeat/src/services/memory-bin.ts": "9fa3d0c47be934d5",
       "aimeat/src/routes/memory-hands.ts": "5c2a324cefe437ec",
       "aimeat/src/routes/owners/export.ts": "afa72be008f60df8",
       "aimeat/src/services/owner-erasure.ts": "c6d160d686be395a",
