@@ -15,9 +15,12 @@
  *
  *   signInGateRefused() is the same decision for GET /v1/apps/:owner/:filename (routes/apps/read.ts),
  *   which also takes a grant this route handed out, so the apex inline address works the same way.
- * @structure signInGateRefused() · registerAppOpenRoutes()
+ * @structure signInGateRefused() · screenshotFollowsAccess() · screenshotGateRefused() · listedScreenshotUrl() · registerAppOpenRoutes()
  * @usage registerAppOpenRoutes(router, config, storage, canonicalOwner)   // from appsRouter
  * @version-history
+ *   2026-10-31 — screenshotGateRefused(): the screenshot of an app that needs a sign-in answers as the
+ *     app does, unless its owner shows it to everyone; a listing's screenshot grant passes, and the
+ *     answer is cached `private` (secaudit2026oct31w2 round 10, W2-12).
  *   v1.2.0 — 2026-10-19 — The grant carries the sign-in session it came from, so it stops opening the
  *     app when the person signs out (services/app-access-token.ts).
  *   v1.1.0 — 2026-10-18 — The grant carries `viewer`, the GHII of the signed-in person it was minted
@@ -32,7 +35,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { appNeedsSignIn, mayOpenApp } from '../../services/app-access.js';
 import { isNodeAccount } from '../../services/audience.js';
 import { appIsPaced } from '../../services/app-pacing.js';
-import { appAccessGranted, generateAppAccessToken } from '../../services/app-access-token.js';
+import { appAccessGranted, appShotGranted, generateAppAccessToken, generateAppShotToken } from '../../services/app-access-token.js';
 import { operatorOverride } from '../../services/operator-override.js';
 import { isSameAccount } from '../../utils/same-account.js';
 import { resolveIdentity } from '../../utils/gaii.js';
@@ -69,6 +72,52 @@ export async function signInGateRefused(
     ? 'This app opens for the people its owner chose, and you are not among them.'
     : 'This app opens for signed-in people only. Sign in and open it again.'));
   return true;
+}
+
+/** The app fields the screenshot decisions read; a listing row (AppSummaryRecord) carries them. */
+type ListedApp = Pick<AppRecord, 'access' | 'manifest' | 'ownerName' | 'filename'>;
+
+/**
+ * Whether the screenshot of `app` follows who may open it: the app needs a sign-in (its own setting or
+ * the node's) and its owner has not chosen to show the screenshot to everyone. An app anyone may open
+ * answers false, so its screenshot stays public (secaudit2026oct31w2 round 10, W2-12).
+ */
+export function screenshotFollowsAccess(config: AimeatConfig, app: ListedApp): boolean {
+  return appNeedsSignIn(config, app) && app.manifest?.screenshotPublic !== true;
+}
+
+/**
+ * The gate of GET /v1/apps/:owner/:filename/screenshot. Answers true when it has already answered the
+ * request, with the app's own refusal (signInGateRefused). Passes a screenshot grant from a listing
+ * (appShotGranted), and everyone signInGateRefused passes. Where the screenshot follows the app's
+ * access, the answer is sent `private`, so no shared cache keeps it for somebody else.
+ */
+export async function screenshotGateRefused(
+  req: Request, res: Response, config: AimeatConfig, storage: Storage, app: AppRecord, canonicalOwner: CanonicalOwner,
+): Promise<boolean> {
+  if (!screenshotFollowsAccess(config, app)) return false;
+  res.setHeader('Cache-Control', 'private, max-age=3600');
+  if (await appShotGranted(req.query.shot, app.ownerName, app.filename)) return false;
+  let operatorRead: boolean | undefined;
+  const operatorReads = async (): Promise<boolean> => (operatorRead ??= await operatorOverride(
+    storage, config, req.auth, { ownerOf: app.ownerName, area: 'app', action: 'read', subject: app.filename }));
+  return signInGateRefused(req, res, config, storage, app, app, canonicalOwner, operatorReads);
+}
+
+/**
+ * The screenshot address a listing hands this caller, for an app that has a screenshot. An app whose
+ * screenshot is public gets the plain address, as before. Where the screenshot follows the app's
+ * access, a caller who may open the app (its owner, an operator, an account the app's setting admits)
+ * gets the address with a screenshot grant, because an <img> carries no session; anybody else gets
+ * null, so the card shows no picture.
+ */
+export async function listedScreenshotUrl(
+  config: AimeatConfig, storage: Storage, app: ListedApp, auth: Request['auth'], viewer: { isOwn: boolean; isOperator: boolean },
+): Promise<string | null> {
+  const base = `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot`;
+  if (!screenshotFollowsAccess(config, app)) return base;
+  const may = viewer.isOwn || viewer.isOperator || (isNodeAccount(auth) && await mayOpenApp(storage, config, app, auth));
+  return may ? `${base}?shot=${encodeURIComponent(await generateAppShotToken(app.ownerName, app.filename))}` : null;
 }
 
 export function registerAppOpenRoutes(router: Router, config: AimeatConfig, storage: Storage, canonicalOwner: CanonicalOwner): void {

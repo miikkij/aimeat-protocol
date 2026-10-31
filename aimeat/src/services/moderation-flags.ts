@@ -34,10 +34,17 @@
  *   - FLAG_TARGET_TYPES / FLAG_REASONS / FLAG_LIMITS — what a flag may say, shared by both doors
  *   - resolveOrganismForFlag() — the organism a flagged memory key belongs to, or null
  *   - createModerationFlag() — validation, duplicate check, organism gate, record, side effects
+ *   - reporterAccount() / activeReporterCount() — one reporting account, one vote toward a hide
+ *   - withoutFlagHiddenMemory() — memory records minus the ones review or the threshold hides
  * @usage
  *   const out = await createModerationFlag({ storage, config }, flaggedBy, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-31 — One account is one reporter toward a hide: activeReporterCount, which the board hide
+ *     and the public summary enforce, and the weighted count, which takes an account's heaviest
+ *     principal once. withoutFlagHiddenMemory: discovery, the librarian and organism search hide a
+ *     memory record on an actioned flag or on the threshold, not on one unreviewed flag, and a
+ *     dismissed flag stops counting (secaudit2026oct31w2 round 10, W2-8 and W2-9).
  *   2026-10-05 — FLAG_TARGET_TYPES and FLAG_REASONS moved unchanged to models/tool-input-vocabulary.ts
  *     and are re-exported: the tool catalog states them (secaudit 2026-10, M3).
  *   v1.0.0 — 2026-08-11 — Initial (August 2026 audit step 8): the flag write moves off both surfaces.
@@ -47,6 +54,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, FlagRecord, OrganismRecord } from '../storage/interface.js';
 import { emitChange } from './event-bus.js';
 import { logger } from '../utils/logger.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 
 /**
  * `app` and `ai_provenance` exist for the AI Act correction procedure (TARGET-058 Phase 8).
@@ -205,19 +213,26 @@ export async function createModerationFlag(
 
     // Auto-hide, weighted by the reporter's trust score and account age (SECURITY P3-11) so a fresh
     // throwaway identity cannot hide content on its own. The threshold is the organism's when the
-    // target belongs to one, the node's otherwise.
+    // target belongs to one, the node's otherwise. One account is one reporter: its session and its
+    // agents together weigh what the heaviest of them weighs (secaudit2026oct31w2 round 10, W2-8).
     const activeFlags = await storage.getFlagsByTarget(targetType, targetId);
-    let weightedFlagCount = 0;
+    const weightByAccount = new Map<string, number>();
     for (const f of activeFlags) {
         if (f.status !== 'active') continue;
         const reporter = await storage.getAgent(f.flaggedBy);
-        if (!reporter) { weightedFlagCount += 0.5; continue; }
-        const trustFactor = Math.max(0.1, (reporter.trustScore ?? 50) / 100);
-        const owner = await storage.getOwner(reporter.owner);
-        const ageDays = owner ? Math.floor((Date.now() - new Date(owner.createdAt).getTime()) / 86_400_000) : 0;
-        const ageFactor = Math.min(1, ageDays / 30); // Full weight after 30 days
-        weightedFlagCount += Math.max(0.1, trustFactor * Math.max(0.2, ageFactor));
+        let weight = 0.5;
+        if (reporter) {
+            const trustFactor = Math.max(0.1, (reporter.trustScore ?? 50) / 100);
+            const owner = await storage.getOwner(reporter.owner);
+            const ageDays = owner ? Math.floor((Date.now() - new Date(owner.createdAt).getTime()) / 86_400_000) : 0;
+            const ageFactor = Math.min(1, ageDays / 30); // Full weight after 30 days
+            weight = Math.max(0.1, trustFactor * Math.max(0.2, ageFactor));
+        }
+        const account = reporterAccount(f.flaggedBy, config.nodeId);
+        weightByAccount.set(account, Math.max(weightByAccount.get(account) ?? 0, weight));
     }
+    let weightedFlagCount = 0;
+    for (const w of weightByAccount.values()) weightedFlagCount += w;
     const autoHideThreshold = organism
         ? organism.moderationConfig.autoHideThreshold
         : config.autoHideThreshold;
@@ -228,4 +243,55 @@ export async function createModerationFlag(
     emitChange('flags');
 
     return { ok: true, flag, hidden };
+}
+
+/**
+ * The account behind a reporter. An agent, an ecosystem app and an app grant name their owner after
+ * the '#'; an owner session's `flaggedBy` is the bare account name (POST /v1/flags stamps req.auth.sub),
+ * which is this node's account; a visitor from another node keeps its home GHII.
+ */
+export function reporterAccount(flaggedBy: string, nodeId: string): string {
+    const owner = ownerGhiiOf(flaggedBy);
+    return owner.includes('@') ? owner : `${owner}@${nodeId}`;
+}
+
+/**
+ * The active flags on one target, counted once per reporting account. This is the count the node
+ * enforces against its auto-hide threshold: a person's own session and every agent they approved are
+ * one reporter, so nobody reaches the threshold alone (secaudit2026oct31w2 round 10, W2-8).
+ */
+export function activeReporterCount(flags: ReadonlyArray<Pick<FlagRecord, 'status' | 'flaggedBy'>>, nodeId: string): number {
+    const accounts = new Set<string>();
+    for (const f of flags) if (f.status === 'active') accounts.add(reporterAccount(f.flaggedBy, nodeId));
+    return accounts.size;
+}
+
+/**
+ * `records` without the memory records that flags hide from discovery and search.
+ *
+ * `flagCount` on a record is the raw number of flags ever raised on it, which its owner and the
+ * operator see, and nothing lowers it. Read as "hide at 1" it let one unreviewed report from any
+ * account remove another owner's record from discovery, the librarian and organism search, for its
+ * owner too, and a dismissed flag never gave it back (W2-9). A record is hidden here when a reviewer
+ * actioned a flag on it, or when the active flags, one per reporting account, reach the auto-hide
+ * threshold (the organism's for an organism record, the node's otherwise). A dismissed flag counts
+ * for neither. Only records whose counter is above 0 are looked up, one flag query each.
+ */
+export async function withoutFlagHiddenMemory<T extends { ownerGaii: string; key: string; flagCount?: number }>(
+    deps: { storage: Storage; config: Pick<AimeatConfig, 'nodeId' | 'autoHideThreshold'> },
+    records: T[],
+): Promise<T[]> {
+    const flagged = records.filter(r => (r.flagCount ?? 0) > 0);
+    if (flagged.length === 0) return records;
+    const { storage, config } = deps;
+    const hidden = new Set<T>();
+    for (const r of flagged) {
+        const targetId = `${r.ownerGaii}::${r.key}`;
+        const flags = await storage.getFlagsByTarget('memory', targetId);
+        if (flags.some(f => f.status === 'actioned')) { hidden.add(r); continue; }
+        const organism = await resolveOrganismForFlag(storage, 'memory', targetId);
+        const threshold = organism ? organism.moderationConfig.autoHideThreshold : config.autoHideThreshold;
+        if (Number.isFinite(threshold) && threshold > 0 && activeReporterCount(flags, config.nodeId) >= threshold) hidden.add(r);
+    }
+    return hidden.size === 0 ? records : records.filter(r => !hidden.has(r));
 }

@@ -32,11 +32,14 @@
  *   - PageRef · pageRefId() — the page a page grant names: a welcome page or a company front page
  *   - generatePageAccessToken() · pageAccessGranted() — the same grant for those two origins
  *   - grantExpiresAt() — the expiry of a grant already verified, for the origin cookie's Max-Age
+ *   - generateAppShotToken() · appShotGranted() — the grant that shows one access-limited app's screenshot
  * @usage
  *   const grant = await generateAppAccessToken({ sub: app.ownerGaii, filename: app.filename });
  *   if (!(await appAccessGranted(req.query.access, app.ownerName, app.filename))) return notFound();
  *   if (!(await pageAccessGranted(req.query.access, { kind: 'company', id: company.id }))) → redirect or 404
  * @version-history
+ *   2026-10-31 — generateAppShotToken() and appShotGranted(): a listing hands a caller who may open an
+ *     access-limited app a grant that shows its screenshot and opens nothing else (secaudit2026oct31w2 round 10, W2-12).
  *   v1.3.0 — 2026-10-19 — A grant minted for a signed-in person carries `sid`, the sign-in session it
  *     came from, and stops opening the app or the page when that session ends: signing out used to
  *     leave the app open on its origin for up to an hour.
@@ -144,6 +147,39 @@ export async function appAccessGranted(token: unknown, ownerBare: string, filena
         // Fails closed, and says so once: a grant that stopped verifying is the difference between
         // "this app is gone" and "your link expired", and only the log can tell them apart.
         logger.warn('app-access grant rejected → the app answers as unknown', { error: String(err) });
+        return false;
+    }
+}
+
+/**
+ * The grant on the screenshot address of an app that opens for fewer people (W2-12). A listing hands
+ * it to a caller who may open the app, because an <img> carries no session. It shows that app's
+ * screenshot and opens nothing else: appAccessGranted refuses its `typ`. One grant per app per hour
+ * window, issued at the window's start and valid for two windows, so the address stays the same for
+ * an hour and a browser keeps the picture in its own cache.
+ */
+const SHOT_WINDOW_SECONDS = 3600;
+
+export async function generateAppShotToken(ownerBare: string, filename: string, nowMs: number = Date.now()): Promise<string> {
+    const { privateKey } = getNodeCryptoKeys();
+    const iat = Math.floor(nowMs / 1000 / SHOT_WINDOW_SECONDS) * SHOT_WINDOW_SECONDS;
+    return new SignJWT({ typ: 'app-shot', filename })
+        .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
+        .setSubject(bare(ownerBare))
+        .setIssuedAt(iat)
+        .setExpirationTime(iat + 2 * SHOT_WINDOW_SECONDS)
+        .sign(privateKey);
+}
+
+/** Does this token show this app's screenshot? Only a screenshot grant this node signed, unexpired, for this app. */
+export async function appShotGranted(token: unknown, ownerBare: string, filename: string): Promise<boolean> {
+    if (typeof token !== 'string' || token === '' || token.length > 4096) return false;
+    try {
+        const { publicKey } = getNodeCryptoKeys();
+        const { payload } = await jwtVerify(token, publicKey, { algorithms: ['EdDSA'] });
+        return payload.typ === 'app-shot' && payload.filename === filename && bare(String(payload.sub ?? '')) === bare(ownerBare);
+    } catch (err) {
+        logger.debug('app screenshot grant rejected', { error: String(err) });
         return false;
     }
 }
