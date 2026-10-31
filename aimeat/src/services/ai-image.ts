@@ -254,10 +254,15 @@ export async function generateForOwner(
     throw new AiCompletionError('PROMPT_TOO_LONG', 400,
       `Prompt is ${prompt.length} characters; the limit is ${MAX_PROMPT_CHARS}.`);
   }
-  // The generation rules, decided before anything is spent: a bypass that is not the caller's to ask
-  // is refused here. The directives of the rules in force go after the caller's prompt, so the
-  // prompt limit above stays the caller's own. An owner's exception for an app matches only the app
-  // the grant names (verifiedApp), never `appId`, which a caller writes itself.
+  // A public picture by a caller with nobody here to ask is refused now, before the provider is paid;
+  // one the owner is asked about is stored private below and the request filed once it exists.
+  const requester = await publicPictureRequester(storage, config, gaii, opts);
+  // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
+  requireAiCallTurn(config, gaii, opts.limit);
+  // The generation rules, decided after the call is counted and before anything is spent: a bypass
+  // that is not the caller's to ask is refused here. The directives of the rules in force go after
+  // the caller's prompt, so the prompt limit above stays the caller's own. An owner's exception for
+  // an app matches only the app the grant names (verifiedApp), never `appId`, which a caller writes.
   const rules = await genRulesForCall(storage, config, gaii, 'image', {
     ownerInPerson: opts.caller === 'owner',
     ...(opts.verifiedApp ? { app: opts.verifiedApp } : {}),
@@ -265,11 +270,6 @@ export async function generateForOwner(
   }, opts.genRulesBypass);
   const directive = directiveText(rules.given, 'image');
   const modelPrompt = directive ? `${prompt}\n\n${directive}` : prompt;
-  // A public picture by a caller with nobody here to ask is refused now, before the provider is paid;
-  // one the owner is asked about is stored private below and the request filed once it exists.
-  const requester = await publicPictureRequester(storage, config, gaii, opts);
-  // POST /v1/ai/image and aimeat_image_generate both arrive here: one count per account, before any spend.
-  requireAiCallTurn(config, gaii, opts.limit);
 
   const plan = await prepareAiCall(storage, config, gaii, {
     op: 'image', model: opts.model, appId: opts.appId, ...(opts.agent ? { agent: opts.agent } : {}),
