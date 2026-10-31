@@ -10258,6 +10258,15 @@ paths:
                 for_owner:
                   type: string
                   description: Must be the caller's own owner when given.
+                schedule:
+                  type: string
+                  maxLength: 60
+                  description: |
+                    When the agent would work on a clock, as a five-field cron in the owner's time zone
+                    ("0 7 * * *" every morning at 7, "0 7 * * 1-5" on weekdays). Stored on the proposal;
+                    its approval page opens with that time chosen, so the owner's one press creates the
+                    agent and its schedule together. Anything that is not a valid five-field cron is
+                    400 INVALID_INPUT. Since 2026-10-31.
                 connector:
                   type: string
                   maxLength: 80
@@ -27189,6 +27198,52 @@ paths:
           $ref: '#/components/responses/NotFound'
 
   # ── Presigned Upload ───────────────────────────────────────
+  /v1/upload/{token}/complete:
+    post:
+      operationId: completeDirectUpload
+      summary: Record a file uploaded straight to the store
+      description: |
+        The second half of a direct upload (`POST /v1/storage` with `mode: presigned` and
+        `direct: true`): after the client has PUT the file to the store address it was given, this
+        records it. The node reads the object's size from the store and decides as for any upload
+        (ceiling, account quota, visibility, provenance); a file it refuses has its object removed.
+        The token is the authorization, single use and 60 minutes, and is spent only once the
+        object is there. No Authorization header and no body. A provenance record attached by id
+        that names a content hash is refused (400 PROVENANCE_HASH_MISMATCH), since the node never
+        held the bytes; a declaration or the agent stamp records without a hash.
+      tags: [Upload]
+      parameters:
+        - name: token
+          in: path
+          required: true
+          schema:
+            type: string
+          description: The upload token from the complete_url.
+      responses:
+        '200':
+          description: The file is recorded. The same fields as a storage upload through PUT /v1/upload/{token}.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '202':
+          description: Recorded at the level it had; making it public waits for the owner (`publish_request`).
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '400':
+          description: '`NOT_DIRECT` (the token is for an upload through the node), `EMPTY_BODY` (the object is empty; it is removed), or a refusal of the write.'
+        '401':
+          description: '`TOKEN_INVALID`.'
+        '409':
+          description: '`OBJECT_NOT_UPLOADED` (PUT the file first; the token is not spent) or `TOKEN_USED`.'
+        '410':
+          description: '`TOKEN_EXPIRED`.'
+        '413':
+          description: '`FILE_TOO_LARGE` or `QUOTA_EXCEEDED`; the object is removed.'
   /v1/upload/{token}:
     put:
       operationId: uploadViaToken
@@ -27787,6 +27842,19 @@ paths:
                     Mint a one-shot upload URL instead of storing bytes now. The response carries
                     `upload_url`, `upload_method`, `content_type`, `max_size_bytes` and
                     `expires_in_seconds`.
+                direct:
+                  type: boolean
+                  description: >
+                    With `mode: presigned`, for a large file: when the file goes to an S3 or Azure store
+                    that can sign an address (an Azure store connected with its account key), the
+                    `upload_url` is in the store itself, for one new object, and the bytes never pass
+                    through the node or its request size limit. The answer adds `direct: true`,
+                    `upload_headers` (send them with the PUT; Azure needs `x-ms-blob-type: BlockBlob`),
+                    `complete_url` and `complete_method: POST`; the file exists only after
+                    `POST /v1/upload/{token}/complete`. `max_size_bytes` is then the large-file
+                    ceiling (quota.storage_max_chunked_file_size_gb). When the file would go to the
+                    database, the answer says `direct: false` with `direct_unavailable` and an ordinary
+                    upload URL. A browser PUT needs a CORS rule on the store.
                 visibility:
                   $ref: '#/components/schemas/UploadVisibility'
                 group_id:
@@ -27998,6 +28066,12 @@ paths:
         A file that carries an AI-provenance record is answered with `AI-Disclosure` (the IETF
         structured field) and `Link: <record>; rel="ai-provenance"` on every representation, and
         the handle and inline JSON carry `ai_provenance` (AiProvenanceItemBlock).
+
+
+        A file of 64 MB or more kept in an S3 or Azure store that can sign an address is answered
+        with 302 to a signed address in the store (15 minutes, `Cache-Control: private, no-store`),
+        after the read is authorized; the bytes, ranges included, then come from the store. The same
+        holds for `GET /v1/pub/{gaii}/{key}` and `GET /v1/download/{token}`.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -47349,8 +47423,9 @@ paths:
                 body: { type: string, maxLength: 10000, description: Optional longer context }
                 link: { type: string, maxLength: 500, description: "Same-node path the notification deep-links to (must start with '/'), e.g. '/v1/profile?tab=messages'" }
                 type: { type: string, pattern: "^[a-zA-Z0-9_:.-]{1,64}$", description: "Machine type; defaults to 'app' / 'agent' / 'custom' by caller role" }
+                email: { type: boolean, description: "Also email the notification to the owner at the address they verified (since 2026-10-31). At most 10 a day from one sender, never when the owner muted it. The answer's `emailed` says what happened: sent, not_asked, no_address, mail_off, limit, failed or muted." }
       responses:
-        '201': { description: "Stored ({ created: true, link }), or honoured as muted ({ created: false, muted: true })" }
+        '201': { description: "Stored ({ created: true, link, emailed }), or honoured as muted ({ created: false, muted: true, emailed })" }
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Missing notifications:send scope }

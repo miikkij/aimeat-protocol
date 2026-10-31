@@ -550,6 +550,7 @@
       "/js/closed-node-fetch.js": "/js/closed-node-fetch.js",
       "/js/session-src.js": "/js/session-src.js",
       "/js/margin-pattern.js": "/js/margin-pattern.js",
+      "/js/help-hover.js": "/js/help-hover.js",
       "/js/theme-choice.js": "/js/theme-choice.js",
       "/js/dialog.js": "/js/dialog.js",
       "/js/theme.js": "/js/theme.js",
@@ -1081,6 +1082,7 @@
     import { siteLink, signInFirst, signedInOnly, customerNode, devLinksShown } from '/js/site.js';
     import { getSession } from '/js/services/auth.js';
     import { loadMarginPattern } from '/js/margin-pattern.js';
+    import { applyHelpHover, helpHoverOf } from '/js/help-hover.js';
     import { loadThemeChoice, watchThemeChoice } from '/js/theme-choice.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { Mark } from '/components/Mark.js';
@@ -1931,9 +1933,11 @@
       }
 
       // The margin pattern is the person's own choice: read once the session is known, again
-      // whenever the sign-in changes (a sign-out takes it away).
-      loadMarginPattern();
-      window.addEventListener('aimeat-auth-change', () => { loadMarginPattern(); });
+      // whenever the sign-in changes (a sign-out takes it away). The help on a word comes from the
+      // same record and the same request.
+      const loadHomePrefs = () => loadMarginPattern().then((prefs) => applyHelpHover(helpHoverOf(prefs)));
+      loadHomePrefs();
+      window.addEventListener('aimeat-auth-change', () => { loadHomePrefs(); });
 
       // The reader's own date format and clock, read the same way and for the same reason: AFTER
       // the session is restored, because the request carries a bearer from localStorage and the
