@@ -32,10 +32,13 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
- *   v1.2.4 — 2026-10-31 — The app path says the publish ends the turn and their data is not read
+ *   v1.2.5 — 2026-10-31 — The app path says the publish ends the turn and their data is not read
  *     after it, and appReadyText gives the address of an app the turn published. On crew34 gpt-oss
  *     published, then called aimeat_discover to look at the person's data, ran out of time, and the
  *     turn ended in "say continue" with no address in the words (v31 K35).
+ *   v1.2.4 — 2026-10-31 — The turn note asks for plain words: a shared place, not an organism, and the
+ *     person's name, never an identity such as name@node-id. A store buyer's first chat answer said
+ *     "organismeja" and printed their full identity (Jouni v27 P7). One added line; the rest unchanged.
  *   v1.2.3 — 2026-10-31 — The app path names only genres that come whole in one answer (genre-receipt
  *     9.9 kB, genre-almanac, genre-departures) and says not to fetch further parts. genre-workbench,
  *     named first before, comes in two parts (22 kB): on crew33 gpt-oss fetched the second and ran out
@@ -109,6 +112,7 @@ export function turnNote(): string {
         '[A note from this node, not from the person]',
         'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
+        'Speak to the person in plain words in their language: say "shared place" for an organism and "workspace" for a workspace, call the person by their name, and never write an identity such as name@node-id, a key or an id to them.',
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
         'An agent can read the web: give a news agent the tools ["news", "article_fetch", "notify"] (Finnish publishers\' feeds; topics politiikka, kotimaa, paauutiset) and any other subject ["web", "article_fetch", "notify"]. When it works on a clock, send `schedule` with the proposal as a five-field cron ("0 7 * * *" every morning at 7), so their one press starts it on that clock. Its result goes to them by email unless they said otherwise: its last task sends the result with the notify tool, and the proposal\'s scopes include notifications:send. Tell them that, and that they can ask for it in their AIMEAT instead.',
         'When the person asks for an app: finish it in this turn, with their sentence as the whole brief and no interview. Read the build specification once, aimeat_handbook_get with tier "build-app-atelier", and no other part unless the app cannot work without it. Then take a genre with aimeat_app_template_get, one that comes whole in one answer: id "genre-receipt" for a list, "genre-almanac" for a calendar or a log, "genre-departures" for a board of items. Every AIMEAT ships these, so one is always there. When an answer says it has more parts, do not fetch them: build on the first part. Build the page from its `content` and keep every script tag it has, and publish with aimeat_app_publish. A template you did not find is never a reason to stop: write the page yourself from the specification and publish it. Give them `url` from the answer.',

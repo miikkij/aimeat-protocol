@@ -6,6 +6,11 @@
  *   work for their AI: the profile first (an interview that becomes their business card), then a
  *   shared place, an agent, a schedule or an app, with the result shown at home.
  * @version-history
+ *   v1.7.0 — 2026-10-31 — On a node the store sold, the block is the four getting-started steps with
+ *     one "Next" button (buyer-steps.js) until the four are done; then it is "Muuta, mitä voit tehdä"
+ *     with the tasks as before, without the seven-stage path (Jouni, v31 K27).
+ *   v1.6.0 — 2026-10-31 — On a node the store sold, the copy-this-prompt block waits in a fold
+ *     (homeJourney.promptFold) instead of filling the Home (Jouni v27 P6).
  *   v1.5.0 — 2026-10-14 — "Make an agent" and "Make an app" open the ideas dialog (ideas-dialog.js).
  *     An agent example goes into the prompt the person copies to their own AI, beside a link that
  *     makes it on the new-agent page instead; an app idea's "Make its agent" moves to "Make an
@@ -53,8 +58,10 @@ import {
 } from '/components/Chooser.js';
 import { StepMat } from './step-mat.js';
 import { swallowed } from '/js/swallowed.js';
+import { customerNode } from '/js/site.js';
 import { buildJourneyPrompt } from './journey-prompts.js';
 import { JourneyPath, RoadChooser, ConnectBox, refreshHome as refresh } from './journey-roads.js';
+import { BuyerSteps, buyerSteps } from './buyer-steps.js';
 
 const html = htm.bind(h);
 const actions = ['profile', 'place', 'agent', 'schedule', 'app'];
@@ -90,6 +97,10 @@ export function HomeJourney() {
   const hasProof = !!connection && connection.exists !== false;
   useEffect(() => { if (hasProof) invalidateShared('home-state', '/v1/home/state'); }, [hasProof]);
   if (!state || !session) return null;
+  // A buyer gets four steps and one button until the four are done; the tasks, the prompt and the
+  // links wait until then, so the first visit has one thing to do (Jouni, v31 K27).
+  const buyerDone = customerNode() && buyerSteps(journey).every((s) => s.done);
+  if (customerNode() && !buyerDone) return html`<${BuyerSteps} journey=${journey} />`;
   // Connected means the same thing as the path's tick: any AI of theirs has reached this node.
   const connected = state.initialized || !!journey?.stages?.find(s => s.id === 'connect')?.done;
   const chosenRoad = road ?? journey?.road ?? null;
@@ -101,9 +112,9 @@ export function HomeJourney() {
   const places = (Array.isArray(orgs) ? [...orgs] : [])
     .sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || ''))).slice(0, 5);
   return html`
-    <${Chooser} titleId="home-journey-title" title=${t('homeJourney.destinationTitle')}
+    <${Chooser} titleId="home-journey-title" title=${customerNode() ? t('buyerSteps.more') : t('homeJourney.destinationTitle')}
       lead=${t(connected ? 'homeJourney.returning' : 'homeJourney.destinationLead')}>
-      <${JourneyPath} journey=${journey} />
+      ${customerNode() ? null : html`<${JourneyPath} journey=${journey} />`}
       ${!connected && html`<${RoadChooser} road=${chosenRoad} onRoad=${setRoad}
         chatEnabled=${!!chat?.enabled} onMessage=${setMessage} />`}
       ${/* An AI that cannot connect cannot do these tasks; its road carries the one task it can. */''}
@@ -136,11 +147,23 @@ export function HomeJourney() {
       <//>
       ${connected && connecting && html`<${ConnectBox} onMessage=${setMessage} />`}
       <div>
-        <p>${t('homeJourney.copyHint')}</p>
-        <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
-          quiet
-          copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
-          onCopied=${() => setCopied(true)} />
+        ${/* The prompt is written in English for any AI to read. A buyer of a store-sold node has the
+              AI here and paid for its credit, so the copy-to-another-AI prompt waits in a fold
+              there rather than filling the Home (Jouni v27 P6). */''}
+        ${customerNode()
+          ? html`<${ChooserFold} summary=${tOr('homeJourney.promptFold', 'Advanced: a ready prompt for an AI you use elsewhere')}>
+              <p>${t('homeJourney.copyHint')}</p>
+              <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
+                quiet
+                copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+                onCopied=${() => setCopied(true)} />
+            <//>`
+          : html`
+            <p>${t('homeJourney.copyHint')}</p>
+            <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
+              quiet
+              copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+              onCopied=${() => setCopied(true)} />`}
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
         <${ChooserLinks}>
           <${Action} onClick=${refresh}>${t('homeJourney.checkResult')}<//>

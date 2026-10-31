@@ -8,6 +8,8 @@
  * @structure SITE_LINK_CONFIG_FIELDS
  * @usage import { SITE_LINK_CONFIG_FIELDS } from './config-schema-site-links.js';
  * @version-history
+ *   v1.5.0 — 2026-10-31 — site.ai_credit_eur_per_usd: euros of AI credit per dollar of the node's key,
+ *     set by the fleet service (Jouni's C, 2026-10-31: the owner sees the AI credit in euros).
  *   v1.4.0 — 2026-10-30 — site.dev_links: whether the footer shows the developer links (Jouni,
  *     2026-10-30: one switch, hidden on a node bought from the store unless the operator decides).
  *   v1.3.0 — 2026-10-29 — site.store_topup_url: a customer node's top-up page in the store, set by
@@ -24,6 +26,7 @@
 import type { SiteLinksConfig } from '../config-types-site-links.js';
 import type { ConfigFieldShape } from './config-field-def.js';
 import { isEmptyOrHttpUrl, isContactList, oneOf } from './config-schema-validators.js';
+import { isEurPerUsd } from '../utils/eur-per-usd.js';
 
 /** A note is one sentence on the front page: plain text, short. */
 const isStoreNote = (v: unknown) => typeof v === 'string' && v.length <= 300;
@@ -70,6 +73,7 @@ export const SITE_LINK_CONFIG_FIELDS: ConfigFieldShape<`siteLinks.${keyof SiteLi
   { key: 'siteLinks.purchasePlan', dotPath: 'site.purchase_plan', envVar: 'AIMEAT_SITE_PURCHASE_PLAN', type: 'string', validate: isPurchaseName, immutable: false, description: 'What the owner bought (Solo, Team), set by the store\'s fleet service. Set, this is a customer\'s node: the welcome on the home, the shorter menu, and no node maintenance in the top bar. Empty: the full view' },
   { key: 'siteLinks.purchasePackage', dotPath: 'site.purchase_package', envVar: 'AIMEAT_SITE_PURCHASE_PACKAGE', type: 'string', validate: isPurchaseName, immutable: false, description: 'The visible name of the package the owner bought with the plan, for the welcome on the home. Empty: no package' },
   { key: 'siteLinks.storeTopup', dotPath: 'site.store_topup_url', envVar: 'AIMEAT_SITE_STORE_TOPUP_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'Where this node\'s owner buys more AI allowance: the store\'s top-up page for this node. The node adds the person\'s language. Empty: the notice that the allowance is spent offers no purchase' },
+  { key: 'siteLinks.aiCreditEurPerUsd', dotPath: 'site.ai_credit_eur_per_usd', envVar: 'AIMEAT_SITE_AI_CREDIT_EUR_PER_USD', type: 'string', validate: isEurPerUsd, immutable: false, range: 'a decimal above 0, at most 10, or empty', description: 'On a node bought from the store: euros of AI credit per US dollar of this node\'s AI key limit, so the owner sees their AI credit in euros. The store\'s fleet service writes it when it makes the key and again on every top-up, as the AI credit in euros after the store\'s fee divided by the key\'s dollar limit (the day\'s EUR-per-USD rate it converted at). Empty: a dollar is shown as a euro' },
   { key: 'siteLinks.signage', dotPath: 'site.signage_url', envVar: 'AIMEAT_SITE_SIGNAGE_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The signage screen the front page frames as its "built by asking" example. Empty hides the example; aimeat.io sets its own screen here' },
   { key: 'siteLinks.signageAdmin', dotPath: 'site.signage_admin_url', envVar: 'AIMEAT_SITE_SIGNAGE_ADMIN_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The admin panel the front page\'s signage example was made in (its second door)' },
   { key: 'siteLinks.incubator', dotPath: 'site.incubator_url', envVar: 'AIMEAT_SITE_INCUBATOR_URL', type: 'string', validate: isEmptyOrHttpUrl, immutable: false, description: 'The agent incubator (adopt a ready-made helper): the "start here" door on the front page\'s incubator card' },
