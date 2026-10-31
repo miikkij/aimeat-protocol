@@ -12760,6 +12760,7 @@
     "cfg_site_store_note_es": "Kaupan ilmoitus espanjaksi",
     "cfg_site_store_soon_code": "Avajaisten alennuskoodi",
     "cfg_site_store_topup_url": "Kaupan sivu, jolta ostetaan lisää tekoälysaldoa",
+    "cfg_site_ai_credit_eur_per_usd": "AI-saldon euroa tekoälyavaimen dollaria kohden",
     "cfg_site_default_locale": "Palvelimen oma kieli",
     "cfg_site_store_orders_url": "Kaupan sivu omistajan tilauksille ja laskuille",
     "cfg_site_purchase_plan": "Mitä omistaja osti",
