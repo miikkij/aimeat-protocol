@@ -16,6 +16,11 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-10-31: Jouni's review of v31 (K32), on a node the store sold: the empty chat says "Kerro, mitä
+ *     haluat – tekoälysi tekee sen.", one line on seeing every step and owning it, the Atelier line,
+ *     and three concrete chips (the news one fills the box); the rail's AI notice, "what does that
+ *     mean" and "what answers here" are one press, "Mikä tekoäly tässä vastaa?"; the session reset
+ *     asks first (AgentStatus). The openings moved unchanged to views/chat-starters.js (max-file-lines).
  *   2026-10-31: The empty chat says what the Atelier is: the workshop where the AI builds an app,
  *     asked for here, ending in a link (v31 K32).
  *   2026-10-31: The live answer leaves out "[Calling: …]" lines a model writes as text, and a turn
@@ -86,6 +91,8 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { swallowed } from '/js/swallowed.js';
+import { useConfirm } from '/components/Modal.js';
+import { BUYER_STARTERS, startersFor } from './chat-starters.js';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { hasSession } from '/js/services/auth.js';
@@ -109,7 +116,7 @@ import {
 } from '/components/ConversationFrame.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { Alert } from '/components/Alert.js';
-import { storeHref, storeOpensSoon } from '/js/site.js';
+import { storeHref, storeOpensSoon, customerNode } from '/js/site.js';
 import { useJourney } from './home/journey-steps.js';
 import { trackVisualViewport } from '/js/visual-viewport.js';
 
@@ -139,54 +146,6 @@ function conversationAsText(title, turns) {
         return `## ${who}\n\n${(turn.text || '').trim()}`;
     }).join('\n\n');
     return `${head}${body}\n`;
-}
-
-/**
- * The openings offered on an empty conversation.
- *
- * Each one is a request a person could have typed. The first is their next stage (STAGE_STARTERS
- * below); "take something off my plate" starts the conversation this place is actually for: what
- * they are trying to get done, in their words, which is the thing everything else attaches to. A person who reads a feature list has told the agent nothing; a person who says
- * what keeps slipping has told it enough to build the whole thing.
- *
- * The button sends the sentence rather than filling the box with it — a half-written prompt waiting
- * to be edited is one more decision, and the point of these is to remove decisions.
- */
-const STARTERS = [
-    { id: 'work', key: 'chat.starterWorkAsk', fallback: 'Something on my plate keeps slipping. Ask me about it, then suggest one thing you could take over.',
-      label: 'chat.starterWork', labelFallback: 'Take something off my plate' },
-    { id: 'connect', key: 'chat.starterConnectAsk', fallback: 'I already pay for an AI subscription. How do I connect it here so it can do this work?',
-      label: 'chat.starterConnect', labelFallback: 'Connect my own AI' },
-    // The one that names a COMPANY rather than a task. Three of these are things a person does;
-    // this is a thing their company gets, and it is the only starter whose first move creates
-    // something with a public address, so the agent asks before it reserves one.
-    { id: 'company', key: 'chat.starterCompanyAsk', fallback: 'Set up my company here, and give it a memory of its own.',
-      label: 'chat.starterCompany', labelFallback: 'Set up my company' },
-];
-
-/**
- * The first starter is the person's next stage on their path (GET /v1/home/state `journey`, the same
- * step the home, Settings and the help page show). A newcomer's is the profile: their AI interviews
- * them, and the answers become their business card on their own page (Jouni, 2026-10-03). The id is
- * what the funnel records (routes/chat.ts, /^[a-z-]{1,32}$/).
- */
-const STAGE_STARTERS = {
-    'first-result': { id: 'profile', key: 'chat.starterProfileAsk', label: 'chat.starterProfile' },
-    ai: { id: 'ai', key: 'chat.starterAiAsk', label: 'chat.starterAi' },
-    connect: STARTERS[1],
-    organise: { id: 'place', key: 'chat.starterPlaceAsk', label: 'chat.starterPlace' },
-    apps: { id: 'apps', key: 'chat.starterAppsAsk', label: 'chat.starterApps' },
-    agents: { id: 'agents', key: 'chat.starterAgentsAsk', label: 'chat.starterAgents' },
-    share: { id: 'share', key: 'chat.starterShareAsk', label: 'chat.starterShare' },
-};
-
-/** The next stage's starter first, then the standing ones it does not repeat; four at most. */
-function startersFor(journey) {
-    const next = journey ? journey.next : 'first-result';
-    const first = next ? STAGE_STARTERS[next] : null;
-    const connected = !!journey?.stages?.find((s) => s.id === 'connect')?.done;
-    const rest = STARTERS.filter((st) => st !== first && !(st.id === 'connect' && connected));
-    return (first ? [first, ...rest] : rest).slice(0, 4);
 }
 
 /**
@@ -227,6 +186,7 @@ export default function ChatView() {
     const [threads, setThreads] = useState([]);
     const [thread, setThread] = useState(null);
     const [draft, setDraft] = useState('');
+    const { confirm: confirmReset, ConfirmUI: ResetConfirm } = useConfirm();
     const [busy, setBusy] = useState(false);
     const [live, setLive] = useState({ text: '', thought: '', progress: '', tools: [], cards: [] });
     const [deleteNote, setDeleteNote] = useState('');
@@ -636,8 +596,15 @@ export default function ChatView() {
 
     const resetSession = useCallback(async () => {
         if (!thread) return;
+        const reset = () => chat.resetThread(thread.id).catch((e) => swallowed('chat: reset', e));
+        // A buyer is told what goes and what stays before it happens (v31 K32).
+        if (customerNode()) {
+            confirmReset(tr('chat.resetConfirm', 'This conversation is cleared. Your notes and apps stay.'), reset,
+                { title: tr('chat.resetBuyer', 'Start the conversation over'), confirmLabel: tr('chat.resetBuyer', 'Start the conversation over') });
+            return;
+        }
         await chat.resetThread(thread.id);
-    }, [thread]);
+    }, [thread, confirmReset]);
 
     if (!hasSession()) {
         return html`
@@ -675,6 +642,7 @@ export default function ChatView() {
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
                     name=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
                     <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
+                    <${ResetConfirm} />
                     ${turns.length > 0 && html`<${ConversationCopy}
                         text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}
                         label=${tr('chat.copyAll', 'Copy conversation')}
@@ -683,8 +651,12 @@ export default function ChatView() {
                         ariaLabel=${tr('chat.copyAll', 'Copy conversation')} />`}
                 <//>
                 <${ConversationFoot}>
-                    <${AiNotice} compact=${true} />
-                    <${GooseCredit} model=${status?.model} />
+                    ${/* A buyer gets one press, "Mikä tekoäly tässä vastaa?", for the notice and the
+                          model behind it, in place of three (v31 K32). */''}
+                    ${customerNode()
+                        ? html`<${AiNotice} compact=${true} line=${tr('chat.buyerAiLine', 'You are talking with your own AI.')} moreLabel=${tr('chat.whatAnswers', 'What AI answers here?')}
+                            extra=${html`<${GooseCredit} model=${status?.model} open=${true} />`} />`
+                        : html`<${AiNotice} compact=${true} /><${GooseCredit} model=${status?.model} />`}
                 <//>
             <//>
 
@@ -715,19 +687,19 @@ export default function ChatView() {
                 <${ConversationScroll} onScroll=${onScrollArea}>
                     ${turns.length === 0 && !busy ? html`
                         <${ConversationWelcome}
-                            title=${t('chat.welcomeTitle')}
-                            body=${`${t('chat.welcomeBody')} ${tr('chat.welcomeAtelier', '')}`.trim()}
-                            trust=${tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
+                            title=${customerNode() ? tr('chat.buyerTitle', 'Say what you want – your AI does it.') : t('chat.welcomeTitle')}
+                            body=${customerNode() ? tr('chat.buyerBody', 'You see every step on the screen, and everything stays in your own account.') : `${t('chat.welcomeBody')} ${tr('chat.welcomeAtelier', '')}`.trim()}
+                            trust=${customerNode() ? tr('chat.welcomeAtelier', '') : tr('chat.welcomeTrust', 'Everything you make here lands in your own account, and nothing becomes public until you publish it yourself.')}>
                             <!-- One concrete thing to ask for, not a menu. An empty box asks a person
                                  to invent a task for a system they have not used; a first request
                                  that ends in a real address they can open answers "what is this for"
                                  better than any paragraph on this screen could. The starters wait for
                                  the person's path, so the first one does not change under the cursor. -->
                             ${journeyReady && html`<${Suggestions}>
-                                ${startersFor(journey).map((st) => html`
+                                ${(customerNode() ? BUYER_STARTERS : startersFor(journey)).map((st) => html`
                                     <${Suggestion} key=${st.key}
                                         disabled=${disabled}
-                                        onClick=${() => send(tr(st.key, st.fallback), st.id)}>
+                                        onClick=${() => (st.fill ? setDraft(tr(st.key, st.fallback)) : send(tr(st.key, st.fallback), st.id))}>
                                         ${tr(st.label, st.labelFallback)}
                                     <//>`)}
                             <//>`}
