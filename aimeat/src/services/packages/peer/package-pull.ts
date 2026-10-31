@@ -24,6 +24,12 @@
  *   import { pullPackage } from './package-pull.js';
  *   const out = await pullPackage({ storage, config, peers }, caller, { groupId, nodeId });
  * @version-history
+ *   v1.8.1 — 2026-10-31 — An unpinned copy (an unverified ZIP import, stored publicKey '') holds no pin:
+ *     a pull from the same node under that peer's federation key is not KEY_CHANGED and pins the key,
+ *     and the not-newer gate does not read the archive's unchecked instant. `fromUpstream` on such a
+ *     copy pulls from the peer it names when this node knows it, at the peer record's address, instead
+ *     of NO_UPSTREAM. A tofu key does not pin an unpinned copy (still KEY_CHANGED); another node is
+ *     still CONFLICT (secaudit 2026-10-31 inv-26).
  *   v1.8.0 — 2026-10-31 — An attestation without the metadata signature is refused (400
  *     METADATA_UNSIGNED) from a peer whose signed heartbeat named 4.2.1 or newer, and from every peer
  *     once this node runs 4.3.0 (unsignedPackageMetadataAccepted in config-federation.ts); before
@@ -105,7 +111,9 @@ export interface PackagePullInput {
      * Refresh the caller's own copy of `groupId` from the source it was first pulled from, under the
      * key pinned then. The first pull was the decision to trust that source; a refresh repeats it and
      * decides nothing new. A source that is a peer still passes the peer gate, so an operator who
-     * switched the peer off stops its refreshes too. Used by the scheduled update check
+     * switched the peer off stops its refreshes too. A copy with no pinned key (an unverified ZIP
+     * import) refreshes from the peer it names under that peer's federation key, when this node
+     * knows the peer, and that pull pins the key. Used by the scheduled update check
      * (package-upstream-refresh.ts).
      */
     fromUpstream?: boolean;
@@ -212,21 +220,36 @@ export async function pullPackage(
 
     // 3. Where this may be pulled from, and whose key proves it.
     let source: ResolvedSource;
+    // True when source.publicKey is the federation peer record's key (not a pinned one, not tofu).
+    let keyFromPeerRecord = false;
     if (input.fromUpstream) {
         const mine = await getPackageFor(storage, `${groupId.split('::')[0]}::${caller.owner}`, caller.owner);
         const up = mine?.upstream;
-        if (!up || up.groupId !== groupId || !up.publicKey) {
+        // An unpinned copy (an unverified ZIP import) names a node but holds no key. When that node
+        // is a peer here, the refresh pulls from it under the peer's federation key and at the peer
+        // record's address, never the archive's own source_url: the same proof a first pull gets,
+        // and the pull pins that key (secaudit 2026-10-31 inv-26).
+        const knownPeer = up && !up.publicKey ? [...peers.values()].some(p => p.nodeId === up.node) : false;
+        if (!up || up.groupId !== groupId || (!up.publicKey && !knownPeer)) {
             return { ok: false, status: 400, code: 'NO_UPSTREAM', message: `Your copy of ${groupId} was not pulled under a key, so there is nothing to refresh it from.` };
         }
-        if (peers.has(up.node)) {
+        if (!up.publicKey) {
             const gate = gatePeer(peers, up.node, 'shareCatalogue');
             if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+            source = { nodeId: gate.peer.nodeId, baseUrl: gate.peer.url, publicKey: gate.peer.publicKey };
+            keyFromPeerRecord = true;
+        } else {
+            if (peers.has(up.node)) {
+                const gate = gatePeer(peers, up.node, 'shareCatalogue');
+                if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
+            }
+            source = { nodeId: up.node, baseUrl: up.url, publicKey: up.publicKey };
         }
-        source = { nodeId: up.node, baseUrl: up.url, publicKey: up.publicKey };
     } else if (input.nodeId) {
         const gate = gatePeer(peers, input.nodeId, 'shareCatalogue');
         if (!gate.ok) return { ok: false, status: gate.status, code: gate.code, message: gate.message };
         source = { nodeId: gate.peer.nodeId, baseUrl: gate.peer.url, publicKey: gate.peer.publicKey };
+        keyFromPeerRecord = true;
     } else if (input.sourceUrl) {
         if (!caller.isOperator) {
             return {
@@ -272,7 +295,11 @@ export async function pullPackage(
             message: `Your package "${existing.name}" was pulled from ${existing.upstream.node}, not from ${source.nodeId}.`,
         };
     }
-    if (existing?.upstream && existing.upstream.publicKey !== source.publicKey) {
+    // An unpinned copy (stored publicKey '', an unverified ZIP import) holds no pin to change. A pull
+    // from the same node under that peer's federation key pins it, as a first pull would; a key taken
+    // on trust (tofu) does not, and stays KEY_CHANGED as before (secaudit 2026-10-31 inv-26).
+    const unpinnedToPin = !!existing?.upstream && !existing.upstream.publicKey && keyFromPeerRecord;
+    if (existing?.upstream && existing.upstream.publicKey !== source.publicKey && !unpinnedToPin) {
         // A source whose key changed is a refusal, never a silent downgrade: this is the only thing
         // between a pinned upstream and somebody else answering for it.
         return {
@@ -412,8 +439,9 @@ export async function pullPackage(
 
     // 9. Not-newer gate, on the instant inside the signature rather than on a version string. The
     //    string sorts by luck; the instant is asserted by the signer and cannot be moved backwards
-    //    without their private key.
-    if (existing?.upstream) {
+    //    without their private key. An unpinned copy's instant is the archive's own word, which no
+    //    key here checked, so it orders nothing: the pull that pins the key applies (inv-26).
+    if (existing?.upstream && !unpinnedToPin) {
         const have = Date.parse(existing.upstream.publishedAt);
         const offered = Date.parse(upstream.publishedAt);
         if (Number.isFinite(have) && Number.isFinite(offered) && offered <= have) {

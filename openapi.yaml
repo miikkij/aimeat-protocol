@@ -56272,7 +56272,9 @@ paths:
         never from this request. `source_url` reaches a node that is not a peer, is operator-only,
         and requires `trust: "tofu"`, which accepts the key that node publishes at
         /.well-known/aimeat and PINS it: a later pull from the same source under a different key is
-        refused rather than applied.
+        refused rather than applied. A copy that holds no pinned key (a ZIP import that landed
+        unverified) is pinned by a pull from the peer it names, verified against that peer's
+        federation key, and that pull applies even when the version is the one already here.
 
 
         The package lands private, and its ownership is the caller's. The publishing author's GHII
