@@ -12,6 +12,9 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-10-31 -- e2e-owner-load-limits.ts and e2e-workspace-dotted-id.ts join the list (not the guard
+ *     tier): one owner's share of the scheduler and the realtime rooms, and a dotted record id that made
+ *     a workspace index unreadable (secaudit2026oct31w2 round 10).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
  *     may start for its agents, and the owner's decision on them.
  *   2026-10-31 -- e2e-package-account-sale.ts joins the list (not the guard tier): an author sells their own package to another account (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
@@ -1367,6 +1370,8 @@ const ALL_SUITES = [
     // A record space that names extensions takes an agent's write only through one of them: every
     // direct write, publish, reopen, delete and archive of an agent refused, the named extension let in.
     'test/e2e-workspace-fenced-space.ts',
+    // A record id with a dot lists under its whole id and no longer makes the index unreadable (secaudit2026oct31w2).
+    'test/e2e-workspace-dotted-id.ts',
     'test/e2e-workspace-rows.ts',
     // A row replaced by another writer family is kept as a revision the delete authority restores (secaudit 2026-10, v80).
     'test/e2e-workspace-row-revisions.ts',
@@ -1576,6 +1581,8 @@ const ALL_SUITES = [
     'test/e2e-agent-tasks.ts',
     'test/e2e-agent-file-handoff.ts',
     'test/e2e-agent-schedules.ts',
+    // One owner's share of the scheduler and the realtime rooms, each limit an operator setting (secaudit2026oct31w2).
+    'test/e2e-owner-load-limits.ts',
     'test/e2e-agent-quality.ts',
     'test/e2e-agent-directives.ts',
     'test/e2e-agent-messages.ts',

@@ -13,6 +13,8 @@
  *   import { nodeLimitsDefaults } from './config-node-limits.js';
  *   const config = { ...nodeLimitsDefaults(), ... };
  * @version-history
+ *   2026-10-31 — scheduleMaxPerOwner, scheduleMinIntervalSeconds and realtimeRoomsPerOwner
+ *     (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2 and -3).
  *   2026-10-29 — federationResolveMaxPeers (secaudit2026oct26 round 8c, federation-03).
  *   2026-10-29 — federationPeeringRequestDays (secaudit2026oct26 round 8c, federation-06).
  *   v1.4.0 — 2026-10-27 — federationIntroductionsPerHour (secaudit2026oct26, unbounded pending peering requests).
@@ -97,6 +99,24 @@ export interface NodeLimitsConfig {
    * default 4; 0 is no limit.
    */
   appRendersAtOnce: number;
+  /**
+   * The most schedules one owner keeps, their agents' and apps' included (services/schedule-load-limits.ts).
+   * AIMEAT_SCHEDULE_MAX_PER_OWNER, default 1000; 0 is no limit. Schedules that exist stay; the limit
+   * decides only the next one (secaudit2026oct31w2 round 10).
+   */
+  scheduleMaxPerOwner: number;
+  /**
+   * The shortest gap, in seconds, between two runs of a schedule made or re-timed from now on.
+   * AIMEAT_SCHEDULE_MIN_INTERVAL_SECONDS, default 60, so every per-minute schedule keeps working; 0 is
+   * no limit. A schedule that exists keeps its time (secaudit2026oct31w2 round 10).
+   */
+  scheduleMinIntervalSeconds: number;
+  /**
+   * The most realtime rooms one owner holds open together, their agents' included, inside
+   * realtime.max_rooms. AIMEAT_REALTIME_ROOMS_PER_OWNER, default 50; 0 is no separate limit
+   * (secaudit2026oct31w2 round 10).
+   */
+  realtimeRoomsPerOwner: number;
 }
 
 /** A whole number from the environment, or the default when it is unset or not a whole number of 0 or more. */
@@ -119,5 +139,8 @@ export function nodeLimitsDefaults(env: NodeJS.ProcessEnv = process.env): NodeLi
     realtimeEchatMaxRooms: wholeOr(env.AIMEAT_REALTIME_ECHAT_MAX_ROOMS, 50),
     realtimeMaxDocsPerRoom: wholeOr(env.AIMEAT_REALTIME_MAX_DOCS_PER_ROOM, 64),
     appRendersAtOnce: wholeOr(env.AIMEAT_APP_RENDERS_AT_ONCE, 4),
+    scheduleMaxPerOwner: wholeOr(env.AIMEAT_SCHEDULE_MAX_PER_OWNER, 1000),
+    scheduleMinIntervalSeconds: wholeOr(env.AIMEAT_SCHEDULE_MIN_INTERVAL_SECONDS, 60),
+    realtimeRoomsPerOwner: wholeOr(env.AIMEAT_REALTIME_ROOMS_PER_OWNER, 50),
   };
 }

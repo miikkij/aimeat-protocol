@@ -19,6 +19,8 @@
  *   - buildBlueprint — derived structural graph (nodes + edges + keys touched)
  * @usage import { saveWorkflow, getWorkflow, buildBlueprint } from '../workflow/store.js';
  * @version-history
+ *   2026-10-31 — saveWorkflow asks schedules.min_interval_seconds of a scheduled trigger given a new
+ *     time (services/schedule-load-limits.ts; secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2).
  *   v1.0.0 — 2026-06-13 — Phase 3: memory-backed CRUD + DAG/offer validation + blueprint.
  *   v1.1.0 — 2026-06-15 — Persist the notify_on_finish opt-in on save.
  *   v1.2.0 — 2026-07-05 — Persist the resume opt-in on save (resume-on-retry downstream decoupling).
@@ -86,6 +88,7 @@ import { shownRun, withoutObservedValues } from './run-redaction.js';
 import { noteDeprecatedUse, removedFrom } from '../deprecation.js';
 import type { ContentReader } from '../classification/reader.js';
 import { memoryTarget } from '../classification/labels.js';
+import { scheduleIntervalRefusal } from '../schedule-load-limits.js';
 import {
   WorkflowDefInputSchema, WORKFLOW_ID_RE,
   type WorkflowDef, type WorkflowDefInput, type WorkflowStep, type WorkflowRun, type Signal,
@@ -567,6 +570,14 @@ export async function saveWorkflow(
   const now = new Date().toISOString();
   const existing = await storage.getMemory(ownerGhii, defKey(id));
   const prior = existing?.value as WorkflowDef | undefined;
+  // A scheduled trigger is a schedule: a new time asks the shortest gap between runs, as a schedule's
+  // does (services/schedule-load-limits.ts). The time the workflow already has is not asked.
+  const priorTrigger = prior?.trigger;
+  if (input.trigger.kind === 'schedule' && !(priorTrigger?.kind === 'schedule'
+      && priorTrigger.cron === input.trigger.cron && priorTrigger.timezone === input.trigger.timezone)) {
+    const tooOften = scheduleIntervalRefusal(input.trigger.cron, input.trigger.timezone, config);
+    if (tooOften) return { ok: false, errors: [`trigger.cron: ${tooOften.message}`] };
+  }
   const def: WorkflowDef = {
     id,
     title: input.title,

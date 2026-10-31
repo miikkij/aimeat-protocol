@@ -8,10 +8,13 @@
  *
  * @structure
  *   - realtimeRouter(config, storage, realtimeManager, peers?): builds the router
- *   - POST /v1/realtime/rooms: create a room (503 when disabled, 429 on ROOM_LIMIT_REACHED)
+ *   - POST /v1/realtime/rooms: create a room (503 when disabled, 429 on ROOM_LIMIT_REACHED and on
+ *     OWNER_ROOM_LIMIT)
  *   - additional room listing/lookup routes over realtimeManager
  *
  * @version-history
+ *   2026-10-31 — POST /v1/realtime/rooms answers 429 OWNER_ROOM_LIMIT past realtime.rooms_per_owner,
+ *     naming the caller's rooms and how to close one (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-3).
  *   2026-10-21 — The TURN caller asks isAnonymousPrincipal, so the minted anonymous token gets no TURN
  *     credential (secaudit 2026-10, anonymous-claim-not-signed).
  *   v1.3.1 — 2026-10-20 — A room's creator is the resolved caller, on create and on the close check,
@@ -34,7 +37,7 @@ import { requireAuth, requireOperator, requireScope } from '../auth/middleware.j
 import { success, error } from '../middleware/envelope.js';
 import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 import { emitChange } from '../services/event-bus.js';
-import type { RealtimeManager } from '../services/realtime-manager.js';
+import { OwnerRoomLimitError, type RealtimeManager } from '../services/realtime-manager.js';
 import type { PeerInfo } from '../services/federation.js';
 import { operatorOverride } from '../services/operator-override.js';
 import { turnEntryFor, type IceServer } from '../services/turn-credentials.js';
@@ -91,6 +94,14 @@ export function realtimeRouter(config: AimeatConfig, storage: Storage, realtimeM
       emitChange('realtime');
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (err instanceof OwnerRoomLimitError) {
+        res.status(429).json(error(config.nodeId, 'OWNER_ROOM_LIMIT',
+          `You and your agents hold ${err.roomIds.length} rooms open on this node, and one owner may hold ${err.limit} at once. `
+          + 'Close a room you no longer use (DELETE /v1/realtime/rooms/<id>, by the account or agent that opened it); '
+          + 'a room nobody is in also closes by itself after it has been idle. The operator sets this limit (realtime.rooms_per_owner).',
+          undefined, { limit: err.limit, your_rooms: err.roomIds.slice(0, 50), close_a_room: 'DELETE /v1/realtime/rooms/:roomId', setting: 'realtime.rooms_per_owner' }));
+        return;
+      }
       if (msg === 'ROOM_LIMIT_REACHED') {
         res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', 'Maximum number of rooms reached'));
         return;
