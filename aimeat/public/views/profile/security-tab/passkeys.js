@@ -19,6 +19,7 @@
  * @structure PasskeysSection({ showToast, inRow })
  * @usage html`<${PasskeysSection} showToast=${showToast} inRow />`
  * @version-history
+ *   v1.12.0 -- 2026-11-01 -- On a node the store sold, the note under "add this device" names the sign-in link, not a password (stillHavePasswordPlace; Jouni's review of the Access page).
  *   v1.11.1 -- 2026-09-28 -- No escHtml() on text preact renders: preact escapes text and attributes
  *     itself, so a passkey name with a quote or an ampersand showed as &quot; / &amp;.
  *   v1.11.0 -- 2026-09-26 -- Every part is a component that takes data (Card section, List rows with
@@ -51,6 +52,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { passkeySupported, addPasskey } from '/js/services/auth.js';
@@ -172,7 +174,7 @@ export function PasskeysSection({ showToast, inRow }) {
           <${Loud} control disabled=${busy} onClick=${addThisDevice}>
             ${busy ? t('profile.security.twoFactor.working') : t('profile.security.passkeys.addThisDevice')}
           <//>
-          <${Space} above="tight"><${Note}>${t('profile.security.passkeys.stillHavePassword')}<//><//>
+          <${Space} above="tight"><${Note}>${t(customerNode() ? 'profile.security.passkeys.stillHavePasswordPlace' : 'profile.security.passkeys.stillHavePassword')}<//><//>
         `
         : html`<${Note}>${t('profile.security.passkeys.unsupported')}<//>`}
     <//>

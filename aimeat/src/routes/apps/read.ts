@@ -11,6 +11,8 @@
  * @version-history
  *   2026-10-31 — The screenshot of an app that needs a sign-in answers as the app does (screenshotGateRefused)
  *     and is cached `private`, unless its owner shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
+ *   2026-10-31 — The served marks (the AI label, the AI-use and info marks) take their language from
+ *     servedPageLocale: the node's own language before the browser's, as the pill does (crew36 check).
  *   2026-10-31 — A browser's own navigation to the bare app address is redirected to `?mode=inline`;
  *     `?download=1` and API clients keep the raw file (v28 #12, K41).
  *   2026-10-25 — A runnable request on the bare app host is redirected to the app's own origin like one on the apex (secaudit2026oct22, read.ts:bare-app-host-runs-any-app).
@@ -134,7 +136,7 @@ import { wantsWebmcpBridge } from '../../utils/app-agent-discovery.js';
 import { appOfRequestOrigin } from '../../services/app-origin-target.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appContentType } from '../../utils/app-content-type.js';
-import { detectLocale } from '../../i18n.js';
+import { servedPageLocale } from '../../i18n.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { currentAppRow } from '../../services/app-served-protection.js';
@@ -677,7 +679,7 @@ export function registerReadRoutes(
         // the hash downloads the source rather than the rendered page.
         const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
         setProvenanceHeaders(res, prov);
-        const locale = detectLocale(req.headers['accept-language']);
+        const locale = servedPageLocale(req, config.siteLinks?.defaultLocale);
         // The "Use with your AI" mark rides with the visible chrome (services/app-ai-use.ts).
         const aiUse = (runnable && isHtml) ? await appAiUse(storage, config, app) : null;
         // The app-info mark rides on the live version only: a page pinned to ?version= is not

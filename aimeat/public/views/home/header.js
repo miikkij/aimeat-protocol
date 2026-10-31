@@ -13,11 +13,13 @@
  *
  *   The button is deliberately not in `.poster-actions`: that row goes full-width below 560px, and a
  *   settings control that fills a phone screen reads as the page's main action, which it is not.
- * @structure HomeHeader({ name, owner, identity, onOpenSettings })
+ * @structure HomeHeader({ name, owner, identity, plate, onOpenSettings })
  * @usage
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   2026-10-31: `plate` passes a line under the name to the masthead: the AI credit on a node the
+ *     store sold (blocks-home.js NameplateBlock, Jouni v27 P6).
  *   2026-09-27: The door to settings and controls is the Action component, the same link (page
  *     group G9, a move).
  *   2026-09-23: Composed from components/Masthead.js (Masthead, MastheadButton, MastheadCog), which
@@ -48,10 +50,10 @@ import { Action } from '/components/Action.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-export function HomeHeader({ name, owner, identity, onOpenSettings }) {
+export function HomeHeader({ name, owner, identity, plate, onOpenSettings }) {
   const avatarSvg = minidenticon(typeof owner === 'string' && owner ? owner : (name || 'user'));
   return html`
-    <${Masthead} avatarSvg=${avatarSvg} name=${name} identity=${identity}
+    <${Masthead} avatarSvg=${avatarSvg} name=${name} identity=${identity} plate=${plate}
       identityTitle=${tr('home.identityHint', 'GHII: your permanent address. People, homes and agents everywhere find you by it.')}>
       ${/* The door to everything behind the home. The header carries the same link, but a person
             reading the nameplate is not reading the header, and the relationship (home in front,

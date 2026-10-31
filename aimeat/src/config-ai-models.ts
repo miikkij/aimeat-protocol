@@ -15,6 +15,8 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   2026-10-31 — The OpenRouter region (AIMEAT_AI_OPENROUTER_REGION, _REGION_FALLBACK, _REGIONS,
+ *     _REGION_PERSON_CHOICE; Jouni, 2026-10-31).
  *   2026-10-25 — aiFreeModelLastResort (AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true; secaudit2026oct22
  *     follow-up, the developer's ruling on the free model).
  *   2026-10-25 — aiNodeKeyMaxOutputTokens (AIMEAT_AI_NODE_KEY_MAX_OUTPUT_TOKENS, default 32000, 0 = no
@@ -55,6 +57,7 @@ export function aiLegacySettingsRoutesAllowed(
 
 type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback' | 'aiFreeModelLastResort'
+  | 'aiOpenrouterRegion' | 'aiOpenrouterRegionFallback' | 'aiOpenrouterRegions' | 'aiOpenrouterRegionPersonChoice'
   | 'aiNodeKeyWhenSpent' | 'aiNodeKeyAccountDailyUsd' | 'aiNodeKeyNodeDailyUsd' | 'aiNodeKeyMaxOutputTokens'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
@@ -76,6 +79,12 @@ export function aiModelDefaults(): AiModelSettings {
     chatFreeAllowanceUsd: parseFloat(process.env.AIMEAT_CHAT_FREE_ALLOWANCE_USD ?? '0') || 0,
     modelFreeFallback: process.env.AIMEAT_MODEL_FREE_FALLBACK ?? 'openrouter/free',
     aiFreeModelLastResort: process.env.AIMEAT_AI_FREE_MODEL_LAST_RESORT !== 'false',
+    aiOpenrouterRegion: process.env.AIMEAT_AI_OPENROUTER_REGION === 'eu' || process.env.AIMEAT_AI_OPENROUTER_REGION === 'us'
+      ? process.env.AIMEAT_AI_OPENROUTER_REGION : 'any',
+    aiOpenrouterRegionFallback: process.env.AIMEAT_AI_OPENROUTER_REGION_FALLBACK === 'off' || process.env.AIMEAT_AI_OPENROUTER_REGION_FALLBACK === 'any'
+      ? process.env.AIMEAT_AI_OPENROUTER_REGION_FALLBACK : 'us',
+    aiOpenrouterRegions: process.env.AIMEAT_AI_OPENROUTER_REGIONS ?? 'eu,us,any',
+    aiOpenrouterRegionPersonChoice: process.env.AIMEAT_AI_OPENROUTER_REGION_PERSON_CHOICE !== 'false',
     aiNodeKeyWhenSpent: process.env.AIMEAT_AI_NODE_KEY_WHEN_SPENT === 'limits' ? 'limits' : 'refuse',
     aiNodeKeyAccountDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, 1),
     aiNodeKeyNodeDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_NODE_DAILY_USD, 10),

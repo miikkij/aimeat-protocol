@@ -11,6 +11,7 @@
  *   - createT(locale): returns a TFunction that resolves keys, falls back to en, then to the key
  *   - detectLocale(acceptLang): picks best locale from an Accept-Language header
  *   - toLocale(val): validates/coerces an arbitrary value to a Locale
+ *   - servedPageLocale(req, nodeLocale): ?lang, cookie, the node's language, then the browser's
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -18,6 +19,8 @@
  *     validates it against LOCALES, so a fourth language needs one edit here rather than two.
  *   v1.2.0 — 2026-10-02 — A key is looked up flat first ("aipage.off.UNTESTED" as one key), so the
  *     server reads the SPA's flat dotted keys as well as nested ones.
+ *   v1.3.0 — 2026-10-31 — servedPageLocale: a served app's marks take the node's own language before
+ *     the browser's, as the served libraries do.
  */
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -113,6 +116,26 @@ export function resolveLocale(
   const fromCookie = localeFromCookie(cookieHeader);
   if (fromCookie) return fromCookie;
   return detectLocale(acceptLang);
+}
+
+/**
+ * The language of a page the node serves on a place's behalf (an app with its marks): ?lang, the
+ * visitor's cookie, the node's own language (site.default_locale), then the browser's. The order the
+ * served libraries read (sdk-libs/_core/lang.js), so the label the server draws and the pill the
+ * page draws speak one language. Accept-Language alone drew "AI-generated" on a Finnish place beside
+ * a Finnish pill (crew36 check, 2026-10-31).
+ */
+export function servedPageLocale(
+  req: { query?: Record<string, unknown>; headers: { cookie?: string; 'accept-language'?: string } },
+  nodeLocale: string | undefined,
+): Locale {
+  const lang = typeof req.query?.lang === 'string' && LOCALES.includes(req.query.lang as Locale) ? req.query.lang : undefined;
+  if (lang) return lang as Locale;
+  const fromCookie = localeFromCookie(req.headers.cookie);
+  if (fromCookie) return fromCookie;
+  const node = (nodeLocale ?? '').trim();
+  if (LOCALES.includes(node as Locale)) return node as Locale;
+  return detectLocale(req.headers['accept-language']);
 }
 
 /** Extract all keys under a prefix as a flat Record for client-side embedding.

@@ -8,6 +8,10 @@
  * @structure StatusBar({ status, onReset })
  * @usage html`<${StatusBar} status=${status} onReset=${reset} />`
  * @version-history
+ *   v1.5.0 — 2026-10-31 — On a node the store sold: no "Your agent" label, and the reset reads "Start
+ *     the conversation over" (Jouni's review of v31, K32; the chat asks before it resets).
+ *   v1.4.0 — 2026-10-31 — On a node the store sold, the allowance line is the AI credit in euros
+ *     (js/ai-credit.js), the number the Home shows (Jouni v27 P6).
  *   v1.3.0 — 2026-10-31 — The model name moved behind the credit's "What answers here" toggle
  *     (components/Credit.js, v27 P7).
  *   v1.2.0 — 2026-10-02 — A person with a key of their own, on the shared chat key, is told the key
@@ -20,6 +24,9 @@
 import { h } from 'preact';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { aiCredit } from '/js/ai-credit.js';
+import { customerNode } from '/js/site.js';
+import { money } from '/js/format.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -37,10 +44,16 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
  */
 export function StatusBar({ status, onReset }) {
     if (!status) return null;
+    // A buyer reads no "Your agent" label and a reset in plain words (Jouni's review of v31, K32).
+    const buyer = customerNode();
     const remaining = Number(status.allowance_remaining_usd ?? 0);
+    // On a node the store sold, the buyer paid in euros and reads the credit in euros (ai-credit.js).
+    const credit = aiCredit(status);
     const payer = {
         own: () => tr('chat.ownKey', 'Running on your own OpenRouter key.'),
-        allowance: () => tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
+        allowance: () => credit
+            ? tr('home.credit.chatLine', 'AI credit left: {amount}.').replace('{amount}', money(credit.eur, 'EUR'))
+            : tr('chat.allowance', '{n} USD left of your allowance.').replace('{n}', remaining.toFixed(2)),
         node: () => tr('chat.nodeKey', 'The house pays for this conversation, on its own key.'),
     }[status.pays] ?? null;
     // What the person's OWN money is doing while the node pays for this conversation. Shown only
@@ -48,8 +61,10 @@ export function StatusBar({ status, onReset }) {
     // limit on the chat: it is the allowance for everything else on the node, and a person who is
     // about to run out of it deserves to have seen it coming somewhere they actually look.
     const elsewhere = status.pays === 'node' && !status.has_own_key && remaining > 0
-        ? tr('chat.allowanceElsewhere', '{n} USD of your allowance left, for everything outside this chat.')
-            .replace('{n}', remaining.toFixed(2))
+        ? (credit
+            ? tr('home.credit.chatElsewhere', 'AI credit left for everything outside this chat: {amount}.').replace('{amount}', money(credit.eur, 'EUR'))
+            : tr('chat.allowanceElsewhere', '{n} USD of your allowance left, for everything outside this chat.')
+                .replace('{n}', remaining.toFixed(2)))
         : null;
     // The technical identity (a raw GAII like chat#alice@node-id) stays one hover away in the
     // title; a person new to all of this reads "Your agent", which is what it is. The full string
@@ -66,7 +81,7 @@ export function StatusBar({ status, onReset }) {
         : null;
     return html`
         <div class="poster-agent-status">
-            <span class="poster-agent-status-who" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>
+            ${buyer ? null : html`<span class="poster-agent-status-who" title=${status.agent_name}>${tr('chat.statusYourAgent', 'Your agent')}</span>`}
             ${payer && html`<span>${payer()}</span>`}
             ${elsewhere && html`<span class="poster-agent-status-note">${elsewhere}</span>`}
             ${ownKeyMissesChat && html`<span class="poster-agent-status-note">${ownKeyMissesChat}</span>`}
@@ -74,7 +89,7 @@ export function StatusBar({ status, onReset }) {
             ${onReset && html`
                 <button type="button" class="poster-action poster-action--quiet poster-rail-action"
                     title=${tr('chat.resetTitle', 'Start a fresh agent session for this conversation. Needed after changing what the agent may do.')}
-                    onClick=${onReset}>${tr('chat.reset', 'Reset session')}</button>`}
+                    onClick=${onReset}>${buyer ? tr('chat.resetBuyer', 'Start the conversation over') : tr('chat.reset', 'Reset session')}</button>`}
         </div>
     `;
 }

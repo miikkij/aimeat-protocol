@@ -1,0 +1,24 @@
+/**
+ * @file public/css/views/owner-start.css
+ * @author Jouni Miikki
+ * SPDX-License-Identifier: MIT
+ * @description The width of the front page of a node the store sold (views/owner-start.js). The
+ *   page is library components; this sheet only gives it a reading width and the page gutter.
+ * @version-history
+ *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P3).
+ */
+.owner-start {
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: var(--sp-8) var(--sp-4);
+}
+
+/* The administration address is printed whole; on a phone a long place name has to break. */
+.owner-start a {
+  overflow-wrap: anywhere;
+}
+
+.owner-start-line {
+  margin: 0 0 var(--sp-2);
+  color: var(--text-muted);
+}

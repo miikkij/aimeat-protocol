@@ -19,6 +19,8 @@
  *     read trusts (secaudit2026oct31w2 round 10, W2-14, W2-15, W2-20).
  *   2026-10-31 -- e2e-app-screenshot-access.ts joins the list (not the guard tier): an access-limited app's screenshot follows who may open it, and the owner's screenshot_public (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-31 -- e2e-flag-counting.ts joins the list (not the guard tier): a board hide counts one person once, a memory flag hides only on review or the threshold (secaudit2026oct31w2 round 10, W2-8 and W2-9).
+ *   2026-10-31 -- e2e-ai-openrouter-region.ts joins the list (not the guard tier): its own node on 28494,
+ *     where an OpenRouter call on the node's key is processed (eu, us, any).
  *   2026-10-31 -- e2e-connector-programs.ts joins the list (not the guard tier): the programs a computer
  *     may start for its agents, and the owner's decision on them.
  *   2026-10-31 -- e2e-package-account-sale.ts joins the list (not the guard tier): an author sells their own package to another account (wish-tekij-myy-oman-pakettinsa-toiselle-k-ytt-j-lle-samassa-solmu).
@@ -1035,6 +1037,9 @@ const ALL_SUITES = [
     // What a call on the node's key costs the account's allowance (secaudit2026oct26): its own node on
     // 28465 with a node key and the stub as the node's OpenRouter. Follows the runner's backend.
     'test/e2e-ai-node-key-metering.ts',
+    // Where an OpenRouter call on the node's key is processed (eu, us, any): its own node on 28494 with
+    // the stub standing in for the three addresses at three paths. Follows the runner's backend.
+    'test/e2e-ai-openrouter-region.ts',
     // The model catalogue (System 2, V4): its own node on 28440 whose catalogue sources point at a
     // local stub serving the sample files, so a refresh, a source that fails, a retirement and a
     // catalogue price are read from what the node wrote. Follows the runner's backend.

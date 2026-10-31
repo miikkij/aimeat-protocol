@@ -51,10 +51,11 @@
   <script>
     (function () {
       try {
-        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | 'auto' | null
+        // Light unless the person chose; 'auto' follows the OS (Jouni, v31 K65).
         document.documentElement.dataset.theme = (stored === 'light' || stored === 'dark')
           ? stored
-          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          : (stored === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
       }

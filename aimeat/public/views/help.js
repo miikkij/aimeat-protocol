@@ -2,17 +2,25 @@
  * @file help.js
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
- * @description Help page, two audiences on one page. "For me" answers the questions a
- *   human actually arrives with; "For my AI" serves the node's help prompt, rendered as
+ * @description Help page, two audiences on one page. "For me" is the page for the person who
+ *   bought this AIMEAT, in their language; "For my AI" serves the node's help prompt, rendered as
  *   markdown and copyable as raw text. The page used to be the second tab alone, dumping
  *   the prompt's markdown SOURCE into a <pre> — so a person who clicked Help got
  *   "## Step 0 — Orient yourself" and code fences.
  * @structure
- *   - HelpView — tab shell
- *   - HumanHelp — start here, common questions, who to ask
- *   - AgentHelp — the copyable prompt + the machine-readable entry points
+ *   - HelpView — tab shell, with the page's own language choice (LangChoice)
+ *   - HumanHelp — the page for a person, read from public/help/help.<lang>.md (helpSections)
+ *   - AgentHelp — the copyable prompt + the machine-readable entry points (AGENTS.md, llms.txt)
  * @usage import HelpView from '/views/help.js'
  * @version-history
+ *   v3.0.0 -- 2026-10-31 -- "For me" is written for the person who bought this AIMEAT, in one markdown
+ *       file per language (public/help/help.{fi,en,es}.md), in the sections Jouni named: getting
+ *       started (the first sentence to your AI), what it costs (the AI credit in euros, more credit,
+ *       the free model), who sees my things, agents and schedules, apps, signing in (the email link),
+ *       if something breaks (support@aimeat.io), and the own AI key under Advanced. Morsels are not
+ *       explained at the start. The store-only parts show on a node the store sold; the old question
+ *       ids still open their section. A language choice sits beside the title. "For my AI" links
+ *       AGENTS.md and llms.txt (Jouni v27 P4).
  *   v2.5.0 -- 2026-10-03 -- "For me" opens with what AIMEAT gives a person, then the steps: a signed-in
  *       person's own path (journey.next first, views/home/journey-steps.js), a visitor's the newcomer
  *       order as plain text. Each question has an anchor and opens from /v1/help#<id>; a "knowledge"
@@ -35,101 +43,103 @@
  *       the terms moved inside the answers. Key ids unchanged, text lives in the locales.
  */
 import { h } from 'preact';
-import { useState, useEffect, useRef } from 'preact/hooks';
+import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
-import { hasSession } from '/js/services/auth.js';
-import { openSteps, stepTitle, stepLine, stepHref, useJourney, VISITOR_STEPS } from './home/journey-steps.js';
+import { t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from '/components/Spinner.js';
 import { Markdown } from '/components/Markdown.js';
-import { Collapsible } from '/components/Collapsible.js';
-import { siteLink, hasSite, contactHref } from '/js/site.js';
+import { customerNode } from '/js/site.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-// The questions people actually arrive with, in the order of their worries: money, privacy,
-// what works for me, sharing, connecting, breaking. The system's own words (agent, organism,
-// morsel) live inside the answers, never in the question. Each answer is a few sentences, not
-// a link list — a link list is what sends someone back to the search box.
-const QUESTIONS = ['cost', 'privacy', 'agent', 'organism', 'knowledge', 'connect', 'broken'];
-
-/** The question an address names (/v1/help#knowledge), so a link from another page opens its answer. */
-const askedQuestion = () => {
-  const id = (typeof window !== 'undefined' ? window.location.hash : '').replace(/^#/, '');
-  return QUESTIONS.includes(id) ? id : null;
-};
-
-/* Canonical Collapsible is controlled; each question owns its own open state. The wrapper carries
- * the question's id, so /v1/help#<id> lands on it and opens it. */
-function Question({ id }) {
-  const [open, setOpen] = useState(() => askedQuestion() === id);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (askedQuestion() === id) ref.current?.scrollIntoView({ block: 'start' });
-  }, [id]);
-  return html`
-    <div id=${id} ref=${ref}>
-      <${Collapsible} title=${tr(`help.q.${id}.q`, id)} open=${open} onToggle=${() => setOpen(o => !o)}>
-        <p class="hlp-answer">${tr(`help.q.${id}.a`, '')}</p>
-      <//>
-    </div>
-  `;
-}
+const LANGS = ['fi', 'en', 'es'];
 
 /**
- * The steps. A signed-in person reads their own path (journey.next first, then the open stages
- * after it), each a link to where it is done; a visitor reads the order a newcomer meets, as plain
- * text. Nothing renders while a signed-in person's path is still being read.
+ * Addresses other pages link to (/v1/help#knowledge, and the question ids of the page before
+ * 2026-10-31) mapped to the section that answers them now.
  */
-function Steps() {
-  const { journey, ready } = useJourney();
-  const signedIn = hasSession();
-  if (signedIn && !ready) return null;
-  const mine = signedIn ? openSteps(journey) : null;
-  if (mine) {
-    return html`
-      <h2 class="section-title">${t('help.nextTitle')}</h2>
-      ${mine.length === 0 ? html`<p>${t('help.pathWalked')}</p>` : html`
-        <ol class="hlp-steps">
-          ${mine.map((id) => html`<li key=${id}><a href=${stepHref(id)}>${stepTitle(id)}</a>. ${stepLine(id)}</li>`)}
-        </ol>`}
-    `;
+const ANCHOR_ALIASES = { agent: 'agents', organism: 'privacy', connect: 'start' };
+
+/**
+ * The page's text for one language: public/help/help.<lang>.md, one source per language (Jouni v27
+ * P4). Parts written for a node the store sold sit between <!--store--> and <!--/store-->, and the
+ * text for any other node between <!--nostore--> and <!--/nostore-->; only the one that applies is
+ * kept. Each "## Title {#id}" starts a section, and the id is its address on the page.
+ * @returns {Array<{ id: string, title: string, body: string }>}
+ */
+export function helpSections(markdown, store) {
+  const kept = String(markdown)
+    .replace(/<!--store-->([\s\S]*?)<!--\/store-->/g, (_m, inner) => (store ? inner : ''))
+    .replace(/<!--nostore-->([\s\S]*?)<!--\/nostore-->/g, (_m, inner) => (store ? '' : inner));
+  const out = [];
+  for (const part of kept.split(/^## /m).slice(1)) {
+    const nl = part.indexOf('\n');
+    const head = (nl < 0 ? part : part.slice(0, nl)).trim();
+    const m = head.match(/^(.*?)\s*\{#([a-z0-9-]+)\}$/);
+    out.push({ id: m ? m[2] : '', title: m ? m[1] : head, body: nl < 0 ? '' : part.slice(nl + 1).trim() });
   }
-  return html`
-    <h2 class="section-title">${tr('help.startTitle', 'Getting started')}</h2>
-    <ol class="hlp-steps">
-      ${VISITOR_STEPS.map((id) => html`<li key=${id}><strong>${stepTitle(id)}</strong>. ${stepLine(id)}</li>`)}
-    </ol>
-    ${!signedIn && html`<p>${t('help.visitorNote')}</p>`}
-    ${hasSite('learn') ? html`
-      <p>${tr('help.start4', 'Learn the whole platform hands-on, free, without an account.')} <a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('help.start4Link', 'Open the Experience Center')}</a></p>` : ''}
-  `;
+  return out;
+}
+
+/** The section an address names, once the sections are on the page. */
+function scrollToAsked(sections) {
+  const raw = (window.location.hash || '').replace(/^#/, '');
+  const id = ANCHOR_ALIASES[raw] || raw;
+  if (id && sections.some(s => s.id === id)) document.getElementById(`help-${id}`)?.scrollIntoView({ block: 'start' });
 }
 
 function HumanHelp({ onAskAi }) {
-  const contact = contactHref(tr('help.contactSubject', 'A question about AIMEAT'));
+  const [lang, setLang] = useState(() => (LANGS.includes(getLocale()) ? getLocale() : 'en'));
+  const [sections, setSections] = useState(null);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => onLocaleChange((loc) => setLang(LANGS.includes(loc) ? loc : 'en')), []);
+
+  useEffect(() => {
+    let live = true;
+    setFailed(false);
+    fetch(`/help/help.${lang}.md`)
+      .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.text(); })
+      .then((text) => { if (live) setSections(helpSections(text, customerNode())); })
+      .catch((err) => { swallowed('help: page text', err); if (live) setFailed(true); });
+    return () => { live = false; };
+  }, [lang]);
+
+  useEffect(() => { if (sections) scrollToAsked(sections); }, [sections]);
+
+  if (failed) return html`<p class="hlp-error">${t('help.loadError')}</p>`;
+  if (!sections) return html`<div class="hlp-loading"><${Spinner} /></div>`;
   return html`
     <div class="hlp-human">
-      <h2 class="section-title">${t('help.whatTitle')}</h2>
-      <p>${t('help.whatLead')}</p>
-
-      <${Steps} />
-
-      <h2 class="section-title">${tr('help.qTitle', 'Common questions')}</h2>
-      <div class="hlp-questions">
-        ${QUESTIONS.map(k => html`<${Question} key=${k} id=${k} />`)}
-      </div>
-
-      <h2 class="section-title">${tr('help.stuckTitle', 'Still stuck')}</h2>
+      <nav class="hlp-toc" aria-label=${tr('help.tocLabel', 'On this page')}>
+        ${sections.filter(s => s.id).map(s => html`<a key=${s.id} href=${`#${s.id}`}
+          onClick=${(e) => { e.preventDefault(); history.replaceState(null, '', `#${s.id}`); scrollToAsked(sections); }}>${s.title}</a>`)}
+      </nav>
+      ${sections.map(s => html`
+        <section key=${s.id || s.title} id=${s.id ? `help-${s.id}` : undefined} class="hlp-section">
+          <h2 class="section-title">${s.title}</h2>
+          <${Markdown} text=${s.body} />
+        </section>`)}
       <div class="hlp-stuck">
         <button class="hlp-btn" type="button" onClick=${onAskAi}>${tr('help.stuckAi', 'Ask your own AI: get the help prompt →')}</button>
-        ${contact ? html`<a class="hlp-door" href=${contact}>${tr('help.stuckHuman', 'Ask a human →')}</a>` : ''}
       </div>
     </div>
   `;
+}
+
+/** The page's own language choice: the same switch the header has, where a reader of this page looks. */
+function LangChoice() {
+  const [lang, setLang] = useState(getLocale());
+  useEffect(() => onLocaleChange(setLang), []);
+  return html`
+    <div class="hlp-langs" role="group" aria-label=${tr('help.langLabel', 'Language')}>
+      ${LANGS.map(l => html`<button key=${l} type="button" class=${`lang-btn ${lang === l ? 'active' : ''}`}
+        aria-pressed=${lang === l} onClick=${() => switchLocale(l)}>${l.toUpperCase()}</button>`)}
+    </div>`;
 }
 
 function AgentHelp({ prompt, loading, error }) {
@@ -146,8 +156,9 @@ function AgentHelp({ prompt, loading, error }) {
 
       <h2 class="section-title">${tr('help.agentEntryTitle', 'For an agent reading this page directly')}</h2>
       <ul class="hlp-endpoints">
+        <li><a href="/AGENTS.md"><code>GET /AGENTS.md</code></a> — ${tr('help.epAgents', 'orientation for an agent: what this node is and where to start')}</li>
+        <li><a href="/llms.txt"><code>GET /llms.txt</code></a> — ${tr('help.epLlms', 'the full agent manual')}</li>
         <li><code>GET /?format=json</code> — ${tr('help.epRoot', 'machine-readable getting started')}</li>
-        <li><code>GET /llms.txt</code> — ${tr('help.epLlms', 'the full agent manual')}</li>
         <li><code>GET /v1/spec</code> — ${tr('help.epSpec', 'the OpenAPI contract')}</li>
         <li><code>POST /v1/mcp</code> — ${tr('help.epMcp', 'the MCP endpoint')}</li>
         <li><code>GET /v1/help/prompt/person</code> — ${tr('help.epPrompt', 'this prompt as plain markdown')}</li>
@@ -180,7 +191,10 @@ export default function HelpView() {
   return html`
     <div class="hlp-container">
       <div class="hlp-card">
-        <h1 class="hlp-title">${tr('help.pageTitle', 'Help')}</h1>
+        <div class="hlp-head">
+          <h1 class="hlp-title">${tr('help.pageTitle', 'Help')}</h1>
+          <${LangChoice} />
+        </div>
 
         <div class="hlp-tabs poster-row--thing" role="tablist">
           <button type="button" role="tab" aria-selected=${tab === 'human'}
