@@ -7,7 +7,8 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
- *   v1.50.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
+ *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
+ *   v1.50.0 -- 2026-10-31 -- aimeat_overview: the whole account in one call, and the page to give the person.
  *   v1.49.0 -- 2026-10-30 -- Several stores of one's own, and `store` on aimeat_storage_upload
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.48.0 -- 2026-10-29 -- Your owner's files in their own storage: the four aimeat_file_store_* tools.
@@ -447,6 +448,11 @@ ${NEW_AGENT_MD}
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`
 (your owner's agents — for delegation via task) · the \`aimeat_onboarding_*\` steps · \`aimeat_handbook_get\`.
+
+**The whole account — \`aimeat_overview\`.** When the person asks what their agents do, where something
+runs, what is used or what has gone quiet: one call answers computers, agents, apps, organisms and
+workspaces, and offerings, with use in the period and the ties between them (\`focus\` follows one item).
+Say it in their words, then give them the page: \`/v1/home?overview=1&focus=<item id>\`.
 
 **Ask the operators — \`support@operators\`.** When something here does not work, when a step will
 not complete, or when you need a decision only a human can make, send it:

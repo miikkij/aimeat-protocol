@@ -13,10 +13,12 @@
  *   WHAT THIS CHANGES IS WHEN THINGS ARE READ. The old home ran eleven requests through one loader
  *   and re-ran all eleven on any SSE event whatsoever. Here a mailbox arriving re-reads the mailbox.
  * @structure NameplateBlock · McpConnectBlock · MatBlock · MailboxBlock · YourTurnBlock · ChatDoorBlock · FleetBlock ·
- *   AgentsBlock · ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
+ *   OverviewBlock · AgentsBlock · ThingsBlock · PlaybooksBlock · AchievementsBlock · FeedBlock · OpenItemsBlock · InstallCtaBlock ·
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-31: OverviewBlock, the account at a glance and the way to the Overview page
+ *     (views/home/overview-band.js, GET /v1/overview).
  *   2026-10-29: NameplateBlock leaves out the full identity on a customer's node: it carries the
  *     node's id, which a buyer never needs to read (UX review 2026-10-29, C).
  *   2026-10-25: YourTurnBlock passes each thread's last message time and the person's window
@@ -58,6 +60,7 @@ import { HomeHeader } from '/views/home/header.js';
 import { HomeJourney } from '../home/journey.js';
 import { HomeFeed } from '/views/home/feed.js';
 import { AgentsBand } from '/views/home/agents-band.js';
+import { OverviewBand } from '/views/home/overview-band.js';
 import { OpenItemsList } from '/components/OpenItemsList.js';
 import { InstallCta } from '/components/InstallCta.js';
 import { McpQuickConnect } from '/components/McpInstall.js';
@@ -143,6 +146,19 @@ export function FleetBlock() {
   const { state } = useHomeState();
   if (!state?.agent) return null;
   return html`<${FleetLine} agent=${state.agent} />`;
+}
+
+/**
+ * The Overview band: five figures for the account, what has gone quiet, and the way to the Overview
+ * page (GET /v1/overview, the totals of the whole account; limit=2 names the busiest of a lane).
+ * A finished home only.
+ */
+export function OverviewBlock(/** @type {{ ctx?: any }} */ { ctx }) {
+  const { state } = useHomeState();
+  const { data } = useShared('home-overview', state?.initialized ? '/v1/overview?range=7d&limit=2' : '',
+    ['agents', 'agent-tasks', 'apps', 'organisms']);
+  if (!state?.initialized || !data) return null;
+  return html`<${OverviewBand} data=${data} navigate=${ctx?.navigate} />`;
 }
 
 /**

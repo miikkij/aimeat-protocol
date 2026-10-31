@@ -11,6 +11,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-10-31 — The chat surface lists its start tools in short words (chat-tool-text.ts; v31 K63).
  *   2026-10-25 — Warn-only mode (AIMEAT_MCP_ENFORCE_SCOPES=false) still answers SCOPE_DENIED for a
  *     word no wildcard carries, so the owner tools that have no check of their own keep their guard
  *     (secaudit2026oct22, warn-only-drops-sole-gate-on-outside-wildcard-tools).
@@ -172,6 +173,7 @@ import { answerScopeDeniedTools } from './scope-denied-answer.js';
 import { askableTool, staleGrantRefusal } from './permission-ask-gate.js';
 import { toolsForSurface, toolsRegisteredOn, isV2Role, V2_ROLES, type SurfaceRole } from '../tool-catalog/surfaces.js';
 import { keepOnly, answerSwitchedOffTools } from './tool-loader.js';
+import { shortenChatTools } from './chat-tool-text.js';
 import { instructionsFor } from './instructions.js';
 import { readBuildInputs } from '../services/mcp-build-inputs.js';
 import { registerManagedPrompts } from './prompts-managed.js';
@@ -383,6 +385,8 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         if (role === 'chat') {
             const off = keepOnly(mcp, toolsForSurface('chat'));
             answerSwitchedOffTools(mcp);
+            // The start tools in short words: they are listed on every model call (v31 K63).
+            shortenChatTools(mcp, toolsForSurface('chat'));
             logger.info(`[mcp-chat] ${agentGaii}: ${off} tool(s) registered and switched off until needed`);
         }
 

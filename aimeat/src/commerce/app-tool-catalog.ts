@@ -17,6 +17,7 @@
  *   const mine = await listOwnCallableAppTools(storage, config, req.auth.owner, 500);
  *   const byApp = await listOwnerAppToolNames(storage, ownerGhii);
  * @version-history
+ *   2026-10-31 — ownPublicManifests is exported, for the overview's offerings lane (services/overview/overview-sources.ts).
  *   2026-10-25 — listPublicAppTools leaves out the tools of an app the operator hid (operatorHidden),
  *     so discover, the commerce feed and catalog, the .well-known card and the merchant files stop
  *     listing them; a manifest for a file the node does not host is unchanged (secaudit2026oct22).
@@ -185,14 +186,14 @@ export async function listPublicAppTools(
 }
 
 /** One of an owner's public, well-formed tool manifests. */
-interface OwnManifest { appId: string; ownerName: string; updatedAt: string; tools: AppTool[] }
+export interface OwnManifest { appId: string; ownerName: string; updatedAt: string; tools: AppTool[] }
 
 /**
  * The public, well-formed tool manifests stored under one owner, in the store's order. The one read
  * both owner listings below are made from: only the records under `ownerGhii`, the identity the
  * invoke route reads a manifest from, so another owner's tools cannot enter either list.
  */
-async function ownPublicManifests(storage: Storage, ownerGhii: string): Promise<OwnManifest[]> {
+export async function ownPublicManifests(storage: Storage, ownerGhii: string): Promise<OwnManifest[]> {
   const out: OwnManifest[] = [];
   const records = await storage.listMemory(ownerGhii, { prefix: 'apps.', visibility: 'public' });
   for (const rec of records) {

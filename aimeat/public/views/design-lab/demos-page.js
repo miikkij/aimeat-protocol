@@ -9,6 +9,7 @@
  * @structure PAGE_DEMOS — { [id]: { variants: [{ name, render(ex) }] } }
  * @usage import { PAGE_DEMOS } from './demos-page.js';
  * @version-history
+ *   v1.6.0 — 2026-10-31 — OverviewMap on a small sample account, every group closed.
  *   v1.5.0 — 2026-10-03 — PageStart: open with the page's button, with a link after the purpose, and
  *     folded.
  *   v1.4.0 — 2026-10-02 — HelpTip (the question mark alone and beside a field's label), Tooltip and
@@ -28,6 +29,8 @@ import { ErrorNote, ErrorNoteFallback } from '/components/ErrorNote.js';
 import { ActionRow } from '/components/ActionRow.js';
 import { Hint } from '/components/Hint.js';
 import { HelpTip } from '/components/HelpTip.js';
+import { OverviewMap } from '/components/OverviewMap.js';
+import { buildLanes, layoutMap } from '/views/home/overview-model.js';
 import { Tooltip } from '/components/Tooltip.js';
 import { ExplainDialog } from '/components/ExplainDialog.js';
 import { PageStart } from '/components/PageStart.js';
@@ -79,6 +82,41 @@ function ExplainDemo({ term }) {
     <${ExplainDialog} term=${term} open=${open} onClose=${() => setOpen(false)} />`;
 }
 
+/** A small account for the overview map: one computer with two agents, two apps, an organism and an offering. */
+const OVERVIEW_SAMPLE = {
+  items: [
+    { id: 'machine:m1', lane: 'machines', kind: 'machine', name: 'Laptop', parent: null, use: 40, unit: 'calls', last_at: null, quiet_days: null, online: true, agents: 2 },
+    { id: 'agent:writer', lane: 'agents', kind: 'agent', name: 'writer', parent: 'machine:m1', use: 30, unit: 'calls', last_at: null, quiet_days: null },
+    { id: 'agent:helper', lane: 'agents', kind: 'agent', name: 'helper', parent: 'machine:m1', use: 10, unit: 'calls', last_at: null, quiet_days: null },
+    { id: 'app:crm.html', lane: 'apps', kind: 'app', name: 'CRM', parent: null, use: 25, unit: 'opens', last_at: null, quiet_days: null },
+    { id: 'app:old.html', lane: 'apps', kind: 'app', name: 'Old app', parent: null, use: 0, unit: 'opens', last_at: null, quiet_days: 41 },
+    { id: 'organism:o1', lane: 'knowledge', kind: 'organism', name: 'Sales', parent: null, use: 12, unit: 'writes', last_at: null, quiet_days: null },
+    { id: 'tools:crm.html', lane: 'offerings', kind: 'app-tools', name: 'crm', parent: null, use: 5, unit: 'calls', last_at: null, quiet_days: null, tools: 3, free_tools: 2 },
+  ],
+  edges: [
+    { from: 'machine:m1', to: 'agent:writer', kind: 'runs', weight: 30 },
+    { from: 'machine:m1', to: 'agent:helper', kind: 'runs', weight: 10 },
+    { from: 'agent:writer', to: 'organism:o1', kind: 'writes', weight: 12 },
+    { from: 'app:crm.html', to: 'organism:o1', kind: 'shows', weight: 4 },
+    { from: 'app:crm.html', to: 'tools:crm.html', kind: 'offers', weight: 5 },
+  ],
+};
+
+/** The overview map on the sample account, every group closed, nothing selected. */
+function OverviewDemo() {
+  const state = { open: new Set(), shown: {}, showQuiet: true };
+  const map = layoutMap(buildLanes(OVERVIEW_SAMPLE, state), OVERVIEW_SAMPLE, state, 1000);
+  const cardText = (n) => {
+    const e = n.entry;
+    const name = e.item?.name ?? (e.kind === 'group' ? `Agents on ${e.machine.name}` : `+${e.count ?? 0} more`);
+    const use = e.item?.use ?? e.use ?? 0;
+    return { name, sub: e.kind === 'group' ? `${e.count} agents` : '', num: String(use), numTitle: '', bar: Math.min(100, use * 3),
+      live: !!e.item?.online, quiet: e.item?.quiet_days != null, sign: e.kind === 'group' ? '+' : null, label: name };
+  };
+  return html`<${OverviewMap} map=${map} sel=${null} related=${() => ''} hotEdge=${() => false} onPick=${noop}
+    laneTitle=${(lane) => ({ title: lane, sub: '' })} laneHelp=${(lane) => ({ term: `overview.${lane}`, label: lane })} cardText=${cardText} />`;
+}
+
 export const PAGE_DEMOS = {
   'page-frame': { flush: true, variants: [
     { name: 'wide', render: () => html`<${PageFrame}><${PageIntro} title="A wide page" sub="Work happens here." /><//>` },
@@ -108,6 +146,9 @@ export const PAGE_DEMOS = {
   ] },
   'explain-dialog': { variants: [
     { name: 'from a link', render: (ex) => html`<${ExplainDemo} term=${ex.term} />` },
+  ] },
+  'overview-map': { variants: [
+    { name: 'closed groups', render: () => html`<${OverviewDemo} />` },
   ] },
   'page-start': { variants: [
     { name: 'open, with the page\'s button', render: (ex) => html`<${PageStart} id="design-lab-open" purpose=${ex.purpose} prompt=${ex.prompt} next=${ex.next}

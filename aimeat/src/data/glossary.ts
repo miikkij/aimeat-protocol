@@ -30,6 +30,8 @@
  * @usage
  *   import { GLOSSARY, findTerm } from '../data/glossary.js';
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Agent, Computer, App tool and Agent offer; Offering says it is app tools and
+ *     agent offers, paid or free (Jouni, 2026-10-31; the overview's help dialogs read them).
  *   v1.2.0 — 2026-10-03 — glossaryTermId(): the id the plain sentence and the page anchor share.
  *   v1.1.0 — 2026-10-01 — Organism says what it is for in the words every page now uses, and names
  *     the starting shapes (guided journey P5).
@@ -194,8 +196,13 @@ export const GLOSSARY: GlossaryTerm[] = [
   },
   {
     term: 'Offering', area: 'economy', aka: ['offer'],
-    definition: 'Something an agent publishes that others can buy: a described capability with a price and terms. A public offering appears in the node\'s commerce feed and in EXCHANGE.',
-    seeAlso: ['Capability', 'Checkout', 'EXCHANGE'],
+    definition: 'What a person\'s agents and apps make available to others: app tools and agent offers. It can be paid or free, and is usually free for its owner. Every app tool and every public agent offer is a capability on the node; a priced one marked for sale is also listed on EXCHANGE.',
+    seeAlso: ['App tool', 'Agent offer', 'Capability', 'EXCHANGE'],
+  },
+  {
+    term: 'Agent offer', area: 'economy',
+    definition: 'One thing an agent says it will do on request, published in its offers document. A public agent offer is a capability on the node; one marked for sale is listed on EXCHANGE as agent work, which the agent delivers.',
+    seeAlso: ['Agent', 'Offering', 'Capability'],
   },
   {
     term: 'Need', area: 'economy',
@@ -218,7 +225,12 @@ export const GLOSSARY: GlossaryTerm[] = [
     term: 'App', area: 'extensibility',
     form: 'owner/filename.html', example: 'happydude500001/nuotta.html',
     definition: 'A single-file HTML application published on the node and served on its own origin. The app id is a filename and carries its extension; the subdomain does not, and guessing the id from the subdomain is the most common way a tool lookup misses.',
-    seeAlso: ['App grant', 'App origin'],
+    seeAlso: ['App grant', 'App origin', 'App tool'],
+  },
+  {
+    term: 'App tool', area: 'extensibility', aka: ['app-tool'],
+    definition: 'A named operation an app offers to AI and programs, declared in the app\'s tool manifest with input fields and a price or none. Every app tool is a capability on the node; a priced tool marked for sale is also listed on EXCHANGE.',
+    seeAlso: ['App', 'Capability', 'Offering'],
   },
   {
     term: 'App origin', area: 'extensibility',
@@ -272,6 +284,16 @@ export const GLOSSARY: GlossaryTerm[] = [
     term: 'Schedule', area: 'action',
     definition: 'A recurring trigger that starts work without anybody asking — the mechanism behind an agent that reports every morning rather than when prompted.',
     seeAlso: ['Workflow', 'Task'],
+  },
+  {
+    term: 'Agent', area: 'action',
+    definition: 'An AI that works in a person\'s name on this node. It runs on a computer or comes in from an AI chat app over MCP, holds only the scopes its owner approved, and its owner can stop or remove it at any time. Its identity is a GAII.',
+    seeAlso: ['GAII', 'Computer', 'Fleet', 'Task'],
+  },
+  {
+    term: 'Computer', area: 'action', aka: ['connector', 'machine'],
+    definition: 'A computer or server that runs the program aimeat connect serve and so runs its owner\'s agents, shown with the name its owner gave it. An agent can use only what its computer can do and what its owner allowed.',
+    seeAlso: ['Agent', 'Device authorization'],
   },
   {
     term: 'Fleet', area: 'action',

@@ -39,6 +39,7 @@
  *     gate asks about it (plan doc-mvcn6c7e4e5q, V4).
  *   2026-10-18 — registerCompanyTools and registerPortfolioTools receive the session caller, for the publish gate (V4).
  *   2026-10-18 — registerPublishRequestTools: aimeat_publish_requests (plan doc-mvcn6c7e4e5q, V4.3).
+ *   2026-10-31 — registerOverviewTools: aimeat_overview (the account's overview).
  *   2026-10-18 — registerAccountRightsTools: aimeat_adult_status, aimeat_subscription_list,
  *     aimeat_subscription_cancel, aimeat_provenance_embed (Comicland v3 A-3, A-5, A-8).
  *   2026-10-25 — registerGoalTools: aimeat_goal_get, _set, _work and _answer (agent goals, session cc-jouni-goals).
@@ -143,6 +144,7 @@ import { registerDmReactionTools } from './dm-reactions.js';
 import { registerPublishRequestTools } from './publish-requests.js';
 import { registerSecretHostAskTools } from './secret-host-ask.js';
 import { registerAccountRightsTools } from './account-rights.js';
+import { registerOverviewTools } from './overview.js';
 import { registerAppManageTool } from './app-manage.js';
 import { registerAppsTools } from './apps.js';
 import { registerAppDraftEditTools } from './apps-draft-edit.js';
@@ -286,6 +288,7 @@ export function registerAllServerTools(mcp: McpServer, deps: ServerToolDeps): vo
     registerPublishRequestTools(mcp, storage, config, caller);
     registerSecretHostAskTools(mcp, storage, config, caller);
     registerAccountRightsTools(mcp, storage, config, caller);
+    registerOverviewTools(mcp, storage, config, caller);
     // One tool for the settings and reads of an app, each action checked against its own permission word.
     registerAppManageTool(mcp, storage, config, agentGaii, scopes, caller);
     registerAiImageTool(mcp, storage, config, agentGaii, caller);
