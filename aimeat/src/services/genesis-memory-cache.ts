@@ -24,9 +24,15 @@
  *   still inside its lifetime and this module does not check times of its own.
  * @structure
  *   - GENESIS_CACHE_OWNER / GENESIS_CACHE_PREFIX / genesisCacheKey(): the one naming
+ *   - GENESIS_CACHE_TAG / GENESIS_SUBSCRIPTION_TAG / genesisSubscriptionKey() / genesisPeerKey() /
+ *     isGenesisSubscriptionRecord(): what else lives under the prefix, told apart
  *   - findCachedGenesis(): the read
  *   - cacheGenesisResults(): the write
  * @version-history
+ *   2026-10-31 — A key built from a peer's own id or answer key never ends in `:subscriptions`
+ *     (genesisPeerKey), so no peer writes the operator's subscription record; the cache read takes
+ *     only rows tagged genesis-cache, never a peer's catalogue entry (secaudit2026oct31w2 round 10,
+ *     genesis:shared-prefix-peer-entries-collide-with-subscriptions-and-cache).
  *   v1.0.0 — 2026-09-04 — Extracted from routes/federation-genesis.ts, which is where the two halves
  *     had disagreed since the cache was added.
  */
@@ -42,9 +48,36 @@ export const GENESIS_CACHE_OWNER = '__genesis__';
 /** The prefix the answering side refuses to re-export. Both halves of the cache use this one. */
 export const GENESIS_CACHE_PREFIX = 'genesis:';
 
+/** The tag on a cached peer answer; the cache read and the public catalogue go by it. */
+export const GENESIS_CACHE_TAG = 'genesis-cache';
+
+/** The tag PUT /v1/federation/genesis-peer/:id/subscriptions writes on the operator's record. */
+export const GENESIS_SUBSCRIPTION_TAG = 'genesis-subscriptions';
+
+/** The operator's subscription record for one genesis peer: which local prefixes are pushed to it. */
+export function genesisSubscriptionKey(peerNodeId: string): string {
+    return `${GENESIS_CACHE_PREFIX}${peerNodeId}:subscriptions`;
+}
+
+/**
+ * The key of something a peer supplied (a catalogue entry, an ingested entry, a cached answer), from
+ * the peer's node id and the id or key the peer chose. A peer-chosen id that would end the key in
+ * `:subscriptions` gets `.entry` added, so no peer can write the operator's subscription record, its
+ * own or another peer's (secaudit2026oct31w2 round 10). Every other key is as it was.
+ */
+export function genesisPeerKey(peerNodeId: string, peerChosenId: string): string {
+    const key = `${GENESIS_CACHE_PREFIX}${peerNodeId}:${peerChosenId}`;
+    return key.endsWith(':subscriptions') ? `${key}.entry` : key;
+}
+
+/** Whether a stored record is the operator's subscription record rather than a peer's entry. */
+export function isGenesisSubscriptionRecord(record: Pick<MemoryRecord, 'key' | 'tags'>): boolean {
+    return (record.tags ?? []).includes(GENESIS_SUBSCRIPTION_TAG) || record.key.endsWith(':subscriptions');
+}
+
 /** One peer's answer for one key. The peer is in the key because two peers may answer for the same key. */
 export function genesisCacheKey(sourceGenesis: string, key: string): string {
-    return `${GENESIS_CACHE_PREFIX}${sourceGenesis}:${key}`;
+    return genesisPeerKey(sourceGenesis, key);
 }
 
 /** What this module needs of the store, which is two calls. */
@@ -75,6 +108,9 @@ export async function findCachedGenesis(
 ): Promise<GenesisResult | undefined> {
     const entries = await store.listMemory(GENESIS_CACHE_OWNER, { prefix: GENESIS_CACHE_PREFIX });
     const hit = entries.find(entry => {
+        // Only a row this cache wrote. A peer's catalogue entry shares the prefix, and its value is
+        // the peer's own, key and gaii fields included.
+        if (!(entry.tags ?? []).includes(GENESIS_CACHE_TAG)) return false;
         const value = entry.value as GenesisResult | null;
         if (!value || typeof value !== 'object') return false;
         return value.key === key && (!targetGaii || value.gaii === targetGaii);
@@ -101,7 +137,7 @@ export async function cacheGenesisResults(
                 ownerGaii: GENESIS_CACHE_OWNER,
                 value: result,
                 visibility: 'public',
-                tags: ['genesis-cache'],
+                tags: [GENESIS_CACHE_TAG],
                 ttlHours,
                 version: 1,
                 createdAt: now,

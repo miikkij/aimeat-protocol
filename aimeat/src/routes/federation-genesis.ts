@@ -13,6 +13,9 @@
  *   - genesis-memory-read (POST/GET): forwards reads to peers or answers peer reads under federation consent
  *   - subscriptions + network-stats + /v1/organisms/:id/reputation
  * @version-history
+ *   2026-10-31 — An ingested entry is stored under genesisPeerKey, which never names the operator's
+ *     subscription record, and GET /v1/federation/cross-catalogue lists catalogue entries only, not the
+ *     cached answers of a local reader's genesis memory read (secaudit2026oct31w2 round 10).
  *   v1.11.0 — 2026-10-15 — GET /v1/federation/genesis-memory-read answers only an approved genesis peer on a request signed for this node (checkNodeRequest), and only keys a federation consent pattern covers (federationConsentCovers); the POST handler signs its fan-out (feature-list audit 166). The GET handler moved to federation-genesis-memory-read.ts, unchanged, to keep this file under 800 lines.
  *   v1.11.0 — 2026-10-11 — Cross-catalogue action pricing is the pacing amount, toll_morsels, with base_morsels as a deprecated mirror until 4.0.0; a 3.x genesis entry's base_morsels reads as toll_morsels (a morsel is pacing, not a price).
  *   v1.10.0 — 2026-10-10 — A genesis peer that has once sent a verified delivery proof is held to it: an ingest without one is refused whatever AIMEAT_FEDERATION_AUDIENCE_REQUIRED says (pinnedRefusal, deliveryProofAt; secaudit 2026-10-10 I21).
@@ -57,7 +60,9 @@ import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
-import { cacheGenesisResults, findCachedGenesis } from '../services/genesis-memory-cache.js';
+import {
+    cacheGenesisResults, findCachedGenesis, genesisPeerKey, isGenesisSubscriptionRecord, GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG,
+} from '../services/genesis-memory-cache.js';
 import { logger } from '../utils/logger.js';
 import { actionPricingFromPeer, presentActionPricing } from '../services/action-pacing.js';
 
@@ -202,8 +207,10 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 try {
                     const genesisMemories = await storage.listMemory('__genesis__', { prefix: 'genesis:' });
                     for (const mem of genesisMemories) {
-                        // Skip subscription metadata entries
-                        if (mem.key.endsWith(':subscriptions')) continue;
+                        // Catalogue entries only: not the operator's subscription records, and not
+                        // cached answers to a local reader's genesis memory read, which this public
+                        // listing would hand to anyone (secaudit2026oct31w2 round 10).
+                        if (isGenesisSubscriptionRecord(mem) || (mem.tags ?? []).includes(GENESIS_CACHE_TAG)) continue;
 
                         const val = mem.value as Record<string, unknown>;
                         if (serviceType && val.service_type !== serviceType && val.category !== serviceType) continue;
@@ -381,7 +388,8 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
             const allEntries = [...(ingestEntries ?? []), ...(ingestCsms ?? [])];
             for (const entry of allEntries) {
                 const entryId = (entry.id ?? entry.name ?? `ingest-${stored}`) as string;
-                const key = `genesis:${source_node}:${entryId}`;
+                // The peer chose the id: never the operator's subscription record (genesisPeerKey).
+                const key = genesisPeerKey(String(source_node), String(entryId));
 
                 await storage.setMemory({
                     key,
@@ -597,7 +605,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                 ownerGaii: '__genesis__',
                 value: { prefixes, updated_at: now },
                 visibility: 'public',
-                tags: ['genesis-subscriptions'],
+                tags: [GENESIS_SUBSCRIPTION_TAG],
                 ttlHours: null,
                 version: 1,
                 createdAt: now,
