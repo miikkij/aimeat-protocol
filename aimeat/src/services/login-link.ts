@@ -32,6 +32,8 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.6.0 — 2026-10-31 — sendLoginLink() takes the language of the page the link was asked from; the
+ *     account's own language stays the fallback (v27 P1: an English store path got a Finnish mail).
  *   v1.5.0 — 2026-10-22 — redeemLoginLink() takes an optional beforeSpend check that runs after every
  *     other check and before the spend, and whose refusal leaves the link unspent: the program
  *     endpoint asks a TOTP account for its code there (secaudit2026oct22, magic-link-verify).
@@ -52,6 +54,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord } from '../storage/interface.js';
+import type { Locale } from '../i18n.js';
 import { getActiveEmailService, type EmailService } from './email.js';
 import { appendMailLog } from './notification-settings.js';
 import { welcomeEmail } from './email-template-welcome.js';
@@ -169,14 +172,16 @@ export async function issueLoginLink(
  */
 export async function sendLoginLink(
     storage: Storage, config: AimeatConfig, ghii: GHIIRecord, email: string, ttlMs = LOGIN_LINK_TTL_MS,
-    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown,
+    mail: EmailService | null | undefined = getActiveEmailService(), redirect?: unknown, locale?: Locale,
 ): Promise<boolean> {
     if (!mail?.enabled || !ghii.magicLinkEnabled) return false;
     const owner = await storage.getOwner(ghii.ownerName);
     if (!owner || owner.disabledAt) return false;
     const back = (await loginReturnTarget(storage, config, redirect)) ? redirect as string : null;
     const url = await issueLoginLink(storage, config, ghii, email, ttlMs, back);
-    const sent = await mail.sendMagicLink(email, url, ghii.locale);
+    // The language of the page the link was asked from, when it named one: a person who asked in
+    // English on a store page reads the mail in English, whatever the account says (v27 P1).
+    const sent = await mail.sendMagicLink(email, url, locale ?? ghii.locale);
     if (sent) await appendMailLog(storage, ghii.ghii, { kind: 'magic_link', subject: 'login link' });
     return sent;
 }

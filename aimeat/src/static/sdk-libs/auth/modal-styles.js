@@ -7,9 +7,11 @@
  *   one. Every colour and face is a page token with a fallback, the same rule the pill follows in
  *   theme.js, so the modal is ink on paper in the shell, light on a dark page, and whatever a
  *   palette says on an app origin. Class-based: nothing in modal.js is styled inline.
- * @structure MODAL_CSS (one string, injected by modal.js into its own <style>).
+ * @structure HEART_SVG, RULE_MARKS (the dialog's two marks) · MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.4.0 — 2026-10-31 — HEART_SVG and RULE_MARKS moved here from modal.js unchanged (pure extraction,
+ *     for the line ceiling).
  *   v1.3.0 — 2026-09-29 — The link row under the sign-in form wraps: with the third link (the emailed
  *     sign-in link) the Finnish row ran past the dialog's right edge.
  *   v1.2.0 — 2026-08-29 — The wordmark reads --font-wordmark (Archivo Black) rather than the headline
@@ -43,6 +45,10 @@ var poster = "var(--font-poster,'Archivo Black','Archivo',system-ui,sans-serif)"
 var wordmark = "var(--font-wordmark,'Archivo Black','Archivo',system-ui,sans-serif)";
 var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-serif)";
 var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
+
+export const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
+export const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg>'
+  + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
 export var MODAL_CSS = [
   inkVarsCss(['.aimeat-scrim']),
