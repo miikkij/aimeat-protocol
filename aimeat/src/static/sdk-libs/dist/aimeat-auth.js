@@ -1935,9 +1935,13 @@
     return inProgress;
   }
 
-  // src/static/sdk-libs/auth/modal.js
+  // src/static/sdk-libs/auth/modal-constants.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+  var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
+  var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
+
+  // src/static/sdk-libs/auth/modal.js
   var NODE_HOST = (function() {
     try {
       return new URL(NODE_URL).host;
@@ -1945,13 +1949,12 @@
       return typeof location !== "undefined" && location.host || "";
     }
   })();
-  var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
-  var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
   function showLoginModal(opts, renderBtn, onClosed) {
     if (signupInProgress()) return;
     var i = opts.i18n || {};
     var lang = currentModalLang();
-    var tab = opts.tab === "register" ? "register" : "signin";
+    var signInOnly = !!opts.signInOnly;
+    var tab = opts.tab === "register" && !signInOnly ? "register" : "signin";
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
@@ -2048,7 +2051,7 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (signInOnly ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(

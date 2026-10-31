@@ -13,6 +13,9 @@
  *   openEmailCompletion, sendEmailCode, showView, capture/restoreInputs }.
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
+ *   v1.16.0 — 2026-10-31 — opts.signInOnly: no register tab, and the dialog opens on signing in
+ *     whatever opts.tab says (a node the store sold, v31 K24). The fixed values (the two identifier
+ *     rules and the two marks) moved to modal-constants.js unchanged (max-file-lines).
  *   v1.15.0 — 2026-10-19 — Opens nothing while a first-time provider sign-up is choosing its username
  *     (signup-state.js): the app-open page's sign-in dialog replaced that step on load.
  *   v1.14.0 — 2026-10-09 — opts.secondFactorLink opens the dialog on the code view in link mode (secaudit 2026-10-09, S1).
@@ -85,25 +88,13 @@ import { passkeyButtonHtml, wirePasskeyButton } from './modal-passkey.js';
 import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
 import { showAuthErrorIn } from './auth-error.js';
 import { signupInProgress } from './signup-state.js';
-
-/** An identifier is an email when it carries a dot-bearing domain. A GHII (`alice@node-id`) never
- *  does, so this separates the two without asking the person which one they typed. */
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-/** The server's owner-name rule (OWNER_RE in src/utils/gaii.ts): lowercase letters, digits and
- *  hyphens, a letter or digit at both ends, 3 to 64 characters. Mirrored here so the field can say
- *  what it wants while the person types instead of in a refusal afterwards. */
-const OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+import { EMAIL_RE, OWNER_NAME_RE, HEART_SVG, RULE_MARKS } from './modal-constants.js';
 
 /** The domain in the crumb above the headline: this node's own, so a self-hosted node shows its
  *  domain there and the wordmark beside it says what the software is. */
 const NODE_HOST = (function () {
   try { return new URL(NODE_URL).host; } catch { return (typeof location !== 'undefined' && location.host) || ''; }
 })();
-
-const HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
-const RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg>'
-  + '<svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
 export function showLoginModal(opts, renderBtn, onClosed) {
   // A first-time provider sign-in is choosing its username in the same #aimeat-modal; opening the
@@ -118,7 +109,10 @@ export function showLoginModal(opts, renderBtn, onClosed) {
   // A caller that already knows which job the person came to do can say so: a button reading
   // "Register your home" opening a sign-in form is a small lie, and the person has to find the
   // tab themselves. Anything other than 'register' keeps the previous behaviour.
-  var tab = opts.tab === 'register' ? 'register' : 'signin';
+  // signInOnly: the caller's node takes no new accounts here, so the dialog has no register tab
+  // (a node the store sold has its owner already, and others come in by invitation: v31 K24).
+  var signInOnly = !!opts.signInOnly;
+  var tab = opts.tab === 'register' && !signInOnly ? 'register' : 'signin';
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();
@@ -257,10 +251,10 @@ export function showLoginModal(opts, renderBtn, onClosed) {
         : (i.descReturning || 'Enter the username or email you signed up with.'))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
-      + '<div class="aimeat-tabs" role="tablist">'
+      + (signInOnly ? '' : '<div class="aimeat-tabs" role="tablist">'
       + '<button type="button" role="tab" class="aimeat-tab' + (isReg ? '' : ' active') + '" data-tab="signin" aria-selected="' + (isReg ? 'false' : 'true') + '">' + escHtml(i.tabSignIn || 'Sign in') + '</button>'
       + '<button type="button" role="tab" class="aimeat-tab' + (isReg ? ' active' : '') + '" data-tab="register" aria-selected="' + (isReg ? 'true' : 'false') + '">' + escHtml(i.tabRegister || 'Create account') + '</button>'
-      + '</div>'
+      + '</div>')
       + '</div>'
       // Body
       + '<div id="aimeat-modal-body" class="aimeat-body">'

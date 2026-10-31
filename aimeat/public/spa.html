@@ -2066,7 +2066,8 @@
               compact: false,
               // A node the store sold has its owner already, so its sign-in offers no registration
               // (Jouni v27 P3): the pill says "Sign in" instead of "Sign in / Register".
-              ...(customerNode() ? { buttonText: t('siteStart.signInPill') } : {}),
+              // Its dialog has no "Create account" tab either: others come in by invitation (v31 K24).
+              ...(customerNode() ? { buttonText: t('siteStart.signInPill'), signInOnly: true } : {}),
               onLogin: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               onLogout: () => window.dispatchEvent(new Event('aimeat-auth-change')),
               i18n: authI18n(),
