@@ -56582,12 +56582,14 @@ paths:
                 description: { type: string }
                 category: { type: string, enum: [signage, marketplace, iot, social, productivity, communication, other] }
                 tags: { type: array, items: { type: string } }
-                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public.' }
+                visibility: { type: string, pattern: '^(private|members|public|organism:[A-Za-z0-9][A-Za-z0-9_-]{0,127})$', description: 'private, members (every account of this node), organism:<id> (that organism''s active members; the author must be one, else 400 NOT_ORGANISM_MEMBER) or public. Any other value, an empty string, false or null included, is 400 INVALID_INPUT and nothing is written.' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '202':
           $ref: '#/components/responses/PublishRequested'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
