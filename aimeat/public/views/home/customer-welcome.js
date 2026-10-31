@@ -19,6 +19,9 @@
  * @structure CustomerWelcome({ session, navigate })
  * @usage html`<${CustomerWelcome} session=${session} navigate=${navigate} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The first step says what connecting gives, in Jouni's words with MCP
+ *     explained, and has one button each for ChatGPT, Claude and Grok that opens the connect guide on
+ *     that AI, and one for another AI (v31 K26).
  *   v1.0.0 — 2026-10-29 — Initial (UX review 2026-10-29, B).
  */
 import { h } from 'preact';
@@ -32,6 +35,14 @@ import { NamedRow } from '/components/NamedRow.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { TextField } from '/components/TextField.js';
 import { Action, Actions, Loud } from '/components/Action.js';
+import { rememberTool } from '/components/SetupGuide.js';
+
+/**
+ * The AIs a buyer most likely has, as the connect guide names them (GET /v1/ai-tools ids). Each
+ * button opens the connect page's guide on that AI (v31 K26: "Mukaan napit Yhdistä ChatGPT /
+ * Claude / Grok").
+ */
+const CONNECT_TOOLS = [['chatgpt', 'ChatGPT'], ['claude-web', 'Claude'], ['grok', 'Grok']];
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -63,7 +74,14 @@ export function CustomerWelcome({ session, initialized, navigate }) {
 
       <${NamedRow} stack label=${tr('home.buyerWelcome.stepsLabel', 'Three steps')}>
         <${IndexList} steps>
-          <${IndexStep}>${tr('home.buyerWelcome.step1', 'Connect the AI you already use, such as ChatGPT or Claude. The way is right below.')}<//>
+          <${IndexStep}>
+            ${tr('homeConnect.lead', 'Connect ChatGPT, Claude or Grok here, and it becomes your chief of staff.')}
+            <${Actions}>
+              ${CONNECT_TOOLS.map(([id, label]) => html`
+                <${Action} small key=${id} href="/v1/profile?tab=mcp" onClick=${() => rememberTool(id)}>${tr('homeConnect.button', 'Connect {ai}').replace('{ai}', label)}<//>`)}
+              <${Action} small soft href="/v1/profile?tab=mcp">${tr('homeConnect.other', 'Another AI')} →<//>
+            <//>
+          <//>
           <${IndexStep}>${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
           <${IndexStep}>${tr('home.buyerWelcome.step3', 'Your order and invoices are in the store, under Orders and invoices in Settings.')}<//>
         <//>

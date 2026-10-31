@@ -15143,6 +15143,11 @@
     "install": "Install",
     "notNow": "Not now"
   },
+  "homeConnect": {
+    "lead": "Connect ChatGPT, Claude or Grok here (MCP is the plug that gives your AI a memory and hands), and it becomes your chief of staff. Choose your AI to see the steps for it.",
+    "button": "Connect {ai}",
+    "other": "Another AI"
+  },
   "homeJourney": {
     "promptFold": "Advanced: a ready prompt for an AI you use elsewhere",
     "title": "What would you like to get done?",
@@ -15183,6 +15188,8 @@
     "destinationTitle": "Your own AI does your work here",
     "destinationLead": "It remembers what you know, uses apps built for it, keeps agents working while you are away, and shares with the people you choose. You own all of it, and you come to this page to approve, to pay or to look.",
     "path": "Your path",
+    "pathCount": "Getting started: {done}/{total} done",
+    "pathNext": "Next:",
     "stage": {
       "ai": "A good AI",
       "connect": "Connected here",
@@ -15190,7 +15197,14 @@
       "organise": "A place for your work",
       "apps": "Apps",
       "agents": "Agents at work",
-      "share": "Shared with others"
+      "share": "Shared with others",
+      "aiWhat": "The AI you work with: this place's chat, or your own Claude, ChatGPT or Grok.",
+      "connectWhat": "Connect your own AI here, so it sees your information and can work for you.",
+      "firstResultWhat": "Tell the AI about yourself and your work, so it can help you in particular.",
+      "organiseWhat": "Gather the information of your work in one place, which you can later share with others.",
+      "appsWhat": "Ask the AI to make an app that does one thing for you.",
+      "agentsWhat": "Give an agent a job it does on a schedule, also when you are away.",
+      "shareWhat": "Share a place or an app with the people you work with."
     },
     "roadsTitle": "Which AI do you use?",
     "roadSubscription": "I pay for an AI",
