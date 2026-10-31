@@ -27764,11 +27764,83 @@ paths:
         - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version.' }
       responses:
         '200':
-          description: The descriptor, its permanent URL, and the latest pointer when unpinned
+          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), and the latest pointer when unpinned
         '403':
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package or version
+        '410':
+          description: GONE. The owner withdrew the package; `details.withdrawn_at` says when. Only a caller the package's audience admits learns this; anyone else gets 404
+    delete:
+      operationId: withdrawDataPackage
+      summary: Withdraw a data package
+      description: |
+        Withdraws the package: its `latest.json` pointer is marked `status: withdrawn` with
+        `withdrawnAt`, and its catalogue entry is removed, so it leaves the public catalogue and
+        discovery. Every read then refuses it: the descriptor, the versions, the rows, the ODPS sheet,
+        the OData feed and the package's files under /v1/pub answer 410 GONE to a caller the package's
+        audience admits (404 to anyone else), and the MCP export answers GONE. The version files stay
+        stored under the owner's retention policy, and a new publish (POST /v1/datapackages) restores
+        the package. With `purge=true` every stored file of the package and its pointer are deleted as
+        well, and the package is gone (404 everywhere).
+
+        The owner in person, or the owner's agent, app grant or ecosystem app holding `storage:write`.
+        Another account gets 403 FORBIDDEN, a principal of the owner without the word 403
+        SCOPE_DENIED, and every refusal comes before any write. Withdrawing a package already
+        withdrawn answers 200 with `already_withdrawn: true`. MCP: aimeat_datapackage_withdraw.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: purge, in: query, required: false, schema: { type: boolean, default: false }, description: 'true also deletes every stored file of the package and its pointer.' }
+      responses:
+        '200':
+          description: '`{ package_id, name, status: "withdrawn", withdrawn_at, purged, already_withdrawn, files_deleted, catalogue_removed }`'
+        '400':
+          description: INVALID_INPUT. The name is not a package name
+        '401':
+          description: AUTH_REQUIRED. No credential, or the shared anonymous principal
+        '403':
+          description: FORBIDDEN for another account; SCOPE_DENIED for a principal of the owner without storage:write
+        '404':
+          description: No such package
+
+  /v1/datapackages/{owner}/{name}/odps:
+    get:
+      operationId: getDataPackageOdps
+      summary: The ODPS product sheet of one version
+      description: |
+        The ODPS v4.1 product sheet of one version, projected when it is read from the descriptor and
+        the version's audience, so it states who reads the package now. `details.visibility` is
+        public, dataspace (every account of this node), organisation (the members of one organism) or
+        private, and `x-aimeat.audience` names the AIMEAT audience (public, members, organism:<id> or
+        private). `authenticationMethod` is `none` only for a public package and `Token` (an AIMEAT
+        bearer token) for the others.
+
+        YAML by default; `format=json` answers the envelope with the sheet under `odps`. Readable by
+        whoever may read the package, and refused as GET /v1/datapackages/{owner}/{name} refuses. A
+        version published before 2026-11-01 also has an `odps.yaml` stored beside its descriptor; its
+        /v1/pub address redirects here.
+      tags: [Data Packages]
+      security: [{}, { BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: version, in: query, required: false, schema: { type: string }, description: 'sha256:… to pin one version. Without it, the newest.' }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [yaml, json], default: yaml } }
+      responses:
+        '200':
+          description: The sheet, as YAML (text/yaml) or, with format=json, `{ odps_version, content_hash, odps }`
+          content:
+            text/yaml:
+              schema: { type: string }
+        '403':
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
+        '404':
+          description: No such package or version, or the caller may not read it
+        '410':
+          description: GONE. The owner withdrew the package
 
   /v1/datapackages/{owner}/{name}/versions:
     get:
@@ -27799,6 +27871,8 @@ paths:
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package
+        '410':
+          description: GONE. The owner withdrew the package
 
   /v1/datapackages/{owner}/{name}/rows/{resource}:
     get:
@@ -27825,6 +27899,8 @@ paths:
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
           description: No such package, version or resource
+        '410':
+          description: GONE. The owner withdrew the package
 
   # ── OData v4 feed ──────────────────────────────────────────
   # The surface Excel, Power BI and Tableau connect to natively and then refresh by themselves. A
@@ -27870,6 +27946,8 @@ paths:
           description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package (OData error shape, not the node envelope)
+        '410':
+          description: The owner withdrew the package (OData error shape, code Gone)
 
   /v1/odata/{owner}/{name}/$metadata:
     get:
@@ -27903,6 +27981,8 @@ paths:
           description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package
+        '410':
+          description: The owner withdrew the package (OData error shape, code Gone)
 
   /v1/odata/{owner}/{name}/{resource}:
     get:
@@ -27951,6 +28031,8 @@ paths:
           description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
         '404':
           description: No such package, version or entity set
+        '410':
+          description: The owner withdrew the package (OData error shape, code Gone)
         '501':
           description: A query construct this feed does not implement — refused rather than ignored
 
@@ -54881,6 +54963,12 @@ paths:
         without the word gets 403 SCOPE_DENIED.
         Supports wildcard keys with path separators.
 
+        A data package's own file under `datapkg/` (its `latest.json`, a version's
+        `datapackage.json`, a resource CSV the descriptor names) is read on the package's audience,
+        as GET /v1/datapackages/{owner}/{name} reads it: an `organism:<id>` package's files open for
+        the organism's members although they are stored at `private`. A withdrawn package's files
+        answer 410. A version's `odps.yaml` redirects to the sheet projected at read time.
+
         With `mode=handle` the response is a presigned, TTL-limited `download_url` plus metadata
         instead of the bytes, so an agent or liaison can hand the URL to a fetch or a document
         parser without pulling binary through a tool result. The access decision is identical. A
@@ -54968,12 +55056,16 @@ paths:
             Link:
               description: '`<record_url>; rel="ai-provenance"`, when the file has a record.'
               schema: { type: string }
+        '302':
+          description: A data package version's stored `odps.yaml` redirects to GET /v1/datapackages/{owner}/{name}/odps?version=…, the sheet projected from the version's audience.
         '304':
           description: Not modified. The If-None-Match or If-Modified-Since validator still matches.
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
+        '410':
+          description: GONE. The file is part of a data package its owner withdrew; only a caller the package's audience admits learns this.
 
   /v1/federation/peer/introduce:
     post:

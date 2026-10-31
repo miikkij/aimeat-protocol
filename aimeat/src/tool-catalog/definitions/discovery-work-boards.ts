@@ -5,6 +5,8 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-01 — aimeat_datapackage_withdraw: withdraw a data package, or with purge delete its files,
+ *     as DELETE /v1/datapackages/{owner}/{name} does (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-31 — aimeat_storage_upload takes `direct`, an upload straight to the file store (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   2026-10-30 — aimeat_storage_upload takes `store`, the store the bytes are kept in (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — aimeat_admin_incident_resolve decides a record of the platform-fee incident ("uncount" or
@@ -307,6 +309,22 @@ export const discoveryWorkBoardsTools = [
             limit: { type: 'number', description: 'Rows for csv/json (default 500, max 5000).', zod: z.number().int().positive().max(5000) },
             offset: { type: 'number', description: 'Row to start from, for csv/json.', zod: z.number().int().nonnegative() },
             select: { type: 'array', description: 'Only these columns.', zod: z.array(z.string().max(INPUT_LIMITS.name)) },
+        },
+    },
+    {
+        name: 'aimeat_datapackage_withdraw',
+        description: 'Withdraw one of your owner\'s data packages, so nobody reads it any more: the descriptor, the rows, the OData feed, the ODPS sheet and the files at its permanent addresses answer 410 Gone, and the package leaves the catalogue. The version files stay stored under the retention policy, and publishing a version again with aimeat_datapackage_publish restores the package. purge: true deletes every stored file of the package as well, which cannot be undone. Only the owner\'s own packages; needs storage:write.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        // Destructive (it stops every read) and idempotent: a second withdrawal answers already_withdrawn.
+        annotations: { title: 'Withdraw Data Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+        // The word DELETE /v1/datapackages/{owner}/{name} asks a principal of the owner.
+        scope: 'storage:write',
+        // Three surfaces, not the four publish and export are on: commerce sells data, it does not take it back.
+        surfaces: ['appdev', 'agent', 'service'],
+        input: {
+            ref: { type: 'string', required: true, description: 'pkg:owner/name of the package. A version pin (@sha256:...) is ignored: a withdrawal covers every version.', zod: z.string().max(INPUT_LIMITS.id) },
+            purge: { type: 'boolean', description: 'true also deletes every stored file of the package and its pointer. Default false: the files stay and a new publish restores the package.' },
         },
     },
     {

@@ -63,6 +63,8 @@ You sign in with a sign-in link. Write your address in the sign-in window, and t
 
 <!--store-->
 The demo ([aimeat.io](https://aimeat.io)), the store ([store.aimeat.io](https://store.aimeat.io)) and your own AIMEAT are three separate accounts. If something happens in one, it does not affect the others.
+
+![The demo, the store and your own AIMEAT are three separate accounts](/help/img/three-accounts-en.png)
 <!--/store-->
 
 <!--nostore-->

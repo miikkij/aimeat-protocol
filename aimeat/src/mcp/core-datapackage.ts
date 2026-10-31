@@ -20,11 +20,18 @@
  *   IT WRITES THROUGH services/datapackage/, not through storage. An MCP tool that reached the store
  *   itself would be a second implementation of the quality gate, the hash and the address, and
  *   `aimeat/no-storage-in-mcp` exists because that has already happened here.
- * @structure registerCoreDataPackageTools() — aimeat_datapackage_publish, aimeat_datapackage_export
+ *
+ *   AND A THIRD FOR TAKING ONE BACK. aimeat_datapackage_withdraw calls the service DELETE
+ *   /v1/datapackages/{owner}/{name} calls; neither of the other two tools has a shape that holds it.
+ * @structure registerCoreDataPackageTools() — aimeat_datapackage_publish, aimeat_datapackage_export,
+ *   aimeat_datapackage_withdraw
  * @usage
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-11-01 — aimeat_datapackage_withdraw withdraws a package (purge deletes its files), through the
+ *     service DELETE /v1/datapackages/{owner}/{name} calls; aimeat_datapackage_export answers GONE for a
+ *     withdrawn package to a reader its audience admits (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-24 — aimeat_datapackage_publish refuses the shared anonymous principal with AUTH_REQUIRED, as
  *     POST /v1/datapackages does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -59,6 +66,7 @@ import { emitChange } from '../services/event-bus.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { publishPackage, openPackage, readRows, parseRef } from '../services/datapackage/store.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE, type DatapackageReader } from '../services/datapackage/audience.js';
+import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
 import { scopeDeniedText } from './scope-denied-answer.js';
 import { toCsv } from '../services/datapackage/table.js';
 import type { TableSchema } from '../services/datapackage/contract.js';
@@ -109,6 +117,9 @@ export function registerCoreDataPackageTools(
      * is the answer on a node that turned enforcement off.
      */
     const scopeRefusal = async (ref: string, reader: DatapackageReader) => {
+        // A withdrawn package answers GONE to a reader its audience admits, as REST answers 410.
+        const withdrawn = await withdrawalOfRef(store, ref, config.nodeId, reader);
+        if (withdrawn) return toolError('GONE', withdrawnMessage(ref, withdrawn.withdrawnAt));
         const parsed = parseRef(ref, config.nodeId);
         if (!parsed || !lacksPackageReadScope(parsed.ownerGhii, reader)) return null;
         if (!(await openPackage(store, ref, config.nodeId, ownerAuthOf(parsed.ownerGhii)))) return null;
@@ -274,6 +285,37 @@ export function registerCoreDataPackageTools(
                     note: 'This is a WINDOW, not the table. For the whole thing use format "url" and let the target '
                         + 'program read the address — pulling every row through a model context is slow and billed.',
                 } : {}),
+            });
+        },
+    );
+
+    // ── aimeat_datapackage_withdraw ──
+    // The same service DELETE /v1/datapackages/{owner}/{name} calls (services/datapackage/withdraw.ts),
+    // which decides who may withdraw: the owner's principal with storage:write.
+    mcp.registerTool(
+        'aimeat_datapackage_withdraw',
+        {
+            description: descriptionFor('aimeat_datapackage_withdraw'),
+            inputSchema: zodShapeFor('aimeat_datapackage_withdraw'),
+            annotations: annotationsFor('aimeat_datapackage_withdraw'),
+        },
+        async ({ ref, purge }) => {
+            if (isAnonymousPrincipal({ sub: agentGaii })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
+            const parsed = parseRef(ref, config.nodeId);
+            if (!parsed) return toolError('INVALID_INPUT', 'ref must look like "pkg:owner/name".');
+            const out = await withdrawPackage(store, caller(), parsed.ownerGhii, parsed.name, { purge: purge === true });
+            if (!out.ok) {
+                if (out.code === 'SCOPE_DENIED') {
+                    return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_datapackage_withdraw', [DATAPACKAGE_WITHDRAW_SCOPE], { baseUrl: config.baseUrl, agentGaii }) }], isError: true as const };
+                }
+                return toolError(out.code, out.message);
+            }
+            return jsonContent({
+                package_id: out.packageId, status: 'withdrawn', withdrawn_at: out.withdrawnAt, purged: out.purged,
+                already_withdrawn: out.alreadyWithdrawn, files_deleted: out.filesDeleted, catalogue_removed: out.catalogueRemoved,
+                note: out.purged
+                    ? 'The package and every stored file of it are deleted. Its addresses answer 404 now.'
+                    : 'Withdrawn: every read of the package answers 410 and it is out of the catalogue. Publishing a version again restores it.',
             });
         },
     );
