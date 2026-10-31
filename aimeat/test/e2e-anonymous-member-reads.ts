@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-anonymous-member-reads
  * @version-history
+ *   2026-10-31 — A Design Book part in proposal: aimeat_designbook_search and aimeat_designbook_get answer
+ *     the minted anonymous token as the REST reads do (secaudit2026oct31w2 round 10, W2-3).
  *   v1.0.0 — 2026-10-27 — Initial (secaudit2026oct26).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -147,6 +149,64 @@ await test('usage: the minted anonymous token still writes and reads its own ano
     assert(!w.isError, `anonymous write: ${w.text.slice(0, 200)}`);
     const r = await callTool(anonMcp!, 'aimeat_memory_read', { key });
     assert(!r.isError && /"n"\s*:\s*1/.test(r.text), `anonymous read: ${r.text.slice(0, 200)}`);
+});
+
+// ─── A Design Book part still in proposal (secaudit2026oct31w2 round 10, W2-3) ───
+// REST shows a part that is not published only to a signed-in reader (routes/designbook.ts isSignedIn),
+// and the minted anonymous token is not one. aimeat_designbook_search and aimeat_designbook_get must
+// answer that token the same.
+const proposedPart = `anon-mr-proposed-${stamp}`;
+const partBody = {
+    v: 1, look: 'editorial',
+    blocks: [
+        { id: 'top', component: 'hero', props: { title: '<App name>', sub: '<One line on what it is>' } },
+        { id: 'items', component: 'list', props: { source: '<prefix>.items' }, span: 'main' },
+    ],
+};
+
+await test('fixture: an owner proposes a Design Book part, and REST hides it from the minted token (404)', async () => {
+    const own = await json('/v1/designbook', as(tokenA, {
+        method: 'POST',
+        body: JSON.stringify({ part: { id: proposedPart, kind: 'fill', title: 'Anon member reads fill', summary: 'A cover over a list.', body: partBody } }),
+    }));
+    assert(own.status === 201 && own.body.data?.part?.status !== 'published', `owner propose: ${own.status} ${JSON.stringify(own.body?.error ?? own.body?.data?.part?.status)}`);
+    const rest = await json(`/v1/designbook/${proposedPart}`, as(anonToken));
+    assert(rest.status === 404, `minted token REST get: ${rest.status}`);
+});
+
+await test('MCP aimeat_designbook_get of a part in proposal: the minted anonymous token is answered NOT_FOUND, as on REST', async () => {
+    const r = await callTool(anonMcp!, 'aimeat_designbook_get', { id: proposedPart });
+    assert(r.offered, `the tool is offered to the anonymous token: ${r.text.slice(0, 200)}`);
+    assert(r.isError && /^NOT_FOUND: /.test(r.text) && !r.text.includes('Anon member reads fill'), `minted token MCP get: ${r.text.slice(0, 200)}`);
+});
+
+await test('MCP aimeat_designbook_search: the minted anonymous token finds no part in proposal, by word or by status', async () => {
+    const byWord = await callTool(anonMcp!, 'aimeat_designbook_search', { q: proposedPart });
+    assert(!byWord.text.includes(proposedPart), `minted token search by word: ${byWord.text.slice(0, 200)}`);
+    const byStatus = await callTool(anonMcp!, 'aimeat_designbook_search', { status: 'proposed', limit: 200 });
+    assert(!byStatus.text.includes(proposedPart), `minted token search by status: ${byStatus.text.slice(0, 200)}`);
+    const parts = (byStatus.data?.parts ?? []) as any[];
+    assert(parts.every(p => p.status === 'published'), `minted token sees a part not published: ${JSON.stringify(parts.map(p => p.status))}`);
+});
+
+await test('usage: an agent of another signed-in owner still reads and finds the part in proposal over MCP', async () => {
+    const r = await callTool(memberMcp!, 'aimeat_designbook_get', { id: proposedPart });
+    assert(!r.isError && r.text.includes(proposedPart), `member agent get: ${r.text.slice(0, 200)}`);
+    const s = await callTool(memberMcp!, 'aimeat_designbook_search', { status: 'proposed', q: proposedPart });
+    assert(!s.isError && s.text.includes(proposedPart), `member agent search: ${s.text.slice(0, 200)}`);
+});
+
+await test('usage: the minted anonymous token still reads the published shelf, a published part and the reasons over MCP', async () => {
+    const map = await callTool(anonMcp!, 'aimeat_designbook_search', {});
+    assert(!map.isError && map.text.length > 0, `map view: ${map.text.slice(0, 200)}`);
+    const pub = await callTool(anonMcp!, 'aimeat_designbook_search', { status: 'published', limit: 5 });
+    const first = ((pub.data?.parts ?? []) as any[])[0];
+    assert(!pub.isError && first?.id, `published search: ${pub.text.slice(0, 200)}`);
+    const one = await callTool(anonMcp!, 'aimeat_designbook_get', { id: first.id });
+    assert(!one.isError && one.text.includes(first.id), `published get: ${one.text.slice(0, 200)}`);
+    const reasons = await callTool(anonMcp!, 'aimeat_designbook_search', { view: 'reasons' });
+    assert(!reasons.isError, `reasons view: ${reasons.text.slice(0, 200)}`);
+    await json(`/v1/designbook/${proposedPart}`, as(tokenA, { method: 'DELETE' }));
 });
 
 console.log('\n' + '─'.repeat(40));
