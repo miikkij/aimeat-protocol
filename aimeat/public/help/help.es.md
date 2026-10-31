@@ -62,7 +62,7 @@ Pide una aplicación en el [chat](/v1/chat), por ejemplo: "Hazme una aplicación
 Entras con un enlace de acceso. Escribe tu dirección en la ventana de entrada y el enlace te llegará por correo. El enlace sirve una vez y durante 15 minutos, y no necesitas contraseña.
 
 <!--store-->
-La demo de AIMEAT ([aimeat.io](https://aimeat.io)), la tienda ([store.aimeat.io](https://store.aimeat.io)) y tu propio AIMEAT son tres sitios distintos, y en cada uno entras por separado. Así, el acceso a uno no abre los demás.
+La demo ([aimeat.io](https://aimeat.io)), la tienda ([store.aimeat.io](https://store.aimeat.io)) y tu propio AIMEAT son tres cuentas distintas. Si pasa algo en una, no afecta a las demás.
 <!--/store-->
 
 <!--nostore-->

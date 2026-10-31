@@ -17567,7 +17567,7 @@
     "loginLinkSendFirst": "Send the sign-in link",
     "loginLinkNoteFirst": "A sign-in link comes to your email. Open it on this same device within 15 minutes. You need no password.",
     "loginLinkPasswordWhy": "If you set a password yourself, you can use it.",
-    "loginLinkPlacesFirst":"The AIMEAT demo, the store and your own AIMEAT are three separate places, and you sign in to each one separately. That way the sign-in of one place does not open the others.",
+    "loginLinkPlacesFirst":"The demo, the store and your own AIMEAT are three separate accounts. If something happens in one, it does not affect the others.",
     "authErrorUsedLink": "This sign-in link has already been used or is not valid. Ask for a new one below, or sign in another way.",
     "authErrorExpired": "This sign-in link has expired. Ask for a new one below.",
     "authErrorDisabled": "This account has been deactivated. Contact the administrator of this service.",
