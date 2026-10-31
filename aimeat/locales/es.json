@@ -599,11 +599,13 @@
           "anonymous_principal_records": "Lo que escribió el agente anónimo compartido",
           "erasure_leftover_schedules": "Programaciones que quedaron de cuentas eliminadas",
           "subdomain_site_origin": "Aplicaciones de otras personas en direcciones de tu dominio",
-          "platform_fee_records": "Registros de comisiones en dinero sin autor conocido"
+          "platform_fee_records": "Registros de comisiones en dinero sin autor conocido",
+          "federation_settlement": "Liquidaciones de un par que pasaban el límite diario"
         },
         "detail": {
           "subdomain_site_origin": "Estas direcciones ({count}) muestran una aplicación que publicó otra persona y también funcionan en tu dominio: {labels}. Funcionan como antes hasta que elijas.",
-          "platform_fee_records": "Estos registros de comisiones en dinero ({count}) se parecen a los que escribe una venta, pero nada indica si los escribió una venta o la propia cuenta. Se cuentan en tus comisiones como antes hasta que elijas."
+          "platform_fee_records": "Estos registros de comisiones en dinero ({count}) se parecen a los que escribe una venta, pero nada indica si los escribió una venta o la propia cuenta. Se cuentan en tus comisiones como antes hasta que elijas.",
+          "federation_settlement": "{node} mandó {count} liquidaciones el {day} ({morsels} morsels en total) que habrían pasado el límite diario de {limit} morsels. No se sumó nada. Si confías en este servidor, sube su límite en la página Federación."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -9483,6 +9485,9 @@
   "notiftext.agreement_breach_op.body": "El aviso está en el historial del contrato.",
   "notiftext.agreement_ended_op.title": "El contrato con {counterparty} ha terminado: borra los datos",
   "notiftext.agreement_ended_op.body": "La fecha de borrado está en la página del contrato.",
+  "notiftext.federation_settlement_refused.title": "Se rechazó una liquidación de {node}",
+  "notiftext.federation_settlement_refused.body": "Habría sumado {amount} morsels y pasado el límite diario de {limit}. No se sumó nada. Si confías en este servidor, sube su límite en la página Federación. Después, su operador podrá mandar la liquidación otra vez.",
+  "notiftext.federation_settlement_refused.open": "Abrir la página Federación",
   "notiftext.internet_opening_requested.title": "{owner} pide abrir {app} a internet",
   "notiftext.internet_opening_requested.body": "Motivo: {reason}. Formularios que se abren con ella: {forms}. Sigue cerrada hasta que un operador lo apruebe.",
   "notiftext.internet_opening_opened.title": "{owner} abrió {app} a internet",
@@ -12056,6 +12061,11 @@
     "fedAllowMessaging": "Entregar mensajes aquí",
     "fedAllowBroadcast": "Anunciar a todos aquí",
     "fedAllowSettlement": "Mover morsels a este registro",
+    "fedSettleCeiling": "Liquidaciones al día",
+    "fedSettleCeilingNode": "Límite diario del servidor",
+    "fedSettleCeilingNone": "Sin límite",
+    "fedSettleCeilingOwn": "Límite propio",
+    "fedSettleCeilingAmount": "Morsels al día",
     "fedTierLadderTitle": "Qué deja hacer cada nivel a un par",
     "fedTierLocked": "El nivel de este par no lo permite. Cambia el nivel para permitir más.",
     "fedTierMeaning_contact": "Solo mensajes. Sin catálogo, sin memoria, sin enrutado, y ninguno aparece en las listas públicas del otro.",
@@ -26021,6 +26031,14 @@
         "ex1": "Activado: un servidor socio cuyos agentes intercambian trabajo con los agentes de aquí. Los morsels de ese trabajo se liquidan aquí.",
         "ex2": "Desactivado: un par con el que solo intercambias mensajes. Nada de lo que manda cambia un saldo aquí.",
         "tip": "Déjalo activado para los pares con los que intercambias trabajo. Desactívalo para un par en el que ya no confías: una liquidación es la única petición de un par que cambia saldos aquí."
+      },
+      "settlement_ceiling": {
+        "title": "Liquidaciones al día",
+        "short": "Lo máximo en morsels que las liquidaciones de este par pueden sumar aquí en un día. Si se pasa, la liquidación se rechaza y recibes un aviso.",
+        "what": "Una liquidación suma morsels que nadie pagó aquí, así que cada día tiene un límite. Por defecto, las liquidaciones de un par caben en lo que queda del límite diario de morsels nuevos de este servidor. En ese mismo límite cuentan los morsels que crea un operador y los paquetes de ritmo vendidos aquí. Puedes dar a un par un límite propio, o quitar el límite a un par en el que confías. Una liquidación que pasa el límite no suma nada. La ves en la página Seguridad y recibes un aviso, y el otro servidor puede mandarla otra vez cuando subas el límite.",
+        "ex1": "Límite diario del servidor: un par que no conoces bien. Sus liquidaciones comparten el límite con los morsels nuevos de este servidor.",
+        "ex2": "Sin límite: un servidor socio cuyos agentes trabajan mucho con los tuyos y en cuyo operador confías.",
+        "tip": "Para que un par no pueda liquidar nada, desactiva Mover morsels a este registro."
       },
       "relay": {
         "title": "Retransmitir a este par",

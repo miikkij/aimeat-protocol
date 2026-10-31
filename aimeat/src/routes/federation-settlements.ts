@@ -11,6 +11,11 @@
  *   - uses buildHopSigningMessage / computeRelayFeeDistribution for relayed multi-hop settlements
  *
  * @version-history
+ *   2026-10-31 — A settlement credits at most what is left of the daily ceiling (services/settlement-
+ *     ceiling.ts): the node's ceiling on morsels added from nothing, or the ceiling or no limit the
+ *     operator set for that peer. Past it the answer is 429 QUOTA_EXCEEDED with the reason, nothing is
+ *     credited, the tracking code stays unused, and the refusal is recorded on the Security page and
+ *     told to the operators (secaudit2026oct31w2 round 10, W2-4, ruling 3).
  *   2026-10-29 — The ledger row is written before the credit, in one transaction with it, and the
  *     database holds one federation_settlement row per identity and tracking code (migration 0122): a
  *     copy taken by another node process at the same moment answers 409 CONFLICT and credits nothing.
@@ -51,6 +56,7 @@ import type { RelayFeeDistribution } from '../types/route-manifest.js';
 import { emitChange } from '../services/event-bus.js';
 import { NONCE_WINDOW_MS } from '../services/request-nonce.js';
 import { isUniqueViolation } from './agent-tasks/dedupe.js';
+import { settlementRoom, recordRefusedSettlement, settlementRefusalMessage } from '../services/settlement-ceiling.js';
 
 /** Thrown inside the settlement transaction when the credited identity is not on this node, to roll the ledger row back. */
 class NoSuchAccount extends Error {}
@@ -66,6 +72,21 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
      * answers 409 as a later one does (secaudit2026oct26, settle duplicate-check-not-atomic-with-credit).
      */
     const settling = new Set<string>();
+
+    /**
+     * The ceiling's room is read and the credit written by one settlement at a time in this process,
+     * so two that arrive together cannot both take the last of it. A settlement waits only for the
+     * one before it, which reads one sum and writes one row.
+     */
+    let queue: Promise<unknown> = Promise.resolve();
+    function oneAtATime<T>(fn: () => Promise<T>): Promise<T> {
+        const run = queue.then(fn, fn);
+        // The caller gets the error from `run`; the queue only has to go on to the next settlement.
+        queue = run.then(() => undefined, (err: unknown) => {
+            logger.warn('settle: a settlement failed inside the one-at-a-time section; the next one goes on', { error: String(err) });
+        });
+        return run;
+    }
 
     // ── P1-11: Signed Federation Settlements ──
 
@@ -217,35 +238,55 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             }
         }
 
-        // Record the settlement, then credit, in one transaction. The ledger row goes first: the
-        // database holds one federation_settlement row per identity and tracking code (Postgres 0122,
-        // SQLite schema-settlement-once.ts), so a copy another node process took at the same moment
-        // fails here and credits nothing. An identity this node does not have rolls the row back.
-        try {
-            await storage.transaction(async () => {
-                await storage.addTransaction({
-                    id: `txn-${randomBytes(8).toString('hex')}`,
-                    gaii,
-                    type: 'federation_settlement',
-                    amount: Math.floor(amount),
-                    counterpartyGaii: from_node,
-                    trackingCode: `settle:${tracking_code}`,
-                    timestamp: new Date().toISOString(),
+        // The daily ceiling on what a peer's settlements add (services/settlement-ceiling.ts; ruling 3 of
+        // 2026-10-31, secaudit2026oct31w2 round 10): the room is read and the credit written one
+        // settlement at a time in this process, so two that arrive together cannot both take the last
+        // of it. A refusal credits nothing, leaves the tracking code unused, and is recorded and told.
+        const credited = Math.floor(amount);
+        const outcome = await oneAtATime(async (): Promise<'settled' | 'refused' | 'no-account' | 'duplicate'> => {
+            const room = await settlementRoom(config, storage, from_node, credited);
+            if (!room.ok) {
+                await recordRefusedSettlement(config, storage, {
+                    fromNode: from_node, gaii: String(gaii), amount: credited, trackingCode: String(tracking_code),
+                    reason: typeof reason === 'string' ? reason : undefined, room,
                 });
-                if (!await storage.creditBalance(gaii, Math.floor(amount))) throw new NoSuchAccount();
-            });
-        } catch (err) {
-            if (err instanceof NoSuchAccount) {
-                res.status(404).json(error(config.nodeId, 'NOT_FOUND',
-                    `Agent ${gaii} not found on this node`));
-                return;
+                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', settlementRefusalMessage(room, credited)));
+                return 'refused';
             }
-            if (isUniqueViolation(err)) {
-                res.status(409).json(error(config.nodeId, 'CONFLICT',
-                    `Settlement already processed for tracking code ${tracking_code}`));
-                return;
+            // Record the settlement, then credit, in one transaction. The ledger row goes first: the
+            // database holds one federation_settlement row per identity and tracking code (Postgres
+            // 0122, SQLite schema-settlement-once.ts), so a copy another node process took at the same
+            // moment fails here and credits nothing. An identity this node does not have rolls the row back.
+            try {
+                await storage.transaction(async () => {
+                    await storage.addTransaction({
+                        id: `txn-${randomBytes(8).toString('hex')}`,
+                        gaii,
+                        type: 'federation_settlement',
+                        amount: credited,
+                        counterpartyGaii: from_node,
+                        trackingCode: `settle:${tracking_code}`,
+                        timestamp: new Date().toISOString(),
+                    });
+                    if (!await storage.creditBalance(gaii, credited)) throw new NoSuchAccount();
+                });
+                return 'settled';
+            } catch (err) {
+                if (err instanceof NoSuchAccount) return 'no-account';
+                if (isUniqueViolation(err)) return 'duplicate';
+                throw err;
             }
-            throw err;
+        });
+        if (outcome === 'refused') return;
+        if (outcome === 'no-account') {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `Agent ${gaii} not found on this node`));
+            return;
+        }
+        if (outcome === 'duplicate') {
+            res.status(409).json(error(config.nodeId, 'CONFLICT',
+                `Settlement already processed for tracking code ${tracking_code}`));
+            return;
         }
 
         logger.info(`Federation settlement applied: ${amount} morsels to ${gaii} from node ${from_node} (tc: ${tracking_code})`);
@@ -255,7 +296,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
             from_node,
             to_node,
             gaii,
-            amount: Math.floor(amount),
+            amount: credited,
             tracking_code,
             relay_distribution: relayDistribution,
         }));

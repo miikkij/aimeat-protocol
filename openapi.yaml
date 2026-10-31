@@ -32327,11 +32327,24 @@ paths:
                     the node's; `node` or null follows the node's setting again. The same as
                     PUT /v1/federation/peers/{nodeId}/relay-claim. 400 INVALID_INPUT for any other
                     word, before anything is written.
+                settlement_ceiling:
+                  nullable: true
+                  oneOf:
+                    - type: integer
+                      minimum: 1
+                    - type: string
+                      description: '"none", "node", or a whole number as digits'
+                  description: >-
+                    How many morsels this peer's settlements may add a day: a whole number of its own,
+                    "none" for no limit, or "node" (or null) for this node's daily ceiling on morsels
+                    added from nothing. The same as PUT /v1/federation/peers/{nodeId}/settlement-ceiling.
+                    The answer carries the setting back as `settlement_ceiling` (a number, "none", or
+                    null). 400 INVALID_INPUT for any other value, before anything is written.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
-          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null. Nothing is written.
+          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null, or a `settlement_ceiling` that is not a whole number of at least 1, none, node or null. Nothing is written.
         '404':
           description: No peer with that node id
         '409':
@@ -32433,6 +32446,60 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
           description: INVALID_INPUT, a missing value or any word but optional, required and node. Nothing is written.
+        '403':
+          description: Not an operator
+        '404':
+          description: NOT_FOUND, no peer with that node id
+
+  /v1/federation/peers/{nodeId}/settlement-ceiling:
+    put:
+      operationId: setPeerSettlementCeiling
+      summary: Set how many morsels one peer's settlements may add a day (operator)
+      description: |
+        A signed settlement (POST /v1/federation/settle) adds morsels no balance on this node paid.
+        By default (`node`) a peer's settlement fits in what is left today (UTC) of this node's daily
+        ceiling on morsels added from nothing, AIMEAT_MAX_OPERATOR_MINT_PER_DAY, counting mints,
+        pacing-pack sales and every peer's settlements together; the mint and the pack sale do not
+        count settlements. A whole number gives this peer a ceiling of its own, counted over its own
+        settlements; `none` takes the limit away. A settlement past the ceiling answers 429
+        QUOTA_EXCEEDED, credits nothing, and is recorded on the Security page with a notice to the
+        operators. The same write as `aimeat_admin_federation_settlement_ceiling_set`.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settlement_ceiling]
+              properties:
+                settlement_ceiling:
+                  nullable: true
+                  oneOf:
+                    - type: integer
+                      minimum: 1
+                    - type: string
+                      description: '"none", "node", or a whole number as digits'
+      responses:
+        '200':
+          description: >-
+            `node_id` and `settlement_ceiling`: `setting` (a number, "none", or null for the node's),
+            `daily_limit` (morsels a day, null for no limit), `counts_against` (peer, node or none)
+            and `credited_today` (what this peer's settlements added since the start of the UTC day).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, anything but a whole number of at least 1, none, node or null. Nothing is written.
         '403':
           description: Not an operator
         '404':
@@ -55156,7 +55223,10 @@ paths:
         over `{from_node, to_node, gaii, amount, tracking_code, reason, timestamp}`; `to_node` must be
         this node, `timestamp` must be within five minutes of this node's clock (400 STALE_TIMESTAMP
         otherwise), and a tracking code is credited once (409 CONFLICT the second time, also for
-        copies of one settlement that arrive at the same moment).
+        copies of one settlement that arrive at the same moment). A settlement credits at most what
+        is left today (UTC) of the daily ceiling for the sending peer: this node's ceiling on morsels
+        added from nothing, or the ceiling or no limit the operator set for that peer
+        (PUT /v1/federation/peers/{nodeId}/settlement-ceiling).
       tags: [Federation]
       requestBody:
         required: true
@@ -55169,6 +55239,12 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          description: >-
+            QUOTA_EXCEEDED, the settlement would pass the daily ceiling for the sending peer. Nothing
+            is credited and the tracking code stays unused; the refusal is recorded on this node's
+            Security page and its operators are told. Send it again after the operator raised the
+            ceiling, or after midnight UTC.
 
   /v1/federation/settle/outbound:
     post:
