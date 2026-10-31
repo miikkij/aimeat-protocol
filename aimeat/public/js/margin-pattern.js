@@ -12,6 +12,8 @@
  * @usage
  *   import { loadMarginPattern, applyMarginPattern, MARGIN_PATTERNS } from '/js/margin-pattern.js';
  * @version-history
+ *   v1.2.0 — 2026-10-31 — load() answers the prefs record it read, so the shell applies the help on a
+ *     word (js/help-hover.js) from the same request.
  *   v1.1.0 — 2026-09-15 — A visitor with no session gets the default pattern, for the front page's margins.
  *   v1.0.0 — 2026-08-29 — Initial.
  */
@@ -49,15 +51,20 @@ export function marginPatternOf(prefs) {
  * Read the record and apply it. Signed out, there is no record: the default pattern goes on, and
  * only the pages that declare strip widths (the front page) show it, so a visitor sees the front
  * page wearing the same margins as the home and every other public page looks as before.
+ * Answers the record it read ({} without one), so the shell applies the other page-wide choices in
+ * it (js/help-hover.js) from the same request.
+ * @returns {Promise<Record<string, unknown>>}
  */
 export async function loadMarginPattern() {
-  if (!getSession()) { applyMarginPattern(DEFAULT_MARGIN_PATTERN); return; }
+  if (!getSession()) { applyMarginPattern(DEFAULT_MARGIN_PATTERN); return {}; }
   try {
     const r = await apiGet('/v1/memory/home.prefs?soft=1');
     const prefs = r?.data?.exists === false ? {} : (r?.data?.value ?? {});
     applyMarginPattern(marginPatternOf(prefs));
+    return prefs;
   } catch (e) {
     swallowed('margin-pattern: prefs', e);
     applyMarginPattern(DEFAULT_MARGIN_PATTERN);
+    return {};
   }
 }
