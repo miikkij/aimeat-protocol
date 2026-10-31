@@ -24,6 +24,8 @@
  * @structure default export Landing({ navigate })
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v7.2.0 — 2026-10-31 — A node the store sold shows its owner's start page (owner-start.js) instead of
+ *     the demo floor, until the owner saves a front page layout of their own (Jouni v27 P3).
  *   v7.1.0 — 2026-10-16 — The layout's passages carry their records (freeformProvenance), for the AI label.
  *   v7.0.0 — 2026-09-14 — The message frame's page (TARGET-075): the fallback tree mirrors the
  *     new DEFAULT_LAYOUTS.portal, built from landing-v2*.js. The arrival logic is untouched.
@@ -121,7 +123,8 @@ import { Hero2, TenSeconds, LinuxLine, Close2 } from './landing-v2.js';
 import { Projector } from './landing-v2-projector.js';
 import { PromptCards, Wall2 } from './landing-v2-cards.js';
 import { SignageShowcase } from './landing-v2-signage.js';
-import { storeHref } from '/js/site.js';
+import { storeHref, customerNode } from '/js/site.js';
+import { OwnerStart } from './owner-start.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function Landing({ navigate }) {
@@ -188,6 +191,14 @@ export default function Landing({ navigate }) {
   // THE FALLBACK BELOW IS NOT DEAD CODE. This is the door an anonymous visitor arrives at, and a
   // page that renders nothing because one fetch failed is the worst outcome on the whole node. If
   // the layout cannot be read, the sections render in the order this file has always used.
+  // A NODE THE STORE SOLD shows its owner's start page until the owner puts a page of their own
+  // there (views/owner-start.js, Jouni v27 P3): the demo floor below advertises the product to the
+  // person who has just bought it. A saved layout is the owner's own page, so it wins; an own HTML
+  // page never reaches this view at all (routes/bootstrap.ts serves it first).
+  if (customerNode() && surface.ready && surface.source !== 'stored') {
+    return html`<${OwnerStart} navigate=${navigate} />`;
+  }
+
   if (!surface.failed && surface.layout) {
     return html`
       <div class="ld">

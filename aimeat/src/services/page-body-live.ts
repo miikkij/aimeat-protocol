@@ -32,6 +32,10 @@
  * @usage
  *   const live = await livePageMarkdown('/', config, storage);
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The help page's text version is public/help/help.<lang>.md, the file the
+ *     view reads (Jouni v27 P4), in the node's own language and with the store variant on a node the
+ *     store sold. It used to list the old page's questions from help.q.*, so a reader without
+ *     JavaScript got the page that no longer exists, morsels included.
  *   v1.0.2 — 2026-10-03 — The help page's text version lists the knowledge question as the page does,
  *     and its steps read help.start1-3, which now name the profile first (the newcomer's path).
  *   v1.0.1 — 2026-09-30 — readChangelog() and ChangelogEntry exported: node-update-check.ts compares
@@ -45,7 +49,6 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { appSeoIndexable } from './app-seo.js';
 import { listSearchableMembers } from './portfolio-members.js';
-import { createT } from '../i18n.js';
 import { logger } from '../utils/logger.js';
 
 /** Owner text on one markdown line: whitespace folded, markdown syntax dropped, length capped. */
@@ -75,6 +78,36 @@ export function readChangelog(): ChangelogEntry[] {
     break;
   }
   return changelog;
+}
+
+/** public/help/help.<lang>.md, read once per language: it ships with the build. */
+const helpFiles = new Map<string, string | null>();
+function readHelpFile(lang: string): string | null {
+  if (helpFiles.has(lang)) return helpFiles.get(lang)!;
+  let text: string | null = null;
+  for (const p of [join(here, '..', '..', 'public', 'help', `help.${lang}.md`), join(here, '..', '..', '..', 'public', 'help', `help.${lang}.md`)]) {
+    if (existsSync(p)) { text = readFileSync(p, 'utf-8'); break; }
+  }
+  helpFiles.set(lang, text);
+  return text;
+}
+
+/**
+ * The help page's text as the view shows it (public/views/help.js, helpSections): the same file,
+ * in the node's own language, with only the store or the non-store variant kept, and the
+ * "{#id}" section addresses dropped from the headings.
+ */
+export function helpPageMarkdown(config: AimeatConfig): string | undefined {
+  const lang = ['en', 'fi', 'es'].includes(config.siteLinks?.defaultLocale ?? '') ? config.siteLinks.defaultLocale : 'en';
+  const source = readHelpFile(lang) ?? readHelpFile('en');
+  if (!source) return undefined;
+  const store = Boolean((config.siteLinks?.purchasePlan ?? '').trim());
+  return source
+    .replace(/<!--store-->([\s\S]*?)<!--\/store-->/g, (_m, inner: string) => (store ? inner : ''))
+    .replace(/<!--nostore-->([\s\S]*?)<!--\/nostore-->/g, (_m, inner: string) => (store ? '' : inner))
+    .replace(/^(#{2,3} .*?)[ \t]*\{#[a-z0-9-]+\}[ \t]*$/gm, '$1')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim() + '\n';
 }
 
 /** The apps a search engine may list, newest first. */
@@ -143,21 +176,8 @@ async function build(path: string, config: AimeatConfig, storage: Storage): Prom
         return `- [${name}](${b}/v1/portfolio/${encodeURIComponent(m.username)})${bio ? `: ${bio}` : ''}`;
       }), ''].join('\n');
     }
-    case '/v1/help': {
-      // The questions the help page answers, in its own words and order (public/views/help.js).
-      const t = createT('en');
-      const qs = ['cost', 'privacy', 'agent', 'organism', 'knowledge', 'connect', 'broken'];
-      const lines = ['## ' + t('help.startTitle'), '',
-        `1. ${t('help.start1')}`, `2. ${t('help.start2')}`, `3. ${t('help.start3')}`, '',
-        '## ' + t('help.qTitle'), ''];
-      for (const q of qs) {
-        const question = t(`help.q.${q}.q`);
-        const answer = t(`help.q.${q}.a`);
-        if (question === `help.q.${q}.q` || answer === `help.q.${q}.a`) continue;
-        lines.push(`### ${question}`, '', answer, '');
-      }
-      return lines.join('\n');
-    }
+    case '/v1/help':
+      return helpPageMarkdown(config);
     default:
       return undefined;
   }

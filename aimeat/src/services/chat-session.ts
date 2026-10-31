@@ -32,6 +32,10 @@
  * @usage
  *   for await (const u of runChatTurn({ storage, config }, ownerName, threadId, text)) { … }
  * @version-history
+ *   v1.16.0 -- 2026-10-31 -- A turn that published an app ends at its limit without the answer phase,
+ *     and its words always carry the app's address (chatTurn.appReady), taken from the publish call's
+ *     own answer. On crew34 the model published, read the person's data until the time ran out, and
+ *     the turn ended in "say continue" with no address (v31 K35).
  *   v1.15.0 -- 2026-10-31 -- withoutToolMarkers also removes a tool call the model wrote in its own
  *     syntax and goose could not parse: DeepSeek's DSML tags and a `name="…" string="…"` fragment (v31 K36).
  *   v1.14.0 -- 2026-10-31 -- The session's MCP token names the MCP endpoint and the process's /v1/llm
@@ -95,7 +99,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { GooseAcpClient, McpServerNotLoadedError, aimeatMcpServer, type PromptImage, type SessionUpdate } from './goose-acp.js';
 import {
-    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText,
+    TURN_LIMITS, TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, appReadyText, publishedAppUrl,
     type GuardReason, type NodeUpdate, type ProgressStep,
 } from './chat-turn-guard.js';
 import { DEFAULT_LOCALE, createT, type Locale } from '../i18n.js';
@@ -493,6 +497,8 @@ export async function* runChatTurn(
     const tools = new Map<string, { title: string; status: string }>();
     const cards = new Map<string, { kind: string; title: string; url?: string; image?: string; ref?: string }>();
     let answer = '';
+    /** The address of the app this turn published, from the publish call's own answer. */
+    let publishedApp: string | undefined;
 
     // WHAT THE PERSON SEES BEFORE THE AGENT SPEAKS (services/chat-turn-guard.ts). A reasoning model
     // spends 15 to 35 s per round and writes its words at the end, so without these lines a turn of
@@ -554,6 +560,7 @@ export async function* runChatTurn(
                         // Keyed by what it points at, so the same thing published twice in one turn
                         // is one card rather than two identical ones.
                         if (update.card) cards.set(update.card.url ?? update.card.ref ?? update.card.title, update.card);
+                        publishedApp = publishedAppUrl(tools.get(key)?.title ?? '', update.card) ?? publishedApp;
                     }
                     yield update;
                 }
@@ -580,7 +587,12 @@ export async function* runChatTurn(
         // to answer from what it found; past the answer phase's own limit the node ends the turn in
         // words of its own. A person who pressed Stop is not asked anything further.
         const finishedAnyway = main.end?.kind === 'done' && main.end.stopReason !== 'cancelled';
-        if (main.limit && !signal?.aborted && !finishedAnyway) {
+        // An app this turn published needs no answer phase: what is left is to give its address, and
+        // the node has it from the publish (crew34 check, 2026-10-31: the model published, then read
+        // the person's data until the time ran out, and the turn ended without the address).
+        if (main.limit && !signal?.aborted && !finishedAnyway && publishedApp) {
+            end = { kind: 'done', stopReason: 'end_turn' };
+        } else if (main.limit && !signal?.aborted && !finishedAnyway) {
             yield { kind: 'guard', phase: 'wrap_up', reason: main.limit, text: progressText(locale, 'wrappingUp') };
             yield progress('wrappingUp');
             callsSinceWords = true;
@@ -588,7 +600,9 @@ export async function* runChatTurn(
                 toolCalls: TURN_LIMITS.wrapUpToolCalls, rounds: 2, ms: TURN_LIMITS.wrapUpMs,
             }, Date.now()));
             end = wrap?.end ?? null;
-            if (!wrap || wrap.limit || end?.kind === 'error') {
+            if (publishedApp && (!wrap || wrap.limit)) {
+                end = { kind: 'done', stopReason: 'end_turn' };
+            } else if (!wrap || wrap.limit || end?.kind === 'error') {
                 const stopped = stoppedText(locale);
                 const words = `${paragraphBreak(answer)}${stopped}`;
                 answer += words;
@@ -606,6 +620,12 @@ export async function* runChatTurn(
                 return null;
             });
             if (refused) end = refused;
+        }
+        // A published app's address is in the words whatever else happened, written once.
+        if (publishedApp && end?.kind !== 'error' && !signal?.aborted && !answer.includes(publishedApp)) {
+            const words = `${paragraphBreak(answer)}${appReadyText(locale, publishedApp)}`;
+            answer += words;
+            yield { kind: 'text', text: words };
         }
         if (end) yield end;
     } finally {

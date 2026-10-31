@@ -12,6 +12,8 @@
  * @structure InstallCta({ compact }) — compact drops the body line for tight surfaces (chat).
  * @usage import { InstallCta } from '/components/InstallCta.js';  html`<${InstallCta} />`
  * @version-history
+ *   v1.3.0 — 2026-10-31 — On a node the store sold, the title names the buyer's own AIMEAT, not
+ *     AIMEAT.IO, which is a different place (install.titleBuyer; seen on the v32 Home shot).
  *   v1.2.0 — 2026-09-24 — "Not now" is the action link's text tone (Jouni's decision "Dismiss").
  *   v1.1.0 — 2026-09-24 — Install is the underlined action link (Jouni's decision "Panel action").
  *   v1.0.0 — 2026-08-16 — Initial: prompt-backed card + iOS hint + per-browser dismissal.
@@ -20,6 +22,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import {
     installAvailable, isInstalled, isIos, promptInstall, onInstallChange,
     dismissInstall, installDismissed,
@@ -46,7 +49,9 @@ export function InstallCta({ compact = false }) {
     return html`
         <div class="install-cta ${compact ? 'install-cta--compact' : ''}" role="note">
             <div class="install-cta-text">
-                <span class="install-cta-title">${tr('install.title', 'Put AIMEAT.IO behind its own button')}</span>
+                <span class="install-cta-title">${customerNode()
+                    ? tr('install.titleBuyer', 'Put your AIMEAT behind its own button')
+                    : tr('install.title', 'Put AIMEAT.IO behind its own button')}</span>
                 ${!compact && html`<span class="install-cta-body">
                     ${offer
                         ? tr('install.body', 'Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.')
