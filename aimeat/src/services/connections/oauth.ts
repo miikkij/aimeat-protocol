@@ -27,6 +27,9 @@
  * @structure startAuthorization · completeAuthorization · resolveClient · fetchAccountIdentity
  * @usage import { startAuthorization, completeAuthorization } from './oauth.js';
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and the
+ *     completion reads the `__Host-` cookie for a round bound over https (roundBindingHeld)
+ *     (secaudit2026oct31w2 round 10, W2-19).
  *   v1.3.0 — 2026-10-15 — Facebook, Instagram and Reddit: the scopes join with the provider's own
  *     separator, its extra authorize parameters ride along, a token answer wrapped in `data` is read,
  *     and the round ends in social-finish.ts, which turns the exchanged token into the publishing
@@ -50,7 +53,7 @@ import { readJson } from '../../utils/read-capped.js';
  *  more than this to sign a person in (secaudit 2026-10, C6). */
 const OAUTH_ANSWER_MAX_BYTES = 256 * 1024;
 import { sealCredential, openCredential } from './credential.js';
-import { bindingMatches, roundApprovalUrl, sealRoundSecret, openRoundSecret } from '../oauth-round-secrets.js';
+import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie, type RoundCookies } from '../oauth-round-secrets.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import { finishSocialToken, SOCIAL_FINISH_PROVIDERS } from './social-finish.js';
@@ -78,6 +81,8 @@ interface StatePayload {
    * Absent until the owner confirms a round started outside their browser.
    */
   bind?: string;
+  /** Which cookie carries the binding; absent on a round written before 2026-10-31 (the plain one). */
+  bindCookie?: RoundBindCookie;
   /** The provider's authorize address, kept so the confirmation step can hand it to the owner. */
   authorizeUrl?: string;
   /**
@@ -180,6 +185,8 @@ export async function startAuthorization(
      * other caller, whose round then waits for the owner to confirm it on the node's page.
      */
     bindBrowser?: (state: string, ttlMs: number) => string;
+    /** Which cookie bindBrowser set ('host' over https), stored with the binding. */
+    bindCookie?: RoundBindCookie;
   },
 ): Promise<StartResult> {
   const provider = findProvider(ctx.providers, input.provider);
@@ -253,7 +260,7 @@ export async function startAuthorization(
   const account = typeof input.account === 'string' ? input.account.trim().slice(0, 200) : '';
   const payload: StatePayload = {
     provider: provider.id, instance, mode: input.mode, authorizeUrl,
-    ...(bind ? { bind } : {}), ...(account ? { account } : {}),
+    ...(bind ? { bind, ...(input.bindCookie ? { bindCookie: input.bindCookie } : {}) } : {}), ...(account ? { account } : {}),
   };
 
   await ctx.storage.createVerificationNonce({
@@ -450,8 +457,11 @@ async function fetchAccountIdentity(
  */
 export async function completeAuthorization(
   ctx: ConnectContext,
-  /** `binding` is the round cookie the callback request carried ('' when it carried none). */
-  input: { state: string; code: string; binding: string },
+  /**
+   * `binding` is the plain round cookie the callback request carried ('' when it carried none),
+   * `hostBinding` the `__Host-` one, `secure` whether it came over https (RoundCookies).
+   */
+  input: { state: string; code: string } & RoundCookies,
 ): Promise<CompleteResult> {
   const nonce = await ctx.storage.getVerificationNonce(input.state);
   if (!nonce || nonce.type !== 'connect') {
@@ -476,7 +486,7 @@ export async function completeAuthorization(
   // The browser that approved at the provider must be the one the round was bound to: the starter's
   // own, or the owner's after they confirmed it on the node's page. Refused before the code is
   // exchanged, so nothing is sealed for anybody else (secrets audit 2026-10-09, chapter 2).
-  if (!bindingMatches(input.binding, payload.bind)) {
+  if (!roundBindingHeld(input, payload.bind, payload.bindCookie)) {
     return {
       ok: false, code: 'NOT_THIS_BROWSER',
       reason: 'this sign-in was not started in this browser, so nothing was connected. Start again from your own account.',
