@@ -87,6 +87,7 @@ One node can serve a company, its staff and the partner companies it approves, a
 - **Everyone on the node sees each other** in the address book, and a colleague's first message needs no approval.
 - **Classification.** Content is public, internal, confidential or highly confidential. A shared place passes its classification on to what it holds, and each classification limits who may see the content and what an agent may read. ([data classification](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#24-data-classification))
 - **The records the GDPR asks for:** a record of processing for the node, each organism and each app, and data processing agreements made from what the node holds. ([AI transparency and compliance](https://github.com/miikkij/aimeat-protocol/blob/main/docs/AIMEAT-Feature-List.md#17-ai-transparency-and-compliance))
+- **AI calls that stay in Europe.** The node's AI calls go only to model servers in the EU or the EEA, the United Kingdom and Switzerland, or only to the United States, or to any country. You choose, you can let each person choose, and every answer says where it was processed. The privacy page and the records of processing follow the setting. ([where AI calls are processed](https://github.com/miikkij/aimeat-protocol/blob/main/docs/operations/openrouter-region.md))
 
 ## What it does
 
