@@ -15,6 +15,8 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   2026-10-31 — PeerSettlementCeilingSchema for PUT /v1/federation/peers/:nodeId/settlement-ceiling
+ *     (secaudit2026oct31w2 round 10).
  *   2026-10-30 — ChunkedUploadInitSchema takes `store` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   String limits — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   Field errors — 2026-10-27 — validateBody answers through models/validation-issues.ts: each detail
@@ -339,6 +341,12 @@ export const PeeringRequestSchema = z.object({
 export const PeeringDecisionSchema = z.object({
     decision: z.enum(['approve', 'reject']),
     reason: z.string().max(10_000).optional(),
+});
+
+/** PUT /v1/federation/peers/:nodeId/settlement-ceiling: a whole number, "none", "node" or null.
+ *  The words themselves are read by services/settlement-ceiling.ts parseSettlementCeiling. */
+export const PeerSettlementCeilingSchema = z.object({
+    settlement_ceiling: z.union([z.number(), z.string().max(INPUT_LIMITS.id), z.null()]),
 });
 
 export const HeartbeatSchema = z.object({

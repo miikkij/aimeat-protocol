@@ -1499,11 +1499,13 @@
           "anonymous_principal_records": "Mitä jaettu anonyymi agentti kirjoitti",
           "erasure_leftover_schedules": "Poistetuilta tileiltä jääneet ajastukset",
           "subdomain_site_origin": "Muiden sovelluksia oman verkkotunnuksesi osoitteissa",
-          "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä"
+          "platform_fee_records": "Rahamaksujen tietueet, joiden kirjoittajaa ei tiedetä",
+          "federation_settlement": "Vertaisen selvitykset, jotka ylittivät päivärajan"
         },
         "detail": {
           "subdomain_site_origin": "Nämä osoitteet ({count}) näyttävät sovellusta, jonka toinen henkilö julkaisi, ja ne toimivat myös omassa verkkotunnuksessasi: {labels}. Ne toimivat kuten ennenkin, kunnes valitset.",
-          "platform_fee_records": "Nämä rahamaksujen tietueet ({count}) näyttävät samalta kuin ne, jotka kauppa kirjoittaa, mutta mikään ei kerro, kirjoittiko ne kauppa vai tili itse. Ne lasketaan rahamaksuihisi kuten ennenkin, kunnes valitset."
+          "platform_fee_records": "Nämä rahamaksujen tietueet ({count}) näyttävät samalta kuin ne, jotka kauppa kirjoittaa, mutta mikään ei kerro, kirjoittiko ne kauppa vai tili itse. Ne lasketaan rahamaksuihisi kuten ennenkin, kunnes valitset.",
+          "federation_settlement": "{node} lähetti {day} selvityksiä, jotka olisivat ylittäneet päivärajan ({limit} murusta). Selvityksiä oli {count}, ja niissä oli yhteensä {morsels} murusta. Mitään ei lisätty. Jos luotat tähän palvelimeen, nosta sen rajaa Federaatio-sivulla."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -10769,6 +10771,9 @@
   "notiftext.agreement_breach_op.body": "Ilmoitus on sopimuksen historiassa.",
   "notiftext.agreement_ended_op.title": "Sopimus {counterparty}:n kanssa päättyi: poista tiedot",
   "notiftext.agreement_ended_op.body": "Poistopäivä on sopimuksen sivulla.",
+  "notiftext.federation_settlement_refused.title": "Vertaisen {node} selvitys hylättiin",
+  "notiftext.federation_settlement_refused.body": "Se olisi lisännyt {amount} murusta ja ylittänyt päivärajan, joka on {limit} murusta. Mitään ei lisätty. Jos luotat tähän palvelimeen, nosta sen rajaa Federaatio-sivulla. Sen jälkeen palvelimen operaattori voi lähettää selvityksen uudelleen.",
+  "notiftext.federation_settlement_refused.open": "Avaa Federaatio-sivu",
   "notiftext.internet_opening_requested.title": "{owner} pyytää avaamaan sovelluksen {app} internetiin",
   "notiftext.internet_opening_requested.body": "Syy: {reason}. Sovelluksen mukana aukeavat lomakkeet: {forms}. Sovellus pysyy suljettuna, kunnes operaattori hyväksyy avauksen.",
   "notiftext.internet_opening_opened.title": "{owner} avasi sovelluksen {app} internetiin",
@@ -13673,6 +13678,11 @@
     "fedAllowMessaging": "Toimita viestit tänne",
     "fedAllowBroadcast": "Tiedota kaikille täällä",
     "fedAllowSettlement": "Siirrä murusia tänne",
+    "fedSettleCeiling": "Selvitykset päivässä",
+    "fedSettleCeilingNode": "Palvelimen päiväraja",
+    "fedSettleCeilingNone": "Ei rajaa",
+    "fedSettleCeilingOwn": "Oma raja",
+    "fedSettleCeilingAmount": "Murusia päivässä",
     "fedTierLadderTitle": "Mitä kukin taso antaa vertaisen tehdä",
     "fedTierLocked": "Tämän vertaisen taso ei salli tätä. Vaihda tasoa, jos haluat sallia enemmän.",
     "fedTierMeaning_contact": "Vain viestit. Ei katalogia, ei muistia eikä reititystä, eikä kumpikaan näy toisen julkisilla listoilla.",
@@ -28381,6 +28391,14 @@
         "ex1": "Päällä: kumppanipalvelin, jonka agentit tekevät työtä täkäläisten agenttien kanssa. Työn muruset selvitetään tänne.",
         "ex2": "Pois: vertainen, jonka kanssa vaihdat vain viestejä. Mikään sen lähettämä ei muuta saldoja täällä.",
         "tip": "Pidä kytkin päällä vertaisille, joiden kanssa vaihdatte työtä. Käännä se pois vertaiselta, johon et enää luota: selvitys on ainoa vertaisen pyyntö, joka muuttaa saldoja täällä."
+      },
+      "settlement_ceiling": {
+        "title": "Selvitykset päivässä",
+        "short": "Näin monta murusta tämän vertaisen selvitykset saavat enintään lisätä tänne yhden päivän aikana. Jos raja ylittyy, selvitys hylätään ja saat siitä ilmoituksen.",
+        "what": "Selvitys lisää murusia, joita kukaan ei täällä maksanut. Siksi jokaisella päivällä on raja. Oletuksena vertaisen selvitykset mahtuvat siihen, mitä tämän palvelimen uusien murusten päivärajasta on jäljellä. Samaan rajaan lasketaan muruset, jotka operaattori luo, ja täällä myydyt tahdistuspaketit. Voit antaa yhdelle vertaiselle oman rajan. Vertaiselta, johon luotat, voit poistaa rajan kokonaan. Rajan ylittävä selvitys ei lisää mitään. Näet sen Tietoturva-sivulla ja saat ilmoituksen. Kun nostat rajaa, toinen palvelin voi lähettää selvityksen uudelleen.",
+        "ex1": "Palvelimen päiväraja: vertainen, jota et tunne hyvin. Sen selvitykset jakavat saman rajan tämän palvelimen uusien murusten kanssa.",
+        "ex2": "Ei rajaa: kumppanipalvelin, jonka agentit tekevät paljon työtä sinun agenttiesi kanssa ja jonka operaattoriin luotat.",
+        "tip": "Jos vertainen ei saa tehdä selvityksiä lainkaan, käännä sen sijaan pois kytkin Siirrä murusia tänne."
       },
       "relay": {
         "title": "Välitä tälle vertaiselle",

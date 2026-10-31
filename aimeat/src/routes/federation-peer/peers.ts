@@ -5,6 +5,9 @@
  * @description Peering-request admin decisions + peer lifecycle routes (approve/reject/delete requests,
  *   activate, heartbeat, presence, peer list/add/update, visiting→member promotion). Extracted from federation-peer.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 — 2026-10-31 — A peer's settlement ceiling: settlement_ceiling on GET /peers, on PUT
+ *     /peers/:nodeId, and its own door PUT /peers/:nodeId/settlement-ceiling (a whole number, "none",
+ *     or "node"; services/settlement-ceiling.ts; secaudit2026oct31w2 round 10, W2-4).
  *   v1.13.0 — 2026-10-29 — GET /v1/admin/peering/requests deletes the requests that expired before it
  *     lists, and a decision on an expired request answers 404 and deletes it
  *     (federation.peering_request_days; secaudit2026oct26 round 8c, federation-06).
@@ -57,7 +60,7 @@ import type { Storage } from '../../storage/interface.js';
 import { requireAuth, requireOperator } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
-import { PeeringDecisionSchema, validateBody } from '../../models/schemas.js';
+import { PeeringDecisionSchema, PeerSettlementCeilingSchema, validateBody } from '../../models/schemas.js';
 import { LIVENESS_RECOVERABLE, type PeerInfo } from '../../services/federation.js';
 import { verify } from '../../auth/keypair.js';
 import { signedMessageRefusal, audienceRefusal, pinnedRefusal, federationPeerProofPin } from '../../services/signed-node-request.js';
@@ -68,6 +71,9 @@ import { deriveTierFlags, coerceTier, clampFlagsToTier } from '../../services/fe
 import { gatePeer, selfNodeIdMessage } from '../../services/federation-peer-gate.js';
 import { getActivePolicy, evaluatePromotion } from '../../services/network-policy.js';
 import { parsePeerRelayClaim, setPeerRelayClaim, peerRelayClaimView } from '../../services/relay-claim-policy.js';
+import {
+    parseSettlementCeiling, peerSettlementCeiling, setPeerSettlementCeiling, writePeerSettlementCeiling, type SettlementCeilingSetting,
+} from '../../services/settlement-ceiling.js';
 import { promotionMetrics } from './promotion.js';
 import { describePeerOrigins } from '../../services/peer-origin-view.js';
 import { pendingRegistrationView } from '../../services/peer-origin.js';
@@ -402,6 +408,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 allow_messaging: p.allowMessaging ?? true,
                 allow_broadcast: p.allowBroadcast ?? true,
                 allow_settlement: p.allowSettlement ?? true,
+                // What this peer's settlements may add a day: a number, 'none', or null for the node's ceiling.
+                settlement_ceiling: await peerSettlementCeiling(storage, p.nodeId),
                 support_upstream: p.supportUpstream ?? false,
                 peer_mode: p.peerMode ?? 'federation',
                 allow_federated_auth: p.allowFederatedAuth ?? false,
@@ -496,7 +504,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             return;
         }
 
-        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier, relay_claim } = req.body ?? {};
+        const { url, public_key, status, share_catalogue, replicate_memory, allow_routing, allow_messaging, allow_broadcast, allow_settlement, support_upstream, peer_mode, allow_federated_auth, federation_auth_scopes, tier, relay_claim, settlement_ceiling } = req.body ?? {};
 
         // Every change is staged on a COPY and the live peers-Map object is only touched after the
         // last refusal has passed (invariant 14 — refuse before you write; audit AI-triage
@@ -586,9 +594,22 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             next.relayClaim = parsed.value;
         }
 
+        // How much this peer's settlements may add a day (services/settlement-ceiling.ts): the same
+        // words as PUT /peers/:nodeId/settlement-ceiling; a stray one refuses the whole call.
+        let ceiling: { value: SettlementCeilingSetting } | null = null;
+        if (settlement_ceiling !== undefined) {
+            const parsed = parseSettlementCeiling(settlement_ceiling);
+            if (!parsed.ok) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.message));
+                return;
+            }
+            ceiling = { value: parsed.value };
+        }
+
         // All refusals are behind us: commit to the live object and persist the same state.
         Object.assign(peer, next);
         await storage.saveFederationPeer(peer);
+        if (ceiling) await writePeerSettlementCeiling(storage, nodeId, ceiling.value, req.auth?.owner ?? 'operator');
 
         res.json(success(config.nodeId, {
             node_id: nodeId,
@@ -606,8 +627,25 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             allow_federated_auth: peer.allowFederatedAuth,
             federation_auth_scopes: peer.federationAuthScopes,
             relay_claim: peer.relayClaim ?? null,
+            settlement_ceiling: await peerSettlementCeiling(storage, nodeId),
             updated: true,
         }));
+        emitChange('federation');
+    });
+
+    // PUT /v1/federation/peers/:nodeId/settlement-ceiling — how many morsels this peer's settlements
+    // may add a day (operator only): a whole number, "none" for no limit, or "node" for this node's
+    // daily ceiling. The door aimeat_admin_federation_settlement_ceiling_set calls;
+    // services/settlement-ceiling.ts does the work for both (secaudit2026oct31w2 round 10, ruling 3).
+    router.put('/v1/federation/peers/:nodeId/settlement-ceiling', requireAuth(), requireOperator(storage), validateBody(PeerSettlementCeilingSchema, config.nodeId), async (req, res) => {
+        const out = await setPeerSettlementCeiling(config, storage, peers, req.params.nodeId as string, req.body?.settlement_ceiling, req.auth?.owner ?? 'operator');
+        if (!out.ok) {
+            res.status(out.status).json(error(config.nodeId, out.code, out.message));
+            return;
+        }
+        res.json(success(config.nodeId, { node_id: out.peer.nodeId, settlement_ceiling: out.view }, [
+            { description: 'The refused settlements, if any, on the Security page', method: 'GET', url: '/v1/admin/security/incidents' },
+        ]));
         emitChange('federation');
     });
 
