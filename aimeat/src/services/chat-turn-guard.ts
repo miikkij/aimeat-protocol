@@ -31,6 +31,20 @@
  *   - withTicks(updates, everyMs) — the update stream with a clock in it, so a limit fires in silence
  *   - progressText(locale, step) / stoppedText(locale) — the person's language, from locales/
  * @version-history
+ *   v1.2.2 — 2026-10-31 — A news or web agent also gets the runtime's `notify` tool and the
+ *     notifications:send scope, which mails its result (crewfive notify_tool.py, aimeat_notify email).
+ *   v1.2.1 — 2026-10-31 — The app path names the genre ids every AIMEAT ships (genre-workbench first),
+ *     and says a template not found is no reason to stop. On crew31 with gpt-oss-120b the turn read
+ *     the specification, looked for "a template" in the person's content, found none and published
+ *     nothing (v31 K35, the check turn on koeajo-uusi459833).
+ *   v1.2.0 — 2026-10-31 — The turn note says an agent can read the web (the runtime's news, web and
+ *     article_fetch tools), sends a clock with the proposal, and delivers by email by default. The
+ *     chat had told a buyer it found no web search and left the schedule for another turn (v31 K45-K47).
+ *   v1.1.0 — 2026-10-31 — The turn note has a path for an app (one read of the specification, a genre,
+ *     the publish, the address; no interview) and says the person is signed in and their own apps sign
+ *     them in; the answer phase publishes a page already written; a published app gets the same grace
+ *     as a proposal. On grokkoe3110b the first message read five parts of the specification, ran out
+ *     of rounds and asked the buyer to say "continue", and told them to sign in (v31 K35, K38).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { createT, type Locale } from '../i18n.js';
@@ -87,6 +101,9 @@ export function turnNote(): string {
         'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
+        'An agent can read the web: give a news agent the tools ["news", "article_fetch", "notify"] (Finnish publishers\' feeds; topics politiikka, kotimaa, paauutiset) and any other subject ["web", "article_fetch", "notify"]. When it works on a clock, send `schedule` with the proposal as a five-field cron ("0 7 * * *" every morning at 7), so their one press starts it on that clock. Its result goes to them by email unless they said otherwise: its last task sends the result with the notify tool, and the proposal\'s scopes include notifications:send. Tell them that, and that they can ask for it in their AIMEAT instead.',
+        'When the person asks for an app: finish it in this turn, with their sentence as the whole brief and no interview. Read the build specification once, aimeat_handbook_get with tier "build-app-atelier", and no other part unless the app cannot work without it. Then take a genre with aimeat_app_template_get: id "genre-workbench" for a tool or a list, "genre-receipt" for a list that reads like a till roll, "genre-almanac" for a calendar or a log. Every AIMEAT ships these, so one is always there. Build the page from its `content` and keep every script tag it has, and publish with aimeat_app_publish. A template you did not find is never a reason to stop: write the page yourself from the specification and publish it. Give them `url` from the answer.',
+        'The person is signed in here, and an app of their own signs them in by itself when they open it, so never ask them to sign in.',
     ].join('\n');
 }
 
@@ -96,6 +113,7 @@ export function wrapUpPrompt(reason: GuardReason): string {
     return [
         `[A note from this node, not from the person] This turn has used ${why} it has, so stop looking for more and answer the person now, in their language, from what you already found.`,
         'If they asked for a new agent, call aimeat_agent_propose once now with a crew_def built from what you found, name in `purpose` any data it still needs, and give them `approval_url` and `next_step` from the answer.',
+        'If they asked for an app and you have its page, publish it now with aimeat_app_publish and give them `url` from the answer.',
         'Otherwise say what you found, what is not done, and that they can say "continue" to go on.',
         'Make at most one more tool call.',
     ].join('\n');
@@ -167,7 +185,8 @@ export class TurnWatch {
         const writing = now - this.writingAt < 3_000;
         // A proposal that went through leaves only the answer to write, which is what a stop would
         // ask for anyway; it gets the answer phase's time rather than a cancel and a new round.
-        const grace = this.completed(/\bagent propose\b/) ? TURN_LIMITS.wrapUpMs : 0;
+        // The same for a published app: what is left is to give the person its address.
+        const grace = this.completed(/\b(agent propose|app publish)\b/) ? TURN_LIMITS.wrapUpMs : 0;
         if (now - this.startedAt > this.limits.ms + grace && !this.inFlight && !writing) return 'time';
         return null;
     }

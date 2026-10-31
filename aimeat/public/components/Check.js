@@ -27,6 +27,8 @@
  * @usage html`<${Check} checked=${on} onChange=${setOn}>${t('x.autoRetry')}<//>`
  *        html`${langs.map((l) => html`<${Check} radio inline name="stt-lang" checked=${lang === l} onChange=${() => setLang(l)}>${word(l)}<//>`)}`
  * @version-history
+ *   v1.4.1 — 2026-10-31 — `help` draws the question mark itself (HelpTip), the markup HelpLabel drew
+ *     until its words began to open the help; the look is unchanged.
  *   v1.4.0 — 2026-10-02 — `help`: the question mark that explains the choice; additive.
  *   v1.3.0 — 2026-09-27 — `strong`: a choice that decides what a form does, bold words and an 18px box
  *     (the old app catalogue's .mz-check), appcat parity (sections-d); additive, check-line.css
@@ -40,7 +42,7 @@
  *     layout most of them draw (a row, the box level with the words, .5rem between) (component plan C5).
  */
 import { h } from 'preact';
-import { HelpLabel } from '/components/HelpTip.js';
+import { HelpTip } from '/components/HelpTip.js';
 import htm from 'htm';
 
 const html = htm.bind(h);
@@ -64,7 +66,9 @@ export function Check({ checked, onChange, radio, name, value, hint, help, inlin
       ${hint ? html`<span class="check-words">${children}<span class="poster-hint">${hint}</span></span>` : children}
     </label>`;
   // help: the question mark after the line, outside the <label>, so pressing it does not tick the box.
-  return help ? html`<${HelpLabel} term=${help} label=${typeof children === 'string' ? children : undefined}>${line}<//>` : line;
+  // A Check keeps the question mark where other labels open the help from their words (HelpLabel),
+  // because pressing these words ticks the box.
+  return help ? html`<span class="field-label-row">${line}<${HelpTip} term=${help} label=${typeof children === 'string' ? children : undefined} /></span>` : line;
 }
 
 export default Check;

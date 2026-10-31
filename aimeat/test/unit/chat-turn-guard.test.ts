@@ -6,6 +6,8 @@
  *   counting the ceiling depends on; e2e-chat-agent holds the turn around it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chat-turn-guard.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The app path in the turn note and the answer phase, the sign-in sentence,
+ *     and the grace after a published app (v31 K35, K38).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
@@ -51,7 +53,8 @@ describe('TurnWatch', () => {
 
     it('never cuts on time while a call runs or words are being written', () => {
         const w = new TurnWatch({ toolCalls: 12, rounds: 3, ms: 10 }, 0);
-        w.observe(call('a', 'aimeat: aimeat app publish'), 5);
+        // A plain write: a published app earns the answer's grace since 2026-10-31 (the case below).
+        w.observe(call('a', 'aimeat: aimeat memory write'), 5);
         expect(w.inFlight).toBe(true);
         expect(w.reached(1_000)).toBeNull();
         w.observe({ kind: 'tool_call', id: 'a', status: 'completed' }, 1_000);
@@ -67,6 +70,13 @@ describe('TurnWatch', () => {
         expect(w.reached(TURN_LIMITS.wrapUpMs)).toBeNull();
         expect(w.reached(TURN_LIMITS.wrapUpMs + 20)).toBe('time');
     });
+
+    it('gives a turn whose app was published the same time (v31 K35)', () => {
+        const w = new TurnWatch({ toolCalls: 12, rounds: 3, ms: 10 }, 0);
+        w.observe(call('a', 'aimeat: aimeat app publish'), 5);
+        w.observe({ kind: 'tool_call', id: 'a', status: 'completed' }, 6);
+        expect(w.reached(TURN_LIMITS.wrapUpMs)).toBeNull();
+    });
 });
 
 describe('what the node tells the model', () => {
@@ -76,6 +86,25 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/one short sentence to the person before your first tool call/);
         expect(note).toMatch(/aimeat_agent_propose/);
         expect(note).toMatch(/aimeat_workspace_list, which takes that organism's id/);
+    });
+    it('the turn note builds an app in one turn and never asks the person to sign in (v31 K35, K38)', () => {
+        const note = turnNote();
+        expect(note).toMatch(/finish it in this turn/);
+        expect(note).toMatch(/no interview/);
+        expect(note).toMatch(/tier "build-app-atelier"/);
+        expect(note).toMatch(/aimeat_app_template_get: id "genre-workbench"/);
+        expect(note).toMatch(/never a reason to stop: write the page yourself/);
+        expect(note).toMatch(/aimeat_app_publish/);
+        expect(note).toMatch(/Give them `url`/);
+        expect(note).toMatch(/never ask them to sign in/);
+        expect(wrapUpPrompt('rounds')).toMatch(/publish it now with aimeat_app_publish/);
+    });
+    it('the turn note gives a news agent its web tools, its clock and email delivery (v31 K45-K47)', () => {
+        const note = turnNote();
+        expect(note).toMatch(/\["news", "article_fetch", "notify"\]/);
+        expect(note).toMatch(/\["web", "article_fetch", "notify"\]/);
+        expect(note).toMatch(/send `schedule` with the proposal/);
+        expect(note).toMatch(/sends the result with the notify tool, and the proposal's scopes include notifications:send/);
     });
     it('the request for an answer says why, and asks for the proposal once', () => {
         expect(wrapUpPrompt('rounds')).toMatch(/the rounds of tool calls/);

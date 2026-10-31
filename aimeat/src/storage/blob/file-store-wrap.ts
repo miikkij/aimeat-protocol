@@ -19,10 +19,16 @@
  *   that removal fails, the daily sweep (services/file-store/file-store-sweep.ts) finds the object no
  *   row names and removes it then. The sweep is also what removes the objects of an erased account,
  *   whose rows go by a cascade that runs in each provider and never passes through here.
- * @structure FileStoreTarget · FileStoreResolver · wrapStorageWithFileStores · relocateStorageFile
+ * @structure FileStoreTarget · FileStoreResolver · wrapStorageWithFileStores · directUploadTarget ·
+ *   storedObjectFacts · discardStorageObject · adoptStorageObject · directDownloadUrl · relocateStorageFile
  * @usage wrapStorageWithFileStores(storage, resolver);   // once, right after createStorage
  *   await relocateStorageFile(storage, owner, key, target);   // the move actions
+ *   const up = await directUploadTarget(storage, owner, undefined, 'image/png', 3600);   // client PUTs to up.url
  * @version-history
+ *   v1.2.0 — 2026-10-31 — Direct transfer: a signed write address for a new object, the row of a file
+ *     whose object a client put there (adoptStorageObject), and a signed read address for a download
+ *     door; the bytes of a large file never pass through the node
+ *     (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.1.0 — 2026-10-30 — A write may carry `storeChoice`, the store its writer named; it is handed to
  *     the resolver and never stored (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -31,7 +37,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage, StorageFileRecord } from '../interface.js';
 import { utf8VerdictFor } from '../../utils/app-content-type.js';
 import { logger } from '../../utils/logger.js';
-import { BlobStoreError, formatBlobRef, parseBlobRef, type BlobStore } from './blob-types.js';
+import { BlobStoreError, formatBlobRef, parseBlobRef, signedWriteHeaders, type BlobStore } from './blob-types.js';
 
 export interface FileStoreTarget {
   storeId: string;
@@ -158,6 +164,93 @@ export function wrapStorageWithFileStores(storage: Storage, resolver: FileStoreR
     if (removed && row?.blobRef) await discard(row.blobRef, 'the file was deleted');
     return removed;
   };
+}
+
+// ── Direct transfer: the bytes go between the client and the store, the node signs and records ──
+
+function rawOf(storage: Storage): RawFileMethods | null {
+  return (storage as Wrapped)[RAW] ?? null;
+}
+
+/** Text types up to this size get their UTF-8 verdict read from the store when a direct upload lands;
+ *  a larger one is stored without it being valid UTF-8 claimed (utf8Verified false). */
+const DIRECT_UTF8_CHECK_MAX_BYTES = 4 * 1024 * 1024;
+
+/**
+ * Where the next file of `ownerGaii` would go, as a signed address the client PUTs the bytes to, and
+ * the reference the row will name once they are there. Null when the file would go to the database or
+ * the store cannot sign one; the caller then uses an upload through the node. The object key is new,
+ * like every write's, and the reference is kept by the node (in a signed upload token), never taken
+ * from the client.
+ */
+export async function directUploadTarget(storage: Storage, ownerGaii: string, choice: string | undefined, contentType: string, expiresInSec: number):
+  Promise<{ blobRef: string; url: string; headers: Record<string, string> } | null> {
+  const raw = rawOf(storage);
+  if (!raw) return null;
+  const target = await raw.resolver.forWrite(ownerGaii, choice);
+  if (!target?.store.signedUrl) return null;
+  const objectKey = `${target.prefix}${randomUUID()}`;
+  const url = target.store.signedUrl(objectKey, { kind: 'write', expiresInSec, contentType });
+  if (!url) return null;
+  return { blobRef: formatBlobRef(target.storeId, objectKey), url, headers: signedWriteHeaders(target.store.kind, contentType) };
+}
+
+/** The size and type of the object a reference names, or null when it is not there (not uploaded yet). */
+export async function storedObjectFacts(storage: Storage, blobRef: string): Promise<{ size: number; contentType: string } | null> {
+  const raw = rawOf(storage);
+  const ref = parseBlobRef(blobRef);
+  if (!raw || !ref) return null;
+  const store = await raw.resolver.forRead(ref.storeId);
+  if (!store?.head) return null;
+  return store.head(ref.objectKey);
+}
+
+/** Remove an object a direct upload left that will not become a file (refused, or too large). */
+export async function discardStorageObject(storage: Storage, blobRef: string, why: string): Promise<void> {
+  await rawOf(storage)?.discard(blobRef, why);
+}
+
+/**
+ * Write the row of a file whose bytes a client already put in a store, through a signed address the
+ * node made for exactly this reference. The object the key named before is removed after the row has
+ * moved on, as with every write. A text file small enough gets its UTF-8 verdict from the object.
+ */
+export async function adoptStorageObject(storage: Storage, file: StorageFileRecord, blobRef: string): Promise<StorageFileRecord> {
+  const raw = rawOf(storage);
+  const ref = parseBlobRef(blobRef);
+  if (!raw || !ref) throw new BlobStoreError(`File ${file.key} has an unreadable object reference`, 0, 'BAD_REFERENCE');
+  let utf8Verified: boolean | undefined;
+  if (utf8VerdictFor({ mimeType: file.mimeType, data: Buffer.alloc(0) }) !== null) {
+    const store = await raw.resolver.forRead(ref.storeId);
+    const bytes = file.size <= DIRECT_UTF8_CHECK_MAX_BYTES && store ? await store.getRange(ref.objectKey, 0, file.size) : null;
+    utf8Verified = bytes ? utf8VerdictFor({ mimeType: file.mimeType, data: bytes }) ?? undefined : false;
+  }
+  const previous = await raw.meta(file.ownerGaii, file.key);
+  const row = { ...file };
+  delete row.storeChoice;
+  delete row.blobRef;
+  const written = await raw.create({ ...row, data: Buffer.alloc(0), blobRef, utf8Verified });
+  if (previous?.blobRef && previous.blobRef !== blobRef) await raw.discard(previous.blobRef, 'replaced by a new upload');
+  return written;
+}
+
+/**
+ * A signed address that reads one stored file straight from its store, for a download door that has
+ * already decided the caller may read it. Null when the file's bytes are in the database or the store
+ * cannot sign one, and the door sends the bytes itself.
+ */
+export async function directDownloadUrl(storage: Storage, ownerGaii: string, key: string, opts: { expiresInSec: number; filename?: string }): Promise<string | null> {
+  const raw = rawOf(storage);
+  if (!raw) return null;
+  const row = await raw.meta(ownerGaii, key);
+  const ref = parseBlobRef(row?.blobRef);
+  if (!row || !ref) return null;
+  const store = await raw.resolver.forRead(ref.storeId);
+  if (!store?.signedUrl) return null;
+  return store.signedUrl(ref.objectKey, {
+    kind: 'read', expiresInSec: opts.expiresInSec, contentType: row.mimeType,
+    ...(opts.filename ? { filename: opts.filename } : {}),
+  });
 }
 
 export type RelocateOutcome = 'moved' | 'already-there' | 'gone' | 'changed';
