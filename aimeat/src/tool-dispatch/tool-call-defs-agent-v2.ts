@@ -14,6 +14,8 @@
  * @structure agentV2CliTools[] — the handler table, spread by tool-call-defs-agent.ts
  * @usage import { agentV2CliTools } from './tool-call-defs-agent-v2.js';
  * @version-history
+ *   v1.2.0 -- 2026-10-31 -- aimeat_connector_program_set, over PUT /v1/agents/v2/connectors/:id/programs/:hash:
+ *     allow or stop a program a computer may start for an agent.
  *   v1.1.0 -- 2026-10-10 -- aimeat_connector_list and aimeat_connector_rename, over
  *     /v1/agents/v2/connectors: the machines the owner's agents run on.
  *   v1.0.0 -- 2026-09-08 -- Extracted from tool-call-defs-agent.ts (max-file-lines).
@@ -218,6 +220,20 @@ export const agentV2CliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) => client.patch(
             `/v1/agents/v2/connectors/${encodeURIComponent(requiredString(input, 'connector'))}`,
             { name: requiredString(input, 'name') },
+        ),
+    },
+    {
+        // → PUT /v1/agents/v2/connectors/:id/programs/:hash (the route takes the id or the present name)
+        name: 'aimeat_connector_program_set',
+        description: "Allow or stop a program one of the account's computers may start for an agent. The hash is the program's `hash` from aimeat_connector_list; decision is 'allow' or 'deny'.",
+        input: {
+            connector: { type: 'string', required: true, description: 'The computer: its id or its present name.' },
+            hash: { type: 'string', required: true, description: "The program's hash from aimeat_connector_list." },
+            decision: { type: 'string', required: true, description: "'allow' or 'deny'." },
+        },
+        handler: ({ client }, input) => client.put(
+            `/v1/agents/v2/connectors/${encodeURIComponent(requiredString(input, 'connector'))}/programs/${encodeURIComponent(requiredString(input, 'hash'))}`,
+            { decision: requiredString(input, 'decision') },
         ),
     },
 ];

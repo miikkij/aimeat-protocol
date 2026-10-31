@@ -10,6 +10,15 @@
  *     PATCH  /v1/agents/v2/connectors/:id  agent:write; the owner's name for one machine, addressed
  *                                          by its id or by its present name
  *     DELETE /v1/agents/v2/connectors/:id  OWNER IN PERSON; forget a machine that is not connected
+ *     PUT    /v1/agents/:name/programs     the agent itself; its connector reports the programs it may
+ *                                          start for that agent, and reads the owner's decision back
+ *     PUT    /v1/agents/v2/connectors/:id/programs/:hash
+ *                                          agent:write; allow or stop the programs under one hash
+ *
+ *   WHY ALLOWING A PROGRAM IS agent:write AND NOT THE OWNER IN PERSON. The design the developer
+ *   approved on 2026-10-31 lets an agent the owner gave that permission allow a program, as it may
+ *   already set a sibling's run mode; the machine still runs only a program it holds itself
+ *   (services/connector-programs.ts).
  *
  *   WHY THE LIST IS OPEN TO THE OWNER'S AGENTS. A person asks their own AI "make me an agent on the
  *   home machine", and the AI has to be able to say which machines there are. Everything in the
@@ -27,6 +36,8 @@
  * @structure registerConnectorRoutes(router, config, storage)
  * @usage registerConnectorRoutes(router, config, storage);
  * @version-history
+ *   v1.2.0 — 2026-10-31 — The programs a computer may start for its agents: reported by each agent,
+ *     allowed or stopped by the owner (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v1.1.0 — 2026-10-14 — The list answers `tunnel_enabled` too (connectorListAnswer), so the page
  *     asks the operator when this node takes no connectors.
  *   v1.0.0 — 2026-10-10 — Initial (wish-agentit-home-ruudusta-kuvaile-tilaa-ja-valitse-kone).
@@ -38,7 +49,25 @@ import { requireAuth, requireOwnerPrincipal, requireScope } from '../../auth/mid
 import { success, error } from '../../middleware/envelope.js';
 import { callerOf } from '../../middleware/caller.js';
 import { connectorListAnswer, renameConnector, forgetConnector } from '../../services/connector-registry.js';
+import { reportAgentPrograms, setProgramDecision } from '../../services/connector-programs.js';
 import { emitChange } from '../../services/event-bus.js';
+import { refuseAnonymousPrincipal } from '../../auth/anonymous-principal.js';
+import { requireScopeUnlessSelf } from '../../auth/self-or-scope.js';
+import { parseGAII } from '../../utils/gaii.js';
+import { z } from 'zod';
+import { validateBody } from '../../models/schemas.js';
+import { boundedText } from '../../models/input-limits.js';
+
+/** What a connector reports for one agent (services/connector-programs.ts reads it the same way). */
+const ProgramsReportSchema = z.object({
+  hash: z.string().regex(/^[0-9a-f]{64}$/).nullable().optional(),
+  status: z.enum(['allowed', 'waiting']).optional(),
+  runner: boundedText(1000).nullable().optional(),
+  wake: boundedText(1000).nullable().optional(),
+  source: z.enum(['connected', 'adopted', 'approved']).nullable().optional(),
+  since: z.string().max(40).nullable().optional(),
+});
+const ProgramDecisionSchema = z.object({ decision: z.enum(['allow', 'deny']) });
 
 export function registerConnectorRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   const ctx = { config, storage };
@@ -71,6 +100,35 @@ export function registerConnectorRoutes(router: Router, config: AimeatConfig, st
     }
     res.json(success(config.nodeId, { connector: out.connector }));
     emitChange('agents');
+  });
+
+  // An agent's connector reports that agent's programs. Its own report needs no scope; a sibling
+  // with agent:write passes the scope check and is then refused, because only the agent on the
+  // machine can say what the machine holds for it. The machine is found from the live tunnel.
+  router.put('/v1/agents/:name/programs', requireAuth(), refuseAnonymousPrincipal(), requireScopeUnlessSelf('agent:write', config.nodeId), validateBody(ProgramsReportSchema, config.nodeId), async (req, res) => {
+    const caller = callerOf(req, config.nodeId, storage);
+    if (caller.kind !== 'agent' || parseGAII(caller.principal)?.agent !== req.params.name) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'An agent reports the programs of the computer it runs on itself.'));
+      return;
+    }
+    const out = await reportAgentPrograms(ctx, caller, req.body);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, out.answer));
+  });
+
+  // The owner, or an agent of theirs with agent:write, allows or stops the programs under one hash
+  // on one computer. A question that waits for them is answered with the same decision.
+  router.put('/v1/agents/v2/connectors/:id/programs/:hash', requireAuth(), requireScope('agent:write'), validateBody(ProgramDecisionSchema, config.nodeId), async (req, res) => {
+    const caller = callerOf(req, config.nodeId, storage);
+    const out = await setProgramDecision(ctx, { caller }, req.params.id as string, req.params.hash as string, req.body?.decision);
+    if (!out.ok) {
+      res.status(out.status).json(error(config.nodeId, out.code, out.message));
+      return;
+    }
+    res.json(success(config.nodeId, { programs: out.programs }));
   });
 
   router.delete('/v1/agents/v2/connectors/:id', requireAuth(), requireOwnerPrincipal(), async (req, res) => {
