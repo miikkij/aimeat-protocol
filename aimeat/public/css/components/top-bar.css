@@ -215,7 +215,10 @@
   color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-xs);
 }
 .topnav-right a.topnav-home:hover { background: var(--bg-surface); }
-.topnav-right a.topnav-home.active { text-decoration: none; box-shadow: inset 0 -3px 0 var(--accent); }
+.topnav-right a.topnav-home.active {
+  text-decoration: none;
+  background: linear-gradient(var(--accent), var(--accent)) bottom / 100% 3px no-repeat;
+}
 .topnav-home svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 /* Truncate a long GHII in the pill so it never blows out the bar (desktop). */
 .aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
