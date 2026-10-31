@@ -31,6 +31,9 @@
  *   - withTicks(updates, everyMs) — the update stream with a clock in it, so a limit fires in silence
  *   - progressText(locale, step) / stoppedText(locale) — the person's language, from locales/
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The turn note asks for plain words: a shared place, not an organism, and the
+ *     person's name, never an identity such as name@node-id. A store buyer's first chat answer said
+ *     "organismeja" and printed their full identity (Jouni v27 P7). One added line; the rest unchanged.
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { createT, type Locale } from '../i18n.js';
@@ -86,6 +89,7 @@ export function turnNote(): string {
         '[A note from this node, not from the person]',
         'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
+        'Speak to the person in plain words in their language: say "shared place" for an organism and "workspace" for a workspace, call the person by their name, and never write an identity such as name@node-id, a key or an id to them.',
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
     ].join('\n');
 }
