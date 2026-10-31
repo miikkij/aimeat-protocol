@@ -20,15 +20,23 @@
  *   and the setting is on whatever the environment says (services/signed-node-request.ts asks the
  *   version again). A peer that has once sent the proof is held to it whatever this says
  *   (deliveryProofAt on the peer).
+ *
+ *   A package pulled from a peer must carry the signature over its component metadata when the peer
+ *   reported PACKAGE_METADATA_SIGNATURE_PEER_FROM or newer, and from every peer from this node's own
+ *   UNSIGNED_PACKAGE_METADATA_REMOVED_IN (unsignedPackageMetadataAccepted).
  * @structure FederationConfig · AUDIENCE_REQUIRED_BY_DEFAULT_IN · UNPROVEN_FORMAT_REMOVED_IN ·
  *   RELAY_CLAIM_OPTIONAL_REMOVED_IN · SIGNED_SERVICE_SUMMARY_PEER_FROM · UNSIGNED_SERVICE_SUMMARY_REMOVED_IN ·
  *   audienceRequiredByDefault(version?) · unprovenFormatLive(version?) · relayClaimOptionalLive(version?) ·
  *   serviceSummaryForm(peerVersion, ownVersion?) · unsignedServiceSummaryAccepted(heartbeatVersion, ownVersion?) ·
- *   federationDefaults()
+ *   PACKAGE_METADATA_SIGNATURE_PEER_FROM · UNSIGNED_PACKAGE_METADATA_REMOVED_IN ·
+ *   unsignedPackageMetadataAccepted(peerVersion, ownVersion?) · federationDefaults()
  * @usage
  *   import { federationDefaults } from './config-federation.js';
  *   const config = { ...federationDefaults(), ... };
  * @version-history
+ *   2026-10-31 — PACKAGE_METADATA_SIGNATURE_PEER_FROM (4.2.1), UNSIGNED_PACKAGE_METADATA_REMOVED_IN
+ *     (4.3.0) and unsignedPackageMetadataAccepted: the window for a package attestation without the
+ *     metadata signature, read by the package pull (decision Jouni 2026-10-31; secaudit 2026-10-31 inv-26).
  *   2026-10-19 — UNSIGNED_SERVICE_SUMMARY_REMOVED_IN is 4.2.0, not 4.0.5: the window closed with no
  *     release inside it when production went from 4.0.3 to 4.1.0 (Jouni, 2026-10-19).
  *   2026-10-16 — unsignedServiceSummaryAccepted: the receiving side of the same window, true through 4.0.4
@@ -81,6 +89,42 @@ export const SIGNED_SERVICE_SUMMARY_PEER_FROM = '4.0.3';
  * Jouni moved it to 4.2.0 on 2026-10-19 so the 4.1.x line carries it.
  */
 export const UNSIGNED_SERVICE_SUMMARY_REMOVED_IN = '4.2.0';
+
+/**
+ * The first node release that signs every package attestation's component metadata
+ * (`metadata_sha256` + `metadata_signature`, services/packages/peer/package-attestation.ts). A pull
+ * from a peer whose signed heartbeat named this release or a newer one is refused when the
+ * attestation carries no metadata signature (decision Jouni, 2026-10-31; secaudit 2026-10-31 inv-26).
+ */
+export const PACKAGE_METADATA_SIGNATURE_PEER_FROM = '4.2.1';
+/**
+ * The release from which this node pulls a package only when its attestation signs the component
+ * metadata, from every peer, of any version or of unknown version. Before it, a peer on an older
+ * release or of unknown version still pulls as before, so a seller node has the 4.2.x line to update
+ * (decision Jouni, 2026-10-31; secaudit 2026-10-31 inv-26).
+ */
+export const UNSIGNED_PACKAGE_METADATA_REMOVED_IN = '4.3.0';
+
+/** Whether this node pulls a package whose attestation carries no metadata signature, and why. */
+export interface UnsignedPackageMetadataAnswer {
+  accepted: boolean;
+  reason: 'window-closed' | 'peer-new' | 'peer-old' | 'peer-unknown';
+}
+
+/**
+ * The answer for a pull from a peer that reported `peerVersion` in its signed heartbeat
+ * (PeerInfo.softwareVersion; null for a source that is not a peer). From
+ * UNSIGNED_PACKAGE_METADATA_REMOVED_IN never. Before it, refused from a peer on
+ * PACKAGE_METADATA_SIGNATURE_PEER_FROM or newer, accepted from an older peer or one of unknown version.
+ */
+export function unsignedPackageMetadataAccepted(peerVersion: string | null | undefined, ownVersion: string = getSoftwareVersion()): UnsignedPackageMetadataAnswer {
+  if (versionAtLeast(ownVersion, UNSIGNED_PACKAGE_METADATA_REMOVED_IN)) return { accepted: false, reason: 'window-closed' };
+  const known = typeof peerVersion === 'string' && /^\d+\.\d+\.\d+/.test(peerVersion.trim());
+  if (!known) return { accepted: true, reason: 'peer-unknown' };
+  return versionAtLeast(peerVersion.trim(), PACKAGE_METADATA_SIGNATURE_PEER_FROM)
+    ? { accepted: false, reason: 'peer-new' }
+    : { accepted: true, reason: 'peer-old' };
+}
 
 /** Which service summary request this node sends a peer, and why. */
 export interface ServiceSummaryForm {

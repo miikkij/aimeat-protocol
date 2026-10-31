@@ -31,6 +31,8 @@
  * @usage
  *   import { buildDescriptor, signAttestation, verifyAttestation } from './package-attestation.js';
  * @version-history
+ *   v1.2.1 — 2026-10-31 — verifyComponentMetadata's comment says that `checked: false` proves
+ *     nothing and names how each caller decides it; the code is unchanged (secaudit 2026-10-31 inv-26).
  *   v1.2.0 — 2026-10-27 — The node also signs each component's install-relevant metadata from
  *     manifest.yaml (label, dependencies, meta): metadata_sha256 in the descriptor, signed by a second
  *     signature, metadata_signature, so the sign string of `signature` and every node that verifies
@@ -169,8 +171,11 @@ export async function signAttestation(
 
 /**
  * Step three: does the metadata that arrived in manifest.yaml match what the node signed? An
- * attestation from a node that signs no metadata (made before 2026-10-27) answers `checked: false`
- * and is decided as before; one that signs it must match, or the pull stops before any write.
+ * attestation from a node that signs no metadata (made before 2026-10-27) answers `checked: false`,
+ * which proves nothing about the metadata: the caller decides it. The pull takes it only inside the
+ * window in config-federation.ts (unsignedPackageMetadataAccepted), and a ZIP import lands it as
+ * unverified (secaudit 2026-10-31 inv-26). One that signs it must match, or the pull stops before
+ * any write.
  */
 export async function verifyComponentMetadata(
     publicKeyBase64: string, doc: AttestationDoc,
