@@ -26,6 +26,8 @@
  *   import { DisplayPrefsFields } from '/components/DisplayPrefsFields.js';
  *   html`<${DisplayPrefsFields} region=${r} timezone=${z} onChange=${(k, v) => set(k, v)} />`
  * @version-history
+ *   v1.1.3 — 2026-10-31 — The time zone search drops an input event no person made (typedByPerson,
+ *     Field.js): LastPass ignored the attributes of v1.1.2 and still wrote the sign-in name in.
  *   v1.1.2 — 2026-10-29 — The time zone search is kept out of password managers (autocomplete off,
  *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
  *     owner's sign-in name into a find field.
@@ -42,6 +44,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { typedByPerson } from '/components/Field.js';
 
 const tr = (key, fallback, vars) => { const v = t(key, vars); return v && v !== key ? v : fallback; };
 
@@ -182,7 +185,7 @@ export function DisplayPrefsFields({ region, timezone, onChange }) {
       <input type="search" class="og-input display-prefs-search" value=${zoneQuery}
         autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-bwignore="true" data-form-type="other"
         placeholder=${tr('profile.prefs.zoneSearch', 'Search for a city: Helsinki, Madrid, Tokyo…')}
-        onInput=${(e) => setZoneQuery(e.target.value)} />
+        onInput=${(e) => { if (typedByPerson(e, zoneQuery)) setZoneQuery(e.target.value); }} />
       <select class="select-field" value=${timezone || ''} size="1"
         onChange=${(e) => onChange('timezone', e.target.value)}>
         <option value="">${tr('profile.prefs.followBrowserZone', 'Follow my browser ({what})',

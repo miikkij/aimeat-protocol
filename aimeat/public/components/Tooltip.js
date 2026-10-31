@@ -13,10 +13,12 @@
  *   pointer or the focus leaves; scrolling hides it. The control is described by the words
  *   (aria-describedby) whether the tooltip is shown or not. The look is css/components/tooltip.css,
  *   on the theme's tokens and shape values only, so a theme changes it without CSS of its own.
- * @structure Tooltip({ text, title, more, quiet, children })
+ * @structure Tooltip({ text, title, more, quiet, delay, gate, children })
  * @usage html`<${Tooltip} title=${t('x.name')} text=${t('x.what')} more=${t('x.more')}>
  *          <button …>?</button><//>`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — `delay` and `gate`, for the help on a word: it waits longer, and the
+ *     person can turn it off (wish-ohje-sanan-p-ll-kysymysmerkkikursori-viiveell-tooltip-ja-kli).
  *   v1.0.0 — 2026-10-02 — Initial, extracted from HelpTip so any control can carry one (wish
  *     "Ohjenappi ja vihjeteksti asetuksille").
  */
@@ -46,11 +48,13 @@ function placeTip(anchor, bubble) {
 }
 
 /**
- * @param {{ text: any, title?: any, more?: any, quiet?: boolean, children: any }} props
+ * @param {{ text: any, title?: any, more?: any, quiet?: boolean, delay?: number, gate?: () => boolean, children: any }} props
  *   `text` the explanation; `title` the small heading over it; `more` a quiet line under it;
- *   `quiet` keeps the tooltip hidden (while what the control opened is in front of it).
+ *   `quiet` keeps the tooltip hidden (while what the control opened is in front of it);
+ *   `delay` the rest in ms before it shows (150 by default); `gate` asked each time it would show,
+ *   and false keeps it hidden (the person's own setting, read at that moment).
  */
-export function Tooltip({ text, title, more, quiet, children }) {
+export function Tooltip({ text, title, more, quiet, delay = SHOW_MS, gate, children }) {
   const [shown, setShown] = useState(false);
   const [place, setPlace] = useState(null);
   const anchor = useRef(null);
@@ -59,7 +63,7 @@ export function Tooltip({ text, title, more, quiet, children }) {
   const id = `tt${useId().replace(/[^a-zA-Z0-9_-]/g, '')}`;
 
   const later = (fn, ms) => { clearTimeout(timer.current); timer.current = setTimeout(fn, ms); };
-  const show = () => { if (!quiet) later(() => setShown(true), SHOW_MS); };
+  const show = () => { if (!quiet && (!gate || gate())) later(() => setShown(true), delay); };
   const hide = () => later(() => { setShown(false); setPlace(null); }, HIDE_MS);
   const now = () => { clearTimeout(timer.current); setShown(false); setPlace(null); };
 

@@ -4,6 +4,9 @@
  *   used by the MCP storage_download handle flow (F11). Covers sign/verify roundtrip, expiry,
  *   wrong token type, and garbage input.
  * @version-history
+ *   v1.4.0 -- 2026-10-31 -- A token that names no file version is refused: the case that accepted one
+ *     now asserts the refusal, a behaviour change Jouni approved (removal of the v1.2.1 transition;
+ *     secaudit 2026-10-31 inv-18).
  *   v1.3.0 -- 2026-10-31 -- A mint that names no file version is refused (secaudit 2026-10-31 inv-18).
  *   v1.2.0 -- 2026-10-21 -- A token without a version (minted before 2026-10-20) is served as before
  *     until it expires; a version claim that is not a string is refused.
@@ -40,17 +43,17 @@ describe('download-token', () => {
         expect(verified.version).toBe('2026-10-20T10:00:00.123Z');
     });
 
-    it('accepts a token that names no file version (minted before 2026-10-20), and it serves whatever the key holds, as before', async () => {
+    // The transition of v1.2.1 is over (Jouni, 2026-10-31): every token minted before 2026-10-20 had
+    // expired by 2026-10-21, so a token that names no file version is refused like any other token
+    // whose version cannot be checked (secaudit 2026-10-31 inv-18).
+    it('refuses a token that names no file version, with TOKEN_INVALID and a word on asking for a new URL', async () => {
         const old = await new SignJWT({ typ: 'download', key: 'k', mimeType: 'text/plain', size: 1 })
             .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
             .setSubject('alice@node')
             .setIssuedAt()
             .setExpirationTime('1h')
             .sign(privateKey);
-        const verified = await verifyDownloadToken(old);
-        expect(verified.key).toBe('k');
-        expect(verified.version).toBeUndefined();
-        expect(servesFileVersion(verified, { createdAt: '2026-10-21T08:00:00.000Z', size: 99 })).toBe(true);
+        await expect(verifyDownloadToken(old)).rejects.toMatchObject({ code: 'TOKEN_INVALID', message: expect.stringContaining('new download URL') });
     });
 
     it('refuses a token whose version claim is not a string', async () => {

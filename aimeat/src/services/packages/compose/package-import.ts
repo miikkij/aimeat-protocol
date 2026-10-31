@@ -23,6 +23,9 @@
  *   import { importParsedPackage } from './package-import.js';
  *   const out = await importParsedPackage({ storage, config }, caller, { parsed, via: 'zip' });
  * @version-history
+ *   v1.2.0 — 2026-10-31 — upstreamFromZip lands a known peer's attestation without the metadata
+ *     signature as unverified (no verifiedAt, no pinned key) instead of verified; the import itself
+ *     still goes through (decision Jouni 2026-10-31; secaudit 2026-10-31 inv-26).
  *   v1.1.1 — 2026-10-27 — upstreamFromZip also checks the signed component metadata where the source
  *     signs it (verifyComponentMetadata); a mismatch is INVALID, as a component digest is (secaudit2026oct26).
  *   v1.1.0 — 2026-09-28 — The imported record keeps the ZIP's `expects` instead of an empty manifest.
@@ -54,8 +57,9 @@ export interface PackageImportDeps { storage: Storage; config: AimeatConfig }
  *
  * THREE ANSWERS, AND THE MIDDLE ONE IS THE POINT. `undefined` — no signature, or one whose signer
  * this node has never heard of, so nothing is claimed. An `UpstreamRef` with `verifiedAt` set — the
- * signer is a peer, the signature checks out against their key, and the components hash to what it
- * covers. `'INVALID'` — the signer IS a peer this node knows and the proof fails, which is a
+ * signer is a peer, the signature checks out against their key, the components hash to what it
+ * covers, and the signed component metadata matches manifest.yaml. An attestation from a peer that
+ * signs no metadata gets the unverified `UpstreamRef` (no verifiedAt, no pinned key). `'INVALID'` — the signer IS a peer this node knows and the proof fails, which is a
  * refusal: a package claiming to come from somewhere it does not is worse than one claiming nothing.
  *
  * This road does not DEMAND a signature. Somebody moving their own package between their own nodes
@@ -90,7 +94,12 @@ export async function upstreamFromZip(
     const digests = verifyComponentDigests(d, parsed.components);
     if (!digests.ok) return 'INVALID';
     // The signed component metadata too, where the source signs it (secaudit2026oct26).
-    if (!(await verifyComponentMetadata(peer.publicKey, doc, parsed.components)).ok) return 'INVALID';
+    const metadata = await verifyComponentMetadata(peer.publicKey, doc, parsed.components);
+    if (!metadata.ok) return 'INVALID';
+    // An attestation without the metadata signature proves the bytes but not what manifest.yaml says
+    // about them (an app's tools, data map, names), so it lands as unverified: no verifiedAt and no
+    // pinned key, the same answer as a signer nobody here knows (secaudit 2026-10-31 inv-26).
+    if (!metadata.checked) return base;
 
     return { ...base, publicKey: peer.publicKey, verifiedAt: new Date().toISOString() };
 }
