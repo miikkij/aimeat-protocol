@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-31 — aimeat_storage_upload takes `direct`: the upload_url is in the file store itself and the
+ *     answer names upload_headers and complete_url (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   2026-10-30 — aimeat_storage_upload takes `store`, the store the writer names for the bytes (inline and
  *     presigned), and the inline answer says the file's `store` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-24 — aimeat_storage_download names signing in when the shared anonymous principal asks
@@ -72,6 +74,7 @@ import { toolError } from './tool-error.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../storage/blob/blob-types.js';
+import { directUploadFields } from '../services/direct-upload-answer.js';
 
 /** The refusals of a named store (services/storage-file-write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
 const STORE_CODES = new Set<string>(['UNKNOWN_STORE', 'STORE_NOT_SELECTABLE', 'STORE_NOT_TAKING_FILES', 'STORE_NOT_REACHABLE', 'NO_OWN_STORAGE']);
@@ -105,7 +108,7 @@ export function registerCoreStorageTools(
             inputSchema: zodShapeFor('aimeat_storage_upload'),
             annotations: annotationsFor('aimeat_storage_upload'),
         },
-        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id, store: storeName }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id, store: storeName, direct }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
             // The store the writer named for the bytes, checked by the shared write with the session's rights.
             const store = storeName ? { id: storeName, operator: caller ? await caller().operator() : false } : undefined;
@@ -128,6 +131,7 @@ export function registerCoreStorageTools(
                     key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
                     ...(publishGate ? { publishGate } : {}),
                     ...(store ? { store } : {}),
+                    ...(direct === true ? { direct: true } : {}),
                 });
                 if (!minted.ok) {
                     if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND' || minted.code === 'PUBLISH_NOT_ALLOWED' || STORE_CODES.has(minted.code)) return toolError(minted.code, minted.message);
@@ -145,7 +149,10 @@ export function registerCoreStorageTools(
                             expires_in_seconds: minted.expiresInSeconds,
                             // A closed node lands the file at 'members' instead of public (plan V1.6).
                             ...(minted.warnings ? { warnings: minted.warnings } : {}),
-                            note: 'PUT the raw file to upload_url. The response contains the result as JSON.',
+                            ...directUploadFields(minted),
+                            note: minted.direct
+                                ? 'PUT the raw file to upload_url with upload_headers, then POST complete_url. The complete answer is the result as JSON.'
+                                : 'PUT the raw file to upload_url. The response contains the result as JSON.',
                         }, null, 2),
                     }],
                 };

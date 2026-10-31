@@ -9,13 +9,15 @@
  *   address cannot reach the node's private network. The signature is the documented algorithm
  *   (docs.aws.amazon.com/IAM/latest/UserGuide/create-signed-request.html); s3SignatureFor is exported
  *   so a unit test holds it to AWS's published example.
- * @structure s3Target · s3SignatureFor · createS3Store
+ * @structure s3Target · s3SignatureFor · s3PresignedUrl · createS3Store
  * @usage const store = createS3Store({ kind: 's3', region: 'eu-north-1', bucket: 'b', … }, fetch);
  * @version-history
+ *   v1.1.0 — 2026-10-31 — head() and signedUrl() (a presigned GET or PUT), so a large file is written and
+ *     read straight from the bucket (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 import { createHash, createHmac } from 'node:crypto';
-import { BlobStoreError, type BlobFetch, type BlobListPage, type BlobStore, type S3Spec } from './blob-types.js';
+import { BlobStoreError, attachmentDisposition, type BlobFetch, type BlobListPage, type BlobStore, type S3Spec } from './blob-types.js';
 import { bodyBuffer, bodyText, drain, failure, uriEncode, xmlValue, xmlValues } from './blob-http.js';
 
 const EMPTY_SHA256 = createHash('sha256').update('').digest('hex');
@@ -79,6 +81,34 @@ export function s3SignatureFor(input: {
   };
 }
 
+/**
+ * A presigned address for one object (SigV4 in the query string,
+ * docs.aws.amazon.com/AmazonS3/latest/API/sigv4-query-string-auth.html): only `host` is signed and the
+ * payload is UNSIGNED-PAYLOAD, so the client sends the bytes as they are. `query` adds parameters that
+ * are signed with it, such as response-content-disposition on a read. The signature comes last, after
+ * the canonical query, which is how test/helpers/fake-s3.ts recomputes it.
+ */
+export function s3PresignedUrl(spec: S3Spec, input: {
+  method: 'GET' | 'PUT'; key: string; expiresInSec: number; now: Date; query?: Record<string, string>;
+}): string {
+  const amzDate = input.now.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  const day = amzDate.slice(0, 8);
+  const scope = `${day}/${spec.region}/s3/aws4_request`;
+  const t = s3Target(spec, input.key, {
+    ...input.query,
+    'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
+    'X-Amz-Credential': `${spec.accessKeyId}/${scope}`,
+    'X-Amz-Date': amzDate,
+    'X-Amz-Expires': String(input.expiresInSec),
+    'X-Amz-SignedHeaders': 'host',
+    ...(spec.sessionToken ? { 'X-Amz-Security-Token': spec.sessionToken } : {}),
+  });
+  const canonicalRequest = [input.method, t.path, t.query, `host:${t.host}\n`, 'host', 'UNSIGNED-PAYLOAD'].join('\n');
+  const stringToSign = ['AWS4-HMAC-SHA256', amzDate, scope, sha256Hex(canonicalRequest)].join('\n');
+  const kSigning = hmac(hmac(hmac(hmac(`AWS4${spec.secretAccessKey}`, day), spec.region), 's3'), 'aws4_request');
+  return `${t.url}&X-Amz-Signature=${createHmac('sha256', kSigning).update(stringToSign).digest('hex')}`;
+}
+
 export function createS3Store(spec: S3Spec, send: BlobFetch): BlobStore {
   const where = spec.endpoint?.trim() ? new URL(spec.endpoint).host : `s3.${spec.region}.amazonaws.com`;
   const label = `s3 bucket "${spec.bucket}" at ${where}`;
@@ -133,6 +163,24 @@ export function createS3Store(spec: S3Spec, send: BlobFetch): BlobStore {
       const res = await request('DELETE', key);
       if (!res.ok && res.status !== 404) throw await failure(res, 'Removing an object', label);
       await drain(res);
+    },
+
+    async head(key) {
+      const res = await request('HEAD', key);
+      await drain(res);
+      if (res.status === 404) return null;
+      if (!res.ok) throw await failure(res, 'Reading an object\'s size', label);
+      return { size: Number(res.headers.get('content-length') ?? 0), contentType: res.headers.get('content-type') ?? 'application/octet-stream' };
+    },
+
+    signedUrl(key, op) {
+      return s3PresignedUrl(spec, {
+        method: op.kind === 'write' ? 'PUT' : 'GET', key, expiresInSec: op.expiresInSec, now: new Date(),
+        ...(op.kind === 'read' ? { query: {
+          ...(op.contentType ? { 'response-content-type': op.contentType } : {}),
+          ...(op.filename ? { 'response-content-disposition': attachmentDisposition(op.filename) } : {}),
+        } } : {}),
+      });
     },
 
     async list(prefix, next): Promise<BlobListPage> {

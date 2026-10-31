@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-10-31 — ai-transparency: a file uploaded straight to its store has a record with no hash.
  *   2026-10-25 — configure-routing: the rule freeModelLastResort and `free_model` on the read
  *     (secaudit2026oct22 follow-up, the free model as the last resort).
  *   v1.4.2 — 2026-10-08 — ai-transparency: `media_kind`, `media_type` and `resembles_real` in the
@@ -140,7 +141,9 @@ text, not description.
   \`/v1/provenance/<id>\`, which anyone can resolve without an account once the content is public.
 - Markdown faces carry the record in frontmatter and one human-readable line in the body.
 - The record is joined to the exact bytes by a SHA-256 hash, so a third party holding the
-  content can ask this node whether it produced them.
+  content can ask this node whether it produced them. One exception: a file uploaded straight to
+  its store (\`aimeat_storage_upload { direct: true }\`) never passes through the node, so its
+  record names no hash, and an existing record that names one cannot be attached to it.
 
 ## What the node records by itself
 

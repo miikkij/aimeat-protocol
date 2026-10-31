@@ -18,6 +18,9 @@
  *   const ref = formatBlobRef(nodeStoreId('s3'), 'aimeat/files/1f0c…');
  *   const { storeId, objectKey } = parseBlobRef(row.blobRef)!;
  * @version-history
+ *   v1.1.0 — 2026-10-31 — head() and signedUrl() on a store, SignedObjectOp, signedWriteHeaders and
+ *     attachmentDisposition: a large file goes from the client to the store and back without passing
+ *     through the node (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.0.0 — 2026-10-29 — Initial (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  */
 
@@ -76,6 +79,32 @@ export interface BlobStore {
   /** Removes the object. An object that is already gone is not an error. */
   delete(key: string): Promise<void>;
   list(prefix: string, next?: string): Promise<BlobListPage>;
+  /** The object's size and content type, or null when there is none. */
+  head?(key: string): Promise<{ size: number; contentType: string } | null>;
+  /** A time-limited address that reads or writes this one object straight from the store, without
+   *  the node in between; null when the store's credentials cannot sign one (an Azure store connected
+   *  with a SAS instead of the account key). */
+  signedUrl?(key: string, op: SignedObjectOp): string | null;
+}
+
+/** What a signed object address allows. A write address creates or replaces one object; a read address
+ *  names the type and download name the store answers with. */
+export type SignedObjectOp =
+  | { kind: 'write'; expiresInSec: number; contentType: string }
+  | { kind: 'read'; expiresInSec: number; contentType?: string; filename?: string };
+
+/** The headers a client sends with its PUT to a signed write address of a store of this kind. Azure
+ *  refuses a blob write without x-ms-blob-type. */
+export function signedWriteHeaders(kind: BlobSpec['kind'], contentType: string): Record<string, string> {
+  return kind === 'azure'
+    ? { 'x-ms-blob-type': 'BlockBlob', 'content-type': contentType }
+    : { 'content-type': contentType };
+}
+
+/** `attachment; filename="…"` with the RFC 6266 `filename*` form for a name outside ASCII. */
+export function attachmentDisposition(filename: string): string {
+  const ascii = filename.replace(/[^\x20-\x7e]|["\\]/g, '_');
+  return `attachment; filename="${ascii}"; filename*=UTF-8''${encodeURIComponent(filename)}`;
 }
 
 /** A store answered something other than success. `status` is the HTTP status, 0 when none came. */

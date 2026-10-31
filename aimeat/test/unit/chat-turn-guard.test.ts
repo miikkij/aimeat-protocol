@@ -92,11 +92,19 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/finish it in this turn/);
         expect(note).toMatch(/no interview/);
         expect(note).toMatch(/tier "build-app-atelier"/);
-        expect(note).toMatch(/aimeat_app_template_get/);
+        expect(note).toMatch(/aimeat_app_template_get: id "genre-workbench"/);
+        expect(note).toMatch(/never a reason to stop: write the page yourself/);
         expect(note).toMatch(/aimeat_app_publish/);
         expect(note).toMatch(/Give them `url`/);
         expect(note).toMatch(/never ask them to sign in/);
         expect(wrapUpPrompt('rounds')).toMatch(/publish it now with aimeat_app_publish/);
+    });
+    it('the turn note gives a news agent its web tools, its clock and email delivery (v31 K45-K47)', () => {
+        const note = turnNote();
+        expect(note).toMatch(/\["news", "article_fetch", "notify"\]/);
+        expect(note).toMatch(/\["web", "article_fetch", "notify"\]/);
+        expect(note).toMatch(/send `schedule` with the proposal/);
+        expect(note).toMatch(/sends the result with the notify tool, and the proposal's scopes include notifications:send/);
     });
     it('the request for an answer says why, and asks for the proposal once', () => {
         expect(wrapUpPrompt('rounds')).toMatch(/the rounds of tool calls/);

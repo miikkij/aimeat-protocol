@@ -46,6 +46,10 @@
  *   }, { headOnly: req.method === 'HEAD', conditionals: req.headers });
  *   if (!served) { …404… }                                         // it vanished mid-request
  * @version-history
+ *   v1.4.0 -- 2026-10-31 -- A reader may offer `direct`, a signed address in the file's object store:
+ *     serveStoredFile answers a GET for a file of DIRECT_DOWNLOAD_MIN_BYTES or more with a 302 there,
+ *     after the 304 check, so the node sends none of its bytes
+ *     (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.3.0 -- 2026-10-10 -- serveStoredFile() sends a body longer than STORED_FILE_SLICE_BYTES a slice
  *     at a time, for a range and for a full download, and stops reading when the client is gone. An
  *     open-ended range (`bytes=0-`, a video element's first request) was one read of the rest of the
@@ -270,7 +274,21 @@ export interface StoredFileReader {
     range(start: number, length: number): Promise<Buffer | null>;
     /** The whole representation. Null only if the file has disappeared. */
     all(): Promise<Buffer | null>;
+    /** A signed address the bytes can be read from straight out of their object store, or null when the
+     *  file is in the database or the store cannot sign one. Asked only for a large file. */
+    direct?(): Promise<string | null>;
 }
+
+/**
+ * From this size a stored file kept in an object store is answered with a redirect to a signed address
+ * in the store: the node sends no bytes and holds none. Smaller files are sent by the node as before,
+ * so an app that fetch()es a picture across origins keeps working on a store without a CORS rule.
+ */
+export const DIRECT_DOWNLOAD_MIN_BYTES = 64 * 1024 * 1024;
+
+/** How long the signed read address of a redirected download works. A client follows it at once;
+ *  a resumed download asks the node again and gets a fresh one. */
+export const DIRECT_DOWNLOAD_TTL_SECONDS = 15 * 60;
 
 /**
  * The most of a stored file one response holds in memory at a time.
@@ -377,6 +395,19 @@ export async function serveStoredFile(
         res.status(304);
         res.end();
         return true;
+    }
+    // A large file in an object store: the caller follows a short-lived signed address and reads the
+    // bytes, ranges included, from the store itself. Asked after the caller's authorization decision,
+    // which every door makes before calling here. Never cached: the address expires.
+    if (!opts.headOnly && read.direct && file.size >= DIRECT_DOWNLOAD_MIN_BYTES) {
+        const url = await read.direct();
+        if (url) {
+            res.status(302);
+            res.setHeader('Location', url);
+            res.setHeader('Cache-Control', 'private, no-store');
+            res.end();
+            return true;
+        }
     }
     // ONE decision, made before anything is sent: can this file's content type be named without its
     // bytes? With a stored verdict, yes, and nothing outside the requested range is ever read. For a

@@ -1,7 +1,3 @@
-import { h } from 'preact';
-import htm from 'htm';
-const html = htm.bind(h);
-
 /**
  * @file SearchBar.js
  * @author Jouni Miikki
@@ -23,12 +19,19 @@ const html = htm.bind(h);
  *   html`<${SearchBar} value=${q} onInput=${e => setQ(e.target.value)}
  *        placeholder=${t('common.search')} />`
  * @version-history
+ *   v1.0.2 — 2026-10-31 — The field drops an input event no person made (typedByPerson, Field.js):
+ *     LastPass ignored the attributes of v1.0.1 and still wrote the sign-in name into a find field.
  *   v1.0.1 — 2026-10-29 — The field is kept out of password managers (autocomplete off,
  *     data-lpignore, data-1p-ignore, data-bwignore, data-form-type="other"): LastPass wrote the
  *     owner's sign-in name into a find field. The Ctrl K search uses this field.
  *   v1.0.0 — 2026-06-02 — Component unification (#24): created canonical
  *     search-bar shell backed by .search-bar / .search-bar-input in theme.css.
  */
+import { h } from 'preact';
+import htm from 'htm';
+import { typedByPerson } from '/components/Field.js';
+const html = htm.bind(h);
+
 export function SearchBar({ value, onInput, placeholder, onSubmit, ariaLabel }) {
   const onKeyDown = onSubmit
     ? (e) => { if (e.key === 'Enter') onSubmit(e.target.value); }
@@ -42,7 +45,7 @@ export function SearchBar({ value, onInput, placeholder, onSubmit, ariaLabel }) 
         placeholder=${placeholder}
         aria-label=${ariaLabel || placeholder}
         value=${value}
-        onInput=${onInput}
+        onInput=${(e) => { if (typedByPerson(e, value ?? '')) onInput?.(e); }}
         onKeyDown=${onKeyDown}
       />
     </div>
