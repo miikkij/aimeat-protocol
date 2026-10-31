@@ -157,6 +157,7 @@
   <link rel="stylesheet" href="/css/components/hint.css">
   <link rel="stylesheet" href="/css/components/tooltip.css">
   <link rel="stylesheet" href="/css/components/explain-dialog.css">
+  <link rel="stylesheet" href="/css/components/overview-map.css">
   <link rel="stylesheet" href="/css/components/help-tip.css">
   <link rel="stylesheet" href="/css/components/page-start.css">
   <link rel="stylesheet" href="/css/components/masthead.css">
@@ -557,6 +558,7 @@
       "/js/app-sandbox.js": "/js/app-sandbox.js",
       "/js/display-prefs.js": "/js/display-prefs.js",
       "/js/format.js": "/js/format.js",
+      "/js/ask-ai-prompt.js": "/js/ask-ai-prompt.js",
       "/js/amount.js": "/js/amount.js",
       "/js/api.js": "/js/api.js",
       "/js/input-limits.js": "/js/input-limits.js",
@@ -794,6 +796,9 @@
       "/views/home/agent-watch-parts.js": "/views/home/agent-watch-parts.js",
       "/js/services/agent-ties.js": "/js/services/agent-ties.js",
       "/views/home/machines.js": "/views/home/machines.js",
+      "/views/home/overview.js": "/views/home/overview.js",
+      "/views/home/overview-model.js": "/views/home/overview-model.js",
+      "/views/home/overview-band.js": "/views/home/overview-band.js",
       "/views/home/news-data.js": "/views/home/news-data.js",
       "/js/services/news.js": "/js/services/news.js",
       "/views/home/news-band.js": "/views/home/news-band.js",
@@ -831,6 +836,7 @@
       "/components/PageStart.js": "/components/PageStart.js",
       "/components/Tooltip.js": "/components/Tooltip.js",
       "/components/ExplainDialog.js": "/components/ExplainDialog.js",
+      "/components/OverviewMap.js": "/components/OverviewMap.js",
       "/components/InkFoot.js": "/components/InkFoot.js",
       "/components/LineList.js": "/components/LineList.js",
       "/components/LinkLine.js": "/components/LinkLine.js",
@@ -1237,6 +1243,11 @@
       // The home's agent pages: a new agent before it exists (/v1/home?new-agent=1), one agent at
       // work (/v1/home?agent=<name>), and the computers agents run on (/v1/home?computers=1; the
       // address it had first, ?machines=1, still opens it).
+      // The account's overview (/v1/home?overview=1[&focus=<item id>]), checked first: a focus
+      // value names an agent or an app and must not open that page instead.
+      if (pathname === '/v1/home' && /[?&]overview=/.test(search)) {
+        return () => import('/views/home/overview.js' + B);
+      }
       if (pathname === '/v1/home' && /[?&]new-agent=/.test(search)) {
         return () => import('/views/home/agent-new.js' + B);
       }

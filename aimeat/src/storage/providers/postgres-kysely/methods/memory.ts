@@ -9,6 +9,8 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
+ *     first, never the value (the overview's activity counts).
  *   2026-10-31 — restoreMemory with a visibility stores it in the UPDATE that clears the tombstone
  *     (secaudit 2026-10-31 inv-24).
  *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
@@ -48,7 +50,8 @@
  */
 import { sql } from 'kysely';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import type { KeyActivityRow, MemoryMetaRow, MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import { clampKeyActivityLimit } from '../../../repositories/memory.repository.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { resolveGroupId } from '../../../memory-sharing.js';
 import { buildSearchBlob, byteSize, isLive, jsonb, rowToMeta, rowToRecord } from '../helpers.js';
@@ -628,5 +631,22 @@ export const memoryMethods = {
       .where('key', 'like', likePrefix(keyPrefix))
       .executeTakeFirst();
     return { active: Number(r?.active ?? 0), archived: Number(r?.archived ?? 0) };
+  },
+
+  // Three columns, never the value: an overview counts thousands of workspace records with this.
+  // applyAll gives the filters every cross-owner read has (the bin, archived, TTL, `.version.N`).
+  async listKeyActivity(this: PostgresKyselyStorage, prefix: string, sinceIso: string, limit: number): Promise<KeyActivityRow[]> {
+    const q = applyAll(
+      this.db.selectFrom('Memory').select(['key', 'ownerGaii', 'updatedAt']).where('updatedAt', '>=', new Date(sinceIso)),
+      { prefix, excludeVersionRows: true },
+      new Date(),
+    );
+    const rows = await q.orderBy('updatedAt', 'desc').orderBy('key').orderBy('ownerGaii')
+      .limit(clampKeyActivityLimit(limit)).execute() as Array<{ key: string; ownerGaii: string; updatedAt: Date | string }>;
+    return rows.map(r => ({
+      key: r.key,
+      ownerGaii: r.ownerGaii,
+      updatedAt: r.updatedAt instanceof Date ? r.updatedAt.toISOString() : new Date(r.updatedAt).toISOString(),
+    }));
   },
 };

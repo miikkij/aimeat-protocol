@@ -23,6 +23,7 @@
  * @structure default AgentView({ navigate })
  * @usage routed at /v1/home?agent=<name> by spa.html (optional started=running|waiting|made)
  * @version-history
+ *   v1.9.0 — 2026-10-31 — "Show in the overview": the Overview page opened on this agent (views/home/overview.js).
  *   v1.8.0 — 2026-10-25 — "Open work it takes": the agent's skills (its tags), which decide the goal
  *     work it may take, with the question mark that explains open work (session cc-jouni-goals).
  *   v1.7.0 — 2026-10-19 — The page's title shows the agent's own picture (components/AgentAvatar.js) before its name, when the agent has set one.
@@ -346,6 +347,7 @@ export default function AgentView({ navigate }) {
 
       <${FormActions}>
         <${Action} href=${settings}>${p('all', 'All its settings →')}<//>
+        <${Action} href=${`/v1/home?overview=1&focus=${encodeURIComponent(`agent:${name}`)}`}>${tr('home.overview.showIn', 'Show in the overview')}<//>
       <//>
     <//>`;
 }

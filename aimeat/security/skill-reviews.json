@@ -265,7 +265,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:6d08498ae57df52e329f3528"
+      "digest": "sha256:889c734cb493a7f2ff8ef7db"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -349,7 +349,7 @@
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/models/app-tool-schemas.ts",
         "aimeat/src/commerce/app-tool-catalog.ts",
@@ -359,7 +359,7 @@
         "aimeat/src/services/refinery/pipeline.ts",
         "aimeat/src/routes/outbound.ts"
       ],
-      "digest": "sha256:7f23722fdd48a478960f79e7"
+      "digest": "sha256:e19574b16dbc48536d54d550"
     },
     "node:aimeat-data-ownership": {
       "reviewedOn": "2026-10-31",
@@ -630,7 +630,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "877f825eb4828018",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "4b105513146dc593"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "8ecbd2ded7c6d491"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"
@@ -785,7 +785,7 @@
     },
     "node:aimeat-agent-capability": {
       "aimeat/src/models/app-tool-schemas.ts": "6e6abae6d08ff4cc",
-      "aimeat/src/commerce/app-tool-catalog.ts": "dfb27bab240a9d9c",
+      "aimeat/src/commerce/app-tool-catalog.ts": "9f754fa8073a0adf",
       "aimeat/src/services/extension-ctx-contract.ts": "ba2b8499c8ca5652",
       "aimeat/src/services/connect-tunnel-push.ts": "a95e82f349c1a36c",
       "aimeat/src/services/workspace-rows/row-service.ts": "d8f6b021dd2f6813",
