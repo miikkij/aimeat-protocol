@@ -24,6 +24,7 @@
  *   import { uploadRouter } from '../routes/upload.js';
  *   app.use(uploadRouter(config, storage));
  * @version-history
+ *   2026-10-31 — POST /v1/upload/{token}/complete, the second half of a direct upload (upload-storage.ts).
  *   2026-10-29 — An extension ZIP under a new name that starts with aimeat- is refused to anyone but an
  *     operator, 409 NAME_RESERVED (services/component-name-prefix.ts; secaudit2026oct26 round 8c).
  *   2026-10-27 — An app upload passes the token's `publishing_app` (the app whose grant minted it) to publishApp (secaudit2026oct26).
@@ -175,7 +176,7 @@ import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { installCortex } from '../services/cortex-lifecycle.js';
 import { upsertCortex } from './cortex/upsert.js';
 import { keptVersionRefusal, extensionCodeOf, snapshotExtensionVersion } from '../services/component-versions.js';
-import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
+import { handleStorageUpload, declaredFromMeta, completeDirectStorageUpload } from './upload-storage.js';
 import { handleSkillUpload } from './upload-skill.js';
 import { parseGAII, localAccountName } from '../utils/gaii.js';
 import { operatorName } from '../services/operator-principal.js';
@@ -206,6 +207,9 @@ import { nodePrefixRefusal } from '../services/component-name-prefix.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
+
+    // The second half of a direct upload: the bytes are in the object store, the token names them.
+    router.post('/v1/upload/:token/complete', (req: Request, res: Response) => completeDirectStorageUpload(res, config, storage, req.params.token as string));
 
     router.put('/v1/upload/:token', async (req: Request, res: Response) => {
         const token = req.params.token as string;
