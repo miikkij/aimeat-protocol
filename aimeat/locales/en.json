@@ -15127,6 +15127,7 @@
     "notNow": "Not now"
   },
   "homeJourney": {
+    "promptFold": "Advanced: a ready prompt for an AI you use elsewhere",
     "title": "What would you like to get done?",
     "returning": "Give your connected AI a task. Your work stays in your own AIMEAT.",
     "note": "Remember something",
@@ -15233,6 +15234,16 @@
     "contentNote": "You can change the content of this site directly in the administration:"
   },
   "home": {
+    "credit": {
+      "line": "AI credit {amount}",
+      "ready": "your AI is ready",
+      "low": "running low",
+      "empty": "used up",
+      "off": "the AI is switched off on this site",
+      "topup": "Buy more credit",
+      "chatLine": "AI credit left: {amount}.",
+      "chatElsewhere": "AI credit left for everything outside this chat: {amount}."
+    },
     "welcome": "Welcome to your new home.",
     "buyerWelcome": {
       "title": "Welcome, {name}",

@@ -6,6 +6,8 @@
  *   work for their AI: the profile first (an interview that becomes their business card), then a
  *   shared place, an agent, a schedule or an app, with the result shown at home.
  * @version-history
+ *   v1.6.0 — 2026-10-31 — On a node the store sold, the copy-this-prompt block waits in a fold
+ *     (homeJourney.promptFold) instead of filling the Home (Jouni v27 P6).
  *   v1.5.0 — 2026-10-14 — "Make an agent" and "Make an app" open the ideas dialog (ideas-dialog.js).
  *     An agent example goes into the prompt the person copies to their own AI, beside a link that
  *     makes it on the new-agent page instead; an app idea's "Make its agent" moves to "Make an
@@ -53,6 +55,7 @@ import {
 } from '/components/Chooser.js';
 import { StepMat } from './step-mat.js';
 import { swallowed } from '/js/swallowed.js';
+import { customerNode } from '/js/site.js';
 import { buildJourneyPrompt } from './journey-prompts.js';
 import { JourneyPath, RoadChooser, ConnectBox, refreshHome as refresh } from './journey-roads.js';
 
@@ -136,11 +139,23 @@ export function HomeJourney() {
       <//>
       ${connected && connecting && html`<${ConnectBox} onMessage=${setMessage} />`}
       <div>
-        <p>${t('homeJourney.copyHint')}</p>
-        <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
-          quiet
-          copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
-          onCopied=${() => setCopied(true)} />
+        ${/* The prompt is written in English for any AI to read. A buyer of a store-sold node has the
+              AI here and paid for its credit, so the copy-to-another-AI prompt waits in a fold
+              there rather than filling the Home (Jouni v27 P6). */''}
+        ${customerNode()
+          ? html`<${ChooserFold} summary=${tOr('homeJourney.promptFold', 'Advanced: a ready prompt for an AI you use elsewhere')}>
+              <p>${t('homeJourney.copyHint')}</p>
+              <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
+                quiet
+                copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+                onCopied=${() => setCopied(true)} />
+            <//>`
+          : html`
+            <p>${t('homeJourney.copyHint')}</p>
+            <${PromptCard} key=${action} label=${t('homeJourney.' + action)} prompt=${prompt}
+              quiet
+              copyLabel=${t('common.copyPrompt')} copiedLabel=${t('common.copied')}
+              onCopied=${() => setCopied(true)} />`}
         ${copied && html`<p role="status">${t('homeJourney.copied')}</p>`}
         <${ChooserLinks}>
           <${Action} onClick=${refresh}>${t('homeJourney.checkResult')}<//>

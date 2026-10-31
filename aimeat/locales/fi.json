@@ -15306,6 +15306,7 @@
     "notNow": "Ei nyt"
   },
   "homeJourney": {
+    "promptFold": "Lisäasetukset: valmis kehote tekoälylle, jota käytät muualla",
     "title": "Mitä haluat saada aikaan?",
     "returning": "Anna yhdistetylle tekoälyllesi tehtävä. Työsi säilyy omassa AIMEATissasi.",
     "note": "Tallenna muistiinpano",
@@ -15412,6 +15413,16 @@
     "contentNote": "Voit vaihtaa tämän sivuston sisällön suoraan hallinnasta:"
   },
   "home": {
+    "credit": {
+      "line": "AI-saldo {amount}",
+      "ready": "tekoäly on valmis",
+      "low": "saldo on vähissä",
+      "empty": "saldo on loppu",
+      "off": "tekoäly ei ole käytössä tällä sivustolla",
+      "topup": "Osta lisää saldoa",
+      "chatLine": "AI-saldoa jäljellä {amount}.",
+      "chatElsewhere": "AI-saldoa jäljellä kaikkeen muuhun kuin tähän keskusteluun {amount}."
+    },
     "welcome": "Tervetuloa uuteen kotiisi.",
     "buyerWelcome": {
       "title": "Tervetuloa, {name}",
