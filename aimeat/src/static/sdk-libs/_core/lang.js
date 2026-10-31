@@ -7,7 +7,8 @@
  *
  *   THE ORDER is the one the platform documents (public/js/utils.js detectLocale, the build-app
  *   prompt, AIMEAT.auth.getLang): ?lang= → the stored choice ('aimeat-lang' in localStorage) → the
- *   'aimeat-lang' cookie → the browser's language → the fallback.
+ *   'aimeat-lang' cookie → the node's own language (site.default_locale, from the config prelude)
+ *   → the browser's language → the fallback.
  *
  *   WITH A LIST (the languages a page or a library carries) a source counts only when it names one
  *   of them, and the fallback is the list's first language. An EMPTY list accepts nothing and
@@ -24,6 +25,9 @@
  *   readLang(['en', 'fi', 'es']);   // a library that ships three languages
  *   pageLang();                     // the page's declared languages, or any language
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The node's own language (window.__AIMEAT_SDK_CFG__.defaultLocale) before the
+ *     browser's, as detectLocale reads it since 2026-10-29: an app on a Finnish customer's place had
+ *     its sign-in pill in English for an English browser (crew32 check turn).
  *   v1.0.0 — 2026-10-05 — Initial: the one resolver and the one setter, moved here from
  *     auth/locale.js (aimeatReadLang, aimeatApplyLang, readLocales) so the modal, the header and the
  *     two kits use them too (secaudit 2026-10, M7).
@@ -90,6 +94,9 @@ export function readLang(locales) {
     const cv = c ? pick(c[1]) : null;
     if (cv) return cv;
   } catch { /* storage blocked, or no location or document: the browser answers below */ }
+  const cfg = typeof window !== 'undefined' ? window.__AIMEAT_SDK_CFG__ : undefined;
+  const node = pick(cfg && cfg.defaultLocale);
+  if (node) return node;
   let nav = null;
   try { nav = pick(String(navigator.language || '').slice(0, 2).toLowerCase()); } catch { /* no navigator */ }
   if (nav) return nav;
