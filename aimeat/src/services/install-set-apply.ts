@@ -34,6 +34,8 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-10-31 — `owner.welcome: false` sends the owner no welcome mail, at any apply; the owner's sign-in
+ *     link is still turned on (v28 #8).
  *   2026-10-31 — A real apply claims the set's record before the real prepare and ensureOwner, which
  *     link the repository, store the pulled copies and can create the owner account; a refusal after
  *     the claim ends it with releaseRun. A second apply at the same moment answered APPLY_IN_PROGRESS
@@ -493,9 +495,14 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
         await trail();
         return { ok: false, status: 500, code: 'APPLY_FAILED', message: `The set was applied in part: ${String(err instanceof Error ? err.message : err)}. What was made is recorded, and applying the set again continues from there.` };
     }
-    // The welcome goes out once everything the person was given exists.
+    // The welcome goes out once everything the person was given exists. `owner.welcome: false` leaves
+    // the owner out at every apply: the store mails its own ready message with the sign-in link, and
+    // the two near-identical mails confused the buyer (v28 #8). ownerToWelcome() above still turns
+    // the owner's sign-in link on, which that message needs.
     record.accounts_created = [...created];
-    const toWelcome = ownerWelcome ? [...created, set.owner.email.toLowerCase()] : [...created];
+    const ownerEmail = set.owner.email.toLowerCase();
+    const withOwner = ownerWelcome ? [...created, ownerEmail] : [...created];
+    const toWelcome = set.owner.welcome === false ? withOwner.filter(e => e !== ownerEmail) : withOwner;
     try {
         // The owner's link opens the set's landing app, signed in, when the set names one.
         const landing = await landingPath(storage, ownerName, set.landing, record.packages);

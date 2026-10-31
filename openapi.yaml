@@ -57366,7 +57366,7 @@ paths:
                     node_id, url, public_key } (links a repository this node does not know yet as an active
                     peer under that key; 409 PEER_KEY_MISMATCH when a peer of that id has another key; 400
                     SELF_NODE_ID when it names this node itself), owner: { name,
-                    email, display_name? }, members?: [{ email, name?, display_name?, join: invite|account,
+                    email, display_name?, welcome? }, members?: [{ email, name?, display_name?, join: invite|account,
                     memberships: [{ organism, role: admin|member, workspaces: [key | { key, role:
                     viewer|contributor }] }] }], organism_names?: { <key>: name }, config?: { <group id>: {
                     <component id>: { <field>: value } } }, auto_update?: boolean, grant_apps?: boolean,
@@ -57383,6 +57383,9 @@ paths:
                     `app_grants`. `landing` names an app component of one of the bundle's packages:
                     the owner's welcome link opens that app, signed in, and the record keeps that path
                     (no token) as `landing_path`, so the landing can be checked without the mail.
+                    `owner.welcome: false` (default true) sends the owner no welcome mail at any
+                    apply, for a seller that mails its own sign-in link; the owner's emailed
+                    sign-in link stays on.
                 secrets:
                   type: object
                   description: 'Secret config values, `{ <group id>: { <component id>: { <field>: value } } }`. Never stored.'
