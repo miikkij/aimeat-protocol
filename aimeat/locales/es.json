@@ -13471,9 +13471,31 @@
     "notNow": "Ahora no"
   },
   "homeConnect": {
-    "lead": "Conecta aquí ChatGPT, Claude o Grok (MCP es el enchufe que da a tu IA memoria y manos), y se convierte en tu jefe de gabinete. Elige tu IA para ver los pasos para ella.",
+    "lead": "Conecta aquí ChatGPT, Claude o Grok, y se convierte en tu mano derecha: recuerda tus cosas y se ocupa de ellas por ti.",
     "button": "Conectar {ai}",
-    "other": "Otra IA"
+    "other": "Otra IA",
+    "mcpQ": "¿Qué es esto?",
+    "mcpWhat": "La conexión usa la tecnología abierta MCP. No necesitas saber nada más de ella."
+  },
+  "buyerSteps": {
+    "title": "Para empezar: {done}/{total} hecho",
+    "lead": "Hazlos en orden. Cada paso abre el siguiente.",
+    "allDone": "Todos los primeros pasos están hechos.",
+    "more": "Más cosas que puedes hacer",
+    "done": "✓ hecho",
+    "next": "Siguiente: {step} →",
+    "connect": "Conecta tu IA (ChatGPT, Claude o Grok)",
+    "connectShort": "Conecta tu IA",
+    "connectLine": "Tu IA obtiene aquí memoria y puede ocuparse de tus cosas por ti.",
+    "profile": "Cuéntanos sobre ti: la IA aprende cómo puede ayudarte",
+    "profileShort": "Cuéntanos sobre ti",
+    "profileLine": "Unas preguntas sobre tu trabajo. Tus respuestas se convierten en tu perfil.",
+    "agent": "Da a un agente su primer trabajo",
+    "agentShort": "Da un trabajo a un agente",
+    "agentLine": "Un agente hace un trabajo acordado con un horario, también cuando no estás.",
+    "app": "Haz tu primera aplicación",
+    "appShort": "Haz una aplicación",
+    "appLine": "Pide una aplicación en el chat y recibes un enlace a la aplicación terminada."
   },
   "homeJourney": {
     "promptFold": "Avanzado: una instrucción lista para una IA que usas en otro sitio",
@@ -13597,28 +13619,24 @@
   "home": {
     "credit": {
       "line": "Saldo de IA {amount}",
-      "ready": "tu IA está lista",
+      "ready": "tu propia IA está lista para usar",
       "low": "queda poco",
       "empty": "se ha agotado",
       "off": "la IA está desactivada en este sitio",
       "topup": "Comprar más saldo",
-      "what": "¿qué es esto?",
       "chatLine": "Saldo de IA restante: {amount}.",
       "chatElsewhere": "Saldo de IA restante para todo lo que no sea esta conversación: {amount}."
     },
     "welcome": "Te damos la bienvenida a tu nuevo hogar.",
     "buyerWelcome": {
-      "title": "Te damos la bienvenida, {name}",
+      "titleNamed": "Te damos la bienvenida a tu propio AIMEAT, {name}",
+      "titlePlain": "Te damos la bienvenida a tu propio AIMEAT",
       "bought": "Compraste AIMEAT {plan}.",
       "boughtPackage": "Compraste AIMEAT {plan} con el paquete {package}.",
-      "lead": "Esto es lo primero que puedes hacer.",
-      "stepsLabel": "Tres pasos",
-      "step1": "Conecta la IA que ya usas, por ejemplo ChatGPT o Claude. Cómo hacerlo está justo debajo.",
+      "stepsLabel": "Dos pasos",
       "step2": "Di en una frase lo que quieres conseguir. AIMEAT crea un agente para ello y te lo muestra antes de que empiece.",
-      "step3": "Tu pedido y tus facturas están en la tienda, en Pedidos y facturas dentro de Ajustes.",
-      "sayLabel": "¿Qué quieres conseguir?",
-      "sayField": "Dilo en una frase",
-      "sayGo": "Muéstrame el agente"
+      "step2Waits": "Esto se abre cuando tu IA esté conectada.",
+      "settings": "Ajustes"
     },
     "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
     "signInTitle": "Entra en tu hogar",
@@ -15638,6 +15656,8 @@
     "themeLabel": "Tema",
     "lightMode": "Modo claro",
     "darkMode": "Modo oscuro",
+    "autoMode": "Automático: sigue el ajuste de tu dispositivo",
+    "autoShort": "Auto",
     "chooseLook": "Elige el aspecto",
     "usernameLabel": "Nombre de usuario",
     "passwordLabel": "Contraseña",

@@ -34,6 +34,8 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.4.0 — 2026-10-31 — "Agents at work" is done when an agent the person made has finished a task
+ *     other than its onboarding test (workersRun), not when it merely exists (Jouni, v31 K27).
  *   v1.3.0 — 2026-10-31 — The "agents at work" stage counts the workers the person made (isOwnWorker):
  *     the basic agents created with the account no longer tick it (Jouni v27 P6).
  *   v1.2.1 — 2026-10-19 — mergeJourneyProfile() writes on the version it read (expectedVersion) and
@@ -117,6 +119,12 @@ export interface JourneySignals {
     apps: number;
     /** Agents that are not a chat connection: they work on their own. */
     workers: number;
+    /**
+     * Of those, the ones that have done work: a finished task other than their onboarding's test
+     * task. An approved agent that has not run yet is not "at work" (Jouni, v31 K27, 2026-10-31:
+     * "Agentit töissä" was ticked with zero agents working).
+     */
+    workersRun: number;
 }
 
 export interface JourneyStage { id: JourneyStageId; done: boolean; declined: boolean }
@@ -180,7 +188,7 @@ export function deriveJourney(s: JourneySignals, record: JourneyRecord): Journey
         'first-result': s.firstResult,
         organise: s.organisms > 0,
         apps: s.apps > 0,
-        agents: s.workers > 0,
+        agents: s.workersRun > 0,
         share: s.sharedWithSomeone,
     };
     const declined = new Set((record.declined ?? []).map(d => d.stage));
@@ -227,6 +235,7 @@ export async function readJourneySignals(
     const sharedWithSomeone = organisms.some(o =>
         [...(o.owners ?? []), ...(o.admins ?? []), ...(o.members ?? [])].some(who => !isMe(who)));
     const apps = usage.counts.apps.used + usage.counts.extensions.used + usage.counts.cortexes;
+    const own = agents.filter(isOwnWorker);
     return {
         connected: state.helloMcp || !!firstCall,
         ownKey: usage.ai.own_key,
@@ -237,8 +246,30 @@ export async function readJourneySignals(
         organisms: organisms.length,
         sharedWithSomeone,
         apps,
-        workers: agents.filter(isOwnWorker).length,
+        workers: own.length,
+        workersRun: await countWorkersRun(storage, ghii, own),
     };
+}
+
+/**
+ * How many of these workers have finished a task that was not their onboarding's test task. One
+ * grouped count for the owner first, so an agent with nothing done costs no further read; for the
+ * rest, at most three done tasks each are looked at, and the first real one answers.
+ */
+async function countWorkersRun(storage: Storage, ownerGhii: string, workers: Array<{ gaii: string }>): Promise<number> {
+    if (!workers.length) return 0;
+    const counts = await storage.countTasksByOwner(ownerGhii);
+    let ran = 0;
+    for (const w of workers) {
+        if (!(counts[w.gaii]?.done > 0)) continue;
+        const [onboarding, done] = await Promise.all([
+            storage.getOnboarding(w.gaii),
+            storage.listAgentTasks(w.gaii, { status: 'done', perPage: 3 }),
+        ]);
+        const testId = (onboarding?.steps.find(s => s.id === 'accept_test_task')?.details as Record<string, unknown> | undefined)?.testTaskId;
+        if (done.tasks.some(t => t.id !== testId)) ran++;
+    }
+    return ran;
 }
 
 /** Both halves, one answer. */

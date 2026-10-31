@@ -15145,9 +15145,31 @@
     "notNow": "Not now"
   },
   "homeConnect": {
-    "lead": "Connect ChatGPT, Claude or Grok here (MCP is the plug that gives your AI a memory and hands), and it becomes your chief of staff. Choose your AI to see the steps for it.",
+    "lead": "Connect ChatGPT, Claude or Grok here, and it becomes your right hand: it remembers your things and takes care of them for you.",
     "button": "Connect {ai}",
-    "other": "Another AI"
+    "other": "Another AI",
+    "mcpQ": "What is this?",
+    "mcpWhat": "The connection uses the open MCP technology. You do not need to know more about it."
+  },
+  "buyerSteps": {
+    "title": "Getting started: {done}/{total} done",
+    "lead": "Do these in order. Each step opens the next.",
+    "allDone": "All the first steps are done.",
+    "more": "More you can do",
+    "done": "✓ done",
+    "next": "Next: {step} →",
+    "connect": "Connect your AI (ChatGPT, Claude or Grok)",
+    "connectShort": "Connect your AI",
+    "connectLine": "Your AI gets a memory here and can take care of things for you.",
+    "profile": "Tell about yourself – the AI learns how it can help",
+    "profileShort": "Tell about yourself",
+    "profileLine": "A few questions about your work. Your answers become your profile.",
+    "agent": "Give an agent its first job",
+    "agentShort": "Give an agent a job",
+    "agentLine": "An agent does an agreed job on a schedule, also while you are away.",
+    "app": "Make your first app",
+    "appShort": "Make an app",
+    "appLine": "Ask for an app in the chat, and you get a link to the finished app."
   },
   "homeJourney": {
     "promptFold": "Advanced: a ready prompt for an AI you use elsewhere",
@@ -15271,28 +15293,24 @@
   "home": {
     "credit": {
       "line": "AI credit {amount}",
-      "ready": "your AI is ready",
+      "ready": "your own AI is ready to use",
       "low": "running low",
       "empty": "used up",
       "off": "the AI is switched off on this site",
       "topup": "Buy more credit",
-      "what": "what is this?",
       "chatLine": "AI credit left: {amount}.",
       "chatElsewhere": "AI credit left for everything outside this chat: {amount}."
     },
     "welcome": "Welcome to your new home.",
     "buyerWelcome": {
-      "title": "Welcome, {name}",
+      "titleNamed": "Welcome to your own AIMEAT, {name}",
+      "titlePlain": "Welcome to your own AIMEAT",
       "bought": "You bought AIMEAT {plan}.",
       "boughtPackage": "You bought AIMEAT {plan} with the package {package}.",
-      "lead": "Here is what to do first.",
-      "stepsLabel": "Three steps",
-      "step1": "Connect the AI you already use, such as ChatGPT or Claude. The way is right below.",
+      "stepsLabel": "Two steps",
       "step2": "Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.",
-      "step3": "Your order and invoices are in the store, under Orders and invoices in Settings.",
-      "sayLabel": "What do you want done?",
-      "sayField": "Say it in one sentence",
-      "sayGo": "Show me the agent"
+      "step2Waits": "This opens when your AI is connected.",
+      "settings": "Settings"
     },
     "welcomeSub": "Before the place can do anything for you, there are a couple of things to do.",
     "signInTitle": "Step into your home",
@@ -17383,6 +17401,8 @@
     "themeLabel": "Theme",
     "lightMode": "Light mode",
     "darkMode": "Dark mode",
+    "autoMode": "Automatic: follows your device",
+    "autoShort": "Auto",
     "chooseLook": "Choose look",
     "usernameLabel": "Username",
     "passwordLabel": "Password",
