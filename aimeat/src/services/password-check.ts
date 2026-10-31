@@ -26,6 +26,11 @@
  *   const pw = await checkPassword(storage, config, ghiiRecord, password);
  *   if (!pw.ok) { res.status(pw.status).json(error(config.nodeId, pw.code, pw.message)); return; }
  * @version-history
+ *   2026-10-31 — An attempt is counted BEFORE the password or code is compared (reserveAttempt), in one
+ *     conditional write on the attempts record, which now also carries the lock it set; the lock was
+ *     read from the account record the request read at its start and the count written after the
+ *     compare, so guesses sent at the same moment were each compared past the lock. A count that
+ *     cannot be written is a refusal, not an uncounted compare (secaudit2026oct31w2 round 10, W2-10).
  *   2026-10-25 — checkTotpManagementCode: removing the factor and replacing its backup codes check the
  *     code with the TOTP lock, and a wrong code counts toward it. The wrong-code count is an increment
  *     on a record of its own (totp-attempts), like the password's, for the sign-in too; it was the
@@ -45,6 +50,7 @@ import type { Storage, GHIIRecord } from '../storage/interface.js';
 import { hashPassword, verifyPassword, isLegacyHash } from './password.js';
 import { validateTotpCode, validateBackupCode, totpConfigOf } from './totp.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
+import { logger } from '../utils/logger.js';
 
 export type CheckRefusal = { ok: false; status: number; code: string; message: string };
 export type CheckResult = { ok: true } | CheckRefusal;
@@ -71,26 +77,74 @@ const parseCount = (v: unknown): number | null => {
 /** The wrong-TOTP-code count, kept the same way, for the sign-in and the factor's own routes alike. */
 const TOTP_ATTEMPTS_NS = 'totp-attempts';
 
-/** Add one failed attempt in `ns` and answer the count as written. `seed` is the account record's count. */
-async function bumpAttempts(storage: Storage, ns: string, ghii: string, seed: number | undefined): Promise<number> {
-  const written = await updateRecord(storage, ns, ghii, v => ({ count: parseCount(v) }),
-    cur => ({ count: (cur.count ?? seed ?? 0) + 1 }), { tag: ns });
-  return written.count ?? 0;
+/**
+ * The attempts record: the count, and since 2026-10-31 the lock it set (`lockedUntil`, ISO). A
+ * record written before then has no lock; its lock is the account record's, read by the caller.
+ */
+type Attempts = { count: number | null; lockedUntil: string | null };
+const parseAttempts = (v: unknown): Attempts => {
+  const until = (v as { lockedUntil?: unknown } | null | undefined)?.lockedUntil;
+  return { count: parseCount(v), lockedUntil: typeof until === 'string' && until ? until : null };
+};
+const lockHolds = (until: string | null, now: number): boolean => !!until && now < new Date(until).getTime();
+
+/** What reserveAttempt answers: the count with this attempt (and the lock it wrote, if any), or the lock that holds. */
+type Reservation = { reserved: number; lockedUntil: string | null } | { locked: string };
+
+/**
+ * Count one attempt BEFORE the secret is compared, in one conditional write on the attempts record,
+ * and answer whether it may be compared: `{ reserved: count }`, or `{ locked: until }` when the lock
+ * holds or this attempt is past the limit. Requests sent at the same moment each write on the
+ * record's version, so the limit bounds the attempts that are compared, not only the ones counted
+ * afterwards (secaudit2026oct31w2, W2-10). The attempt that reaches the limit writes the lock and is
+ * still compared, as the last allowed guess always was. A count that could not be written after
+ * every retry is answered as locked: an attempt that was not counted is not compared.
+ */
+async function reserveAttempt(
+  storage: Storage, ns: string, ghii: string, seed: number | undefined, max: number, lockMs: number,
+): Promise<Reservation> {
+  let outcome: Reservation = { locked: '' };
+  try {
+    await updateRecord(storage, ns, ghii, parseAttempts, (cur) => {
+      const now = Date.now();
+      if (cur.lockedUntil && lockHolds(cur.lockedUntil, now)) { outcome = { locked: cur.lockedUntil }; return UNCHANGED; }
+      // A lock of this record that has run out starts the count again.
+      const base = cur.lockedUntil ? 0 : (cur.count ?? seed ?? 0);
+      const lockedUntil = new Date(now + lockMs).toISOString();
+      if (base >= max) { outcome = { locked: lockedUntil }; return { count: base, lockedUntil }; }
+      const lock = base + 1 >= max ? lockedUntil : null;
+      outcome = { reserved: base + 1, lockedUntil: lock };
+      return { count: base + 1, lockedUntil: lock };
+    }, { tag: ns });
+  } catch (err) {
+    // updateRecord gave up after CAS_ATTEMPTS conflicts: other attempts are being counted right now.
+    // The answer is a refusal, so the attempt that could not be counted is not compared either.
+    logger.warn('password-check: an attempt could not be counted and was refused', { ns, ghii, error: String(err) });
+    return { locked: new Date(Date.now() + 1000).toISOString() };
+  }
+  return outcome;
 }
 
 async function clearAttempts(storage: Storage, ns: string, ghii: string): Promise<void> {
-  await updateRecord(storage, ns, ghii, v => ({ count: parseCount(v) }),
-    cur => (cur.count ? { count: 0 } : UNCHANGED), { tag: ns });
+  await updateRecord(storage, ns, ghii, parseAttempts,
+    cur => (cur.count || cur.lockedUntil ? { count: 0, lockedUntil: null } : UNCHANGED), { tag: ns });
 }
 
-/** Add one failed attempt and answer the count as written. */
-async function countFailedAttempt(storage: Storage, rec: GHIIRecord): Promise<number> {
-  return bumpAttempts(storage, ATTEMPTS_NS, rec.ghii, rec.passwordFailedAttempts);
+/**
+ * Clear the count after the account record's lock ran out, unless the attempts record holds a lock
+ * of its own that has not: the account record the caller read may be older than that lock.
+ */
+async function clearExpiredAttempts(storage: Storage, ns: string, ghii: string): Promise<void> {
+  await updateRecord(storage, ns, ghii, parseAttempts,
+    cur => (lockHolds(cur.lockedUntil, Date.now()) || (!cur.count && !cur.lockedUntil) ? UNCHANGED : { count: 0, lockedUntil: null }), { tag: ns });
 }
 
 async function resetAttempts(storage: Storage, ghii: string): Promise<void> {
   await clearAttempts(storage, ATTEMPTS_NS, ghii);
 }
+
+const passwordLocked = (until: string): CheckRefusal => ({ ok: false, status: 429, code: 'PASSWORD_LOCKED',
+  message: `Account temporarily locked due to too many failed login attempts. Try again after ${until}` });
 
 /**
  * Check `password` against the account's hash, with the per-account lock. An account with no
@@ -104,25 +158,22 @@ export async function checkPassword(storage: Storage, config: PasswordConfig, re
   // Per-account password lockout (brute-force protection)
   if (rec.passwordLockedUntil) {
     const lockExpires = new Date(rec.passwordLockedUntil).getTime();
-    if (Date.now() < lockExpires) {
-      return { ok: false, status: 429, code: 'PASSWORD_LOCKED',
-        message: `Account temporarily locked due to too many failed login attempts. Try again after ${rec.passwordLockedUntil}` };
-    }
+    if (Date.now() < lockExpires) return passwordLocked(rec.passwordLockedUntil);
     await storage.updateGHII(rec.ghii, { passwordFailedAttempts: 0, passwordLockedUntil: null });
-    await resetAttempts(storage, rec.ghii);
+    await clearExpiredAttempts(storage, ATTEMPTS_NS, rec.ghii);
     rec.passwordFailedAttempts = 0;
     rec.passwordLockedUntil = undefined;
   }
 
+  // The attempt is counted before the verify, so guesses sent at the same moment are bounded by the
+  // lock too; a right password clears the count below.
+  const slot = await reserveAttempt(storage, ATTEMPTS_NS, rec.ghii, rec.passwordFailedAttempts,
+    config.passwordLockoutAttempts, config.passwordLockoutMinutes * 60_000);
+  if ('locked' in slot) return passwordLocked(slot.locked);
+
   if (!await verifyPassword(password, rec.passwordHash)) {
-    // The count is the one written by the increment, not the account record read before the
-    // verify: wrong guesses sent at the same moment each add one, and the one that reaches the
-    // limit sets the lock.
-    const attempts = await countFailedAttempt(storage, rec);
-    const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
-    if (attempts >= config.passwordLockoutAttempts) {
-      update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
-    }
+    const update: Record<string, unknown> = { passwordFailedAttempts: slot.reserved };
+    if (slot.lockedUntil) update.passwordLockedUntil = slot.lockedUntil;
     await storage.updateGHII(rec.ghii, update);
     return WRONG;
   }
@@ -156,13 +207,21 @@ export async function checkSecondFactor(
   const locked = await totpLockRefusal(storage, rec);
   if (locked) return locked;
 
+  if (!totp_code && !backup_code) {
+    return { ok: false, status: 401, code: 'TOTP_REQUIRED',
+      message: 'This account uses two-step sign-in. Enter the code from your app, or one of your backup codes.' };
+  }
+  // Replay protection: reject if same code was just used
+  if (totp_code && rec.totpLastUsedCode === totp_code) {
+    return { ok: false, status: 401, code: 'TOTP_REPLAY', message: 'This TOTP code has already been used. Wait for the next code.' };
+  }
+
+  const slot = await reserveTotpAttempt(storage, config, rec);
+  if ('locked' in slot) return totpLocked(slot.locked);
+
   let verified = false;
 
   if (totp_code) {
-    // Replay protection: reject if same code was just used
-    if (rec.totpLastUsedCode === totp_code) {
-      return { ok: false, status: 401, code: 'TOTP_REPLAY', message: 'This TOTP code has already been used. Wait for the next code.' };
-    }
     if (validateTotpCode(rec.totpSecret, totp_code, totpConfigOf(config)).valid) {
       verified = true;
       await storage.updateGHII(rec.ghii, {
@@ -188,40 +247,48 @@ export async function checkSecondFactor(
 
   if (verified) return { ok: true };
 
-  if (!totp_code && !backup_code) {
-    return { ok: false, status: 401, code: 'TOTP_REQUIRED',
-      message: 'This account uses two-step sign-in. Enter the code from your app, or one of your backup codes.' };
-  }
-
-  return totpWrongCode(storage, config, rec, 'Invalid TOTP code or backup code.');
+  return totpWrongCode(storage, rec, slot, 'Invalid TOTP code or backup code.');
 }
+
+const totpLocked = (until: string): CheckRefusal => ({ ok: false, status: 429, code: 'TOTP_LOCKED',
+  message: `Account temporarily locked due to too many failed TOTP attempts. Try again after ${until}` });
 
 /** The refusal while the account's TOTP lock holds, or null; a lock that has run out is cleared. */
 async function totpLockRefusal(storage: Storage, rec: GHIIRecord): Promise<CheckRefusal | null> {
   if (!rec.totpLockedUntil) return null;
-  if (Date.now() < new Date(rec.totpLockedUntil).getTime()) {
-    return { ok: false, status: 429, code: 'TOTP_LOCKED',
-      message: `Account temporarily locked due to too many failed TOTP attempts. Try again after ${rec.totpLockedUntil}` };
-  }
+  if (Date.now() < new Date(rec.totpLockedUntil).getTime()) return totpLocked(rec.totpLockedUntil);
   // Lock expired — reset counters
   await storage.updateGHII(rec.ghii, { totpFailedAttempts: 0, totpLockedUntil: null });
-  await clearAttempts(storage, TOTP_ATTEMPTS_NS, rec.ghii);
+  await clearExpiredAttempts(storage, TOTP_ATTEMPTS_NS, rec.ghii);
   rec.totpFailedAttempts = 0;
   rec.totpLockedUntil = undefined;
   return null;
 }
 
 /**
- * Count one wrong code and answer it: TOTP_LOCKED when this one reached the limit, else INVALID_TOTP
- * with `message`. The count is the one written by the increment (bumpAttempts), so wrong codes sent at
- * the same moment each add one.
+ * Clear the wrong-code count and its lock, for the removal of the factor (services/totp-recovery.ts
+ * eraseTotp): a factor armed again starts with no count, as the account record's fields always did.
  */
-async function totpWrongCode(storage: Storage, config: TotpCheckConfig, rec: GHIIRecord, message: string): Promise<CheckRefusal> {
-  const attempts = await bumpAttempts(storage, TOTP_ATTEMPTS_NS, rec.ghii, rec.totpFailedAttempts);
-  const lockUntil = attempts >= config.totpMaxFailedAttempts
-    ? new Date(Date.now() + config.totpLockoutSeconds * 1000).toISOString()
-    : undefined;
-  await storage.updateGHII(rec.ghii, { totpFailedAttempts: attempts, totpLockedUntil: lockUntil });
+export async function clearTotpAttempts(storage: Storage, ghii: string): Promise<void> {
+  await clearAttempts(storage, TOTP_ATTEMPTS_NS, ghii);
+}
+
+/** Count one code before it is compared (reserveAttempt), with the TOTP limit and lock length. */
+function reserveTotpAttempt(storage: Storage, config: TotpCheckConfig, rec: GHIIRecord): Promise<Reservation> {
+  return reserveAttempt(storage, TOTP_ATTEMPTS_NS, rec.ghii, rec.totpFailedAttempts,
+    config.totpMaxFailedAttempts, config.totpLockoutSeconds * 1000);
+}
+
+/**
+ * Answer a wrong code that was counted before the compare: TOTP_LOCKED when it reached the limit,
+ * else INVALID_TOTP with `message`. The account record's fields are written from the count, for
+ * every reader of the account.
+ */
+async function totpWrongCode(
+  storage: Storage, rec: GHIIRecord, slot: { reserved: number; lockedUntil: string | null }, message: string,
+): Promise<CheckRefusal> {
+  const lockUntil = slot.lockedUntil ?? undefined;
+  await storage.updateGHII(rec.ghii, { totpFailedAttempts: slot.reserved, totpLockedUntil: lockUntil });
   if (lockUntil) {
     return { ok: false, status: 429, code: 'TOTP_LOCKED',
       message: `Too many wrong codes, so this account is paused until ${lockUntil}. Wait until then and try again.` };
@@ -246,9 +313,11 @@ export async function checkTotpManagementCode(
   if (!code && !backup) return { ok: false, status: 401, code: 'INVALID_TOTP', message: wrongMessage };
   const locked = await totpLockRefusal(storage, rec);
   if (locked) return locked;
+  const slot = await reserveTotpAttempt(storage, config, rec);
+  if ('locked' in slot) return totpLocked(slot.locked);
   const verified = (!!code && !!rec.totpSecret && validateTotpCode(rec.totpSecret, code, totpConfigOf(config)).valid)
     || (!!backup && !!rec.totpBackupCodes && validateBackupCode(backup, rec.totpBackupCodes).valid);
-  if (!verified) return totpWrongCode(storage, config, rec, wrongMessage);
+  if (!verified) return totpWrongCode(storage, rec, slot, wrongMessage);
   if (rec.totpFailedAttempts) await storage.updateGHII(rec.ghii, { totpFailedAttempts: 0, totpLockedUntil: null });
   await clearAttempts(storage, TOTP_ATTEMPTS_NS, rec.ghii);
   return { ok: true };
