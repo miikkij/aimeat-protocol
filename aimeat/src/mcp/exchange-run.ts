@@ -21,6 +21,10 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken, scopes);
  * @version-history
+ *   2026-10-31 — aimeat_app_tool_invoke resolves the binding of a contracted or granted call inside the
+ *     chokepoint (productRefusal), before it charges: TOOL_NOT_INVOKABLE and CAPABILITY_NOT_FOUND came
+ *     back after the settle with no refund, and a mis-bound capability was charged and refunded
+ *     (secaudit 2026-10-31 inv-05).
  *   2026-10-27 — aimeat_exchange_proposal_decide answers CONTRACT_ENDED for a revoked contract (secaudit2026oct26).
  *   2026-10-25 — The members-only question reads a bare tool binding as the app owner's own extension (owner namespaces wish, secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -84,7 +88,7 @@
  */
 import { McpServer } from '@modelcontextprotocol/server';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { localAccountName } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
@@ -98,7 +102,8 @@ import { refuseWorkBetween } from '../services/work-parties.js';
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal, CONTRACT_ENDED_TEXT,
 } from '../services/exchange-proposals.js';
-import { authoriseMeteredCall } from '../services/metered-access.js';
+import { authoriseMeteredCall, type ProductRefusal } from '../services/metered-access.js';
+import type { MeteredEntitlement } from '../services/metered-entitlements.js';
 import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
@@ -118,6 +123,9 @@ import { insufficientMorselsMessage } from '../commerce/pacing-pack.js';
 import { pacingReceipt } from '../services/metered-settlement.js';
 import { appToolBindingRefusal } from '../services/capability-invoke.js';
 import { findBackingCapability } from '../services/component-address.js';
+
+/** An app tool's binding, resolved for one call: the capability it runs and the interface version it was pinned at. */
+interface BoundTool { cap: CapabilityRecord; pinnedVersion: number | undefined; providerGhii: string }
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -219,9 +227,40 @@ export function registerExchangeRunTools(
             if (await membersOnlyRefusalForCapability(storage, toolDef.action_id, callerGaii, ownerName)) {
                 return fail(`MEMBERS_ONLY: ${MEMBERS_ONLY_MESSAGE}`);
             }
+
+            // Resolve the binding from the PINNED interface snapshot (the freeze), else the tool's
+            // current binding. A CONTRACT is pinned to the interface version it was signed at, so a
+            // provider can ship a newer app without breaking a live integration. The owner's own
+            // call has nothing to pin — they get their current binding, which is theirs to change.
+            // The manifest NAMES a capability; it does not confer one (services/capability-invoke.ts
+            // appToolBindingRefusal; secaudit 2026-10).
+            const bindingFor = async (ent: MeteredEntitlement | null): Promise<BoundTool | ProductRefusal> => {
+                const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
+                const providerGhii = ent?.providerGhii ?? `${ownerName}@${config.nodeId}`;
+                const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, app, tool, pinnedVersion) : null;
+                const binding = iface?.binding ?? toolDef.action_id ?? null;
+                if (!binding) return { statusCode: 422, code: 'TOOL_NOT_INVOKABLE', message: 'this tool has no capability binding to invoke' };
+                // A bare binding names the app owner's own extension (services/component-address.ts).
+                const cap = await findBackingCapability(storage, binding, ownerName);
+                if (!cap) return { statusCode: 404, code: 'CAPABILITY_NOT_FOUND', message: `backing capability not found (${binding})` };
+                const misbound = appToolBindingRefusal(cap, ownerName, `${ownerName}/${app}`, tool);
+                if (misbound) return misbound;
+                return { cap, pinnedVersion, providerGhii };
+            };
+            // Under a contract or a grant the binding is resolved INSIDE the chokepoint, from the
+            // entitlement it found and before it charges, so a tool that cannot run is refused with
+            // nothing taken (refused_product). It was resolved after the settle: a mis-bound
+            // capability was refunded and a missing one kept the charge (secaudit 2026-10-31 inv-05).
+            let bound = null as BoundTool | null;
             const outcome = await authoriseMeteredCall({
                 config, storage, caller: callerGaii,
                 product: { ext: coordExt, action: tool, label, providerOwner: ownerName },
+                productRefusal: async (ent) => {
+                    const b = await bindingFor(ent);
+                    if ('code' in b) return b;
+                    bound = b;
+                    return null;
+                },
             });
             if (outcome.kind === 'no_right' && isToolPriced(toolDef)) {
                 return fail(`NO_CONTRACT: accept a contract for "${ownerName}/${app}/${tool}" first (aimeat_exchange_accept with its offering_id)`);
@@ -230,28 +269,17 @@ export function registerExchangeRunTools(
                 const r = meteredRefusalText(outcome, label, config);
                 return fail(`${r.code}: ${r.message}`);
             }
-
-            // Resolve the binding from the PINNED interface snapshot (the freeze), else the tool's
-            // current binding. A CONTRACT is pinned to the interface version it was signed at, so a
-            // provider can ship a newer app without breaking a live integration. The owner's own
-            // call has nothing to pin — they get their current binding, which is theirs to change.
-            const ent = outcome.kind === 'settled' ? outcome.entitlement : null;
-            const pinnedVersion = ent?.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
-            const providerGhii = ent?.providerGhii ?? `${ownerName}@${config.nodeId}`;
-            const iface = pinnedVersion ? await getInterfaceVersion(storage, providerGhii, app, tool, pinnedVersion) : null;
-            const binding = iface?.binding ?? toolDef.action_id ?? null;
-            if (!binding) return fail('TOOL_NOT_INVOKABLE: this tool has no capability binding to invoke');
-            // A bare binding names the app owner's own extension (services/component-address.ts).
-            const cap = await findBackingCapability(storage, binding, ownerName);
-            if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
-            // The manifest NAMES a capability; it does not confer one. Refused after the price is
-            // decided and before the pacing is charged, as on the REST twin
-            // (services/capability-invoke.ts appToolBindingRefusal; secaudit 2026-10).
-            const misbound = appToolBindingRefusal(cap, ownerName, `${ownerName}/${app}`, tool);
-            if (misbound) {
-                if (outcome.kind === 'settled') await outcome.refund();
-                return fail(`${misbound.code}: ${misbound.message}`);
+            // The owner's own call and a call with no right charge nothing here, so their binding is
+            // resolved now, before the pacing below.
+            if (!bound) {
+                const b = await bindingFor(outcome.kind === 'settled' ? outcome.entitlement : null);
+                if ('code' in b) {
+                    if (outcome.kind === 'settled') await outcome.refund();
+                    return fail(`${b.code}: ${b.message}`);
+                }
+                bound = b;
             }
+            const { cap, pinnedVersion, providerGhii } = bound;
 
             // A tool with no money price and no contract runs free in money but is paced: its pacing
             // amount is charged before the call, as on the REST twin (commerce/app-tool-catalog.ts).
