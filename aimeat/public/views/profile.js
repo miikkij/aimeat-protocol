@@ -10,6 +10,8 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-10-31 — The AI tab hands its three cards (decision model, transparency, compliance) to the
+ *     page as `extras`, so a buyer's simple view keeps them inside "Lisäasetukset" (v31 K58).
  *   2026-10-29 — The "Your own storage" tab (views/profile/storage-tab.js, id 'storage'): a person keeps
  *     their files in their own S3 bucket or Azure container (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
  *   2026-10-25 — The "Goals" tab (views/profile/goals-tab.js): the agents' goals and their rules.
@@ -125,11 +127,12 @@ import LibrariesTab from './profile/libraries-tab.js';
 // AND, below them, the owner's own transparency view: what they published with a model in it, how
 // much of it carries a label, and what this node records about a model call (TARGET-058 Phase 8).
 function AiTab(props) {
+  // The page draws the three cards: after itself, or inside "Lisäasetukset" for a buyer (v31 K58).
   return html`
-    <${AiSettingsTab} ...${props} />
-    <${DecideCard} />
-    <${AiTransparencyCard} />
-    <${ComplianceCard} />`;
+    <${AiSettingsTab} ...${props} extras=${html`
+      <${DecideCard} />
+      <${AiTransparencyCard} />
+      <${ComplianceCard} />`} />`;
 }
 
 /** Old tab ids that still arrive in links and in a remembered session. */
