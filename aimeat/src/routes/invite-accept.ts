@@ -24,6 +24,9 @@
  * @structure inviteAcceptRouter(config, storage, deps): the two public routes
  * @usage app.use(inviteAcceptRouter(config, storage, { findWsEntry }));
  * @version-history
+ *   2026-10-31 — Both routes take the invitation's id as well as its token (invitationFor): the
+ *     in-app notice links by id, and an id opens the invitation only for the invited person signed
+ *     in in person, never for a signed-out accept (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
  *   2026-10-27 — An account made here reads fromNodeMachine(req) for the setup code (secaudit2026oct26).
  *   2026-10-27 — fromLoopback is read through requestFromThisMachine (no forwarding header, a loopback Host) (secaudit2026oct26).
  *   2026-10-23 — An account made here passes whether the request came in on a loopback socket
@@ -58,7 +61,7 @@
  *     registration invite (remake 4b) made the flow shared. No behaviour change for organism
  *     invitations; the node variant is the added branch.
  */
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -90,6 +93,9 @@ export interface InviteAcceptDeps {
 /** The invitation types a token redeems. A 'code' invite provisions its account at mint and is never one. */
 const TOKEN_TYPES = new Set<InvitationRecord['type']>(['link', 'registration', 'app']);
 
+/** An invitation id (a UUID), which the in-app notice of an invitation links to. */
+const INVITATION_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps: InviteAcceptDeps): Router {
   const router = Router();
   const { findWsEntry } = deps;
@@ -108,12 +114,29 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
     return null;
   }
 
+  /**
+   * The invitation `token` names: the raw token of an emailed link, or the invitation's id, which
+   * the in-app notice links to. An id opens an organism link invitation only for the invited person
+   * signed in in person, whose verified address is the invited one; for anyone else, signed out
+   * included, it is no invitation, so an id never makes an account. The notice is readable by every
+   * principal of the account holding memory:read (secaudit2026oct31w2, R-f-2026sec-07-d7).
+   */
+  async function invitationFor(token: string, req: Request): Promise<InvitationRecord | null> {
+    const byToken = await storage.getInvitationByHash(hashInviteToken(token));
+    if (byToken) return byToken;
+    if (!INVITATION_ID.test(token) || !req.auth || isAnonymousPrincipal(req.auth) || !isOwnerPrincipal(req.auth)) return null;
+    const inv = await storage.getInvitation(token);
+    if (!inv || inv.type !== 'link' || !inv.organismId) return null;
+    const me = await storage.getGHII(`${req.auth.owner as string}@${config.nodeId}`);
+    return me?.emailVerifiedAt && me.emailHash === inv.emailHash ? inv : null;
+  }
+
   /* GET /v1/invitations/:token — PUBLIC: invite details for the accept page (token carried in the URL).
    * optionalAuth so a signed-in visitor gets a `viewer` verdict (does MY verified email match the
    * invited address?) and the accept page can warn BEFORE the button instead of after a 403. */
   router.get('/v1/invitations/:token', optionalAuth(), rateLimit({ max: 30, windowMs: 60_000 }), async (req, res) => {
     const token = req.params.token as string;
-    const inv = await storage.getInvitationByHash(hashInviteToken(token));
+    const inv = await invitationFor(token, req);
     if (!inv || inv.status === 'cancelled' || !TOKEN_TYPES.has(inv.type)) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
     if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
@@ -173,7 +196,7 @@ export function inviteAcceptRouter(config: AimeatConfig, storage: Storage, deps:
   /* POST /v1/invitations/:token/accept — PUBLIC: register (or use current session) + join org + workspaces */
   router.post('/v1/invitations/:token/accept', optionalAuth(), rateLimit({ max: 10, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const token = req.params.token as string;
-    const inv = await storage.getInvitationByHash(hashInviteToken(token));
+    const inv = await invitationFor(token, req);
     if (!inv || inv.status === 'cancelled') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
     // Only magic-link invites are redeemable via a token. A 'code' invite provisions its account at
     // mint time and its uuid tokenHash is never surfaced anywhere — defence in depth: refuse to run the

@@ -54367,6 +54367,8 @@ paths:
         optionalAuth: when a session is present the response also carries a `viewer` object
         { owner, has_verified_email, email_matches } so the accept page can warn — before the button —
         that the signed-in account cannot accept (its verified email doesn't match the invited address).
+        `token` may also be the invitation's id (the in-app notification's link), which answers only
+        the invited person signed in in person and 404 for anyone else.
       tags: [Organisms]
       security: []
       parameters:
@@ -54395,6 +54397,12 @@ paths:
         place it answers `app_waiting` with a `reason`, the account stays signed in and the link stays
         usable. An `app` link whose app invitation is no longer open answers 404 before any account
         is made.
+
+        `token` may also be the invitation's id, which is what the in-app notification of an
+        invitation to an existing account links to. An id opens the invitation only for the invited
+        person signed in in person (an owner session or owner-level token whose verified email is the
+        invited address), on this route and on GET /v1/invitations/{token}; for anyone else it
+        answers 404, so it can never create an account.
       tags: [Organisms]
       security: []
       parameters:
