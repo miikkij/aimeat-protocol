@@ -319,7 +319,7 @@
         "aimeat/src/routes/ai-gen-rules.ts",
         "aimeat/src/services/ai-image.ts"
       ],
-      "digest": "sha256:1a34680860aef6a2ee28f3a9"
+      "digest": "sha256:2d418558132de8fbc92e13f6"
     },
     "node:aimeat-extension-builder": {
       "reviewedOn": "2026-10-31",
@@ -825,7 +825,7 @@
       "aimeat/src/services/ai/gen-rules.ts": "0f9bece086232cec",
       "aimeat/src/services/ai/gen-rules-store.ts": "34377e884aa25b71",
       "aimeat/src/routes/ai-gen-rules.ts": "012cd2933649f50b",
-      "aimeat/src/services/ai-image.ts": "8d196f3538d7ef7b"
+      "aimeat/src/services/ai-image.ts": "107d839179362cae"
     }
   }
 }
