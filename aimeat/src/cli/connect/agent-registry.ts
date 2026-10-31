@@ -24,6 +24,8 @@
  *   - `AgentRegistry` -- holds the entries by GAII, exposes resolve/get/list/size
  *
  * @version-history
+ *   v1.3.0 -- 2026-10-31 -- An entry carries the commands the machine holds for it (`heldCommands`), so
+ *     the owner's decision on the node is acted on without a restart (program-report.ts).
  *   v1.2.0 -- 2026-09-02 -- remove(gaii). The counterpart to add()'s refusal: an entry may not be
  *     replaced silently, but it may be removed deliberately and added again, which is what a
  *     deleted-and-recreated agent needs -- same identity, a different credential.
@@ -34,6 +36,7 @@
 import { AimeatClient } from './api-client.js';
 import { isGaii } from './agent-gaii.js';
 import type { AimeatPerAgentConfig, LoadedAgent } from './config.js';
+import type { HeldCommands } from './command-trust.js';
 import { logger } from '../../utils/logger.js';
 
 export interface RegisteredAgent {
@@ -44,6 +47,11 @@ export interface RegisteredAgent {
   owner: string;
   client: AimeatClient;
   config: AimeatPerAgentConfig;
+  /**
+   * The runner and wake command this machine holds for the agent instead of running them
+   * (command-trust.ts). Taken into use, or set, when the owner decides on the node (program-report.ts).
+   */
+  heldCommands?: HeldCommands | null;
 }
 
 /** How an agent is named to a person: `concierge@alice` reads better than the full GAII. */
@@ -184,7 +192,7 @@ export function buildRegistry(loaded: LoadedAgent[]): AgentRegistry {
     // whose token it holds is exactly the case where the stale-credential retry cannot run.
     const client = new AimeatClient(a.config.node_url, a.token, { agent: a.agent, owner: a.owner });
     try {
-      reg.add({ gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config });
+      reg.add({ gaii: a.gaii, agent: a.agent, owner: a.owner, client, config: a.config, heldCommands: a.heldCommands ?? null });
     } catch (err) {
       logger.warn('registry: a duplicate identity was not loaded', { gaii: a.gaii, error: String(err) });
     }

@@ -30,11 +30,15 @@
  *   not recorded; the routes that take no connector choice serve it as before.
  * @structure CONNECTORS_KEY · StoredConnector · ConnectorView · listConnectors() · connectorListAnswer() · findConnector() ·
  *   syncConnectors() · renameConnector() · forgetConnector() · setWanted() · clearWanted() ·
- *   wantedInstalls() · recordPlacement() · startConnectorRegistry()
+ *   wantedInstalls() · recordPlacement() · liveConnectorOf() · principalsOnConnector() · mutateConnector() ·
+ *   startConnectorRegistry()
  * @usage
  *   const rows = await listConnectors({ config, storage }, owner);
  *   const hit = await findConnector({ config, storage }, owner, 'Kotikone');
  * @version-history
+ *   v1.3.0 — 2026-10-31 — A connector's row keeps the programs it may start for its agents and the
+ *     owner's decision on each (connector-programs.ts), and the listing shows them with their age;
+ *     a forgotten connector takes them with it (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v1.2.0 — 2026-10-14 — connectorListAnswer(): the list with `tunnel_enabled`, so a page and an
  *     AI can tell a node that takes no connectors from an owner who has none (innokas.aimeat.io,
  *     2026-10-14: the tunnel was off, the upgrade answered 502, and the page still offered the
@@ -53,6 +57,7 @@ import { INSTALL_NAME_MAX } from './connect-tunnel-roster.js';
 import { emitChange } from './event-bus.js';
 import { parseGAII, runAsNode } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+import { programViewsOf, type StoredAgentPrograms, type ProgramAsk, type ProgramView } from './connector-programs-view.js';
 
 /** Where an owner's connectors live, in the owner's own namespace. */
 export const CONNECTORS_KEY = 'agents.connectors.registry';
@@ -79,6 +84,10 @@ export interface StoredConnector {
   features?: string[] | null;
   /** Agent names last seen on it. */
   agents: string[];
+  /** Agent name → the programs its connector last reported for it (connector-programs.ts). */
+  programs?: Record<string, StoredAgentPrograms>;
+  /** Program hash → the owner's decision on it, and the request that asked (connector-programs.ts). */
+  program_asks?: Record<string, ProgramAsk>;
 }
 
 interface Registry {
@@ -107,6 +116,13 @@ export interface ConnectorView {
   agents: string[];
   /** Agents ordered to it that have no key yet. */
   waiting: string[];
+  /**
+   * The programs it may start for its agents, one row per program, with the owner's decision on
+   * each. Null when it never reported any (a connector older than this list).
+   */
+  programs: ProgramView[] | null;
+  /** When it last reported its programs, so the list shows its age. Null when it never did. */
+  programs_reported_at: string | null;
 }
 
 export interface RegistryContext { config: AimeatConfig; storage: Storage }
@@ -240,6 +256,9 @@ export async function listConnectors(ctx: RegistryContext, owner: string): Promi
     const d = live.find(x => x.id === id);
     const reported = d?.name ?? rec?.reported_name ?? null;
     const held = new Set([...(rec?.agents ?? []), ...(d?.agents ?? [])]);
+    // An agent seen live on another connector has moved there; a deleted agent is no longer anybody's.
+    const here = [...held].filter(n => exists.has(n) && (liveNames.get(n) ?? id) === id).sort();
+    const reports = Object.values(rec?.programs ?? {});
     return {
       id,
       name: rec?.given_name ?? reported,
@@ -249,9 +268,10 @@ export async function listConnectors(ctx: RegistryContext, owner: string): Promi
       last_seen: d ? now : (rec?.last_seen ?? now),
       run_modes: d?.runModes ?? rec?.run_modes ?? null,
       features: d?.features ?? rec?.features ?? null,
-      // An agent seen live on another connector has moved there; a deleted agent is no longer anybody's.
-      agents: [...held].filter(n => exists.has(n) && (liveNames.get(n) ?? id) === id).sort(),
+      agents: here,
       waiting: Object.entries(reg.wanted).filter(([n, want]) => want === id && keyless.has(n)).map(([n]) => n).sort(),
+      programs: rec?.programs ? programViewsOf(rec.programs, rec.program_asks, here) : null,
+      programs_reported_at: reports.length ? reports.map(p => p.reported_at).sort().at(-1) ?? null : null,
     };
   });
   return rows.sort((x, y) => Number(y.online) - Number(x.online) || (x.name ?? x.id).localeCompare(y.name ?? y.id));
@@ -402,6 +422,36 @@ export function recordPlacement(ctx: RegistryContext, owner: string, agentNames:
       }
     }
     return { write, result: undefined };
+  });
+}
+
+/**
+ * The connected connector that holds this principal right now, by its install id: the machine an
+ * agent runs on. Null when no addressable connector of the owner carries it.
+ */
+export function liveConnectorOf(owner: string, principal: string): string | null {
+  return connectedDaemons(owner).find(d => !!d.installId && d.principals.includes(principal))?.installId ?? null;
+}
+
+/** The principals a connected connector holds right now: whom to tell that its programs changed. */
+export function principalsOnConnector(owner: string, installId: string): string[] {
+  return connectedDaemons(owner).find(d => d.installId === installId)?.principals ?? [];
+}
+
+/**
+ * One change to one connector's stored row, in the owner's one-at-a-time queue. A connector that is
+ * live and not yet recorded is recorded first. `change` answers whether to write and what to return;
+ * a connector the owner does not have answers null.
+ */
+export async function mutateConnector<T>(
+  ctx: RegistryContext, owner: string, installId: string,
+  change: (rec: StoredConnector) => { write: boolean; result: T },
+): Promise<T | null> {
+  await syncConnectors(ctx, owner);
+  return mutate(ctx, owner, (reg) => {
+    const rec = reg.connectors.find(c => c.id === installId);
+    if (!rec) return { write: false, result: null };
+    return change(rec);
   });
 }
 
