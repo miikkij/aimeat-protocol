@@ -38,6 +38,10 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.11.0 — 2026-10-31 — Direct upload: the mint with `direct` answers a signed address in the object
+ *     store and a complete address, and the write takes `object` (the reference from the signed token and
+ *     the size the store reports) instead of bytes, with the large-file ceiling, and records the file
+ *     naming that object (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.10.0 — 2026-10-30 — `store` on the write and the presigned mint: the store the writer named for
  *     the bytes (`own:<name>`, `node:<name>`), checked with the writer's rights before anything moves and
  *     carried in the token; a file put in the writer's own storage does not count toward the quota
@@ -112,6 +116,7 @@ import {
 import type { ClosedNodeWarning } from './closed-node-level.js';
 import { uploadVisibilityOf } from './content-defaults.js';
 import { resolveChoice } from './file-store/file-store-resolver.js';
+import { adoptStorageObject, directUploadTarget } from '../storage/blob/file-store-wrap.js';
 
 /**
  * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
@@ -143,6 +148,12 @@ export function setStorageFileHooks(hooks: { afterStore?: StorageFileHook; after
  *  the token is signed with are the same value, so they cannot drift apart. */
 export const STORAGE_UPLOAD_URL_TTL_SECONDS = 3600;
 
+/** The largest file a client may put straight in an object store: the large-file setting
+ *  (quota.storage_max_chunked_file_size_gb), since the bytes never pass through the node. */
+export function directFileMaxBytes(config: AimeatConfig): number {
+    return config.storageMaxChunkedFileSizeGb * 1024 * 1024 * 1024;
+}
+
 /** What a caller supplies so the write can reach the rest of the node. */
 export interface StorageWriteDeps {
     storage: Storage;
@@ -173,7 +184,15 @@ export interface StorageWriteRefusal {
 
 export interface StorageFileInput {
     key: string;
-    data: Buffer;
+    /** The bytes. Absent exactly when `object` names them in a store already. */
+    data?: Buffer;
+    /**
+     * A file whose bytes a client already PUT in an object store, through the signed address the node
+     * made for this reference (mintStorageUploadUrl with `direct`). The reference comes from the signed
+     * upload token and the size from the store, never from the client. The ceiling is the one for a
+     * file kept in a store, and the row names the object instead of holding bytes.
+     */
+    object?: { blobRef: string; size: number };
     mimeType?: string;
     visibility?: StorageFileRecord['visibility'];
     groupId?: string;
@@ -337,7 +356,7 @@ async function attachableRecord(
  * the by-hash lookup would never find the file, and the public label would describe other bytes.
  */
 async function provenanceForStoredBytes(
-    deps: StorageWriteDeps, p: StorageProvenanceInput, data: Buffer,
+    deps: StorageWriteDeps, p: StorageProvenanceInput, data: Buffer | undefined,
     visibility: StorageFileRecord['visibility'], held: AiProvenanceRecordRow[],
 ): Promise<{ ok: true; id: string | undefined } | ProvenanceRefusal> {
     const { storage, config } = deps;
@@ -345,6 +364,16 @@ async function provenanceForStoredBytes(
     if (p.declaredId) {
         const row = await attachableRecord(storage, p.actor, p.declaredId);
         if ('ok' in row) return row;
+        // A file that went straight to its store never passed through the node, so a record about exact
+        // bytes cannot be checked against it, and is not attached unchecked.
+        if (!data) {
+            if (!row.contentHash) return { ok: true, id: row.id };
+            return {
+                ok: false, status: 400, code: 'PROVENANCE_HASH_MISMATCH',
+                message: `Record ${row.id} is about exact bytes, and this file went straight to its store, so the node `
+                    + 'cannot compare them. Describe the file in ai_provenance instead, or upload it through the node.',
+            };
+        }
         const bytesHash = contentHashOf(data);
         if (row.contentHash && row.contentHash !== bytesHash) {
             return {
@@ -434,10 +463,15 @@ export async function writeStorageFile(
             workspaceRef: visibility === 'workspace' ? input.workspaceRef : undefined,
         };
 
-    if (input.data.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+    if (!input.data && !input.object) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'No file data received' };
+    const size = input.object ? input.object.size : input.data!.length;
+    // A file kept in an object store has the larger ceiling: its bytes never pass through the node.
+    if (input.object ? size > directFileMaxBytes(config) : size > config.storageMaxFileSizeMb * 1024 * 1024) {
         return {
             ok: false, status: 413, code: 'QUOTA_EXCEEDED', limit: 'per_file',
-            message: `File size exceeds ${config.storageMaxFileSizeMb}MB limit`,
+            message: input.object
+                ? `File size exceeds the ${config.storageMaxChunkedFileSizeGb} GB limit of a file kept in a store`
+                : `File size exceeds ${config.storageMaxFileSizeMb}MB limit`,
         };
     }
 
@@ -446,7 +480,7 @@ export async function writeStorageFile(
     if (storeRefused) return storeRefused;
 
     // M-2 (§8.4): the account-wide ceiling, which is a different gate from the per-file one above.
-    const quota = await checkStorageQuota(config, storage, ownerGaii, input.data.length, input.store?.id);
+    const quota = await checkStorageQuota(config, storage, ownerGaii, size, input.store?.id);
     if (!quota.allowed) {
         return { ok: false, status: 413, code: 'QUOTA_EXCEEDED', limit: 'account', message: quota.reason! };
     }
@@ -455,25 +489,28 @@ export async function writeStorageFile(
     // nothing. A record minted here is held and stored only once the file has landed.
     const held: AiProvenanceRecordRow[] = [];
     const decided = input.provenance
-        ? await provenanceForStoredBytes(deps, input.provenance, input.data, level.visibility, held)
+        ? await provenanceForStoredBytes(deps, input.provenance, input.object ? undefined : input.data, level.visibility, held)
         : { ok: true as const, id: input.aiProvenanceId };
     if (!decided.ok) return decided;
 
-    const file = await storage.createStorageFile({
+    const record: StorageFileRecord = {
         key: input.key,
         ownerGaii,
         visibility: level.visibility,
         groupId: level.groupId,
         workspaceRef: level.workspaceRef,
         mimeType: input.mimeType ?? 'application/octet-stream',
-        size: input.data.length,
-        data: input.data,
+        size,
+        data: input.data ?? Buffer.alloc(0),
         ...(input.tags?.length ? { tags: input.tags } : {}),
         federate: input.federate === true,
         createdAt: new Date().toISOString(),
         ...(decided.id ? { aiProvenanceId: decided.id } : {}),
         ...(input.store?.id ? { storeChoice: input.store.id } : {}),
-    });
+    };
+    const file = input.object
+        ? await adoptStorageObject(storage, record, input.object.blobRef)
+        : await storage.createStorageFile(record);
     await storeHeldProvenance(storage, held);
 
     // M-3 (§15): the charge that follows the check. Missing on the tool door, so the same upload
@@ -601,6 +638,10 @@ export interface StorageUploadUrlInput {
     /** The store the writer named for the bytes: checked now with the writer's rights, carried in the
      *  token as `store`, and asked again for the store's state when the bytes land. */
     store?: StoreChoice;
+    /** Ask for an address in the object store itself: the client PUTs the bytes there and then POSTs
+     *  the node's complete address. Answered with an upload through the node when the file would go to
+     *  the database or the store cannot sign one. */
+    direct?: boolean;
 }
 
 export type StorageUploadUrlResult =
@@ -609,6 +650,12 @@ export type StorageUploadUrlResult =
         uploadUrl: string;
         contentType: string;
         maxBytes: number;
+        /** True when uploadUrl is in the object store: PUT there with uploadHeaders, then POST completeUrl. */
+        direct?: boolean;
+        uploadHeaders?: Record<string, string>;
+        completeUrl?: string;
+        /** Why an upload asked as direct goes through the node instead. */
+        directUnavailable?: string;
         expiresInSeconds: number;
         /** The file will land at 'members' instead of public: the node is closed (plan V1.6). */
         warnings?: ClosedNodeWarning[];
@@ -653,10 +700,15 @@ export async function mintStorageUploadUrl(
     const storeRefused = await storeChoiceRefusal(deps, ownerGaii, input.store);
     if (storeRefused) return storeRefused;
 
+    const contentType = input.mimeType ?? 'application/octet-stream';
+    // Direct: the address is the store's own, for one new object; the node keeps the reference in the
+    // signed token and records the file when the client completes.
+    const target = input.direct
+        ? await directUploadTarget(deps.storage, ownerGaii, input.store?.id, contentType, STORAGE_UPLOAD_URL_TTL_SECONDS)
+        : null;
     // The operator's own setting, not a constant: a node configured for 50 MB used to mint 10 MB
     // tokens and refuse everything above it, with nothing connecting the admin page to the tool.
-    const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
-    const contentType = input.mimeType ?? 'application/octet-stream';
+    const maxBytes = target ? directFileMaxBytes(config) : config.storageMaxFileSizeMb * 1024 * 1024;
     const token = await generateUploadToken({
         sub: ownerGaii,
         ...(input.provenance ? { actor: input.provenance.actor } : {}),
@@ -672,6 +724,7 @@ export async function mintStorageUploadUrl(
             ai_provenance_id: input.provenance?.declaredId,
             publish_ask: carry.requester,
             store: input.store?.id || undefined,
+            object: target?.blobRef,
         }),
         maxBytes,
         contentType,
@@ -679,7 +732,10 @@ export async function mintStorageUploadUrl(
 
     return {
         ok: true,
-        uploadUrl: `${config.baseUrl}/v1/upload/${token}`,
+        ...(target
+            ? { uploadUrl: target.url, direct: true, uploadHeaders: target.headers, completeUrl: `${config.baseUrl}/v1/upload/${token}/complete` }
+            : { uploadUrl: `${config.baseUrl}/v1/upload/${token}`,
+                ...(input.direct ? { direct: false, directUnavailable: 'This file goes to the node\'s database or to a store the node cannot sign an address for, so it is uploaded through the node.' } : {}) }),
         contentType,
         maxBytes,
         expiresInSeconds: STORAGE_UPLOAD_URL_TTL_SECONDS,
