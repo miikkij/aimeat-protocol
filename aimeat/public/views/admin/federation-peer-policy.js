@@ -23,6 +23,9 @@
  *   - PeerPolicyCell — the per-peer control group
  * @usage <${PeerPolicyCell} peer=${p} onUpdate=${(field, value) => doUpdatePolicy(p.node_id, field, value)} />
  * @version-history
+ *   v2.2.0 — 2026-10-31 — Settlements a day, under the settlement switch while it is on: this server's
+ *     daily ceiling, no limit, or a ceiling of the peer's own, with its question mark
+ *     (federation.settlement_ceiling; secaudit2026oct31w2 round 10, W2-4).
  *   v2.1.0 — 2026-10-02 — The question marks that explain a peer's policy: federation.settlement, federation.relay, federation.replicate on their Check lines (a `help` term per CAPABILITIES entry), federation.peer_mode on the mode Select, which now has its visible label (dashboard.fedPeerMode) (components/HelpTip.js).
  *   v2.0.0 — 2026-09-27 — Library components, no class: each capability is a Check line (a
  *     tier-locked one dimmed and disabled, its ✗ keeping the tooltip that says why), the routing
@@ -36,11 +39,13 @@
  *   v1.0.0 — 2026-08-23 — Initial, with the contact tier.
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Check } from '/components/Check.js';
 import { Select } from '/components/Select.js';
+import { TextField } from '/components/TextField.js';
 import { Note } from '/components/Note.js';
 import { Facts } from '/components/Facts.js';
 import { Stack, Split } from '/components/Layout.js';
@@ -91,6 +96,34 @@ export function TierLadderLegend() {
     <//>`;
 }
 
+/**
+ * How many morsels this peer's settlements may add a day (services/settlement-ceiling.ts): this
+ * server's daily ceiling, no limit, or a number of its own. Choosing "a ceiling of its own" only opens
+ * the number field; the setting is saved when a whole number is typed and the field is left.
+ */
+function SettlementCeiling({ peer, onUpdate }) {
+  const setting = peer.settlement_ceiling ?? null;
+  const [own, setOwn] = useState(typeof setting === 'number');
+  const [amount, setAmount] = useState(typeof setting === 'number' ? String(setting) : '');
+  const mode = typeof setting === 'number' || own ? 'own' : setting === 'none' ? 'none' : 'node';
+  const choose = (v) => {
+    if (v === 'own') { setOwn(true); return; }
+    setOwn(false);
+    onUpdate('settlement_ceiling', v);
+  };
+  const save = (v) => {
+    const n = String(v ?? '').trim();
+    if (/^\d+$/.test(n) && Number(n) >= 1) onUpdate('settlement_ceiling', Number(n));
+  };
+  return html`
+    <${Select} fit label=${t('dashboard.fedSettleCeiling')} help="federation.settlement_ceiling" value=${mode}
+      onChange=${choose}
+      options=${[['node', t('dashboard.fedSettleCeilingNode')], ['none', t('dashboard.fedSettleCeilingNone')], ['own', t('dashboard.fedSettleCeilingOwn')]]} />
+    ${mode === 'own' && html`
+      <${TextField} size="short" type="number" min="1" step="1" label=${t('dashboard.fedSettleCeilingAmount')}
+        value=${amount} onInput=${setAmount} onChange=${save} onEnter=${save} />`}`;
+}
+
 export default function PeerPolicyCell({ peer, onUpdate }) {
   const tier = peer.tier || 'member';
   const ceiling = CEILING[tier] || CEILING.member;
@@ -109,6 +142,8 @@ export default function PeerPolicyCell({ peer, onUpdate }) {
             ${!allowed && html` <${Note} kind="meta" inline title=${t('dashboard.fedTierLocked')}>✗<//>`}
           <//>`;
   })}
+
+      ${ceiling.allow_settlement && peer.allow_settlement !== false && html`<${SettlementCeiling} peer=${peer} onUpdate=${onUpdate} />`}
 
       <${Select} fit label=${t('dashboard.fedPeerMode')} help="federation.peer_mode" value=${peer.peer_mode || 'federation'} disabled=${!!ceiling.peer_mode}
         onChange=${(v) => onUpdate('peer_mode', v)}

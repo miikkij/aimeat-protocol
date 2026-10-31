@@ -33,6 +33,8 @@
  *     for, "licence unknown" at an audit, and the owners' fonts as an inventory (the font manager).
  *   v1.15.0 -- 2026-10-02 -- When the person asks for a new agent (new-agent.ts), after agent
  *     classification: this surface carries aimeat_agent_propose and no handbook said what it is for.
+ *   2026-10-31 -- Federation: the daily ceiling on what a peer's settlements add, and
+ *     aimeat_admin_federation_settlement_ceiling_set (secaudit2026oct31w2 round 10).
  *   v1.14.0 -- 2026-10-01 -- Federation: the roster's `origin`, and aimeat_admin_federation_peer_remove for
  *     freeing a node id held under another key.
  *   v1.13.1 -- 2026-09-30 -- Classification: a person in their own session or an app makes an
@@ -137,7 +139,10 @@ updates, or holds one to required while the node is on optional. Each roster row
 arrived (\`origin\`): a peer a package grant or an install set added without the operator is
 \`recorded\` with who asked. \`aimeat_admin_federation_peer_remove\` with \`emergency: true\` removes a peer
 at once and frees its node id, which is what to do when the Security page says a node id is held
-under another key and the operator confirms the held peer is not the real node.
+under another key and the operator confirms the held peer is not the real node. A peer's signed
+settlements add morsels nobody here paid, so they fit in what is left of the node's daily ceiling
+on new morsels; one past it adds nothing and shows on the Security page. For a peer the operator
+trusts, \`aimeat_admin_federation_settlement_ceiling_set\` gives it a ceiling of its own or none.
 
 **Classification (operator).** Content on this node can carry a classification (public, internal,
 confidential, highly confidential, or a level an owner or an organism adds), which decides which

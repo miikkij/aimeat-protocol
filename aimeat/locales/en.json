@@ -1485,11 +1485,13 @@
           "anonymous_principal_records": "What the shared anonymous agent wrote",
           "erasure_leftover_schedules": "Scheduled tasks that deleted accounts left behind",
           "subdomain_site_origin": "Other people's apps at addresses on your own domain",
-          "platform_fee_records": "Money fee records whose writer is not known"
+          "platform_fee_records": "Money fee records whose writer is not known",
+          "federation_settlement": "Settlements a peer sent past the daily ceiling"
         },
         "detail": {
           "subdomain_site_origin": "These addresses ({count}) show an app that another person published, and they also work on your own domain: {labels}. They work as before until you choose.",
-          "platform_fee_records": "These money fee records ({count}) look like the ones a sale writes, but nothing shows whether a sale or the account itself wrote them. They count in your money fees as before until you choose."
+          "platform_fee_records": "These money fee records ({count}) look like the ones a sale writes, but nothing shows whether a sale or the account itself wrote them. They count in your money fees as before until you choose.",
+          "federation_settlement": "{node} sent {count} settlements on {day} ({morsels} morsels in all) that would have passed the daily ceiling of {limit} morsels. Nothing was added. If you trust this server, raise its ceiling on the Federation page."
         },
         "caps": {
           "line": "{label}: {cap}",
@@ -10575,6 +10577,9 @@
   "notiftext.agreement_breach_op.body": "The notice is in the agreement's history.",
   "notiftext.agreement_ended_op.title": "The agreement with {counterparty} ended: delete the data",
   "notiftext.agreement_ended_op.body": "The deletion day is on the agreement's page.",
+  "notiftext.federation_settlement_refused.title": "A settlement from {node} was refused",
+  "notiftext.federation_settlement_refused.body": "It would have added {amount} morsels, past the daily ceiling of {limit}. Nothing was added. If you trust this server, raise its ceiling on the Federation page. Its operator can then send the settlement again.",
+  "notiftext.federation_settlement_refused.open": "Open the Federation page",
   "notiftext.internet_opening_requested.title": "{owner} asks to open {app} to the internet",
   "notiftext.internet_opening_requested.body": "Reason: {reason}. Forms that open with it: {forms}. It stays closed until an operator approves.",
   "notiftext.internet_opening_opened.title": "{owner} opened {app} to the internet",
@@ -13472,6 +13477,11 @@
     "fedAllowMessaging": "Deliver messages here",
     "fedAllowBroadcast": "Announce to everyone here",
     "fedAllowSettlement": "Move morsels onto this ledger",
+    "fedSettleCeiling": "Settlements a day",
+    "fedSettleCeilingNode": "This server's daily ceiling",
+    "fedSettleCeilingNone": "No limit",
+    "fedSettleCeilingOwn": "A ceiling of its own",
+    "fedSettleCeilingAmount": "Morsels a day",
     "fedTierLadderTitle": "What each level lets a peer do",
     "fedTierLocked": "This peer's tier does not allow it. Change the tier to widen what crosses.",
     "fedTierMeaning_contact": "Messages and nothing else. No catalogue, no memory, no routing, and neither side lists the other publicly.",
@@ -28195,6 +28205,14 @@
         "ex1": "On: a partner server whose agents exchange work with the agents here. The morsels for that work are settled here.",
         "ex2": "Off: a peer you link with for messages only. Nothing it sends changes a balance here.",
         "tip": "Keep it on for peers that exchange work with you. Turn it off for a peer you no longer trust: a settlement is the one request from a peer that changes balances here."
+      },
+      "settlement_ceiling": {
+        "title": "Settlements a day",
+        "short": "The most morsels this peer's settlements may add here in one day. Past it, a settlement is refused and you are told.",
+        "what": "A settlement adds morsels that no balance here paid, so each day has a ceiling. By default a peer's settlements fit in what is left of this server's daily ceiling on new morsels. Morsels an operator creates and pacing packs sold here count against the same ceiling. You can give one peer a ceiling of its own, or no limit for a peer you trust. A settlement past the ceiling adds nothing. You see it on the Security page and get a notice, and the other server can send it again after you raise the ceiling.",
+        "ex1": "This server's daily ceiling: a peer you do not know well. Its settlements share the ceiling with the new morsels of this server.",
+        "ex2": "No limit: a partner server whose agents do a lot of work with yours, and whose operator you trust.",
+        "tip": "To stop a peer settling at all, turn off Move morsels onto this ledger instead."
       },
       "relay": {
         "title": "Relay to this peer",
