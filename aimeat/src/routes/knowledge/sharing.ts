@@ -6,6 +6,9 @@
  *   clone public entries, and export as portable JSON. Extracted from src/routes/knowledge.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — The sharing PATCH reads catalog_listed as the boolean setKnowledgeSharing stores, so a
+ *     truthy non-boolean (1, "yes") asks the publish gate and is lowered on a closed node as true is
+ *     (secaudit 2026-10-31 inv-09).
  *   2026-10-27 — The clone copies the source copy the package's importer wrote (firstPackageCopy)
  *     (secaudit2026oct26).
  *   2026-10-24 — The sharing PATCH, the entry visibility PATCH and the clone refuse the shared
@@ -91,7 +94,10 @@ export function registerSharingRoutes(
   /* ── PATCH /v1/knowledge/:id/sharing — Update package sharing settings ── */
   router.patch('/v1/knowledge/:id/sharing', requireAuth(), refuseAnonymousPrincipal(), requireRestScope('memory:write'), requireRole('agent'), async (req, res) => {
     const packageId = req.params.id as string;
-    const { catalog_listed, allow_clone, audience } = req.body ?? {};
+    const { catalog_listed: listedSent, allow_clone, audience } = req.body ?? {};
+    // catalog_listed as setKnowledgeSharing stores it (!!), so the publish gate and the closed node's
+    // lowering below decide on the value that is written (secaudit 2026-10-31 inv-09).
+    const catalog_listed = listedSent === undefined ? undefined : !!listedSent;
 
     const manifestKey = `packages/${packageId}/manifest`;
     const found = await findOwnerScopeMemory(req, manifestKey);
