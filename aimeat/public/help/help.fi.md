@@ -14,14 +14,14 @@ Voit myös keskustella tekoälyn kanssa suoraan [chatissa](/v1/chat).
 
 Jos käytät jo ChatGPT:tä, Claudea tai Grokia, yhdistä se tänne, niin siitä tulee oikea kätesi: se näkee saman tiedon ja tekee samat asiat kuin chat. Napit yhdistämiseen ovat Kodissa.
 
-(Yhteys toimii avoimella MCP-tekniikalla. Sinun ei tarvitse tietää siitä muuta.)
+(Yhteys toimii avoimella MCP-standardilla (Model Context Protocol), jota ChatGPT, Claude ja Grok tukevat. Haluatko tietää lisää? Lue [modelcontextprotocol.io](https://modelcontextprotocol.io) (englanniksi) tai kysy tekoälyltäsi: "Mitä MCP tarkoittaa ja miten se toimii?")
 
-## AI-saldo ja mitä tämä maksaa {#cost}
+## Tekoälysaldo ja mitä tämä maksaa {#cost}
 
 <!--store-->
-Ostokseesi kuuluu AI-saldoa. AI-saldo on euromäärä, jolla maksetaan tekoälyn työ täällä. Näet jäljellä olevan saldon Kodissa nimesi alla, chatissa ja [Tekoäly-sivulla](/v1/profile?tab=ai).
+Ostokseesi kuuluu tekoälysaldoa. Tekoälysaldo on euromäärä, jolla maksetaan tekoälyn työ täällä. Näet jäljellä olevan saldon Kodissa nimesi alla, chatissa ja [Tekoäly-sivulla](/v1/profile?tab=ai).
 
-Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Kun haluat lisää, paina Kodissa saldon vieressä Osta lisää saldoa. Maksu tehdään samalla kortilla, eikä uutta tilausta tarvita. Voit ostaa milloin tahansa.
+Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Lisää tekoälyä saat painamalla Kodissa saldon vieressä Osta lisää tekoälyä. Se on kertamaksu, eikä uutta tilausta tarvita. Voit ostaa milloin tahansa.
 
 Kun saldo loppuu, AIMEAT kertoo sen ja näyttää, miten voit jatkaa.
 
@@ -39,7 +39,7 @@ Kaikki, mitä tallennat, on aluksi yksityistä. Vain sinä näet sen.
 
 Sinä päätät, mitä jaat. Voit jakaa työtilan eli joukon asiakirjoja ihmisille, jotka kutsut, tai julkaista jotain kaikille. Jaettu näkyy vain niille, joille jaoit.
 
-Agentti tai yhdistetty tekoäly saa tehdä vain sen, minkä sille sallit. Näet ja voit perua jokaisen luvan [Pääsy-sivulla](/v1/profile?tab=access).
+Agentti tai yhdistetty tekoäly saa tehdä vain sen, minkä sille sallit. Näet ja voit perua jokaisen luvan [Pääsy ja turvallisuus -sivulla](/v1/profile?tab=access).
 
 Voit viedä kaikki tietosi itsellesi ja poistaa tilisi Asetuksista.
 
@@ -49,7 +49,7 @@ Agentti on tekoäly, joka tekee yhden työn puolestasi, myös silloin kun et ole
 
 Kerro [Kodissa](/v1/home) yhdellä lauseella, mitä haluat. AIMEAT tekee agentin ja näyttää sen ennen kuin se aloittaa. Jos työ toistuu, sano se: esimerkiksi "joka arkiaamu kello 8". Silloin agentti tekee työn ajastetusti.
 
-Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/profile?tab=scheduler), josta näet, milloin kukin agentti tekee työtä seuraavaksi. Valmiit työt näet Kodissa, ja halutessasi agentti lähettää ne sähköpostiisi. Voit pysäyttää agentin milloin tahansa.
+Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/profile?tab=scheduler), josta näet, milloin kukin agentti tekee työtä seuraavaksi. Valmiit työt näet Kodissa kohdassa Mitä on tapahtunut. Halutessasi agentti lähettää ne myös sähköpostiisi. Voit pysäyttää agentin milloin tahansa.
 
 ## Sovellukset {#apps}
 
@@ -59,9 +59,11 @@ Pyydä sovellusta [chatissa](/v1/chat), esimerkiksi: "Tee minulle sovellus, joll
 
 ## Kirjautuminen {#signin}
 
-Kirjaudut sähköpostilinkillä. Kirjoita osoitteesi kirjautumisikkunaan, niin saat linkin. Linkki toimii kerran ja 15 minuutin ajan, eikä salasanaa tarvita.
+Kirjaudut kirjautumislinkillä. Kirjoita osoitteesi kirjautumisikkunaan, niin saat linkin sähköpostiisi. Linkki toimii kerran ja 15 minuutin ajan, eikä salasanaa tarvita.
 
-Jos haluat, voit lisätä pääsyavaimen. Silloin kirjaudut sormenjäljellä, kasvoilla tai laitteen näytön lukituksella. Pääsyavaimen lisäät [Turvallisuus-sivulla](/v1/profile?tab=security).
+<!--nostore-->
+Jos haluat, voit kirjautua myös sormenjäljellä, kasvoilla tai laitteen näytön lukituksella. Sen otat käyttöön [Pääsy ja turvallisuus -sivulla](/v1/profile?tab=access).
+<!--/nostore-->
 
 ## Jos jokin menee rikki {#broken}
 
