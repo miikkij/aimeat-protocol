@@ -39,6 +39,8 @@
  *   gooseChildEnv(config, parentEnv, personal?)
  * @usage spawn(bin, ['acp'], { env: gooseChildEnv(config, process.env, { token }) })
  * @version-history
+ *   v1.3.0 — 2026-10-31 — The shared key's child gets OPENROUTER_HOST from the node's OpenRouter region
+ *     (eu.openrouter.ai, us.openrouter.ai or openrouter.ai; services/ai/openrouter-region.ts).
  *   v1.2.0 — 2026-10-04 — GOOSE_PATH_ROOT is always the chat's own root (services/goose-chat-config.ts),
  *     where the node's config switches off the goose extensions the chat does not use.
  *   v1.1.0 — 2026-09-28 — System 2 plan, V5: the node route. Without the shared key the child's
@@ -98,6 +100,8 @@ export function chatUsesSharedKey(config: Pick<AimeatConfig, 'gooseProviderApiKe
  */
 export function gooseChildEnv(
   config: GooseEnvConfig, parentEnv: NodeJS.ProcessEnv, personal?: { token: string },
+  /** The shared key only: OpenRouter's host for the node's region (services/ai/openrouter-region.ts). */
+  openrouterHost?: string,
 ): NodeJS.ProcessEnv {
   const allowed = new Set<string>([...GOOSE_BASE_ENV, ...config.gooseEnvPassthrough].map(n => n.toUpperCase()));
   const env: NodeJS.ProcessEnv = {};
@@ -117,6 +121,10 @@ export function gooseChildEnv(
   // Every model call this agent makes is billed to whoever owns this key. The node decides who may
   // spend it before a turn is ever started; goose only sees the key.
   if (config.gooseProviderApiKey) env.OPENROUTER_API_KEY = config.gooseProviderApiKey;
+  // goose's OpenRouter provider reads its address from OPENROUTER_HOST (goose 1.50.0 binary,
+  // 2026-10-31); the node's region decides it, and nothing the host passed through overrides that.
+  for (const name of Object.keys(env)) if (name.toUpperCase() === 'OPENROUTER_HOST') delete env[name];
+  if (config.gooseProviderApiKey && openrouterHost) env.OPENROUTER_HOST = openrouterHost;
   // Set only when non-empty: an unset value must leave goose's own configuration as it was.
   if (config.gooseProvider) env.GOOSE_PROVIDER = config.gooseProvider;
   if (config.gooseModel) env.GOOSE_MODEL = config.gooseModel;

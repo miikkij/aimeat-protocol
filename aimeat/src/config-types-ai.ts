@@ -11,6 +11,8 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-10-31 — aiOpenrouterRegion, aiOpenrouterRegionFallback, aiOpenrouterRegions,
+ *     aiOpenrouterRegionPersonChoice: where the node's OpenRouter calls are processed (Jouni, 2026-10-31).
  *   2026-10-25 — aiFreeModelLastResort (secaudit2026oct22 follow-up, the developer's ruling on the free model).
  *   2026-10-25 — aiNodeKeyMaxOutputTokens (secaudit2026oct22, node-key-allowance-precheck-unbounded-call-cost).
  *   v1.5.1 — 2026-10-12 — aiLegacySettingsRoutes no longer names /v1/ai/settings, which stays in 4.0.0.
@@ -110,6 +112,24 @@ export interface AiCapabilityConfig extends DecideConfig {
    * 2026-10-25). AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true.
    */
   aiFreeModelLastResort: boolean;
+  /**
+   * Where an OpenRouter call on the node's key is processed (services/ai/openrouter-region.ts):
+   * `eu` (eu.openrouter.ai, EU/EEA, UK and Swiss endpoints only), `us` (us.openrouter.ai) or `any`
+   * (openrouter.ai, any provider in any country). The in-region addresses need OpenRouter's Business
+   * plan on the node's key. AIMEAT_AI_OPENROUTER_REGION, default any (Jouni, 2026-10-31).
+   */
+  aiOpenrouterRegion: 'eu' | 'us' | 'any';
+  /**
+   * When the model is not offered in the chosen region: `off` refuses and names the region's models,
+   * `us` sends the call to us.openrouter.ai, `any` tries us.openrouter.ai and then openrouter.ai. The
+   * answer says where the call went. A person may override it in their routing rules.
+   * AIMEAT_AI_OPENROUTER_REGION_FALLBACK, default us.
+   */
+  aiOpenrouterRegionFallback: 'off' | 'us' | 'any';
+  /** The regions the node's key may be sent to, comma separated: eu, us, any. AIMEAT_AI_OPENROUTER_REGIONS, default all three. */
+  aiOpenrouterRegions: string;
+  /** Whether a person may choose their own region and fallback for the node's key in their routing rules. AIMEAT_AI_OPENROUTER_REGION_PERSON_CHOICE, default true. */
+  aiOpenrouterRegionPersonChoice: boolean;
   /**
    * Instance-level model defaults, one per role. Read only when the OWNER has not chosen a model of
    * their own: owner setting, then this, then a refusal that names what to set. Empty (the default)
