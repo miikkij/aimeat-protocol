@@ -89,7 +89,7 @@ export function CustomerWelcome({ session, initialized }) {
             <//>
           <//>
           <${IndexStep} line=${tr('home.buyerWelcome.step2Waits', 'This opens when your AI is connected.')}>
-            <${Note} kind="meta" inline>${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
+            <${Note} kind="quiet">${tr('home.buyerWelcome.step2', 'Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.')}<//>
           <//>
         <//>
       <//>

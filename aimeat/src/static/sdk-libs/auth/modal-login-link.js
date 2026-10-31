@@ -57,9 +57,12 @@ export function loginLinkViewHtml(i, field, linkFirst) {
   // Opened first (a node the store sold), it speaks to the buyer: their own AIMEAT, the address
   // they bought with, how long the link lasts and that no password is needed (v31 K24).
   var first = function (key, plain, fallback) { return (linkFirst && i[key]) || i[plain] || fallback; };
+  // With the buyer's words the dialog's own heading already says them (modal.js), so the step does
+  // not repeat its title and line under it.
+  var said = linkFirst && i.loginLinkTitleFirst;
   return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">'
-    + '<h3 class="aimeat-sub-title">' + escHtml(first('loginLinkTitleFirst', 'loginLinkTitle', 'Sign in with an emailed link')) + '</h3>'
-    + '<p class="aimeat-sub-desc">' + escHtml(first('loginLinkDescFirst', 'loginLinkDesc', 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.')) + '</p>'
+    + (said ? '' : '<h3 class="aimeat-sub-title">' + escHtml(first('loginLinkTitleFirst', 'loginLinkTitle', 'Sign in with an emailed link')) + '</h3>'
+      + '<p class="aimeat-sub-desc">' + escHtml(first('loginLinkDescFirst', 'loginLinkDesc', 'Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.')) + '</p>')
     + field(first('emailLabelFirst', 'emailLabel', 'Email'), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">')
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first('loginLinkSendFirst', 'loginLinkSend', 'Send the link')) + '</button>'
