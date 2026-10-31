@@ -149,7 +149,8 @@ Stripe account connected first. Name up to three memory parts as \`preview\` (sc
 those and the name, description and price are what everyone sees, and only buyers read and install the
 rest, including every later version. Keep the app the package was made from out of public view, or
 its address gives the template away. \`aimeat_package_sales\` lists the sales and refunds one. A buyer
-uses \`aimeat_package_buy\` without \`repository\`, or Buy on the Packages page.
+buys it from their own AI or with Buy on the Packages page (\`/v1/profile?tab=packages&package=<group id>\`
+opens its row, which is where an app sends its person to buy).
 
 **App config.** An app that needs values to work declares them as a JSON Schema in
 \`<script type="application/json" id="aimeat-config">\` (string, number, integer and boolean fields, never a

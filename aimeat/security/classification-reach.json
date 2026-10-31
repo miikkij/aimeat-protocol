@@ -2282,6 +2282,24 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Package entitlement records."
     },
+    "src/services/packages/sale/package-account-checkout.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the buyer's own checkout session record, read only for the tracking code the collect wrote, so the author's refund reaches the right charge."
+    },
+    "src/services/packages/sale/package-account-entitlement.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: a package's account sale (prices, preview part ids, purchases) in the package-account-sales system namespace that no principal addresses, and the status of the seller's own copy of a checkout order. Commercial records, not anybody's content."
+    },
+    "src/services/packages/sale/package-account-sale.ts": {
+      "reads": {
+        "listMemory": 3
+      },
+      "why": "Reviewed 2026-10-31, the node's own read: the account sale records in the package-account-sales system namespace, listed for the packages on sale, a buyer's own purchases and a refund by charge id. Commercial records, not anybody's content."
+    },
     "src/services/packages/sale/package-offer.ts": {
       "reads": {
         "getMemory": 2
