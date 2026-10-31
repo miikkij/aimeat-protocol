@@ -17,6 +17,10 @@
  * @structure packageTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { packageTools } from './tool-call-defs-packages.js';
  * @version-history
+ *   v1.16.0 -- 2026-10-31 -- aimeat_package_price_set (PUT /v1/packages/:groupId/price) and
+ *     aimeat_package_sales (GET .../sales, POST .../sales/:order/refund); aimeat_package_buy without
+ *     `repository` reads GET /v1/packages/:groupId and opens a `package-account` checkout, and action
+ *     purchases reads GET /v1/package-purchases; aimeat_package_list forwards `for_sale`.
  *   v1.15.0 -- 2026-10-17 -- aimeat_package_publish and _compose take visibility members and organism:<id>;
  *     the route validates it (plan doc-mvcn6c7e4e5q, V3.7).
  *   v1.14.0 -- 2026-10-04 -- aimeat_package_install forwards `grant_apps`.
@@ -63,11 +67,13 @@ export const packageTools: ConnectCliToolDefinition[] = [
             search: { type: 'string', description: 'Search over name, description and tags.' },
             author: { type: 'string', description: 'Only this author\'s packages. Your own name also shows your private ones.' },
             status: { type: 'string', enum: ['draft', 'published', 'archived'], description: 'Defaults to published.' },
+            for_sale: { type: 'boolean', description: 'true: only the packages their authors sell to accounts of this node, each with its price.' },
         },
         handler: ({ client }, input) => client.get(`/v1/packages${query({
             search: optionalString(input, 'search'),
             author: optionalString(input, 'author'),
             status: optionalString(input, 'status'),
+            for_sale: optionalBoolean(input, 'for_sale') === true ? 'true' : undefined,
         })}`),
     },
     {
@@ -394,6 +400,17 @@ export const packageTools: ConnectCliToolDefinition[] = [
             const groupId = optionalString(input, 'group_id') ?? '';
             const nodeId = optionalString(input, 'node_id');
             if (action === 'subscriptions') return client.get('/v1/package-sales/subscriptions');
+            // No repository: a package its author sells on this node (routes/package-account-sales.ts).
+            if (action === 'purchases') return client.get('/v1/package-purchases');
+            if (!repository && (action === 'offer' || action === 'checkout')) {
+                const listing = await client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}`);
+                if (action === 'offer' || listing.ok === false) return listing;
+                const sale = ((listing.data ?? {}) as { sale?: { price?: { currency?: string } } }).sale;
+                return client.post('/v1/commerce/checkout-sessions', {
+                    ...(sale?.price?.currency ? { currency: sale.price.currency } : {}),
+                    items: [{ kind: 'package-account', app: groupId }],
+                });
+            }
             if (action === 'auto_renew') {
                 return client.put('/v1/package-sales/subscriptions/auto-renew', {
                     repository, group_id: groupId, node_id: nodeId ?? '', auto_renew: optionalBoolean(input, 'auto_renew') ?? false,
@@ -409,6 +426,30 @@ export const packageTools: ConnectCliToolDefinition[] = [
                 ...(currency ? { currency } : {}),
                 items: [{ kind: 'package', agent: repository, app: groupId, offer_id: action === 'renew' ? `renew:${nodeId ?? ''}` : 'buy', input: lineInput }],
             });
+        },
+    },
+    {
+        // The author's price on their own package, sold to accounts of this node.
+        name: 'aimeat_package_price_set',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            if (input.price !== undefined) body.price = input.price as JsonObject | null;
+            const state = optionalString(input, 'state');
+            if (state !== undefined) body.state = state;
+            const preview = optionalArray(input, 'preview');
+            if (preview !== undefined) body.preview = preview;
+            return client.put(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}/price`, body);
+        },
+    },
+    {
+        // The author's sales of it, and a refund of one.
+        name: 'aimeat_package_sales',
+        handler: ({ client }, input) => {
+            const groupId = encodeURIComponent(requiredString(input, 'group_id'));
+            if (requiredString(input, 'action') === 'refund') {
+                return client.post(`/v1/packages/${groupId}/sales/${encodeURIComponent(requiredString(input, 'order'))}/refund`, {});
+            }
+            return client.get(`/v1/packages/${groupId}/sales`);
         },
     },
     {

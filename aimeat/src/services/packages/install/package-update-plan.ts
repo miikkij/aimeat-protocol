@@ -19,6 +19,8 @@
  *   import { planInstanceUpdate } from './package-update-plan.js';
  *   const out = await planInstanceUpdate({ storage }, caller, instanceId);
  * @version-history
+ *   v1.2.0 — 2026-10-31 — 402 PURCHASE_REQUIRED for a package its author sells to accounts when the
+ *     owner holds no paid purchase of it (sale/package-account-entitlement.ts).
  *   v1.1.0 — 2026-09-28 — A forked install is refused (409 FORKED); a managed one overwrites every
  *     changed component, since no edit can be held there (services/packages/install/package-managed.ts).
  *   v1.0.0 — 2026-09-05 — Extraction out of routes/instances/manage.ts, plus the live-hash fix.
@@ -28,6 +30,7 @@ import type {
 } from '../../../storage/interface.js';
 import { fetchComponentContent, computeHash } from '../../component-registrar.js';
 import { forkedUpdateRefusal } from './package-managed.js';
+import { purchaseRefusal } from '../sale/package-account-entitlement.js';
 
 export interface ComponentDiff {
     componentId: string;
@@ -75,6 +78,10 @@ export async function planInstanceUpdate(
     }
     const forked = forkedUpdateRefusal(instance);
     if (forked) return forked;
+    // A package its author sells: a newer version is for an account holding a paid purchase, so a
+    // refunded buyer keeps the copy they have and receives nothing newer (package-account-entitlement.ts).
+    const unpaid = await purchaseRefusal(storage, instance.packageGroupId, caller.owner);
+    if (unpaid) return { ok: false, ...unpaid };
     // A managed install cannot hold an owner's edit (services/packages/install/package-managed.ts refuses every one),
     // so every changed component is a plain overwrite and nothing waits for a merge.
     const managed = instance.mode === 'managed';

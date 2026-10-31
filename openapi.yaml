@@ -30925,7 +30925,7 @@ paths:
                     type: object
                     description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, app-tool, ext-call, package, pacing-pack], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }. pacing-pack: only quantity; the pack is the one GET /v1/wallet names as pacing_pack, sold by the operator in its own currency.' }
+                      kind: { type: string, enum: [offer, app-tool, ext-call, package, package-account, pacing-pack, subscription], default: offer, description: 'package: agent is the repository node id, app the package group id, offer_id "buy" or "renew:<node id>", input { node: { node_id, url, public_key }, auto_renew }. package-account: only app, the group id of a package its author sells to accounts of this node; the money goes to the author, and once paid the buyer''s account may read and install it. pacing-pack: only quantity; the pack is the one GET /v1/wallet names as pacing_pack, sold by the operator in its own currency.' }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
                       tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
@@ -55132,9 +55132,18 @@ paths:
     get:
       operationId: listPackages
       summary: List packages
-      description: List packages with optional filtering. Public packages visible without auth.
+      description: >-
+        List packages with optional filtering. Public packages visible without auth. With
+        `for_sale=true`, only the packages their authors sell to accounts of this node, as listings:
+        name, description, category, tags, author, version, the parts without content (a part the
+        author names as preview carries its content), `sale` { state, price, buyable } and `buy`, the
+        checkout line that buys it.
       tags: [Packages]
       parameters:
+        - name: for_sale
+          in: query
+          description: 'true: the packages on sale to accounts of this node, as listings with the price.'
+          schema: { type: string, enum: ['true'] }
         - name: search
           in: query
           schema: { type: string }
@@ -55685,6 +55694,126 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/packages/{groupId}/price:
+    put:
+      operationId: setPackageAccountPrice
+      summary: Sell your own package to accounts of this node
+      description: >-
+        The package's author only; requires commerce:sell, and a session of this node. `price`
+        { amount, currency } in micro-units of EUR or USD (1 EUR = 1000000), or null to end the sale.
+        `state` on_sale (listed and sold), paused (listed, not sold) or ended. `preview`: up to three
+        ids of the package's memory parts anyone may read before buying. Every version must be private
+        (409 PRICE_NEEDS_PRIVATE), and the author must have their own Stripe account connected (409
+        NO_PAYMENT_ACCOUNT), since the buyer's money settles there. While the sale is on or paused the
+        group cannot be made members, organism or public (PATCH /v1/packages/{groupId} answers 409
+        PACKAGE_PRICED). A new price is appended and reaches only new buyers.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                price:
+                  nullable: true
+                  type: object
+                  properties:
+                    amount: { type: integer }
+                    currency: { type: string, enum: [EUR, USD] }
+                state: { type: string, enum: [on_sale, paused, ended] }
+                preview: { type: array, maxItems: 3, items: { type: string } }
+      responses:
+        '200':
+          description: '`data.sale` is `{ group_id, author, state, price, buyable, preview, updated_at }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/packages/{groupId}/sales:
+    get:
+      operationId: listPackageAccountSales
+      summary: Your sales of a package you sell to accounts
+      description: >-
+        The author only; requires commerce:sell. The sale, every price, every purchase (buyer, order,
+        amount, currency, bought_at, state paid, pending or refunded; pending is a checkout that did
+        not complete) newest first, and the totals of the paid ones per currency.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is the sale with `prices`, `sales` and `totals`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/packages/{groupId}/sales/{order}/refund:
+    post:
+      operationId: refundPackageAccountSale
+      summary: Refund one purchase of your package
+      description: >-
+        The author only; requires commerce:sell. Gives the money back on the payment method that
+        collected it, on the author's own payment account. Once the payment method says it refunded,
+        the buyer can no longer read, install or update the package, and is told; copies already
+        installed stay. 409 ALREADY_REFUNDED, REFUND_RUNNING (another refund of it runs now),
+        NOT_COMPLETED (the checkout never completed), RAIL_UNAVAILABLE; 502 REFUND_FAILED when the
+        payment method did not return the money, and the purchase stands.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: groupId, in: path, required: true, schema: { type: string } }
+        - { name: order, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: '`data` is `{ group_id, order, buyer, amount, currency, outcome, state }`.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/package-purchases:
+    get:
+      operationId: listPackagePurchases
+      summary: The packages you bought from their authors
+      description: >-
+        The caller's own purchases; requires commerce:buy. One row per package: group_id, name,
+        author, order, amount, currency, bought_at, state (paid, pending, refunded), `entitled`
+        (whether the account may read and install it now), `covers` ("line": every version, later
+        ones included) and `install`, the endpoint that installs it.
+      tags: [Packages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: '`data.purchases` is the list.'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/federation/package-sales/{groupId}/offer:
     get:
@@ -56493,6 +56622,13 @@ paths:
         installer's approval), the jobs its extensions run on their own, the operating guides it
         carries for the installer's AI, the settings the install asks, and what this node must already
         have. Derived from the package's own components on every read.
+
+        A package its author sells to accounts of this node: a reader holding a paid purchase, the
+        author and the operator get the package with `sale` and `entitled: true`. Any other reader,
+        signed in or not, gets its listing while it is on sale or paused: `listing_only: true`,
+        `entitled: false`, the parts without content (a preview part carries its content), `sale`
+        { group_id, author, state, price, buyable, preview } and `buy`, the line for POST
+        /v1/commerce/checkout-sessions (`{ kind: 'package-account', app, currency }`).
       tags: [Packages]
       parameters:
         - name: groupId
@@ -56501,7 +56637,7 @@ paths:
           schema: { type: string }
       responses:
         '200':
-          description: Latest published package
+          description: Latest published package, or the listing of a package on sale
           content:
             application/json:
               schema:
@@ -56678,7 +56814,9 @@ paths:
     get:
       operationId: getPackageVersion
       summary: Get specific version
-      description: Retrieve a specific version of a package.
+      description: >-
+        Retrieve a specific version of a package. A package its author sells to accounts of this node
+        answers 402 PURCHASE_REQUIRED to a reader holding no paid purchase while it is listed for sale.
       tags: [Packages]
       parameters:
         - name: groupId
@@ -56770,6 +56908,9 @@ paths:
         group_id }`) is served a PRIVATE package it holds an entitlement to: the newest published
         version made up to the entitlement's `updates_until`. A version made after it answers 403
         UPDATES_ENDED; a node with no entitlement 404. An unsigned request is decided on visibility.
+        A package its author sells to accounts of this node is exported to its author, the operator
+        and an account holding a paid purchase; anyone else gets 402 PURCHASE_REQUIRED while it is
+        listed for sale.
       tags: [Packages]
       parameters:
         - name: groupId
