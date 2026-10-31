@@ -22,6 +22,9 @@
  *   const agent = await ensureChatAgent(storage, config, ownerName);
  *   const { token } = await mintChatAgentToken(storage, config, agent);
  * @version-history
+ *   v1.4.0 — 2026-10-31 — mintChatAgentToken takes `use`: the session's MCP token names the MCP
+ *     endpoint as its audience, the process's /v1/llm token names none. From 4.0.0 the MCP endpoint
+ *     refused the chat's token, and goose ran every turn without AIMEAT tools (v27 P2).
  *   v1.3.0 — 2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   v1.2.0 — 2026-10-18 — The chat agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
  *   v1.1.1 — 2026-09-05 — Notifies MCP through mcp/resource-events.ts, the leaf, not mcp/index.ts,
@@ -48,6 +51,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { scopesForProfile } from '../tool-catalog/scopes.js';
 import { emitChange } from './event-bus.js';
 import { emitToolListChanged } from '../mcp/resource-events.js';
+import { mcpResourceOf } from '../utils/mcp-resource.js';
 import { logger } from '../utils/logger.js';
 import { agentListingTags } from './content-defaults.js';
 import { newAgentClearance } from './agent-clearance.js';
@@ -215,9 +219,16 @@ export interface ChatAgentToken {
  *
  * `mcp_client` marks where the session came from, which is what makes the chat show up in the
  * owner's connected-clients list as itself rather than as an anonymous agent.
+ *
+ * `use` says which endpoint the token is for, and the two cannot share one token from 4.0.0:
+ * - `mcp`: the session's tool surface. The MCP endpoint refuses an `mcp_client` token that names no
+ *   audience (mcp/oauth-binding.ts mcpAudienceRefusal), so this one names `<base>/v1/mcp`. Without
+ *   it every chat on a 4.x node ran with no AIMEAT tools from 2026-10-13 to 2026-10-31.
+ * - `rest`: the process's model calls through /v1/llm. A REST route refuses a token whose audience is
+ *   the MCP endpoint (auth/mcp-token-on-rest.ts), so this one names none.
  */
 export async function mintChatAgentToken(
-    storage: Storage, config: AimeatConfig, agent: ChatAgentIdentity,
+    storage: Storage, config: AimeatConfig, agent: ChatAgentIdentity, use: 'mcp' | 'rest',
 ): Promise<ChatAgentToken> {
     const sessionId = `chat-${randomBytes(16).toString('hex')}`;
     const now = new Date().toISOString();
@@ -230,6 +241,7 @@ export async function mintChatAgentToken(
         roles: ['agent'],
         scopes: agent.scopes,
         mcp_client: 'aimeat-chat',
+        ...(use === 'mcp' ? { aud: mcpResourceOf(config) } : {}),
     } as never, config.agentJwtTtlSeconds, sessionId);
 
     await storage.createSession({

@@ -6,9 +6,11 @@
  *   phone): a way back, a New button, one row per conversation with a delete, and whatever the page
  *   puts under the list. Its look is css/components/thread-list.css; the catalogue entry is
  *   `thread-list`.
- * @structure ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) · ThreadPerson({ expanded, onClick, children })
+ * @structure ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose, children }) · ThreadPerson({ expanded, onClick, children }) · threadTitle(thread)
  * @usage html`<${ThreadList} threads=${threads} activeId=${id} onOpen=${…} onNew=${…} onDelete=${…} onClose=${…}>…<//>`
  * @version-history
+ *   v1.3.0 — 2026-10-31 — threadTitle(): the stored placeholder "New chat" reads as chat.new in the
+ *     page's language (v27 P7).
  *   v1.2.0 — 2026-09-26 — ThreadPerson, the person tone: a heading over one person's conversations
  *     that opens and closes them. Messages draws its list as these rows (Jouni's decision
  *     "Conversation list").
@@ -22,6 +24,15 @@ import { t } from '/js/i18n.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+
+/**
+ * A conversation's name as the person reads it. The node stores "New chat" until the first message
+ * names the conversation (services/chat-threads.ts), and that placeholder is shown in the page's
+ * language rather than as stored (v27 P7).
+ */
+export function threadTitle(thread) {
+    return !thread?.title || thread.title === 'New chat' ? tr('chat.new', 'New conversation') : thread.title;
+}
 
 /**
  * The person's conversations.
@@ -46,7 +57,7 @@ export function ThreadList({ threads, activeId, onOpen, onNew, onDelete, onClose
                         ${threads.map((thread) => html`
                             <li key=${thread.id} class="poster-thread ${thread.id === activeId ? 'poster-thread--active' : ''}">
                                 <button type="button" class="poster-thread-open" onClick=${() => onOpen(thread.id)}>
-                                    <span class="poster-thread-title">${thread.title}</span>
+                                    <span class="poster-thread-title">${threadTitle(thread)}</span>
                                     <span class="poster-thread-sub">${tr('chat.turnCount', '{n} messages').replace('{n}', String(thread.turns ?? 0))}</span>
                                 </button>
                                 <button type="button" class="poster-icon poster-icon--small poster-thread-del"

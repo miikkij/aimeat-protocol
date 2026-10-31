@@ -297,7 +297,7 @@ export const SAMPLES = {
       after: after('.poster-action--more', () => row(more('What does that mean?'))) },
     { id: 'status-link', measure: '.poster-agent-status-link', render: () => html`<div class="poster-agent-status"><a class="poster-agent-status-link" href="#">Use your own key →</a></div>`,
       after: after('.poster-action--more', () => row(more('Use your own key →'))) },
-    { id: 'credit-link', measure: '.poster-credit-link', render: () => html`<${GooseCredit} />`,
+    { id: 'credit-link', measure: '.poster-credit-link', render: () => html`<${GooseCredit} open=${true} />`,
       after: after('.poster-action--more', () => row(html`<a class="poster-action poster-action--more" href="#"><span aria-hidden="true">🪿</span> Powered by goose</a>`)) },
     { id: 'setup-docs', measure: '.ast-docs', render: () => html`<div class="poster-chooser"><a class="ast-docs" href="#">Official instructions from claude.ai →</a></div>`,
       after: after('.poster-action--more', () => row(more('Official instructions from claude.ai →'))) },

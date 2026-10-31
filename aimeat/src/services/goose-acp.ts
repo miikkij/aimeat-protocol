@@ -19,12 +19,15 @@
  *   and the lifetime of the agent is a plain child process.
  * @structure
  *   - GooseAcpClient — start(), newSession(), prompt(), cancel(), close()
+ *   - McpServerNotLoadedError — newSession()'s refusal when a required MCP server did not load
  *   - SessionUpdate — what a turn emits, normalised for the chat surface
  * @usage
  *   const acp = await GooseAcpClient.start(config);
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.10.0 — 2026-10-31 — newSession() takes `required`: a named MCP server that failed to load
+ *     throws McpServerNotLoadedError instead of a session with no tools (v27 P2).
  *   v2.9.0 — 2026-10-04 — start() writes the chat's goose config first (services/goose-chat-config.ts).
  *   v2.8.0 — 2026-10-02 — The chat's tool surface is /v2/mcp/chat: a small core, the rest found by
  *     purpose. On /v1/mcp a one-line question paid for about 129 000 tokens of tool descriptions.
@@ -99,6 +102,18 @@ interface JsonRpcMessage {
     params?: Record<string, unknown>;
     result?: unknown;
     error?: { code: number; message: string; data?: unknown };
+}
+
+/**
+ * A session whose required MCP server did not load. On 2026-10-31 a goose session came back with the
+ * aimeat server refused (401), the model went on without tools, wrote "[Calling: …]" as text and
+ * stopped, and the person saw a turn that never ended.
+ */
+export class McpServerNotLoadedError extends Error {
+    constructor(readonly server: string, readonly reason: string) {
+        super(`MCP server "${server}" did not load: ${reason}`);
+        this.name = 'McpServerNotLoadedError';
+    }
 }
 
 /** How long one turn may run. Turns take minutes when an agent is building something. */
@@ -280,8 +295,12 @@ export class GooseAcpClient {
         return done;
     }
 
-    /** Start a session with its own MCP servers. `cwd` is required by the protocol and unused here. */
-    async newSession(opts: { mcpServers: AcpMcpServer[]; cwd?: string }): Promise<string> {
+    /**
+     * Start a session with its own MCP servers. `cwd` is required by the protocol and unused here.
+     * A server named in `required` that failed to load throws McpServerNotLoadedError: the session
+     * exists, but a turn on it would run with none of that server's tools.
+     */
+    async newSession(opts: { mcpServers: AcpMcpServer[]; cwd?: string; required?: string[] }): Promise<string> {
         const result = await this.call('session/new', {
             cwd: opts.cwd ?? process.cwd(),
             mcpServers: opts.mcpServers,
@@ -294,6 +313,8 @@ export class GooseAcpClient {
             if (!ext.success) logger.warn(`[goose] extension "${ext.name}" failed to load: ${ext.error ?? 'unknown'}`);
         }
         if (!result.sessionId) throw new Error('goose session/new returned no sessionId');
+        const missing = (result.extensionLoadResults ?? []).find((ext) => !ext.success && (opts.required ?? []).includes(ext.name));
+        if (missing) throw new McpServerNotLoadedError(missing.name, missing.error ?? 'unknown');
         return result.sessionId;
     }
 
