@@ -236,7 +236,7 @@
     if (s === "light" || s === "dark") return s;
     var attr = document.documentElement.dataset.theme;
     if (attr === "light" || attr === "dark") return attr;
-    return osMode();
+    return s === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   function osMode() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";

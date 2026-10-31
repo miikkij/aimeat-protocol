@@ -9,9 +9,8 @@
  *   modeSwitchHtml/wireModeSwitch · ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
- *   v1.9.0 — 2026-10-31 — aimeatReadTheme() reads the "automatic" choice ('auto'); with no mode on
- *     the page it falls back to the device's, so an app keeps its default while the node's own
- *     pages, which set a mode first, open light (Jouni, v31 K65 as scoped at 17.27). The mode switch has a third
+ *   v1.9.0 — 2026-10-31 — aimeatReadTheme() is light when nothing is chosen; the OS preference
+ *     counts only when the stored choice is 'auto' (Jouni, v31 K65). The mode switch has a third
  *     button, "Auto", which stores 'auto' and follows the device, live; aimeatThemeChoice() reads the
  *     choice, and the change event carries `choice` beside the mode shown.
  *   v1.8.1 — 2026-10-05 — escHtml escapes all five characters, quotes included, for the attributes
@@ -79,9 +78,8 @@ export function aimeatReadTheme() {
   if (s === 'light' || s === 'dark') return s;
   var attr = document.documentElement.dataset.theme;
   if (attr === 'light' || attr === 'dark') return attr;
-  // No mode on the page yet: the device's. The node's own pages always set one (light unless chosen,
-  // v31 K65); an app keeps the device default (Jouni, 17.27: apps are left as they are).
-  return osMode();
+  // Light unless the person chose "automatic" ('auto'): AIMEAT's own look (Jouni, v31 K65).
+  return (s === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
 }
 
 /** The device's own mode, for the "automatic" choice. */
