@@ -9,6 +9,8 @@
  * Micro-memory:  default 500 KB total per agent (hard limit)
  *
  * @version-history
+ *   v1.4.1 — 2026-10-30 — checkStorageQuota takes the store the writer named: a file put in one of the
+ *     owner's own stores passes, one put in a node store counts (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.4.0 — 2026-10-29 — The storage quota leaves out the files kept in storage their owner connected,
  *     and a file that goes there passes the check (services/file-store/).
  *   v1.3.0 — 2026-10-25 — enforceExtensionMemoryLimits() refuses a new key past the operator's total
@@ -169,10 +171,12 @@ export async function checkStorageQuota(
     storage: Storage,
     gaii: string,
     additionalBytes: number,
+    /** The store the writer named for the file (`own:<name>`, `node:<name>`), when one was named. */
+    storeChoice?: string,
 ): Promise<QuotaCheckResult> {
     const currentBytes = await getStorageTotalBytes(storage, gaii);
     // A file that goes to the storage its owner connected uses none of the node's.
-    if (additionalBytes > 0 && await writesToOwnStore({ storage, config }, gaii)) {
+    if (additionalBytes > 0 && await writesToOwnStore({ storage, config }, gaii, storeChoice)) {
         return { allowed: true, currentBytes, quotaBytes: config.storageQuotaMb * 1024 * 1024, overageBytes: 0, overageMorsels: 0 };
     }
     const projectedBytes = currentBytes + additionalBytes;

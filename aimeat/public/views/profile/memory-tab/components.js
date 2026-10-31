@@ -8,6 +8,9 @@
  *   Extracted from memory-tab.js to satisfy max-file-lines. Every part is a component of the kit
  *   that gets data; the file writes no class.
  * @version-history
+ *   v2.3.0 -- 2026-10-30 -- The upload form's "Where to keep it", when the person may choose a store
+ *     (GET /v1/file-store `choices`): the first answer is where new files go now and sends no store
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v2.2.1 -- 2026-10-25 -- secaudit2026oct22: "Open in new tab" for a private file opens the blob as
  *     inertBlob() gives it: HTML, SVG and other script-capable types as plain text or a download.
  *   v2.2.0 -- 2026-10-20 -- The file preview carries the fold "What is known about this file" under the
@@ -85,6 +88,8 @@ import { fileIcon, fileCategory, fileBytesUrl, fetchFileBytes, encKeyPath } from
 import { FileFacts } from './file-facts.js';
 import { inertBlob } from './inert-blob.js';
 import { swallowed } from '/js/swallowed.js';
+import { getMyFileStore } from '/js/services/file-store.js';
+import { storeWords } from '../storage/store-words.js';
 
 /** A public value, read on the spot: the opened row's panel holds it (browse-view.js). */
 export function DiscoverPreview({ ownerGaii, memKey }) {
@@ -305,6 +310,23 @@ export function FileUploadForm({ onUpload, onCancel }) {
   const [vis, setVis] = useState('private');
   const [fileTags, setFileTags] = useState([]);
   const [uploading, setUploading] = useState(false);
+  // Where the bytes go: '' is where new files go now, so `store` is sent only when the person picks one.
+  const [store, setStore] = useState('');
+  const [places, setPlaces] = useState(null);
+  useEffect(() => {
+    let live = true;
+    getMyFileStore()
+      .then((r) => { if (live) setPlaces(r.data); })
+      // Without the answer the form keeps its old shape: no choice, the files go where new files go.
+      .catch((e) => swallowed('memory-tab: read the stores a file may go to', e));
+    return () => { live = false; };
+  }, []);
+  const storeOptions = places && (places.choices || []).length
+    ? [
+      ['', t('profile.files.storeNow', { where: storeWords(places.new_files_go_to) })],
+      ...places.choices.filter((c) => c.store !== places.new_files_go_to).map((c) => [c.store, storeWords(c.store)]),
+    ]
+    : null;
 
   const addFiles = (newFiles) => {
     if (!newFiles || newFiles.length === 0) return;
@@ -329,7 +351,7 @@ export function FileUploadForm({ onUpload, onCancel }) {
   const handleSubmit = async () => {
     if (fileItems.length === 0 || uploading) return;
     setUploading(true);
-    await onUpload(fileItems, vis, fileTags);
+    await onUpload(fileItems, vis, fileTags, store || undefined);
     setUploading(false);
   };
 
@@ -344,6 +366,8 @@ export function FileUploadForm({ onUpload, onCancel }) {
       <${FileDrop} multiple items=${fileItems} onFiles=${addFiles} onRename=${updateKey} onRemove=${removeFile}
         iconOf=${(f) => fileIcon(f.type)} />
       <${Select} label=${t('profile.files.visLabel')} value=${vis} onChange=${setVis} options=${visOptions} />
+      ${storeOptions ? html`
+        <${Select} label=${t('profile.files.storeLabel')} hint=${t('profile.files.storeHint')} value=${store} onChange=${setStore} options=${storeOptions} />` : null}
       <${TagInput} label=${t('profile.files.tagsLabel') || 'Tags'} lowercase adder whole tags=${fileTags} onChange=${setFileTags}
         placeholder=${t('profile.files.tagsPlaceholder') || 'Add tag and press Enter'} />
       <${FormActions}>

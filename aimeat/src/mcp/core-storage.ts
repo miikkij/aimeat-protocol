@@ -16,6 +16,8 @@
  *   import { registerCoreStorageTools } from './core-storage.js';
  *   registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-30 — aimeat_storage_upload takes `store`, the store the writer names for the bytes (inline and
+ *     presigned), and the inline answer says the file's `store` (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-24 — aimeat_storage_download names signing in when the shared anonymous principal asks
  *     for another owner's members file, which resolveFileRef now refuses (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -68,6 +70,11 @@ import { toDeclaredProvenance } from './ai-provenance-input.js';
 import { loadServedProvenance, provenanceItemBlock } from '../services/ai-provenance-marks.js';
 import { toolError } from './tool-error.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
+import { parseBlobRef } from '../storage/blob/blob-types.js';
+
+/** The refusals of a named store (services/storage-file-write.ts StoreChoiceRefusalCode), answered as `CODE: message`. */
+const STORE_CODES = new Set<string>(['UNKNOWN_STORE', 'STORE_NOT_SELECTABLE', 'STORE_NOT_TAKING_FILES', 'STORE_NOT_REACHABLE', 'NO_OWN_STORAGE']);
 
 /** F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
  *  handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
@@ -98,8 +105,10 @@ export function registerCoreStorageTools(
             inputSchema: zodShapeFor('aimeat_storage_upload'),
             annotations: annotationsFor('aimeat_storage_upload'),
         },
-        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id }) => {
+        async ({ key, data_base64, mime_type, visibility, group_id, workspace_refs, ai_provenance, ai_provenance_id, store: storeName }) => {
             const deps = { storage, config, emitResourceUpdated, emitResourceListChanged };
+            // The store the writer named for the bytes, checked by the shared write with the session's rights.
+            const store = storeName ? { id: storeName, operator: caller ? await caller().operator() : false } : undefined;
             // The same binding POST /v1/storage takes; the shared write refuses a workspace file
             // that names none.
             const workspaceRef = visibility === 'workspace' ? normalizeWorkspaceRefs(workspace_refs, undefined) || undefined : undefined;
@@ -118,9 +127,10 @@ export function registerCoreStorageTools(
                 const minted = await mintStorageUploadUrl(deps, agentGaii, {
                     key, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
                     ...(publishGate ? { publishGate } : {}),
+                    ...(store ? { store } : {}),
                 });
                 if (!minted.ok) {
-                    if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND' || minted.code === 'PUBLISH_NOT_ALLOWED') return toolError(minted.code, minted.message);
+                    if (minted.code === 'SCOPE_DENIED' || minted.code === 'NOT_FOUND' || minted.code === 'PUBLISH_NOT_ALLOWED' || STORE_CODES.has(minted.code)) return toolError(minted.code, minted.message);
                     return { content: [{ type: 'text' as const, text: minted.message }], isError: true };
                 }
                 return {
@@ -156,11 +166,12 @@ export function registerCoreStorageTools(
             const written = await writeStorageFile(deps, agentGaii, {
                 key, data: fileData, mimeType: mime_type, visibility, groupId: group_id, workspaceRef, provenance,
                 ...(publishGate ? { publishGate } : {}),
+                ...(store ? { store } : {}),
             });
             if (!written.ok) {
-                // A provenance refusal answers `CODE: message`, the code REST answers.
+                // A provenance or a store refusal answers `CODE: message`, the code REST answers.
                 if (written.code === 'SCOPE_DENIED' || written.code === 'NOT_FOUND' || written.code === 'PROVENANCE_HASH_MISMATCH'
-                    || written.code === 'PUBLISH_NOT_ALLOWED') {
+                    || written.code === 'PUBLISH_NOT_ALLOWED' || STORE_CODES.has(written.code)) {
                     return toolError(written.code, written.message);
                 }
                 // Only the per-file ceiling has an answer the caller can act on. Offering the
@@ -180,6 +191,8 @@ export function registerCoreStorageTools(
                     ...(written.publishRequest ? { publish_request: written.publishRequest } : {}),
                     ...(written.warnings?.length ? { warnings: written.warnings } : {}),
                     mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, visibility: file.visibility, uploaded: true,
+                    // Where the bytes went: `database`, `node:<name>` or `own:<name>`.
+                    store: choiceIdOf(parseBlobRef(file.blobRef)?.storeId),
                     // The record the file carries: attached, declared or stamped by the shared write.
                     ...provenanceItemBlock(prov),
                     ...(written.overageMorsels > 0 ? { overage_charged: written.overageMorsels } : {}),

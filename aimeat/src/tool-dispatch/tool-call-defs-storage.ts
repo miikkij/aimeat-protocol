@@ -6,6 +6,8 @@
  *   aimeat_storage_download and aimeat_storage_delete, thin proxies over /v1/storage and /v1/pub.
  *   Moved from tool-call-defs-core.ts, which had reached the 800-line limit.
  * @version-history
+ *   v1.4.0 — 2026-10-30 — aimeat_storage_upload forwards `store`, the store the writer names for the
+ *     bytes (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.3.0 — 2026-10-08 — aimeat_storage_upload forwards ai_provenance (validated here first) and
  *     ai_provenance_id; POST /v1/storage records them (recorded-by-route).
  *   v1.2.0 — 2026-10-06 — aimeat_storage_upload without data_base64 asks for a presigned upload_url;
@@ -41,6 +43,7 @@ export const storageCliTools: ConnectCliToolDefinition[] = [
             const declared = parseDeclarationInput(input.ai_provenance);
             if (declared) body.ai_provenance = input.ai_provenance as JsonObject[keyof JsonObject];
             const provenanceId = optionalString(input, 'ai_provenance_id'); if (provenanceId) body.ai_provenance_id = provenanceId;
+            const store = optionalString(input, 'store'); if (store) body.store = store;
             return client.post('/v1/storage', body);
         },
     },

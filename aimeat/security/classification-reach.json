@@ -695,10 +695,15 @@
         "getStorageFileMeta": 5,
         "readStorageFileRange": 1,
         "getStorageFile": 3,
-        "listStorageFiles": 1,
         "generateDownloadToken": 2
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 review): the reads that hand content to a caller pass the classification reader; a range read and a download-token mint serve only a file whose metadata passed it on the same request (GET /v1/download serves a token minted after it). fileKeyFor (2026-10-26) reads metadata only to decide which key the request names; nothing it reads is answered, and the file under that key then passes the reader."
+    },
+    "src/routes/storage-files-list.ts": {
+      "reads": {
+        "listStorageFiles": 1
+      },
+      "why": "Moved 2026-10-30 from routes/storage-files.ts by pure extraction (Reviewed 2026-09-29, TARGET-082 review): GET /v1/storage lists the caller's own files and passes them through the classification reader before any is answered."
     },
     "src/routes/subdomain-origin-docs.ts": {
       "reads": {
@@ -1919,6 +1924,12 @@
         "listStorageFilesForOwners": 1
       },
       "why": "Written 2026-10-29, the node's own read: the file metadata (no bytes) of one person and their agents, to count how many are in the person's own storage and to choose which to move. The person asking is the owner of every file read; only counts and the moved file names go back."
+    },
+    "src/services/file-store/node-file-stores.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-10-30, the node's own read: the record of the node's named file stores (targets, folders, encrypted keys, the default) under system@<node>. Read to decide where a new file goes and to show the stores to the operators. No content of anyone's is shown from here."
     },
     "src/services/file-store/owner-file-store.ts": {
       "reads": {

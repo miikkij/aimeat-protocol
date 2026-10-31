@@ -38,6 +38,10 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.10.0 — 2026-10-30 — `store` on the write and the presigned mint: the store the writer named for
+ *     the bytes (`own:<name>`, `node:<name>`), checked with the writer's rights before anything moves and
+ *     carried in the token; a file put in the writer's own storage does not count toward the quota
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.9.2 — 2026-10-30 — removeStorageFile reads the file's metadata, not its bytes: a file in an S3 or
  *     Azure store was downloaded whole to be deleted, and one whose object had gone answered 404 for ever.
  *   v1.9.1 — 2026-10-26 — removeStorageFile and changeStorageFileVisibility reach the account's own extension file by its short key
@@ -107,6 +111,7 @@ import {
 } from './storage-file-publish.js';
 import type { ClosedNodeWarning } from './closed-node-level.js';
 import { uploadVisibilityOf } from './content-defaults.js';
+import { resolveChoice } from './file-store/file-store-resolver.js';
 
 /**
  * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
@@ -147,10 +152,16 @@ export interface StorageWriteDeps {
     emitResourceListChanged?: (gaii: string) => void;
 }
 
+/** Why the store a writer named cannot take the file (services/file-store/file-store-resolver.ts resolveChoice). */
+export type StoreChoiceRefusalCode = 'UNKNOWN_STORE' | 'STORE_NOT_SELECTABLE' | 'STORE_NOT_TAKING_FILES' | 'STORE_NOT_REACHABLE' | 'NO_OWN_STORAGE';
+
+/** The store a writer named for a file's bytes. `operator` lets them name a node store not open to everyone. */
+export interface StoreChoice { id: string; operator: boolean }
+
 export interface StorageWriteRefusal {
     ok: false;
     status: number;
-    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | ProvenanceRefusalCode;
+    code: 'INVALID_INPUT' | 'FORBIDDEN' | 'QUOTA_EXCEEDED' | 'NOT_ORGANISM_MEMBER' | 'PUBLISH_NOT_ALLOWED' | 'LABEL_CAPS_AUDIENCE' | ProvenanceRefusalCode | StoreChoiceRefusalCode;
     message: string;
     /**
      * Which ceiling refused, when the code is QUOTA_EXCEEDED. The per-file one has an answer the
@@ -189,6 +200,15 @@ export interface StorageFileInput {
      * public by design (a data package, an app backup) leaves it unset.
      */
     publishGate?: StoragePublishGate;
+    /** The store the writer named for the bytes. Absent: the owner's default store, else the node's. */
+    store?: StoreChoice;
+}
+
+/** A refusal when the named store cannot take a file of `ownerGaii`; null when it can, or none was named. */
+async function storeChoiceRefusal(deps: StorageWriteDeps, ownerGaii: string, store: StoreChoice | undefined): Promise<StorageWriteRefusal | null> {
+    if (!store?.id) return null;
+    const r = await resolveChoice({ storage: deps.storage, config: deps.config }, ownerGaii, store.id, { operator: store.operator });
+    return r.ok ? null : { ok: false, status: r.status, code: r.code as StorageWriteRefusal['code'], message: r.message };
 }
 
 /** The writer and its statement, for {@link StorageFileInput.provenance}. */
@@ -421,8 +441,12 @@ export async function writeStorageFile(
         };
     }
 
+    // The store the writer named, asked with the writer's rights before any byte moves.
+    const storeRefused = await storeChoiceRefusal(deps, ownerGaii, input.store);
+    if (storeRefused) return storeRefused;
+
     // M-2 (§8.4): the account-wide ceiling, which is a different gate from the per-file one above.
-    const quota = await checkStorageQuota(config, storage, ownerGaii, input.data.length);
+    const quota = await checkStorageQuota(config, storage, ownerGaii, input.data.length, input.store?.id);
     if (!quota.allowed) {
         return { ok: false, status: 413, code: 'QUOTA_EXCEEDED', limit: 'account', message: quota.reason! };
     }
@@ -448,6 +472,7 @@ export async function writeStorageFile(
         federate: input.federate === true,
         createdAt: new Date().toISOString(),
         ...(decided.id ? { aiProvenanceId: decided.id } : {}),
+        ...(input.store?.id ? { storeChoice: input.store.id } : {}),
     });
     await storeHeldProvenance(storage, held);
 
@@ -573,6 +598,9 @@ export interface StorageUploadUrlInput {
      * `publish_ask`, so the upload files the request when the bytes land.
      */
     publishGate?: { caller: CallerContext; app?: string };
+    /** The store the writer named for the bytes: checked now with the writer's rights, carried in the
+     *  token as `store`, and asked again for the store's state when the bytes land. */
+    store?: StoreChoice;
 }
 
 export type StorageUploadUrlResult =
@@ -621,6 +649,9 @@ export async function mintStorageUploadUrl(
     if (capped) return capped;
     const carry = await mintPublishCarry({ storage: deps.storage, config }, ownerGaii, input.key, input.visibility, input.publishGate);
     if (!carry.ok) return carry;
+    // No URL for a store that cannot take the file.
+    const storeRefused = await storeChoiceRefusal(deps, ownerGaii, input.store);
+    if (storeRefused) return storeRefused;
 
     // The operator's own setting, not a constant: a node configured for 50 MB used to mint 10 MB
     // tokens and refuse everything above it, with nothing connecting the admin page to the tool.
@@ -640,6 +671,7 @@ export async function mintStorageUploadUrl(
             ai_provenance: input.provenance?.wireBlock ?? undefined,
             ai_provenance_id: input.provenance?.declaredId,
             publish_ask: carry.requester,
+            store: input.store?.id || undefined,
         }),
         maxBytes,
         contentType,

@@ -14,9 +14,12 @@
  *   Every part is a component that gets data (SettingsPage, Rail, Section, List, Folds, Mark,
  *   Action, Note, Box, Field, StoredValue); the file writes no class and no style.
  * @structure SYSTEM_SPACES · classify · renderMemoryView (cover or page) · renderCover · renderSpace ·
- *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · fileRows
+ *   renderRecord · renderOther · renderPage · crumb · pageDoors · spaceTable · placeOfFile · fileRows
  * @usage import { renderMemoryView } from './memory-tab/cover.js';
  * @version-history
+ *   v1.30.0 -- 2026-10-30 -- A file kept in a named store says which under its name ("in your store
+ *     "x"", "in the service's store "x""); a file in the database or the server's own store says nothing
+ *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.29.3 -- 2026-10-19 -- "Whose memory" shows each agent's shown name (agentLabel), in alphabetical order.
  *   v1.29.2 -- 2026-10-18 -- A key space's "{n} public" and "{n} for members" tags in the plural form too ("1 julkinen", "1 pública").
  *   v1.29.1 -- 2026-10-18 -- A count of keys is said in the language's plural form (i18n.js tn): "1 key", not "1 keys".
@@ -104,6 +107,7 @@ import { renderEntries } from './entries-view.js';
 import { renderBrowsePanel } from './browse-view.js';
 import { LoadFailed } from '/js/load-state.js';
 import { agentLabel } from '/js/services/agents.js';
+import { storeShort } from '../storage/store-words.js';
 
 /* Key spaces the node and the agents write for their own use. Theirs to own, rarely theirs to read. */
 export const SYSTEM_SPACES = new Set(['notif', 'ai-usage', 'commerce', 'agents', 'generator', 'org', 'gate', 'usage']);
@@ -208,6 +212,15 @@ function spaceTable(ctx, list, { head: head0 = true, id = '' } = {}) {
     ${list.length > TABLE_ROWS && !open ? html`<${More} label=${c('showAll', 'show all {n}').replace('{n}', String(list.length))} onMore=${() => ctx.toggleMore(id)} />` : null}`;
 }
 
+/**
+ * Where a file's bytes are, when the person chose it or it is in a store with a name: one of their own
+ * stores, or a store of this service. A file in the database or in the store the server keeps every
+ * file in says nothing, so a person who never uses stores sees no change.
+ */
+function placeOfFile(f) {
+  return storeShort(f.store);
+}
+
 function fileRows(ctx, files) {
   const { NODE_URL, setPreviewFile, handleDownloadFile, handleDeleteFile, showToast } = ctx;
   return html`<${List} cols="mark-name-meta-doors" keepCols empty=${t('profile.files.empty') || 'No files yet.'}>${files.map(f => {
@@ -221,7 +234,7 @@ function fileRows(ctx, files) {
         ${isImage
           ? html`<${Lead} size="large" picture=${html`<${AuthImage} src=${fileBytesUrl(f, NODE_URL)} alt=${key} />`} />`
           : html`<${Lead} size="large" text=${kind} label=${kind} />`}
-        <${Name} tag=${html`<${AudienceBadge} value=${f.visibility || 'private'} />`}>${key}<//>
+        <${Name} tag=${html`<${AudienceBadge} value=${f.visibility || 'private'} />`} desc=${placeOfFile(f) || undefined}>${key}<//>
         <${Cell} meta>${f.size ? formatBytes(f.size) : ''}<//>
         <${Doors}>
           <${Action} small row soft onClick=${() => setPreviewFile(f)}>${t('profile.files.preview') || 'Preview'}<//>

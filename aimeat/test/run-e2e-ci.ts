@@ -42,6 +42,7 @@
  *   2026-10-25 -- e2e-mcp-warn-only-scopes.ts joins the list (not the guard tier): a node with AIMEAT_MCP_ENFORCE_SCOPES=false keeps the words no wildcard carries on the node MCP surface, on its own node on 28991 (secaudit2026oct22).
  *   2026-10-25 -- e2e-anonymous-records-incident.ts joins the list (not the guard tier): what the shared anonymous agent wrote outside its namespace is one Security page incident, once, on its own node on 28458 (secaudit2026oct22).
  *   2026-10-25 -- e2e-goals.ts joins the list (not the guard tier): agent goals (session cc-jouni-goals).
+ *   2026-10-30 -- e2e-file-store-named.ts joins the list (not the guard tier): several file stores, one default each, and the writer's choice.
  *   2026-10-29 -- e2e-file-store.ts joins the list (not the guard tier): stored files in an S3 store, the node's and a person's own.
  *   2026-10-25 -- e2e-app-internet-opening.ts joins the list (not the guard tier): one app and its forms opened to the internet on a closed node.
  *   2026-10-24 -- e2e-federated-members-reads.ts joins the list (not the guard tier): a visitor from another node reads 'members' content on no read path without a consent, and local accounts read it as before (secaudit2026oct22).
@@ -575,6 +576,9 @@ const ALL_SUITES = [
     // Self-spawns its own node (block 30500) with its file bytes in an S3 store inside the test
     // process (block 30900): the node's store, a person's own, the approval rule and the sweep.
     'test/e2e-file-store.ts',
+    // Self-spawns its own node (block 30600) with several stores in an S3 service inside the test
+    // process (block 30900): named node stores, a person's several own, and the writer's choice.
+    'test/e2e-file-store-named.ts',
     // Self-spawns its own node with the app origin and strict new-app defaults.
     'test/e2e-app-access.ts',
     // Self-spawns its own node with the app, portfolio and company origins and the publish gate on.

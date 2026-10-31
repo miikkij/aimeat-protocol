@@ -4,6 +4,29 @@
     {
       "date": "2026-10-30",
       "kind": "feature",
+      "id": "2026-10-30-several-file-stores-and-you-choose-where-a-file-goes",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Several file stores, and you choose where a file goes",
+        "fi": "Useampi tallennustila, ja sinä valitset, minne tiedosto menee"
+      },
+      "summary": {
+        "en": "Keep files in several S3 or Azure stores, and choose the store when you save a file.",
+        "fi": "Pidä tiedostoja useassa S3- tai Azure-tallennustilassa ja valitse tallennustila tallentaessasi."
+      },
+      "body": {
+        "en": "The operator can add named S3 and Azure Blob stores on the admin page or through chat, make one the default and open stores for everyone to choose. You can connect several stores of your own and pick your default. When you or your AI save a file, you can name the store it goes to, and the file list shows where each file is.",
+        "fi": "Operaattori voi lisätä nimettyjä S3- ja Azure Blob -tallennustiloja ylläpitosivulla tai chatissa, valita niistä oletuksen ja avata tallennustiloja kaikkien valittaviksi. Sinä voit yhdistää useamman oman tallennustilan ja valita oletuksesi. Kun sinä tai tekoälysi tallennatte tiedoston, voitte valita tallennustilan, ja tiedostolista näyttää, missä kukin tiedosto on."
+      }
+    },
+    {
+      "date": "2026-10-30",
+      "kind": "feature",
       "id": "2026-10-30-a-style-kit-for-the-whole-server-and-the-choices-on-screen",
       "highlight": false,
       "audience": [

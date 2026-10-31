@@ -12,6 +12,8 @@
  *   v1.4.0 — 2026-07-31 — uploadFilePresigned(): mint an upload URL and PUT the raw bytes, so a file
  *                          upload is capped by quota.storage_max_file_size_mb instead of by how much
  *                          base64 fits in a JSON body (~3.7 MB, reported as a bare 413).
+ *   v1.5.0 — 2026-10-30 — uploadFilePresigned(…, store): the store a person picks for the file's bytes
+ *                          (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
@@ -244,12 +246,17 @@ function uploadTarget(url) {
  *  body at security.json_body_limit_mb, so a 4 MB file used to answer a bare 413 on a node whose
  *  quota.storage_max_file_size_mb said 50. /v1/upload/ skips body parsing and streams instead.
  *
- *  Returns the upload response payload (key, size, embed_url, ...). Throws with a readable reason. */
-export async function uploadFilePresigned(file, key, mimeType, visibility, tags, workspaceRefs) {
+ *  `store` names where the bytes go ('own:<name>' or 'node:<name>', one of GET /v1/file-store's
+ *  `choices`); without it they go where the person's new files go now. A store the person may not
+ *  choose is refused at the mint, before any byte moves, with the server's code on the error.
+ *
+ *  Returns the upload response payload (key, size, embed_url, store, ...). Throws with a readable reason. */
+export async function uploadFilePresigned(file, key, mimeType, visibility, tags, workspaceRefs, store) {
   const mime = mimeType || file.type || 'application/octet-stream';
   const body = { key, mime_type: mime, visibility: visibility || 'private', mode: 'presigned' };
   if (tags && tags.length > 0) body.tags = tags;
   if (workspaceRefs) body.workspace_refs = workspaceRefs;
+  if (store) body.store = store;
 
   const mint = await api('/v1/memory/files', { method: 'POST', body: JSON.stringify(body) });
   const uploadUrl = mint?.data?.upload_url;

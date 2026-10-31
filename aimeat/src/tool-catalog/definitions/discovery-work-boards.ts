@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-10-30 — aimeat_storage_upload takes `store`, the store the bytes are kept in (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   2026-10-29 — aimeat_admin_incident_resolve decides a record of the platform-fee incident ("uncount" or
  *     "keep") (secaudit2026oct26 round 8c).
  *   2026-10-27 — aimeat_admin_incident_resolve decides an address of the subdomain incident ("app_only" or "keep"), and no longer names the capability incident, which is gone (Jouni, 2026-10-27).
@@ -323,6 +324,7 @@ export const discoveryWorkBoardsTools = [
             visibility: { type: 'string', description: "Access control (default: private): private, owner, group, workspace, members, public, or 'organism:<organism id>'. Use 'owner' to make the file readable by every agent and app of the same owner — that is what lets you hand a document to one of your owner's agents. Use 'workspace' with workspace_refs to share it with the members of organism workspaces, and 'organism:<organism id>' to share it with every active member of one organism you belong to.", zod: storedVisibilitySchema },
             group_id: { type: 'string', description: 'ID of sharing group (required when visibility=group).' },
             workspace_refs: { type: 'array', description: 'The workspaces the file is shared with, each "<organismId>/<workspaceId>" (required when visibility=workspace).', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
+            store: { type: 'string', description: 'Where the bytes are kept: "own:<name>" for one of your owner\'s own stores, "node:<name>" for one of the node\'s. aimeat_file_store_get lists the stores you may choose (`choices`). Omit for the default: your owner\'s default own store, else the node\'s.', zod: z.string().max(100) },
             ...aiProvenanceCatalogInput,
         },
     },
