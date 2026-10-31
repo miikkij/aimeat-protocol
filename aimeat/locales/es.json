@@ -13550,6 +13550,7 @@
     "profileAnswersSaved": "Guardamos tus respuestas de la entrevista donde solo tú puedes verlas."
   },
   "siteStart": {
+    "signInPill": "Entrar",
     "title": "Este es tu propio AIMEAT, {host}",
     "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",
     "signInLabel": "Entrar",
