@@ -7,9 +7,10 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
- *   v1.7.0 — 2026-10-31 — The first-paint restore is light unless the person chose: a stored 'dark'
- *     is dark, a stored 'auto' follows the OS, anything else is light (Jouni, v31 K65), as
- *     /lib/aimeat-boot.js decides.
+ *   v1.7.0 — 2026-10-31 — The first-paint restore reads the "automatic" choice: a stored 'light' or
+ *     'dark' wins, and 'auto' or no choice follows the OS, as before and as /lib/aimeat-boot.js
+ *     decides. Apps keep the OS default; only the node's own pages open light (Jouni, v31 K65 as
+ *     scoped at 17.27).
  *   v1.6.0 — 2026-09-19 — The three Classic shells sign in with `onSession`. They started the app from
  *     `onLogin` and polled getSession every 300 ms for the silent sign-in, while the build specification
  *     has taught `onSession(session, { restored })` since 2026-09-13 as the one handler for a restored
@@ -74,7 +75,7 @@ entry: index.html
     (function () {
       function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
       function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
-      function want(m) { return m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : m; }
+      function want(m) { return m === 'light' || m === 'dark' ? m : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
       mode(want(localStorage.getItem('aimeat-theme')));
       pal(localStorage.getItem('aimeat-palette'));
       addEventListener('storage', function (e) {
@@ -163,7 +164,7 @@ entry: index.html
     (function () {
       function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
       function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
-      function want(m) { return m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : m; }
+      function want(m) { return m === 'light' || m === 'dark' ? m : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
       mode(want(localStorage.getItem('aimeat-theme')));
       pal(localStorage.getItem('aimeat-palette'));
       addEventListener('storage', function (e) {
@@ -259,7 +260,7 @@ entry: index.html
     (function () {
       function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
       function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
-      function want(m) { return m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : m; }
+      function want(m) { return m === 'light' || m === 'dark' ? m : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); }
       mode(want(localStorage.getItem('aimeat-theme')));
       pal(localStorage.getItem('aimeat-palette'));
       addEventListener('storage', function (e) {

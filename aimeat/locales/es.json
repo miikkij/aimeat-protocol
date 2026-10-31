@@ -6842,7 +6842,7 @@
   "aipage.stripAllowanceBought": "saldo de IA restante: {n}",
   "aipage.simple.titleSub": "tu saldo de IA y su uso",
   "aipage.simple.desc": "Tu IA funciona con el saldo de IA que compraste: una cantidad en euros que paga el trabajo de la IA aquí. Si quieres usar una cuenta de IA propia, abre Ajustes avanzados al final de la página.",
-  "aipage.simple.lasts": "alcanza para unos {n} mensajes normales con tu uso actual",
+  "aipage.simple.lasts": "alcanza para unos {n} mensajes normales",
   "aipage.simple.underCent": "menos de 1 céntimo",
   "aipage.simple.topupNote": "Abre el pago con la misma tarjeta, sin una suscripción nueva.",
   "aipage.simple.connTitle": "Tu propia cuenta de IA (opcional)",
