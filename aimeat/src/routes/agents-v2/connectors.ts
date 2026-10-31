@@ -60,7 +60,7 @@ import { boundedText } from '../../models/input-limits.js';
 
 /** What a connector reports for one agent (services/connector-programs.ts reads it the same way). */
 const ProgramsReportSchema = z.object({
-  hash: z.string().regex(/^[0-9a-f]{64}$/).nullable().optional(),
+  hash: z.string().max(64).regex(/^[0-9a-f]{64}$/).nullable().optional(),
   status: z.enum(['allowed', 'waiting']).optional(),
   runner: boundedText(1000).nullable().optional(),
   wake: boundedText(1000).nullable().optional(),
