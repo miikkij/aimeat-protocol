@@ -123,7 +123,8 @@ async function preflight(url: string, origin: string, method: 'PUT' | 'GET', kin
     if (!res.ok) return false;
     const allowOrigin = res.headers.get('access-control-allow-origin');
     const allowMethods = (res.headers.get('access-control-allow-methods') ?? '').toUpperCase().split(/\s*,\s*/);
-    return (allowOrigin === '*' || allowOrigin === origin) && (allowMethods.includes(method) || allowMethods.includes('*'));
+    // A CORS answer's `*` is the store admitting any method; it is not a permission scope.
+    return (allowOrigin === '*' || allowOrigin === origin) && allowMethods.some(m => m === method || m === '*');
   } catch (err) {
     logger.warn('file store browser check: the preflight got no answer', { origin, method, error: err instanceof Error ? err.message : String(err) });
     return null;
