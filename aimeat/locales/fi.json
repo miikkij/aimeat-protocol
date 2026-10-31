@@ -17721,6 +17721,7 @@
     "emailLabelFirst": "Sähköpostiosoitteesi",
     "loginLinkSendFirst": "Lähetä kirjautumislinkki",
     "loginLinkNoteFirst": "Saat sähköpostiisi kirjautumislinkin. Avaa se samalla laitteella 15 minuutin kuluessa. Salasanaa ei tarvita.",
+    "loginLinkPlacesFirst": "AIMEAT-esittely, kauppa ja oma AIMEATisi ovat kolme erillistä paikkaa, ja jokaiseen kirjaudutaan erikseen. Näin yhden paikan tunnus ei avaa muita.",
     "authErrorUsedLink": "Tämä kirjautumislinkki on jo käytetty, tai se ei kelpaa. Pyydä uusi linkki alta tai kirjaudu toisella tavalla.",
     "authErrorExpired": "Tämä kirjautumislinkki on vanhentunut. Pyydä uusi linkki alta.",
     "authErrorDisabled": "Tämä tili on suljettu. Ota yhteyttä palvelun ylläpitäjään.",

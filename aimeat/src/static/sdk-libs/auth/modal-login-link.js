@@ -25,6 +25,9 @@
  * @structure loginLinkAskHtml(i) · loginLinkViewHtml(i, field, linkFirst) · hereAddress() · wireLoginLinkStep(ctx) → { open }
  * @usage import { loginLinkAskHtml, loginLinkViewHtml, wireLoginLinkStep } from './modal-login-link.js';
  * @version-history
+ *   v1.4.0 — 2026-10-31 — Opened first, the step also says that the demo, the store and the buyer's
+ *     own AIMEAT are three places with three sign-ins (modal.loginLinkPlacesFirst), which is why
+ *     this one asks again (Jouni's K62: no signed handover from the store; people are told instead).
  *   v1.3.0 — 2026-10-31 — Opened first, the step uses the buyer's words when the page has them
  *     (modal.loginLinkTitleFirst, …DescFirst, emailLabelFirst, …SendFirst and the note under the
  *     button, …NoteFirst): "Kirjaudu omaan AIMEATiisi" (Jouni's review of v31, K24 with K25).
@@ -69,6 +72,8 @@ export function loginLinkViewHtml(i, field, linkFirst) {
     + '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button>'
     + '</div>'
     + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + '</p>' : '')
+    // Why this place asks again although the store already knows the buyer (K62).
+    + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + '</p>' : '')
     + '<p id="aimeat-ll-msg" class="aimeat-msg"></p>'
     + '</div>';
 }

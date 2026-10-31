@@ -15797,6 +15797,7 @@
     "emailLabelFirst": "Tu dirección de correo",
     "loginLinkSendFirst": "Enviar el enlace de acceso",
     "loginLinkNoteFirst": "Recibirás un enlace de acceso en tu correo. Ábrelo en este mismo dispositivo en 15 minutos. No necesitas contraseña.",
+    "loginLinkPlacesFirst": "La demo de AIMEAT, la tienda y tu propio AIMEAT son tres sitios distintos, y en cada uno entras por separado. Así, el acceso a uno no abre los demás.",
     "authErrorUsedLink": "Este enlace de acceso ya se usó o no es válido. Pide uno nuevo abajo o inicia sesión de otra forma.",
     "authErrorExpired": "Este enlace de acceso caducó. Pide uno nuevo abajo.",
     "authErrorDisabled": "Esta cuenta está desactivada. Contacta al administrador de este servicio.",
