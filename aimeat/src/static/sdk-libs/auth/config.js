@@ -10,6 +10,7 @@
  *   AUTH_PROVIDERS · PROVIDER_ICONS.
  * @usage import { NODE_URL, APEX_URL, AUTH_PROVIDERS, appDeclaredScopes } from './config.js';
  * @version-history
+ *   v1.2.0 — 2026-10-31 — LINK_FIRST: the sign-in dialog opens on the emailed link on a store-bought node (v28 #7).
  *   v1.1.0 — 2026-09-29 — EMAIL_LOGIN: whether the node sends mail, read from the auth prelude.
  *   v1.0.1 — 2026-09-13 — The appDeclaredScopes comment says what the node does with an unknown
  *     scope word (refuses the whole sign-in) instead of the opposite.
@@ -52,6 +53,11 @@ export const EMAIL_REQUIRED = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_A
 // Does this node send mail? The sign-in modal offers "Email me a sign-in link" only then, because on
 // a node without SMTP the request answers 200 and nothing arrives.
 export const EMAIL_LOGIN = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailLogin);
+
+// Does the sign-in dialog open on the emailed-link step, with the password one press away? True on a
+// node bought from the store that sends mail: its buyer was promised no passwords (v28 #7). A caller
+// that passes opts.linkFirst decides for itself.
+export const LINK_FIRST = EMAIL_LOGIN && !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.linkFirst);
 
 // Per-provider button glyphs (inline SVG — no external fetch).
 export const PROVIDER_ICONS = {

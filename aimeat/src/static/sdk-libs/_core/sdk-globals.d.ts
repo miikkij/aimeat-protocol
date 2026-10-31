@@ -10,6 +10,7 @@
  *   casts, and is shared by every lib (e.g. audio also needs webkitAudioContext).
  * @usage Picked up by tsconfig.sdk.json (its include globs the sdk-libs .d.ts files). No runtime effect.
  * @version-history
+ *   v1.2.0 — 2026-10-31 — __AIMEAT_AUTH_CFG__.linkFirst (v28 #7).
  *   v1.1.0 — 2026-09-02 — Motion, anime and Lenis globals, the three vendored animation packs
  *     the Atelier parts lazy-load (wish-atelier-motion-libraries-and-parts).
  *   v1.0.0 — 2026-07-19 — Initial: webkit audio/speech globals + SDK config prelude + AIMEAT namespace.
@@ -32,6 +33,8 @@ interface Window {
     emailRequired?: boolean;
     /** Whether the node sends mail, so an emailed sign-in link can arrive. */
     emailLogin?: boolean;
+    /** Whether the sign-in dialog opens on the emailed link: a node bought from the store (v28 #7). */
+    linkFirst?: boolean;
   };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;
