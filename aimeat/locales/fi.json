@@ -13767,6 +13767,7 @@
     "cfgGroup_extensions": "Laajennukset",
     "cfgGroup_security": "Turvallisuus",
     "cfg_security_login_rate_limit_max": "Kirjautumisen nopeusrajoitus (max per ikkuna)",
+    "cfg_security_agent_token_rate_limit_max": "Agenttien kirjautumisraja (tunnisteita minuutissa per IP)",
     "cfg_security_login_rate_limit_window_ms": "Kirjautumisen nopeusrajoitusikkuna (ms)",
     "cfg_security_registration_rate_limit_max": "Rekisteroinnin nopeusrajoitus (max per ikkuna)",
     "cfg_security_registration_rate_limit_window_ms": "Rekisteroinnin nopeusrajoitusikkuna (ms)",

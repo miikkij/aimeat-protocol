@@ -12150,6 +12150,7 @@
     "cfgGroup_extensions": "Extensiones",
     "cfgGroup_security": "Seguridad",
     "cfg_security_login_rate_limit_max": "Límite de intentos de entrada (máximo por ventana)",
+    "cfg_security_agent_token_rate_limit_max": "Límite de acceso de agentes (credenciales por minuto por IP)",
     "cfg_security_login_rate_limit_window_ms": "Ventana del límite de entrada (ms)",
     "cfg_security_registration_rate_limit_max": "Límite de registros (máximo por ventana)",
     "cfg_security_registration_rate_limit_window_ms": "Ventana del límite de registros (ms)",

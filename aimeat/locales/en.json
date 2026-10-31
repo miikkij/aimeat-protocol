@@ -13588,6 +13588,7 @@
     "cfgGroup_extensions": "Extensions",
     "cfgGroup_security": "Security",
     "cfg_security_login_rate_limit_max": "Login rate limit (max per window)",
+    "cfg_security_agent_token_rate_limit_max": "Agent sign-in rate limit (credentials per minute per IP)",
     "cfg_security_login_rate_limit_window_ms": "Login rate limit window (ms)",
     "cfg_security_registration_rate_limit_max": "Registration rate limit (max per window)",
     "cfg_security_registration_rate_limit_window_ms": "Registration rate limit window (ms)",
