@@ -29,6 +29,7 @@
  *   const out = await writeMemoryRecord({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
  *   2026-10-27 — A `gatePublic` write asks services/memory-write-asks.ts, which adds a mail refinery
  *     definition's destination changed by a writer that may not run it (secaudit2026oct26).
  *   2026-10-27 — A `gatePublic` write of the welcome page's switch (portfolio.config) asks the publish
@@ -160,6 +161,7 @@ import { memoryTarget } from './classification/label-rows.js';
 import { closedNodeLevel, type ClosedNodeWarning } from './closed-node-level.js';
 import { shadowWarning } from './memory-write-shadow.js';
 import { memoryWriteAsks, fileMemoryWriteAsks } from './memory-write-asks.js';
+import { tallyWriterOf } from './data-map/tally-writer.js';
 export { shadowWarning };
 
 /** What a caller must supply for the fan-out that a memory write sets off. */
@@ -673,7 +675,7 @@ export async function writeMemoryRecord(
     //    runs here rather than in each caller's tail — which is where it used to live, on one door
     //    only. A caller that cannot offer an optional piece (a node with no peers has no replication
     //    queue; a tool call has no HTTP response) simply omits it, and the rest still happens.
-    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, caller.principal, input.noTriggers);
+    const after = await afterMemoryWrite(deps, caller.targetGaii, input.key, !!existing, tallyWriterOf(caller, config.nodeId, caller.app), input.noTriggers);
 
     const warnings: MemoryWriteWarning[] = [];
     if (shadowedBy) warnings.push(shadowWarning(input.key, caller.targetGaii, shadowedBy));

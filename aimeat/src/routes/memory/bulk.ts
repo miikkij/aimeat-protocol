@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Bulk + cross-user memory routes: export, import, bulk-delete, bundle (ZIP), discover, copy. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
  *   2026-10-27 — An entry of POST /v1/memory/bulk or /import of the welcome page's switch
  *     (portfolio.config) asks the publish gate as PUT /v1/portfolio/config does: all but the change
  *     that makes the served page public is stored, and the request is in `publish_requests`
@@ -101,6 +102,7 @@ import type { MemoryRecord } from '../../storage/interface.js';
 import { requireAuth, requireScope, requireExternalPrincipal, requireLocalSession } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
+import { tallyWriterOf } from '../../services/data-map/tally-writer.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { emitMemoryWritten, emitRecordChange } from '../../services/event-bus.js';
@@ -258,7 +260,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Fire the same reactive/live-update signals a single write does, for each entry actually written.
     for (const it of result.items) {
       if (it.status === 'created' || it.status === 'updated') {
-        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: resolve(req), kind: 'write' });
+        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: req.auth!.app ? tallyWriterOf(callerOf(req, config.nodeId, storage), config.nodeId, req.auth!.app) : resolve(req), kind: 'write' });
         emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(it.key)}`);
         emitMemoryWritten(gaii, it.key, it.status);
       }
@@ -476,7 +478,7 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     for (const it of result.items) {
       if (it.status === 'created' || it.status === 'updated') {
-        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: resolve(req), kind: 'write' });
+        recordMemoryTouch({ ownerGaii: gaii, key: it.key, writerPrincipal: req.auth!.app ? tallyWriterOf(callerOf(req, config.nodeId, storage), config.nodeId, req.auth!.app) : resolve(req), kind: 'write' });
         emitMemoryWritten(gaii, it.key, it.status);
       }
       if (it.status === 'failed') failed.push({ key: renameOf.get(it.key) ?? it.key, reason: it.reason ?? 'failed' });

@@ -20030,6 +20030,12 @@ paths:
           description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
           description: PROVIDER_ERROR (the provider failed; see AiProviderFailure) or EMPTY_COMPLETION (every attempt answered with no content; the message names the finish_reason).
+        '503':
+          description: >
+            EXTENSION_RUNS_BUSY - the call is served by an extension provider, and the account's share of
+            extension runs (extensions.run_slots_per_account) or the node's pool (extensions.run_slots)
+            stayed full for one run's wall clock while the call waited for a slot; `details.retry_after_sec`
+            says when to try again.
 
   /v1/ai/policy:
     get:
