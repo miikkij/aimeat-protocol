@@ -39,6 +39,8 @@
  *   DELETE /v1/mcp-servers/:id              -- detach, and forget the credential
  * @usage app.use(mcpServersRouter(config, storage));
  * @version-history
+ *   2026-10-31 — A sign-in round started in the owner's browser over https is bound with the `__Host-`
+ *     cookie, and the callback reads both cookies and clears both (secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-20 — The OAuth callback hands the authorization server's `iss` (RFC 9207) to finishMcpOAuth.
  *   2026-10-16 — PUT /:id/grants stores a grant on a node-wide server under the caller's owner, where
  *     the access check now reads it; 409 GRANT_NOT_APPLICABLE is for somebody else's personal server
@@ -99,7 +101,7 @@ import {
 import { emitChange } from '../services/event-bus.js';
 import { recordAccountEvent } from '../services/account-events.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
-import { browserCanBind, issueRoundBinding, readRoundBinding, clearRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { browserCanBind, browserRoundBinding, roundCookiesOf, endRoundBinding } from '../middleware/oauth-round-cookie.js';
 import { callerOf } from '../middleware/caller.js';
 
 /** The callback's path, which the round cookie is scoped to (services/mcp-client/oauth.ts mcpCallbackUrl). */
@@ -501,7 +503,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
         ownerGhii: ownerOf(req),
         startedBy: callerPrincipal(req.auth!, config.nodeId),
         ...(typeof b.return_url === 'string' ? { returnUrl: b.return_url } : {}),
-        ...(inBrowser ? { bindBrowser: (state: string, ttl: number) => issueRoundBinding(req, res, state, MCP_CALLBACK_PATH, ttl) } : {}),
+        ...(inBrowser ? browserRoundBinding(req, res, MCP_CALLBACK_PATH) : {}),
       });
       if (!started.ok) {
         const status = started.code === 'NO_ENCRYPTION_KEY' ? 503
@@ -527,7 +529,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/mcp-servers/callback', async (req: Request, res: Response) => {
     const state = typeof req.query.state === 'string' ? req.query.state : '';
     const code = typeof req.query.code === 'string' ? req.query.code : '';
-    if (state) clearRoundBinding(req, res, state, MCP_CALLBACK_PATH);
+    if (state) endRoundBinding(req, res, state, MCP_CALLBACK_PATH);
     if (!state || !code) {
       return res.status(400).json(error(
         config.nodeId, 'BAD_REQUEST', 'That sign-in did not come back complete. Start again.',
@@ -535,7 +537,7 @@ export function mcpServersRouter(config: AimeatConfig, storage: Storage): Router
     }
 
     const iss = typeof req.query.iss === 'string' ? req.query.iss : '';
-    const done = await finishMcpOAuth({ storage, config, state, code, iss, binding: readRoundBinding(req, state) });
+    const done = await finishMcpOAuth({ storage, config, state, code, iss, ...roundCookiesOf(req, state) });
     if (!done.ok) {
       return res.status(done.code === 'BAD_STATE' ? 400 : done.code === 'NOT_THIS_BROWSER' ? 403 : 502)
         .json(error(config.nodeId, done.code, done.message));

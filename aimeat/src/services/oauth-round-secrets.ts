@@ -21,9 +21,12 @@
  *   THE ROUND'S SECRETS ARE SEALED. The PKCE verifier and a dynamic client registration's secret
  *   are encrypted with the node key and bound to the round's state and their role (encryptBound),
  *   so the verification_nonces table holds no usable secret while a round waits.
- * @structure bindingHash · bindingMatches · roundApprovalUrl · sealRoundSecret · openRoundSecret
- * @usage if (!bindingMatches(input.binding, payload.bind)) return refuse();
+ * @structure bindingHash · bindingMatches · RoundBindCookie · RoundCookies · roundBindingHeld · roundApprovalUrl · sealRoundSecret · openRoundSecret
+ * @usage if (!roundBindingHeld(input, payload.bind, payload.bindCookie)) return refuse();
  * @version-history
+ *   v1.1.0 — 2026-10-31 — roundBindingHeld: a round bound over https finishes only with the `__Host-`
+ *     cookie, which a same-site page cannot write; the payload records which cookie it set
+ *     (secaudit2026oct31w2 round 10, W2-19).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -45,6 +48,35 @@ export function bindingMatches(value: string | null | undefined, storedHash: unk
   const got = Buffer.from(bindingHash(value), 'hex');
   const want = Buffer.from(storedHash, 'hex');
   return got.length === want.length && timingSafeEqual(got, want);
+}
+
+/**
+ * Which cookie carries a round's binding: `host` is the `__Host-` cookie set over https, which a
+ * same-site app, portfolio or company page cannot write; `plain` is the old name, set over plain http.
+ * The round's payload records it as `bindCookie` beside `bind`.
+ */
+export type RoundBindCookie = 'host' | 'plain';
+
+/** The round cookies a callback request carried, and whether it came over https. */
+export interface RoundCookies {
+  /** The plain-name cookie's value, '' when absent. */
+  binding: string;
+  /** The `__Host-` cookie's value, '' or absent when absent. */
+  hostBinding?: string;
+  /** True when the request came over https (directly or through the node's proxy). */
+  secure?: boolean;
+}
+
+/**
+ * Whether the callback request belongs to the browser the round was bound to. A round bound with
+ * the `__Host-` cookie finishes only with that cookie; a round bound with the plain cookie finishes
+ * only over plain http, where it was started. A round written before `bindCookie` existed reads the
+ * plain cookie, so a round in flight across the deploy finishes (secaudit2026oct31w2, W2-19).
+ */
+export function roundBindingHeld(cookies: RoundCookies, storedHash: unknown, bindCookie: unknown): boolean {
+  if (bindCookie === 'host') return bindingMatches(cookies.hostBinding, storedHash);
+  if (bindCookie === 'plain' && cookies.secure) return false;
+  return bindingMatches(cookies.binding, storedHash);
 }
 
 /** The node's confirmation page for a round started outside the owner's browser. */

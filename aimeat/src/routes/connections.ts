@@ -29,6 +29,7 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   2026-10-31 — A round started in the owner's browser over https is bound with the `__Host-` cookie (browserRoundBinding; secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-29 — A delegation is bound to one author's app (bound_app on its view); an app by another author on one named by file name alone answers 202 with the channel owner's pending question (secaudit2026oct26 round 8c, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-27 — A delegated publish passes only for the delegation's app (its signed grant or eco id), a person who uses that app or their agents, and the channel owner; any other caller is 403 DELEGATION_NOT_FOR_CALLER naming the app to use (secaudit2026oct26, delegated-publish/app-id-not-bound-to-caller).
  *   2026-10-25 — An (app id, action) belongs to one channel: a delegation for a pair another channel holds is 409 DELEGATION_IN_USE, the 201 reads its own row back, and a delegated publish of a pair held on two channels is 409 DELEGATION_AMBIGUOUS (secaudit2026oct22, h50/connections-delegation-lookup-unscoped).
@@ -87,7 +88,7 @@ import { requireEncryptionKey, sealCredential } from '../services/connections/cr
 import { connectionHoldersOf, listUsableConnections, requireUsableConnection, readAsOwnerRefusal, CONNECTIONS_READ_AS_OWNER_SCOPE, toPublicConnection, toPublicClient } from '../services/connections/access.js';
 import { startAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { answerConnectCallback, connectCallbackPath } from './connections-callback.js';
-import { browserCanBind, issueRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { browserCanBind, browserRoundBinding } from '../middleware/oauth-round-cookie.js';
 import { callerOf } from '../middleware/caller.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { readResource } from '../services/connections/read.js';
@@ -397,7 +398,7 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       account: str(req.body?.account) || undefined,
       mode,
       returnUrl: str(req.body?.return_url),
-      ...(inBrowser ? { bindBrowser: (state: string, ttl: number) => issueRoundBinding(req, res, state, connectCallbackPath(config), ttl) } : {}),
+      ...(inBrowser ? browserRoundBinding(req, res, connectCallbackPath(config)) : {}),
     });
     if (!result.ok) {
       // The reason travels with the refusal. "Disabled" alone leaves an operator nothing to act on.
