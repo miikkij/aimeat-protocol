@@ -1453,6 +1453,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Existence check through file metadata; no bytes are read."
     },
+    "src/services/datapackage/file-read.ts": {
+      "reads": {
+        "getStorageFile": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D0.4), the node's own read: a data package's latest.json pointer and a version's descriptor, read to decide who may read a file under datapkg/. Nothing read is answered; GET /v1/pub then passes the file it serves through the classification reader (hiddenFromCaller)."
+    },
     "src/services/datapackage/odps-read.ts": {
       "reads": {
         "getStorageFileMeta": 1
