@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-31: The credit line's "Buy more credit" is there at all times, in the page's language,
+ *     not only when the credit runs low (v28 #19).
  *   2026-10-31: The credit line ends with "what is this?", a link to the help page's cost section,
  *     so the term is explained where it first appears (Jouni's "teach during use").
  *   2026-10-31: On a node the store sold, NameplateBlock carries the AI credit in euros under the
@@ -52,7 +54,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
@@ -84,7 +86,9 @@ const identityOf = (session) =>
 
 /**
  * The AI credit under a buyer's name, in euros, with whether their AI is ready, and where to buy
- * more when it runs low (Jouni v27 P6). Nothing on a node the store did not sell (ai-credit.js).
+ * more (Jouni v27 P6). The top-up link is there at all times, not only when the credit runs low:
+ * a buyer who wants more before it runs out found no way to buy it (v28 #19). Nothing on a node the
+ * store did not sell (ai-credit.js).
  */
 function CreditPlate() {
   const customer = customerNode();
@@ -98,7 +102,7 @@ function CreditPlate() {
     empty: tr('home.credit.empty', 'used up'),
     off: tr('home.credit.off', 'the AI is switched off on this site'),
   }[credit.state];
-  const topup = credit.state === 'low' || credit.state === 'empty' ? topupHref() : '';
+  const topup = topupHref(getLocale());
   return html`
     <span class="poster-masthead-status">
       ${tr('home.credit.line', 'AI credit {amount}').replace('{amount}', amount)} · ${stateText}

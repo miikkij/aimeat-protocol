@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
  *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
  *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
  *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
@@ -60,7 +61,7 @@
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { customerNode } from '/js/site.js';
 import { PageSection } from '/components/PageSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
@@ -78,7 +79,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
-import { creditEur } from '/js/ai-credit.js';
+import { creditEur, topupHref } from '/js/ai-credit.js';
 import { money as fmtMoney } from '/js/format.js';
 
 /** The allowance left on the node's key: euros of AI credit on a node the store sold, else dollars. */
@@ -143,6 +144,18 @@ function mast(ctx) {
   // On a customer's node the allowance is what the buyer paid for, not a starter gift (UX review C).
   const bought = customerNode();
   const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: allowanceMoney(ctx.chat?.allowance_remaining_usd || 0) });
+  // A buyer on the node's key buys more credit in the store, so that is the loud action, there at all
+  // times (v28 #19); a key of their own stays one small link away, and OpenRouter's balance page,
+  // which shows a balance they do not have, is left out.
+  const topup = bought && !keyed ? topupHref(getLocale()) : '';
+  if (topup) {
+    return {
+      title: t('profile.generator.openrouter.title'), sub: x('titleSub'), help: 'concept.provider', marks, desc,
+      actions: html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Actions}>
+        <${Action} small href="https://openrouter.ai/keys" newTab>${x('getKeyShort')}<//>
+      <//>`,
+    };
+  }
   const loud = keyed
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
     : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
