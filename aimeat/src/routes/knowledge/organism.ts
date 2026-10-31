@@ -6,6 +6,8 @@
  *   list packages shared with an organism, and read a package's reputation/quality signals.
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — Both organism routes admit an active member only; an invited or banned owner is
+ *     answered 403 NOT_MEMBER (secaudit2026oct31w2 round 10, f-2026aug-organisms-workspaces-2).
  *   2026-10-27 — The reputation read shows the last review only to the account that holds the oldest
  *     copy of the package's manifest key, as the reviews read does (secaudit2026oct26).
  *   2026-10-19 — POST /v1/knowledge/:id/contribute adds the organism tag on the manifest's version
@@ -67,8 +69,10 @@ export function registerOrganismRoutes(
       return;
     }
 
+    // An invited or banned owner holds a membership row too; only an active one is a member, as at
+    // every other organism gate (organism-namespace-access.ts).
     const membership = await storage.getMembership(organism_id, ghii);
-    if (!membership) {
+    if (!membership || membership.status !== 'active') {
       res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You are not a member of this organism'));
       return;
     }
@@ -122,9 +126,9 @@ export function registerOrganismRoutes(
     const ghii = req.auth!.owner as string;
     const organismId = req.params.id as string;
 
-    // Verify membership
+    // Verify membership: an active one, as above.
     const membership = await storage.getMembership(organismId, ghii);
-    if (!membership) {
+    if (!membership || membership.status !== 'active') {
       res.status(403).json(error(config.nodeId, 'NOT_MEMBER', 'You are not a member of this organism'));
       return;
     }

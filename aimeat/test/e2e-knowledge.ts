@@ -649,6 +649,44 @@ await test('Non-member cannot read the contributed package manifest → 403', as
   assert(status === 403, `Expected 403, got ${status}`);
 });
 
+// ── secaudit2026oct31w2 round 10 (R-f-2026aug-organisms-workspaces-2): the two knowledge organism
+// routes admit an ACTIVE member only, as every other organism gate does. An active member lists and
+// contributes as before; an invited or banned owner is answered as a non-member.
+await test('An active member lists the organism\'s contributed packages → 200 with the package', async () => {
+  const { status, body } = await json(`/v1/knowledge/organism/${organismId}`, { headers: { Authorization: `Bearer ${member.agentToken}` } });
+  assert(status === 200, `Expected 200, got ${status}: ${JSON.stringify(body?.error)}`);
+  assert(JSON.stringify(body.data).includes(contributedPkgId), `the contributed package is listed: ${JSON.stringify(body.data).slice(0, 300)}`);
+});
+
+await test('An invited (not yet accepted) owner neither lists nor contributes → 403 NOT_MEMBER', async () => {
+  const inv = await json(`/v1/organisms/${organismId}/invitations`, {
+    method: 'POST', headers: { Authorization: `Bearer ${agentToken}` }, body: JSON.stringify({ invitee: nonMember.owner }),
+  });
+  assert(inv.status === 201, `invite ${inv.status}: ${JSON.stringify(inv.body?.error)}`);
+  const list = await json(`/v1/knowledge/organism/${organismId}`, { headers: { Authorization: `Bearer ${nonMember.agentToken}` } });
+  assert(list.status === 403 && list.body?.error?.code === 'NOT_MEMBER', `invited list: ${list.status} ${JSON.stringify(list.body?.error ?? list.body?.data).slice(0, 300)}`);
+  const contribute = await json('/v1/knowledge/any-package/contribute', {
+    method: 'POST', headers: { Authorization: `Bearer ${nonMember.agentToken}` }, body: JSON.stringify({ organism_id: organismId }),
+  });
+  assert(contribute.status === 403 && contribute.body?.error?.code === 'NOT_MEMBER', `invited contribute: ${contribute.status} ${JSON.stringify(contribute.body?.error)}`);
+});
+
+await test('A banned former member neither lists nor contributes → 403 NOT_MEMBER', async () => {
+  const banned = await makeOwnerAgent(`korgban${Date.now()}`);
+  const join = await json(`/v1/organisms/${organismId}/join`, { method: 'POST', headers: { Authorization: `Bearer ${banned.agentToken}` } });
+  assert(join.status === 201, `join ${join.status}`);
+  const before = await json(`/v1/knowledge/organism/${organismId}`, { headers: { Authorization: `Bearer ${banned.agentToken}` } });
+  assert(before.status === 200, `an active member lists: ${before.status}`);
+  const ban = await json(`/v1/organisms/${organismId}/members/${encodeURIComponent(banned.owner)}?ban=1`, { method: 'DELETE', headers: { Authorization: `Bearer ${agentToken}` } });
+  assert(ban.status === 200, `ban ${ban.status}: ${JSON.stringify(ban.body?.error)}`);
+  const list = await json(`/v1/knowledge/organism/${organismId}`, { headers: { Authorization: `Bearer ${banned.agentToken}` } });
+  assert(list.status === 403 && list.body?.error?.code === 'NOT_MEMBER', `banned list: ${list.status} ${JSON.stringify(list.body?.error ?? list.body?.data).slice(0, 300)}`);
+  const contribute = await json('/v1/knowledge/any-package/contribute', {
+    method: 'POST', headers: { Authorization: `Bearer ${banned.agentToken}` }, body: JSON.stringify({ organism_id: organismId }),
+  });
+  assert(contribute.status === 403 && contribute.body?.error?.code === 'NOT_MEMBER', `banned contribute: ${contribute.status} ${JSON.stringify(contribute.body?.error)}`);
+});
+
 // ─── The pacing amount's name: sharing.toll_morsels, sharing.morsel_price deprecated ───
 // Ruling decision-4-0-0-sharing-morsel-price-ja-cost-morsels-saavat-nimen-toll: the same on 3.x and
 // 4.0.0 (only 5.0.0 refuses the old name, which the unit test toll-morsels-names.test.ts covers).
