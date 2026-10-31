@@ -32,6 +32,9 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-10-31 — The kind `living-ai-spend`: a living document whose config a writer without ai:use set
+ *     up refreshes itself with the owner's AI once the owner allows it (services/living-pulse-spend.ts;
+ *     secaudit2026oct31w2 round 10).
  *   2026-10-30 — The kind `card-adult-confirm`: a credit card payment only the seller's own Stripe
  *     account attests is confirmed by the buyer before it records them as an adult
  *     (commerce/card-adult-ask.ts). An approval may say that only the owner in person allows it
@@ -151,7 +154,9 @@ export type PublishKind =
   // The owner's welcome page reading their memory, when a writer without memory:read wrote it (services/portfolio-read-hold.ts).
   | 'portfolio-memory-read'
   // A program a computer holds for an agent, allowed by the owner (services/connector-programs.ts).
-  | 'connector-program';
+  | 'connector-program'
+  // A living document refreshing itself with the owner's AI, set up by a writer without ai:use (services/living-pulse-spend.ts).
+  | 'living-ai-spend';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
