@@ -41,6 +41,7 @@
  *   const { blocking, warnings } = await lintAppArtifact(html, config);
  *   if (blocking.length) return refusal;
  * @version-history
+ *   2026-10-31 — Refuses a page that calls AIMEAT.atelier without loading the kit (app-lint-kit-loaded.ts; v28 #13).
  *   2026-10-27 — collectAssetRefs reads the tags with one linear scan (utils/html-tag-scan.ts), not a
  *     `[^>]*` pattern per opener (secaudit2026oct26, collectAssetRefs:unclosed-tag-quadratic-scan).
  *   2026-10-25 — A dead cortex lib path gets one sentence on the owner's namespace, where a cortex installed since then loads from (secaudit2026oct22).
@@ -108,6 +109,7 @@ import { registerIsOwed } from './app-build-level-meta.js';
 import { undeclaredScopeFindings } from './app-scope-needs.js';
 import { readTextCapped } from '../utils/read-capped.js';
 import { tagAttributes } from '../utils/html-tag-scan.js';
+import { kitCalledButNotLoaded, KIT_NOT_LOADED_MESSAGE } from './app-lint-kit-loaded.js';
 
 /** The most of one cortex lib the scope check reads; a larger one is not read (its calls are not seen). */
 const LIB_READ_MAX_BYTES = 2 * 1024 * 1024;
@@ -153,6 +155,7 @@ export async function lintAppArtifact(html: string, config: AimeatConfig): Promi
   const warnings: AppArtifactFinding[] = [];
 
   blocking.push(...checkInlineScripts(html));
+  if (kitCalledButNotLoaded(html)) blocking.push(finding('atelier-kit-not-loaded', 'critical', KIT_NOT_LOADED_MESSAGE));
 
   const refs = collectAssetRefs(html, config);
   warnings.push(...refs.warnings);
