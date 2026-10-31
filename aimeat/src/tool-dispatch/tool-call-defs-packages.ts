@@ -403,7 +403,8 @@ export const packageTools: ConnectCliToolDefinition[] = [
             // No repository: a package its author sells on this node (routes/package-account-sales.ts).
             if (action === 'purchases') return client.get('/v1/package-purchases');
             if (!repository && (action === 'offer' || action === 'checkout')) {
-                const listing = await client.get(`/v1/packages/${encodeURIComponent(requiredString(input, 'group_id'))}`);
+                // The node answers a missing or unknown group id (404); nothing is decided here.
+                const listing = await client.get(`/v1/packages/${encodeURIComponent(groupId || '-')}`);
                 if (action === 'offer' || listing.ok === false) return listing;
                 const sale = ((listing.data ?? {}) as { sale?: { price?: { currency?: string } } }).sale;
                 return client.post('/v1/commerce/checkout-sessions', {
