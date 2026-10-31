@@ -14,14 +14,14 @@ You can also talk with the AI directly in the [chat](/v1/chat).
 
 If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your right hand: it sees the same information and does the same things as the chat. The buttons to connect are on your Home.
 
-(The connection uses the open MCP technology. You do not need to know more about it.)
+(The connection uses the open MCP standard (Model Context Protocol), which ChatGPT, Claude and Grok support. Want to know more? Read [modelcontextprotocol.io](https://modelcontextprotocol.io) or ask your AI: "What does MCP mean and how does it work?")
 
 ## AI credit and what this costs {#cost}
 
 <!--store-->
 Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name, in the chat and on the [AI page](/v1/profile?tab=ai).
 
-The credit is used when the AI answers or does work. To buy more, press Buy more credit next to the credit on your Home. The payment uses the same card, and no new subscription is needed. You can do it at any time.
+The credit is used when the AI answers or does work. To get more AI, press Buy more AI next to the credit on your Home. It is a one-off payment, and no new subscription is needed. You can do it at any time.
 
 When the credit is used up, AIMEAT tells you and shows how to go on.
 
@@ -39,7 +39,7 @@ Everything you save is private at first. Only you see it.
 
 You decide what you share. You can share a workspace, a collection of documents, with the people you invite, or publish something for everyone. What you share is seen only by those you shared it with.
 
-An agent or a connected AI may do only what you allow it. You see every permission, and can take it back, on the [Access page](/v1/profile?tab=access).
+An agent or a connected AI may do only what you allow it. You see every permission, and can take it back, on the [Access and security page](/v1/profile?tab=access).
 
 You can export all your data and delete your account in Settings.
 
@@ -49,7 +49,7 @@ An agent is an AI that does one job for you, also when you are away.
 
 Say in one sentence on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
 
-You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, and if you want, the agent sends it to your email. You can stop an agent at any time.
+You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, under What has happened. If you want, the agent also sends it to your email. You can stop an agent at any time.
 
 ## Apps {#apps}
 
@@ -59,9 +59,11 @@ Ask for an app in the [chat](/v1/chat), for example: "Make me an app to follow m
 
 ## Signing in {#signin}
 
-You sign in with an email link. Write your address in the sign-in window, and you get a link. The link works once and for 15 minutes, and you need no password.
+You sign in with a sign-in link. Write your address in the sign-in window, and the link comes to your email. The link works once and for 15 minutes, and you need no password.
 
-If you want, you can add a passkey. Then you sign in with your fingerprint, your face or your device's screen lock. You add a passkey on the [Security page](/v1/profile?tab=security).
+<!--nostore-->
+If you want, you can also sign in with your fingerprint, your face or your device's screen lock (a passkey). You turn it on on the [Access and security page](/v1/profile?tab=access).
+<!--/nostore-->
 
 ## If something breaks {#broken}
 

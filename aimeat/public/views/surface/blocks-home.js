@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-31: Jouni's v32 approval (K26): "Tekoälysaldo X € · oma tekoälysi on käytössä · Osta lisää
+ *     tekoälyä", and under it "Kertamaksu. Ei uutta tilausta." (home.credit.topupNote).
  *   2026-10-31: Jouni's review of v31 (K26): on a node the store sold the nameplate shows no name
  *     while the only name is the account id; the credit line reads "AI-saldo X € · oma tekoälysi on
  *     valmis käyttöön · Osta lisää saldoa", without "mikä tämä on?".
@@ -78,6 +80,7 @@ import { aiCredit, topupHref } from '/js/ai-credit.js';
 import { money } from '/js/format.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
+import { Note } from '/components/Note.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -109,8 +112,9 @@ function CreditPlate() {
   return html`
     <span class="poster-masthead-status">
       ${tr('home.credit.line', 'AI credit {amount}').replace('{amount}', amount)} · ${stateText}
-      ${topup && html` · <a href=${topup} target="_blank" rel="noopener">${tr('home.credit.topup', 'Buy more credit')}</a>`}
-    </span>`;
+      ${topup && html` · <a href=${topup} target="_blank" rel="noopener">${tr('home.credit.topup', 'Buy more AI')}</a>`}
+    </span>
+    ${topup && html`<${Note} kind="meta">${tr('home.credit.topupNote', 'One-off payment. No new subscription.')}<//>`}`;
 }
 
 export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {

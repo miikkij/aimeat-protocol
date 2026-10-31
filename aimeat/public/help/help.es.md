@@ -14,14 +14,14 @@ También puedes hablar con la IA directamente en el [chat](/v1/chat).
 
 Si ya usas ChatGPT, Claude o Grok, conéctalo aquí y se convierte en tu mano derecha: ve la misma información y hace lo mismo que el chat. Los botones para conectarlo están en tu Inicio.
 
-(La conexión usa la tecnología abierta MCP. No necesitas saber nada más de ella.)
+(La conexión usa el estándar abierto MCP (Model Context Protocol), que admiten ChatGPT, Claude y Grok. ¿Quieres saber más? Lee [modelcontextprotocol.io](https://modelcontextprotocol.io) (en inglés) o pregúntale a tu IA: "¿Qué significa MCP y cómo funciona?")
 
 ## Saldo de IA y cuánto cuesta {#cost}
 
 <!--store-->
 Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda en tu Inicio bajo tu nombre, en el chat y en la [página de IA](/v1/profile?tab=ai).
 
-El saldo se gasta cuando la IA responde o hace un trabajo. Para comprar más, pulsa Comprar más saldo junto al saldo en tu Inicio. El pago se hace con la misma tarjeta y no hace falta una suscripción nueva. Puedes hacerlo cuando quieras.
+El saldo se gasta cuando la IA responde o hace un trabajo. Para tener más IA, pulsa Comprar más IA junto al saldo en tu Inicio. Es un pago único y no hace falta una suscripción nueva. Puedes hacerlo cuando quieras.
 
 Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir.
 
@@ -39,7 +39,7 @@ Todo lo que guardas es privado al principio. Solo tú lo ves.
 
 Tú decides lo que compartes. Puedes compartir un espacio de trabajo, un conjunto de documentos, con las personas que invites, o publicar algo para todos. Lo que compartes solo lo ven aquellos con quienes lo compartiste.
 
-Un agente o una IA conectada solo puede hacer lo que tú le permites. Ves cada permiso, y puedes retirarlo, en la [página de Acceso](/v1/profile?tab=access).
+Un agente o una IA conectada solo puede hacer lo que tú le permites. Ves cada permiso, y puedes retirarlo, en la [página de Acceso y seguridad](/v1/profile?tab=access).
 
 Puedes exportar todos tus datos y borrar tu cuenta en Ajustes.
 
@@ -49,7 +49,7 @@ Un agente es una IA que hace un trabajo por ti, también cuando no estás.
 
 Di en una frase en tu [Inicio](/v1/home) lo que quieres. AIMEAT crea el agente y te lo muestra antes de que empiece. Si el trabajo se repite, dilo: por ejemplo "cada mañana de lunes a viernes a las 8". Así el agente hace el trabajo con ese horario.
 
-Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Ves el trabajo terminado en tu Inicio y, si quieres, el agente te lo envía por correo. Puedes detener un agente cuando quieras.
+Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Ves el trabajo terminado en tu Inicio, en Lo que ha pasado. Si quieres, el agente también te lo envía por correo. Puedes detener un agente cuando quieras.
 
 ## Aplicaciones {#apps}
 
@@ -59,9 +59,11 @@ Pide una aplicación en el [chat](/v1/chat), por ejemplo: "Hazme una aplicación
 
 ## Entrar {#signin}
 
-Entras con un enlace por correo. Escribe tu dirección en la ventana de entrada y recibirás un enlace. El enlace sirve una vez y durante 15 minutos, y no necesitas contraseña.
+Entras con un enlace de acceso. Escribe tu dirección en la ventana de entrada y el enlace te llegará por correo. El enlace sirve una vez y durante 15 minutos, y no necesitas contraseña.
 
-Si quieres, puedes añadir una llave de acceso. Así entras con tu huella, tu cara o el bloqueo de pantalla de tu dispositivo. La llave de acceso se añade en la [página de Seguridad](/v1/profile?tab=security).
+<!--nostore-->
+Si quieres, también puedes entrar con tu huella, tu cara o el bloqueo de pantalla de tu dispositivo (una llave de acceso). Se activa en la [página de Acceso y seguridad](/v1/profile?tab=access).
+<!--/nostore-->
 
 ## Si algo se rompe {#broken}
 

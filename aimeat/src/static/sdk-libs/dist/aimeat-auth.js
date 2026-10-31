@@ -236,7 +236,7 @@
     if (s === "light" || s === "dark") return s;
     var attr = document.documentElement.dataset.theme;
     if (attr === "light" || attr === "dark") return attr;
-    return osMode();
+    return s === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
   function osMode() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
@@ -1755,6 +1755,7 @@
   var KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M15 12v2"></path></svg>';
   function passkeyButtonHtml(i) {
     if (!passkeySupported()) return "";
+    if (LINK_FIRST) return "";
     return '<button type="button" id="aimeat-passkey-btn" class="aimeat-oauth-btn">' + KEY_SVG + escHtml(i.passkeySignIn || "Sign in with a passkey") + '</button><p id="aimeat-passkey-hint" class="aimeat-hint">' + escHtml(i.passkeyHint || "Your fingerprint, face or screen lock. No password to remember.") + "</p>";
   }
   function wirePasskeyButton(ctx) {
