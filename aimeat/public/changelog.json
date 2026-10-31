@@ -4,6 +4,28 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-overview-map",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Overview map",
+        "fi": "Kokonaiskuva"
+      },
+      "summary": {
+        "en": "See your computers, agents, apps, knowledge and offerings on one page, with how much each is used.",
+        "fi": "Näet tietokoneesi, agenttisi, sovelluksesi, tietosi ja tarjoamasi yhdellä sivulla ja kuinka paljon kutakin käytetään."
+      },
+      "body": {
+        "en": "See your whole account on one page: which computers bring which agents, the apps and workspaces they use, what they offer and how much each is used. Open any card in place, and ask your own AI about anything in a help dialog with the facts included.",
+        "fi": "Näet koko tilisi yhdellä sivulla: mitkä tietokoneet tuovat mitkäkin agentit, mitä sovelluksia ja työtiloja ne käyttävät, mitä ne tarjoavat ja kuinka paljon kutakin käytetään. Avaat minkä tahansa kortin paikallaan. Ohjedialogista saat valmiin kysymyksen omalle tekoälyllesi, ja tiedot tulevat sen mukana."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-large-files-straight-to-your-file-store",
       "highlight": false,
       "audience": [
