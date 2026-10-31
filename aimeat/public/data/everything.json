@@ -1614,6 +1614,15 @@
      "plain": "Schedule limits and defaults Stop after a chosen number of successful fires, including a one-shot job, and inherit defaults from the target agent when creating a schedule. The daily USD guard checks the owner's recorded AI spending before an AI-completion job starts; it does not cap other schedule kinds or reserve the next call's cost. Limits: you set a schedule's limits and an agent's defaults on the page or over REST; a schedule your AI creates from a chat takes the target agent's defaults, and it cannot set or change a limit of its own. POST /v1/schedules, PATCH /v1/schedules/:id (constraints), PATCH /v1/agents/:name/schedule-constraints, Agents > Agent Config"
     },
     {
+     "slug": "g-8-schedule-load-limits",
+     "cells": [
+      "<strong>Schedule load limits</strong>",
+      "One account cannot load the scheduler every other account shares. A schedule made or given a new time runs at most once a minute, and one owner keeps at most 1000 schedules, their agents' and apps' included. A workflow's scheduled trigger follows the same shortest time. Schedules that exist keep their time and stay. A refusal says the number and the setting. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat.",
+      "<code>schedules.min_interval_seconds</code>, <code>schedules.max_per_owner</code>, <code>POST /v1/schedules</code>, <code>PATCH /v1/schedules/:id</code>, <code>PUT /v1/workflows/:id</code>"
+     ],
+     "plain": "Schedule load limits One account cannot load the scheduler every other account shares. A schedule made or given a new time runs at most once a minute, and one owner keeps at most 1000 schedules, their agents' and apps' included. A workflow's scheduled trigger follows the same shortest time. Schedules that exist keep their time and stay. A refusal says the number and the setting. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat. schedules.min_interval_seconds, schedules.max_per_owner, POST /v1/schedules, PATCH /v1/schedules/:id, PUT /v1/workflows/:id"
+    },
+    {
      "slug": "g-8-schedule-run-history-and-results",
      "cells": [
       "<strong>Schedule run history and results</strong>",
@@ -2953,10 +2962,10 @@
      "slug": "g-13-realtime-rooms",
      "cells": [
       "<strong>Realtime rooms</strong>",
-      "Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through <code>AIMEAT.live</code>, with no refresh, when the app holds <code>social:read</code>. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat.",
-      "<code>/v1/realtime/rooms</code>, live domain <code>realtime-rooms</code>, <code>realtime.max_docs_per_room</code>, <code>realtime.echat_max_rooms</code>"
+      "Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through <code>AIMEAT.live</code>, with no refresh, when the app holds <code>social:read</code>. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. One owner and their agents hold at most 50 rooms open at once, so one account cannot take every room; the refusal lists that owner's rooms and says how to close one. The operator changes these numbers, or turns them off with 0, from the Config tab or through chat.",
+      "<code>/v1/realtime/rooms</code>, live domain <code>realtime-rooms</code>, <code>realtime.max_docs_per_room</code>, <code>realtime.echat_max_rooms</code>, <code>realtime.rooms_per_owner</code>"
      ],
-     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through AIMEAT.live, with no refresh, when the app holds social:read. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. The operator changes both numbers, or turns them off with 0, from the Config tab or through chat. /v1/realtime/rooms, live domain realtime-rooms, realtime.max_docs_per_room, realtime.echat_max_rooms"
+     "plain": "Realtime rooms Rooms for peer-to-peer sessions between browsers. An app's lobby hears the room list change as it happens (a room opened, closed or emptied, a player joining or leaving) through AIMEAT.live, with no refresh, when the app holds social:read. A room keeps the latest state of up to 64 shared documents for players who join later; a document past that is still sent to the room. Anonymous echat visitors hold at most 50 rooms together, so they never take every room the apps use. One owner and their agents hold at most 50 rooms open at once, so one account cannot take every room; the refusal lists that owner's rooms and says how to close one. The operator changes these numbers, or turns them off with 0, from the Config tab or through chat. /v1/realtime/rooms, live domain realtime-rooms, realtime.max_docs_per_room, realtime.echat_max_rooms, realtime.rooms_per_owner"
     },
     {
      "slug": "g-13-moderation",
@@ -4568,6 +4577,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 464
+  "rows": 465
  }
 }
