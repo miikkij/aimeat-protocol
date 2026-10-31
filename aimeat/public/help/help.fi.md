@@ -62,7 +62,7 @@ Pyydä sovellusta [chatissa](/v1/chat), esimerkiksi: "Tee minulle sovellus, joll
 Kirjaudut kirjautumislinkillä. Kirjoita osoitteesi kirjautumisikkunaan, niin saat linkin sähköpostiisi. Linkki toimii kerran ja 15 minuutin ajan, eikä salasanaa tarvita.
 
 <!--store-->
-AIMEAT-esittely ([aimeat.io](https://aimeat.io)), kauppa ([store.aimeat.io](https://store.aimeat.io)) ja oma AIMEATisi ovat kolme erillistä paikkaa, ja jokaiseen kirjaudutaan erikseen. Näin yhden paikan tunnus ei avaa muita.
+Esittely ([aimeat.io](https://aimeat.io)), kauppa ([store.aimeat.io](https://store.aimeat.io)) ja oma AIMEATisi ovat kolme erillistä tiliä. Jos yhdessä sattuu jotain, se ei vaikuta muihin.
 <!--/store-->
 
 <!--nostore-->
