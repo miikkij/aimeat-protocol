@@ -8089,7 +8089,7 @@
   "aipage.simple.titleSub": "AI-saldosi ja sen käyttö",
   "aipage.simple.desc": "Tekoälysi toimii ostamallasi AI-saldolla: euromäärällä, jolla maksetaan tekoälyn työ täällä. Jos haluat käyttää omaa tekoälytiliäsi, avaa sivun alaosasta Lisäasetukset.",
   "aipage.simple.stripCredit": "AI-saldoa jäljellä",
-  "aipage.simple.lasts": "riittää noin {n} tavalliseen viestiin nykyisellä käytölläsi",
+  "aipage.simple.lasts": "riittää noin {n} tavalliseen viestiin",
   "aipage.simple.underCent": "alle 1 snt",
   "aipage.simple.topupNote": "Avaa maksun samalla kortilla – ei uutta tilausta.",
   "aipage.simple.connTitle": "Oma tekoälytili (valinnainen)",

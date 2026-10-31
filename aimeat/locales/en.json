@@ -7894,7 +7894,7 @@
   "aipage.stripAllowanceBought": "AI allowance left: {n}",
   "aipage.simple.titleSub": "your AI credit and how it is used",
   "aipage.simple.desc": "Your AI runs on the AI credit you bought: an amount in euros that pays for the AI's work here. If you want to use an AI account of your own, open Advanced settings at the bottom of the page.",
-  "aipage.simple.lasts": "lasts about {n} ordinary messages at your current use",
+  "aipage.simple.lasts": "lasts about {n} ordinary messages",
   "aipage.simple.underCent": "under 1 cent",
   "aipage.simple.topupNote": "Opens the payment with the same card – no new subscription.",
   "aipage.simple.connTitle": "Your own AI account (optional)",
