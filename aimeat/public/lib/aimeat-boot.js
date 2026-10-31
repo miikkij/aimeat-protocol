@@ -14,8 +14,9 @@
  *
  *   IT SETS ATTRIBUTES; IT DECIDES NOTHING ELSE. The login pill (aimeat-auth) owns the theme
  *   and palette CONTROLS and keeps both live after load; this file only covers the gap between
- *   navigation and the pill mounting. With no choice stored, or storage blocked, the page is light;
- *   the OS preference counts only when the stored choice is 'auto' ("automatic").
+ *   navigation and the pill mounting. A stored 'light' or 'dark' wins; with 'auto' ("automatic"),
+ *   with no choice stored, or with storage blocked, the OS preference decides. Apps keep that
+ *   default; only the node's own pages open light (spa.html, Jouni's v31 K65 as scoped at 17.27).
  *
  *   No gate lints public/lib JavaScript, so the discipline lives in this header and in
  *   test/e2e-libs.ts, which asserts the file serves, stays synchronous-safe (no top-level
@@ -23,10 +24,12 @@
  * @structure one IIFE: mode() · pal() · resolve() · restore from localStorage · storage listener
  * @usage  <script src="/lib/aimeat-boot.js"></script>   (in <head>, before any stylesheet paint matters)
  * @version-history
+ *   v0.2.1 — 2026-10-31 — Back to the OS preference when nothing is chosen: K65's light default is
+ *     for the node and the store, and apps stay as they were (Jouni 17.27; "palauta tummiksi" on the
+ *     blueprint apps). 'auto' is still read as the OS's. Closed so by Jouni at 20.14 (K65, option B):
+ *     light only on the node's own pages and in the store; the kit apps are not made light here.
  *   v0.2.0 — 2026-10-31 — Light unless the person chose: 'light' or 'dark' as stored, the OS's on
- *     'auto', light otherwise (Jouni, v31 K65: AIMEAT opens in its own light look). Confirmed for
- *     the kit apps that load this file, the same evening: "olisi kiva että ne oletuksena aukeaa
- *     vaaleana". An app with a fixed look of its own sets it after this file and keeps it.
+ *     'auto', light otherwise (Jouni, v31 K65: AIMEAT opens in its own light look).
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1): the shell theme-restore IIFE,
  *     served. Same semantics as the inline original in shells.ts.
  */
@@ -49,12 +52,12 @@
   try {
     storedMode = localStorage.getItem('aimeat-theme');
     storedPal = localStorage.getItem('aimeat-palette');
-  } catch (e) { /* storage blocked — the page is light, as with no choice */ }
+  } catch (e) { /* storage blocked — the OS preference below still applies */ }
 
-  /** The mode a stored choice means: light or dark as chosen, the OS's on 'auto', else light (Jouni, v31 K65). */
+  /** The mode a stored choice means: light or dark as chosen, else the OS's ('auto' or no choice). */
   function resolve(m) {
     if (m === 'light' || m === 'dark') return m;
-    return m === 'auto' && typeof matchMedia === 'function'
+    return typeof matchMedia === 'function'
       && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
