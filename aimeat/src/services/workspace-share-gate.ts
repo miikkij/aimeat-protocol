@@ -19,6 +19,9 @@
  *   const opened = newlyOpened(prev, next);
  *   if (opened.length && ask) { const held = withholdOpening(prev, next, opened, untilIn); ... }
  * @version-history
+ *   2026-11-01 — publishedPageIds reads a page's id from the end of its key (spaceRowAt), so a page
+ *     whose id holds a dot is held to its own label when its space is shared whole; it was skipped
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.2.0 — 2026-10-18 — shareCapRefusal holds each published page of a space shown whole (or of
  *     every space, for the whole workspace) to its own effective label, and refuses naming the first
  *     page over its cap (plan doc-mvdipuyqraas, L3 gap closed in L5). It held a whole space to the
@@ -40,6 +43,7 @@ import { labelById } from './classification/defaults.js';
 import { effectiveLabels } from './classification/effective.js';
 import { memoryTarget, targetId } from './classification/label-rows.js';
 import { classificationActiveFor, policyFor } from './classification/policy.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 
 /** A target as `until` names it: `*` (the workspace), `space:<name>`, or `<space>/<id>` (a page). */
 type ShareTarget = string;
@@ -146,17 +150,23 @@ export async function shareCapRefusal(
     .map(o => ({ name: o.name, namespace: o.namespace, from: shownAt(prev.public || prev.spaces[o.name] === true) }))
     .filter(o => o.from === null || isWiderAudience(to, o.from));
   if (!spaces.length) return null;
-  return spacePagesRefusal(ctx, orgId, ws, spaces, page => shownAt(prev.docs[page] === true), to, by);
+  const prefixes = spacePrefixesOf(`organism.${orgId}.w.${ws}`, manifest?.objectTypes);
+  return spacePagesRefusal(ctx, orgId, ws, spaces, prefixes, page => shownAt(prev.docs[page] === true), to, by);
 }
 
-/** The published pages of one space: the keys under `prefix` whose rest is `<id>.latest`. */
-async function publishedPageIds(storage: Storage, prefix: string): Promise<string[]> {
+/**
+ * The published pages of one space: the keys under `prefix` whose rest is `<id>.latest`, the id read
+ * from the end so a page whose id holds a dot is held to its label too; it was skipped, and a space
+ * shared whole opened it past its cap (secaudit2026oct31w2 round 10b). `prefixes` are every declared
+ * space's, so a key of a longer namespace is left to that space.
+ */
+async function publishedPageIds(storage: Storage, prefix: string, prefixes: readonly string[]): Promise<string[]> {
   const ids = new Set<string>();
   for (let offset = 0; offset < 20_000; offset += 1000) {
     const { items } = await storage.listAllMemoryMeta({ prefix, limit: 1000, offset, excludeVersionRows: true });
     for (const row of items) {
-      const parts = row.key.slice(prefix.length).split('.');
-      if (parts.length === 2 && parts[1] === 'latest' && parts[0]) ids.add(parts[0]);
+      const at = spaceRowAt(row.key, prefix, prefixes);
+      if (at?.copy === 'latest') ids.add(at.id);
     }
     if (items.length < 1000) break;
   }
@@ -172,7 +182,7 @@ async function publishedPageIds(storage: Storage, prefix: string): Promise<strin
  */
 async function spacePagesRefusal(
   ctx: { storage: Storage; config: AimeatConfig }, orgId: string, ws: string,
-  spaces: Array<{ name: string; namespace: string; from: AudienceLevel | null }>,
+  spaces: Array<{ name: string; namespace: string; from: AudienceLevel | null }>, prefixes: readonly string[],
   pageFrom: (page: string) => AudienceLevel | null, to: AudienceLevel, by: CapOptions['by'],
 ): Promise<{ ok: false; status: 409; code: string; message: string } | null> {
   const { storage, config } = ctx;
@@ -182,7 +192,7 @@ async function spacePagesRefusal(
   const level = storedLevel(config, to);
   for (const space of spaces) {
     const prefix = `organism.${orgId}.w.${ws}.${space.namespace}.`;
-    const pages = (await publishedPageIds(storage, prefix)).map(id => ({ page: `${space.name}/${id}`, target: memoryTarget(scope, `${prefix}${id}`) }));
+    const pages = (await publishedPageIds(storage, prefix, prefixes)).map(id => ({ page: `${space.name}/${id}`, target: memoryTarget(scope, `${prefix}${id}`) }));
     if (!pages.length) continue;
     const eff = await effectiveLabels(storage, policy, pages.map(p => p.target));
     for (const { page, target } of pages) {
