@@ -7,6 +7,7 @@
  *   the agents as a table that opens into a card), the ink rail, the device-auth approvals, the
  *   scope modal.
  * @version-history
+ *   v4.24.0 -- 2026-10-31 -- While a proposal waits, its panel (with Approve and Decline) comes first on the page, not third (v31 K49).
  *   v4.23.1 -- 2026-10-28 -- The list no longer names the agents holding all permissions: the node no longer narrows them, so the owner is not asked to; each agent's card offers the narrowing.
  *   v4.23.0 -- 2026-10-25 -- An approval of a new device taking over an existing agent sends the owner's
  *     choice to sign its other sessions out (end_other_sessions; secaudit2026oct22).
@@ -600,6 +601,11 @@ export default function AgentsTab({ session, showToast, onStats }) {
     { id: 'agp-list', num: '05', label: p('secAgents'), count: agents.length },
   ];
 
+  // One panel element, placed first while a proposal waits and third otherwise (v31 K49). The same
+  // key in both places keeps the panel mounted when it moves, so an open form keeps what was typed.
+  const newAgentPanel = html`<${NewAgentPanel} key="agp-new" session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
+    open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} draft=${newDraft} />`;
+
   return html`
     <${SettingsPage} name="agp"
       crumb=${[t('nav.profile'), t('profile.tabs.agents')]}
@@ -627,6 +633,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
           onSave=${handleSaveScopes}
           onCancel=${() => setScopesModal(null)} />`}
         <${ConfirmUI} />`}>
+          ${/* A proposal that waits comes first, with its Approve and Decline: the page's top said
+                "1 waiting for you" while the proposal sat in the third section, and a buyer found
+                nothing to press (v31 K49). With nothing waiting, the order below. */''}
+          ${waitingCount > 0 && newAgentPanel}
           ${/* The one-press road in. Above the connect guide on purpose: for somebody whose connector
                 is already running, this is the whole job, and the guide below is the long way round. */''}
           ${/* What should an agent do: the question first, so the sections below are reached by an
@@ -637,8 +647,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
           ${/* An agent of the person's own, and what their agents have proposed. Below the two fixed
                 names on purpose: those are what a new account should take first, and this is the door
                 for the job they do not cover. */''}
-          <${NewAgentPanel} session=${session} showToast=${showToast} onCreated=${loadData} agents=${agents}
-            open=${newOpen} setOpen=${setNewOpen} onWaiting=${setWaitingCount} draft=${newDraft} />
+          ${waitingCount > 0 ? null : newAgentPanel}
 
           <${Section} id="agp-connect" num="04" title=${p('secConnect')} count=${p('secConnectSub')} doors=${connectDoor}>
             ${!connectOpen ? html`<${Note} kind="lead">${p('connectLede')}<//>` : html`

@@ -16,11 +16,13 @@
  *   THE WORDS FOR WHEN AN AGENT WORKS are the five the proposal page offers (whenWords), so a row
  *   here and a choice there cannot name one thing two ways.
  *
- *   Composed from library components only (Band, NamedRow, LineList, TextField, Action, Mark, Note);
+ *   Composed from library components only (Band, NamedRow, LineList, List, TextField, Action, Mark, Note);
  *   it has no sheet of its own.
  * @structure AgentsBand({ data, navigate }) · whenWords(worker) · machineName(connector) · stateWords(worker)
  * @usage html`<${AgentsBand} data=${homeAgents} navigate=${ctx.navigate} />`
  * @version-history
+ *   2026-10-31 — Each proposal under "Waiting for you" has Approve and Decline on its row; its name
+ *     opens its own page. The rows were links only, with nothing to press (v31 K49).
  *   2026-10-25 — The band's title carries the question mark that explains an agent, and its first rows
  *     are the goals (views/home/goals-part.js): the field that gives the agents a goal, the running
  *     goals, and what in them waits for the person (session cc-jouni-goals).
@@ -40,6 +42,8 @@ import { ago } from '/js/format.js';
 import { Band, BandNote } from '/components/Band.js';
 import { NamedRow } from '/components/NamedRow.js';
 import { LineList } from '/components/LineList.js';
+import { List, Row, Name, Desc, Doors } from '/components/List.js';
+import { apiPost } from '/js/api.js';
 import { AgentAvatar, avatarOf } from '/components/AgentAvatar.js';
 import { TextField } from '/components/TextField.js';
 import { Action, Loud } from '/components/Action.js';
@@ -119,7 +123,26 @@ function handleOf(id) {
 /** @param {{ data: any, navigate?: (path: string) => void }} props */
 export function AgentsBand({ data, navigate }) {
   const [say, setSay] = useState('');
+  // What became of a proposal decided on this band, by id: the sentence shown in its row until the
+  // live update takes the row away.
+  const [settled, setSettled] = useState({});
+  const [busy, setBusy] = useState(false);
   if (!data) return null;
+
+  async function settle(p, decision) {
+    const name = p.display_name || p.name;
+    setBusy(true);
+    try {
+      const resp = await apiPost(`/v1/agents/v2/agent-proposals/${encodeURIComponent(p.id)}/${decision}`, {});
+      const d = resp?.data;
+      const key = decision === 'decline' ? 'declined' : d?.attached ? 'done' : d?.waiting_for_connector ? 'madeWaiting' : 'madeNotRunning';
+      setSettled((s) => ({ ...s, [p.id]: tr('profile.agents.new.' + key, '').replaceAll('{name}', name) }));
+    } catch (err) {
+      setSettled((s) => ({ ...s, [p.id]: err?.message || tr('profile.agents.new.failed', '') }));
+    } finally {
+      setBusy(false);
+    }
+  }
   const proposals = data.proposals ?? [];
   const workers = data.workers ?? [];
   const machines = data.connectors ?? [];
@@ -153,14 +176,26 @@ export function AgentsBand({ data, navigate }) {
 
       ${proposals.length > 0 && html`
         <${NamedRow} stack label=${tr('home.agents.waitingLabel', 'Waiting for you')}>
-          <${LineList} rows=${proposals.map((p) => ({
-            id: p.id,
-            name: p.by_person
-              ? tr('home.agents.proposed', 'Proposed agent: {name}').replace('{name}', p.display_name)
-              : tr('home.agents.proposedBy', '{who} proposes an agent: {name}').replace('{who}', handleOf(p.proposed_by)).replace('{name}', p.display_name),
-            text: p.purpose,
-            href: newAgentPath('&proposal=' + encodeURIComponent(p.id)),
-          }))} />
+          ${/* Each one is decided here: Approve starts it as proposed, Decline makes nothing, and the
+                name opens its own page to change it first. The rows were links only, and a buyer saw
+                text with nothing to press (v31 K49). */''}
+          <${List} cols="name-desc-doors">
+            ${proposals.map((p) => html`
+              <${Row} key=${p.id}>
+                <${Name} href=${newAgentPath('&proposal=' + encodeURIComponent(p.id))}
+                  onFollow=${(e) => { if (!navigate) return; e.preventDefault(); navigate(newAgentPath('&proposal=' + encodeURIComponent(p.id))); }}>
+                  ${p.by_person
+                    ? tr('home.agents.proposed', 'Proposed agent: {name}').replace('{name}', p.display_name)
+                    : tr('home.agents.proposedBy', '{who} proposes an agent: {name}').replace('{who}', handleOf(p.proposed_by)).replace('{name}', p.display_name)}
+                <//>
+                <${Desc}>${settled[p.id] || p.purpose}<//>
+                <${Doors}>
+                  ${!settled[p.id] && html`
+                    <${Loud} control disabled=${busy} onClick=${() => settle(p, 'approve')}>${tr('profile.agents.new.approve', 'Approve')}<//>
+                    <${Action} small row disabled=${busy} onClick=${() => settle(p, 'decline')}>${tr('profile.agents.new.decline', 'Decline')}<//>`}
+                <//>
+              <//>`)}
+          <//>
         <//>`}
 
       ${workers.length > 0 && html`

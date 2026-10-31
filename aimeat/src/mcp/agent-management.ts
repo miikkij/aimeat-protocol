@@ -17,6 +17,7 @@
  *   import { registerAgentManagementTools } from './agent-management.js';
  *   registerAgentManagementTools(mcp, storage, config, getAgentGaii, emitU, emitL, scopes, caller);
  * @version-history
+ *   2026-10-31 — aimeat_agent_propose's approval_url is the proposal's own page on the home (v31 K51).
  *   2026-10-27 — aimeat_agent_runtime_report refuses the shared anonymous principal with AUTH_REQUIRED,
  *     as aimeat_agent_tags_set does (secaudit2026oct26, runtime-source:shared-anonymous-agent-self-report).
  *   2026-10-27 — aimeat_agent_mode_set passes the session's agent to setAgentMode, which tells the owner
@@ -307,7 +308,7 @@ export function registerAgentManagementTools(
             // service applies is "no more than the caller holds", and the caller is this session.
             const out = await proposeAgent({ config, storage }, caller().auth, input as Parameters<typeof proposeAgent>[2]);
             if (!out.ok) return { content: [{ type: 'text' as const, text: out.message }], isError: true };
-            const approvalUrl = proposalApprovalUrl(config.baseUrl);
+            const approvalUrl = proposalApprovalUrl(config.baseUrl, out.proposal.id);
             return {
                 content: [{
                     type: 'text' as const,

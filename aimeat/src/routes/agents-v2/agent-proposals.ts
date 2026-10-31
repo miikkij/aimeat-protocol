@@ -23,6 +23,7 @@
  * @structure nextStep() · registerAgentProposalRoutes()
  * @usage registerAgentProposalRoutes(router, config, storage);
  * @version-history
+ *   2026-10-31 — approval_url is the proposal's own page on the home (v31 K51).
  *   2026-10-18 — The proposal answer's `next_step` says when the proposed agent may invite people (organism:invite).
  *   2026-10-18 — A new agent gets the node's classification.agent_clearance_default as its clearance (plan doc-mvdipuyqraas, L2.1).
  *   2026-10-18 — An approved proposal's agent is tagged `unlisted` when visibility.agent_listed_default is off (plan doc-mvcn6c7e4e5q, V5.8).
@@ -144,7 +145,7 @@ export function registerAgentProposalRoutes(router: Router, config: AimeatConfig
       res.status(out.status).json(error(config.nodeId, out.code, out.message));
       return;
     }
-    const approvalUrl = proposalApprovalUrl(config.baseUrl);
+    const approvalUrl = proposalApprovalUrl(config.baseUrl, out.proposal.id);
     res.status(201).json(success(config.nodeId, {
       proposal: out.proposal,
       created: false,
