@@ -9,6 +9,8 @@
  *   - registerReadRoutes() — versions, forks, lineage, screenshot GET/POST/DELETE, app download
  * @usage registerReadRoutes(router, config, storage, canonicalOwner); // from appsRouter
  * @version-history
+ *   2026-10-31 — The screenshot of an app that needs a sign-in answers as the app does (screenshotGateRefused)
+ *     and is cached `private`, unless its owner shows it to everyone (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-31 — A browser's own navigation to the bare app address is redirected to `?mode=inline`;
  *     `?download=1` and API clients keep the raw file (v28 #12, K41).
  *   2026-10-25 — A runnable request on the bare app host is redirected to the app's own origin like one on the apex (secaudit2026oct22, read.ts:bare-app-host-runs-any-app).
@@ -152,7 +154,7 @@ import { isOperatorCaller, operatorOverride } from '../../services/operator-over
 import { callerOf } from '../../middleware/caller.js';
 import { appIsPaced, appToll } from '../../services/app-pacing.js';
 import { appNeedsSignIn } from '../../services/app-access.js';
-import { signInGateRefused } from './open.js';
+import { signInGateRefused, screenshotGateRefused, screenshotFollowsAccess } from './open.js';
 import { accessCodeUnlockPage } from './access-code-page.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
@@ -256,6 +258,11 @@ export function registerReadRoutes(
             return;
         }
 
+        // The screenshot of an app that needs a sign-in follows who may open the app, unless its
+        // owner shows it to everyone (routes/apps/open.ts, W2-12). The icon stays public.
+        if (await screenshotGateRefused(req, res, config, storage, app, canonicalOwner)) return;
+        const followsAccess = screenshotFollowsAccess(config, app);
+
         const screenshotKey = `apps/screenshots/${filename}`;
         const file = await storage.getStorageFile(app.ownerGaii, screenshotKey);
         if (file) {
@@ -270,7 +277,7 @@ export function registerReadRoutes(
                 return;
             }
             res.setHeader('Content-Length', file.size.toString());
-            res.setHeader('Cache-Control', 'public, max-age=3600');
+            res.setHeader('Cache-Control', followsAccess ? 'private, max-age=3600' : 'public, max-age=3600');
             res.send(file.data);
             return;
         }

@@ -2249,6 +2249,15 @@
      "plain": "Who may open an app Listing says who sees an app in a list; this says who may open it. Anyone (the default), signed-in (people with an account on this node, and their agents and apps), or the members of one organism you belong to. Someone who opens the link without a session is asked to sign in and comes back to the app; someone outside the organism is told the app is not open to them. You and an operator always open it, an access code still applies on top, and a new version keeps the setting. In the app catalogue you set it under Manage, beside the listing, and the app's page says in one sentence who can open it. The operator sets how a NEW app starts: its listing, who may open it, and whether it gets a generated access code, which the publish answer tells you; a fork starts the same way, without a code. Your welcome page and a company's front page take the same three choices and the same sign-in step; a search engine never lists a page that is not open to anyone. open_to on PATCH /v1/apps/:filename and aimeat_app_manage action settings, open_to on GET /v1/apps (the level only for anyone but the owner), POST /v1/apps/:owner/:filename/open, /v1/app-open, apps.default_listing, apps.default_access, apps.default_access_code; for pages access on PUT /v1/portfolio/config, aimeat_portfolio_publish, PUT /v1/companies/:id/front-page and aimeat_company_front_page, POST /v1/portfolio/:username/open, POST /v1/companies/:id/open"
     },
     {
+     "slug": "g-10-who-sees-an-app-s-screenshot",
+     "cells": [
+      "<strong>Who sees an app's screenshot</strong>",
+      "The screenshot of an app that opens for fewer people than anyone follows who may open it: people the app does not open for get no screenshot, in the catalogue or at its address. The icon stays public. You can choose to show the screenshot to everyone, also to people who cannot open the app; in the app catalogue you set it under Manage, below who can open it, and a new version keeps the choice. Nothing changes for an app anyone may open.",
+      "<code>screenshot_public</code> on <code>PATCH /v1/apps/:filename</code> and <code>aimeat_app_manage</code> action <code>settings</code>, <code>GET /v1/apps/:owner/:filename/screenshot</code> (<code>shot</code>), <code>screenshot_url</code> on <code>GET /v1/apps</code>"
+     ],
+     "plain": "Who sees an app's screenshot The screenshot of an app that opens for fewer people than anyone follows who may open it: people the app does not open for get no screenshot, in the catalogue or at its address. The icon stays public. You can choose to show the screenshot to everyone, also to people who cannot open the app; in the app catalogue you set it under Manage, below who can open it, and a new version keeps the choice. Nothing changes for an app anyone may open. screenshot_public on PATCH /v1/apps/:filename and aimeat_app_manage action settings, GET /v1/apps/:owner/:filename/screenshot (shot), screenshot_url on GET /v1/apps"
+    },
+    {
      "slug": "g-10-screenshots-icons-and-promotion",
      "cells": [
       "<strong>Screenshots, icons and promotion</strong>",
@@ -4568,6 +4577,6 @@
  "outro": "AIMEAT Feature List. The node version and the day of the review are in the line under the title. The contract is <code>openapi.yaml</code>; the specification is AIMEAT Core 2026-11 (normative since node 4.0.0; RFC v4.0 Core and Platform before it), and the Platform reference describes what the node builds on it; later changes are at <a href=\"/v1/changelog\">the change log</a>.",
  "counts": {
   "groups": 24,
-  "rows": 464
+  "rows": 465
  }
 }
