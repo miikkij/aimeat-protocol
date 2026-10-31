@@ -25,6 +25,10 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.3.0 — 2026-10-31 — `productRefusal`: a door's check of what the found entitlement would run,
+ *     asked before the pacing and the settlement, answers `refused_product` with nothing charged. The
+ *     app-tool doors resolved their binding after the settle, refunded a mis-bound capability and kept
+ *     the charge for a missing one (secaudit 2026-10-31 inv-05).
  *   v1.2.1 — 2026-10-13 — A grant on a source priced in the 4.0.0 form (one pacing amount, carried as
  *     the morsel-rail list price with an explicit toll of 0) has the provider pay that pacing amount;
  *     with only the toll it burned nothing, so a granted call of such a source was not paced at all.
@@ -93,6 +97,8 @@ export type MeteredOutcome =
   | { kind: 'refused_budget'; entitlement: MeteredEntitlement }
   /** A provider's grant has reached the ceiling they were willing to carry. */
   | { kind: 'refused_grant_cap'; entitlement: MeteredEntitlement }
+  /** The door's own check of what this entitlement would run refused it (MeteredCallArgs.productRefusal). Nothing was charged. */
+  | { kind: 'refused_product'; entitlement: MeteredEntitlement; refusal: ProductRefusal }
   /** The payer could not cover the pacing toll or the price. */
   | { kind: 'insufficient'; entitlement: MeteredEntitlement | null; needed: number; carried: boolean }
   /** Payment could not be moved; the caller was NOT charged. */
@@ -264,7 +270,17 @@ export interface MeteredCallArgs {
    * missing session is never treated as a permission — it simply skips a check that does not apply.
    */
   session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
+  /**
+   * The door's check of what this entitlement would run, asked after the entitlement is found and
+   * before anything is charged. An app-tool door resolves the binding from the entitlement's pinned
+   * interface version here, so a tool with no binding, a missing capability or a capability its app's
+   * owner does not own is refused with nothing to give back. Null lets the call go on.
+   */
+  productRefusal?: (entitlement: MeteredEntitlement) => Promise<ProductRefusal | null>;
 }
+
+/** What a door's productRefusal answers: the status, code and sentence it would have sent. */
+export interface ProductRefusal { statusCode: number; code: string; message: string }
 
 /**
  * Decide, settle, and RECORD. The recording wraps the decision rather than sitting inside it, for
@@ -334,6 +350,10 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   //     (a free call spends nothing).
   const refusal = await appSpendRefusal(storage, session);
   if (refusal) return refusal;
+  // 2c. The door's own question about what this entitlement would run, before the pacing and the
+  //     settlement below: a refusal here leaves nothing to give back (secaudit 2026-10-31 inv-05).
+  const productRefusal = args.productRefusal ? await args.productRefusal(ent) : null;
+  if (productRefusal) return { kind: 'refused_product', entitlement: ent, refusal: productRefusal };
   const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
 
   // 3. Pacing, first and always. The one brake that bounds RATE rather than total spend, which is the
