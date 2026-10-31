@@ -294,13 +294,13 @@
       "digest": "sha256:e889ce5039a1ecdeff09bd30"
     },
     "node:configure-routing": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/routes/ai.ts",
         "aimeat/src/routes/ai-providers.ts",
         "aimeat/src/services/ai/routing.ts"
       ],
-      "digest": "sha256:a9353f9277dbdcc453e93852"
+      "digest": "sha256:a0efe7e6312628c2224d8848"
     },
     "node:aimeat-ai-model-policy": {
       "reviewedOn": "2026-10-05",
@@ -434,14 +434,14 @@
       "digest": "sha256:47e0ed7b1bb2c39fa5eaef76"
     },
     "node:diagnose-a-workflow": {
-      "reviewedOn": "2026-10-29",
+      "reviewedOn": "2026-10-31",
       "watches": [
         "aimeat/src/models/workflow-schemas.ts",
         "aimeat/src/mcp/agent-schedules.ts",
         "aimeat/src/services/scheduler.ts",
         "aimeat/src/services/ai/route-plan.ts"
       ],
-      "digest": "sha256:d39d53efdbdc69f7277de2eb"
+      "digest": "sha256:bc5d42b77cfb094adde3e6df"
     },
     "node:aimeat-game-apps": {
       "reviewedOn": "2026-10-25",
@@ -648,8 +648,8 @@
     },
     "node:configure-routing": {
       "aimeat/src/routes/ai.ts": "7628abf3c26aaa19",
-      "aimeat/src/routes/ai-providers.ts": "c228f456946d57d2",
-      "aimeat/src/services/ai/routing.ts": "1d653dd83370f0e8"
+      "aimeat/src/routes/ai-providers.ts": "41e102a20bb078b2",
+      "aimeat/src/services/ai/routing.ts": "3ab2ace7eeab4d80"
     },
     "node:use-app-bound-skills": {
       "aimeat/src/routes/skills.ts": "feaff1af3ffa487c"
@@ -661,7 +661,7 @@
       "aimeat/src/models/workflow-schemas.ts": "dee2fc6f57ab54dc",
       "aimeat/src/mcp/agent-schedules.ts": "e802bccc70a99998",
       "aimeat/src/services/scheduler.ts": "b228800f4b2c4643",
-      "aimeat/src/services/ai/route-plan.ts": "7b7530020363a980"
+      "aimeat/src/services/ai/route-plan.ts": "f2543ca4d87e6281"
     },
     "node:aimeat-game-apps": {
       "aimeat/src/data/library-packs/vendored-creative.ts": "7b36a75cea8da2f1",

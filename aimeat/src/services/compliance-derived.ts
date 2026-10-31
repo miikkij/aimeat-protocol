@@ -23,6 +23,8 @@
  *   processorsView() · transfersOf() · frameworkVerdicts() · EEA
  * @usage const draft = await appRegisterDraft(storage, 'alice', 'crm.html');
  * @version-history
+ *   v1.4.0 — 2026-10-31 — The node's OpenRouter key is one processor per region it can reach (eu, us,
+ *     any; ai/openrouter-region.ts regionsInUse), eu and us with their country.
  *   v1.3.0 — 2026-10-29 — An app gets a register only when someone other than its user can read its
  *     personal data (compliance-app-reach.ts) or it keeps regulated data; other data only its owner
  *     sees is in the node's new `node-user-content` record. On aimeat.io every app that kept
@@ -39,7 +41,8 @@
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { nodeAiProviders } from './ai/providers.js';
+import { nodeAiProviders, NODE_OPENROUTER_ID } from './ai/providers.js';
+import { regionsInUse, REGION_COUNTRY, REGION_HOSTS } from './ai/openrouter-region.js';
 import { readAppDataMap } from './data-map/data-map-store.js';
 import { appAiSignals } from './compliance-app-signals.js';
 import { appReach, type AppReachReading } from './compliance-app-reach.js';
@@ -202,6 +205,20 @@ export function derivedProcessors(config: AimeatConfig): ComplianceProcessor[] {
   const out: ComplianceProcessor[] = [];
   for (const p of nodeAiProviders(config)) {
     if (!p.leaves) continue;
+    // The node's OpenRouter key is one processor per region it can reach, each with its own country
+    // (ai/openrouter-region.ts). `any` keeps the id the single entry had, so what the operator wrote
+    // about it stays attached.
+    if (p.id === NODE_OPENROUTER_ID) {
+      for (const r of regionsInUse(config)) {
+        out.push({
+          id: r === 'any' ? 'ai-node-openrouter' : `ai-node-openrouter-${r}`,
+          name: `This node's OpenRouter key (${REGION_HOSTS[r]})`, service: 'ai', host: REGION_HOSTS[r],
+          ...(r === 'any' ? {} : { country: REGION_COUNTRY[r] }),
+          answerSources: src(r === 'any' ? ['name', 'service', 'host'] : ['name', 'service', 'host', 'country']),
+        });
+      }
+      continue;
+    }
     const host = hostOf(p.baseUrl);
     out.push({ id: `ai-${p.id}`.replace(/[^A-Za-z0-9._-]+/g, '-'), name: p.title || p.id, service: 'ai', ...(host ? { host } : {}), answerSources: src(['name', 'service', 'host']) });
   }
