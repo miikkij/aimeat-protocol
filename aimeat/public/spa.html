@@ -51,14 +51,14 @@
   <!-- __AIMEAT_THEMES__ -->
   <!-- No-flash theme boot: set data-theme on <html> before first paint.
        Plain inline JS (NOT a module — modules defer and reintroduce the flash).
-       Unset key = follow OS until the user makes an explicit choice. -->
+       Unset key = light, AIMEAT's own look (Jouni, v31 K65, 2026-10-31); 'auto' follows the OS. -->
   <script>
     (function () {
       try {
-        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | null
+        var stored = localStorage.getItem('aimeat-theme'); // 'light' | 'dark' | 'auto' | null
         var theme = (stored === 'light' || stored === 'dark')
           ? stored
-          : (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+          : (stored === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = theme;
       } catch (e) {
         document.documentElement.dataset.theme = 'light';
@@ -428,7 +428,8 @@
       function storedMode() {
         var m = get('aimeat-theme');
         if (m === 'light' || m === 'dark') return m;
-        return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        // Light unless the person chose "automatic" (v31 K65).
+        return m === 'auto' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
       }
       function wear(L) {
         if (L.theme && L.theme !== HOUSE) root.setAttribute('data-aimeat-theme', L.theme); else root.removeAttribute('data-aimeat-theme');

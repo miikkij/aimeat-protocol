@@ -14,14 +14,17 @@
  *
  *   IT SETS ATTRIBUTES; IT DECIDES NOTHING ELSE. The login pill (aimeat-auth) owns the theme
  *   and palette CONTROLS and keeps both live after load; this file only covers the gap between
- *   navigation and the pill mounting. Storage-blocked browsers fall back to the OS preference.
+ *   navigation and the pill mounting. With no choice stored, or storage blocked, the page is light;
+ *   the OS preference counts only when the stored choice is 'auto' ("automatic").
  *
  *   No gate lints public/lib JavaScript, so the discipline lives in this header and in
  *   test/e2e-libs.ts, which asserts the file serves, stays synchronous-safe (no top-level
  *   await, no imports) and never touches the network.
- * @structure one IIFE: mode() · pal() · restore from localStorage/OS · storage listener
+ * @structure one IIFE: mode() · pal() · resolve() · restore from localStorage · storage listener
  * @usage  <script src="/lib/aimeat-boot.js"></script>   (in <head>, before any stylesheet paint matters)
  * @version-history
+ *   v0.2.0 — 2026-10-31 — Light unless the person chose: 'light' or 'dark' as stored, the OS's on
+ *     'auto', light otherwise (Jouni, v31 K65: AIMEAT opens in its own light look).
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1): the shell theme-restore IIFE,
  *     served. Same semantics as the inline original in shells.ts.
  */
@@ -44,14 +47,20 @@
   try {
     storedMode = localStorage.getItem('aimeat-theme');
     storedPal = localStorage.getItem('aimeat-palette');
-  } catch (e) { /* storage blocked — the OS preference below still applies */ }
+  } catch (e) { /* storage blocked — the page is light, as with no choice */ }
 
-  mode(storedMode || (typeof matchMedia === 'function'
-    && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+  /** The mode a stored choice means: light or dark as chosen, the OS's on 'auto', else light (Jouni, v31 K65). */
+  function resolve(m) {
+    if (m === 'light' || m === 'dark') return m;
+    return m === 'auto' && typeof matchMedia === 'function'
+      && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  mode(resolve(storedMode));
   pal(storedPal);
 
   addEventListener('storage', function (e) {
-    if (e.key === 'aimeat-theme' && e.newValue) mode(e.newValue);
+    if (e.key === 'aimeat-theme' && e.newValue) mode(resolve(e.newValue));
     if (e.key === 'aimeat-palette' && e.newValue) pal(e.newValue);
   });
 })();

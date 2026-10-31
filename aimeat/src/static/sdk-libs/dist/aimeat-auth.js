@@ -231,23 +231,32 @@
       if (u === "light" || u === "dark") return u;
     } catch {
     }
-    try {
-      var s = localStorage.getItem(AIMEAT_THEME_KEY);
-      if (s === "light" || s === "dark") return s;
-    } catch {
-    }
+    var s = aimeatThemeChoice();
+    if (s === "light" || s === "dark") return s;
     var attr = document.documentElement.dataset.theme;
     if (attr === "light" || attr === "dark") return attr;
+    return s === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function osMode() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
-  function aimeatApplyTheme(t) {
-    document.documentElement.dataset.theme = t;
+  function aimeatThemeChoice() {
+    var s = null;
     try {
-      localStorage.setItem(AIMEAT_THEME_KEY, t);
+      s = localStorage.getItem(AIMEAT_THEME_KEY);
+    } catch {
+    }
+    return s === "light" || s === "dark" || s === "auto" ? s : "";
+  }
+  function aimeatApplyTheme(t) {
+    var shown = t === "auto" ? osMode() : t === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = shown;
+    try {
+      localStorage.setItem(AIMEAT_THEME_KEY, t === "auto" ? "auto" : shown);
     } catch {
     }
     try {
-      window.dispatchEvent(new CustomEvent("aimeat-theme-change", { detail: { theme: t } }));
+      window.dispatchEvent(new CustomEvent("aimeat-theme-change", { detail: { theme: shown, choice: t === "auto" ? "auto" : shown } }));
     } catch {
     }
   }
@@ -278,9 +287,10 @@
     }
   }
   function modeSwitchHtml(i) {
-    var cur = aimeatReadTheme();
+    var cur = aimeatThemeChoice() === "auto" ? "auto" : aimeatReadTheme();
     var light = i.lightMode || "Light mode";
     var dark = i.darkMode || "Dark mode";
+    var auto = i.autoMode || "Automatic: follows your device";
     var fixed = aimeatFixedLight();
     var why = i.fixedRegister || "This register keeps its own light";
     var only = styleOnlyMode();
@@ -293,7 +303,7 @@
     var onlyWord = function(m) {
       return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || "only") + "</span>" : "";
     };
-    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button></span>";
+    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button>" + (fixed || only ? "" : '<button type="button" data-mode="auto" aria-pressed="' + (cur === "auto") + '" title="' + escHtml(auto) + '" aria-label="' + escHtml(auto) + '"><span class="seg-ico" aria-hidden="true">' + escHtml(i.autoShort || "Auto") + "</span></button>") + "</span>";
   }
   function wireModeSwitch(container) {
     var root = container.querySelector("#aimeat-mode-switch");
@@ -316,8 +326,15 @@
         /** @type {CustomEvent} */
         ev
       );
-      if (e && e.detail && e.detail.theme) sync(e.detail.theme);
+      if (e && e.detail && e.detail.theme) sync(aimeatThemeChoice() === "auto" ? "auto" : e.detail.theme);
     });
+    if (window.matchMedia) {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var onOs = function() {
+        if (aimeatThemeChoice() === "auto") aimeatApplyTheme("auto");
+      };
+      if (mq.addEventListener) mq.addEventListener("change", onOs);
+    }
   }
   function ensureAuthPillStyles() {
     if (document.getElementById("aimeat-auth-pill-css")) return;
@@ -628,6 +645,8 @@
       lightMode: "Light mode",
       darkMode: "Dark mode",
       themeLabel: "Light or dark",
+      autoMode: "Automatic: follows your device",
+      autoShort: "Auto",
       fixedRegister: "This register keeps its own light",
       styleLightOnly: "This style has a light mode only",
       styleDarkOnly: "This style has a dark mode only",
@@ -648,6 +667,8 @@
       lightMode: "Vaalea tila",
       darkMode: "Tumma tila",
       themeLabel: "Vaalea vai tumma",
+      autoMode: "Automaattinen: seuraa laitteesi asetusta",
+      autoShort: "Auto",
       fixedRegister: "Tämä rekisteri pitää oman valonsa",
       styleLightOnly: "Tällä tyylillä on vain vaalea tila",
       styleDarkOnly: "Tällä tyylillä on vain tumma tila",
@@ -668,6 +689,8 @@
       lightMode: "Modo claro",
       darkMode: "Modo oscuro",
       themeLabel: "Claro u oscuro",
+      autoMode: "Automático: sigue el ajuste de tu dispositivo",
+      autoShort: "Auto",
       fixedRegister: "Este registro conserva su propia luz",
       styleLightOnly: "Este estilo solo tiene modo claro",
       styleDarkOnly: "Este estilo solo tiene modo oscuro",
