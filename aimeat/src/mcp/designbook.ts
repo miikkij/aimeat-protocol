@@ -10,6 +10,9 @@
  *   import { registerDesignbookTools } from './designbook.js';
  *   registerDesignbookTools(mcp, storage, config, () => agentGaii, caller);
  * @version-history
+ *   2026-10-31 — search and get answer the shared anonymous principal as GET /v1/designbook and
+ *     GET /v1/designbook/:id answer a caller that is not signed in: the published shelf only, and
+ *     NOT_FOUND for a part not published (secaudit2026oct31w2 round 10, W2-3).
  *   2026-10-30 — The node's default kit: aimeat_designbook_kit_default takes `node` (asks the session's
  *     caller().operator(), as PUT /v1/designbook/kits/default asks isOperatorCaller), and
  *     aimeat_designbook_kit takes view "defaults" (GET /v1/designbook/kits/defaults).
@@ -119,7 +122,12 @@ export function registerDesignbookTools(
             }
             return answer(async () => {
             // The reader is named: a kit narrower than the node is listed only inside its reach (kit.ts).
-            const parts = await book.list({ kind, status, q, limit }, { reader: getAgentGaii() });
+            // The shared anonymous principal is not a signed-in reader: it gets the published shelf
+            // and no reader, as GET /v1/designbook answers a caller that is not signed in.
+            const anonymous = isAnonymousPrincipal({ sub: getAgentGaii() });
+            const parts = await book.list(
+                { kind, status: anonymous ? 'published' : status, q, limit },
+                { reader: anonymous ? null : getAgentGaii() });
             return {
                 parts, count: parts.length,
                 note: parts.length
@@ -139,7 +147,16 @@ export function registerDesignbookTools(
         },
         // The reader is named: a component that no longer passes the bench shows its markup and
         // stylesheet only to its proposer, or an agent acting for them (service.ts get).
-        async ({ id }) => answer(() => book.get(id, getAgentGaii())),
+        // A part that is not published is for signed-in readers, and the shared anonymous principal is
+        // not one: it gets NOT_FOUND with the words GET /v1/designbook/:id answers it.
+        async ({ id }) => {
+            if (!isAnonymousPrincipal({ sub: getAgentGaii() })) return answer(() => book.get(id, getAgentGaii()));
+            return answer(async () => {
+                const out = await book.get(id, null);
+                if (out.part.status !== 'published') throw new DesignBookError('NOT_FOUND', 'No published part has this id.');
+                return out;
+            });
+        },
     );
 
     mcp.registerTool(

@@ -33,6 +33,8 @@
  *   v1.3.0 — 2026-10-18 — A change that makes the app really public (listed, open to anyone, no access
  *     code) announces it on the public feed and the board, once (services/app-announce.ts); an app
  *     that was not public at its publish was not announced then (Jouni's ruling, plan doc-mvcn6c7e4e5q).
+ *   2026-10-31 — `screenshot_public` (boolean): the owner shows the screenshot of an app that opens
+ *     for fewer people to everyone; the answer carries it (secaudit2026oct31w2 round 10, W2-12).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppProtection, AppRecord, AppListing } from '../storage/interface.js';
@@ -50,7 +52,7 @@ import { appTarget } from './classification/containers.js';
 export const SETTINGS_PRESENTATION_FIELDS = ['name', 'description', 'descriptions'] as const;
 
 /** How an app is offered: needs the `operate` rung on a delegated app. */
-export const SETTINGS_OFFERING_FIELDS = ['access_code', 'open_to', 'listing', 'parked', 'forkable', 'protection'] as const;
+export const SETTINGS_OFFERING_FIELDS = ['access_code', 'open_to', 'screenshot_public', 'listing', 'parked', 'forkable', 'protection'] as const;
 
 /** The three `listing` values, in the order the catalogue offers them. */
 export const APP_LISTINGS: readonly AppListing[] = ['listed', 'community', 'unlisted'];
@@ -89,6 +91,8 @@ export interface ParsedAppSettings {
     accessCode?: { code: string | undefined };
     /** Present when `access` was in the body: the value to store, null for anyone. */
     access?: { store: string | null };
+    /** Present when `screenshot_public` was in the body: show the screenshot to everyone. */
+    screenshotPublic?: boolean;
     /** From `listing`, or from the older `parked` boolean (true = unlisted, false = listed). */
     listing?: AppListing;
     forkable?: boolean;
@@ -105,6 +109,11 @@ export interface AppSettingsState {
     listing: AppListing;
     /** Who may open it: anyone, signed-in, or organism:<id> (services/app-access.ts). */
     open_to: AppAccess;
+    /**
+     * True when the owner shows the screenshot to everyone. False: the screenshot follows `open_to`
+     * (an app anyone may open shows it to everyone either way).
+     */
+    screenshot_public: boolean;
     /** True for community and unlisted: the app is off every public surface. */
     parked: boolean;
     forkable: boolean;
@@ -169,6 +178,10 @@ export function parseOwnerSettingsInput(
         const parsed = parseAppAccessInput(body.open_to);
         if ('refusal' in parsed) return bad(parsed.refusal);
         settings.access = parsed;
+    }
+    if ('screenshot_public' in body) {
+        if (typeof body.screenshot_public !== 'boolean') return bad('screenshot_public must be a boolean');
+        settings.screenshotPublic = body.screenshot_public;
     }
     if ('listing' in body) {
         if (typeof body.listing !== 'string' || !APP_LISTINGS.includes(body.listing as AppListing)) {
@@ -294,6 +307,14 @@ export async function applyOwnerSettingsUpdate(
                 : 'Only the members of the organism can open the app. Others are asked to sign in, and are refused if they are not members.');
     }
 
+    if (settings.screenshotPublic !== undefined) {
+        await storage.updateAppMeta(ownerGaii, filename, { screenshotPublic: settings.screenshotPublic });
+        await audit('screenshot_public', { on: settings.screenshotPublic });
+        notes.push(settings.screenshotPublic
+            ? 'Everyone sees the app\'s screenshot, also people who cannot open the app.'
+            : 'The app\'s screenshot is shown to the people who can open the app.');
+    }
+
     if (settings.listing !== undefined) {
         await storage.setAppListing(ownerGaii, filename, settings.listing);
         await audit(settings.listing === 'listed' ? 'unparked' : settings.listing === 'community' ? 'community' : 'parked');
@@ -345,6 +366,7 @@ export function appSettingsState(app: AppRecord | null | undefined, filename: st
         protected: !!app?.accessCode,
         listing: appListingOf(app ?? {}),
         open_to: appAccessOf(app),
+        screenshot_public: app?.manifest?.screenshotPublic === true,
         parked: !!app?.parked,
         forkable: !!app?.forkable,
         protection: app?.manifest?.protection ?? null,

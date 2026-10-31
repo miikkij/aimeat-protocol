@@ -20,8 +20,12 @@
  *     that counts (services/workspace-meta.ts), not the first copy the store returned.
  *   v1.4.0 -- 2026-09-29 -- The caller passes a classification reader, which the candidates pass, and
  *     each workspace's read is decided by decideWorkspaceRead, the one decision (TARGET-082).
+ *   2026-10-31 -- A flagged document is left out on an actioned flag or on the organism's auto-hide
+ *     threshold (withoutFlagHiddenMemory), not on one unreviewed flag (`maxFlags: 0`), and a dismissed
+ *     flag stops counting (secaudit2026oct31w2 round 10, W2-9).
  */
 import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
+import { withoutFlagHiddenMemory } from './moderation-flags.js';
 import type { AimeatConfig } from '../config.js';
 import { localAccountOf } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
@@ -78,9 +82,12 @@ export async function searchOrganismContent(
 
   // Indexed full-text candidates, scoped to the organism (or one workspace).
   const keyPrefix = onlyWs ? `organism.${id}.w.${onlyWs}.` : `organism.${id}.w.`;
-  // The classification reader (TARGET-082): a hit this reader may not see is not a candidate.
+  // The classification reader (TARGET-082): a hit this reader may not see is not a candidate. A flag
+  // hides a document on review or on the threshold, not on its own (moderation-flags.ts, W2-9).
+  const found = await storage.searchText(q, { keyPrefix, limit: CANDIDATES, archived: opts.archived });
+  const shownByFlags = new Set(await withoutFlagHiddenMemory({ storage, config }, found.map(h => h.record)));
   const hits = await opts.reader.show(
-    await storage.searchText(q, { keyPrefix, maxFlags: 0, limit: CANDIDATES, archived: opts.archived }),
+    found.filter(h => shownByFlags.has(h.record)),
     h => memoryTarget(h.record.ownerGaii, h.record.key));
 
   // Per-workspace manifest + read-permission cache (resolved once per workspace). The manifest is the
