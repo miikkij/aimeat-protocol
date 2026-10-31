@@ -10801,6 +10801,8 @@
   "notiftext.delegation_bound.body": "You let the app \"{label}\" publish \"{action}\" on your channel and named it only by its file name, so an app of the same name by someone else could have used the permission. From now on only your own app {app} may use it. Its users publish through it as before.",
   "notiftext.approval_goal_model_spend.title": "{who} asks AIMEAT's AI to do the task \"{work}\" at your cost",
   "notiftext.approval_goal_model_spend.body": "{agent} added the task \"{work}\" to your goal \"{goal}\" for AIMEAT's AI. {agent} may not use your AI itself, so the cost of the task waits for you. If you allow it, the AI does this task and the AI tasks {agent} adds to this goal later. If you do not, this task is not done.",
+  "notiftext.approval_living_ai_spend.title": "{who} set up a living document that would use your AI",
+  "notiftext.approval_living_ai_spend.body": "{writer} set up the living document \"{document}\". It updates itself with your AI, and you pay for it from your own key or your AI allowance. {writer} may not use your AI itself, so the update waits for you. If you allow it, the document updates itself on its schedule. If you do not, the AI does not update it and nothing is spent.",
   "notiftext.approval_refinery_definition.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
   "notiftext.approval_refinery_definition.body": "The mail refinery gets your email and saves the messages in a workspace. After the change, it reads the mailbox {mailbox} and saves each message in the workspace {workspace}. {who} may not make this change alone, so the change waits for your approval. If you do not allow it, nothing changes.",
   "notiftext.approval_refinery_definition_text.title": "{who} asks to change where your mail refinery {refinery} gets and saves your mail",
@@ -27106,6 +27108,17 @@
         "high": "This task is not done. Nothing is spent.",
         "tipLabel": "When to allow",
         "tip": "Allow if you want the goal to go on with this task. If the agent may always use your AI, give it that permission on the agent's page, and then it no longer asks."
+      },
+      "approval_living_ai_spend": {
+        "title": "A living document would update itself at your cost",
+        "short": "An agent or an app set up a living document that your AI would update, paid from your own key or your AI allowance.",
+        "what": "A living document updates its sections on a schedule with your AI. You pay for each update, from your own key or from your AI allowance. The agent or app that set up this document does not have the permission to use your AI, so it cannot spend your money alone. That is why you are asked.",
+        "lowLabel": "If you allow",
+        "low": "The document updates itself on its schedule, at your cost.",
+        "highLabel": "If you do not allow",
+        "high": "The AI does not update the document. Nothing is spent.",
+        "tipLabel": "When to allow",
+        "tip": "Allow if you want this document to stay current. If the agent or app may always use your AI, give it that permission, and then it no longer asks."
       },
       "approval_schedule_instruction": {
         "title": "Someone changed a scheduled task",

@@ -2031,6 +2031,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/services/living-pulse-spend.ts": {
+      "reads": {
+        "getMemory": 2
+      },
+      "why": "Written 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned record living-spend-hold.<config key> that holds the owner's answer, and whether the living config named by an approved request still exists. Nothing of either is shown to anyone or sent to a model."
+    },
     "src/services/mail-read-consent.ts": {
       "reads": {
         "getMemory": 2,

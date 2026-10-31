@@ -10995,6 +10995,8 @@
   "notiftext.delegation_bound.body": "Annoit sovellukselle \"{label}\" luvan julkaista kanavallasi (\"{action}\") ja nimesit sen vain tiedostonimellä. Siksi joku muu olisi voinut käyttää lupaa samannimisellä sovelluksella. Tästä eteenpäin lupaa voi käyttää vain oma sovelluksesi {app}. Sen käyttäjät julkaisevat sillä kuten ennenkin.",
   "notiftext.approval_goal_model_spend.title": "{who} pyytää, että AIMEATin tekoäly tekee tehtävän ”{work}” sinun kustannuksellasi",
   "notiftext.approval_goal_model_spend.body": "{agent} lisäsi tavoitteeseesi ”{goal}” tehtävän ”{work}” AIMEATin tekoälylle. {agent} ei itse saa käyttää tekoälyäsi, joten tehtävän kulu odottaa sinun päätöstäsi. Jos sallit, tekoäly tekee tämän tehtävän ja ne tekoälytehtävät, jotka {agent} lisää tähän tavoitteeseen myöhemmin. Jos et salli, tätä tehtävää ei tehdä.",
+  "notiftext.approval_living_ai_spend.title": "{who} loi elävän dokumentin, joka käyttäisi tekoälyäsi",
+  "notiftext.approval_living_ai_spend.body": "{writer} loi elävän dokumentin ”{document}”. Dokumentti päivittyy tekoälysi avulla, ja sinä maksat sen omalla avaimellasi tai tekoälysaldostasi. {writer} ei itse saa käyttää tekoälyäsi, joten päivitys odottaa sinun päätöstäsi. Jos sallit, dokumentti päivittyy aikataulunsa mukaan. Jos et salli, tekoäly ei päivitä sitä, eikä rahaa kulu.",
   "notiftext.approval_refinery_definition.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
   "notiftext.approval_refinery_definition.body": "Postinjalostamo hakee sähköpostisi ja tallentaa viestit työtilaan. Muutoksen jälkeen se lukee postilaatikkoa {mailbox} ja tallentaa jokaisen viestin työtilaan {workspace}. {who} ei saa tehdä tätä muutosta yksin, joten muutos odottaa hyväksyntääsi. Jos et salli, mikään ei muutu.",
   "notiftext.approval_refinery_definition_text.title": "{who} pyytää lupaa muuttaa, mistä postinjalostamo {refinery} hakee postisi ja minne se tallentaa sen",
@@ -27285,6 +27287,17 @@
         "high": "Tätä tehtävää ei tehdä, eikä rahaa kulu.",
         "tipLabel": "Milloin kannattaa sallia",
         "tip": "Salli, jos haluat tavoitteen jatkuvan tällä tehtävällä. Jos agentti saa aina käyttää tekoälyäsi, anna sille tämä lupa agentin sivulla. Silloin se ei enää kysy."
+      },
+      "approval_living_ai_spend": {
+        "title": "Elävä dokumentti päivittäisi itsensä sinun kustannuksellasi",
+        "short": "Agentti tai sovellus loi elävän dokumentin, jonka tekoälysi päivittäisi. Kulu maksetaan omalla avaimellasi tai tekoälysaldostasi.",
+        "what": "Elävä dokumentti päivittää osionsa aikataulun mukaan tekoälysi avulla. Sinä maksat jokaisen päivityksen omalla avaimellasi tai tekoälysaldostasi. Agentilla tai sovelluksella, joka loi dokumentin, ei ole lupaa käyttää tekoälyäsi, joten se ei voi käyttää rahojasi yksin. Siksi sinulta kysytään.",
+        "lowLabel": "Jos sallit",
+        "low": "Dokumentti päivittyy aikataulunsa mukaan. Sinä maksat päivitykset.",
+        "highLabel": "Jos et salli",
+        "high": "Tekoäly ei päivitä dokumenttia, eikä rahaa kulu.",
+        "tipLabel": "Milloin kannattaa sallia",
+        "tip": "Salli, jos haluat dokumentin pysyvän ajan tasalla. Jos agentti tai sovellus saa aina käyttää tekoälyäsi, anna sille tämä lupa. Silloin se ei enää kysy."
       },
       "approval_schedule_instruction": {
         "title": "Joku muutti ajastusta",
