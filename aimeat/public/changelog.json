@@ -4,6 +4,29 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-rules-for-ai-pictures-and-videos",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "operator"
+      ],
+      "title": {
+        "en": "Rules for AI pictures and videos",
+        "fi": "Säännöt tekoälyn kuville ja videoille"
+      },
+      "summary": {
+        "en": "Switch on a rule so people in AI pictures and videos appear only as art, never like a real person's photo.",
+        "fi": "Kytke päälle sääntö, jolla tekoälyn kuvien ja videoiden ihmiset näkyvät vain taiteena, eivät valokuvana."
+      },
+      "body": {
+        "en": "Switch on a rule so people in AI pictures and videos appear only as art, never like a photograph of a real person; agents get the same rule for tools they use elsewhere. You find it on the AI page in Settings & Controls, and your AI can switch it for you. The people who run your AIMEAT can turn a rule on for everyone or require it.",
+        "fi": "Kytke päälle sääntö, jolla tekoälyn kuvien ja videoiden ihmiset näkyvät vain taiteena, eivät koskaan valokuvalta oikeasta ihmisestä; agentit saavat saman säännön muihin työkaluihin. Löydät sen Asetusten tekoälysivulta, ja tekoälysi voi kytkeä sen puolestasi. AIMEATisi ylläpito voi laittaa säännön päälle kaikille tai vaatia sitä."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-ask-the-chat-for-an-app-and-get-its-address-in-the-same-message",
       "highlight": true,
       "audience": [
