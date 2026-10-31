@@ -14,6 +14,9 @@
  *   // … the share gate …
  *   const docs = await found.release(readerFor({ storage, config }, req.auth));
  * @version-history
+ *   2026-11-01 — A page's or a record's id is read from the end of its key (spaceRowAt), so one whose
+ *     id holds a dot is in the public share and the member read under its whole id; it was skipped
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.5.0 — 2026-10-16 — Moved from routes/organisms/shared-public.ts unchanged, so the share's
  *     decision can be asked from a service and an MCP tool too (services/share-provenance.ts, the
  *     compliance counts); a service may not import a route.
@@ -39,6 +42,7 @@ import { logger } from '../utils/logger.js';
 import { isDocPublicAt } from './workspace-share.js';
 import { findWorkspaceRecord } from './workspace-write.js';
 import { isHtmlPageValue } from './html-page.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 import type { ResolvedShare, PublicDoc, PublicRecord } from '../routes/organisms/share-types.js';
 
 /** What a public read found, held until the share's access gate has admitted the caller. */
@@ -101,6 +105,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
     if (!manifest) return pending([], id, ws, (f: { doc: PublicDoc; rec: MemoryRecord }) => f.doc);
     const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
     const root = `organism.${id}.w.${ws}`;
+    const prefixes = spacePrefixesOf(root, objectTypes);
     const found: Array<{ doc: PublicDoc; rec: MemoryRecord }> = [];
     for (const ot of objectTypes) {
       const name = typeof ot.name === 'string' ? ot.name : undefined;
@@ -119,10 +124,11 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
       const nsPrefix = `${root}.${namespace}.`;
       const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
       for (const r of items) {
-        if (!r.key.startsWith(nsPrefix)) continue;
-        const parts = r.key.slice(nsPrefix.length).split('.');
-        const docId = parts[0];
-        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
+        // The id is read from the end of the key, so a page whose id holds a dot is served under
+        // its whole id (secaudit2026oct31w2 round 10b).
+        const row = spaceRowAt(r.key, nsPrefix, prefixes);
+        if (row?.copy !== 'latest') continue;   // only published
+        const docId = row.id;
         if (!isDocPublic(share, name, docId)) continue;
         found.push({ rec: r, doc: toPublicDoc(name, namespace, docId, r) });
       }
@@ -141,6 +147,7 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
     if (!manifest) return [];
     const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
     const root = `organism.${id}.w.${ws}`;
+    const prefixes = spacePrefixesOf(root, objectTypes);
     const out: Array<{ out: PublicRecord; rec: MemoryRecord }> = [];
     for (const ot of objectTypes) {
       const name = typeof ot.name === 'string' ? ot.name : undefined;
@@ -150,11 +157,9 @@ export function createPublicCollectors(storage: Storage, config: AimeatConfig) {
       const nsPrefix = `${root}.${namespace}.`;
       const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
       for (const r of items) {
-        if (!r.key.startsWith(nsPrefix)) continue;
-        const parts = r.key.slice(nsPrefix.length).split('.');
-        const recId = parts[0];
-        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        out.push({ rec: r, out: { type: name, id: recId, value: r.value ?? null, aiProvenanceId: r.aiProvenanceId ?? null } });
+        const row = spaceRowAt(r.key, nsPrefix, prefixes);
+        if (row?.copy !== 'latest') continue;   // only published
+        out.push({ rec: r, out: { type: name, id: row.id, value: r.value ?? null, aiProvenanceId: r.aiProvenanceId ?? null } });
       }
     }
     return out;

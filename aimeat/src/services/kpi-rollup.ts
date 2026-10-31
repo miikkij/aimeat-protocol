@@ -21,8 +21,11 @@
  *   v1.0.0 — 2026-06-23 — Initial: sum/count/avg/min/max over a space's published records, with an
  *     optional structured equality filter { field, value }. Workspace-local (source.space resolves
  *     within the same workspace); org-level / cross-workspace sources are deferred.
+ *   2026-11-01 — A record's id is read from the end of its key (spaceRowAt), so a record whose id
+ *     holds a dot is aggregated under its whole id; it was left out (secaudit2026oct31w2 round 10b).
  */
 import type { MemoryRecord } from '../storage/interface.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 
 export type KpiAgg = 'sum' | 'count' | 'avg' | 'min' | 'max';
 
@@ -70,15 +73,15 @@ export function evaluateRecordsKpi(
 
   // Collapse to published instances: prefer `.latest`, else a bare write; ignore `.draft` + `.version.N`.
   const nsPrefix = `${root}.${namespace}.`;
+  const prefixes = spacePrefixesOf(root, objectTypes);
   const current = new Map<string, MemoryRecord>();
   for (const r of records) {
-    if (!r.key.startsWith(nsPrefix)) continue;
-    const rest = r.key.slice(nsPrefix.length).split('.');
-    const id = rest[0];
-    const role = rest.slice(1).join('.');
-    if (role !== '' && role !== 'latest') continue;   // draft / version.N → not the published value
-    const prev = current.get(id);
-    if (!prev || role === 'latest') current.set(id, r);
+    // The id is read from the end of the key (spaceRowAt), so a record whose id holds a dot counts
+    // once under its whole id (secaudit2026oct31w2 round 10b).
+    const row = spaceRowAt(r.key, nsPrefix, prefixes);
+    if (row?.copy !== 'bare' && row?.copy !== 'latest') continue;   // draft / version.N → not the published value
+    const prev = current.get(row.id);
+    if (!prev || row.copy === 'latest') current.set(row.id, r);
   }
 
   const rows = [...current.values()]

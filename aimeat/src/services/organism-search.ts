@@ -23,6 +23,8 @@
  *   2026-10-31 -- A flagged document is left out on an actioned flag or on the organism's auto-hide
  *     threshold (withoutFlagHiddenMemory), not on one unreviewed flag (`maxFlags: 0`), and a dismissed
  *     flag stops counting (secaudit2026oct31w2 round 10, W2-9).
+ *   2026-11-01 -- A hit's record id is read from the end of its key (recordRowAt), so a hit in a record
+ *     whose id holds a dot names its whole id (secaudit2026oct31w2 round 10b, dotted record ids).
  */
 import type { ArchiveFilter, Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import { withoutFlagHiddenMemory } from './moderation-flags.js';
@@ -32,6 +34,7 @@ import { workspaceMetaReader } from './workspace-meta.js';
 import { decideWorkspaceRead } from './workspace-access.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { recordRowAt } from './workspace-record-key.js';
 
 export interface OrganismSearchHit {
   ws: string;
@@ -136,11 +139,13 @@ export async function searchOrganismContent(
     if (!meta || !meta.canRead) continue;
     const ot = meta.types.find(t => parsed.rest.startsWith(t.ns + '.'));
     if (!ot) continue;
-    const tail = parsed.rest.slice(ot.ns.length + 1);
-    const dot = tail.indexOf('.');
-    const instanceId = dot < 0 ? tail : tail.slice(0, dot);
-    const role = dot < 0 ? '' : tail.slice(dot + 1);
-    if (role === 'draft' || role.startsWith('version.')) continue;
+    // The id is read from the end of the key (recordRowAt), so a hit in a record whose id holds a dot
+    // names its whole id; split on the first dot it named a record that does not exist
+    // (secaudit2026oct31w2 round 10b).
+    const row = recordRowAt(parsed.rest.slice(ot.ns.length + 1));
+    if (!row || row.copy === 'draft' || row.copy === 'version') continue;
+    const instanceId = row.id;
+    const role = row.copy === 'latest' ? 'latest' : '';
     const k = `${parsed.ws}/${ot.name}/${instanceId}`;
     const prev = byInstance.get(k);
     // Prefer latest over bare; otherwise keep the higher-scoring hit.

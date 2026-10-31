@@ -53,6 +53,9 @@
  *     workspace loader: the read is decided by decideWorkspaceRead (membership and managers included)
  *     and the records pass the caller's classification reader, which every overview now takes
  *     (TARGET-082). A non-member's summary is the name the caller already had.
+ *   2026-11-01 — collectWorkspaceSummary reads a record's id from the end of its key (spaceRowAt), so
+ *     a record whose id holds a dot is listed and counted under its whole id; it was left out
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -61,6 +64,7 @@ import { isMemoryBackedSpace } from './workspace-meta.js';
 import { loadWorkspaceContent } from './workspace-content.js';
 import type { ContentReader } from './classification/reader.js';
 import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
+import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
@@ -198,6 +202,7 @@ export async function collectWorkspaceSummary(
   summary.readable = got.canRead;
   if (!got.canRead) return summary;
   const items = got.items;
+  const prefixes = spacePrefixesOf(root, manifest?.objectTypes);
 
   for (const ot of manifest?.objectTypes ?? []) {
     const name = typeof ot.name === 'string' ? ot.name : undefined;
@@ -210,14 +215,13 @@ export async function collectWorkspaceSummary(
     const nsPrefix = `${root}.${namespace}.`;
     const current = new Map<string, MemoryRecord>();
     for (const r of items) {
-      if (!r.key.startsWith(nsPrefix)) continue;
-      const rest = r.key.slice(nsPrefix.length).split('.');
-      const id = rest[0];
-      const role = rest.slice(1).join('.');
-      if (role === '' || role === 'latest') {
-        const prev = current.get(id);
+      // The id is read from the end of the key (spaceRowAt), so a record whose id holds a dot is in
+      // the overview under its whole id (secaudit2026oct31w2 round 10b).
+      const row = spaceRowAt(r.key, nsPrefix, prefixes);
+      if (row?.copy === 'bare' || row?.copy === 'latest') {
+        const prev = current.get(row.id);
         // Prefer a `.latest` over a bare write; otherwise keep what we have.
-        if (!prev || role === 'latest') current.set(id, r);
+        if (!prev || row.copy === 'latest') current.set(row.id, r);
       }
     }
 
