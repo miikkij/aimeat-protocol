@@ -424,6 +424,98 @@ await test('OWNER -> OWN AGENT (same owner, same node) ALSO pushes deliver{dm.in
   await t.close();
 });
 
+// ─── A DM to an agent that may not read messages (secaudit2026oct31w2 round 10, W2-13) ───
+// The developer's ruling 2 of 2026-10-31: an identity without messages:read gets the arrival notice
+// without the subject, the sender or a preview; the owner gets one question with Allow and Don't
+// allow; after Allow the agent gets whole deliveries. An agent holding the word sees no change.
+console.log('\nPhase 6 — A DM to an agent without messages:read (ruling 2, 2026-10-31)');
+let quiet: { gaii: string; priv: string; token: string; name: string } | null = null;
+await test('6a. The agent without messages:read gets an arrival notice without subject, sender or preview', async () => {
+  const name = 'recquiet';
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth(A.token),
+    body: JSON.stringify({ name, owner: A.name, capabilities: ['memory'], scopes: ['memory:read'] }),
+  });
+  assert(reg.status === 201, `register agent ${reg.status}: ${JSON.stringify(reg.body)}`);
+  const gaii = reg.body.data.agent.gaii as string;
+  const priv = reg.body.data.private_key as string;
+  quiet = { gaii, priv, name, token: await agentToken(gaii, priv) };
+  const t = await TunnelClient.connect(BASE, quiet.token);
+  await t.waitForBacklog(1000);
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: auth(B.token),
+    body: JSON.stringify({ to: gaii, body: 'Salainen sisalto', subject: 'Salainen otsikko' }),
+  });
+  assert(send.status === 201, `dm send ${send.status}: ${JSON.stringify(send.body)}`);
+  const d = await t.waitForDeliver(3000);
+  await t.close();
+  assert(d !== null && d.kind === 'dm.inbound', `expected a dm.inbound arrival notice, got ${JSON.stringify(d)}`);
+  const p = d!.payload as any;
+  assert(p?.id === send.body.data.message.id, `message id ${p?.id}`);
+  assert(p?.subject === undefined && p?.senderGhii === undefined && p?.preview === undefined && p?.conversationId === undefined,
+    `the notice carried the message: ${JSON.stringify(p)}`);
+  assert(p?.readable === false && JSON.stringify(p?.needs) === '["messages:read"]', `not marked unreadable: ${JSON.stringify(p)}`);
+});
+
+await test('6b. The REST read of the same inbox refuses that agent (the push now answers the same)', async () => {
+  assert(!!quiet, 'agent from 6a');
+  const r = await json('/v1/messages/agent-inbox', { headers: auth(quiet!.token) });
+  assert(r.status === 403, `agent-inbox ${r.status}`);
+});
+
+await test('6c. The owner is asked once, in plain words, with Allow and Don\'t allow', async () => {
+  let asks: any[] = [];
+  for (let i = 0; i < 40 && asks.length === 0; i++) {
+    const n = await json('/v1/notifications', { headers: auth(A.token) });
+    asks = (n.body?.data?.notifications ?? []).filter((x: any) => x.type === 'agent_permission_ask' && x.i18n?.key === 'agent_permission_ask_dm');
+    if (asks.length === 0) await new Promise(r => setTimeout(r, 100));
+  }
+  assert(asks.length === 1, `expected one message-read question, got ${asks.length}`);
+  const ask = asks[0];
+  assert(/received a message it cannot read/.test(ask.title), `title: ${ask.title}`);
+  assert(!/Salainen/.test(JSON.stringify(ask)), 'the question repeated the message');
+  assert(ask.actions?.some((a: any) => a.id === 'allow' && a.endpoint === `/v1/agents/${quiet!.name}/allow` && JSON.stringify(a.body?.scopes) === '["messages:read"]'), `no Allow: ${JSON.stringify(ask.actions)}`);
+  assert(ask.actions?.some((a: any) => a.id === 'deny' && a.endpoint === `/v1/agents/${quiet!.name}/refusals/decline`), `no Don't allow: ${JSON.stringify(ask.actions)}`);
+  // The agent's card shows the request as open until the owner answers.
+  const list = await json('/v1/agents', { headers: auth(A.token) });
+  const row = (list.body?.data?.agents ?? []).find((x: any) => x.name === quiet!.name);
+  assert((row?.refusals ?? []).some((r: any) => JSON.stringify(r.needed) === '["messages:read"]'), `no open request on the card: ${JSON.stringify(row?.refusals)}`);
+});
+
+await test('6d. After Allow the agent gets the whole delivery', async () => {
+  assert(!!quiet, 'agent from 6a');
+  const allow = await json(`/v1/agents/${quiet!.name}/allow`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ scopes: ['messages:read'] }) });
+  assert(allow.status === 200 && JSON.stringify(allow.body.data.added) === '["messages:read"]', `allow ${allow.status} ${JSON.stringify(allow.body)}`);
+  const t = await TunnelClient.connect(BASE, await agentToken(quiet!.gaii, quiet!.priv));
+  await t.waitForBacklog(1000);
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: auth(B.token),
+    body: JSON.stringify({ to: quiet!.gaii, body: 'Nyt saa lukea', subject: 'Luettava' }),
+  });
+  assert(send.status === 201, `dm send ${send.status}`);
+  const d = await t.waitForDeliver(3000);
+  await t.close();
+  const p = d?.payload as any;
+  assert(d?.kind === 'dm.inbound' && p?.subject === 'Luettava' && p?.senderGhii === `${B.name}@${NODE_ID}` && typeof p?.preview === 'string',
+    `not whole after Allow: ${JSON.stringify(d)}`);
+  assert(p?.readable === undefined, 'a whole delivery is not marked unreadable');
+});
+
+await test('6e. An agent holding every word gets the same whole payload as before', async () => {
+  const t = await TunnelClient.connect(BASE, aAgent.token);
+  await t.waitForBacklog(1000);
+  const send = await json('/v1/messages', {
+    method: 'POST', headers: auth(B.token),
+    body: JSON.stringify({ to: aAgent.gaii, body: 'Tavallinen viesti', subject: 'Ennallaan' }),
+  });
+  assert(send.status === 201, `dm send ${send.status}`);
+  const d = await t.waitForDeliver(3000);
+  await t.close();
+  const p = d?.payload as any;
+  assert(p?.subject === 'Ennallaan' && p?.conversationId === send.body.data.message.conversationId && p?.readable === undefined,
+    `payload changed: ${JSON.stringify(p)}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 await test('Cascade-delete owners', async () => {
