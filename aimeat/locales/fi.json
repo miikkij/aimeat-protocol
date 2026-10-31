@@ -15398,6 +15398,19 @@
     "profilePasteSaved": "Tallennettu. Profiilisivusi on valmis.",
     "profileAnswersSaved": "Tallensimme haastattelun vastauksesi niin, että vain sinä näet ne."
   },
+  "siteStart": {
+    "title": "Tämä on oma AIMEATisi {host}",
+    "signInNote": "Kirjaudu sisään sähköpostilinkillä. Kirjoita osoite, jolla ostit AIMEATin. Lähetämme siihen linkin, joka kirjaa sinut sisään ilman salasanaa.",
+    "signInLabel": "Kirjaudu sisään",
+    "emailField": "Sähköpostiosoitteesi",
+    "sendLink": "Lähetä kirjautumislinkki",
+    "linkSent": "Jos osoitteella on täällä tili, linkki on matkalla. Avaa se sähköpostistasi. Linkki toimii kerran ja 15 minuutin ajan.",
+    "linkFailed": "Linkkiä ei voitu lähettää juuri nyt. Yritä hetken päästä uudelleen.",
+    "signedInNote": "Olet kirjautunut sisään.",
+    "openHome": "Avaa oma Koti",
+    "contentLabel": "Tämä sivu",
+    "contentNote": "Voit vaihtaa tämän sivuston sisällön suoraan hallinnasta:"
+  },
   "home": {
     "welcome": "Tervetuloa uuteen kotiisi.",
     "buyerWelcome": {

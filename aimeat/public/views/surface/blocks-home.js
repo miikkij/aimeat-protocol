@@ -318,7 +318,8 @@ export function InstallCtaBlock() {
  */
 export function OwnAimeatBlock() {
   const store = storeHref();
-  if (!store) return null;
+  // A node the store sold IS the buyer's own AIMEAT: telling them it is a demo is wrong there (v27 P3).
+  if (!store || customerNode()) return null;
   return html`
     <${OwnAimeat} href=${store}
       label=${tr('home.ownAimeat.label', 'Demo')}

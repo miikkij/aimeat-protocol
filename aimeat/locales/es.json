@@ -13545,6 +13545,19 @@
     "profilePasteSaved": "Guardado. Tu página de perfil está lista.",
     "profileAnswersSaved": "Guardamos tus respuestas de la entrevista donde solo tú puedes verlas."
   },
+  "siteStart": {
+    "title": "Este es tu propio AIMEAT, {host}",
+    "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",
+    "signInLabel": "Entrar",
+    "emailField": "Tu dirección de correo",
+    "sendLink": "Enviar el enlace de acceso",
+    "linkSent": "Si esta dirección tiene una cuenta aquí, el enlace va de camino. Ábrelo desde tu correo. Sirve una vez y durante 15 minutos.",
+    "linkFailed": "No se pudo enviar el enlace ahora. Vuelve a intentarlo dentro de un momento.",
+    "signedInNote": "Has entrado.",
+    "openHome": "Abrir tu Inicio",
+    "contentLabel": "Esta página",
+    "contentNote": "Puedes cambiar el contenido de este sitio directamente en la administración:"
+  },
   "home": {
     "welcome": "Te damos la bienvenida a tu nuevo hogar.",
     "buyerWelcome": {
