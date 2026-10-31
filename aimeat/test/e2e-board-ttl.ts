@@ -17,6 +17,9 @@
  *   v1.4.0 -- 2026-08-30 -- Test 35 turned around: any account opens a public board (35), up to the
  *     node's count (35b); system boards stay the operator's. Phase 10: the board's own rules (41),
  *     a notice extended and taken down (42), the poster's standing on the listing (43).
+ *   2026-10-31 -- Test 40: three more people report after the five reports of two people, because one
+ *     person and their own agents count once toward the hide (secaudit2026oct31w2 round 10, W2-8).
+ *     The assertions are unchanged.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=board-ttl
 
@@ -950,6 +953,18 @@ await test('40. Five reports hide a public post from everyone but its author and
             body: JSON.stringify({ targetType: 'board_post', targetId: hiddenId, reason: 'spam' }),
         });
         assert(status === 201, `report ${i + 1}: ${status} ${JSON.stringify(body)}`);
+    }
+    // The five reports above come from two people (each owner with their own agents), and one person
+    // and their agents count once toward the hide (secaudit2026oct31w2 round 10, W2-8). Three more
+    // people report, so five people have reported.
+    for (let i = 0; i < 3; i++) {
+        const token = (await registerOwner(BASE, `bd-report-${i}-${Date.now()}`)).token;
+        const { status, body } = await json('/v1/flags', {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ targetType: 'board_post', targetId: hiddenId, reason: 'spam' }),
+        });
+        assert(status === 201, `report by person ${i + 3}: ${status} ${JSON.stringify(body)}`);
     }
     const { body: anonList } = await json(`/v1/boards/${publicBoardId}/posts?limit=100`);
     assert(!anonList.data.posts.some((p: any) => p.id === hiddenId), 'a stranger still sees the hidden post in the listing');

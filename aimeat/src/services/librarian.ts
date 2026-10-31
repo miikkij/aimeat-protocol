@@ -41,6 +41,9 @@
  *     that organism's records as snippets here while the key route answered 403 (secaudit 2026-10,
  *     the v57 shape). The records it drops are not counted in `omitted`, because memory:read-as-owner
  *     would not show them.
+ *   2026-10-31 — A flagged record is left out on an actioned flag or on the auto-hide threshold
+ *     (withoutFlagHiddenMemory), not on one unreviewed flag (`maxFlags: 0`), and a dismissed flag
+ *     stops counting (secaudit2026oct31w2 round 10, W2-9).
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -50,6 +53,7 @@ import { ownDoorRefusal } from '../utils/own-door-keys.js';
 import { organismKeysCarried } from './group-shares-classification.js';
 import { ownerScopeView } from './owner-scope-read.js';
 import { organismReadableRecords, type OrganismListCaller } from './organism-namespace-access.js';
+import { withoutFlagHiddenMemory } from './moderation-flags.js';
 
 export interface LibrarianHit {
   key: string;
@@ -184,7 +188,7 @@ export async function librarianSearch(
   let raw;
   let ownersSearched: number;
   if (opts.scope === 'public') {
-    raw = await storage.searchText(opts.query, { visibility: 'public', keyPrefix: opts.keyPrefix, limit, maxFlags: 0 });
+    raw = await storage.searchText(opts.query, { visibility: 'public', keyPrefix: opts.keyPrefix, limit });
     ownersSearched = -1;   // public: the whole node, not a counted owner set
   } else {
     let ownerGaiis: string[];
@@ -198,9 +202,12 @@ export async function librarianSearch(
     } else {
       ownerGaiis = [opts.viewerGaii];
     }
-    raw = await storage.searchText(opts.query, { ownerGaiis, keyPrefix: opts.keyPrefix, limit, maxFlags: 0 });
+    raw = await storage.searchText(opts.query, { ownerGaiis, keyPrefix: opts.keyPrefix, limit });
     ownersSearched = ownerGaiis.length;
   }
+  // A flag hides a record on review or on the threshold, not on its own (moderation-flags.ts, W2-9).
+  const shownByFlags = new Set(await withoutFlagHiddenMemory({ storage, config }, raw.map(h => h.record)));
+  raw = raw.filter(h => shownByFlags.has(h.record));
 
   // ONE CAPABILITY, ONE DOOR: a Design Book part is public, and it is found and read through the
   // Design Book (its search, and GET /v1/designbook/:id), so no hit here is one.
