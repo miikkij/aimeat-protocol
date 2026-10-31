@@ -33,6 +33,9 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-10-31 — Over https a sign-in round's cookie is one a same-site page cannot write: the binding
+ *     value under the plain name seals nothing, at the owner's start and at the confirmation of an
+ *     agent's round, and the owner's own browser finishes both (secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-27 — Phase 5: an app holding work:request and mcp:use invokes a capability over a remote
  *     tool, and a grant for app:{owner}/{file} narrows it on the invoke route as on the direct call
  *     (secaudit2026oct26, capability-invoke.ts:mcp-source:app-grant-caller-misses-app-narrowing).
@@ -761,6 +764,84 @@ await test('an agent\'s sign-in waits for the owner to confirm it in their own b
   assert(!!signedIn.credential && !JSON.stringify(signedIn).includes('e2e-oauth-token'), 'the confirmed sign-in sealed no credential');
 
   const removed = await json('/v1/mcp-servers/agentround', { method: 'DELETE', headers: ownerAuth() });
+  assert(removed.status === 200, `clean up: ${removed.status}`);
+});
+
+// secaudit2026oct31w2 W2-19: over https the round cookie is the __Host- one, which an app,
+// portfolio or company page on a sibling host cannot write for the apex. The requests come as
+// through the node's https proxy (X-Forwarded-Proto: https).
+const HTTPS = { 'X-Forwarded-Proto': 'https' };
+/** Every round cookie a response set, as `name=value` pairs, whatever the name's prefix. */
+const roundJar = (res: Response): string[] => res.headers.getSetCookie().map(c => c.split(';')[0]!).filter(p => p.includes('aimeat_oauth_') && !p.endsWith('='));
+const plainRoundName = (state: string) => `aimeat_oauth_${createHash('sha256').update(state).digest('hex').slice(0, 16)}`;
+const httpsMcpCallback = (state: string, cookie: string) => fetch(`${BASE}/v1/mcp-servers/callback?state=${encodeURIComponent(state)}&code=e2e-code`, {
+  redirect: 'manual', headers: { ...HTTPS, Cookie: cookie },
+});
+
+await test('over https: the binding value under the plain cookie name seals nothing; the owner\'s own browser finishes', async () => {
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'hostround', url: `${OAUTH_BASE}/mcp`, auth: 'oauth' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}: ${JSON.stringify(attached.body)}`);
+  const id = attached.body.data.server.id as string;
+  const start = () => fetch(`${BASE}/v1/mcp-servers/hostround/authorize`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json', ...BROWSER_START, ...HTTPS, Authorization: `Bearer ${ownerToken}` }, body: '{}',
+  });
+  const first = await start();
+  const firstBody = await first.json() as any;
+  const jar = roundJar(first);
+  assert(first.status === 200 && jar.length > 0, `https authorize: ${first.status} ${JSON.stringify(firstBody).slice(0, 200)}`);
+  const value = jar[0]!.slice(jar[0]!.indexOf('=') + 1);
+  const planted = await httpsMcpCallback(firstBody.data.state, `${plainRoundName(firstBody.data.state)}=${value}`);
+  await planted.arrayBuffer();
+  assert(planted.status === 403, `SECURITY: a plain-name cookie finished an https round: ${planted.status}`);
+  assert(!(await storedServer(id))?.credential, 'a credential was sealed for the planted cookie');
+
+  const mine = await start();
+  const mineBody = await mine.json() as any;
+  const ok = await httpsMcpCallback(mineBody.data.state, roundJar(mine).join('; '));
+  assert(ok.status === 200, `usage: the owner's own https sign-in: ${ok.status} ${(await ok.text()).slice(0, 200)}`);
+  assert(!!(await storedServer(id))?.credential, 'usage: the owner\'s own https sign-in sealed nothing');
+
+  const removed = await json('/v1/mcp-servers/hostround', { method: 'DELETE', headers: ownerAuth() });
+  assert(removed.status === 200, `clean up: ${removed.status}`);
+});
+
+await test('over https: an agent\'s round the owner confirmed finishes with the owner\'s cookie, and not with the plain name', async () => {
+  const attached = await json('/v1/mcp-servers', {
+    method: 'POST', headers: ownerAuth(),
+    body: JSON.stringify({ name: 'hostagentround', url: `${OAUTH_BASE}/mcp`, auth: 'oauth' }),
+  });
+  assert(attached.status === 201, `attach: ${attached.status}`);
+  const manager = await agentWithScopes({ name: ownerName, token: ownerToken }, 'mcphostsignin', ['mcp:read', 'mcp:manage']);
+  const confirmed = async (): Promise<{ state: string; jar: string[] }> => {
+    const started = await json('/v1/mcp-servers/hostagentround/authorize', {
+      method: 'POST', headers: { Authorization: `Bearer ${manager.token}` }, body: JSON.stringify({}),
+    });
+    assert(started.status === 200, `agent authorize: ${started.status}`);
+    const state = started.body.data.state as string;
+    const approved = await fetch(`${BASE}/v1/oauth-rounds/${encodeURIComponent(state)}/approve`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json', ...BROWSER_START, ...HTTPS, ...ownerAuth() }, body: '{}',
+    });
+    await approved.arrayBuffer();
+    assert(approved.status === 200, `approve: ${approved.status}`);
+    return { state, jar: roundJar(approved) };
+  };
+  const one = await confirmed();
+  const value = one.jar[0]!.slice(one.jar[0]!.indexOf('=') + 1);
+  const planted = await httpsMcpCallback(one.state, `${plainRoundName(one.state)}=${value}`);
+  await planted.arrayBuffer();
+  assert(planted.status === 403, `SECURITY: a plain-name cookie finished a confirmed https round: ${planted.status}`);
+
+  const two = await confirmed();
+  const ok = await httpsMcpCallback(two.state, two.jar.join('; '));
+  await ok.arrayBuffer();
+  assert(ok.status === 302 && ok.headers.get('location') === '/connection-done.html',
+    `usage: the confirmed https round did not finish: ${ok.status} → ${ok.headers.get('location')}`);
+  assert(!!(await storedServer(attached.body.data.server.id))?.credential, 'usage: the confirmed https sign-in sealed nothing');
+
+  const removed = await json('/v1/mcp-servers/hostagentround', { method: 'DELETE', headers: ownerAuth() });
   assert(removed.status === 200, `clean up: ${removed.status}`);
 });
 

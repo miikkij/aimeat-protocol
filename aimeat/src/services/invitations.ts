@@ -21,6 +21,8 @@
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  *   await revokeDepartedMemberAccess(storage, config, { organism, departing });
  * @version-history
+ *   2026-10-31 — The in-app notice of an email invitation links by the invitation's id, not the raw
+ *     token (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
  *   2026-10-27 — findWorkspaceEntry and the departure revoke read the registry copy that counts
  *     (workspace-meta-read.ts workspaceRegistrations), not the first copy in store order, so a copy a
  *     since-demoted admin wrote names no creator (secaudit2026oct26).
@@ -331,11 +333,15 @@ export async function createEmailInvitation(
   const acceptUrl = `${config.baseUrl}/v1/invite?token=${rawToken}`;
 
   // If the email already maps to a registered user, also ping them in-app (email still sent below).
+  // The notice links by the invitation's id, never the raw token: the bell is readable by every
+  // principal of the account holding memory:read, and the raw token makes a new account on the
+  // signed-out accept. An id opens the invitation only for the invited person signed in
+  // (routes/invite-accept.ts; secaudit2026oct31w2, R-f-2026sec-07-d7).
   if (existing) {
     await notify(storage, existing.ghii, {
       type: 'organism_invitation',
       title: `${inviterName} invited you to join "${input.organism.name}"`,
-      link: `/v1/invite?token=${rawToken}`,
+      link: `/v1/invite?token=${invitation.id}`,
     });
     emitChange('notifications');
   }

@@ -15,6 +15,8 @@
  * @structure answerConnectCallback(config, storage, providers)
  * @usage const answer = answerConnectCallback(config, storage, providers); answer(req, res, { state, code, providerError });
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The callback reads the plain and the `__Host-` round cookie and clears both;
+ *     a round bound over https finishes only with the `__Host-` one (secaudit2026oct31w2 round 10, W2-19).
  *   v1.0.0 — 2026-10-09 — Moved from routes/connections.ts; the round binding is checked and its
  *     cookie cleared; every refusal is text/plain (secrets audit 2026-10-09, chapter 2, and F5).
  */
@@ -25,7 +27,7 @@ import { logger } from '../utils/logger.js';
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { completeAuthorization, callbackUrl } from '../services/connections/oauth.js';
 import type { OutboundProvider } from '../services/connections/providers.js';
-import { readRoundBinding, clearRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { roundCookiesOf, endRoundBinding } from '../middleware/oauth-round-cookie.js';
 import { sendPlainText } from '../middleware/plain-text.js';
 import { safeRedirectPath } from '../utils/same-origin-path.js';
 
@@ -60,7 +62,7 @@ export function answerConnectCallback(
       return;
     }
     const { state, code, providerError } = query;
-    if (state) clearRoundBinding(req, res, state, connectCallbackPath(config));
+    if (state) endRoundBinding(req, res, state, connectCallbackPath(config));
 
     if (providerError) {
       // The user pressed cancel, or the provider refused. Not our failure, and not an error page:
@@ -83,7 +85,7 @@ export function answerConnectCallback(
 
     const result = await completeAuthorization(
       { config, storage, providers, key },
-      { state, code, binding: readRoundBinding(req, state) },
+      { state, code, ...roundCookiesOf(req, state) },
     );
     if (!result.ok) {
       // 403 for a browser the round was not bound to: the request was well formed, and this caller
