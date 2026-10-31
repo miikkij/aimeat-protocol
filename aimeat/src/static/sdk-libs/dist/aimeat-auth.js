@@ -521,6 +521,9 @@
       if (cv) return cv;
     } catch {
     }
+    const cfg2 = typeof window !== "undefined" ? window.__AIMEAT_SDK_CFG__ : void 0;
+    const node = pick(cfg2 && cfg2.defaultLocale);
+    if (node) return node;
     let nav = null;
     try {
       nav = pick(String(navigator.language || "").slice(0, 2).toLowerCase());

@@ -11,6 +11,7 @@
  * @structure NotificationCreateError · createPrincipalNotification
  * @usage const r = await createPrincipalNotification(storage, config, req.auth!, body);
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The report mail carries Reply-To from email.reply_to when it is set (Jouni, 20.14).
  *   v1.3.0 — 2026-10-31 — `email: true` also mails the notification to the owner's verified address,
  *     at most EMAIL_PER_DAY a sender, never when muted; `emailed` says what became of it. An agent
  *     could reach the owner's bell and devices only, so "send me the summary by email" had no way
@@ -155,7 +156,8 @@ async function mailOwner(
   const url = link ? `${config.baseUrl.replace(/\/+$/, '')}${link}` : '';
   const text = [body?.trim(), url].filter(Boolean).join('\n\n');
   try {
-    const ok = await email.sendNotification(owner.notificationEmail, title, text || title);
+    // A reply goes where somebody reads it (email.reply_to), not to the node's no-reply sender.
+    const ok = await email.sendNotification(owner.notificationEmail, title, text || title, { replyTo: config.smtpReplyTo });
     if (!ok) return 'failed';
     emailsSent.get(key)?.push(now);
     await appendMailLog(storage, ghii, { kind: 'notification', subject: title });

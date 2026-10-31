@@ -11,9 +11,11 @@
  *   log showed "aimeat handbook get" five times and lines reading "failed error", and the buyer could
  *   not tell whether anything had worked. A call that failed and was tried again is the agent's
  *   business; a kind of step that never succeeded is said once, in a sentence.
- * @structure WorkLog({ tools }) · WorkLine({ tool }) · stepKind(title) · workSummary(tools)
+ * @structure WorkLog({ tools, ended }) · WorkLine({ tool, ended }) · stepKind(title) · workSummary(tools, ended)
  * @usage html`<${WorkLog} tools=${turn.tools} />`
  * @version-history
+ *   v2.1.0 — 2026-10-31 — `ended`: a saved turn shows a call whose finished status never arrived with
+ *     no running mark and no "starting" word (crew32 check turn: "Haen pohjan…" after the app was published).
  *   v2.0.0 — 2026-10-31 — Folded by default, with a summary in the person's words: one entry per kind
  *     of step, ✓ when one of them finished, and one sentence when a kind never did. The lines name the
  *     step in words, the tool's own name stays as the line's title (v31 K33, K37).
@@ -72,7 +74,7 @@ function kindWords(kind) {
  * @param {Array<{ title?: string, status?: string }>} tools
  * @returns {{ kinds: Array<{ kind: string, done: boolean, running: boolean }>, stuck: boolean }}
  */
-export function workSummary(tools) {
+export function workSummary(tools, ended = false) {
     const byKind = new Map();
     for (const tool of tools || []) {
         const kind = stepKind(tool.title);
@@ -81,7 +83,9 @@ export function workSummary(tools) {
         const status = String(tool.status || 'pending');
         if (status === 'completed') k.done = true;
         else if (status === 'failed') k.failed = true;
-        else k.running = true;
+        // In a turn that has ended nothing runs: a call whose last word never reached the stream
+        // is shown with no mark, not as still going.
+        else if (!ended) k.running = true;
         byKind.set(kind, k);
     }
     const kinds = [...byKind.values()];
@@ -97,9 +101,10 @@ export function workSummary(tools) {
  * The status is a word rather than a colour alone: a person who cannot see the difference between
  * two greens still has to be able to tell a call that finished from one that failed.
  */
-export function WorkLine({ tool }) {
+export function WorkLine({ tool, ended = false }) {
     const status = String(tool.status || 'pending');
-    const label = tr(`chat.work.${status}`, status);
+    const settled = status === 'completed' || status === 'failed';
+    const label = ended && !settled ? '' : tr(`chat.work.${status}`, status);
     const kind = stepKind(tool.title);
     return html`
         <li class="poster-worklog-line poster-worklog-line--${status}" title=${tool.title || ''}>
@@ -109,11 +114,14 @@ export function WorkLine({ tool }) {
     `;
 }
 
-/** The work log for one turn: the summary in words, and every call behind the fold. */
-export function WorkLog({ tools }) {
+/**
+ * The work log for one turn: the summary in words, and every call behind the fold. `ended`: the turn
+ * is over (a saved turn), so nothing in it is still running.
+ */
+export function WorkLog({ tools, ended = false }) {
     const shown = (tools || []).filter((tool) => stepKind(tool.title) !== null);
     if (shown.length === 0) return null;
-    const { kinds, stuck } = workSummary(shown);
+    const { kinds, stuck } = workSummary(shown, ended);
     return html`
         <details class="poster-worklog">
             <summary class="poster-worklog-summary">
@@ -124,7 +132,7 @@ export function WorkLog({ tools }) {
                 ${stuck && html`<span class="poster-worklog-stuck">${tr('chat.work.stuck', 'One step did not go through.')}</span>`}
             </summary>
             <ul class="poster-worklog-list">
-                ${shown.map((tool, i) => html`<${WorkLine} key=${i} tool=${tool} />`)}
+                ${shown.map((tool, i) => html`<${WorkLine} key=${i} tool=${tool} ended=${ended} />`)}
             </ul>
         </details>
     `;

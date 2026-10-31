@@ -551,6 +551,8 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   smtpUser: string | null;
   smtpPass: string | null;
   smtpFrom: string;
+  /** The Reply-To of a report an agent or an app mails its owner; null: replies go to the From. */
+  smtpReplyTo: string | null;
   smtpSecure: boolean;
   smtpRejectUnauthorized: boolean;
   emailConfirmationRequired: boolean;
