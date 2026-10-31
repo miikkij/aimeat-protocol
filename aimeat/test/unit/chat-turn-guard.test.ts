@@ -6,6 +6,7 @@
  *   counting the ceiling depends on; e2e-chat-agent holds the turn around it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chat-turn-guard.test.ts
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The sentences between steps are in the person's language (crew36).
  *   v1.3.0 — 2026-10-31 — The publish ends the turn, and the node knows the published app's address
  *     only from a publish (crew34 K35).
  *   v1.2.1 — 2026-10-31 — The turn note's plain-words line (v27 P7).
@@ -89,6 +90,8 @@ describe('what the node tells the model', () => {
         const note = turnNote();
         expect(note).toMatch(/not from the person/);
         expect(note).toMatch(/one short sentence to the person before your first tool call/);
+        // crew36: the Finnish answer began with the model's own English steps.
+        expect(note).toMatch(/Write these sentences in the person's language too/);
         expect(note).toMatch(/aimeat_agent_propose/);
         expect(note).toMatch(/aimeat_workspace_list, which takes that organism's id/);
         // A store buyer read "organismeja" and their own name@node-id in the first answer (v27 P7).

@@ -32,6 +32,8 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.2.6 — 2026-10-31 — The sentences between steps are in the person's language too. On crew36 the
+ *     Finnish answer began "Fetching template for a list app. Publishing the shopping-list app."
  *   v1.2.5 — 2026-10-31 — The app path says the publish ends the turn and their data is not read
  *     after it, and appReadyText gives the address of an app the turn published. On crew34 gpt-oss
  *     published, then called aimeat_discover to look at the person's data, ran out of time, and the
@@ -110,7 +112,7 @@ export function stepForTool(title: string): ProgressStep | null {
 export function turnNote(): string {
     return [
         '[A note from this node, not from the person]',
-        'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work.',
+        'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work. Write these sentences in the person\'s language too, never in English when they wrote in another.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
         'Speak to the person in plain words in their language: say "shared place" for an organism and "workspace" for a workspace, call the person by their name, and never write an identity such as name@node-id, a key or an id to them.',
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
