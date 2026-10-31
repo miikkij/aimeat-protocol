@@ -13,6 +13,7 @@
  * @structure renderSchedulerView · renderCover · secNext · secRhythm · secContinuous · secRare · secAll · secAgents · registerTable · pages
  * @usage import { renderSchedulerView } from './scheduler/cover.js';
  * @version-history
+ *   v1.22.0 -- 2026-10-31 -- With no schedule at all the cover is the explanation, "Tee ensimmäinen agentti →" (to the Home's new-agent page) with "tai tee ajastus itse", and the one empty line: no strip, tags, filters or side panel (Jouni's review of v31, K53-K55). "Ei vielä hallinnoituja ajastuksia" reads "Sinulla ei ole vielä ajastuksia".
  *   v1.21.0 -- 2026-10-31 -- The week's rhythm, the continuous ones, the rarer ones and the agents' reported times are drawn only when they hold something (v31 K54); with no schedule at all, "next up" says where an approved agent's run will appear (K53); the head says in plain words what the page is (K55).
  *   v1.20.0 -- 2026-09-26 -- Every part is a component that takes data (page group G5): the page frame is the SettingsPage, the strip the FigureStrip, the lists the List (the time a Figure, the countdown the Num's sign, the long words clipped), the week's rhythm the WeekRhythm, the continuous jobs the JobChips, the search the SearchLine, "show more" the More, the doors the Tab's fold tone. Main's grey tags come back: the paused count, and the failed count while it is 0, are the dim Mark (main's og-chip--dim).
  *   v1.19.0 -- 2026-09-26 -- What fires next, the rarer ones, the register and the agents' own jobs are the Listing (listing, listing-row and its head row, name, who, words, figure and doors cells; listing--cols keeps the narrow-screen columns), a unification: the look most tabs use.
@@ -116,6 +117,21 @@ function renderCover(ctx) {
       : { key: 'latest', n: '·', label: c('stripLatest'), sub: t('profile.scheduler.never') },
     { key: 'failed', n: m.failed.length, label: c('stripFailed'), sub: c('stripFailedSub') },
   ]} />`;
+
+  // With no schedule at all the page is its explanation and one way on: no counters, tags, filters
+  // or side panel, which would only count zeros (Jouni's review of v31, K53-K55).
+  if (!ctx.occLoading && m.all.length === 0 && ctx.internal.length === 0) {
+    return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')}
+      desc=${c('desc')}
+      actions=${html`
+        <${Loud} href="/v1/home?new-agent=1">${c('firstAgent')}<//>
+        <${Actions}><${Action} small onClick=${() => ctx.pickView({ kind: 'page', id: 'create' })}>${c('orSchedule')}<//><//>`}
+      strip=${ctx.error ? html`<${Note} kind="message" error>${ctx.error}<//>` : null}>
+        <${PageSection} id="sc-next" num="01" title=${c('secNext')} count=${null} first=${true}>
+          <${Note} kind="quiet">${c('emptyAll')}<//>
+        <//>
+    <//>`;
+  }
 
   return html`<${SettingsPage} name="sc" crumb=${crumb(ctx, [])} title=${t('profile.scheduler.title')}
     marks=${[
