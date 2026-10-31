@@ -2,22 +2,24 @@
 
 AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.
 
-Empieza con una frase. Abre tu [Inicio](/v1/home) y escribe en el campo lo que quieres conseguir, por ejemplo:
+Empieza con una frase. Abre tu [Inicio](/v1/home), tu propia página aquí, y escribe en el campo lo que quieres conseguir, por ejemplo:
 
 > Reúne cada mañana de lunes a viernes las noticias del sector y escribe un resumen corto.
 
-AIMEAT crea un agente con ello y te lo muestra antes de que empiece. También puedes hablar con la IA directamente en el [chat](/v1/chat).
+AIMEAT crea un agente con esa frase. Un agente es una IA que hace un trabajo por ti, también cuando no estás. Crearlo lleva un momento, porque la IA escribe primero sus instrucciones. Ves el agente en tu Inicio antes de que empiece, y tú decides si empieza.
 
-Si ya usas Claude, ChatGPT u otra IA, puedes conectarla aquí. Así ve la misma información y hace lo mismo que el chat. Las instrucciones están en tu Inicio.
+También puedes hablar con la IA directamente en el [chat](/v1/chat).
+
+Si ya usas Claude, ChatGPT u otra IA, puedes conectarla aquí. La conexión usa MCP, una forma abierta de que una IA use un servicio con tu permiso. Así tu IA ve la misma información y hace lo mismo que el chat. Las instrucciones están en tu Inicio.
 
 ## Cuánto cuesta {#cost}
 
 <!--store-->
-Tu compra incluye saldo de IA. Ves cuánto queda, en euros, en tu Inicio bajo tu nombre y en el chat.
+Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda en tu Inicio bajo tu nombre y en el chat.
 
 El saldo se gasta cuando la IA responde o hace un trabajo. Cuando queda poco, tu Inicio muestra un enlace para comprar más. El saldo adicional se compra en la tienda, igual que compraste este sitio.
 
-Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir: comprar más saldo, usar tu propia clave de IA (mira Avanzado más abajo) o, si este sitio tiene un modelo gratuito, seguir con él. El modelo gratuito responde peor.
+Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir, por ejemplo: comprar más saldo en la tienda o, si este sitio tiene un modelo gratuito, seguir con él. El modelo gratuito responde peor.
 
 La cuota mensual y las facturas están en la tienda. Las encuentras en Ajustes, en Pedidos y facturas.
 <!--/store-->
@@ -31,7 +33,7 @@ Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir, por ejemp
 
 Todo lo que guardas es privado al principio. Solo tú lo ves.
 
-Tú decides lo que compartes. Puedes compartir un espacio de trabajo con las personas que invites, o publicar algo para todos. Lo que compartes solo lo ven aquellos con quienes lo compartiste.
+Tú decides lo que compartes. Puedes compartir un espacio de trabajo, un conjunto de documentos, con las personas que invites, o publicar algo para todos. Lo que compartes solo lo ven aquellos con quienes lo compartiste.
 
 Un agente o una IA conectada solo puede hacer lo que tú le permites. Ves cada permiso, y puedes retirarlo, en la [página de Acceso](/v1/profile?tab=access).
 
@@ -65,9 +67,9 @@ Si algo no funciona, escribe a [support@aimeat.io](mailto:support@aimeat.io). Cu
 
 ## Avanzado: tu propia IA {#advanced}
 
-Solo necesitas esta parte si quieres usar un servicio de IA propio.
+Solo necesitas esta parte si quieres usar un servicio de IA que pagas tú, por ejemplo OpenRouter.
 
-Puedes guardar tu propia clave de IA en los [ajustes de IA](/v1/profile?tab=ai), por ejemplo una clave de OpenRouter. Así el uso de la IA se cobra en tu propia cuenta de ese servicio.
+Guarda la clave de ese servicio en los [ajustes de IA](/v1/profile?tab=ai). Así el trabajo de IA que cubre la clave se cobra en tu cuenta de ese servicio. Los ajustes de IA muestran qué partes cubre la clave.
 
 ## Conocimiento y paquetes {#knowledge}
 

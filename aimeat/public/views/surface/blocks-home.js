@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-10-31: The credit line ends with "what is this?", a link to the help page's cost section,
+ *     so the term is explained where it first appears (Jouni's "teach during use").
  *   2026-10-31: On a node the store sold, NameplateBlock carries the AI credit in euros under the
  *     name, with whether the AI is ready and the store's top-up link when it runs low; the "this is
  *     a demo" block draws nothing there (Jouni v27 P3, P6).
@@ -101,6 +103,7 @@ function CreditPlate() {
     <span class="poster-masthead-status">
       ${tr('home.credit.line', 'AI credit {amount}').replace('{amount}', amount)} · ${stateText}
       ${topup && html` · <a href=${topup} target="_blank" rel="noopener">${tr('home.credit.topup', 'Buy more credit')}</a>`}
+      ${html` · <a href="/v1/help#cost">${tr('home.credit.what', 'what is this?')}</a>`}
     </span>`;
 }
 

@@ -22,6 +22,9 @@
  * @structure OwnerStart({ navigate })
  * @usage html`<${OwnerStart} navigate=${navigate} />` (landing.js)
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The page says what AIMEAT is, what happens after sign-in and how long the
+ *     link takes, and that visitors see it until the owner publishes a front page (Jouni's "teach
+ *     during use", relayed 2026-10-31 13.58).
  *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P3).
  */
 import { h } from 'preact';
@@ -76,6 +79,7 @@ export function OwnerStart({ navigate }) {
   return html`
     <div class="owner-start">
       <${Band} title=${t('siteStart.title', { host })}>
+        <${BandNote}>${t('siteStart.intro')}<//>
         ${inside
           ? html`
             <${BandNote}>${t('siteStart.signedInNote')}<//>
@@ -93,7 +97,8 @@ export function OwnerStart({ navigate }) {
                 actions=${html`<${Loud} control onClick=${send} disabled=${state === 'sending' || state === 'sent' || !email.trim()}>${t('siteStart.sendLink')}<//>`} />
             <//>
             ${state === 'sent' && html`<${BandNote}>${t('siteStart.linkSent')}<//>`}
-            ${state === 'failed' && html`<${BandNote}>${t('siteStart.linkFailed')}<//>`}`}
+            ${state === 'failed' && html`<${BandNote}>${t('siteStart.linkFailed')}<//>`}
+            <${BandNote}>${t('siteStart.next')}<//>`}
 
         <${NamedRow} stack label=${t('siteStart.contentLabel')}>
           <p class="owner-start-line">${t('siteStart.contentNote')}</p>
