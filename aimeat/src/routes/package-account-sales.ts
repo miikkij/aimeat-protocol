@@ -42,7 +42,7 @@ export function registerPackageAccountSaleRoutes(router: Router, config: AimeatC
 
     router.put('/v1/packages/:groupId/price', requireAuth(), requireLocalSession(), requireScope('commerce:sell'), validateBody(PriceBodySchema, config.nodeId), async (req, res) => {
         // The shape is checked here; the money rules (a positive amount, EUR or USD) in setAccountPrice.
-        const body = (req as unknown as { validated: z.infer<typeof PriceBodySchema> }).validated;
+        const body = (req.body ?? {}) as z.infer<typeof PriceBodySchema>;
         const out = await setAccountPrice({ storage, config }, { owner: req.auth!.owner }, group(req.params.groupId), {
             price: body.price, state: body.state, preview: body.preview,
         });
