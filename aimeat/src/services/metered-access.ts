@@ -25,6 +25,11 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.3.1 — 2026-10-31 — The contract's state, rate window, a grant's carried ceiling and the budget
+ *     are asked before the pacing is charged, so a call they refuse moves no morsels; a settlement that
+ *     refuses after the pacing (the morsel price not covered, the money rail failing) gives the pacing
+ *     back. A refused call kept its pacing charge (secaudit 2026-10-31,
+ *     f-secaudit2026oct31-extra-metered-pacing-order).
  *   v1.3.0 — 2026-10-31 — `productRefusal`: a door's check of what the found entitlement would run,
  *     asked before the pacing and the settlement, answers `refused_product` with nothing charged. The
  *     app-tool doors resolved their binding after the settle, refunded a mis-bound capability and kept
@@ -253,9 +258,10 @@ export async function appSpendRefusal(
  *      through the app-tool endpoint paid the platform rake to themselves.
  *   2. THE RIGHT — a provider's grant if one is active, else the contract, both keyed to the owner
  *      who pays (see `metered-entitlements.ts`).
- *   3. PACING — burned before anything is authorised, so a paced-out call costs one morsel-sized
- *      attempt rather than a settled payment that has to be reversed. On a grant the provider carries it.
- *   4. STATE, RATE, CEILINGS — the contract's own limits, and a grant's separate carried ceiling.
+ *   3. STATE, RATE, CEILINGS — the contract's own limits, and a grant's separate carried ceiling.
+ *      They write nothing, so a call they refuse is refused before anything is charged.
+ *   4. PACING — charged before the settlement, so a paced-out call is refused before a payment moves.
+ *      On a grant the provider carries it. When the settlement then refuses, the pacing is given back.
  *   5. SETTLE + ATTRIBUTE — move the value, apply the rake, advance the meter, record WHO called.
  */
 export interface MeteredCallArgs {
@@ -356,8 +362,27 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   if (productRefusal) return { kind: 'refused_product', entitlement: ent, refusal: productRefusal };
   const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
 
-  // 3. Pacing, first and always. The one brake that bounds RATE rather than total spend, which is the
-  //    property a money budget does not have.
+  // 3. Limits: the contract's state, its rate window, a grant's carried ceiling and the budget. They
+  //    read the entitlement and write nothing, so they are asked BEFORE the pacing below: a call they
+  //    refuse leaves no pacing rows and moves no morsels (secaudit 2026-10-31,
+  //    f-secaudit2026oct31-extra-metered-pacing-order). They were asked after it, and a refused call
+  //    kept its pacing charge.
+  if (ent.state !== 'active') return { kind: 'inactive', entitlement: ent };
+
+  const decision = computeCharge(ent, Date.now());
+  if (!decision.allowed) return { kind: 'refused_rate', entitlement: ent };
+
+  // A grant's ceiling is on what the PROVIDER carries. The consumer spends nothing, so the ordinary
+  // budget check below can never fire on one, and "carry them up to 500 morsels" would mean nothing.
+  if (ent.grant && ent.grant.capCarriedUnits !== null
+      && ent.grant.carriedUnits + ent.grant.listPricePerCall > ent.grant.capCarriedUnits) {
+    return { kind: 'refused_grant_cap', entitlement: ent };
+  }
+
+  if (!budgetAllows(ent, decision.chargeUnits)) return { kind: 'refused_budget', entitlement: ent };
+
+  // 4. Pacing, on every call the limits allow. The one brake that bounds RATE rather than total
+  //    spend, which is the property a money budget does not have.
   //    Part of the pacing burns, the operator share goes where the fee policy sends it, and the rest
   //    is credited to the provider. A grant covers both halves of a price, so the provider pays the
   //    pacing, and with no one else to credit the whole amount burns.
@@ -376,27 +401,21 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   });
   if (!paced) return { kind: 'insufficient', entitlement: ent, needed: toll, carried: !!ent.grant };
 
-  // 4. Limits.
-  if (ent.state !== 'active') return { kind: 'inactive', entitlement: ent };
-
-  const decision = computeCharge(ent, Date.now());
-  if (!decision.allowed) return { kind: 'refused_rate', entitlement: ent };
-
-  // A grant's ceiling is on what the PROVIDER carries. The consumer spends nothing, so the ordinary
-  // budget check below can never fire on one, and "carry them up to 500 morsels" would mean nothing.
-  if (ent.grant && ent.grant.capCarriedUnits !== null
-      && ent.grant.carriedUnits + ent.grant.listPricePerCall > ent.grant.capCarriedUnits) {
-    return { kind: 'refused_grant_cap', entitlement: ent };
-  }
-
-  if (!budgetAllows(ent, decision.chargeUnits)) return { kind: 'refused_budget', entitlement: ent };
-
   // 5. Move it, and record who caused it.
   const settled: SettlementResult = await settleMeteredCharge({
     config, storage, ent, caller, product, charge: decision.chargeUnits, newPricing: decision.pricing,
   });
-  if (settled.kind === 'insufficient') return { kind: 'insufficient', entitlement: ent, needed: settled.needed, carried: false };
-  if (settled.kind === 'failed') return { kind: 'settlement_failed', entitlement: ent, reason: settled.reason };
+  // The settlement's own atomic debit (or the money rail) is the decision here, so it can only refuse
+  // after the pacing above was charged. The pacing is given back on that refusal, because the call
+  // does not run and the answer tells the caller nothing was charged.
+  if (settled.kind === 'insufficient') {
+    await paced.reverse();
+    return { kind: 'insufficient', entitlement: ent, needed: settled.needed, carried: false };
+  }
+  if (settled.kind === 'failed') {
+    await paced.reverse();
+    return { kind: 'settlement_failed', entitlement: ent, reason: settled.reason };
+  }
   // What the app spent of its owner's money, so the ceiling means something on the next call. Only
   // morsels are counted against it: a money charge is denominated in micro-units and the two are not
   // the same number, so summing them into one ceiling would be the bug this file already fixed once.

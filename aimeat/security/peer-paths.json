@@ -188,8 +188,8 @@
       "why": "A customer node's signed request verified with its pinned key; a peer sharing no catalogue is heard only for what it holds an entitlement to."
     },
     "src/services/packages/peer/package-pull.ts": {
-      "count": 3,
-      "why": "A pull goes to a peer sharing the catalogue, verified with its pinned key; an address given directly is read for its card through safeFetch (trust on first use, the caller's own decision)."
+      "count": 5,
+      "why": "A pull goes to a peer sharing the catalogue, verified with its pinned key; an address given directly is read for its card through safeFetch (trust on first use, the caller's own decision). The refresh of an unpinned copy (an unverified ZIP import) reads the url and key of the federation peer its stored upstream names, through the same peer gate as a pull, never the archive's own source_url, and that key then pins the copy; a trust-on-first-use key never pins one (secaudit 2026-10-31 inv-26)."
     },
     "src/services/packages/sale/package-sale-auth.ts": {
       "count": 2,

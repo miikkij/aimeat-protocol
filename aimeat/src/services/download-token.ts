@@ -17,6 +17,10 @@
  * @usage
  *   import { generateDownloadToken, verifyDownloadToken } from '../services/download-token.js';
  * @version-history
+ *   v1.3.0 -- 2026-10-31 -- The v1.2.1 transition ends: a token without `ver` is refused TOKEN_INVALID,
+ *     with a word on asking for a new download URL. Every such token was minted before 2026-10-20 and
+ *     had expired by 2026-10-21, so no URL handed out stops working (Jouni, 2026-10-31; secaudit
+ *     2026-10-31 inv-18). VerifiedDownloadToken.version is required.
  *   v1.2.2 -- 2026-10-31 -- generateDownloadToken refuses a payload without a version (a non-empty
  *     string). A mint without one produced a token with no `ver`, which the transition rule of v1.2.1
  *     serves without the version check (secaudit 2026-10-31 inv-18). No current caller mints one.
@@ -67,11 +71,8 @@ export interface VerifiedDownloadToken {
     key: string;
     mimeType: string;
     size: number;
-    /**
-     * The file version (its createdAt at the mint) this token may fetch. Absent on a token minted
-     * before 2026-10-20, which names no version and is served as it was then until it expires.
-     */
-    version?: string;
+    /** The file version (its createdAt at the mint) this token may fetch. */
+    version: string;
     filename?: string;
 }
 
@@ -88,10 +89,9 @@ export class DownloadTokenError extends Error {
 
 export async function generateDownloadToken(payload: DownloadTokenPayload, ttlSeconds: number = 3600): Promise<string> {
     if (!_privateKey) throw new Error('Download token keys not initialized');
-    // A token without `ver` is served whatever the key holds (verifyDownloadToken keeps that for
-    // tokens minted before 2026-10-20), so a mint that names no version would mint one that skips
-    // the version check. Every caller passes the stored file's createdAt; one that does not is a
-    // defect, refused here before anything is signed (secaudit 2026-10-31 inv-18).
+    // A token without `ver` names no version to check, and verifyDownloadToken refuses it. Every
+    // caller passes the stored file's createdAt; one that does not is a defect, refused here before
+    // anything is signed (secaudit 2026-10-31 inv-18).
     if (typeof payload.version !== 'string' || !payload.version) {
         throw new Error('A download token names no file version: pass the stored file\'s createdAt as `version`.');
     }
@@ -129,10 +129,13 @@ export async function verifyDownloadToken(token: string): Promise<VerifiedDownlo
     if (payload.typ !== 'download') {
         throw new DownloadTokenError('TOKEN_INVALID', 'Token is not a download token');
     }
-    // Only a token minted before 2026-10-20 lacks `ver`. It is served as it was then, for the rest of
-    // its own life (an hour at most), so a download URL handed out before the upgrade keeps working.
-    // A `ver` that is present but not a string is not something this node signed, and is refused.
-    if (payload.ver !== undefined && (typeof payload.ver !== 'string' || !payload.ver)) {
+    // A token names the file version it may fetch. One without `ver` was minted before 2026-10-20, and
+    // every such token had expired by 2026-10-21, so it is refused like any token whose version cannot
+    // be checked (the v1.2.1 transition ended 2026-10-31, Jouni; secaudit 2026-10-31 inv-18).
+    if (payload.ver === undefined) {
+        throw new DownloadTokenError('TOKEN_INVALID', 'This download URL is from before the node checked file versions. Ask for a new download URL.');
+    }
+    if (typeof payload.ver !== 'string' || !payload.ver) {
         throw new DownloadTokenError('TOKEN_INVALID', 'Token names no valid file version');
     }
 
@@ -141,7 +144,7 @@ export async function verifyDownloadToken(token: string): Promise<VerifiedDownlo
         key: payload.key as string,
         mimeType: payload.mimeType as string,
         size: payload.size as number,
-        ...(typeof payload.ver === 'string' ? { version: payload.ver } : {}),
+        version: payload.ver,
         filename: typeof payload.filename === 'string' ? payload.filename : undefined,
     };
 }
@@ -150,14 +153,11 @@ export async function verifyDownloadToken(token: string): Promise<VerifiedDownlo
  * Does the stored file still hold the version the token was minted for? Its createdAt (compared as a
  * time, so the two backends' spellings of one instant agree) and its size must both match. A file
  * written again under the same key, at any visibility, is a different version and is not served.
- * A token minted before 2026-10-20 names no version and is served whatever the key holds, as it was
- * then; it expires within the hour it was minted for.
  */
 export function servesFileVersion(
     verified: Pick<VerifiedDownloadToken, 'version' | 'size'>,
     file: { createdAt: string; size: number },
 ): boolean {
-    if (verified.version === undefined) return true;
     if (file.size !== verified.size) return false;
     if (file.createdAt === verified.version) return true;
     const a = Date.parse(file.createdAt), b = Date.parse(verified.version);
