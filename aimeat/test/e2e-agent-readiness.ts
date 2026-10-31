@@ -210,7 +210,7 @@ function locs(xml: string): string[] {
     // the old page's questions, morsels included, while the view had moved on.
     await test('the help page sends the text the view shows', async () => {
         const seen = visibleText(shellBodies.get('/v1/help') ?? '');
-        assert(seen.includes('What this costs'), 'the cost section is missing');
+        assert(seen.includes('AI credit and what this costs'), 'the cost section is missing');
         assert(seen.includes('Who sees my things'), 'the privacy section is missing');
         assert(!/\{#[a-z]/.test(seen), 'a section address {#id} reached the text');
         assert(!/morsel/i.test(seen), 'the old page text is still sent');

@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
  *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
  *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
  *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
@@ -64,6 +65,7 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { customerNode } from '/js/site.js';
 import { PageSection } from '/components/PageSection.js';
+import { FoldSection } from '/components/FoldSection.js';
 import { SettingsPage } from '/components/SettingsPage.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { FigureStrip } from '/components/FigureStrip.js';
@@ -98,7 +100,65 @@ const SHOWN = 8;
 /** The line a form says after it acted; a refusal in its error tone. */
 const msg = (m) => (m ? html`<${Note} kind="message" error=${!!m.error}>${m.text}<//>` : null);
 
+/**
+ * A buyer on a node the store sold, with no key of their own, reads this page for one thing: how
+ * much AI credit is left and how fast it goes. So that is all the page shows up front, in euros, and
+ * everything a developer sets (the key, the providers, the routing, the roles, the model policy, the
+ * budget's edit, what spends the key) is one fold below, "Lisäasetukset" (v31 K58, K60).
+ */
+const simpleView = (ctx) => customerNode() && !ctx.keyed;
+
+function renderSimple(ctx) {
+  const loading = !ctx.settings;
+  return html`
+    <${SettingsPage} name="ai"
+      crumb=${crumb()}
+      ...${mast(ctx)}
+      strip=${strip(ctx)}
+      railTitle=${x('railTitle')}
+      sections=${[
+        { id: 'ai-today', num: '01', label: x('simple.todayTitle'), count: '' },
+        { id: 'ai-advanced', num: '02', label: x('simple.advanced'), count: '' },
+      ]}
+      pagesLabel=${x('pages')}
+      pages=${pageLinks(ctx.navigate)}
+      after=${html`<${ctx.ConfirmUI} />`}>
+      ${loading ? html`<${Note} kind="loading">${x('loading')}<//>` : html`
+        ${secToday(ctx)}
+        <${FoldSection} id="ai-advanced" num="02" title=${x('simple.advanced')} sub=${x('simple.advancedSub')}
+          lead=${x('simple.advancedLead')} open=${ctx.advancedOpen} onToggle=${() => ctx.setAdvancedOpen(!ctx.advancedOpen)}>
+          ${secConnection(ctx)}
+          ${secProviders(ctx, '02')}
+          ${secRouting(ctx, '03')}
+          ${secRoles(ctx, '04')}
+          ${secPolicy(ctx, '05')}
+          ${secBudget(ctx)}
+          ${secConsumers(ctx)}
+        <//>`}
+    <//>`;
+}
+
+/** Today's use against the daily limit, and this month's, in euros of AI credit (v31 K60). */
+function secToday(ctx) {
+  const u = ctx.usage;
+  const r = ctx.roll;
+  if (!u) return html`<${PageSection} id="ai-today" num="01" title=${x('simple.todayTitle')} count=${null} first=${true}><${Note} kind="loading">${x('loading')}<//><//>`;
+  const budget = Number(u.daily_budget_usd) || 0;
+  const spent = Number(u.spent_today_usd) || 0;
+  const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
+  return html`
+    <${PageSection} id="ai-today" num="01" title=${x('simple.todayTitle')} count=${null} first=${true}>
+      <${Facts} rows=${[
+        { key: 'today', k: x('simple.todayLabel'), v: html`
+          <${FactLine} sub=${x('simple.limitNote')}>${x('simple.todayLine', { spent: allowanceMoney(spent), budget: allowanceMoney(budget) })}<//>
+          <${Meter} quota pct=${pct} figure=${`${allowanceMoney(spent)} / ${allowanceMoney(budget)} · ${pct} %`} />` },
+        { key: 'month', k: x('monthLabel'), v: r && r.days ? x('simple.monthLine', { cost: allowanceMoney(r.cost) }) : x('monthNone') },
+      ]} />
+    <//>`;
+}
+
 export function renderPage(ctx) {
+  if (simpleView(ctx)) return renderSimple(ctx);
   const s = ctx.settings;
   const loading = !s;
   return html`
@@ -136,7 +196,11 @@ export function renderPage(ctx) {
 function mast(ctx) {
   const s = ctx.settings;
   const keyed = ctx.keyed;
-  const marks = !s ? [] : keyed
+  // The simple view's tags are the credit and its warning only: "no key" read as a fault (v31 K58).
+  const marks = !s ? [] : simpleView(ctx)
+    ? [ctx.chat ? { label: x('simple.chipCredit', { n: allowanceMoney(ctx.chat.allowance_remaining_usd || 0) }) } : null,
+      ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null]
+    : keyed
     ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
     : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: allowanceMoney(ctx.chat.allowance_remaining_usd) }) } : null,
       // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
@@ -145,15 +209,13 @@ function mast(ctx) {
   const bought = customerNode();
   const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: allowanceMoney(ctx.chat?.allowance_remaining_usd || 0) });
   // A buyer on the node's key buys more credit in the store, so that is the loud action, there at all
-  // times (v28 #19); a key of their own stays one small link away, and OpenRouter's balance page,
-  // which shows a balance they do not have, is left out.
-  const topup = bought && !keyed ? topupHref(getLocale()) : '';
-  if (topup) {
+  // times (v28 #19). The key, OpenRouter's pages and the rest are in Lisäasetukset (v31 K58).
+  if (simpleView(ctx)) {
+    const topup = topupHref(getLocale());
     return {
-      title: t('profile.generator.openrouter.title'), sub: x('titleSub'), help: 'concept.provider', marks, desc,
-      actions: html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Actions}>
-        <${Action} small href="https://openrouter.ai/keys" newTab>${x('getKeyShort')}<//>
-      <//>`,
+      title: t('profile.generator.openrouter.title'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
+      desc: !s ? '' : x('simple.desc', { n: allowanceMoney(ctx.chat?.allowance_remaining_usd || 0) }),
+      actions: topup ? html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//>` : null,
     };
   }
   const loud = keyed
@@ -172,7 +234,14 @@ function strip(ctx) {
   const s = ctx.settings;
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!s) return html`<${FigureStrip} loading=${4} />`;
+  if (!s) return html`<${FigureStrip} loading=${simpleView(ctx) ? 3 : 4} />`;
+  if (simpleView(ctx)) {
+    return html`<${FigureStrip} items=${[
+      { key: 'credit', n: ctx.chat ? allowanceMoney(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit') },
+      { key: 'today', n: u ? allowanceMoney(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: allowanceMoney(u.daily_budget_usd) }) : '' },
+      { key: 'month', n: r ? allowanceMoney(r.cost) : '…', label: x('stripMonth') },
+    ]} />`;
+  }
   const rl = ctx.rl;
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
   return html`<${FigureStrip} items=${[
