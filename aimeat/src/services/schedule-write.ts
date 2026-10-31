@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-10-31 — Create asks schedules.min_interval_seconds and schedules.max_per_owner, and an edit
+ *     that gives a new time asks the first (services/schedule-load-limits.ts; secaudit2026oct31w2
+ *     round 10, f-2026aug-dos-ratelimit-2). A schedule that exists keeps its time.
  *   2026-10-31 — updateScheduleRecord writes a sibling's instruction hold before it stores the new
  *     instruction, and stores nothing when the hold cannot be written, so no fire between the two runs
  *     the instruction with the maker's reach (secaudit 2026-10-31 inv-27).
@@ -98,6 +101,7 @@ import { organismVisibilityRefusal } from './organism-visibility.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from './schedule-constraints.js';
 import { scheduleFileDenial } from './schedule-file-access.js';
 import { checkScheduleGate, isValidCron, scheduleKindScopeRefusal, type ScheduleKind } from './schedule-gate.js';
+import { scheduleIntervalRefusal, scheduleCountRefusal } from './schedule-load-limits.js';
 import { isKeptExtensionSchedule } from './schedule-extension-keep.js';
 import { findExtension } from './component-address.js';
 import { aiScheduleInputRefusal } from './schedule-ai-read.js';
@@ -160,6 +164,8 @@ function accessorOf(
 
 export type ScheduleWriteErrorCode =
     | 'INVALID_KIND' | 'SCOPE_DENIED' | 'INVALID_CRON'
+    // The operator's limits on one owner's schedules (services/schedule-load-limits.ts).
+    | 'SCHEDULE_TOO_FREQUENT' | 'SCHEDULE_LIMIT'
     | 'NOT_FOUND' | 'FORBIDDEN'
     | 'INVALID_INPUT' | 'CONNECTION_UNAVAILABLE' | 'NO_SUCH_FILE' | 'FILE_ACCESS_DENIED'
     | 'AGENT_NOT_FOUND' | 'AGENT_REQUIRED'
@@ -379,6 +385,10 @@ export async function createScheduleRecord(
         { isOwnerSession: caller.isOwnerSession, scopes: caller.scopes },
     );
     if (gateRefusal) return { ok: false, ...gateRefusal };
+    // What one owner may load the shared scheduler with (services/schedule-load-limits.ts).
+    const loadRefusal = scheduleIntervalRefusal(body.cron as string, typeof body.timezone === 'string' ? body.timezone : undefined, config)
+        ?? await scheduleCountRefusal(storage, owner, config);
+    if (loadRefusal) return { ok: false, ...loadRefusal };
     if (kind === 'connections-publish') {
         const bad = await checkConnectionsPublishInput(
             storage, config, owner, body.input,
@@ -595,6 +605,9 @@ export async function updateScheduleRecord(
     if (typeof patch.cron === 'string') {
         const tz = typeof patch.timezone === 'string' ? patch.timezone : job.timezone;
         if (!isValidCron(patch.cron, tz)) return { ok: false, status: 400, code: 'INVALID_CRON', message: 'cron is invalid' };
+        // A new time is asked the shortest gap; the time the schedule already has is not.
+        const tooOften = patch.cron !== job.cron || tz !== job.timezone ? scheduleIntervalRefusal(patch.cron, tz, config) : null;
+        if (tooOften) return { ok: false, ...tooOften };
         updates.cron = patch.cron;
     }
     if (typeof patch.timezone === 'string') updates.timezone = patch.timezone;

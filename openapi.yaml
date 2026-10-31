@@ -59581,9 +59581,24 @@ paths:
                         properties:
                           schedule: { $ref: '#/components/schemas/Schedule' }
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: >
+            Among the refusals: `INVALID_CRON`, and `SCHEDULE_TOO_FREQUENT`: the cron runs more often
+            than the node's `schedules.min_interval_seconds` allows (default 60, so once a minute is
+            accepted; 0 is no limit). The message names the setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: >
+            `SCHEDULE_LIMIT` — the owner already keeps `schedules.max_per_owner` schedules (default 1000,
+            0 is no limit), their agents' and apps' included. Delete one and make this one again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '403':
           description: >
             `SCOPE_DENIED` — the caller lacks the scope the schedule's kind drives.
@@ -59741,7 +59756,10 @@ paths:
                         type: array
                         items: { type: object, properties: { code: { type: string }, message: { type: string } } }
         '400':
-          description: INVALID_CRON, INVALID_INPUT (an empty prompt) or NO_PROMPT (a kind that has no prompt)
+          description: >
+            INVALID_CRON, INVALID_INPUT (an empty prompt), NO_PROMPT (a kind that has no prompt) or
+            SCHEDULE_TOO_FREQUENT (a new cron that runs more often than `schedules.min_interval_seconds`
+            allows; a cron the schedule already has is not asked)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -59975,7 +59993,9 @@ paths:
                             properties:
                               warnings: { type: array, items: { type: string }, description: 'Present only when something in the body did nothing.' }
         '400':
-          description: Validation failed (error.details.errors[] lists the problems)
+          description: >
+            Validation failed (error.details.errors[] lists the problems). Among them: a scheduled
+            trigger given a new cron that runs more often than `schedules.min_interval_seconds` allows.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -70458,7 +70478,15 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          description: >
+            `QUOTA_EXCEEDED` — the node holds `realtime.max_rooms` rooms. `OWNER_ROOM_LIMIT` — the
+            caller's owner and their agents hold `realtime.rooms_per_owner` rooms (default 50, 0 is no
+            separate limit); `error.details.your_rooms` lists them, and closing one
+            (DELETE /v1/realtime/rooms/{roomId}) frees the share.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '503':
           description: Realtime disabled on this node
     get:
