@@ -9,6 +9,7 @@
  *   an update without a visibility keeps the one stored.
  * @usage cd aimeat && pnpm exec vitest run test/unit/package-group-visibility-check.test.ts
  * @version-history
+ *   2026-10-31 — The stub storage answers getMemory (no account sale), which updatePackageGroup now reads.
  *   2026-10-31 — Initial (secaudit 2026-10-31 inv-25).
  */
 import { describe, it, expect } from 'vitest';
@@ -31,6 +32,9 @@ function world() {
             return v;
         },
         getLatestPublished: async () => versions[versions.length - 1],
+        // No account sale on this group: saleVisibilityRefusal (sale/package-account-entitlement.ts)
+        // reads it before a non-private visibility is written.
+        getMemory: async () => null,
     } as unknown as Storage;
     const deps = { storage, config: { nodeId: 'pkg-vis-test' } as unknown as AimeatConfig };
     return { deps, writes, versions };
