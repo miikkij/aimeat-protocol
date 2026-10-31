@@ -22,13 +22,19 @@
  *   THE LAST WRITE MERGES. finishRun writes on the version it read. When the record changed after the
  *   claim (a run that took over a claim older than RUN_CLAIM_MS), what each run made is kept: the
  *   per-item maps and the lists are merged, and the other run's claim stays.
- * @structure RUN_CLAIM_MS · RunClaim · RunRecord · claimRun() · finishRun()
+ *   A RUN REFUSED AFTER ITS CLAIM, before it made anything, ends the claim with releaseRun: a record
+ *   the claim created is removed, an earlier one keeps its value.
+ * @structure RUN_CLAIM_MS · RunClaim · RunRecord · claimRun() · releaseRun() · finishRun()
  * @usage
  *   const claimed = await claimRun(storage, key, parse, () => newAppliedRecord(...));
  *   if (!claimed) return busy;
+ *   // a refusal before the first write: await releaseRun(storage, key, parse, claimed);
  *   // ... the run changes claimed.record ...
  *   await finishRun(storage, key, parse, claimed.record, claimed.claim);
  * @version-history
+ *   v1.1.0 — 2026-10-31 — claimRun says whether its claim created the record (`created`), and
+ *     releaseRun ends a claim whose run was refused before its first write, so applyInstallSet can
+ *     claim before the repository link, the pulls and the owner account (secaudit 2026-10-31 inv-22).
  *   v1.0.0 — 2026-10-18 — Initial (atomic-write round: applyInstallSet and installSetForOwner).
  */
 import { randomUUID } from 'node:crypto';
@@ -81,16 +87,35 @@ async function writeOn(storage: Storage, key: string, rec: MemoryRecord | null, 
  */
 export async function claimRun<T extends RunRecord>(
     storage: Storage, key: string, parse: (v: unknown) => T | null, fresh: () => T,
-): Promise<{ record: T; claim: RunClaim } | null> {
+): Promise<{ record: T; claim: RunClaim; created: boolean } | null> {
     const claim: RunClaim = { id: randomUUID(), since: new Date().toISOString() };
     for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
         const rec = await storage.getMemory(NS_INSTALL_SETS, key);
         const cur = parse(rec?.value);
         if (live(cur?.running, Date.now())) return null;
         const base = stripClaim(cur ?? fresh());
-        if (await writeOn(storage, key, rec, { ...base, running: claim }, base.created_at)) return { record: base, claim };
+        if (await writeOn(storage, key, rec, { ...base, running: claim }, base.created_at)) return { record: base, claim, created: cur === null };
     }
     return null;
+}
+
+/**
+ * End a claim whose run was refused before its first write. A record the claim itself created is
+ * removed, so a refused first apply leaves no applied set behind (install-set-trust.ts reads every
+ * record); an earlier record keeps its value, without the claim. A claim another run has taken over
+ * since is left alone.
+ */
+export async function releaseRun<T extends RunRecord>(
+    storage: Storage, key: string, parse: (v: unknown) => T | null, claimed: { claim: RunClaim; created: boolean },
+): Promise<void> {
+    for (let attempt = 0; attempt < CAS_ATTEMPTS; attempt++) {
+        const rec = await storage.getMemory(NS_INSTALL_SETS, key);
+        const cur = parse(rec?.value);
+        if (!rec || !cur || cur.running?.id !== claimed.claim.id) return;
+        if (claimed.created) { await storage.deleteMemory(NS_INSTALL_SETS, key, 'install-set-run'); return; }
+        if (await writeOn(storage, key, rec, stripClaim(cur), cur.created_at)) return;
+    }
+    throw new Error(`install set record ${key} changed under every one of ${CAS_ATTEMPTS} attempts; apply the set again`);
 }
 
 /** `ours` over `stored`, keeping what each run made and a claim that is not ours. */

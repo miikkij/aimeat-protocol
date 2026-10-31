@@ -34,6 +34,10 @@
  * @usage
  *   const out = await applyInstallSet({ storage, config, peers }, { installSet, secrets, dryRun: true });
  * @version-history
+ *   2026-10-31 — A real apply claims the set's record before the real prepare and ensureOwner, which
+ *     link the repository, store the pulled copies and can create the owner account; a refusal after
+ *     the claim ends it with releaseRun. A second apply at the same moment answered APPLY_IN_PROGRESS
+ *     ("made nothing") after those writes (secaudit 2026-10-31 inv-22).
  *   2026-10-29 — A set whose repository is this node itself is refused (400 SELF_NODE_ID) before the
  *     card read: no peer under this node's own id (secaudit2026oct26 round 8c, federation-07).
  *   2026-10-18 — A real apply claims the set's record before it makes anything (install-set-run.ts
@@ -99,7 +103,7 @@ import { selfNodeIdMessage } from './federation-peer-gate.js';
 import { proveNodeCard } from './packages/peer/package-peer-register.js';
 import { recordPeerOrigin } from './peer-origin.js';
 import { NS_INSTALL_SETS } from './install-set-trust.js';
-import { claimRun, finishRun, type RunClaim } from './install-set-run.js';
+import { claimRun, finishRun, releaseRun, type RunClaim } from './install-set-run.js';
 import { writeAppWorkspaceLinks, type AppWorkspaceLink } from './app-workspaces.js';
 import { grantInstalledApps, landingPath, type AppGrantStep } from './install-set-grants.js';
 import { recordOperatorAction } from './operator-access-audit.js';
@@ -416,23 +420,33 @@ export async function applyInstallSet(deps: ApplyDeps, input: ApplyInput): Promi
     }
     if (checked.problems.length > 0) return cannotApply(checked.problems);
 
-    const prep = await prepare(deps, input);
-    if (!prep.ok) return prep;
-    if (prep.problems.length > 0) return cannotApply(prep.problems);
-    const { set, bundle, bundleVersion, remote, secrets } = prep;
-    const ownerName = set.owner.name;
-
-    const owner = await ensureOwner(storage, config, set.owner);
-    if (!owner.ok) return owner;
-    const localBundle = prep.bundleLocalGroup;
-    const key = appliedRecordKey(ownerName, localBundle);
-    const now = new Date().toISOString();
     // One run at a time across node processes (install-set-run.ts): the record is claimed before
-    // anything is made, and a second apply at the same moment is refused here.
+    // anything is made, and a second apply at the same moment is refused here. The real prepare
+    // links the repository and stores the pulled copies, and ensureOwner can create the account, so
+    // the claim comes before both; the plan above gave the key (secaudit 2026-10-31 inv-22).
+    const ownerName = checked.set.owner.name;
+    const localBundle = checked.bundleLocalGroup;
+    const key = appliedRecordKey(ownerName, localBundle);
     const claimed = await claimRun(storage, key, appliedValue, () => newAppliedRecord(ownerName,
-        { group_id: set.bundle.groupId, local_group_id: localBundle, node_id: set.bundle.nodeId ?? null, version: bundleVersion, name: bundle.name },
+        { group_id: checked.set.bundle.groupId, local_group_id: localBundle, node_id: checked.set.bundle.nodeId ?? null, version: checked.bundleVersion, name: checked.bundle.name },
         input.appliedBy));
     if (!claimed) return APPLY_IN_PROGRESS;
+    // A refusal from here to the first install ends the claim, and a record the claim made goes too.
+    const release = () => releaseRun(storage, key, appliedValue, claimed);
+    let prep: Awaited<ReturnType<typeof prepare>>;
+    let owner: Awaited<ReturnType<typeof ensureOwner>>;
+    try {
+        prep = await prepare(deps, input);
+        if (!prep.ok) { await release(); return prep; }
+        if (prep.problems.length > 0) { await release(); return cannotApply(prep.problems); }
+        owner = await ensureOwner(storage, config, prep.set.owner);
+        if (!owner.ok) { await release(); return owner; }
+    } catch (err) {
+        await release();
+        throw err;
+    }
+    const { set, bundle, bundleVersion, remote, secrets } = prep;
+    const now = new Date().toISOString();
     const record: AppliedRecord = claimed.record;
     const finish = () => finishRun(storage, key, appliedValue, record, claimed.claim);
     record.bundle.version = bundleVersion;
