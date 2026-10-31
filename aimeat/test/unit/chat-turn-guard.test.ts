@@ -6,13 +6,15 @@
  *   counting the ceiling depends on; e2e-chat-agent holds the turn around it.
  * @usage cd aimeat && pnpm exec vitest run test/unit/chat-turn-guard.test.ts
  * @version-history
+ *   v1.3.0 — 2026-10-31 — The publish ends the turn, and the node knows the published app's address
+ *     only from a publish (crew34 K35).
  *   v1.2.0 — 2026-10-31 — Every genre the turn note names ships and comes in one part.
  *   v1.1.0 — 2026-10-31 — The app path in the turn note and the answer phase, the sign-in sentence,
  *     and the grace after a published app (v31 K35, K38).
  *   v1.0.0 — 2026-10-02 — Initial.
  */
 import { describe, it, expect } from 'vitest';
-import { TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, TURN_LIMITS } from '../../src/services/chat-turn-guard.js';
+import { TurnWatch, stepForTool, turnNote, wrapUpPrompt, withTicks, progressText, stoppedText, appReadyText, publishedAppUrl, TURN_LIMITS } from '../../src/services/chat-turn-guard.js';
 import { nodeTemplateAnswer } from '../../src/services/node-templates.js';
 
 const call = (id: string, title: string, status = 'pending') => ({ kind: 'tool_call', id, title, status });
@@ -109,7 +111,23 @@ describe('what the node tells the model', () => {
         expect(note).toMatch(/aimeat_app_publish/);
         expect(note).toMatch(/Give them `url`/);
         expect(note).toMatch(/never ask them to sign in/);
+        expect(note).toMatch(/When aimeat_app_publish has answered, the app is done/);
+        expect(note).toMatch(/do not read it after the publish/);
         expect(wrapUpPrompt('rounds')).toMatch(/publish it now with aimeat_app_publish/);
+    });
+    it('the node knows the address of an app the turn published, and only from a publish (crew34 K35)', () => {
+        const card = { kind: 'app', url: 'https://ostoslista.example.io/' };
+        expect(publishedAppUrl('aimeat: aimeat app publish', card)).toBe(card.url);
+        expect(publishedAppUrl('aimeat: aimeat_app_draft_publish', card)).toBe(card.url);
+        // A list of apps answers with an app card too, and that app was not made in this turn.
+        expect(publishedAppUrl('aimeat: aimeat app list', card)).toBeUndefined();
+        expect(publishedAppUrl('aimeat: aimeat app publish', { kind: 'page', url: card.url })).toBeUndefined();
+        expect(publishedAppUrl('aimeat: aimeat app publish', null)).toBeUndefined();
+    });
+    it('the line for a published app gives its address in the person\'s language', () => {
+        expect(appReadyText('fi', 'https://x.example/')).toBe('Sovelluksesi on valmis. Avaa se tästä: https://x.example/');
+        expect(appReadyText('en', 'https://x.example/')).toMatch(/^Your app is ready\. .*https:\/\/x\.example\/$/);
+        expect(appReadyText('es', 'https://x.example/')).toMatch(/^Tu aplicación está lista\. .*https:\/\/x\.example\/$/);
     });
     it('the turn note gives a news agent its web tools, its clock and email delivery (v31 K45-K47)', () => {
         const note = turnNote();

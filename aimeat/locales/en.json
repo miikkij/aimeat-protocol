@@ -27012,6 +27012,7 @@
       "wrappingUp": "This is taking a while, so I'll answer now with what I have."
     },
     "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts.",
+    "appReady": "Your app is ready. Open it here: {{url}}",
     "toolsNotConnected": "I could not connect to your AIMEAT tools, so I did not start. Try again in a moment."
   },
   "explain": {
