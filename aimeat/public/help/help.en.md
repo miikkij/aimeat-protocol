@@ -12,12 +12,12 @@ You can also talk with the AI directly in the [chat](/v1/chat).
 
 If you already use Claude, ChatGPT or another AI, you can connect it here. The connection uses MCP, an open way for an AI to use a service with your permission. Then your AI sees the same information and does the same things as the chat. The instructions are on your Home.
 
-## What this costs {#cost}
+## AI credit and what this costs {#cost}
 
 <!--store-->
-Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name and in the chat.
+Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name, in the chat and on the [AI page](/v1/profile?tab=ai).
 
-The credit is used when the AI answers or does work. When it runs low, your Home shows a link where you buy more. You buy more credit in the store, the same way you bought this place.
+The credit is used when the AI answers or does work. To buy more, press Buy more credit next to the credit on your Home. You can do it at any time. You buy the credit in the store, the same way you bought this place.
 
 When the credit is used up, AIMEAT tells you and shows how to go on, for example: buy more credit in the store, or, if this site has a free model, go on with that. The free model answers less well.
 
@@ -45,13 +45,13 @@ An agent is an AI that does one job for you, also when you are away.
 
 Say in one sentence on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
 
-What the agent finishes shows on your Home. You can stop an agent at any time.
+You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. What the agent finishes shows on your Home. You can stop an agent at any time.
 
 ## Apps {#apps}
 
 An app is a small web page that does one thing, for example a calculator, a form or a game.
 
-Ask the AI to make an app, for example in the chat: "Make me an app to follow my customers' orders." The finished app opens at its own address, and its data is saved here.
+Ask for an app in the [chat](/v1/chat), for example: "Make me an app to follow my customers' orders." You get a link to the finished app. Open it and use it: it has its own address, and its data is saved here. Your apps are also on the [Apps page](/v1/profile?tab=apps).
 
 ## Signing in {#signin}
 

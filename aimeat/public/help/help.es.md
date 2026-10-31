@@ -12,12 +12,12 @@ También puedes hablar con la IA directamente en el [chat](/v1/chat).
 
 Si ya usas Claude, ChatGPT u otra IA, puedes conectarla aquí. La conexión usa MCP, una forma abierta de que una IA use un servicio con tu permiso. Así tu IA ve la misma información y hace lo mismo que el chat. Las instrucciones están en tu Inicio.
 
-## Cuánto cuesta {#cost}
+## Saldo de IA y cuánto cuesta {#cost}
 
 <!--store-->
-Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda en tu Inicio bajo tu nombre y en el chat.
+Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda en tu Inicio bajo tu nombre, en el chat y en la [página de IA](/v1/profile?tab=ai).
 
-El saldo se gasta cuando la IA responde o hace un trabajo. Cuando queda poco, tu Inicio muestra un enlace para comprar más. El saldo adicional se compra en la tienda, igual que compraste este sitio.
+El saldo se gasta cuando la IA responde o hace un trabajo. Para comprar más, pulsa Comprar más saldo junto al saldo en tu Inicio. Puedes hacerlo cuando quieras. El saldo se compra en la tienda, igual que compraste este sitio.
 
 Cuando el saldo se agota, AIMEAT te lo dice y te muestra cómo seguir, por ejemplo: comprar más saldo en la tienda o, si este sitio tiene un modelo gratuito, seguir con él. El modelo gratuito responde peor.
 
@@ -45,13 +45,13 @@ Un agente es una IA que hace un trabajo por ti, también cuando no estás.
 
 Di en una frase en tu [Inicio](/v1/home) lo que quieres. AIMEAT crea el agente y te lo muestra antes de que empiece. Si el trabajo se repite, dilo: por ejemplo "cada mañana de lunes a viernes a las 8". Así el agente hace el trabajo con ese horario.
 
-Lo que el agente termina aparece en tu Inicio. Puedes detener un agente cuando quieras.
+Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Lo que el agente termina aparece en tu Inicio. Puedes detener un agente cuando quieras.
 
 ## Aplicaciones {#apps}
 
 Una aplicación es una pequeña página web que hace una cosa, por ejemplo una calculadora, un formulario o un juego.
 
-Pide a la IA que haga una aplicación, por ejemplo en el chat: "Hazme una aplicación para seguir los pedidos de mis clientes." La aplicación terminada se abre en su propia dirección, y sus datos se guardan aquí.
+Pide una aplicación en el [chat](/v1/chat), por ejemplo: "Hazme una aplicación para seguir los pedidos de mis clientes." Recibes un enlace a la aplicación terminada. Ábrela y úsala: tiene su propia dirección, y sus datos se guardan aquí. Tus aplicaciones también están en la [página de Aplicaciones](/v1/profile?tab=apps).
 
 ## Entrar {#signin}
 

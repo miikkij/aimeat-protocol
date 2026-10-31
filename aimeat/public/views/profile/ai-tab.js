@@ -16,6 +16,8 @@
  * @structure AiSettingsTab() — state + handlers (each a legacy call, and the provider call on a 410) → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.6.0 — 2026-10-31 — advancedOpen: the simple view's "Lisäasetukset" fold on a node the store
+ *     sold (ai/page.js renderSimple, v31 K58).
  *   v1.5.0 — 2026-10-13 — Legacy route first, provider path on 410 (js/services/ai-connection.js
  *     legacyOr): on 3.x the connection section calls /v1/openrouter/settings and /test as it did before
  *     v1.4.0, so the providers table, who pays for the chat, the test and the removal are as they were.
@@ -67,6 +69,8 @@ export default function AiSettingsTab({ navigate, showToast }) {
   const [capsEditing, setCapsEditing] = useState(false);
   const [caps, setCaps] = useState({});
   const [showAllApps, setShowAllApps] = useState(false);
+  // The simple view's "Lisäasetukset" fold (ai/page.js renderSimple), shut until opened.
+  const [advancedOpen, setAdvancedOpen] = useState(false);
   const [metric, setMetric] = useState('cost');
   const [busy, setBusy] = useState(false);
   const [connMsg, setConnMsg] = useState(null);
@@ -242,7 +246,7 @@ export default function AiSettingsTab({ navigate, showToast }) {
 
   const ctx = {
     settings, aiSettings, usage, history, chat, conn,
-    budgetEditing, budgetDraft, capsEditing, caps, showAllApps, metric, busy,
+    budgetEditing, budgetDraft, capsEditing, caps, showAllApps, metric, busy, advancedOpen, setAdvancedOpen,
     connMsg, budgetMsg, capsMsg,
     keyed: keyedFor(settings), host,
     quotas: aiSettings?.app_quotas || {},
