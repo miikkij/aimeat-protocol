@@ -16025,6 +16025,7 @@
       "open": "Home settings",
       "title": "Home settings",
       "showAch": "Show achievements on the home",
+      "helpOnHover": "Show the help when I rest the pointer on a word",
       "pattern": "Margin pattern",
       "patternHint": "A figure on the empty margins of the home, the chat and the settings, fading toward the middle. Shows on wide screens only.",
       "patternOff": "Off",
@@ -27254,6 +27255,7 @@
       }
     },
     "more": "Click for examples.",
+    "moreWord": "Click the word for the full explanation.",
     "range": "Range",
     "low": "Lower value",
     "high": "Higher value",

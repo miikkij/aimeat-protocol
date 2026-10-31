@@ -16219,6 +16219,7 @@
       "open": "Kodin asetukset",
       "title": "Kodin asetukset",
       "showAch": "Näytä saavutukset kotona",
+      "helpOnHover": "Näytä ohje, kun pidän hiirtä sanan päällä",
       "pattern": "Reunakuvio",
       "patternHint": "Kuvio kodin, chatin ja asetusten tyhjillä reunoilla, haalenee keskelle päin. Näkyy vain leveällä näytöllä.",
       "patternOff": "Pois",
@@ -27433,6 +27434,7 @@
       }
     },
     "more": "Napsauta, niin näet esimerkit.",
+    "moreWord": "Napsauta sanaa, niin näet koko ohjeen.",
     "range": "Arvoalue",
     "low": "Pieni arvo",
     "high": "Suuri arvo",
