@@ -18,12 +18,14 @@
  *   visitor rate limiter keys it (visitorRunShareKey). PER PROCESS, as the rate limiters are
  *   (rate-buckets.ts).
  * @structure RunSlotTurn · EXT_RUN_RETRY_AFTER_SEC · takeExtensionRunSlot(config, account) · runSlotsInUse()
- *   · visitorRunShareKey(ip) · SELLER_RUNS_PER_RUN · createRunQueue(max)
+ *   · waitExtensionRunSlot(config, account, opts) · visitorRunShareKey(ip) · SELLER_RUNS_PER_RUN · createRunQueue(max)
  * @usage
  *   const slot = takeExtensionRunSlot(config, ownerGhiiOf(caller.gaii));
  *   if (!slot.ok) return refuse(503, slot.code, slot.message, slot.retryAfterSec);
  *   try { ... run ... } finally { slot.release(); }
  * @version-history
+ *   v1.3.0 — 2026-10-31 — waitExtensionRunSlot: an AI call served by an extension provider takes a slot
+ *     too, and waits for one rather than being refused (secaudit2026oct31w2 round 10, W2-16).
  *   v1.2.0 — 2026-10-27 — createRunQueue and SELLER_RUNS_PER_RUN: the seller runs one buying run's
  *     ctx.buy calls start go at most four at once, the rest queued (secaudit2026oct26).
  *   v1.1.0 — 2026-10-27 — visitorRunShareKey: a visitor's share is keyed by IPv6 /64, as the visitor
@@ -44,6 +46,8 @@ export type RunSlotTurn =
 
 let inUse = 0;
 const byAccount = new Map<string, number>();
+/** Callers of waitExtensionRunSlot parked until a slot is released. Each one tries again when woken. */
+const slotWaiters = new Set<() => void>();
 
 /** Request-driven runs in progress on this node now. */
 export function runSlotsInUse(): number {
@@ -77,8 +81,37 @@ export function takeExtensionRunSlot(config: AimeatConfig, account: string): Run
             inUse--;
             const left = (byAccount.get(account) ?? 1) - 1;
             if (left > 0) byAccount.set(account, left); else byAccount.delete(account);
+            for (const wake of [...slotWaiters]) wake();
         },
     };
+}
+
+/**
+ * A slot for a run whose caller is already waiting on the node for its answer (an AI call served by
+ * an extension provider), taken as takeExtensionRunSlot takes it; when the pool or the account's
+ * share is full, the caller waits until a run ends, at most `maxWaitMs` or until `signal` aborts, and
+ * then gets the same refusal takeExtensionRunSlot gives. A waiting caller holds no sandbox, and how
+ * many can wait is bounded by the per-account AI call rate (secaudit2026oct31w2 round 10, W2-16).
+ */
+export async function waitExtensionRunSlot(
+    config: AimeatConfig, account: string, opts: { maxWaitMs: number; signal?: AbortSignal },
+): Promise<RunSlotTurn> {
+    const deadline = Date.now() + opts.maxWaitMs;
+    for (;;) {
+        const turn = takeExtensionRunSlot(config, account);
+        if (turn.ok || opts.signal?.aborted || Date.now() >= deadline) return turn;
+        await new Promise<void>((resolve) => {
+            const wake = (): void => {
+                clearTimeout(timer);
+                slotWaiters.delete(wake);
+                opts.signal?.removeEventListener('abort', wake);
+                resolve();
+            };
+            const timer = setTimeout(wake, Math.max(0, deadline - Date.now()));
+            slotWaiters.add(wake);
+            opts.signal?.addEventListener('abort', wake, { once: true });
+        });
+    }
 }
 
 /**

@@ -17,6 +17,8 @@
  *   fallback price.
  * @structure CAPABILITY_OP · assertOwnExtensionProvider() · extensionRunner()
  * @version-history
+ *   v1.3.0 — 2026-10-31 — A provider run takes a slot of the request-driven run pool on the owner's
+ *     share and waits for one when the share is full (secaudit2026oct31w2 round 10, W2-16).
  *   v1.2.0 — 2026-10-25 — The provider's extension is the owner's own first, found through
  *     services/component-address.ts (owner namespaces wish, secaudit2026oct22).
  *   v1.1.1 -- 2026-10-25 -- The run passes servesWaitingCaller: the AI call's caller waits for it, so a deactivated account does not stop it (secaudit2026oct22).
@@ -33,6 +35,8 @@ import type { AiProvider } from './providers.js';
 import { aiProviderDeclarationOf, type ExtensionAiProviderDeclaration } from '../extension-ai-provider-declaration.js';
 import { runExtensionActionAsSystem } from '../extension-system-run.js';
 import { findExtension } from '../component-address.js';
+import { waitExtensionRunSlot } from '../extension-run-slots.js';
+import { extensionWallClockMs } from '../extension-run-deadline.js';
 
 /** The action op a capability is served by. */
 export const CAPABILITY_OP: Record<AiCapability, AiOp> = {
@@ -114,6 +118,13 @@ export function extensionRunner(
     // The node's own refusal (the manifest does not list the operation), never a provider status.
     if (!decl.ops.includes(op as never)) throw new AiCompletionError('INVALID_PROVIDER', 400, `The extension '${name}' does not serve ai.${op}.`);
     const inject = key ? (decl.authHeader ? { name: decl.authHeader, value: key } : { name: 'Authorization', value: `Bearer ${key}` }) : undefined;
+    // A request-driven sandbox run takes a slot on the owner's share, as POST /v1/ext does. The AI
+    // call's caller is already waiting, so a full share makes it wait for a run to end (at most one
+    // run's wall clock) instead of refusing a call that worked before (secaudit2026oct31w2 round 10).
+    const slot = await waitExtensionRunSlot(config, ownerGhii, {
+      maxWaitMs: extensionWallClockMs({ timeoutMs: config.extensionTimeoutMs }), ...(signal ? { signal } : {}),
+    });
+    if (!slot.ok) throw new AiCompletionError(slot.code, 503, slot.message, { retry_after_sec: slot.retryAfterSec });
     let result: unknown;
     try {
       const out = await runExtensionActionAsSystem({ storage, config }, {
@@ -132,6 +143,8 @@ export function extensionRunner(
       // the extension threw is the provider failing.
       const timedOut = /interrupted|timed out|timeout/i.test(msg);
       throw Object.assign(new Error(`The extension '${name}' failed on ai.${op}: ${msg.slice(0, 300)}`), { status: signal?.aborted ? 499 : timedOut ? 504 : 502 });
+    } finally {
+      slot.release();
     }
     if (!result || typeof result !== 'object' || Array.isArray(result)) {
       throw Object.assign(new Error(`The extension '${name}' answered ai.${op} with no result object.`), { status: 502 });

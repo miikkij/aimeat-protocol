@@ -11,11 +11,12 @@
  *     - 0 is no limit on either number.
  * @usage cd aimeat && pnpm exec vitest run test/unit/extension-run-slots.test.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — waitExtensionRunSlot (secaudit2026oct31w2 round 10, W2-16).
  *   v1.0.0 — 2026-10-25 — Initial (secaudit2026oct22, lead 817).
  */
 import { describe, it, expect } from 'vitest';
 import type { AimeatConfig } from '../../src/config.js';
-import { takeExtensionRunSlot, runSlotsInUse, visitorRunShareKey } from '../../src/services/extension-run-slots.js';
+import { takeExtensionRunSlot, runSlotsInUse, visitorRunShareKey, waitExtensionRunSlot } from '../../src/services/extension-run-slots.js';
 
 const cfg = (node: number, perAccount: number) => ({ extensionRunSlots: node, extensionRunSlotsPerAccount: perAccount }) as unknown as AimeatConfig;
 type Held = { ok: true; release: () => void };
@@ -82,6 +83,37 @@ describe('request-driven extension run slots', () => {
         const held = Array.from({ length: 500 }, () => takeExtensionRunSlot(c, 'busy@n'));
         expect(held.every(h => h.ok)).toBe(true);
         for (const h of held) (h as Held).release();
+        expect(runSlotsInUse()).toBe(0);
+    });
+
+    // secaudit2026oct31w2 round 10 (W2-16): an AI call on an extension provider waits for a slot.
+    it('a waiting caller gets the slot when a run ends, and only then', async () => {
+        const c = cfg(10, 1);
+        const first = takeExtensionRunSlot(c, 'wait@n') as Held;
+        let got = false;
+        const waiting = waitExtensionRunSlot(c, 'wait@n', { maxWaitMs: 5000 }).then((t) => { got = true; return t; });
+        await new Promise(r => setTimeout(r, 20));
+        expect(got).toBe(false);
+        expect(runSlotsInUse()).toBe(1);
+        first.release();
+        const turn = await waiting;
+        expect(turn.ok).toBe(true);
+        expect(runSlotsInUse()).toBe(1);
+        (turn as Held).release();
+        expect(runSlotsInUse()).toBe(0);
+    });
+
+    it('a waiting caller is refused after maxWaitMs, or at once when its signal aborts, naming the setting', async () => {
+        const c = cfg(10, 1);
+        const held = takeExtensionRunSlot(c, 'full@n') as Held;
+        const late = await waitExtensionRunSlot(c, 'full@n', { maxWaitMs: 30 });
+        expect(late.ok).toBe(false);
+        if (!late.ok) expect(late.message).toContain('extensions.run_slots_per_account');
+        const ac = new AbortController();
+        const pending = waitExtensionRunSlot(c, 'full@n', { maxWaitMs: 60_000, signal: ac.signal });
+        ac.abort();
+        expect((await pending).ok).toBe(false);
+        held.release();
         expect(runSlotsInUse()).toBe(0);
     });
 });
