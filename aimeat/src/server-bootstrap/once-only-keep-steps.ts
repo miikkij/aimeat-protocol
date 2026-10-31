@@ -21,6 +21,8 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-10-31 -- recordDatapackageAudiencesOnce, after the ai schedule step: every existing data package
+ *     gets the service-owned record of its audience (secaudit2026oct31w2 round 10).
  *   2026-10-29 -- askUncertainAccountantGrantsOnce, last: an older accountant grant whose holder the
  *     estimate cannot place is asked of the client with one press (secaudit2026oct26 round 8c).
  *   2026-10-29 -- markPlatformFeeWritersOnce, after the capability step: the platform-fee records another writer wrote are left
@@ -85,6 +87,7 @@ import { keepExtensionFirstUseOnce } from '../services/extension-first-use-keep.
 import { keepExtensionPublishOnce } from '../services/extension-publish-keep.js';
 import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
+import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
@@ -106,6 +109,11 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // input changes (services/schedule-ai-read.ts). Awaited, so the list exists before scheduler.start().
   await keepAiScheduleReadsOnce(storage, config)
     .catch(err => logger.error('Failed to keep the reads of the older agent ai schedules; the next boot tries again', { error: String(err) }));
+  // Every data package that has a version gets the service-owned record of its audience, as its pointer
+  // and descriptor files have it at the update, so it keeps its readers (services/datapackage/
+  // audience-record.ts). Awaited, so no read meets a package without its record.
+  await recordDatapackageAudiencesOnce(storage, config)
+    .catch(err => logger.error('Failed to record the audience of the existing data packages; the next boot tries again', { error: String(err) }));
   // The knowledge link rows written before link rows carried their owner get the namespace that holds
   // their source package (services/knowledge-link-owner-keep.ts). Awaited, so a package's links show
   // from the first request.
