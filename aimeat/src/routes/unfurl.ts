@@ -20,6 +20,10 @@
  *   - parseMeta(html, base)    → extract OG/Twitter/<title> metadata, resolving relative image URLs
  *
  * @version-history
+ *   2026-10-31 — parseMeta reads the page's <meta> tags and <title> once, in one linear pass
+ *     (utils/html-tag-scan.ts), in place of up to 18 patterns that each ran from every `<meta` and cost
+ *     the square of the page's size on a page full of openers; exported for its test
+ *     (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
  *   v1.1.0 — 2026-10-05 — The page is read with readBodyPrefix and the image with readBodyCapped
  *     (utils/read-capped.ts) in place of a private copy, so an image over the ceiling is refused (413)
  *     rather than served cut (secaudit 2026-10, C6).
@@ -36,6 +40,7 @@ import { safeFetch } from '../utils/url-validator.js';
 import { cached } from '../services/cache.js';
 import { logger } from '../utils/logger.js';
 import { readBodyCapped, readBodyPrefix } from '../utils/read-capped.js';
+import { metaTags, metaContentOf, titleText, type MetaAttributes } from '../utils/html-tag-scan.js';
 
 /** Page fetch caps — an unfurl only needs the <head>, so a small ceiling covers real pages. */
 const MAX_HTML_BYTES = 512 * 1024;      // 512 KB of HTML is plenty to reach the OG tags
@@ -56,13 +61,13 @@ export function decodeEntities(s: string): string {
   return s.replace(/&(amp|lt|gt|quot|apos|#0?39|#x27|nbsp);/gi, (_, name: string) => ENTITIES[name.toLowerCase()]);
 }
 
-/** Find a <meta> tag's content by property/name, tolerating attribute order (content before or after). */
-function metaByKey(html: string, key: string): string | null {
-  const k = key.replace(/[.:]/g, '\\$&');
-  const after = new RegExp(`<meta[^>]+(?:property|name)=["']${k}["'][^>]*?content=["']([^"']*)["']`, 'i');
-  const before = new RegExp(`<meta[^>]+content=["']([^"']*)["'][^>]*?(?:property|name)=["']${k}["']`, 'i');
-  const m = after.exec(html) || before.exec(html);
-  return m && m[1] ? decodeEntities(m[1].trim()) : null;
+/**
+ * A <meta> tag's content by property or name, in any attribute order. The tags are read once per page
+ * in one linear pass (utils/html-tag-scan.ts), not with a pattern per key run from every `<meta`.
+ */
+function metaByKey(tags: MetaAttributes[], key: string): string | null {
+  const v = metaContentOf(tags, ['property', 'name'], key);
+  return v ? decodeEntities(v.trim()) : null;
 }
 
 interface Preview {
@@ -75,20 +80,21 @@ interface Preview {
 }
 
 /** Pull OG/Twitter/<title> metadata out of a page, resolving a relative og:image against the page URL. */
-function parseMeta(html: string, originalUrl: string, resolvedUrl: string): Preview {
-  const head = html.slice(0, 200_000); // OG tags live in <head>; cap the regex work
-  const titleTag = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(head);
-  const title = metaByKey(head, 'og:title') || metaByKey(head, 'twitter:title')
-    || (titleTag ? decodeEntities(titleTag[1].trim()) : null);
-  const description = metaByKey(head, 'og:description') || metaByKey(head, 'twitter:description')
-    || metaByKey(head, 'description');
-  const rawImage = metaByKey(head, 'og:image') || metaByKey(head, 'og:image:url') || metaByKey(head, 'twitter:image');
+export function parseMeta(html: string, originalUrl: string, resolvedUrl: string): Preview {
+  const head = html.slice(0, 200_000); // OG tags live in <head>; cap the work
+  const tags = metaTags(head);
+  const titleTag = titleText(head);
+  const title = metaByKey(tags, 'og:title') || metaByKey(tags, 'twitter:title')
+    || (titleTag !== null ? decodeEntities(titleTag.trim()) : null);
+  const description = metaByKey(tags, 'og:description') || metaByKey(tags, 'twitter:description')
+    || metaByKey(tags, 'description');
+  const rawImage = metaByKey(tags, 'og:image') || metaByKey(tags, 'og:image:url') || metaByKey(tags, 'twitter:image');
   let image: string | null = null;
   if (rawImage) {
     // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { image = new URL(rawImage, resolvedUrl).toString(); } catch { image = null; }
   }
-  const siteName = metaByKey(head, 'og:site_name') || (() => {
+  const siteName = metaByKey(tags, 'og:site_name') || (() => {
     // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { return new URL(resolvedUrl).hostname.replace(/^www\./, ''); } catch { return null; }
   })();
