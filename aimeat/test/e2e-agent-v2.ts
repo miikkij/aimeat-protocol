@@ -1044,6 +1044,22 @@ async function run() {
             'the proposed agent must not exist before the owner approves');
     });
 
+    await test('a proposal keeps the clock it names, and a malformed clock is refused (v31 K47)', async () => {
+        // The source was broken: a proposal could not carry a schedule, so the chat asked the person
+        // to come back and say "continue" for it after approving.
+        const post = (schedule: unknown, name: string) => json('/v1/agents/v2/agent-proposals', {
+            method: 'POST', headers: { Authorization: `Bearer ${writer.token}` },
+            body: JSON.stringify({ name, purpose: 'Gathers the morning news into five points.', scopes: ['memory:read'], crew_def: PROPOSED_DEF, schedule }),
+        });
+        const ok = await post('0 7 * * *', 'morning-news');
+        assert(ok.status === 201 && ok.body.data.proposal.schedule === '0 7 * * *', `the clock is kept: ${ok.status} ${JSON.stringify(ok.body.data?.proposal?.schedule ?? ok.body.error)}`);
+        for (const bad of ['every morning', '0 7 * *', 7]) {
+            const r = await post(bad, 'bad-clock');
+            assert(r.status === 400 && r.body.error.code === 'INVALID_INPUT', `${JSON.stringify(bad)} is refused: ${r.status}`);
+        }
+        await json(`/v1/agents/v2/agent-proposals/${ok.body.data.proposal.id}/decline`, { method: 'POST', headers: authA });
+    });
+
     await test('the owner sees it waiting', async () => {
         const r = await json('/v1/agents/v2/agent-proposals', { headers: authA });
         assert(r.status === 200, `list ${r.status}`);

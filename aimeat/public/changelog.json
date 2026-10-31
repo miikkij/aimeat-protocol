@@ -4,6 +4,29 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-large-files-straight-to-your-file-store",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent",
+        "developer"
+      ],
+      "title": {
+        "en": "Large files straight to your file store",
+        "fi": "Suuret tiedostot suoraan tallennustilaan"
+      },
+      "summary": {
+        "en": "A file of hundreds of megabytes goes straight to your S3 or Azure storage and back, without passing through AIMEAT.",
+        "fi": "Satojen megatavujen tiedosto menee suoraan S3- tai Azure-tallennustilaasi ja takaisin kulkematta AIMEATin kautta."
+      },
+      "body": {
+        "en": "When your files are kept in S3 or Azure storage, an app or your AI can send a large file, up to several gigabytes, straight there, and a file of 64 MB or more downloads straight from there. AIMEAT checks who may write and read, records the file and counts it, but the bytes do not pass through it. For a browser, the storage needs a CORS rule.",
+        "fi": "Kun tiedostosi ovat S3- tai Azure-tallennustilassa, sovellus tai tekoälysi voi lähettää suuren tiedoston, jopa useita gigatavuja, suoraan sinne, ja vähintään 64 Mt:n tiedosto latautuu suoraan sieltä. AIMEAT tarkistaa, kuka saa kirjoittaa ja lukea, kirjaa tiedoston ja laskee sen kiintiöön, mutta tavut eivät kulje sen kautta. Selainta varten tallennustilaan tarvitaan CORS-sääntö."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-see-and-decide-what-your-computers-may-start",
       "highlight": false,
       "audience": [

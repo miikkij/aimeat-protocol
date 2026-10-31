@@ -6411,6 +6411,16 @@
   "chat.work.pending": "alkaa",
   "chat.work.title": "Mitä tehtiin",
   "chat.work.untitled": "työkalukutsu",
+  "chat.work.step.guide": "Luen ohjeet",
+  "chat.work.step.template": "Haen pohjan",
+  "chat.work.step.publish": "Julkaisen",
+  "chat.work.step.propose": "Ehdotan agenttia",
+  "chat.work.step.schedule": "Ajastan",
+  "chat.work.step.find": "Etsin työkalun",
+  "chat.work.step.read": "Katson tietojasi",
+  "chat.work.step.write": "Tallennan",
+  "chat.work.step.work": "Teen vaiheen",
+  "chat.work.stuck": "Yksi vaihe ei onnistunut.",
   "chat.working": "Työn alla…",
   "classic": {
     "nav": {
@@ -10562,6 +10572,7 @@
   "emailpage.kind.invitation": "kutsu",
   "emailpage.kind.agent_ask": "agenttisi pyyntö",
   "emailpage.kind.agent_narrowed": "agenttisi rajatut oikeudet",
+  "emailpage.kind.notification": "agenttisi tai sovelluksesi raportti",
   "emailpage.chatTitle": "Sähköposti chatista",
   "emailpage.chatSub": "hae, lue, lähetä tallennetulle · sovelluksen valtuutus · kehote",
   "emailpage.copyPrompt": "Kopioi kehote",
@@ -16209,6 +16220,7 @@
       "open": "Kodin asetukset",
       "title": "Kodin asetukset",
       "showAch": "Näytä saavutukset kotona",
+      "helpOnHover": "Näytä ohje, kun pidän hiirtä sanan päällä",
       "pattern": "Reunakuvio",
       "patternHint": "Kuvio kodin, chatin ja asetusten tyhjillä reunoilla, haalenee keskelle päin. Näkyy vain leveällä näytöllä.",
       "patternOff": "Pois",
@@ -17752,7 +17764,8 @@
     "lookLightOnly": "Tällä tyylillä on vain vaalea tila.",
     "lookDarkOnly": "Tällä tyylillä on vain tumma tila.",
     "lookThemes": "Teemat",
-    "lookStyles": "Tämän teeman tyylit"
+    "lookStyles": "Tämän teeman tyylit",
+    "menu": "Valikko"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Sanasto",
@@ -27426,6 +27439,7 @@
       }
     },
     "more": "Napsauta, niin näet esimerkit.",
+    "moreWord": "Napsauta sanaa, niin näet koko ohjeen.",
     "range": "Arvoalue",
     "low": "Pieni arvo",
     "high": "Suuri arvo",

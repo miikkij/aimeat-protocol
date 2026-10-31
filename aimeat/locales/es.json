@@ -5193,6 +5193,16 @@
   "chat.work.pending": "iniciando",
   "chat.work.title": "Lo que se hizo",
   "chat.work.untitled": "llamada a herramienta",
+  "chat.work.step.guide": "Leo las instrucciones",
+  "chat.work.step.template": "Busco una base",
+  "chat.work.step.publish": "Publico",
+  "chat.work.step.propose": "Propongo un agente",
+  "chat.work.step.schedule": "Programo el horario",
+  "chat.work.step.find": "Busco una herramienta",
+  "chat.work.step.read": "Consulto tus datos",
+  "chat.work.step.write": "Guardo",
+  "chat.work.step.work": "Hago un paso",
+  "chat.work.stuck": "Un paso no se completó.",
   "chat.working": "Trabajando…",
   "classic": {
     "nav": {
@@ -9276,6 +9286,7 @@
   "emailpage.kind.invitation": "una invitación",
   "emailpage.kind.agent_ask": "la solicitud de tu agente",
   "emailpage.kind.agent_narrowed": "los permisos limitados de tu agente",
+  "emailpage.kind.notification": "un informe de tu agente o tu aplicación",
   "emailpage.chatTitle": "Correo desde un chat",
   "emailpage.chatSub": "buscar, leer, enviar a un contacto guardado · la delegación de una aplicación · el prompt",
   "emailpage.copyPrompt": "Copiar el prompt",
@@ -14355,6 +14366,7 @@
       "open": "Configuración del hogar",
       "title": "Configuración del hogar",
       "showAch": "Mostrar los logros en el inicio",
+      "helpOnHover": "Mostrar la ayuda cuando dejo el puntero sobre una palabra",
       "pattern": "Patrón de los márgenes",
       "patternHint": "Una figura en los márgenes vacíos del hogar, el chat y la configuración, que se desvanece hacia el centro. Solo se ve en pantallas anchas.",
       "patternOff": "Sin patrón",
@@ -15827,7 +15839,8 @@
     "lookLightOnly": "Este estilo solo tiene modo claro.",
     "lookDarkOnly": "Este estilo solo tiene modo oscuro.",
     "lookThemes": "Temas",
-    "lookStyles": "Estilos de este tema"
+    "lookStyles": "Estilos de este tema",
+    "menu": "Menú"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glosario",
@@ -25066,6 +25079,7 @@
       }
     },
     "more": "Haz clic para ver ejemplos.",
+    "moreWord": "Haz clic en la palabra para ver la explicación completa.",
     "range": "Rango",
     "low": "Valor bajo",
     "high": "Valor alto",

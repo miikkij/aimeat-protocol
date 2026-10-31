@@ -6,6 +6,7 @@
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
  *   2026-10-31 — aimeat_overview: the account's overview (GET /v1/overview), on all three surfaces.
+ *   2026-10-31 — aimeat_agent_propose takes `schedule` (v31 K47); aimeat_notify takes `email` (v31 K46).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_contact_list's description names origin 'colleague', every other person of a company node (members see each other).
  *   2026-10-23 — aimeat_agent_runtime_report's `llm` takes 'local' (plan doc-mvlftkh9zmc9, C3.4).
@@ -379,6 +380,7 @@ export const agentMessagingTools = [
             run_mode: { type: 'string', description: "'spawn' starts a worker per piece of work (right for bursty jobs); 'resident' stays up (right for an agent that answers people as they write, at a few seconds of cold start saved)." },
             crew_def: { type: 'object', description: 'What it would BE, in the crewaimeat crew_def shape — the same document aimeat_crew_publish takes. Strongly recommended.' },
             connector: { type: 'string', description: "Which of the account's connectors (computers) runs it, by name or id from aimeat_connector_list. Send it when the person said where the agent is to run. Leave it out otherwise: the person chooses when approving, and an account with one connector has nothing to choose.", zod: z.string().max(80) },
+            schedule: { type: 'string', description: 'When it works on a clock, as a five-field cron in the person\'s time zone: "0 7 * * *" every morning at 7, "0 7 * * 1-5" on weekdays. The approval page starts with this time, and the person\'s one press starts the agent on it. Leave it out for an agent that works when asked.', zod: z.string().max(60) },
         },
     },
     {
@@ -484,6 +486,7 @@ export const agentMessagingTools = [
             body: { type: 'string', description: 'The detail, a few lines at most.', zod: z.string().max(10_000) },
             link: { type: 'string', description: 'Where a click leads: a path on this AIMEAT starting with "/". Default: the Agents page.', zod: z.string().max(500) },
             type: { type: 'string', description: 'A short machine word for the kind of event, e.g. report_ready.', zod: z.string().max(64) },
+            email: { type: 'boolean', description: 'Also email it to your owner at the address they verified, for a report they asked to get by mail. At most 10 a day from you; never when they muted you. The answer\'s `emailed` says what happened (sent, no_address, mail_off, limit, failed, muted).' },
         },
     },
     {

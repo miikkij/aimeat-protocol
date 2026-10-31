@@ -16,7 +16,8 @@
  * @structure notifyUsageCliTools[] — the handler table, spread by index.ts
  * @usage import { notifyUsageCliTools } from './tool-call-defs-notify-usage.js';
  * @version-history
- *   v1.1.0 — 2026-10-31 — aimeat_overview, over GET /v1/overview (src/routes/overview.ts, src/mcp/overview.ts).
+ *   v1.2.0 — 2026-10-31 — aimeat_overview, over GET /v1/overview (src/routes/overview.ts, src/mcp/overview.ts).
+ *   v1.1.0 — 2026-10-31 — aimeat_notify forwards `email` (v31 K46).
  *   v1.0.0 — 2026-10-12 — Moved from the connector MCP modules (wish: every MCP tool on aimeat connect serve).
  */
 import type { ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -32,6 +33,7 @@ export const notifyUsageCliTools: ConnectCliToolDefinition[] = [
             body: input.body,
             link: input.link,
             type: input.type,
+            email: input.email,
         }),
     },
     {

@@ -6,6 +6,9 @@
  * @structure Phases 1-11, each a numbered `test()` against a live node on E2E_BASE.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
  * @version-history
+ *   2026-10-31 — Test 67 asserts the refusal of a download URL with no version (401 TOKEN_INVALID,
+ *     asking for a new URL): the transition it held open ended, a behaviour change Jouni approved
+ *     (secaudit 2026-10-31 inv-18). A URL made now still stops at a re-upload.
  *   2026-10-21 — Test 66 asserts the old TTL again: a handle asked for with no credential lives the
  *     owner's hour (3600 s) with anonymous mode off, as before 2026-10-20, and the foreign 900 s with
  *     it on (the shared anonymous principal is a stranger, as it always was). Test 67: a
@@ -1403,7 +1406,9 @@ await test('66. A handle for a public file asked for with no credential lives as
     assert(own.status === 200 && own.body.data.expires_in_seconds === 3600, `the owner's handle TTL: ${own.body.data?.expires_in_seconds}`);
 });
 
-await test('67. A download URL made before the version binding (no version in it) is served until it expires, as before', async () => {
+// The transition this test held open ended on 2026-10-31 (Jouni; secaudit 2026-10-31 inv-18): every
+// URL without a version had expired by 2026-10-21, so one is now refused with a word on asking anew.
+await test('67. A download URL with no version in it is refused TOKEN_INVALID, and says to ask for a new one', async () => {
     // Such a URL can only be made by the node key, so the test signs it with the node's own key, read
     // from the database the server under test uses, in the shape generateDownloadToken had before `ver`.
     const key = `ver-legacy-${Date.now()}.txt`;
@@ -1424,11 +1429,9 @@ await test('67. A download URL made before the version binding (no version in it
     const legacy = await new SignJWT({ typ: 'download', key, mimeType: 'text/plain', size: Buffer.byteLength('made before the upgrade') })
         .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' }).setSubject(ownerGaii).setIssuedAt().setExpirationTime('3600s')
         .sign(signKey);
-    for (let i = 0; i < 2; i++) {
-        const got = await rawFetch(`/v1/download/${legacy}`);
-        const text = await got.text();
-        assert(got.status === 200 && text === 'made before the upgrade', `the older download URL: ${got.status} ${text.slice(0, 200)}`);
-    }
+    const got = await rawFetch(`/v1/download/${legacy}`);
+    const text = await got.text();
+    assert(got.status === 401 && text.includes('TOKEN_INVALID') && text.includes('new download URL'), `the older download URL: ${got.status} ${text.slice(0, 200)}`);
     // The hole stays closed for every URL made now: it names its version, and a re-upload ends it.
     const h = await json(`/v1/storage/${encodeURIComponent(key)}?mode=handle`, { headers: { Authorization: `Bearer ${ownerToken}` } });
     await sleep(5);

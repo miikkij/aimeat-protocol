@@ -5,11 +5,14 @@
  * @description The storage half of PUT /v1/upload/:token (a presigned storage upload), and the one
  *   reading of the `ai_provenance` block a presigned token carries. Moved out of routes/upload.ts by
  *   pure extraction when that file reached the 800-line ceiling; upload.ts still dispatches here.
- * @structure declaredFromMeta() · handleStorageUpload()
+ * @structure declaredFromMeta() · completeDirectStorageUpload() · handleStorageUpload()
  * @usage
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.4.0 — 2026-10-31 — completeDirectStorageUpload (POST /v1/upload/{token}/complete): the file a client
+ *     PUT straight in the object store is recorded from the size the store reports; a refused one's
+ *     object is removed (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
  *   v1.3.0 — 2026-10-30 — The token's `store`, the store the writer named at the mint, goes to the write
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  *   v1.2.0 — 2026-10-20 — An agent the mint allowed to publish (no `publish_ask` in the token) is asked
@@ -38,6 +41,62 @@ import { versionedAddress } from '../utils/http-range.js';
 import { uploadProvenanceBlock } from './storage-provenance-input.js';
 import { choiceIdOf } from '../services/file-store/file-store-resolver.js';
 import { parseBlobRef } from '../storage/blob/blob-types.js';
+import { directDownloadUrl, discardStorageObject, storedObjectFacts } from '../storage/blob/file-store-wrap.js';
+import { DIRECT_DOWNLOAD_TTL_SECONDS } from '../utils/http-range.js';
+import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
+import { uploadPrincipalRefusal } from '../services/upload-principal.js';
+
+/** The signed address a download door redirects a large stored file to (serveStoredFile), named with
+ *  the last part of its key. */
+export function directReadUrl(storage: Storage, ownerGaii: string, key: string): Promise<string | null> {
+    return directDownloadUrl(storage, ownerGaii, key, { expiresInSec: DIRECT_DOWNLOAD_TTL_SECONDS, filename: key.split('/').pop() });
+}
+
+/**
+ * POST /v1/upload/{token}/complete: the second half of a direct upload. The client has PUT the bytes
+ * to the store address the mint answered; the token (the same capability as the PUT door's, single
+ * use) names the object the node chose. The object's size comes from the store, and the shared write
+ * then decides with it as with any upload. The token is spent only once the object is there, so a
+ * complete called too early can be called again.
+ */
+export async function completeDirectStorageUpload(res: Response, config: AimeatConfig, storage: Storage, token: string): Promise<void> {
+    const refuseToken = (err: unknown) => {
+        const code = err instanceof UploadTokenError ? err.code : 'TOKEN_INVALID';
+        const status = code === 'TOKEN_EXPIRED' ? 410 : code === 'TOKEN_USED' ? 409 : 401;
+        res.status(status).json({ success: false, error: code, message: err instanceof Error ? err.message : 'Invalid upload token' });
+    };
+    // Read without spending: the spend waits for the object.
+    let peek;
+    try { peek = await verifyUploadToken(token, { revokeTokenIfAbsent: async () => true }); } catch (err) { refuseToken(err); return; }
+    const blobRef = peek.meta.object;
+    if (peek.utype !== 'storage' || typeof blobRef !== 'string') {
+        res.status(400).json({ success: false, error: 'NOT_DIRECT', message: 'This upload URL is not a direct one. PUT the file to it instead.' });
+        return;
+    }
+    const principalRefused = await uploadPrincipalRefusal(storage, peek);
+    if (principalRefused) { res.status(401).json({ success: false, error: 'TOKEN_INVALID', message: principalRefused }); return; }
+    const facts = await storedObjectFacts(storage, blobRef);
+    if (!facts) {
+        res.status(409).json({ success: false, error: 'OBJECT_NOT_UPLOADED', message: 'The file is not in the store yet. PUT it to the upload_url with the upload_headers, then complete again.' });
+        return;
+    }
+    if (facts.size === 0 || facts.size > peek.maxBytes) {
+        await discardStorageObject(storage, blobRef, 'a direct upload outside the size limits');
+        res.status(facts.size === 0 ? 400 : 413).json(facts.size === 0
+            ? { success: false, error: 'EMPTY_BODY', message: 'The uploaded file is empty.' }
+            : { success: false, error: 'FILE_TOO_LARGE', message: `Upload exceeds limit of ${peek.maxBytes} bytes` });
+        return;
+    }
+    let verified;
+    try { verified = await verifyUploadToken(token, storage); } catch (err) { refuseToken(err); return; }
+    try {
+        await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, undefined, verified.actorIsAgent, { blobRef, size: facts.size });
+    } catch (err) {
+        await discardStorageObject(storage, blobRef, 'the direct upload could not be recorded');
+        logger.error('Direct upload complete failed', { error: (err as Error).message });
+        res.status(500).json({ success: false, error: 'PROCESSING_FAILED', message: 'Upload processing failed', reason: (err as Error).message.slice(0, 300) });
+    }
+}
 
 /**
  * The `ai_provenance` block a presigned token carries, mapped to the mint path's input — or
@@ -62,7 +121,8 @@ export function declaredFromMeta(meta: Record<string, unknown>): DeclaredProvena
 
 export async function handleStorageUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer, actorIsAgent = false,
+    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer | undefined, actorIsAgent = false,
+    object?: { blobRef: string; size: number },
 ): Promise<void> {
     // tags + workspace_refs ride in the token meta (PRESIGNED_META_KEYS.storage). Dropping them here
     // is how a presigned upload of a workspace-shared file would land as an untagged private one —
@@ -87,7 +147,7 @@ export async function handleStorageUpload(
         sub,
         {
             key: meta.key as string,
-            data,
+            ...(object ? { object } : { data }),
             mimeType: (meta.mime_type as string) ?? 'application/octet-stream',
             visibility: (meta.visibility as StorageFileRecord['visibility']) ?? 'private',
             groupId: typeof meta.group_id === 'string' ? meta.group_id : undefined,
@@ -109,6 +169,8 @@ export async function handleStorageUpload(
         },
     );
     if (!written.ok) {
+        // A refused direct upload leaves no object behind: it will never become a file.
+        if (object) await discardStorageObject(storage, object.blobRef, `the write refused it (${written.code})`);
         res.status(written.status).json({ success: false, error: written.code, message: written.message });
         return;
     }
