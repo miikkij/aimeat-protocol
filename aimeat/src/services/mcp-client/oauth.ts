@@ -33,6 +33,9 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and finishMcpOAuth
+ *     reads the `__Host-` cookie for a round bound over https (roundBindingHeld) (secaudit2026oct31w2
+ *     round 10, W2-19).
  *   2026-10-20 — On the MCP SDK v2 client (@modelcontextprotocol/client): the provider keeps the
  *     discovery state with the round, declares application_type 'web', round-trips the issuer stamp
  *     on the tokens and the client registration, and the callback's `iss` reaches auth() (RFC 9207,
@@ -59,7 +62,7 @@ import { sealMcpCredential, openMcpCredential, requireEncryptionKey } from './cr
 import { guardedFetch } from './transport.js';
 import { mcpClientPool } from './pool.js';
 import { logger } from '../../utils/logger.js';
-import { bindingMatches, roundApprovalUrl, sealRoundSecret, openRoundSecret } from '../oauth-round-secrets.js';
+import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie } from '../oauth-round-secrets.js';
 import { describeUpstreamError } from './upstream-error.js';
 
 /** How long a person has to finish the round in their browser before the state is dead. */
@@ -79,6 +82,8 @@ interface RoundPayload {
   returnUrl: string;
   /** SHA-256 of the cookie that binds the round to one browser. Absent until the owner confirms. */
   bind?: string;
+  /** Which cookie carries the binding; absent on a round written before 2026-10-31 (the plain one). */
+  bindCookie?: RoundBindCookie;
   /** The far side's authorize address, kept so the confirmation step can hand it to the owner. */
   authorizeUrl?: string;
   /** Who started the round: the owner in person, or an agent acting for them. */
@@ -216,6 +221,8 @@ export async function startMcpOAuth(input: {
    * then waits for the owner to confirm it on the node's page.
    */
   bindBrowser?: (state: string, ttlMs: number) => string;
+  /** Which cookie bindBrowser set ('host' over https), stored with the binding. */
+  bindCookie?: RoundBindCookie;
 }): Promise<OAuthStart> {
   const { storage, config, server, ownerGhii } = input;
 
@@ -278,7 +285,7 @@ export async function startMcpOAuth(input: {
     returnUrl: input.returnUrl ?? '',
     authorizeUrl: provider.captured.authorizationUrl,
     ...(input.startedBy ? { startedBy: input.startedBy } : {}),
-    ...(bind ? { bind } : {}),
+    ...(bind ? { bind, ...(input.bindCookie ? { bindCookie: input.bindCookie } : {}) } : {}),
     ...(provider.captured.discoveryState ? { discovery: provider.captured.discoveryState } : {}),
   };
 
@@ -320,8 +327,11 @@ export async function finishMcpOAuth(input: {
    * the round was started against before the code is exchanged.
    */
   iss?: string;
-  /** The round cookie the callback request carried ('' when it carried none). */
+  /** The plain round cookie the callback request carried ('' when it carried none). */
   binding: string;
+  /** The `__Host-` round cookie it carried, and whether it came over https (RoundCookies). */
+  hostBinding?: string;
+  secure?: boolean;
 }): Promise<OAuthFinish> {
   const { storage, config } = input;
   const used = {
@@ -348,7 +358,7 @@ export async function finishMcpOAuth(input: {
   // The browser that signed in at the far side must be the one the round was bound to: the owner's,
   // at the start or after they confirmed an agent's round. Checked before the code is exchanged, so
   // nothing is sealed for anybody else (secrets audit 2026-10-09, chapter 2).
-  if (!bindingMatches(input.binding, payload.bind)) {
+  if (!roundBindingHeld(input, payload.bind, payload.bindCookie)) {
     return {
       ok: false,
       code: 'NOT_THIS_BROWSER',

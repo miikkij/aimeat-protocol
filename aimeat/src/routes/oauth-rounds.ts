@@ -20,6 +20,8 @@
  *   POST /v1/oauth-rounds/:state/approve  -- bind it to this browser; answers the provider's address
  * @usage app.use(oauthRoundsRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-10-31 — approve over https sets the `__Host-` round cookie and records it on the
+ *     round (secaudit2026oct31w2 round 10, W2-19).
  *   v1.1.0 — 2026-10-10 — approve binds the round before it sets the cookie, and a round already
  *     bound answers 409 with no Set-Cookie (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
@@ -31,7 +33,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireOwnerPrincipal } from '../auth/middleware.js';
 import { callerOf } from '../middleware/caller.js';
-import { newRoundBinding, setRoundBinding } from '../middleware/oauth-round-cookie.js';
+import { newRoundBinding, setRoundBinding, roundCookieKind } from '../middleware/oauth-round-cookie.js';
 import { buildOutboundProviders } from '../services/connections/providers.js';
 import { findOwnersRound, describeRound, bindRound, type OwnersRound } from '../services/oauth-rounds.js';
 import { connectCallbackPath } from './connections-callback.js';
@@ -77,12 +79,15 @@ export function oauthRoundsRouter(config: AimeatConfig, storage: Storage): Route
     // The round is bound first and the cookie set only on success, so a refused approve sets no
     // cookie that would overwrite the binding of the browser that won (secaudit 2026-10-10 I6).
     const binding = newRoundBinding();
-    const bound = await bindRound(storage, found, binding.hash);
+    // Over https the cookie is the `__Host-` one, which a same-site page cannot write, and the round
+    // records which was set (secaudit2026oct31w2, W2-19).
+    const cookie = roundCookieKind(req);
+    const bound = await bindRound(storage, found, binding.hash, cookie);
     if (!bound) {
       res.status(409).json(error(config.nodeId, 'ALREADY_USED', 'This sign-in was already used. Ask for a new one.'));
       return;
     }
-    setRoundBinding(req, res, found.round.state, path, ttl, binding.value);
+    setRoundBinding(req, res, found.round.state, path, ttl, binding.value, 'lax', cookie === 'host');
     res.set('Cache-Control', 'no-store');
     res.json(success(config.nodeId, { authorize_url: bound.authorizeUrl }));
   });

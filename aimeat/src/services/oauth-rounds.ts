@@ -20,6 +20,8 @@
  * @structure findOwnersRound · describeRound · bindRound
  * @usage const found = await findOwnersRound(storage, state, caller.ownerGhii);
  * @version-history
+ *   v1.2.0 — 2026-10-31 — bindRound records which cookie carries the binding (`bindCookie`), so the
+ *     callback reads the `__Host-` one for a round confirmed over https (secaudit2026oct31w2 round 10, W2-19).
  *   v1.1.0 — 2026-10-10 — bindRound refuses a round that is already bound (secaudit 2026-10-10 I6).
  *   v1.0.0 — 2026-10-09 — Initial (secrets audit 2026-10-09, chapter 2).
  */
@@ -28,6 +30,7 @@ import type { VerificationNonceRecord } from '../storage/types/auth.js';
 import type { OutboundProvider } from './connections/providers.js';
 import { findProvider } from './connections/providers.js';
 import { ownerGhiiOf } from '../utils/gaii.js';
+import type { RoundBindCookie } from './oauth-round-secrets.js';
 import { logger } from '../utils/logger.js';
 
 export type RoundKind = 'account' | 'mcp_server';
@@ -101,7 +104,9 @@ export async function describeRound(storage: Storage, providers: OutboundProvide
  * Bind the round to the browser whose binding hashes to `bindHash`, and return the provider's
  * address to send that browser to. Null when somebody else consumed the round first.
  */
-export async function bindRound(storage: Storage, found: OwnersRound, bindHash: string): Promise<{ authorizeUrl: string } | null> {
+export async function bindRound(
+  storage: Storage, found: OwnersRound, bindHash: string, bindCookie?: RoundBindCookie,
+): Promise<{ authorizeUrl: string } | null> {
   const { round, payload } = found;
   // Compare-and-set (secaudit 2026-10-10 I6): a round already bound to a browser stays bound to it.
   // The delete below cannot refuse alone, because the bound round is re-written under the same state
@@ -114,7 +119,7 @@ export async function bindRound(storage: Storage, found: OwnersRound, bindHash: 
   await storage.createVerificationNonce({
     ...round,
     redirectUri: round.redirectUri || back,
-    payload: JSON.stringify({ ...payload, bind: bindHash, ...(found.kind === 'mcp_server' && !payload.returnUrl ? { returnUrl: back } : {}) }),
+    payload: JSON.stringify({ ...payload, bind: bindHash, ...(bindCookie ? { bindCookie } : {}), ...(found.kind === 'mcp_server' && !payload.returnUrl ? { returnUrl: back } : {}) }),
   });
   return { authorizeUrl: payload.authorizeUrl as string };
 }
