@@ -56,6 +56,7 @@
     "POST /v1/signals/behaviour": "A BEACON — the on-page behaviour script on an owner's app sends one when a page view ends, from a visitor who has no account. Rate limited per IP at 60 a minute; it counts only for an existing app of this node's account that has counting on, every map is bounded per view and per day, and it writes that app's one count record and nothing else (AI visibility, layer D).",
     "POST /v1/signals/:owner/:streamId/hit":"A BEACON — counting a click from a person who has no account is what it is for. Rate limited per IP at 120 a minute, and it writes a counter and nothing else.",
     "POST /v1/validate": "WRITES NOTHING — a stateless schema check: it takes a body and an endpoint name and answers valid or invalid. It is in this population because the population is 'not a GET', which is the right way to draw it; this is the one member where the verb is the only thing write-shaped about it.",
-    "PUT /v1/upload/:token": "THE PRE-SIGNED TOKEN IS THE CREDENTIAL — that is what presigning means. 401 when it does not verify, 409 when it has been used, 410 when it has expired."
+    "POST /v1/upload/:token/complete": "THE PRE-SIGNED TOKEN IS THE CREDENTIAL, the same one PUT /v1/upload/:token takes: completeDirectStorageUpload() in routes/upload-storage.ts verifies it (401 when it does not verify, 409 when used, 410 when expired) and spends it once the object it names is in the store.",
+    "PUT /v1/upload/:token":"THE PRE-SIGNED TOKEN IS THE CREDENTIAL — that is what presigning means. 401 when it does not verify, 409 when it has been used, 410 when it has expired."
   }
 }

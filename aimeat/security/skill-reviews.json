@@ -265,7 +265,7 @@
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:e33c75bcfae5825a1209c54e"
+      "digest": "sha256:cb5b3b898a8c4159b6b44226"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -630,7 +630,7 @@
     },
     "node:manage-my-agents": {
       "aimeat/src/mcp/core.ts": "877f825eb4828018",
-      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "9a303ede1dfea071"
+      "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "9990120d7daac507"
     },
     "node:manage-my-profile-data": {
       "aimeat/src/routes/memory/shared.ts": "63fa0c63bd582ea7"

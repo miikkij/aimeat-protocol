@@ -192,6 +192,9 @@ export const DEFAULT_BLOCKS: Record<SurfaceId, SurfaceBlockInstance[]> = {
         // important thing on the page: nothing else here works over chat until it is done. On every
         // other day it renders nothing and the mat line moves up into its place.
         b('home.mcp-connect'),
+        // The account at a glance, first among the content blocks (accepted canvas "Kokonaiskuva",
+        // board 2): it is the one place that shows how the rest of the page fits together.
+        b('home.overview'),
         b('home.mat'),
         b('home.mailbox'),
         // Straight under the unread count, because it answers the question the count raises. The

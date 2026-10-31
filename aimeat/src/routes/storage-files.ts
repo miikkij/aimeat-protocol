@@ -11,6 +11,7 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-10-31 -- `direct: true` with mode 'presigned' answers an address in the object store; a large stored file redirects to its store (wish-suuret-tiedostot-virtaavat).
  *   2026-10-30 -- POST /v1/storage takes `store` (JSON) or `?store=` (raw body), the store the writer
  *     names for the bytes, for the inline write and the presigned mint; the upload answer and the list
  *     say each file's `store`; GET /v1/storage moved by pure extraction to routes/storage-files-list.ts
@@ -152,6 +153,7 @@ import { setStoredFileHeaders } from '../utils/file-download-headers.js';
 import { INLINE_MAX_BYTES, isInlineableMime, extractKey, requestedFilename } from './storage-files-request.js';
 import { storageChunkedUploadRouter } from './storage-files-chunked.js';
 import { setAcceptRanges, serveStoredFile, needsBytesForType, storedFileEtag, versionedAddress, type StoredFileReader } from '../utils/http-range.js';
+import { directReadUrl } from './upload-storage.js'; import { directUploadFields } from '../services/direct-upload-answer.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { requireAuth, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -196,6 +198,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     const readerFor = (ownerGaii: string, key: string): StoredFileReader => ({
         range: (start, length) => storage.readStorageFileRange(ownerGaii, key, start, length),
         all: async () => (await storage.getStorageFile(ownerGaii, key))?.data ?? null,
+        direct: () => directReadUrl(storage, ownerGaii, key),
     });
 
     /** The file's AI-provenance marks (`AI-Disclosure`, `Link: rel="ai-provenance"`) on a response
@@ -305,6 +308,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     provenance,
                     publishGate: { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) },
                     ...(store ? { store } : {}),
+                    ...(req.body?.direct === true ? { direct: true } : {}),
                 });
                 if (!minted.ok) {
                     res.status(minted.status).json(error(config.nodeId, minted.code, minted.message));
@@ -316,6 +320,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                     content_type: minted.contentType,
                     max_size_bytes: minted.maxBytes,
                     expires_in_seconds: minted.expiresInSeconds,
+                    ...directUploadFields(minted),
                     // A closed node lands the file at 'members' instead of public (plan V1.6).
                     ...(minted.warnings ? { warnings: minted.warnings } : {}),
                 }));

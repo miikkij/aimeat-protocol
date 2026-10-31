@@ -14,9 +14,12 @@
  *   a comment, so the copies were deleted rather than repaired. If you need memory CRUD, it lives in
  *   methods/memory.ts; do not reintroduce a second one here.
  * @structure archivedSql · sumMemoryBytes / sumMemoryBytesForOwners / countMemory / countMemoryWithOrigins ·
- *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
+ *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix ·
+ *   listKeyActivity
  * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   2026-10-31 — listKeyActivity: key, owner and updatedAt under a key prefix since a time, newest
+ *     first, never the value (the overview's activity counts).
  *   2026-10-25 — countMemory takes excludePrefixes (secaudit2026oct22).
  *   2026-10-16 — LIVE_SQL and deleteExpiredMemory (QA audit D4-01, E4-01, D4-05); key prefixes are GLOB
  *     patterns from storage/key-prefix.ts, literal and case-sensitive (QA audit D4-07).
@@ -30,7 +33,8 @@
  */
 import type Database from 'better-sqlite3';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+import type { KeyActivityRow, MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
+import { clampKeyActivityLimit } from '../../../repositories/memory.repository.js';
 import { globPrefix } from '../../../key-prefix.js';
 
 /** SQL fragment (with leading ` AND`) restricting the `memory.archived` column by filter. Default
@@ -277,4 +281,18 @@ export function countArchivedByKeyPrefix(db: Database.Database, keyPrefix: strin
      FROM memory WHERE key GLOB ?`
   ).get(globPrefix(keyPrefix)) as { active: number | null; archived: number | null };
   return { active: row.active ?? 0, archived: row.archived ?? 0 };
+}
+
+/**
+ * Key activity under a prefix since a time, any owner, newest first: three columns, never the value.
+ * The same filters as listAllMemoryMeta with excludeVersionRows (the bin and archived through
+ * archivedSql, expired TTL rows through LIVE_SQL, `.version.N` history rows by key). updatedAt is an
+ * ISO-8601 string here, so the string comparison with `sinceIso` orders as the times do.
+ */
+export function listKeyActivity(db: Database.Database, prefix: string, sinceIso: string, limit: number): KeyActivityRow[] {
+  return db.prepare(
+    `SELECT key, ownerGaii, updatedAt FROM memory
+     WHERE key GLOB ? AND updatedAt >= ? AND key NOT LIKE '%.version.%'${archivedSql()}${LIVE_SQL}
+     ORDER BY updatedAt DESC, key, ownerGaii LIMIT ?`
+  ).all(globPrefix(prefix), sinceIso, new Date().toISOString(), clampKeyActivityLimit(limit)) as KeyActivityRow[];
 }
