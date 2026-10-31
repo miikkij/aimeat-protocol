@@ -38,6 +38,10 @@
  *   closePayoutHoldNotArrived · listOpenPayoutHoldsOnNode · markPayoutHoldArrived
  * @usage const holds = await openPayoutHolds(storage, provider, beneficiary, currency);
  * @version-history
+ *   v1.1.1 -- 2026-10-31 -- markPayoutHoldArrived closes a record the provider closed as not arrived
+ *     between its check and its write as 'arrived', because the entries were already marked paid: the
+ *     operator was answered CONFLICT, the record said not arrived, the book said paid, and nobody was
+ *     told (secaudit 2026-10-31 inv-02).
  *   v1.1.0 -- 2026-10-29 -- The operator marks a held payout as arrived with a reference: the entries are
  *     paid, the record closes, the beneficiary and the provider are told (secaudit2026oct26 round 8c,
  *     commerce/beneficiary-payout:settle-error-unrecorded-possible-payment).
@@ -177,7 +181,9 @@ export type MarkArrivedResult =
  * the record closes as 'arrived', and the beneficiary and the provider are told. The entries are paid
  * first and the record closed after, so a failure between the two leaves the entries out of every
  * quote (they read paid) rather than payable a second time; two presses at once pay the entries once
- * (markEntriesPaid moves only released entries) and close the record once.
+ * (markEntriesPaid moves only released entries) and close the record once. A not-arrived close from
+ * the provider that lands between the check and the close is overwritten as 'arrived', because the
+ * entries it would quote again are already paid.
  */
 export async function markPayoutHoldArrived(
   storage: Storage, args: { providerGhii: string; nonce: string; reference: string; by: string },
@@ -206,7 +212,10 @@ export async function markPayoutHoldArrived(
   });
   let closed: PayoutHold | null = null;
   await updateRecord<PayoutHold | null>(storage, args.providerGhii, key, v => (v ?? null) as PayoutHold | null, cur => {
-    if (!cur || cur.status !== 'unconfirmed') return UNCHANGED;
+    // 'not-arrived' here means the provider's close landed after the check above and before this
+    // write: the entries are already paid on the operator's reading of the chain, so the record
+    // says what the book says. A second press finds 'arrived' and changes nothing.
+    if (!cur || (cur.status !== 'unconfirmed' && cur.status !== 'not-arrived')) return UNCHANGED;
     closed = { ...cur, status: 'arrived', closedAt: new Date().toISOString(), arrivedReference: reference, closedBy: args.by };
     return closed;
   }, { tag: 'commerce', visibility: 'owner', tags: ['commerce'] });

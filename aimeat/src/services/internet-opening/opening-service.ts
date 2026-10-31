@@ -17,10 +17,12 @@
  *   An app qualifies when its own setting lets anyone open it, it has no access code, it is not parked
  *   and no operator hid it: an opening lifts the node's sign-in rule for one app, never the owner's own.
  *   Only the app page, its own documents and its declared forms open; its other data calls stay closed.
- * @structure OpeningActor · OpeningResult · ineligible · requestOpening · closeOpening · decideOpening ·
+ * @structure OpeningActor · OpeningResult · ineligible · checkDays · requestOpening · closeOpening · decideOpening ·
  *   setTrustedOpener · openingOf (openingMode and directOpening re-exported from opening-policy.ts)
  * @usage const r = await requestOpening(ctx, actor, { filename: 'page.html', reason: 'Consent form for the event' });
  * @version-history
+ *   v1.0.1 — 2026-10-31 — checkDays is exported, so the owner's question an agent's opening files
+ *     (opening-door.ts) checks `days` with the same rule before it is filed (secaudit 2026-10-31 inv-23).
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 import type { AppRecord } from '../../storage/interface.js';
@@ -73,7 +75,8 @@ function checkReason(reason: unknown): string | OpeningFail {
   return r;
 }
 
-function checkDays(ctx: OpeningCtx, days: unknown): number | OpeningFail {
+/** The opening's length in days: absent is the node's longest, else a whole number from 1 to it. */
+export function checkDays(ctx: OpeningCtx, days: unknown): number | OpeningFail {
   const max = ctx.config.appInternetOpeningMaxDays ?? 90;
   if (days === undefined || days === null) return max;
   const n = Number(days);

@@ -20,6 +20,9 @@
  *   import { installPackage } from './package-install.js';
  *   const out = await installPackage({ storage, config, scheduler }, caller, { groupId });
  * @version-history
+ *   v1.15.0 — 2026-10-31 — A package its author sells to accounts installs for an account holding a
+ *     paid purchase (packageVisibleTo); anyone else gets 402 PURCHASE_REQUIRED while it is listed for
+ *     sale (sale/package-account-entitlement.ts).
  *   v1.14.0 — 2026-10-29 — With install role operator, an installer whose account may not install
  *     extension code gets the rest of the package, and each extension component switched off and
  *     waiting for an operator (`awaitingOperator`; the preview's extension_code_awaits_operator;
@@ -96,6 +99,7 @@ import { planPackageConfig, missingConfigMessage, configPreview } from '../compo
 import { expectsOf, missingExpects, expectsMissingMessage, type PackageExpects } from '../compose/package-expects.js';
 import { emitChange } from '../../event-bus.js';
 import { packageVisibleTo } from '../compose/package-read.js';
+import { listedSaleRefusal } from '../sale/package-account-entitlement.js';
 import { skillComponentName } from './package-skill-component.js';
 import { proposeBundledAgentsOfApps, type BundledAgentProposal } from '../../app-agent-propose.js';
 import type { AppRecord } from '../../../storage/types/apps.js';
@@ -325,7 +329,9 @@ export async function installPackage(
     // 'members' and 'organism:<id>' are installed by whom services/audience.ts admits (package-read.ts
     // packageVisibleTo, the rule the read doors use; plan doc-mvcn6c7e4e5q, V3.7).
     if (!(await packageVisibleTo(storage, pkg, caller))) {
-        return { ok: false, status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
+        // A package listed for sale says so: its listing is public, so 402 confirms nothing new.
+        return (await listedSaleRefusal(storage, groupId))
+            ?? { ok: false, status: 404, code: 'NOT_FOUND', message: `Package not found: ${groupId}` };
     }
 
     // Sort components by dependency order for installation

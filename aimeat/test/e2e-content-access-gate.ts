@@ -20,6 +20,9 @@
  *   origins provisioned.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-content-access-gate
  * @version-history
+ *   2026-10-31 — A route the open list leaves out by name stays closed in other letters
+ *     (/v1/auth/Anonymous, /v1/portfolio/Members), and the open routes beside them still pass
+ *     (secaudit 2026-10-31 inv-07).
  *   2026-10-30 — The shell test opens the structure page, the secret allow page and the outside-app
  *     capability allow page too: the gate had its own copy of the page list and missed all three, so
  *     the structure page link an AI handed out answered SIGN_IN_REQUIRED on innokas.aimeat.io.
@@ -198,6 +201,22 @@ async function main() {
             assert(mine.status === 200, `account read ${mine.status}`);
             const anon = await json('/v1/apps');
             assert(anon.status === 401 && anon.body.error?.code === 'SIGN_IN_REQUIRED', `anon read ${anon.status} ${JSON.stringify(anon.body.error)}`);
+        });
+
+        await test('a closed route spelled in other letters is closed: Express routes paths whatever their case', async () => {
+            // The two routes the open list leaves out by name, in capitals: the shared anonymous token
+            // (which would open the MCP endpoint to a stranger) and the published-members list.
+            for (const [method, path] of [['POST', '/v1/auth/Anonymous'], ['POST', '/v1/AUTH/ANONYMOUS'], ['GET', '/v1/portfolio/Members'], ['GET', '/v1/Portfolio/MEMBERS']] as const) {
+                const r = await json(path, { method, headers: { Accept: 'application/json' }, body: method === 'POST' ? '{}' : undefined });
+                assert(r.status === 401 && r.body.error?.code === 'SIGN_IN_REQUIRED', `${method} ${path}: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)?.slice(0, 200)}`);
+            }
+            // USAGE: the open routes beside them still pass: the other sign-in steps and a person's portfolio page.
+            const providers = await json('/v1/auth/providers');
+            assert(providers.status === 200, `GET /v1/auth/providers ${providers.status} ${JSON.stringify(providers.body?.error)}`);
+            const challenge = await json(`/v1/auth/challenge?owner=${owner}`);
+            assert(challenge.status === 200, `GET /v1/auth/challenge ${challenge.status} ${JSON.stringify(challenge.body?.error)}`);
+            const page = await fetch(`${BASE}/v1/portfolio/${owner}`, { headers: { Accept: 'text/html' } });
+            assert(page.status === 200, `GET /v1/portfolio/${owner} ${page.status}`);
         });
 
         await test('the shell a stranger gets carries no app and says the node is signed-in only', async () => {

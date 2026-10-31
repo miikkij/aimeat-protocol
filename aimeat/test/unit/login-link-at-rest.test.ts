@@ -8,6 +8,8 @@
  *   link outstanding. A row written the old way (the raw token as id) is still redeemed for one
  *   release, because a welcome link lasts seven days.
  * @version-history
+ *   v1.1.0 — 2026-10-31 — A link mailed to the verified address of an account with no notification
+ *     address signs in (the store's buyers, v27 P1); one mailed to a replaced address is refused.
  *   v1.0.1 — 2026-10-23 — provisionOwner is called as a request from loopback (fromLoopback): a call with
  *     no request is asked for the setup code of a node without an operator (secaudit2026oct22).
  *   v1.0.0 — 2026-10-09 — Initial.
@@ -62,6 +64,27 @@ describe('the sign-in link token at rest', () => {
       expiresAt: new Date(Date.now() + LOGIN_LINK_TTL_MS).toISOString(), createdAt: new Date().toISOString(), verifiedAt: null,
     });
     expect((await redeemLoginLink(storage, config, token)).ok).toBe(true);
+    expect((await redeemLoginLink(storage, config, token)).ok).toBe(false);
+  });
+
+  // v27 P1: the store makes a buyer's account with POST /v1/owners and proves the address through
+  // POST /v1/ghii/verify-email, which knows only the address's hash. The account holds the verified
+  // hash and the link on, and no notificationEmail; every link it was mailed was refused.
+  it('a link mailed to the verified address of an account with no notification address signs in (the source was broken)', async () => {
+    const { ghii, email } = await person('hashonly');
+    await storage.updateGHII(ghii.ghii, { notificationEmail: null as unknown as string });
+    const fresh = (await storage.getGHII(ghii.ghii))!;
+    expect(fresh.notificationEmail ?? null).toBeNull();
+    expect(fresh.emailHash).toBe(sha256(email));
+    const token = new URL(await issueLoginLink(storage, config, fresh, email, LOGIN_LINK_TTL_MS)).searchParams.get('token')!;
+    expect((await redeemLoginLink(storage, config, token)).ok).toBe(true);
+  });
+
+  it('a link mailed to an address that is no longer the account\'s is refused', async () => {
+    const { ghii, email } = await person('moved');
+    const token = new URL(await issueLoginLink(storage, config, ghii, email, LOGIN_LINK_TTL_MS)).searchParams.get('token')!;
+    const next = 'moved-next@example.test';
+    await storage.updateGHII(ghii.ghii, { emailHash: sha256(next), notificationEmail: next });
     expect((await redeemLoginLink(storage, config, token)).ok).toBe(false);
   });
 });

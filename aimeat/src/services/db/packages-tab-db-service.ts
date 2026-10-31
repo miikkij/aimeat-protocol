@@ -12,6 +12,8 @@
  * @structure PackagesTabService.overview(owner) → { instances, packages, templates, available }
  * @usage const p = await createPackagesTabService(storage).overview(owner);
  * @version-history
+ *   v1.3.0 — 2026-10-31 — `forSale` (packages their authors sell to accounts), `purchases` (what the
+ *     owner bought) and `selling` (the sale of each own package), for the page's Buy and Sales.
  *   v1.2.0 — 2026-09-05 — The owner's own list carries DRAFTS. It was filtered to published, which
  *     hid exactly the packages whose author still had something to do about them: a draft is
  *     installable by nobody, including its author, and one that cannot be seen cannot be published.
@@ -23,6 +25,8 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/read-scope/read-scope.js';
+import { listForSale, purchasesOf, saleView } from '../packages/sale/package-account-sale.js';
+import { readAccountSale } from '../packages/sale/package-account-entitlement.js';
 
 export interface PackagesOverview {
   instances: { instances: unknown[]; total: number };
@@ -31,6 +35,12 @@ export interface PackagesOverview {
   /** What is on offer to install: every author's public, published packages. The page joins these
    *  with the template listings by group id into one list, so a package is never shown twice. */
   available: { packages: unknown[]; total: number };
+  /** Packages their authors sell to accounts of this node, as listings with the price. */
+  forSale: { packages: unknown[]; total: number };
+  /** What the owner bought. */
+  purchases: { purchases: unknown[] };
+  /** The sale of each of the owner's own packages that has one, by group id. */
+  selling: Record<string, unknown>;
 }
 
 export class PackagesTabService {
@@ -58,11 +68,22 @@ export class PackagesTabService {
         this.storage.listPackages({ status: 'published', visibility: 'public', limit: 100, offset: 0 }),
       ]);
       const ownLive = pkg.packages.filter(p => p.status !== 'archived').slice(0, 50);
+      // Packages their authors sell to accounts here, the caller's own purchases, and the sale of
+      // each of the caller's own packages (services/packages/sale/package-account-sale.ts).
+      const [forSale, purchases] = await Promise.all([listForSale(this.storage, { limit: 100 }), purchasesOf(this.storage, owner)]);
+      const selling: Record<string, unknown> = {};
+      for (const p of ownLive) {
+        const sale = await readAccountSale(this.storage, p.packageGroupId);
+        if (sale) selling[p.packageGroupId] = { ...saleView(sale), sales: sale.purchases.filter(x => x.state === 'paid').length };
+      }
       return {
         instances: { instances: inst.instances, total: inst.total },
         packages: { packages: ownLive, total: ownLive.length },
         templates: { templates: tpl.listings, total: tpl.total },
         available: { packages: pub.packages, total: pub.total },
+        forSale: { packages: forSale.packages, total: forSale.total },
+        purchases: { purchases },
+        selling,
       };
     });
   }

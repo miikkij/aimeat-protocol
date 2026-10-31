@@ -186,6 +186,7 @@
   var AUTH_PROVIDERS = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.providers || [];
   var EMAIL_REQUIRED = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailRequired);
   var EMAIL_LOGIN = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailLogin);
+  var LINK_FIRST = EMAIL_LOGIN && !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.linkFirst);
   var PROVIDER_ICONS = {
     google: '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>',
     entra: '<svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>',
@@ -1232,6 +1233,8 @@
   var wordmark = "var(--font-wordmark,'Archivo Black','Archivo',system-ui,sans-serif)";
   var section = "var(--font-poster-section,'Archivo','DM Sans',system-ui,sans-serif)";
   var mono = "var(--font-mono,'JetBrains Mono','SF Mono',monospace)";
+  var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
+  var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
   var MODAL_CSS = [
     inkVarsCss([".aimeat-scrim"]),
     ".aimeat-scrim{position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;",
@@ -1876,9 +1879,13 @@
     if (!EMAIL_LOGIN) return "";
     return '<a href="#" id="aimeat-login-link" class="aimeat-link">' + escHtml(i.loginLinkAsk || "Email me a sign-in link") + "</a>";
   }
-  function loginLinkViewHtml(i, field) {
+  function loginLinkViewHtml(i, field, linkFirst) {
     if (!EMAIL_LOGIN) return "";
-    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.loginLinkTitle || "Sign in with an emailed link") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.loginLinkDesc || "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(i.loginLinkSend || "Send the link") + '</button><button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(i.backToLogin || "Back to Login") + '</button></div><p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
+    var back = linkFirst ? i.loginLinkUsePassword || "Use a password instead" : i.backToLogin || "Back to Login";
+    var first = function(key, plain, fallback) {
+      return linkFirst && i[key] || i[plain] || fallback;
+    };
+    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>" + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + '</button><button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button></div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
   }
   function hereAddress() {
     if (inIsolatedFrame()) return "";
@@ -1894,7 +1901,8 @@
   function wireLoginLinkStep(ctx) {
     var i = ctx.i;
     var ask = document.getElementById("aimeat-login-link");
-    if (!ask) return;
+    if (!ask) return { open: function() {
+    } };
     var emailEl = (
       /** @type {any} */
       document.getElementById("aimeat-ll-email")
@@ -1904,8 +1912,7 @@
       document.getElementById("aimeat-ll-send")
     );
     var msgEl = document.getElementById("aimeat-ll-msg");
-    ask.addEventListener("click", function(e) {
-      e.preventDefault();
+    function open() {
       var typed = (
         /** @type {any} */
         document.getElementById("aimeat-username")
@@ -1916,6 +1923,10 @@
       setTimeout(function() {
         emailEl.focus();
       }, 30);
+    }
+    ask.addEventListener("click", function(e) {
+      e.preventDefault();
+      open();
     });
     document.getElementById("aimeat-ll-back").addEventListener("click", function() {
       ctx.showView("login");
@@ -1929,7 +1940,7 @@
       var label = i.loginLinkSend || "Send the link";
       sendBtn.textContent = i.working || "Working...";
       sendBtn.disabled = true;
-      var body = { email };
+      var body = { email, lang: currentModalLang() };
       var back = typeof ctx.redirect === "string" && ctx.redirect ? ctx.redirect : hereAddress();
       if (back) body.redirect = back;
       try {
@@ -1947,6 +1958,12 @@
       e.preventDefault();
       if (!sendBtn.disabled) send();
     });
+    var first = ctx.openFirst;
+    if (first && !first.linkFirstOpened) {
+      first.linkFirstOpened = true;
+      open();
+    }
+    return { open };
   }
 
   // src/static/sdk-libs/auth/signup-state.js
@@ -1961,8 +1978,6 @@
   // src/static/sdk-libs/auth/modal-constants.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
-  var HEART_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.8 8.2 3 4.5 6.7 4.5c2 0 3.6 1.1 4.5 2.6.9-1.5 2.5-2.6 4.5-2.6 3.7 0 5.9 3.7 4.3 7.3C19.5 16.4 12 21 12 21z"></path></svg>';
-  var RULE_MARKS = '<svg class="r-ok" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="square" aria-hidden="true"><path d="M2 6.5 5 9.5 10 3"></path></svg><svg class="r-no" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2" y="2" width="8" height="8"></rect></svg>';
 
   // src/static/sdk-libs/auth/modal.js
   var NODE_HOST = (function() {
@@ -1977,7 +1992,7 @@
     var i = opts.i18n || {};
     var lang = currentModalLang();
     var signInOnly = !!opts.signInOnly;
-    var tab = opts.tab === "register" && !signInOnly ? "register" : "signin";
+    var tab = opts.tab === "register" && !signInOnly ? "register" : "signin", linkFirst = opts.linkFirst === void 0 ? LINK_FIRST : !!opts.linkFirst;
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
@@ -2038,8 +2053,13 @@
       });
     }
     function busyOrAway() {
-      var body = document.getElementById("aimeat-modal-body");
-      return !!body && body.style.display === "none" || !!modal.querySelector("button:disabled");
+      var body = document.getElementById("aimeat-modal-body"), away = !!body && body.style.display === "none";
+      if (away && linkFirst && !opts.linkFirstRedrawn) {
+        opts.linkFirstRedrawn = true;
+        opts.linkFirstOpened = false;
+        away = false;
+      }
+      return away || !!modal.querySelector("button:disabled");
     }
     function render(anim) {
       modal.innerHTML = buildModalInner(i, lang, anim, tab);
@@ -2074,13 +2094,13 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (signInOnly ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : signInOnly && i2.loginLinkTitleFirst || i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : signInOnly && i2.loginLinkDescFirst || i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (signInOnly ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
         i2.passwordLabel || "Password",
         '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '">'
-      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
+      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly ? ' style="display:none"' : "") + ">" + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
         i2.usernameLabel || "Username",
         '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><div id="aimeat-reg-rules" class="aimeat-rules">' + rule("len", i2.usernameRuleLength || "3 to 64 characters") + rule("chars", i2.usernameRuleChars || "Letters a to z, digits and hyphens") + rule("edges", i2.usernameRuleEdges || "Starts and ends with a letter or digit") + "</div>",
         '<p class="aimeat-hint">' + escHtml(i2.usernameLowercase || "Capital letters become lowercase.") + " " + escHtml(i2.usernameHint || "This becomes your permanent name here.") + "</p>"
@@ -2098,7 +2118,7 @@
         i2.displayNameOptional || "optional"
       ) + '<div class="aimeat-actions"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" class="aimeat-err"></p></div>' + (AUTH_PROVIDERS.length ? '<div class="aimeat-or"><span></span><b>' + escHtml(i2.orLabel || "OR") + "</b><span></span></div>" + AUTH_PROVIDERS.map(function(p) {
         return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field) + totpViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
+      }).join("") : "") + "</div>" + recoveryViewsHtml(i2, field) + loginLinkViewHtml(i2, field, linkFirst) + totpViewHtml(i2, field) + '<div id="aimeat-why" class="aimeat-why"' + (isReg ? "" : ' style="display:none"') + '><h4 class="aimeat-why-title">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div class="aimeat-why-row"><span class="aimeat-why-num">01</span><span>' + escHtml(i2.whyGhii || "Your own digital identity. Only you control it") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">02</span><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div class="aimeat-why-row"><span class="aimeat-why-num">03</span><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div class="aimeat-why-row strong"><span class="aimeat-why-num">04</span><span>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you: your own AI operating system.") + "</span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -2203,7 +2223,7 @@
         },
         onSuccess: finishLogin
       });
-      wireLoginLinkStep({ i, api, showView, redirect: opts.redirect });
+      wireLoginLinkStep({ i, api, showView, redirect: opts.redirect, openFirst: linkFirst && tab === "signin" ? opts : null });
       var totpStep = wireTotpStep({
         i,
         showView,
@@ -2679,7 +2699,7 @@
     var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
     var redirectUri = location.origin + "/";
     var scope = scopeStr || appDeclaredScopes();
-    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt === "create" ? "&prompt=create" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
+    var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + (prompt === "create" ? "&prompt=create" : "") + "&lang=" + encodeURIComponent(String(readLang(["en", "fi", "es"]))) + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
     var w = 460, h = 660;
     var left = window.screen && window.screen.width ? (window.screen.width - w) / 2 : 0;
     var top = window.screen && window.screen.height ? (window.screen.height - h) / 2 : 0;

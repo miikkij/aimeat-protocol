@@ -21,6 +21,7 @@
  *       approval points it; an agent with publish:public points it at once;
  *     - gate off again: each of those is direct.
  * @version-history
+ *   2026-10-31 — PUT /v1/portfolio/config with enabled 1 or "yes" asks as true does (secaudit 2026-10-31 inv-10).
  *   v1.1.0 — 2026-10-20 — A presigned app publish by an agent that lost publish:public after the mint
  *     lands unlisted with a request (202); an agent that still holds it is listed at once (secaudit
  *     2026-10, PUT-v1-upload:no-live-principal-recheck).
@@ -258,6 +259,14 @@ await test('Welcome page: config enabled asks too, and a page replaced after the
     const d = await decide(c.body.data.publish_request.request_id, A.token);
     assert(d.status === 409 && d.body.error.code === 'OUTDATED', `approve: ${d.status} ${JSON.stringify(d.body.error)}`);
     assert(await anonPortfolio() === 404, 'the replaced page stays off');
+});
+
+await test('Welcome page: config enabled 1 or "yes" asks as true does, and the page stays off', async () => {
+    for (const enabled of [1, 'yes']) {
+        const c = await call('/v1/portfolio/config', { token: asker.token, method: 'PUT', body: { enabled } });
+        assert(c.status === 202 && c.body.data.publish_request?.kind === 'portfolio', `config ${JSON.stringify(enabled)}: ${c.status} ${JSON.stringify(c.body.error ?? c.body.data)}`);
+        assert(await anonPortfolio() === 404, `enabled ${JSON.stringify(enabled)}: the page is served without the owner's approval`);
+    }
 });
 
 let companyId = '';

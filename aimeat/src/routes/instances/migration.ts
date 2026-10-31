@@ -6,6 +6,8 @@
  *   and apply a migration to an instance (replace/skip/custom/install_new actions).
  *   Extracted from src/routes/instances.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-10-31 — migration-prompt answers 402 PURCHASE_REQUIRED for a package its author sells
+ *     to accounts when the owner holds no paid purchase of it (package-account-entitlement.ts).
  *   v1.7.0 — 2026-10-12 — requireRestScope (auth/rest-scope-gate.ts): packages:write on POST /v1/instances/:id/migration-prompt. Allowed with the Deprecation headers before 4.0.0, refused from it (wish-rest-reitit-ilman-scope-tarkistusta-agentti-p-see-kaikkeen).
  *   v1.6.0 — 2026-09-29 — TARGET-082 V4: migration-prompt reads the owner's live component content
  *     through fetchComponentContentForAi with the caller's ContentReader; a memory or translation
@@ -45,6 +47,7 @@ import { resolveGhii } from '../../utils/ghii-resolver.js';
 import { migrateOrRequest, updateOrRequest, requestedBody } from '../../services/packages/install/package-install-requests.js';
 import { actCallerOf as callerOf } from './install-requests.js';
 import { requireRestScope } from '../../auth/rest-scope-gate.js';
+import { purchaseRefusal } from '../../services/packages/sale/package-account-entitlement.js';
 
 // ── Register migration routes ─────────────────────────────────────────
 
@@ -65,6 +68,12 @@ export function registerMigrationRoutes(
     }
     if (instance.owner !== owner) {
       res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the instance owner can generate migration prompts'));
+      return;
+    }
+    // A package its author sells: the newer version's content is for an account that holds a purchase.
+    const unpaid = await purchaseRefusal(storage, instance.packageGroupId, owner);
+    if (unpaid) {
+      res.status(unpaid.status).json(error(config.nodeId, unpaid.code, unpaid.message));
       return;
     }
 
