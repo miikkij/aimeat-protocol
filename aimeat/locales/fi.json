@@ -6375,6 +6375,7 @@
   "chat.transcribeFailed": "Nauhoitusta ei saatu muutettua tekstiksi.",
   "chat.turnCount": "{n} viestiä",
   "chat.turnFailed": "Vuoroa ei saatu vietyä loppuun.",
+  "chat.connectionLost": "Yhteys katkesi. Yritä uudelleen.",
   "chat.useOwnKeyLink": "Käytä omaa avainta",
   "chat.welcomeBody": "Se lukee ja kirjoittaa muistiinpanojasi, yhteisiä paikkojasi ja sovelluksiasi täällä, ja näet ruudulla jokaisen askeleen, jonka se ottaa. Pyydä siltä jotain tai aloita jostakin näistä.",
   "chat.capTitle": "Tämä keskustelu on käyttänyt ilmaisen kyytinsä.",
@@ -27030,7 +27031,8 @@
       "thinking": "Mietin vielä, miten tämä kannattaa tehdä.",
       "wrappingUp": "Tämä vie aikaa, joten vastaan nyt sillä, mitä jo tiedän."
     },
-    "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa."
+    "stopped": "Lopetin tähän, koska tämä kesti liian kauan, eikä vastaukseni ole valmis. Sano \"jatka\", niin jatkan tästä, tai kysy asia pienemmissä osissa.",
+    "toolsNotConnected": "En saanut yhteyttä AIMEAT-työkaluihisi, joten en aloittanut. Yritä hetken päästä uudelleen."
   },
   "explain": {
     "open": "Ohje: {term}",

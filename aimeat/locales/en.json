@@ -6196,6 +6196,7 @@
   "chat.transcribeFailed": "That recording could not be turned into text.",
   "chat.turnCount": "{n} messages",
   "chat.turnFailed": "The turn could not be completed.",
+  "chat.connectionLost": "The connection was lost. Try again.",
   "chat.useOwnKeyLink": "Use your own key",
   "chat.welcomeBody": "It reads and writes your notes, your shared places and your apps here, and every step it takes shows on the screen. Ask it for something, or start with one of these.",
   "chat.capTitle": "This conversation has used up its free ride.",
@@ -26866,7 +26867,8 @@
       "thinking": "Still working out how best to do this.",
       "wrappingUp": "This is taking a while, so I'll answer now with what I have."
     },
-    "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts."
+    "stopped": "I stopped here because this took too long, and my answer is not finished. Say \"continue\" and I go on from here, or ask again in smaller parts.",
+    "toolsNotConnected": "I could not connect to your AIMEAT tools, so I did not start. Try again in a moment."
   },
   "explain": {
     "open": "Explain: {term}",
