@@ -250,12 +250,12 @@ export function showLoginModal(opts, renderBtn, onClosed) {
       // decides both.
       + '<h2 class="aimeat-headline">'
       // A buyer (signInOnly) is signing in to the AIMEAT they bought, with the address they bought it with.
-      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : ((signInOnly && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
+      + escHtml(isReg ? (i.headlineNew || 'Welcome in.') : (((signInOnly || linkFirst) && i.loginLinkTitleFirst) || i.headlineReturning || 'Welcome back.'))
       + '</h2>'
       + '<p class="aimeat-line">'
       + escHtml(isReg
         ? (i.lineNew || 'Pick a username and password.')
-        : ((signInOnly && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.'))
+        : (((signInOnly || linkFirst) && i.loginLinkDescFirst) || i.descReturning || 'Enter the username or email you signed up with.'))
       + '</p>'
       // Two tabs, two jobs. Which one is showing decides what the body asks for.
       + (signInOnly ? '' : '<div class="aimeat-tabs" role="tablist">'
