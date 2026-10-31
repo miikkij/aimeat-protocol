@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The log is a fold: its summary (heading, steps in words, the stuck line)
+ *     and the lines under it (v31 K33).
  *   v1.0.1 — 2026-10-02 — The live dot keeps its 9 px when the status line wraps to two lines (a
  *     progress sentence at 390 px squeezed it to 6.6 px).
  *   v1.0.0 — 2026-09-23 — Moved unchanged from css/parts*.css (UI consolidation phase 1, a move).
@@ -20,7 +22,21 @@
   padding-top: 8px;
 }
 /* The heading's look is the quiet day heading's (.poster-day-title--quiet); this keeps its place. */
-.poster-worklog-head { margin: 0 0 4px; }
+.poster-worklog-head { margin: 0; }
+/* Folded by default (v31 K33): the summary is the heading and the steps in words, without the
+   browser's own triangle; the lines open under it. */
+.poster-worklog-summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--sp-1) var(--sp-2);
+}
+.poster-worklog-summary::-webkit-details-marker { display: none; }
+.poster-worklog-steps { font-size: var(--text-xs); color: var(--text-dim); }
+.poster-worklog-stuck { font-size: var(--text-xs); color: var(--danger); }
+.poster-worklog[open] > .poster-worklog-list { margin-top: var(--sp-1); }
 .poster-worklog-list {
   list-style: none;
   margin: 0;
