@@ -32,6 +32,8 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-10-31 -- The `schedules` section (how many schedules one owner keeps, and the shortest time
+ *     between two runs) sits under limits (secaudit2026oct31w2 round 10).
  *   v3.9.0 -- 2026-10-29 -- The `file_store` section (where stored files keep their bytes, and whether a
  *     person may connect a storage of their own) sits under limits right after the quota section, the
  *     storage quota's neighbour (wish-tiedostot-azure-blob-storageen-tai-aws-s3-een-noden-yhteinen).
@@ -140,7 +142,7 @@ const DOMAINS = [
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
-  { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime'] },
+  { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime', 'schedules'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
   { id: 'integrations', groups: ['email', 'push', 'indexing', 'seo', 'cors', 'site', 'themes', 'apps', 'cookies', 'connections', 'visibility', 'geo'] },
 ];
