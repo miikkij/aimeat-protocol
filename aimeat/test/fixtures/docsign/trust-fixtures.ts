@@ -20,6 +20,7 @@
  *   crl · trustedList · lotl · signXml · qcStatements
  * @usage const ca = makeCertX({ ... ca: true }); const pdf = signPdfAs('adbe.pkcs7.detached', signer, key, [ca], 'text');
  * @version-history
+ *   2026-10-31 — secaudit2026oct31w2 round 10: makeCertX takes an optional validity period.
  *   v1.1.0 — 2026-10-25 — secaudit2026oct22: buildCmsX can carry OCSP responses as an unsigned
  *     adbe-revocationInfoArchival attribute, leave out the signer or the messageDigest attribute;
  *     ocspResponse takes a thisUpdate; signXmlById signs one element by its Id.
@@ -73,6 +74,8 @@ export interface CertOpts {
   ocspUrl?: string; crlUrl?: string;
   qc?: { sscd: boolean; type?: 'esign' | 'eseal' };
   eku?: string[];
+  /** The validity period; default from a day ago to five years ahead. */
+  validity?: { notBefore: Date; notAfter: Date };
 }
 
 export function makeCertX(o: CertOpts): Buffer {
@@ -101,7 +104,7 @@ export function makeCertX(o: CertOpts): Buffer {
     serialNumber: new Uint8Array(o.serial).buffer,
     signature: sigAlg,
     issuer: o.issuer,
-    validity: new Validity({ notBefore: new Date(now - DAY), notAfter: new Date(now + 5 * 365 * DAY) }),
+    validity: new Validity(o.validity ?? { notBefore: new Date(now - DAY), notAfter: new Date(now + 5 * 365 * DAY) }),
     subject: o.subject,
     subjectPublicKeyInfo: spki,
     extensions: new Extensions(extensions),

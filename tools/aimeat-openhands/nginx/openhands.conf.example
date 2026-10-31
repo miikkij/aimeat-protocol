@@ -10,7 +10,15 @@
 #   - The agent-server inside each runtime container enforces its own session_api_key
 #     (32-char random per-conversation token; a Bearer over Basic Auth would be redundant).
 #   - The default MCP proxy checks X-Session-API-Key + X-OpenHands-ServerConversation-ID.
-#   - Both back-ends bind to 172.17.0.1 (docker0 host-IP, host-private) — not the internet.
+#   - /runtime-<port> forwards only ports in the range OpenHands publishes runtime containers on
+#     (30000-59999: agent server 30000-39999, VS Code 40000-49999, app ports 50000-59999), and
+#     refuses the ports listed in its `if` lines.
+#
+# What /runtime-<port> reaches: 172.17.0.1 is this host's own docker0 address, so the route reaches
+# ANY listener on this host bound to 0.0.0.0 or 172.17.0.1 on a port in that range, and every
+# container port Docker publishes without an address (daemon.json ip=172.17.0.1 binds them there),
+# without Basic Auth. Keep every other service on this host bound to 127.0.0.1, or on a port outside
+# 30000-59999, or add an `if` line for its port in that location. Check with: ss -ltnp
 #
 # Setup (see DEPLOY-PROMPT.md "Expose via nginx"):
 #   1) Point a DNS A record for __DOMAIN__ at this host.
@@ -31,7 +39,6 @@ map $http_upgrade $connection_upgrade {
     default upgrade;
     ''      close;
 }
-
 server {
     listen 80;
     listen [::]:80;
@@ -65,9 +72,14 @@ server {
     # (via daemon.json ip=172.17.0.1). The app tells the browser to reach them at
     # https://__DOMAIN__/runtime-<port>/*  — this location extracts <port> and forwards.
     # Auth is OFF here: the runtime enforces its own session_api_key (bearer per conversation).
+    # Only ports 30000-59999 match (the regex is quoted because of its braces); any other
+    # /runtime-<n> falls through to `location /` and its Basic Auth.
     # Named captures avoid nginx's builtin $uri clash: `$rt_path` not `$uri`.
-    location ~ ^/runtime-(?<rt_port>[0-9]+)(?<rt_path>/.*)?$ {
+    location ~ "^/runtime-(?<rt_port>[3-5][0-9]{4})(?<rt_path>/.*)?$" {
         auth_basic off;
+        # Ports in the range that belong to other services on this host answer 404 instead of being
+        # forwarded. 40050 is the AIMEAT node's default port; add one such line per other port.
+        if ($rt_port = 40050) { return 404; }
 
         proxy_pass http://172.17.0.1:$rt_port$rt_path$is_args$args;
         proxy_http_version 1.1;

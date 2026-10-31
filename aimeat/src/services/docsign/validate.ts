@@ -40,6 +40,9 @@
  *   2026-10-27 — secaudit2026oct26: one validatePdf or validateCmsFile call runs inside an outbound
  *     budget of docsign.max_fetches requests (online-budget.ts), and a PDF with more than
  *     docsign.max_signatures signature fields is refused as TOO_MANY_SIGNATURES before any is read.
+ *   2026-10-31 — secaudit2026oct31w2 round 10: a signature or document timestamp proves a time only
+ *     when its signer certificate carries id-kp-timeStamping and was in force at genTime; otherwise
+ *     the reason is TIMESTAMP_NOT_TSA and the time is a stated one.
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -48,7 +51,7 @@ import { verifyCms, verifyTimestampToken, type CmsCheck, type TimestampCheck } f
 import { buildChain, isEudiTestRoot, type BuiltChain } from './chain.js';
 import { findIssuingService, qualifiersFor, type TrustMatch } from './trust-list.js';
 import { checkRevocation, type RevocationResult } from './revocation.js';
-import { readCert, holderLabel, type CertInfo } from './x509-info.js';
+import { readCert, holderLabel, OID, type CertInfo } from './x509-info.js';
 import { withOnlineBudget } from './online-budget.js';
 
 export type Verdict = 'valid' | 'invalid' | 'indeterminate';
@@ -78,6 +81,7 @@ export const REASONS = {
   SERVICE_NOT_GRANTED_AT_SIGNING: 'The certification service was not in a granted status on the EU trusted list at the signing time.',
   TIMESTAMP_INVALID: 'The timestamp on the signature does not verify.',
   TIMESTAMP_UNTRUSTED: 'The timestamp verifies, but its authority is not on a trusted list.',
+  TIMESTAMP_NOT_TSA: 'The timestamp verifies, but its signer is not a time-stamping authority in force at that time, so it does not prove the time.',
   CONTENT_ADDED_AFTER_SIGNING: 'Content other than signatures was added to the file after this signature. The signed version is intact, but what you see is not exactly what was signed.',
   NOT_WHOLE_FILE: 'Later signatures or validation data were added after this signature, which is normal.',
   ONLINE_CHECKS_OFF: 'This node does not reach the network for validation, so trust and revocation were not checked.',
@@ -222,7 +226,10 @@ async function assess(
       // list, or one that chains to an operator anchor. A token from any other TSA is intact but is
       // a time its maker states, so the rules for a claimed time apply (an expired or revoked
       // certificate is then not excused by it). Offline, only an operator anchor can be checked.
-      if (tsa) {
+      // Before trust, the token's signer must be a time-stamping authority in force at genTime.
+      if (tsa && !actsAsTsaAt(tsa, signingTime)) {
+        reasons.push('TIMESTAMP_NOT_TSA');
+      } else if (tsa) {
         const tsaChain = await buildChain(config, tsa.der, ts.certificates, online);
         const tsaTrust = online ? await findIssuingService(config, tsaChain.certs, signingTime, ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC']) : null;
         if (tsaTrust?.match?.positiveAt) {
@@ -377,6 +384,17 @@ async function assess(
 const ORDER: Reason[] = Object.keys(REASONS) as Reason[];
 const order = (r: Reason) => ORDER.indexOf(r);
 
+/**
+ * RFC 3161 section 2.3: a timestamp's signer is a time-stamping authority only when its certificate
+ * carries the id-kp-timeStamping extended key usage, and its word counts for a time only when that
+ * certificate was in force then. Any other key under a trusted CA states a time; it does not prove one.
+ */
+function actsAsTsaAt(tsa: CertInfo, genTime: Date | null): boolean {
+  if (!genTime || !tsa.extKeyUsage.includes(OID.ekuTimeStamping)) return false;
+  const t = genTime.getTime();
+  return Date.parse(tsa.notBefore) <= t && t <= Date.parse(tsa.notAfter);
+}
+
 function safeRead(der: Buffer): CertInfo | null {
   // eslint-disable-next-line aimeat/no-silent-catch -- an unreadable signer certificate is reported as SIGNER_CERT_MISSING by the caller
   try { return readCert(der); } catch { return null; }
@@ -390,7 +408,9 @@ async function assessDocTimestamp(config: AimeatConfig, field: PdfSignatureField
   const tsa = ts.tsaCert ? safeRead(ts.tsaCert) : null;
   let match: TrustMatch | null = null;
   let chain: BuiltChain | null = null;
-  if (tsa && verdict === 'valid') {
+  const actsAsTsa = !!tsa && actsAsTsaAt(tsa, ts.genTime ? new Date(ts.genTime) : null);
+  if (tsa && verdict === 'valid' && !actsAsTsa) { reasons.push('TIMESTAMP_NOT_TSA'); verdict = 'indeterminate'; }
+  else if (tsa && verdict === 'valid') {
     chain = await buildChain(config, tsa.der, ts.certificates, online);
     if (online) match = (await findIssuingService(config, chain.certs, ts.genTime ? new Date(ts.genTime) : new Date(), ['TSA/QTST', 'TSA', 'CA/QC', 'CA/PKC'])).match;
     if (!online) { reasons.push('ONLINE_CHECKS_OFF'); verdict = 'indeterminate'; }
@@ -460,7 +480,8 @@ async function validatePdfWithinBudget(config: AimeatConfig, pdf: Buffer, opts: 
   for (const f of fields.filter((x) => x.isDocTimestamp && x.cms.length)) {
     const { report, ts } = await assessDocTimestamp(config, f, online);
     // Only a document timestamp whose own authority is trusted proves when an earlier signature
-    // existed; an untrusted one is a time its maker states.
+    // existed; an untrusted one is a time its maker states. One whose signer is not a
+    // time-stamping authority (TIMESTAMP_NOT_TSA) builds no chain, so it is not trusted either.
     if (report.trust.trusted && report.verdict !== 'invalid') docTs.set(f.index, ts);
     signatures.push(report);
   }
