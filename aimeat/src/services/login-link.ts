@@ -32,6 +32,9 @@
  * @structure LOGIN_LINK_TTL_MS · WELCOME_LINK_TTL_MS · loginReturnTarget() · issueLoginLink() ·
  *   sendLoginLink() · sendWelcomeLink() · redeemLoginLink()
  * @version-history
+ *   v1.6.1 — 2026-10-31 — redeemLoginLink() takes the account's verified address as "still theirs" as
+ *     well as its notification address: an account proven by hash alone has no notification address,
+ *     and every link the store's buyers were mailed was refused INVALID_TOKEN (v27 P1).
  *   v1.6.0 — 2026-10-31 — sendLoginLink() takes the language of the page the link was asked from; the
  *     account's own language stays the fallback (v27 P1: an English store path got a Finnish mail).
  *   v1.5.0 — 2026-10-22 — redeemLoginLink() takes an optional beforeSpend check that runs after every
@@ -239,7 +242,13 @@ export async function redeemLoginLink(storage: Storage, config: AimeatConfig, to
     if (!owner || owner.disabledAt) return { ok: false, code: 'ACCOUNT_DISABLED' };
     const ghii = await storage.getGHII(`${record.ownerName}@${config.nodeId}`);
     if (!ghii) return { ok: false, code: 'INVALID_TOKEN' };
-    if (!ghii.magicLinkEnabled || !ghii.notificationEmail || emailHashOf(ghii.notificationEmail) !== record.emailHash) {
+    // The address the link was mailed to is still the account's: its verified address, or its
+    // notification address. An account proven by hash alone (POST /v1/ghii/verify-email, which never
+    // sees the address: the store's buyers) has no notification address, and every link it was mailed
+    // was refused (v27 P1, 2026-10-31).
+    const stillTheirs = record.emailHash === ghii.emailHash
+        || (!!ghii.notificationEmail && emailHashOf(ghii.notificationEmail) === record.emailHash);
+    if (!ghii.magicLinkEnabled || !stillTheirs) {
         return { ok: false, code: 'INVALID_TOKEN' };
     }
     // The caller's own condition (the program endpoint's second factor): a refusal leaves the link
