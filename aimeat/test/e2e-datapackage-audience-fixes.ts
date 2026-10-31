@@ -188,6 +188,17 @@ await test('D0.4c A members package\'s CSV opens for another account through /v1
     assert(anon.status === 404, `anonymous reads the members CSV: ${show(anon)}`);
 });
 
+await test('D0.4d A private file the owner put by hand inside an organism package\'s folder stays closed to the members', async () => {
+    const dPath = pathOf(descriptorUrls[P.org]);
+    const ownerSeg = dPath.split('/')[3];
+    const key = decodeURIComponent(dPath.split('/').slice(4).join('/')).replace(/datapackage\.json$/, 'notes.txt');
+    const up = await call('/v1/storage', { token: A.token, body: { key, data: Buffer.from('hand-placed secret').toString('base64'), mime_type: 'text/plain', visibility: 'private' } });
+    assert(up.status === 201, `upload: ${show(up)}`);
+    const b = await call(`/v1/pub/${ownerSeg}/${key}`, { token: B.token });
+    assert(b.status === 403 && !b.text.includes('hand-placed secret'), `a member read a file the package did not publish: ${show(b)}`);
+    await call(`/v1/storage/${key}`, { method: 'DELETE', token: A.token });
+});
+
 // ── D0.3 Withdrawing a package ─────────────────────────────────────────────────────────────────────
 console.log('\nD0.3 Withdrawing a package');
 

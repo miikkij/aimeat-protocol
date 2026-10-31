@@ -11,6 +11,10 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-01 -- GET /v1/pub reads a data package's own file (the pointer, a descriptor, a resource
+ *     CSV) on the package's audience (services/datapackage/file-read.ts): an organism package's files
+ *     are stored at 'private', so its members got 403 CONSENT_DENIED following the descriptor's
+ *     addresses (plan doc-mvwxcas3dom3, D0.4).
  *   2026-11-01 -- GET /v1/pub of a data package version's `odps.yaml` redirects to GET
  *     /v1/datapackages/{owner}/{name}/odps, the sheet projected from the version's audience; GET
  *     /v1/download/:token moved by pure extraction to routes/storage-files-download.ts (800-line
@@ -179,6 +183,7 @@ import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type S
 import { generateDownloadToken } from '../services/download-token.js';
 import { storageDownloadRouter } from './storage-files-download.js';
 import { odpsRedirectFor } from '../services/datapackage/odps-read.js';
+import { packageFileVerdict } from '../services/datapackage/file-read.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
 // Named apart from this file's own byte `readerFor` below: this one is the classification reader.
@@ -487,6 +492,22 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 ...provenanceItemBlock(prov),
             }, [{ description: 'Fetch the file bytes', method: 'GET', url: `/v1/download/${token}` }]));
         };
+
+        // A data package's own file is read on the package's audience (services/datapackage/file-read.ts):
+        // an organism or private package's files are stored at 'private', which the tier rules below
+        // open to nobody but a consent holder, so a member following the descriptor read nothing.
+        const pkg = await packageFileVerdict(storage, gaii, key, req.auth);
+        if (pkg.kind === 'open' && file.visibility !== 'public') {
+            if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
+            const viewer = req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii;
+            const prov = await markProvenance(res, file, !!req.auth?.sub && viewer === gaii);
+            if (handleMode) { await sendHandle(viewer, prov); return; }
+            res.setHeader('Cache-Control', 'private, max-age=300');
+            if (!await serveStoredFile(res, file, req.headers.range, readerFor(gaii, key), { headOnly: req.method === 'HEAD', conditionals: req.headers })) {
+                res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found'));
+            }
+            return;
+        }
 
         // Public files are always accessible (audited when the consent layer is on,
         // mirroring memory's public read).
