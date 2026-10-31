@@ -21,6 +21,9 @@
  * @structure ANONYMOUS_ACCOUNT · isAnonymousPrincipal(auth) · refuseAnonymousPrincipal(message?)
  * @usage router.get('/v1/catalogue/directory', requireAuth(), refuseAnonymousPrincipal(), requireScope('catalogue:read'), handler)
  * @version-history
+ *   v1.1.1 — 2026-10-31 — Header only: the REST scope gate (auth/rest-scope-gate.ts) keeps the flag
+ *     too. The "REST-scope" in v1.1.0's list never changed: the minted token holds ANONYMOUS_SCOPES and
+ *     reads the App Catalog's cortex popup through that gate (secaudit 2026-10-31 inv-01).
  *   v1.1.0 — 2026-10-21 — Every guard that read only the `anonymous` flag asks this instead (the board
  *     roster and read routes, the agent card, the app legal pages, the device-auth approver, the
  *     member list, the profile and owner rosters, the bearer refresh, the requireOwnerPrincipal,

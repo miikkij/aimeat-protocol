@@ -21,6 +21,10 @@
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.6.1 — 2026-10-31 — readPublishSpace() refuses a namespace under `w.` when no ws is given: the
+ *     publish, batch publish and reopen doors built that workspace record's key at the organism root
+ *     and ran none of their workspace checks, so a member with no grant reopened a workspace's
+ *     record into a draft of their own (secaudit 2026-10-31 inv-06).
  *   v1.6.0 — 2026-10-18 — resolveSpaceNamespace(): a publish, a batch publish and a reopen take a
  *     space by its name as the write tools do. The UNDECLARED_SPACE refusal for a member who named a
  *     declared space by its name says which namespace it has, instead of "declares no space" beside
@@ -342,12 +346,20 @@ export function undeclaredSpaceRefusal(
  * manifest, and a space any of them declares is declared. An archived workspace is refused by the
  * archive guard, which the doors run separately and which says so; without the archived copies it
  * would be refused here as having no manifest, which is not true. The organism root (no `ws`) has no
- * workspace manifest and is not refused.
+ * workspace manifest and is not refused, except for a namespace under `w.`: that names a record of a
+ * workspace (organism.<id>.w.<ws>.…) without its ws, and the doors run their workspace read, write
+ * and fence checks only when ws is given (secaudit 2026-10-31 inv-06).
  */
 export async function readPublishSpace(
     storage: Storage, organismId: string, ws: string | undefined, namespace: string,
     opts?: { audience?: UndeclaredSpaceAudience; nodeId?: string },
 ): Promise<{ ot: PublishObjectType | undefined; refusal: UndeclaredSpaceRefusal | null }> {
+    if (!ws && (namespace === 'w' || namespace.startsWith('w.'))) {
+        const how = 'Name the workspace in ws and the space in namespace, for example ws: "<workspace id>", namespace: "shared.notes".';
+        return { ot: undefined, refusal: { ok: false, status: 422, code: 'UNDECLARED_SPACE',
+            message: `Nothing was changed: "${namespace}" is a workspace's record, not a space of the organism. ${how}`,
+            details: { namespace, how_to_fix: how } } };
+    }
     const mkey = `${ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`}.meta.manifest`;
     const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10, archived: 'include' })).items.filter(r => r.key === mkey);
     const typesOf = (r: MemoryRecord | null | undefined): PublishObjectType[] =>

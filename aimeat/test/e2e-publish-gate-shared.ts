@@ -13,6 +13,8 @@
  *     - the MCP tool of the same door answers publish_request in its text, not as an error;
  *     - refusals: another owner changing A's organism (403) or A's cortex visibility (403).
  * @version-history
+ *   2026-10-31 — An organisation board asked to public with federate true keeps its level and is not
+ *     federated (secaudit 2026-10-31 inv-13).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-gate-shared
@@ -218,6 +220,22 @@ await test('Board: PATCH visibility keeps the level; a board given another level
     const d = await approve(pr.request_id);
     assert(d.status === 409 && d.body.error.code === 'OUTDATED', `approve: ${d.status} ${JSON.stringify(d.body.error)}`);
     assert(!(await anonBoards()).includes(id), 'still not public');
+});
+
+await test('Board: an organisation board asked to public with federate true keeps its level and stays unfederated', async () => {
+    const o = await call('/v1/organisms', { token: asker.token, body: { name: `Board org ${tag}`, visibility: 'private' } });
+    assert(o.status === 201, `organism: ${o.status} ${JSON.stringify(o.body.error)}`);
+    const level = `organism:${o.body.data.organism.id}`;
+    const c = await call('/v1/boards', { token: asker.token, body: { name: `Org board ${tag}`, visibility: level } });
+    assert(c.status === 201 && c.body.data.visibility === level, `create: ${c.status} ${JSON.stringify(c.body.error ?? c.body.data)}`);
+    const id = c.body.data.id as string;
+    const p = await call(`/v1/boards/${id}/visibility`, { token: asker.token, method: 'PATCH', body: { visibility: 'public', federate: true } });
+    asked(p, 'patch');
+    assert(p.body.data.visibility === level, `patch stored ${p.body.data.visibility}`);
+    assert(p.body.data.federate === false, `an organisation board was stored federated: ${JSON.stringify(p.body.data)}`);
+    const list = await call('/v1/boards', { token: asker.token });
+    const row = (list.body.data?.boards as Body[] ?? []).find(b => b.id === id);
+    assert(row && row.federate === false, `listed as ${JSON.stringify(row)}`);
 });
 
 await test('Board: the agent with publish:public and the owner in person create it public at once', async () => {
