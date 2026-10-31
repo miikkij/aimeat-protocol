@@ -1,6 +1,8 @@
 ## Getting started {#start}
 
-AIMEAT is your own place where AI does work for you. It remembers what you tell it, makes agents and apps for you, and everything in it is yours.
+ChatGPT, Claude or Grok is your right hand: it remembers your things and takes care of them. Agents do the agreed work all the time, also while you are away.
+
+AIMEAT is your own place where all this happens. Everything in it is yours.
 
 Start with one sentence. Open your [Home](/v1/home), your own page here, and write in the field what you want done, for example:
 
@@ -10,16 +12,18 @@ AIMEAT makes an agent from it. An agent is an AI that does one job for you, also
 
 You can also talk with the AI directly in the [chat](/v1/chat).
 
-If you already use Claude, ChatGPT or another AI, you can connect it here. The connection uses MCP, an open way for an AI to use a service with your permission. Then your AI sees the same information and does the same things as the chat. The instructions are on your Home.
+If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your right hand: it sees the same information and does the same things as the chat. The buttons to connect are on your Home.
+
+(The connection uses the open MCP technology. You do not need to know more about it.)
 
 ## AI credit and what this costs {#cost}
 
 <!--store-->
 Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name, in the chat and on the [AI page](/v1/profile?tab=ai).
 
-The credit is used when the AI answers or does work. To buy more, press Buy more credit next to the credit on your Home. You can do it at any time. You buy the credit in the store, the same way you bought this place.
+The credit is used when the AI answers or does work. To buy more, press Buy more credit next to the credit on your Home. The payment uses the same card, and no new subscription is needed. You can do it at any time.
 
-When the credit is used up, AIMEAT tells you and shows how to go on, for example: buy more credit in the store, or, if this site has a free model, go on with that. The free model answers less well.
+When the credit is used up, AIMEAT tells you and shows how to go on.
 
 The monthly fee and the invoices are in the store. You find them in Settings, under Orders and invoices.
 <!--/store-->
@@ -45,7 +49,7 @@ An agent is an AI that does one job for you, also when you are away.
 
 Say in one sentence on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
 
-You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. What the agent finishes shows on your Home. You can stop an agent at any time.
+You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, and if you want, the agent sends it to your email. You can stop an agent at any time.
 
 ## Apps {#apps}
 
