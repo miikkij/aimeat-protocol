@@ -30,6 +30,9 @@
  *   const r = await readWorkspaceOp({ storage, config }, caller, { organismId, ws });
  *   if (!r.ok) return fail(r.message);
  * @version-history
+ *   2026-10-31 — readWorkspaceOp reads each record's role from the end of its key (recordAt), skips a
+ *     key of a longer namespace and makes no empty slot, so one record id with a dot no longer makes
+ *     the index answer 500 to every member (secaudit2026oct31w2 round 10, f-2026-10-23-dotted-id-breaks-index).
  *   2026-10-30 — A document's embedded images are bound by the writer's principal, as linked files are.
  *   2026-10-30 — writeWorkspaceOp binds every file a landed value links with /v1/pub, and the writer
  *     controls, to the workspace (services/record-files.ts; Jouni, 2026-10-30).
@@ -147,7 +150,7 @@ import { provenanceForWrite, provenanceDeclarationRefusal, stampAutonomousOutput
 import { mediaKindOfValue, type AiProvenanceLevel, type AiProvenanceMethod } from '../models/ai-provenance-schemas.js';
 import { memoryContentBytes, documentContentBytes } from '../utils/memory-content.js';
 import { directValueProvenance, type DeclarationParser } from './workspace-direct-provenance.js';
-import { instanceFromKey } from './workspace-record-key.js';
+import { instanceFromKey, recordAt } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
 import { normalizeHtmlPageValue, isHtmlPageValue, schemaViewOfDocument } from './html-page.js';
 import { isPageStale } from './workspace-opened.js';
@@ -236,18 +239,25 @@ export async function readWorkspaceOp(
 
     type Slot = { latest?: MemoryRecord; draft?: MemoryRecord };
     const spaces = new Map<string, { ot: ObjType; inst: Map<string, Slot> }>();
+    const nsPrefixes = (manifest.objectTypes ?? []).filter(ot => ot.namespace).map(ot => `${root}.${ot.namespace}.`);
     for (const ot of manifest.objectTypes ?? []) {
         if (!ot.namespace || !isMemoryBackedSpace(ot)) continue;
         const nsPrefix = `${root}.${ot.namespace}.`;
+        // A key of a space whose namespace begins with this one belongs to that space.
+        const longer = nsPrefixes.filter(p => p.length > nsPrefix.length && p.startsWith(nsPrefix));
         const inst = new Map<string, Slot>();
         for (const r of items) {
-            if (!r.key.startsWith(nsPrefix)) continue;
-            const parts = r.key.slice(nsPrefix.length).split('.');
-            const role = parts.slice(1).join('.');
-            const slot = inst.get(parts[0]) ?? {};
-            if (role === '' || role === 'latest') slot.latest = fresherRec(slot.latest, r);
-            else if (role === 'draft') slot.draft = fresherRec(slot.draft, r);
-            inst.set(parts[0], slot);
+            if (!r.key.startsWith(nsPrefix) || longer.some(p => r.key.startsWith(p))) continue;
+            // The role is read from the END of the key, as the write guard reads it, so an id with a
+            // dot in it is one record under its whole id. Split from the front, `v1.2.draft` was record
+            // `v1` with a role nothing set, an empty slot that made the whole index answer 500 for
+            // every member (secaudit2026oct31w2 round 10, f-2026-10-23-dotted-id-breaks-index).
+            const at = recordAt(r.key.slice(nsPrefix.length));
+            if (!at) continue;
+            const slot = inst.get(at.id) ?? {};
+            if (at.role === 'latest') slot.latest = fresherRec(slot.latest, r);
+            else slot.draft = fresherRec(slot.draft, r);
+            inst.set(at.id, slot);
         }
         spaces.set(ot.name, { ot, inst });
     }
