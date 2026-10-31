@@ -11,6 +11,9 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-10-31 — aimeat_app_publish and aimeat_app_draft_publish answer with `url`, the address to hand
+ *     the person, as aimeat_app_list does. They answered with download_url first, the raw file served
+ *     as an attachment, and the node chat gave a buyer that link: it downloaded the app (v28 #12).
  *   2026-10-27 — aimeat_app_publish and aimeat_app_draft_publish under a role-'app' token name that app on the version (`publishingApp`; secaudit2026oct26).
  *   2026-10-27 — aimeat_app_get and aimeat_app_list count the minted anonymous token as no member of this node, so it neither reads nor lists an app listed to members, as on REST (secaudit2026oct26, minted-anonymous-token-counted-as-member).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -156,6 +159,12 @@ import { mayViewApp } from '../services/app-visibility.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { publishAskOf } from '../services/publish-requests/ask.js';
 import { publishAskedFields } from '../services/app-publish-gate.js';
+
+/** The address a person opens a just-published app at: the one aimeat_app_list gives, read-only. */
+async function publishedAppUrl(config: AimeatConfig, storage: Storage, ownerName: string, filename: string): Promise<string | null> {
+    const byApp = await resolveAppUrls(config, storage, [{ owner: ownerName, filename }]);
+    return Object.values(byApp)[0] ?? null;
+}
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -348,6 +357,7 @@ export function registerAppsTools(
                             name: out.manifest.name,
                             size: out.size,
                             is_update: out.isUpdate,
+                            url: await publishedAppUrl(config, storage, scope.ownerName, filename),
                             download_url: out.downloadUrl,
                             inline_url: `${out.downloadUrl}?mode=inline`,
                             ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
@@ -494,7 +504,8 @@ export function registerAppsTools(
                         type: 'text' as const,
                         text: JSON.stringify({
                             filename, version_number: out.versionNumber, is_update: out.isUpdate,
-                            parked: out.parked, download_url: out.downloadUrl, inline_url: `${out.downloadUrl}?mode=inline`,
+                            parked: out.parked, url: await publishedAppUrl(config, storage, scope.ownerName, filename),
+                            download_url: out.downloadUrl, inline_url: `${out.downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
                             ...(out.roadmapHint ? { roadmap_hint: out.roadmapHint } : {}),
                             ...(out.designSpecHint ? { design_spec_hint: out.designSpecHint } : {}),

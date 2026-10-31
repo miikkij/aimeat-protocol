@@ -24,6 +24,28 @@
       }
     },
     {
+      "date": "2026-10-31",
+      "kind": "feature",
+      "id": "2026-10-31-sell-your-own-package",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Sell your own package",
+        "fi": "Myy oma pakettisi"
+      },
+      "summary": {
+        "en": "Put a price on a package you made, and another user of the same AIMEAT can buy it.",
+        "fi": "Hinnoittele tekemäsi paketti, ja toinen saman AIMEATin käyttäjä voi ostaa sen."
+      },
+      "body": {
+        "en": "Put a price on a package you made. Another user of the same AIMEAT buys it on the Packages page or through their AI. The money goes to your own Stripe account, and the buyer can install the package and its later versions. You see every sale and can refund it.",
+        "fi": "Aseta hinta tekemällesi paketille. Toinen saman AIMEATin käyttäjä ostaa sen Paketit-sivulta tai tekoälynsä kautta. Raha menee omalle Stripe-tilillesi, ja ostaja voi asentaa paketin ja sen myöhemmät versiot. Näet jokaisen myynnin ja voit hyvittää sen."
+      }
+    },
+    {
       "date": "2026-10-30",
       "kind": "feature",
       "id": "2026-10-30-several-file-stores-and-you-choose-where-a-file-goes",
