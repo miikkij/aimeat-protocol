@@ -11,6 +11,8 @@
  * @version-history
  *   2026-10-31 — aimeat-gen-rules: the generation rules for AI pictures and videos; ai-transparency
  *     names `rules_followed`.
+ *   2026-10-31 — configure-routing: the OpenRouter region rules (openrouterRegion,
+ *     openrouterRegionFallback), `openrouter_region` on the read and `region` on an answer's route.
  *   2026-10-31 — ai-transparency: a file uploaded straight to its store has a record with no hash.
  *   2026-10-25 — configure-routing: the rule freeModelLastResort and `free_model` on the read
  *     (secaudit2026oct22 follow-up, the free model as the last resort).
@@ -199,7 +201,18 @@ Three separate "routing" layers — identify which one the owner means:
    \`freeModelLastResort\`: whether a call on the node's key that named no model gets the free model
    when the allowance cannot pay, true, false, or null for the operator's default; \`free_model\` on
    the read says what applies now).
-   Every answer carries \`route\`: who chose, who answered, each attempt. Spend history is
+   **Where OpenRouter processes a call** is the owner's to choose when the operator allows it:
+   \`openrouterRegion\` eu (eu.openrouter.ai: servers in the EU or the EEA, the UK or Switzerland), us
+   (us.openrouter.ai) or any (openrouter.ai, any country), and \`openrouterRegionFallback\`: what
+   happens to a model the region does not offer (off refuses it with AI_MODEL_NOT_IN_REGION and names
+   the region's models, us sends it to the US, any tries the US and then any country). Null keeps
+   the node's choice. \`openrouter_region\` on the read says what the node allows, whether the owner
+   may choose, and what applies now on the node's key and on the owner's own OpenRouter key (whose
+   default is any, because an own key may not be on the plan the regional addresses need). When an
+   owner asks where their data goes, read it and say it in their words.
+   Every answer carries \`route\`: who chose, who answered, each attempt; an OpenRouter answer's
+   \`answeredBy.region\` says where it was processed, and \`regionWanted\` the region it was meant for
+   when it fell back. Spend history is
    \`GET /v1/ai/usage/history\`, where each failed attempt before a fallback is a line of its own.
    The operator's side: \`AIMEAT_AI_PROVIDERS\`, \`AIMEAT_AI_BUILTIN_PROVIDERS\`,
    \`AIMEAT_AI_PROVIDER_EGRESS\` and \`AIMEAT_AI_PROVIDER_TYPES\` on the Config tab; the node's own

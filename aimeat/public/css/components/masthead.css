@@ -8,6 +8,8 @@
  * @usage Linked from public/spa.html in the component block, whose order keeps the order these
  *   rules had when they were one sheet.
  * @version-history
+ *   v1.4.0 — 2026-10-31 — .poster-masthead-status: a line under the name that wraps (the AI credit,
+ *     Jouni v27 P6).
  *   v1.3.1 — 2026-09-27 — The preview's own name: .pf-avatar-preview → .poster-masthead-preview (a
  *     move: the declarations are unchanged).
  *   v1.3.0 — 2026-09-26 — The head's picture as a preview beside the field that sets it
@@ -40,6 +42,12 @@
   font-family: var(--font-mono); font-size: var(--text-small); color: var(--text-dim);
   margin-top: 0.9rem;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: help;
+}
+/* A status line under the name (the AI credit on a node the store sold): the identity's type, but it
+   wraps instead of ending in an ellipsis, because the part that is cut is the part that matters. */
+.poster-masthead-status {
+  font-family: var(--font-mono); font-size: var(--text-small); color: var(--text-dim);
+  margin-top: 0.9rem;
 }
 .poster-masthead-actions { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: 0.6rem; }
 .poster-masthead-cog { flex: none; opacity: 0.8; }

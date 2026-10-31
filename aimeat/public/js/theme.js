@@ -4,8 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description Dark/light theme controller for the AIMEAT SPA. Owns the
  *   `data-theme` attribute on <html>, persists the user's explicit choice to
- *   localStorage (`aimeat-theme`), and — until the user makes an explicit
- *   choice — tracks the OS `prefers-color-scheme`. Mirrors the i18n module's
+ *   localStorage (`aimeat-theme`), and is light until the user chooses; the OS
+ *   `prefers-color-scheme` is tracked only when the stored choice is 'auto'
+ *   ("automatic"). Mirrors the i18n module's
  *   shape (getter / setter / subscribe + a `aimeat-theme-change` CustomEvent).
  *   The no-flash initial paint is handled by an inline boot snippet in
  *   spa.html <head>; this module takes over once the SPA mounts.
@@ -17,6 +18,8 @@
  *   const off = onThemeChange((t) => ...);   // subscribe, returns unsubscribe
  *   toggleTheme();                           // flip light <-> dark
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Light until the person chooses: the OS preference is followed only when the
+ *     stored choice is 'auto' (Jouni, v31 K65). The head snippet in spa.html decides the same way.
  *   v1.0.0 — 2026-06-02 — Initial dark/light theming (Phase 1 mechanism).
  *   v1.2.0 — 2026-09-24 — The OS listener leaves the mode alone while the page wears a style with
  *     one mode only (Themes & Styles).
@@ -36,15 +39,20 @@ let mediaQuery = null;
 // Set true while WE dispatch EVENT_NAME so the external listener (below) ignores our own echo.
 let selfDispatch = false;
 
-/** Read the stored explicit choice, or null if the user has not chosen. */
-function storedChoice() {
+/** The stored value as it is ('light', 'dark', 'auto' or anything else), or null. */
+function storedRaw() {
   try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return VALID.has(v) ? v : null;
+    return localStorage.getItem(STORAGE_KEY);
   } catch {
     // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     return null;
   }
+}
+
+/** Read the stored explicit choice of a mode, or null if the user has not chosen one. */
+function storedChoice() {
+  const v = storedRaw();
+  return VALID.has(v) ? v : null;
 }
 
 /** Sync the <meta name="theme-color"> so mobile browser chrome matches. */
@@ -62,6 +70,14 @@ export function getTheme() {
 /** True if the user has explicitly picked a theme (vs. following the OS). */
 export function hasExplicitChoice() {
   return storedChoice() !== null;
+}
+
+/**
+ * True only when the person chose "automatic" (the key holds 'auto'): then the OS decides. With no
+ * choice at all the page is light, AIMEAT's own look (Jouni, v31 K65, 2026-10-31).
+ */
+function followsOs() {
+  return storedRaw() === 'auto';
 }
 
 /**
@@ -120,7 +136,7 @@ export function initThemeSystem() {
   if (window.matchMedia) {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
     const onOsChange = (e) => {
-      if (hasExplicitChoice()) return; // explicit choice wins over OS
+      if (!followsOs()) return; // the OS decides only when the person chose "automatic"
       // A style with one mode only keeps that mode (Themes & Styles; the look boot in spa.html).
       if (document.querySelector('meta[name="aimeat-light"][data-look]')) return;
       setTheme(e.matches ? 'dark' : 'light', false);

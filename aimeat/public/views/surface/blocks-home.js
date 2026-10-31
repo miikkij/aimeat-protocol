@@ -19,6 +19,18 @@
  * @version-history
  *   2026-10-31: OverviewBlock, the account at a glance and the way to the Overview page
  *     (views/home/overview-band.js, GET /v1/overview).
+ *   2026-10-31: Jouni's v32 approval (K26): "Tekoälysaldo X € · oma tekoälysi on käytössä · Osta lisää
+ *     tekoälyä", and under it "Kertamaksu. Ei uutta tilausta." (home.credit.topupNote).
+ *   2026-10-31: Jouni's review of v31 (K26): on a node the store sold the nameplate shows no name
+ *     while the only name is the account id; the credit line reads "AI-saldo X € · oma tekoälysi on
+ *     valmis käyttöön · Osta lisää saldoa", without "mikä tämä on?".
+ *   2026-10-31: The credit line's "Buy more credit" is there at all times, in the page's language,
+ *     not only when the credit runs low (v28 #19).
+ *   2026-10-31: The credit line ends with "what is this?", a link to the help page's cost section,
+ *     so the term is explained where it first appears (Jouni's "teach during use").
+ *   2026-10-31: On a node the store sold, NameplateBlock carries the AI credit in euros under the
+ *     name, with whether the AI is ready and the store's top-up link when it runs low; the "this is
+ *     a demo" block draws nothing there (Jouni v27 P3, P6).
  *   2026-10-29: NameplateBlock leaves out the full identity on a customer's node: it carries the
  *     node's id, which a buyer never needs to read (UX review 2026-10-29, C).
  *   2026-10-25: YourTurnBlock passes each thread's last message time and the person's window
@@ -49,7 +61,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { useShared } from '/views/surface/shared-read.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { useHomePrefs } from '/views/surface/home-prefs.js';
@@ -67,8 +79,11 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { storeHref, storeOpensSoon, storeSoonCode, customerNode } from '/js/site.js';
+import { aiCredit, topupHref } from '/js/ai-credit.js';
+import { money } from '/js/format.js';
 import { LinkLine } from '/components/LinkLine.js';
 import { OwnAimeat } from '/components/OwnAimeat.js';
+import { Note } from '/components/Note.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -78,13 +93,45 @@ const identityOf = (session) =>
 
 // ── The person ──
 
+/**
+ * The AI credit under a buyer's name, in euros, with whether their AI is ready, and where to buy
+ * more (Jouni v27 P6). The top-up link is there at all times, not only when the credit runs low:
+ * a buyer who wants more before it runs out found no way to buy it (v28 #19). Nothing on a node the
+ * store did not sell (ai-credit.js).
+ */
+function CreditPlate() {
+  const customer = customerNode();
+  const { data } = useShared('chat-status', customer ? '/v1/chat/status' : null, ['chat']);
+  const credit = aiCredit(data);
+  if (!credit) return null;
+  const amount = money(credit.eur, 'EUR');
+  const stateText = {
+    ready: tr('home.credit.ready', 'your AI is ready'),
+    low: tr('home.credit.low', 'running low'),
+    empty: tr('home.credit.empty', 'used up'),
+    off: tr('home.credit.off', 'the AI is switched off on this site'),
+  }[credit.state];
+  const topup = topupHref(getLocale());
+  return html`
+    <span class="poster-masthead-status">
+      ${tr('home.credit.line', 'AI credit {amount}').replace('{amount}', amount)} · ${stateText}
+      ${topup && html` · <a href=${topup} target="_blank" rel="noopener">${tr('home.credit.topup', 'Buy more AI')}</a>`}
+    </span>
+    ${topup && html`<${Note} kind="meta">${tr('home.credit.topupNote', 'One-off payment. No new subscription.')}<//>`}`;
+}
+
 export function NameplateBlock(/** @type {{ ctx?: any, props?: Record<string, any>, title?: string, text?: string, blockKey?: string }} */ { ctx }) {
   const { state } = useHomeState();
   if (!state) return null;
+  // On a node the store sold, a name that is only the account id ("KOEUUSI417276") is not shown as
+  // the page's big heading: the nameplate goes without a name until the person gives one; the
+  // welcome above already says whose AIMEAT this is (v31 K26).
+  const idOnly = customerNode() && (!state.displayName || state.displayName === state.owner);
   return html`<${HomeHeader}
-    name=${state.displayName}
+    name=${idOnly ? '' : state.displayName}
     owner=${state.owner}
     identity=${customerNode() ? '' : identityOf(ctx?.session) ?? state.ghii}
+    plate=${html`<${CreditPlate} />`}
     onOpenSettings=${ctx?.openSettings} />`;
 }
 
@@ -334,7 +381,8 @@ export function InstallCtaBlock() {
  */
 export function OwnAimeatBlock() {
   const store = storeHref();
-  if (!store) return null;
+  // A node the store sold IS the buyer's own AIMEAT: telling them it is a demo is wrong there (v27 P3).
+  if (!store || customerNode()) return null;
   return html`
     <${OwnAimeat} href=${store}
       label=${tr('home.ownAimeat.label', 'Demo')}

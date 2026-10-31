@@ -20,6 +20,8 @@
  *   ROUTING_KEY · agentRoutingKey · RoutingRules · DEFAULT_RULES · RoutingRecord · readRouting ·
  *   rulesFor · defaultsFor · normaliseRoutingInput · setRouting
  * @version-history
+ *   v1.2.0 — 2026-10-31 — rules.openrouterRegion and rules.openrouterRegionFallback: where the person's
+ *     OpenRouter calls are processed, eu, us or any (Jouni, 2026-10-31).
  *   v1.1.0 — 2026-10-25 — rules.freeModelLastResort: the account's own word on the free model as the
  *     last resort on the node's key; null keeps the node's default (secaudit2026oct22 follow-up).
  *   v1.0.1 — 2026-10-05 — An agent name is checked with isValidAgentName, the grammar agents have (secaudit 2026-10, M2).
@@ -67,7 +69,19 @@ export interface RoutingRules {
    * node's default (ai.free_model_last_resort). Jouni, 2026-10-25.
    */
   freeModelLastResort: boolean | null;
+  /**
+   * Where an OpenRouter call is processed (services/ai/openrouter-region.ts): eu, us or any. On the
+   * node's key it counts only when the operator lets people choose (ai.openrouter_region_person_choice)
+   * and allows that region; null is the node's choice. On the person's own OpenRouter key it is theirs
+   * alone; null there is any, the address their key always used. Jouni, 2026-10-31.
+   */
+  openrouterRegion: 'eu' | 'us' | 'any' | null;
+  /** When the model is not offered in that region: off, us or any. Null: the node's default. */
+  openrouterRegionFallback: 'off' | 'us' | 'any' | null;
 }
+
+const REGIONS = ['eu', 'us', 'any'] as const;
+const REGION_FALLBACKS = ['off', 'us', 'any'] as const;
 
 /** Jouni's J9 defaults, approved 2026-09-28. */
 export const DEFAULT_RULES: Readonly<RoutingRules> = Object.freeze({
@@ -81,6 +95,8 @@ export const DEFAULT_RULES: Readonly<RoutingRules> = Object.freeze({
   speechVoiceMayChange: false,
   maxCostPerCallUsd: null,
   freeModelLastResort: null,
+  openrouterRegion: null,
+  openrouterRegionFallback: null,
 });
 
 export type RoutingDefaults = Partial<Record<AiCapability, string[]>>;
@@ -123,6 +139,9 @@ function readRules(v: unknown): RoutingRules {
     speechVoiceMayChange: bool('speechVoiceMayChange'),
     maxCostPerCallUsd: typeof r.maxCostPerCallUsd === 'number' && r.maxCostPerCallUsd >= 0 ? r.maxCostPerCallUsd : null,
     freeModelLastResort: typeof r.freeModelLastResort === 'boolean' ? r.freeModelLastResort : null,
+    openrouterRegion: (REGIONS as readonly unknown[]).includes(r.openrouterRegion) ? r.openrouterRegion as RoutingRules['openrouterRegion'] : null,
+    openrouterRegionFallback: (REGION_FALLBACKS as readonly unknown[]).includes(r.openrouterRegionFallback)
+      ? r.openrouterRegionFallback as RoutingRules['openrouterRegionFallback'] : null,
   };
 }
 
@@ -216,6 +235,16 @@ export function normaliseRoutingInput(input: unknown, knownIds: ReadonlySet<stri
         if (r.freeModelLastResort !== null && typeof r.freeModelLastResort !== 'boolean') {
           problems.push('rules.freeModelLastResort: true, false, or null for the node\'s default.');
         } else rules.freeModelLastResort = r.freeModelLastResort as boolean | null;
+      }
+      if (r.openrouterRegion !== undefined) {
+        if (r.openrouterRegion !== null && !(REGIONS as readonly unknown[]).includes(r.openrouterRegion)) {
+          problems.push('rules.openrouterRegion: eu, us, any, or null for the node\'s choice.');
+        } else rules.openrouterRegion = r.openrouterRegion as RoutingRules['openrouterRegion'];
+      }
+      if (r.openrouterRegionFallback !== undefined) {
+        if (r.openrouterRegionFallback !== null && !(REGION_FALLBACKS as readonly unknown[]).includes(r.openrouterRegionFallback)) {
+          problems.push('rules.openrouterRegionFallback: off, us, any, or null for the node\'s default.');
+        } else rules.openrouterRegionFallback = r.openrouterRegionFallback as RoutingRules['openrouterRegionFallback'];
       }
       out.rules = rules;
     }

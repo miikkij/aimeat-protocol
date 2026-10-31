@@ -6,6 +6,7 @@
  * @description Main AIMEAT CLI entry point, including node management commands and agent connector dispatch.
  * @structure Parses top-level CLI flags, routes subcommands, starts the server, and delegates connector commands.
  * @usage Executed through the published `aimeat` binary.
+ * @version-history 2026-10-31 — `handover-link`: a one-time sign-in link for the person the node was set up for, as one JSON line (cli/handover-link.ts).
  * @version-history 2026-10-25 — --db-url, --db-path and --admin-password name storage.database_url, storage.sqlite_path and setup.admin_password, the rows' paths on the Config tab.
  * @version-history 2026-10-16 — Caught errors are logged with errorFields(err), so the line carries the message and the stack instead of {} (QA audit E1-04).
  * @version-history v1.9.4 — 2026-05-28 — Allow agent connector flags and drain async auth handles before exit.
@@ -69,6 +70,8 @@ const { values, positionals } = parseArgs({
     'install-set': { type: 'string' },
     'install-set-secrets': { type: 'string' },
     'include-secrets': { type: 'boolean' },
+    account: { type: 'string' },
+    lang: { type: 'string' },
     token: { type: 'string' },
     help: { type: 'boolean', short: 'h' },
     version: { type: 'boolean', short: 'v' },
@@ -211,6 +214,10 @@ if (subcommand === 'config') {
   if (cliKeys.length > 0) prov.markEnv(cliKeys); // CLI overrides show as 'env' in display
   console.log(formatConfig(config, prov));
   process.exit(0);
+} else if (subcommand === 'handover-link') {
+  // One JSON line on stdout; the fleet's control service reads it (cli/handover-link.ts).
+  const { runHandoverLink } = await import('./cli/handover-link.js');
+  process.exit(await runHandoverLink(config, { account: stringFlag(values.account), lang: stringFlag(values.lang) }));
 } else if (subcommand === 'init') {
   const { runInitWizard } = await import('./cli/init-wizard.js');
   await runInitWizard(config, {

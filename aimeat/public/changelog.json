@@ -27,6 +27,27 @@
     {
       "date": "2026-10-31",
       "kind": "feature",
+      "id": "2026-10-31-the-aimeat-you-buy-is-yours-at-once",
+      "highlight": false,
+      "audience": [
+        "user"
+      ],
+      "title": {
+        "en": "The AIMEAT you buy is yours at once",
+        "fi": "Kaupasta ostettu AIMEAT on omasi heti"
+      },
+      "summary": {
+        "en": "Your own AIMEAT speaks to you in plain words, shows your AI allowance in euros and opens light.",
+        "fi": "Oma AIMEATisi puhuu selkeästi, näyttää tekoälysaldon euroina ja avautuu vaaleana."
+      },
+      "body": {
+        "en": "Home tells you the one thing to do first, connecting your own AI, and leaves once it is done. Your AI allowance shows in euros beside \"Buy more AI\", a one-off payment with no new subscription. You sign in with a link that comes to your email, and the sign-in window says why the demo, the store and your own AIMEAT each ask you to sign in. The help page, the chat and the AI page use the same plain words.",
+        "fi": "Koti kertoo, mitä teet ensin: liität oman tekoälysi. Kun se on tehty, ohje poistuu. Tekoälysaldo näkyy euroina, ja sen vieressä on Osta lisää tekoälyä. Se on kertamaksu, eikä uutta tilausta tarvita. Kirjaudut sähköpostiisi tulevalla linkillä, ja kirjautumisikkuna kertoo, miksi esittely, kauppa ja oma AIMEATisi pyytävät kukin kirjautumaan. Ohjesivu, chat ja tekoälysivu käyttävät samoja selkeitä sanoja."
+      }
+    },
+    {
+      "date": "2026-10-31",
+      "kind": "feature",
       "id": "2026-10-31-ask-the-chat-for-an-app-and-get-its-address-in-the-same-message",
       "highlight": true,
       "audience": [

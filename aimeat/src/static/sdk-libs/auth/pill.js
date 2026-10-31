@@ -14,6 +14,8 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.7.2 — 2026-10-31 — On a page that names fewer than two languages the labels choose among the
+ *     pill's own (en, fi, es) rather than English alone, so the place's language reaches them.
  *   v1.7.1 — 2026-10-01 — Languages passed as opts.locales mark <html lang> at mount, as the
  *     aimeat-locales meta does at load (aimeatRestoreLang).
  *   v1.7.0 — 2026-09-24 — The pill re-draws on 'aimeat-look-change': on the node's own pages the picker
@@ -55,6 +57,7 @@ import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
 import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
 import { readLocales, langSwitchHtml, wireLangSwitch, aimeatReadLang, aimeatRestoreLang } from './locale.js';
 import { pillStrings } from './pill-strings.js';
+import { MODAL_LANGS } from './i18n.js';
 import { paletteControlHtml, wirePaletteControl } from './palette.js';
 import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
@@ -90,8 +93,11 @@ export function mountPill(auth, selector, opts = {}) {
   // The pill's own labels follow the reader's language. The caller's strings always win, so the SPA
   // (which passes the node's full dictionary) is unaffected; an app that passes nothing stops
   // getting an English "Logout" under a Spanish page. Recomputed per render, because the pill's own
-  // switch can change the language while the page is open.
-  let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
+  // switch can change the language while the page is open. A page that names fewer than two
+  // languages leaves the choice to the languages the pill itself speaks, so the place's own language
+  // reaches it (it was ['en'], which could only ever answer English; crew33 check, 2026-10-31).
+  const labelLangs = locales.length ? locales : MODAL_LANGS;
+  let i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
   // Compact pill (≤600px: one small button, the rest in a popover) is the mobile-safe DEFAULT at
   // every address. It was the default on an app origin only, so the same app opened on the node's
   // own /v1/apps/ path, or on a node without app origins, got the full row on a phone and pushed the
@@ -116,7 +122,7 @@ export function mountPill(auth, selector, opts = {}) {
   }
 
   function render() {
-    i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ['en'])), opts.i18n);
+    i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
     // Prefer the live session (carries the H-2 _app/_own grant metadata) over the persisted copy.
     const stored = auth.getSession() || load('session');
     if (stored) {

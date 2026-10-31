@@ -31,6 +31,9 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.11.0 — 2026-10-31 — An OpenRouter candidate's target is its region's address (eu, us or any;
+ *     ai/openrouter-region.ts), decided from the model and the key that pays; a model no allowed
+ *     region offers is rejected with reason 'region' (AI_MODEL_NOT_IN_REGION). Jouni, 2026-10-31.
  *   v1.10.0 — 2026-10-29 — The node's key at its own spending limit (nodeKeyStanding 'node-key-spent')
  *     refuses with AI_BALANCE_SPENT, and the free model takes over only when the account itself
  *     turned it on (rules.freeModelLastResort true), never on the node's default: the person chooses
@@ -88,6 +91,7 @@ import { textPricePerMtok, uncataloguedTextCost } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 import { extensionRunner } from './extension-provider.js';
 import { nodeKeyOutputCap, nodeKeyRoomUsd, tooCostlyMessage, type NodeKeyHold } from './node-key-hold.js';
+import { decideRegion, regionChoiceFor, type OpenRouterRegion } from './openrouter-region.js';
 
 export type ChosenBy = 'call-model' | 'call-provider' | 'role' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
@@ -104,6 +108,8 @@ export interface AiCandidate {
   degradedToFree?: boolean;
   /** Node key only: the call's estimate, held while it runs, and the answer's length (ai/node-key-hold.ts). */
   nodeKey?: NodeKeyHold;
+  /** OpenRouter only: the region the call goes to and the one it was meant for (ai/openrouter-region.ts). */
+  region?: { used: OpenRouterRegion; wanted: OpenRouterRegion };
 }
 
 /** What ai-allowance.ts nodeKeyStanding answers: may the node's key pay one more call, and if not, why. */
@@ -120,7 +126,7 @@ export interface NodeKeyAnswer {
 export type RejectReason =
   | 'problem' | 'type-not-allowed' | 'capability-off' | 'requires-local' | 'host-not-allowed' | 'no-model'
   | 'policy' | 'no-key' | 'node-key-host' | 'allowance-spent' | 'untested' | 'failing' | 'leaves-machine' | 'too-costly'
-  | 'too-small';
+  | 'too-small' | 'region';
 
 export interface RejectedCandidate {
   provider: string;
@@ -511,12 +517,25 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       continue;
     }
 
-    const candidate: AiCandidate = {
-      provider: p, model, keyScope, chosenBy: by,
+    // ── where an OpenRouter call is processed: eu, us or any, for this model and this key ──
+    let region: { used: OpenRouterRegion; wanted: OpenRouterRegion; baseUrl: string } | undefined;
+    if (p.type === 'openrouter') {
+      const decided = await decideRegion(config, regionChoiceFor(config, rules, keyScope), model);
+      if (!decided.ok) {
+        reject(p, 'region', decided.message, { model, error: new AiCompletionError('AI_MODEL_NOT_IN_REGION', 400, decided.message, { region: decided.wanted, offered: decided.offered }) });
+        continue;
+      }
+      region = { used: decided.region, wanted: decided.wanted, baseUrl: decided.baseUrl };
+    }
+    const target = p.type === 'extension'
       // An extension provider's target carries the runner bound to the owner and the key (V6).
-      target: p.type === 'extension'
-        ? { ...providerTarget(p, config, key), runExtension: extensionRunner(storage, config, gaii, p, key) }
-        : providerTarget(p, config, key),
+      ? { ...providerTarget(p, config, key), runExtension: extensionRunner(storage, config, gaii, p, key) }
+      : providerTarget(p, config, key);
+    if (region) target.baseUrl = region.baseUrl;
+
+    const candidate: AiCandidate = {
+      provider: p, model, keyScope, chosenBy: by, target,
+      ...(region ? { region: { used: region.used, wanted: region.wanted } } : {}),
       policyChoseModel: chosen.policyChoseModel && !degradedToFree,
       ...(allowanceRemainingUsd !== undefined ? { allowanceRemainingUsd } : {}),
       ...(degradedToFree ? { degradedToFree } : {}),

@@ -29,6 +29,8 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.4.0 — 2026-10-31 — aiProvidersView carries openrouter_region: the operator's region, what the
+ *     person may choose and what applies to them now (ai/openrouter-region.ts regionView).
  *   v1.3.1 — 2026-10-25 — An extension provider's view finds the owner's own extension first
  *     (services/component-address.ts; owner namespaces wish, secaudit2026oct22).
  *   v1.3.0 — 2026-10-25 — aiProvidersView carries free_model: whether the node's key has a free model,
@@ -60,6 +62,7 @@ import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { logger } from '../../utils/logger.js';
+import { regionView } from './openrouter-region.js';
 import { isValidAgentName, localAccountName } from '../../utils/gaii.js';
 import { findExtension } from '../component-address.js';
 import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from '../ai-provider-common.js';
@@ -461,6 +464,7 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
   routing: { defaults: RoutingDefaults; rules: RoutingRules; agent_defaults?: RoutingDefaults };
   limits: { max_owner_providers: number };
   free_model: { available: boolean; model: string | null; node_default: boolean; in_effect: boolean };
+  openrouter_region: Record<string, unknown>;
 }> {
   const [{ node, owner }, routing] = await Promise.all([
     providersForOwner(storage, config, ownerGhii), readRouting(storage, ownerGhii, agent),
@@ -503,6 +507,8 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
       node_default: config.aiFreeModelLastResort !== false,
       in_effect: routing.owner.rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false),
     },
+    // Where OpenRouter calls are processed: eu, us or any (ai/openrouter-region.ts).
+    openrouter_region: regionView(config, routing.owner.rules),
   };
 }
 

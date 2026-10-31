@@ -19,12 +19,14 @@
  *
  *   The state is this process's: one node runs one process, and a restart forgets it, which costs
  *   one refused call before it is known again.
- * @structure NodeKeyBalance · markNodeKeySpent() · nodeKeySpent() · readNodeKeyBalance() ·
- *   allowanceShown() · resetNodeKeyBalanceForTests()
+ * @structure NodeKeyBalance · markNodeKeySpent() · markNodeKeyUsed() · nodeKeySpent() ·
+ *   readNodeKeyBalance() · allowanceShown() · resetNodeKeyBalanceForTests()
  * @usage
  *   if (keyScope === 'node' && isNoCreditFailure(err)) markNodeKeySpent();
  *   if (await nodeKeySpent(config)) { … refuse with the balance notice … }
  * @version-history
+ *   v1.1.0 — 2026-10-31 — markNodeKeyUsed(): a call the node's key paid for drops the cached balance,
+ *     so the chat status and the AI page show the same number after a turn (v28 finding 9).
  *   v1.0.0 — 2026-10-29 — Initial (UX review 2026-10-29, A1: the balance the owner bought ran out).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -53,6 +55,16 @@ export function markNodeKeySpent(): void {
   if (spentSince === null) logger.warn('[ai] the node\'s OpenRouter key has no money left; calls on it are refused until its limit is raised');
   spentSince ??= Date.now();
   lastRecheck = Date.now();
+  cached = null;
+}
+
+/**
+ * The node's key just paid for a call (ai-allowance.ts debitAllowance), so the balance a page shows
+ * is read again on its next request instead of from the five-minute cache. Without this the chat's
+ * status line kept the balance from before the turn while a page opened later showed the new one:
+ * 0.30 USD beside 0,03 $ on the same node (v28 finding 9, 2026-10-31).
+ */
+export function markNodeKeyUsed(): void {
   cached = null;
 }
 

@@ -232,23 +232,32 @@
       if (u === "light" || u === "dark") return u;
     } catch {
     }
-    try {
-      var s = localStorage.getItem(AIMEAT_THEME_KEY);
-      if (s === "light" || s === "dark") return s;
-    } catch {
-    }
+    var s = aimeatThemeChoice();
+    if (s === "light" || s === "dark") return s;
     var attr = document.documentElement.dataset.theme;
     if (attr === "light" || attr === "dark") return attr;
+    return s === "auto" && window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  }
+  function osMode() {
     return window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   }
-  function aimeatApplyTheme(t) {
-    document.documentElement.dataset.theme = t;
+  function aimeatThemeChoice() {
+    var s = null;
     try {
-      localStorage.setItem(AIMEAT_THEME_KEY, t);
+      s = localStorage.getItem(AIMEAT_THEME_KEY);
+    } catch {
+    }
+    return s === "light" || s === "dark" || s === "auto" ? s : "";
+  }
+  function aimeatApplyTheme(t) {
+    var shown = t === "auto" ? osMode() : t === "dark" ? "dark" : "light";
+    document.documentElement.dataset.theme = shown;
+    try {
+      localStorage.setItem(AIMEAT_THEME_KEY, t === "auto" ? "auto" : shown);
     } catch {
     }
     try {
-      window.dispatchEvent(new CustomEvent("aimeat-theme-change", { detail: { theme: t } }));
+      window.dispatchEvent(new CustomEvent("aimeat-theme-change", { detail: { theme: shown, choice: t === "auto" ? "auto" : shown } }));
     } catch {
     }
   }
@@ -279,9 +288,10 @@
     }
   }
   function modeSwitchHtml(i) {
-    var cur = aimeatReadTheme();
+    var cur = aimeatThemeChoice() === "auto" ? "auto" : aimeatReadTheme();
     var light = i.lightMode || "Light mode";
     var dark = i.darkMode || "Dark mode";
+    var auto = i.autoMode || "Automatic: follows your device";
     var fixed = aimeatFixedLight();
     var why = i.fixedRegister || "This register keeps its own light";
     var only = styleOnlyMode();
@@ -294,7 +304,7 @@
     var onlyWord = function(m) {
       return only === m ? '<span aria-hidden="true">' + escHtml(i.modeOnly || "only") + "</span>" : "";
     };
-    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button></span>";
+    return '<span id="aimeat-mode-switch" role="group"' + seg + '><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '"' + (fixed ? off2 : ' title="' + escHtml(light) + '"') + ' aria-label="' + escHtml(fixed ? why : light) + '"><span class="seg-ico" aria-hidden="true">☀</span>' + onlyWord("light") + '</button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '"' + (fixed ? off2 : ' title="' + escHtml(dark) + '"') + ' aria-label="' + escHtml(fixed ? why : dark) + '"><span class="seg-ico" aria-hidden="true">☾</span>' + onlyWord("dark") + "</button>" + (fixed || only ? "" : '<button type="button" data-mode="auto" aria-pressed="' + (cur === "auto") + '" title="' + escHtml(auto) + '" aria-label="' + escHtml(auto) + '"><span class="seg-ico" aria-hidden="true">' + escHtml(i.autoShort || "Auto") + "</span></button>") + "</span>";
   }
   function wireModeSwitch(container) {
     var root = container.querySelector("#aimeat-mode-switch");
@@ -317,8 +327,15 @@
         /** @type {CustomEvent} */
         ev
       );
-      if (e && e.detail && e.detail.theme) sync(e.detail.theme);
+      if (e && e.detail && e.detail.theme) sync(aimeatThemeChoice() === "auto" ? "auto" : e.detail.theme);
     });
+    if (window.matchMedia) {
+      var mq = window.matchMedia("(prefers-color-scheme: dark)");
+      var onOs = function() {
+        if (aimeatThemeChoice() === "auto") aimeatApplyTheme("auto");
+      };
+      if (mq.addEventListener) mq.addEventListener("change", onOs);
+    }
   }
   function ensureAuthPillStyles() {
     if (document.getElementById("aimeat-auth-pill-css")) return;
@@ -632,6 +649,8 @@
       lightMode: "Light mode",
       darkMode: "Dark mode",
       themeLabel: "Light or dark",
+      autoMode: "Automatic: follows your device",
+      autoShort: "Auto",
       fixedRegister: "This register keeps its own light",
       styleLightOnly: "This style has a light mode only",
       styleDarkOnly: "This style has a dark mode only",
@@ -652,6 +671,8 @@
       lightMode: "Vaalea tila",
       darkMode: "Tumma tila",
       themeLabel: "Vaalea vai tumma",
+      autoMode: "Automaattinen: seuraa laitteesi asetusta",
+      autoShort: "Auto",
       fixedRegister: "Tämä rekisteri pitää oman valonsa",
       styleLightOnly: "Tällä tyylillä on vain vaalea tila",
       styleDarkOnly: "Tällä tyylillä on vain tumma tila",
@@ -672,6 +693,8 @@
       lightMode: "Modo claro",
       darkMode: "Modo oscuro",
       themeLabel: "Claro u oscuro",
+      autoMode: "Automático: sigue el ajuste de tu dispositivo",
+      autoShort: "Auto",
       fixedRegister: "Este registro conserva su propia luz",
       styleLightOnly: "Este estilo solo tiene modo claro",
       styleDarkOnly: "Este estilo solo tiene modo oscuro",
@@ -688,6 +711,51 @@
     var over = PILL_STRINGS[lang] || {};
     var out = {};
     for (var k in base) if (Object.prototype.hasOwnProperty.call(base, k)) out[k] = over[k] || base[k];
+    return out;
+  }
+
+  // src/static/sdk-libs/auth/i18n.js
+  var MODAL_LANGS = ["en", "fi", "es"];
+  function currentModalLang() {
+    return (
+      /** @type {string} */
+      readLang(MODAL_LANGS)
+    );
+  }
+  function flattenModalI18n(obj, prefix, out) {
+    out = out || {};
+    prefix = prefix || "";
+    for (var k in obj) {
+      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
+      var key = prefix ? prefix + "." + k : k;
+      var v = obj[k];
+      if (v && typeof v === "object" && !Array.isArray(v)) flattenModalI18n(v, key, out);
+      else out[key] = v;
+    }
+    return out;
+  }
+  async function loadModalI18n(lang) {
+    var v = Date.now();
+    var t = {};
+    try {
+      var enRes = await fetch(NODE_URL + "/locales/en.json?v=" + v);
+      if (enRes.ok) t = flattenModalI18n(await enRes.json());
+    } catch {
+    }
+    if (lang !== "en") {
+      try {
+        var locRes = await fetch(NODE_URL + "/locales/" + lang + ".json?v=" + v);
+        if (locRes.ok) {
+          var loc = flattenModalI18n(await locRes.json());
+          for (var lk in loc) if (Object.prototype.hasOwnProperty.call(loc, lk)) t[lk] = loc[lk];
+        }
+      } catch {
+      }
+    }
+    var out = {};
+    for (var k in t) {
+      if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf("modal.") === 0) out[k.slice(6)] = t[k];
+    }
     return out;
   }
 
@@ -1010,7 +1078,8 @@
     }
     const locales = readLocales(opts);
     if (locales.length) aimeatRestoreLang({ locales });
-    let i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+    const labelLangs = locales.length ? locales : MODAL_LANGS;
+    let i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
     const useCompact = opts.compact !== void 0 ? !!opts.compact : true;
     function wireCompactTrigger() {
       var compactBtn = document.getElementById("aimeat-auth-compact");
@@ -1028,7 +1097,7 @@
       });
     }
     function render() {
-      i = Object.assign({}, pillStrings(aimeatReadLang(locales.length ? locales : ["en"])), opts.i18n);
+      i = Object.assign({}, pillStrings(aimeatReadLang(labelLangs)), opts.i18n);
       const stored = auth2.getSession() || load("session");
       if (stored) {
         var pillHtml = '<div class="aimeat-auth-pill"><span class="aimeat-auth-dot" aria-hidden="true"></span><span class="aimeat-auth-label">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span class="aimeat-auth-fed">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" class="aimeat-auth-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
@@ -1152,51 +1221,6 @@
         } else render();
       });
     }
-  }
-
-  // src/static/sdk-libs/auth/i18n.js
-  var MODAL_LANGS = ["en", "fi", "es"];
-  function currentModalLang() {
-    return (
-      /** @type {string} */
-      readLang(MODAL_LANGS)
-    );
-  }
-  function flattenModalI18n(obj, prefix, out) {
-    out = out || {};
-    prefix = prefix || "";
-    for (var k in obj) {
-      if (!Object.prototype.hasOwnProperty.call(obj, k)) continue;
-      var key = prefix ? prefix + "." + k : k;
-      var v = obj[k];
-      if (v && typeof v === "object" && !Array.isArray(v)) flattenModalI18n(v, key, out);
-      else out[key] = v;
-    }
-    return out;
-  }
-  async function loadModalI18n(lang) {
-    var v = Date.now();
-    var t = {};
-    try {
-      var enRes = await fetch(NODE_URL + "/locales/en.json?v=" + v);
-      if (enRes.ok) t = flattenModalI18n(await enRes.json());
-    } catch {
-    }
-    if (lang !== "en") {
-      try {
-        var locRes = await fetch(NODE_URL + "/locales/" + lang + ".json?v=" + v);
-        if (locRes.ok) {
-          var loc = flattenModalI18n(await locRes.json());
-          for (var lk in loc) if (Object.prototype.hasOwnProperty.call(loc, lk)) t[lk] = loc[lk];
-        }
-      } catch {
-      }
-    }
-    var out = {};
-    for (var k in t) {
-      if (Object.prototype.hasOwnProperty.call(t, k) && k.indexOf("modal.") === 0) out[k.slice(6)] = t[k];
-    }
-    return out;
   }
 
   // src/static/sdk-libs/auth/modal-styles.js
@@ -1735,6 +1759,7 @@
   var KEY_SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="12" r="4"></circle><path d="M12 12h9M18 12v3M15 12v2"></path></svg>';
   function passkeyButtonHtml(i) {
     if (!passkeySupported()) return "";
+    if (LINK_FIRST) return "";
     return '<button type="button" id="aimeat-passkey-btn" class="aimeat-oauth-btn">' + KEY_SVG + escHtml(i.passkeySignIn || "Sign in with a passkey") + '</button><p id="aimeat-passkey-hint" class="aimeat-hint">' + escHtml(i.passkeyHint || "Your fingerprint, face or screen lock. No password to remember.") + "</p>";
   }
   function wirePasskeyButton(ctx) {
@@ -1862,7 +1887,11 @@
   function loginLinkViewHtml(i, field, linkFirst) {
     if (!EMAIL_LOGIN) return "";
     var back = linkFirst ? i.loginLinkUsePassword || "Use a password instead" : i.backToLogin || "Back to Login";
-    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none"><h3 class="aimeat-sub-title">' + escHtml(i.loginLinkTitle || "Sign in with an emailed link") + '</h3><p class="aimeat-sub-desc">' + escHtml(i.loginLinkDesc || "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.") + "</p>" + field(i.emailLabel || "Email", '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(i.loginLinkSend || "Send the link") + '</button><button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + '</button></div><p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
+    var first = function(key, plain, fallback) {
+      return linkFirst && i[key] || i[plain] || fallback;
+    };
+    var said = linkFirst && i.loginLinkTitleFirst;
+    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">' + (said ? "" : '<h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>") + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + "</button>" + (linkFirst ? "" : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button>") + "</div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + "</p>" : "") + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + " " : "") + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + "</a></p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
   }
   function hereAddress() {
     if (inIsolatedFrame()) return "";
@@ -1905,7 +1934,8 @@
       e.preventDefault();
       open();
     });
-    document.getElementById("aimeat-ll-back").addEventListener("click", function() {
+    document.getElementById("aimeat-ll-back").addEventListener("click", function(e) {
+      e.preventDefault();
       ctx.showView("login");
     });
     async function send() {
@@ -1952,9 +1982,11 @@
     return inProgress;
   }
 
-  // src/static/sdk-libs/auth/modal.js
+  // src/static/sdk-libs/auth/modal-constants.js
   var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   var OWNER_NAME_RE = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
+
+  // src/static/sdk-libs/auth/modal.js
   var NODE_HOST = (function() {
     try {
       return new URL(NODE_URL).host;
@@ -1966,7 +1998,8 @@
     if (signupInProgress()) return;
     var i = opts.i18n || {};
     var lang = currentModalLang();
-    var tab = opts.tab === "register" ? "register" : "signin", linkFirst = opts.linkFirst === void 0 ? LINK_FIRST : !!opts.linkFirst;
+    var signInOnly = !!opts.signInOnly;
+    var tab = opts.tab === "register" && !signInOnly ? "register" : "signin", linkFirst = opts.linkFirst === void 0 ? LINK_FIRST : !!opts.linkFirst;
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
@@ -2068,13 +2101,13 @@
       }
       return "<style>" + MODAL_CSS + '</style><div class="aimeat-scrim"><div class="aimeat-dlg' + (anim ? " aimeat-in" : "") + '"><div class="aimeat-head"><div class="aimeat-crumb"><div class="aimeat-brand"><span class="aimeat-mark">AIME' + HEART_SVG + "<b>AT</b></span>" + (NODE_HOST ? '<span class="aimeat-host">' + escHtml(NODE_HOST) + " /</span>" : "") + '</div><div class="aimeat-crumb-right"><div class="aimeat-langsw" role="group" aria-label="' + escHtml(i2.switchLanguage || "Language") + '">' + MODAL_LANGS.map(function(l) {
         return '<button type="button" class="aimeat-lang' + (lang2 === l ? " active" : "") + '" data-lang="' + l + '">' + l.toUpperCase() + "</button>";
-      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
+      }).join("") + '</div><button type="button" id="aimeat-close-btn" class="aimeat-close" aria-label="' + escHtml(i2.closeDialog || "Close") + '"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 3l10 10M13 3L3 13"></path></svg></button></div></div><h2 class="aimeat-headline">' + escHtml(isReg ? i2.headlineNew || "Welcome in." : (signInOnly || linkFirst) && i2.loginLinkTitleFirst || i2.headlineReturning || "Welcome back.") + '</h2><p class="aimeat-line">' + escHtml(isReg ? i2.lineNew || "Pick a username and password." : (signInOnly || linkFirst) && i2.loginLinkDescFirst || i2.descReturning || "Enter the username or email you signed up with.") + "</p>" + (signInOnly ? "" : '<div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + "</button></div>") + '</div><div id="aimeat-modal-body" class="aimeat-body"><div id="aimeat-tab-signin"' + (isReg ? ' style="display:none"' : "") + ">" + passkeyButtonHtml(i2) + field(
         i2.identifierLabel || "Username or email",
         '<input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '">'
       ) + field(
         i2.passwordLabel || "Password",
         '<input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '">'
-      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link">' + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
+      ) + '<div class="aimeat-actions"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" class="aimeat-err"></p><div class="aimeat-links"><a href="#" id="aimeat-forgot-pw" class="aimeat-link">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" class="aimeat-link"' + (signInOnly ? ' style="display:none"' : "") + ">" + escHtml(i2.forgotUsername || "Forgot username?") + "</a>" + loginLinkAskHtml(i2) + '</div></div><div id="aimeat-tab-register"' + (isReg ? "" : ' style="display:none"') + ">" + field(
         i2.usernameLabel || "Username",
         '<input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" autocapitalize="none" spellcheck="false" maxlength="64" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><div id="aimeat-reg-rules" class="aimeat-rules">' + rule("len", i2.usernameRuleLength || "3 to 64 characters") + rule("chars", i2.usernameRuleChars || "Letters a to z, digits and hyphens") + rule("edges", i2.usernameRuleEdges || "Starts and ends with a letter or digit") + "</div>",
         '<p class="aimeat-hint">' + escHtml(i2.usernameLowercase || "Capital letters become lowercase.") + " " + escHtml(i2.usernameHint || "This becomes your permanent name here.") + "</p>"

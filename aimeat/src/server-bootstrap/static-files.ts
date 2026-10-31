@@ -11,6 +11,10 @@
  *   - setupStaticFiles() -- main entry, applied during server bootstrap
  *   - STATIC_HTML_REDIRECTS -- map of legacy .html paths to canonical /v1/ routes
  * @version-history
+ *   v1.15.1 -- 2026-10-31 -- A .md file under public/ is no-cache with an ETag like JS, CSS and
+ *     HTML: the help page's text stayed a week old in the browser after an update.
+ *   v1.15.0 -- 2026-10-31 -- /locales is no-cache with an ETag, as the JS and CSS are: a reload
+ *     costs a 304, and an edited locale file is read at once (v27 P7).
  *   v1.14.0 -- 2026-10-16 -- The SPA's frame-src names the page host (config.pageHost), where an HTML
  *     page of a workspace runs in its frame (routes/page-host.ts).
  *   v1.13.1 -- 2026-09-26 -- /app-frame-core.js, the module /app-frame.js imports (shared with the App
@@ -367,7 +371,9 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       // option correct as config hygiene so the static layer never treats a dotfile as a real file.
       dotfiles: 'deny',
       setHeaders: (res, filePath) => {
-        if (/\.(js|css|html)$/.test(filePath)) {
+        // Markdown too: the help page's text (public/help/help.<lang>.md) is fetched without the
+        // build id, so a 7-day cache kept the old text in a browser for a week after an update.
+        if (/\.(js|css|html|md)$/.test(filePath)) {
           res.setHeader('Cache-Control', 'no-cache');
         }
         // A /lib/ asset whose directory pins a FULL version (ffmpeg-core@0.12.6/) can never change
@@ -393,10 +399,18 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     }));
   }
 
-  // Serve locale files at /locales/*.json (used by SPA i18n module)
+  // Serve locale files at /locales/*.json (used by SPA i18n module). No-cache with an ETag, as the
+  // JS and CSS are: the browser asks again on every page view and gets 304 with no body while the
+  // file is unchanged, and a changed file is read at once. With max-age 1h and the build id as the
+  // key (public/js/i18n.js), a locale edit stayed invisible for an hour on a node that was not
+  // restarted; with the old per-load key, every view downloaded both 2 MB files (v27 P7).
   const localeDir = resolveAssetDir('locales', __dirname, process.cwd());
   if (localeDir) {
-    app.use('/locales', express.static(localeDir, { maxAge: '1h', dotfiles: 'deny' }));
+    app.use('/locales', express.static(localeDir, {
+      dotfiles: 'deny',
+      etag: true,
+      setHeaders: (res) => { res.setHeader('Cache-Control', 'no-cache'); },
+    }));
   }
 
   // PWA manifest + app-catalog + silent-bridge pages. The service worker is NOT here: /sw.js

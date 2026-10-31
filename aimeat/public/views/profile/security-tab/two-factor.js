@@ -21,6 +21,7 @@
  *   - the two code-gated actions (regenerate, disable) ask for the code inline
  * @usage html`<${TwoFactorSection} twoFactor=${ov.two_factor} managed=${!!managedBy} ... />`
  * @version-history
+ *   v1.13.0 -- 2026-11-01 -- On a node the store sold, the off line does not say the password is the only protection: the buyer signs in by emailed link (offDescPlace; Jouni's review, the Access page's red warning).
  *   v1.12.0 -- 2026-09-26 -- Every part is a component that takes data (Card section, Mark status,
  *     Note, Action/Loud with copy, TextField, SubHeading, Layout, and two new ones: QrCode and
  *     CodeGrid); the section writes no class. `inRow` replaces the Access page's CSS that hid the
@@ -50,6 +51,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { Card } from '/components/Card.js';
@@ -197,7 +199,7 @@ export function TwoFactorSection({ twoFactor, managed, showToast, onChanged, inR
         <${Space} below="small"><${Note}>
           ${tf.pending
             ? t('profile.security.twoFactor.unfinished')
-            : t('profile.security.twoFactor.offDesc')}
+            : t(customerNode() ? 'profile.security.twoFactor.offDescPlace' : 'profile.security.twoFactor.offDesc')}
         <//><//>
         <${Loud} control disabled=${busy} onClick=${startSetup}>
           ${busy ? working : t('profile.security.twoFactor.setUp')}

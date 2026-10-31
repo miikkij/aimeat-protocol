@@ -17,9 +17,11 @@
  *   - `facts`: the field table is the Facts (css/components/facts.css) instead of the classic rows.
  *   - `stepRows`: the steps are the numbered list's rows (IndexList) instead of the classic list.
  *   The tool the reader picks is remembered in this browser (localStorage aimeat.setup.tool).
- * @structure SetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose })
+ * @structure SetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose }) ·
+ *   rememberTool(id)
  * @usage html`<${SetupGuide} poster facts stepRows />` · html`<${InstructionsDialog} open=${o} onClose=${close} />`
  * @version-history
+ *   v1.2.0 — 2026-10-31 — rememberTool() exported, so a page can open the guide on one tool.
  *   v1.1.0 — 2026-10-01 — `claudeNote` replaces claude.ai's model line: the home's free road
  *     recommends Opus, which the free plan does not have (Jouni's decision).
  *   v1.0.1 — 2026-09-27 — Draws its own class names (every .ast-* → .setup-guide-*, .ast-tool-reco →
@@ -55,7 +57,8 @@ const rememberedTool = () => {
   // eslint-disable-next-line aimeat/no-silent-catch -- blocked storage means "no remembered choice", which is the same answer as an empty slot; the caller falls back to the first tool either way
   try { return localStorage.getItem(LAST_TOOL_KEY) || ''; } catch { return ''; }
 };
-const rememberTool = (id) => {
+/** Open the guide on this tool the next time it draws (the Home's "Connect ChatGPT" buttons, v31 K26). */
+export const rememberTool = (id) => {
   // eslint-disable-next-line aimeat/no-silent-catch -- storage blocked only costs the remembered choice
   try { localStorage.setItem(LAST_TOOL_KEY, id); } catch { /* the choice just does not persist */ }
 };

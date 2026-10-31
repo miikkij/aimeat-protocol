@@ -38,6 +38,8 @@
  *     { message, deliverableKey, pipeline: 'rest.task_complete' }, resolve(req));
  *   if (!done.ok) { … done.status / done.code / done.message … }
  * @version-history
+ *   v1.9.0 — 2026-10-31 — The onboarding smoke test does not reach the owner's home feed when it
+ *     finishes; it is the agent's own check, not work the owner asked for (Jouni v27 P6).
  *   v1.8.0 — 2026-10-25 — A task that does a work of an agent goal (workTrackingCode goal:…) settles
  *     that work on done, failed and declined, and the goal moves on (services/goals/goals-hooks.ts).
  *   v1.7.0 — 2026-10-20 — The public feed entry for a completed task names the public deliverable
@@ -143,15 +145,21 @@ export async function afterTaskCompleted(
     void shareFinishedWork({ storage, config }, task, deliverableKey ?? updated?.deliverableKey);
 
     // The owner's own "what has happened". Their agent finishing work is the single most ordinary
-    // thing they would want told without asking for it.
-    void recordAccountEvent(storage, {
-        ownerGhii: ownerGhiiOf(task.agentGaii),
-        kind: 'agent_task_done',
-        actorGaii: task.agentGaii,
-        subject: id,
-        link: `/v1/profile?tab=agents&task=${encodeURIComponent(id)}`,
-        data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '' },
-    }, config);
+    // thing they would want told without asking for it. The onboarding smoke test is not work the
+    // owner asked for: an agent connecting finishes it by itself, and on a node bought a minute
+    // earlier the Home's first news read "concierge finished: Onboarding verification" (Jouni v27
+    // P6, 2026-10-31). The task stays on the agent's Activity tab.
+    void (async () => {
+        if (await isOnboardingTestTask(storage, task)) return;
+        await recordAccountEvent(storage, {
+            ownerGhii: ownerGhiiOf(task.agentGaii),
+            kind: 'agent_task_done',
+            actorGaii: task.agentGaii,
+            subject: id,
+            link: `/v1/profile?tab=agents&task=${encodeURIComponent(id)}`,
+            data: { agent: task.agentGaii.split('#')[0], title: task.title ?? '' },
+        }, config);
+    })().catch(e => logger.error('recording a finished task for the home feed failed', { taskId: id, error: String(e) }));
 
     // Public landing feed — only when the agent published a PUBLIC deliverable (a real material).
     if (deliverableKey) {

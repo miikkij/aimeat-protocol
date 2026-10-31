@@ -9,6 +9,8 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.6.0 — 2026-10-31 — aiCreditEurPerUsd: euros of AI credit per dollar of the node's key, set
+ *     by the fleet service, so the pages show the credit in euros at the rate it was bought at.
  *   v1.5.0 — 2026-10-30 — devLinks: whether the footer shows the developer links (Jouni, 2026-10-30).
  *   v1.4.0 — 2026-10-29 — storeTopup: a customer node's own top-up page in the store (UX review
  *     2026-10-29, A1). defaultLocale: the node's own language before the browser's (C). storeOrders,
@@ -102,6 +104,14 @@ export interface SiteLinksConfig {
    * spent offers no purchase.
    */
   storeTopup: string;
+  /**
+   * Euros of AI credit per US dollar of the node's key limit, written by the fleet service when it
+   * mints the key and again as a total on every top-up: the AI credit after the store's fee divided
+   * by the dollar limit, which is the day's EUR-per-USD rate the store converted at. A decimal as
+   * text, or empty: the pages then count a dollar as a euro, which is how the keys minted before
+   * 2026-10-31 were made (Jouni's C, 2026-10-31: "Asiakkaan UI näyttää saldon euroina").
+   */
+  aiCreditEurPerUsd: string;
   /** The owner's orders and invoices in the store, set by the fleet service. The node adds `lang`. Empty hides the link. */
   storeOrders: string;
   /**

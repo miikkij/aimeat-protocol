@@ -9,6 +9,8 @@
  *   Carved from main.js.
  * @usage import { initRender, renderApps, renderTags, serverStateByFilename, setServerManifests } from './render.js'; initRender({...})
  * @version-history
+ *   v1.0.3 — 2026-11-01 — With no apps the foot says so plainly (foot.empty), not "every one of your
+ *     0 apps…" (Jouni's review, K39).
  *   v1.0.2 — 2026-09-26 — A preview opens through preview-host.js as the app it is, so it gets that
  *     app's own grant and never the owner's session; closing the frame forgets it.
  *   v1.0.1 — 2026-09-26 — The opens count follows the page language (dateLocale).
@@ -581,7 +583,8 @@ function renderApps() {
     // The foot's first fact carries the count. Before the first listing lands the count is a
     // claim we cannot make yet, so the line stays blank.
     var statsEl = document.getElementById('stats');
-    statsEl.textContent = listingLoaded ? t('foot.p1').replace('{n}', String(entries.length)) : '';
+    // With no apps the count sentence read "Jokainen 0 sovelluksestasi…"; it says so plainly instead (K39).
+    statsEl.textContent = !listingLoaded ? '' : entries.length ? t('foot.p1').replace('{n}', String(entries.length)) : t('foot.empty');
 
     renderStateBar(entries);
     renderTags(entries);

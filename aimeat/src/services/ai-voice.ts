@@ -6,6 +6,7 @@
  * @structure streamReply, streamSpeech; bounded SSE parsing; speech price cache
  * @usage await streamReply(storage, config, principal, options, signal, emit)
  * @version-history
+ *   v1.12.1 - 2026-10-31 - The speech price is read from OpenRouter's in-region hosts too (isOpenRouterApiUrl).
  *   v1.12.0 - 2026-10-08 - The reply and the speech take `agent`, passed to prepareAiCall: a voice call an
  *     agent makes is attributed to the agent, as a completion is.
  *   v1.11.0 - 2026-10-08 - The speech record states `mediaKind: audio` and the provider's content type, so its label reads as audio.
@@ -56,6 +57,7 @@ import { runRoute, type AiRoute } from './ai/route-run.js';
 import type { AiCandidate } from './ai/route-plan.js';
 import { checkSpeechVoice, speechAudioOf, speechFormatHint } from './ai-voice-audio.js';
 import { callCost } from './ai/catalog/price.js';
+import { isOpenRouterApiUrl } from './ai/types.js';
 import { servedProvenanceOf } from './ai-provenance-marks.js';
 import { logger } from '../utils/logger.js';
 import { emitChange } from './event-bus.js';
@@ -239,7 +241,7 @@ export async function streamReply(storage: Storage, config: AimeatConfig, gaii: 
 
 const speechPrices = new Map<string, { at: number; price: number }>();
 async function speechPrice(plan: AiCallPlan): Promise<number | undefined> {
-  if (new URL(plan.baseUrl).hostname !== 'openrouter.ai') return undefined;
+  if (!isOpenRouterApiUrl(plan.baseUrl)) return undefined;
   const key = plan.baseUrl + '/' + plan.model; const cached = speechPrices.get(key);
   if (cached && Date.now() - cached.at < 300000) return cached.price;
   const models = await listModels(plan.key, plan.baseUrl, 'speech');
