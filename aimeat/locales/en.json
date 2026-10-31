@@ -17558,7 +17558,8 @@
     "lookLightOnly": "This style has a light mode only.",
     "lookDarkOnly": "This style has a dark mode only.",
     "lookThemes": "Themes",
-    "lookStyles": "Styles in this theme"
+    "lookStyles": "Styles in this theme",
+    "menu": "Menu"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glossary",

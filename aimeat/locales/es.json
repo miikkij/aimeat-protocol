@@ -15827,7 +15827,8 @@
     "lookLightOnly": "Este estilo solo tiene modo claro.",
     "lookDarkOnly": "Este estilo solo tiene modo oscuro.",
     "lookThemes": "Temas",
-    "lookStyles": "Estilos de este tema"
+    "lookStyles": "Estilos de este tema",
+    "menu": "Menú"
   },
   "nav.chat": "Chat",
   "nav.glossary": "Glosario",
