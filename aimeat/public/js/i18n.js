@@ -10,6 +10,7 @@
  *   - t(key, vars) / tOr(key, fallbackText, vars): dot-key lookup with {var} interpolation
  *   - tEn(key): a key's English text, whatever the active locale
  *   - tn(key, n, vars): a count in the language's plural form (`<key>_one`, `<key>_other`, …)
+ *   - tPrefix(prefix): every loaded string under one prefix, the prefix taken off
  *   - switchLocale() / onLocaleChange(): change locale and notify subscribed listeners
  *   - flatten(): internal — collapses nested translation objects to dot-notation keys
  *
@@ -17,6 +18,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-10-14 — tEn(): a key's English text, for the menu find's English words.
  *   v1.2.0 — 2026-10-18 — tn(): a count in the language's plural form, through Intl.PluralRules.
+ *   v1.3.0 — 2026-10-31 — tPrefix(): the sign-in dialog's strings for the consent page (v27 P1).
  */
 import { detectLocale, persistLocale } from './utils.js';
 import { swallowed } from '/js/swallowed.js';
@@ -78,6 +80,20 @@ export function t(key, vars) {
     }
   }
   return str;
+}
+
+/**
+ * Every loaded string under one prefix, with the prefix taken off: `tPrefix('modal.')` is the sign-in
+ * dialog's strings in the page's language, handed to it so its first paint is not English (v27 P1).
+ */
+export function tPrefix(prefix) {
+  const out = {};
+  for (const source of [fallback, translations]) {
+    for (const [k, v] of Object.entries(source)) {
+      if (k.startsWith(prefix) && typeof v === 'string') out[k.slice(prefix.length)] = v;
+    }
+  }
+  return out;
 }
 
 /**

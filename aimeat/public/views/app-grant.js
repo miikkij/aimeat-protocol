@@ -77,11 +77,13 @@
  *     link returns to this page, a path of the node, instead of the app, which the node refused for an
  *     account with no grant yet. The popup hears the mail tab's sign-in as a storage event and goes on
  *     to the consent; the mail tab, with no app waiting on it, says "You are signed in" and offers the app.
+ *   v1.10.1 — 2026-10-31 — The sign-in dialog gets the page's own modal strings, so it does not first
+ *     draw in English for a second on a Finnish page.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, tPrefix } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { showLoginModal, getStoredGhii, getNodeUrl, restoreSession } from '/js/services/auth.js';
@@ -133,7 +135,9 @@ export default function AppGrant() {
       const res = await api(`/v1/app-grants/request/${encodeURIComponent(requestId)}`);
       register = res.data?.prompt === 'create';
     } catch (err) { swallowed('app-grant: the request before sign-in', err); }
-    if (!showLoginModal(register ? { tab: 'register' } : { linkFirst: true })) window.location.href = '/v1/profile';
+    // The page's own strings go with it, so the dialog's first paint is not English (v1.10.1).
+    const i18n = tPrefix('modal.');
+    if (!showLoginModal(register ? { tab: 'register', i18n } : { linkFirst: true, i18n })) window.location.href = '/v1/profile';
   }
 
   // The mailed link opens in another tab and signs the person in there. That tab stores the session,
