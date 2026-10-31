@@ -24,6 +24,9 @@
  *   const out = await createPackageGroup({ storage, config }, caller, { name, components });
  *   if (!out.ok) return res.status(out.status).json(error(nodeId, out.code, out.message));
  * @version-history
+ *   2026-10-31 — updatePackageGroup checks every visibility it writes (`!== undefined`), so an empty
+ *     string, false or null is 400 INVALID_INPUT; only a non-empty one was checked and any other was
+ *     written to every version (secaudit 2026-10-31 inv-25).
  *   v1.6.0 — 2026-10-18 — updatePackageGroup: the body of PATCH /v1/packages/:groupId, moved here so an
  *     approved publish request makes a group public through the same function (plan doc-mvcn6c7e4e5q, V4).
  *   v1.5.0 — 2026-10-17 — Two more visibilities: 'members' (every account of this node) and
@@ -467,7 +470,8 @@ export async function updatePackageGroup(
         return { ok: false, status: 403, code: 'FORBIDDEN', message: 'Only the package author can update group metadata' };
     }
     // private, members, organism:<id> or public; an organism the author is not in is 400 before any write.
-    const refused = input.visibility ? await packageVisibilityRefusal(storage, input.visibility, caller.owner) : null;
+    // Asked of every visibility the write below stores, an empty or false one included (secaudit 2026-10-31 inv-25).
+    const refused = input.visibility !== undefined ? await packageVisibilityRefusal(storage, input.visibility, caller.owner) : null;
     if (refused) return refused;
 
     const updates: Partial<PackageRecord> = { updatedAt: new Date().toISOString() };

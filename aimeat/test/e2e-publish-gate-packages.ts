@@ -21,6 +21,7 @@
  *       anonymous caller, another owner and the owner's agent without storage:read, pinned or listed
  *       (secaudit 2026-10 v42).
  * @version-history
+ *   2026-10-31 — K3b: catalog_listed 1 or "yes" on the sharing PATCH asks as true does (secaudit 2026-10-31 inv-09).
  *   v1.1.0 — 2026-10-20 — D5: approving version 2 public opens no earlier private version (secaudit 2026-10 v42).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvcn6c7e4e5q, V4: packages, knowledge, data packages).
  */
@@ -243,6 +244,17 @@ await test('K3. PATCH /v1/knowledge/:id/sharing to public asks; the owner approv
     const d = await decide(p.body.data.publish_request.request_id, A.token, 'approve');
     assert(d.status === 200, `approve: ${show(d)}`);
     assert((await anonKnowledge(k2Id)).status === 200, 'listed after approval');
+});
+
+await test('K3b. PATCH /v1/knowledge/:id/sharing with catalog_listed 1 or "yes" asks as true does; the package stays unlisted', async () => {
+    for (const listed of [1, 'yes']) {
+        const r = await importKnowledge(asker.token, `Truthy Knowledge ${listed}`, 'owner', [{ key: 'note', visibility: 'private' }]);
+        assert(r.status === 201 && !r.body.data.publish_request, `import: ${show(r)}`);
+        const id = r.body.data.package_id as string;
+        const p = await call(`/v1/knowledge/${id}/sharing`, { token: asker.token, method: 'PATCH', body: { catalog_listed: listed } });
+        assert(p.status === 202 && p.body.data.audience === 'owner' && p.body.data.publish_request?.kind === 'knowledge', `sharing ${JSON.stringify(listed)}: ${show(p)}`);
+        assert((await anonKnowledge(id)).status === 404, `catalog_listed ${JSON.stringify(listed)}: listed without the owner's approval`);
+    }
 });
 
 await test('K4. PATCH of an entry to public asks; an entry changed since is not published (409 OUTDATED)', async () => {
