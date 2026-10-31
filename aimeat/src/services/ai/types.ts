@@ -14,6 +14,7 @@
  *   - adapterTypeOf() — the owner's legacy provider setting mapped to an adapter type
  *   - CostSource — where the cost recorded for a call came from
  * @version-history
+ *   2026-10-31 — OPENROUTER_API_HOSTS and isOpenRouterApiUrl: the global and the two in-region hosts.
  *   2026-10-16 — isLoopback reads a literal 127.0.0.0/8 address, not any host text starting with "127." (QA audit S4-01).
  *   v1.2.0 — 2026-09-28 — The `extension` adapter type and ExtensionOpRunner on the target (V6).
  *   v1.1.1 — 2026-09-28 — CostSource comment: `catalog` and `table` are in use (V4).
@@ -60,6 +61,16 @@ export const FIXED_BASE_URLS = {
 export type FixedProviderType = keyof typeof FIXED_BASE_URLS;
 export const FIXED_PROVIDER_TYPES = Object.keys(FIXED_BASE_URLS) as FixedProviderType[];
 export const isFixedType = (t: string): t is FixedProviderType => Object.prototype.hasOwnProperty.call(FIXED_BASE_URLS, t);
+
+/** OpenRouter's own API hosts: the global one and the two in-region ones (ai/openrouter-region.ts). */
+export const OPENROUTER_API_HOSTS: readonly string[] = ['openrouter.ai', 'eu.openrouter.ai', 'us.openrouter.ai'];
+
+/** Whether an address is one of OpenRouter's own API hosts over https. */
+export function isOpenRouterApiUrl(url: string): boolean {
+  if (!URL.canParse(url)) return false;
+  const u = new URL(url);
+  return u.protocol === 'https:' && OPENROUTER_API_HOSTS.includes(u.hostname.toLowerCase());
+}
 
 /** One resolved destination for a call. Built by prepareAiCall, never from a request body. */
 export interface AiTarget {
