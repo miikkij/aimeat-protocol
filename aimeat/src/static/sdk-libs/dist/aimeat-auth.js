@@ -1891,7 +1891,7 @@
       return linkFirst && i[key] || i[plain] || fallback;
     };
     var said = linkFirst && i.loginLinkTitleFirst;
-    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">' + (said ? "" : '<h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>") + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + '</button><button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button></div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + "</p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
+    return '<div id="aimeat-login-link-view" class="aimeat-body" style="display:none">' + (said ? "" : '<h3 class="aimeat-sub-title">' + escHtml(first("loginLinkTitleFirst", "loginLinkTitle", "Sign in with an emailed link")) + '</h3><p class="aimeat-sub-desc">' + escHtml(first("loginLinkDescFirst", "loginLinkDesc", "Enter the email address of your account. We send a link that signs you in. It works once, for 15 minutes.")) + "</p>") + field(first("emailLabelFirst", "emailLabel", "Email"), '<input id="aimeat-ll-email" class="aimeat-inp" type="email" autocomplete="email" placeholder="you@example.com">') + '<div class="aimeat-actions"><button id="aimeat-ll-send" class="aimeat-go">' + escHtml(first("loginLinkSendFirst", "loginLinkSend", "Send the link")) + "</button>" + (linkFirst ? "" : '<button id="aimeat-ll-back" class="aimeat-cancel">' + escHtml(back) + "</button>") + "</div>" + (linkFirst && i.loginLinkNoteFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkNoteFirst) + "</p>" : "") + (linkFirst && i.loginLinkPlacesFirst ? '<p class="aimeat-sub-desc">' + escHtml(i.loginLinkPlacesFirst) + "</p>" : "") + (linkFirst ? '<p class="aimeat-sub-desc">' + (i.loginLinkPasswordWhy ? escHtml(i.loginLinkPasswordWhy) + " " : "") + '<a href="#" id="aimeat-ll-back" class="aimeat-link">' + escHtml(back) + "</a></p>" : "") + '<p id="aimeat-ll-msg" class="aimeat-msg"></p></div>';
   }
   function hereAddress() {
     if (inIsolatedFrame()) return "";
@@ -1934,7 +1934,8 @@
       e.preventDefault();
       open();
     });
-    document.getElementById("aimeat-ll-back").addEventListener("click", function() {
+    document.getElementById("aimeat-ll-back").addEventListener("click", function(e) {
+      e.preventDefault();
       ctx.showView("login");
     });
     async function send() {

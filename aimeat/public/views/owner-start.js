@@ -22,6 +22,8 @@
  * @structure OwnerStart({ navigate })
  * @usage html`<${OwnerStart} navigate=${navigate} />` (landing.js)
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The admin address and "visitors see this page" show only to a signed-in
+ *     person; a visitor signed out sees the sign-in and nothing about running the site (Jouni, K65-4).
  *   v1.1.0 — 2026-10-31 — The page says what AIMEAT is, what happens after sign-in and how long the
  *     link takes, and that visitors see it until the owner publishes a front page (Jouni's "teach
  *     during use", relayed 2026-10-31 13.58).
@@ -100,12 +102,13 @@ export function OwnerStart({ navigate }) {
             ${state === 'failed' && html`<${BandNote}>${t('siteStart.linkFailed')}<//>`}
             <${BandNote}>${t('siteStart.next')}<//>`}
 
-        <${NamedRow} stack label=${t('siteStart.contentLabel')}>
-          <p class="owner-start-line">${t('siteStart.contentNote')}</p>
-          <${Actions}>
-            <${Action} small href=${admin}>${admin}<//>
-          <//>
-        <//>
+        ${inside && html`
+          <${NamedRow} stack label=${t('siteStart.contentLabel')}>
+            <p class="owner-start-line">${t('siteStart.contentNote')}</p>
+            <${Actions}>
+              <${Action} small href=${admin}>${admin}<//>
+            <//>
+          <//>`}
       <//>
     </div>`;
 }
