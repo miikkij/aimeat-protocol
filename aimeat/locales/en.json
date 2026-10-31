@@ -6217,6 +6217,16 @@
   "chat.work.pending": "starting",
   "chat.work.title": "What was done",
   "chat.work.untitled": "a tool call",
+  "chat.work.step.guide": "Reading the instructions",
+  "chat.work.step.template": "Getting a starting point",
+  "chat.work.step.publish": "Publishing",
+  "chat.work.step.propose": "Proposing an agent",
+  "chat.work.step.schedule": "Setting the schedule",
+  "chat.work.step.find": "Looking for a tool",
+  "chat.work.step.read": "Looking up your information",
+  "chat.work.step.write": "Saving",
+  "chat.work.step.work": "Doing a step",
+  "chat.work.stuck": "One step did not go through.",
   "chat.working": "Working…",
   "classic": {
     "nav": {

@@ -130,9 +130,13 @@ describe('v2 MCP surfaces', () => {
      */
     it('chat starts small, carries the proposal and the finder, and registers everything full does', () => {
         const chat = toolsForSurface('chat');
-        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(20);
+        // 22 since 2026-10-31: the app template and the publish joined, because goose refuses a
+        // switched-off tool called by name and a buyer's "build me an app" ran out of its turn
+        // looking for them (v31 K35). The token cost is cut in the descriptions instead (K63).
+        expect(MCP_SURFACES.chat.length).toBeLessThanOrEqual(22);
         for (const name of ['aimeat_tools_find', 'aimeat_invoke', 'aimeat_handbook_get', 'aimeat_discover',
-            'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_agent_propose', 'aimeat_memory_write']) {
+            'aimeat_organism_list', 'aimeat_workspace_list', 'aimeat_agent_propose', 'aimeat_memory_write',
+            'aimeat_app_template_get', 'aimeat_app_publish']) {
             expect(chat.has(name), name).toBe(true);
         }
         const registered = toolsRegisteredOn('chat');

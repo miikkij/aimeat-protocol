@@ -5193,6 +5193,16 @@
   "chat.work.pending": "iniciando",
   "chat.work.title": "Lo que se hizo",
   "chat.work.untitled": "llamada a herramienta",
+  "chat.work.step.guide": "Leo las instrucciones",
+  "chat.work.step.template": "Busco una base",
+  "chat.work.step.publish": "Publico",
+  "chat.work.step.propose": "Propongo un agente",
+  "chat.work.step.schedule": "Programo el horario",
+  "chat.work.step.find": "Busco una herramienta",
+  "chat.work.step.read": "Consulto tus datos",
+  "chat.work.step.write": "Guardo",
+  "chat.work.step.work": "Hago un paso",
+  "chat.work.stuck": "Un paso no se completó.",
   "chat.working": "Trabajando…",
   "classic": {
     "nav": {
