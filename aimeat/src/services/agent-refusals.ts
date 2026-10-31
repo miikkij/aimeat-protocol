@@ -50,6 +50,8 @@
  *   noteAgentRefusal(req.auth, ['agent:write'], false, 'PATCH /v1/agents/:name/tags');
  *   const { refusals, request } = await readAgentAccess(storage, ownerGhii, 'concierge', agent.defaultScopes ?? ['*']);
  * @version-history
+ *   2026-10-31 — The opened-refusal listener also gets the refused call, so a withheld direct message is
+ *     asked about in words of its own (secaudit2026oct31w2 round 10).
  *   2026-10-28 — A refusal keeps only the words the agent's record lacks, so neither the card nor the
  *     owner's bell and email ask for a permission the agent already holds.
  *   2026-10-18 — A refusal note and a decline write the record on its version (record-cas.ts
@@ -158,7 +160,7 @@ const chains = new Map<string, Promise<void>>();
  * and no other open refusal of the agent already needs the same words. services/permission-ask-notice.ts
  * asks the person; a listener here keeps this file free of the bell and the email.
  */
-export type RefusalOpenedListener = (ownerGhii: string, agent: AgentRecord, words: string[]) => void | Promise<void>;
+export type RefusalOpenedListener = (ownerGhii: string, agent: AgentRecord, words: string[], call: string) => void | Promise<void>;
 let openedListener: RefusalOpenedListener | null = null;
 
 export function initAgentRefusals(storage: Storage, onOpened?: RefusalOpenedListener): void {
@@ -290,7 +292,7 @@ async function persistRefusal(
   const opened = !(at && stillOpen) && !merged.declinedAt;
   const words = entry.anyOf ? entry.needed.slice(0, 1) : entry.needed;
   if (opened && openedListener && !kept.some((e) => sameEntry(e, entry.needed, e.call))) {
-    await Promise.resolve(openedListener(ownerGhii, agent, words)).catch((err: unknown) => {
+    await Promise.resolve(openedListener(ownerGhii, agent, words, entry.call)).catch((err: unknown) => {
       logger.warn('agent-refusals: the opened-refusal listener failed; the refusal is still noted', { gaii, error: String(err) });
     });
   }
