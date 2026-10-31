@@ -8,6 +8,7 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.6.0 — 2026-10-31 — AIMEAT_SITE_AI_CREDIT_EUR_PER_USD, kept only when it is a positive decimal.
  *   v1.5.0 — 2026-10-30 — AIMEAT_SITE_DEV_LINKS ('auto' unless it says 'show' or 'hide').
  *   v1.4.0 — 2026-10-29 — AIMEAT_SITE_STORE_TOPUP_URL, AIMEAT_SITE_STORE_ORDERS_URL,
  *     AIMEAT_SITE_DEFAULT_LOCALE, AIMEAT_SITE_PURCHASE_PLAN and AIMEAT_SITE_PURCHASE_PACKAGE.
@@ -22,6 +23,17 @@
  */
 import type { SiteContact, SiteLinksConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
+
+/**
+ * Euros per US dollar as the fleet service writes it: empty, or a plain positive decimal up to 10
+ * ("0.8634"). Ten is far above any EUR/USD rate there has been; a larger number is a typo.
+ */
+export function isEurPerUsd(v: unknown): boolean {
+  if (v === '') return true;
+  if (typeof v !== 'string' || !/^\d{1,2}(\.\d{1,8})?$/.test(v)) return false;
+  const n = Number(v);
+  return n > 0 && n <= 10;
+}
 
 /**
  * The people printed on the public pages, from `AIMEAT_SITE_CONTACTS` (a JSON array of
@@ -93,6 +105,9 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     storeNoteEs: (process.env.AIMEAT_SITE_STORE_NOTE_ES ?? '').trim(),
     storeSoonCode: (process.env.AIMEAT_SITE_STORE_SOON_CODE ?? '').trim(),
     storeTopup: (process.env.AIMEAT_SITE_STORE_TOPUP_URL ?? '').trim(),
+    // A rate that does not read as a positive decimal is no rate: the pages count a dollar as a euro.
+    aiCreditEurPerUsd: isEurPerUsd((process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim())
+        ? (process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim() : '',
     storeOrders: (process.env.AIMEAT_SITE_STORE_ORDERS_URL ?? '').trim(),
     purchasePlan: (process.env.AIMEAT_SITE_PURCHASE_PLAN ?? '').trim(),
     purchasePackage: (process.env.AIMEAT_SITE_PURCHASE_PACKAGE ?? '').trim(),

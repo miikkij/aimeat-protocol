@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.34.0 -- 2026-10-31 -- On a node the store sold, the allowance left is euros of AI credit (js/ai-credit.js creditEur), the number the Home and the chat show (v28 finding 9).
  *   v1.33.0 -- 2026-10-29 -- The head says the AI allowance is running low below a tenth of what was bought (the chat status's allowance_low), and the allowance it shows is the node key's own limit when that is smaller (UX review A1).
  *   v1.32.0 -- 2026-10-03 -- The page's start (components/PageStart.js): it says this is the AI the person's apps and agents use on this server and links the page where their chat AI is connected; its button opens the key field while there is no key. The title's question mark, concept.provider (guidance part B).
  *   v1.31.0 -- 2026-10-02 -- The question marks that explain the daily budget and an app's daily limit: ai.daily_budget on the budget row, ai.app_daily_cap on the spend table's limit column (components/HelpTip.js); the grey line about the app limits under the table goes, the explanation carries it. The budget's line with the live figures stays.
@@ -77,6 +78,14 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
+import { creditEur } from '/js/ai-credit.js';
+import { money as fmtMoney } from '/js/format.js';
+
+/** The allowance left on the node's key: euros of AI credit on a node the store sold, else dollars. */
+const allowanceMoney = (usd) => {
+  const eur = creditEur(usd);
+  return eur === null ? money(usd) : fmtMoney(eur, 'EUR');
+};
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
@@ -128,12 +137,12 @@ function mast(ctx) {
   const keyed = ctx.keyed;
   const marks = !s ? [] : keyed
     ? [{ label: s.provider === 'openrouter' ? x('chipOwnKey') : x('chipOwnProvider'), tone: 'sun' }, { label: x('provider.' + (s.provider || 'openrouter')) }, ctx.usage ? { label: x('chipBudget', { n: money(ctx.usage.daily_budget_usd) }) } : null]
-    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: money(ctx.chat.allowance_remaining_usd) }) } : null,
+    : [{ label: x('chipNoKey'), tone: 'coral' }, ctx.chat && ctx.chat.allowance_remaining_usd > 0 ? { label: x('chipHouseKey', { host: ctx.host, n: allowanceMoney(ctx.chat.allowance_remaining_usd) }) } : null,
       // The warning before the allowance runs out (A1, 2026-10-29): below a tenth of what was bought.
       ctx.chat?.allowance_low ? { label: x('chipAllowanceLow'), tone: 'coral' } : null, { label: x('provider.openrouter') }];
   // On a customer's node the allowance is what the buyer paid for, not a starter gift (UX review C).
   const bought = customerNode();
-  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: money(ctx.chat?.allowance_remaining_usd || 0) });
+  const desc = !s ? '' : keyed ? x('desc', { host: ctx.host }) : x(bought ? 'descNoKeyBought' : 'descNoKey', { host: ctx.host, n: allowanceMoney(ctx.chat?.allowance_remaining_usd || 0) });
   const loud = keyed
     ? html`<${Loud} control disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>`
     : html`<${Loud} href="https://openrouter.ai/keys" newTab>${x('getKey')}<//>`;
@@ -155,7 +164,7 @@ function strip(ctx) {
   const payer = ctx.keyed ? x('stripOwnKey') : ctx.host;
   return html`<${FigureStrip} items=${[
     { key: 'pays', n: payer, tone: 'coral', label: x('stripPays'),
-      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: money(ctx.chat.allowance_remaining_usd || 0) }) : '') },
+      sub: ctx.keyed ? x('stripPaysSub', { provider: x('provider.' + (s.provider || 'openrouter')), host: ctx.host }) : (ctx.chat ? x(customerNode() ? 'stripAllowanceBought' : 'stripAllowance', { n: allowanceMoney(ctx.chat.allowance_remaining_usd || 0) }) : '') },
     { key: 'today', n: u ? money(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('stripTodaySub', { n: money(u.daily_budget_usd) }) : '' },
     { key: 'month', n: r ? money(r.cost) : '…', label: x('stripMonth'), sub: r ? x('stripMonthSub', { calls: r.calls, apps: r.apps.length }) : '' },
     { key: 'roles', n: rl.view ? String(rl.roles.length) : '…', label: x('rl.title'), tone: rl.waiting ? 'coral' : undefined,
@@ -280,7 +289,7 @@ function secConsumers(ctx) {
         { k: x('consumer.agents'), v: x('consumerAgentsBody') },
         { k: x('consumer.media'), v: x('consumerMediaBody') },
         { k: x('consumer.chat'), v: chat
-          ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: money(chat.allowance_remaining_usd || 0) }))
+          ? (chat.pays === 'node' ? x('consumerChatNode', { host: ctx.host, model: chat.model || '' }) : chat.pays === 'own' ? x('consumerChatOwn') : x('consumerChatAllowance', { n: allowanceMoney(chat.allowance_remaining_usd || 0) }))
           : x('consumerChatUnknown'), ...(chatMissed ? { sub: x('consumerChatSub') } : {}) },
         crewsRow,
         { k: x('consumer.agentRule'), v: x('consumerAgentRuleBody') },
