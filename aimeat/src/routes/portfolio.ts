@@ -12,6 +12,8 @@
  *   2026-10-31 — PUT /v1/portfolio/upload by a writer without memory:read files the owner's question
  *     whether the page may read their memory, and answers it as memory_read; GET /v1/portfolio/data
  *     tells the owner viewer_reads_memory and memory_read_request (services/portfolio-read-hold.ts; audit H-9).
+ *   2026-10-31 — PUT /v1/portfolio/config stores a truthy `enabled` (1, "yes") as true before the
+ *     publish gate, so it asks the gate as true does (secaudit 2026-10-31 inv-10).
  *   2026-10-24 — PUT /v1/portfolio/config and PUT /v1/portfolio/upload refuse the shared anonymous
  *     principal with refuseAnonymousPrincipal: the page is a public page of the account, outside the
  *     anonymous/ namespace (secaudit2026oct22, routes/auth.ts:anonymous-mint:writes-outside-anonymous-namespace).
@@ -418,6 +420,9 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // The publish gate (plan doc-mvcn6c7e4e5q, V4): switching the page on, or opening a page that is on
     // to anyone, makes it public. A caller the node asks the owner about saves the rest of the config
     // without that one field, and the request for it is filed after the write.
+    // The page reader serves on any truthy switch (resolvePublishedPortfolio), so a truthy one is
+    // stored as true and the gate decides on what is served (secaudit 2026-10-31 inv-10).
+    if (body.enabled && body.enabled !== true) body = { ...body, enabled: true };
     const enabled = body.enabled === true ? true : body.enabled === false ? false : undefined;
     const gate = enabled === true || access
       ? await portfolioRaiseAsk({ storage, config }, callerOf(req, config.nodeId, storage), req.auth?.app, ownerName,
