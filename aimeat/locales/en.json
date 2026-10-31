@@ -18661,6 +18661,36 @@
       "OWNER_FILE_STORES_OFF": "The people who run this service do not let anyone connect their own storage here.",
       "INVALID_INPUT": "Something in the form is missing or not valid. The server's words are below.",
       "NO_OWN_STORAGE": "You have no store of your own that takes files. Connect one first."
+    },
+    "browser": {
+      "label": "Straight from the browser",
+      "state": {
+        "allowed": "Yes. Apps on this service can send files straight to the store.",
+        "partial": "Only from some addresses of this service",
+        "missing": "No. The store has no CORS rule for this service.",
+        "unknown": "Not known. The store did not answer the check.",
+        "not_checked": "Not checked yet. Test the store to find out."
+      },
+      "needsKey": "The store is connected with a SAS URL, which cannot sign a link for one file, so its files go through this service. For direct transfer, connect it with the account key or a connection string.",
+      "notCovered": "The rule does not cover {origins}.",
+      "throughService": "Until the rule is in place, an app on this service sends files through this service. That is slower, and it limits the file size.",
+      "checkedAt": "Checked {when}.",
+      "connectHint": "An app on this service can send a large file straight to the store only when the store has a CORS rule for this service. The test after you connect tells you whether the rule is there, and which rule to add. AI agents and scripts do not need it.",
+      "rule": {
+        "title": "Add this CORS rule to the store",
+        "whereAzure": "In the Azure portal, open the storage account. Then open Settings, Resource sharing (CORS), and the Blob service tab. Add one row with these values, and save.",
+        "whereS3": "In the AWS console, open the bucket. Then open Permissions, Cross-origin resource sharing (CORS), and Edit. Other S3 services have the same setting on the bucket.",
+        "origins": "Allowed origins",
+        "methods": "Allowed methods",
+        "headers": "Allowed headers",
+        "exposed": "Exposed headers",
+        "maxAge": "Max age",
+        "whyAny": "The * lets in every address of this service, because each app has its own address. The rule gives nobody access to your files: each upload and download still needs a link that this service signs for one file, and the link works for a few minutes only.",
+        "jsonLead": "Paste this as the bucket's CORS configuration:",
+        "copy": "Copy the rule",
+        "copied": "Copied",
+        "after": "When you have saved the rule, test the store again."
+      }
     }
   },
   "profile": {
@@ -18793,7 +18823,12 @@
         "disconnectHint": "Disconnect removes your keys from this service. Your bucket or container and its contents stay as they are.",
         "disconnectFirst": "{n} of your files are in this store. Move them to another place first. Then you can disconnect it.",
         "disconnectAsk": "Disconnect your store \"{name}\", the {where}? Your keys are removed from here. If it is your default, new files then stay on this service.",
-        "disconnected": "Your store \"{name}\" is disconnected."
+        "disconnected": "Your store \"{name}\" is disconnected.",
+        "testAgain": "Test again",
+        "testing": "Testing…",
+        "testedReady": "Your store \"{name}\" passed the test, and apps can send files straight to it.",
+        "testedNotReady": "Your store \"{name}\" passed the test. Apps cannot send files straight to it yet. The store's details tell you what to add.",
+        "testedFailed": "Your store \"{name}\" did not pass the test. The store's details show the step that failed."
       },
       "places": {
         "title": "Where your files are",
@@ -27268,6 +27303,21 @@
     "high": "Higher value",
     "examples": "Examples",
     "when": "When to change it",
+    "fileStore": {
+      "cors": {
+        "title": "Straight from the browser (CORS)",
+        "short": "Whether an app in your browser can send files straight to an S3 bucket or Azure container, without the files going through this service.",
+        "what": "A web page may send data only to its own address, unless the other address allows it. That permission is a CORS rule, and you add it on the bucket or the storage account. With the rule, an app on this service can send a large file straight to your store, and this service only signs a link for that one file. Without the rule, the app sends the file to this service, and this service passes it on. That is slower, and it limits the file size. Large downloads come straight from the store either way.",
+        "lowLabel": "Without the rule",
+        "low": "Apps send files to the store through this service. Uploads are slower, and very large files may not fit.",
+        "highLabel": "With the rule",
+        "high": "Apps send large files straight to the store, at the store's speed and up to its own size limit.",
+        "ex1": "An app uploads a 600 MB disk image: with the rule it goes straight to Azure as one file.",
+        "ex2": "Your AI agent uploads a file with a script: the rule does not matter, because scripts do not ask for it.",
+        "tipLabel": "Is it safe",
+        "tip": "Yes. The rule only tells browsers that pages of this service may talk to the store. Nobody gets access to your files from the rule: each transfer needs a link that this service signs for one file, and the link works for a few minutes only. An Azure store connected with a SAS URL cannot sign such links, so its files always go through this service. Connect it with the account key if you want direct transfer."
+      }
+    },
     "ai": {
       "temperature": {
         "title": "Temperature",

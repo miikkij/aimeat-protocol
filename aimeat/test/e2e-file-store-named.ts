@@ -11,15 +11,20 @@
  *   every upload road (inline, presigned, chunked, MCP) and the file list says where each file is; a
  *   person keeps two stores of their own, picks the default and chooses either; files move between
  *   stores and a store is removed once empty; the operator moves the environment's files into a named
- *   store; the sweep of one store keeps the objects a sibling store of the same bucket names.
+ *   store; the sweep of one store keeps the objects a sibling store of the same bucket names; a store
+ *   with no CORS rule is kept, answers that a browser cannot send to it with the rule to add, and is
+ *   tested again by its name alone.
  *
  *   The failure modes: a non-operator cannot add a node store or name one not open to everyone; a
  *   reserved name, a wrong key, an unknown store and a malformed choice are refused and save nothing;
- *   another person's store cannot be named; a store holding files is not removed.
+ *   another person's store cannot be named or tested; an agent without secrets:manage tests nothing; a
+ *   store holding files is not removed.
  * @structure main() — own node on block 30600, fake S3 on block 30900 (e2e-file-store.ts uses it too;
  *   suites of one lane run one after another)
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-file-store-named.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The browser check: browser_access with the CORS rule, a test again by name, and
+ *     its refusals.
  *   v1.0.0 — 2026-10-30 — Initial (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
 import { nodeEntryArgs } from './helpers/node-entry.js';
@@ -243,6 +248,31 @@ async function main() {
             assert(several.status === 400, `a nameless connect with several stores ${several.status}`);
             const other = await upload(B.token, 'b/x.txt', 'not B\'s store', 'own:photos');
             assert(other.status === 404 && other.body.error?.code === 'UNKNOWN_STORE', `another person's store was named: ${other.status}`);
+        });
+
+        await test('a store with no CORS rule is kept, says a browser cannot send to it and which rule to add, and is tested again by name', async () => {
+            // The fake S3 answers no preflight, as a bucket with no CORS rule does.
+            const view = await call('/v1/file-store', { token: A.token });
+            const docs = (view.body.data.stores as Body[]).find(s => s.name === 'docs')!;
+            assert(docs.browser_access.cors === 'missing' && docs.browser_access.ready === false && docs.browser_access.signs === true, JSON.stringify(docs.browser_access));
+            assert(docs.browser_access.rule.allowed_origins[0] === '*' && JSON.parse(docs.browser_access.rule.json)[0].AllowedMethods.includes('PUT'), JSON.stringify(docs.browser_access.rule));
+            const before = docs.browser_access.checked_at;
+            await sleep(5);
+            const again = await call('/v1/file-store', { token: A.token, method: 'PUT', body: { name: 'docs' } });
+            assert(again.status === 200 && again.body.data.test.ok === true, JSON.stringify(again.body));
+            const after = (again.body.data.view.stores as Body[]).find(s => s.name === 'docs')!;
+            assert(after.browser_access.checked_at > before && after.last_check.ok === true, JSON.stringify(after));
+            assert(again.body.data.view.default_store === 'own:docs', 'a test changed the default');
+            const st = await call('/v1/admin/file-store', { token: op.token });
+            assert((st.body.data.stores as Body[]).find(s => s.name === 'archive').browser_access.cors === 'missing', JSON.stringify(st.body.data.stores));
+        });
+
+        await test('FAILURE: a person tests no store of another person, and an agent without secrets:manage tests nothing', async () => {
+            const other = await call('/v1/file-store', { token: B.token, method: 'PUT', body: { name: 'docs' } });
+            assert(other.status === 400 && other.body.error?.code === 'INVALID_INPUT', `B tested A's store: ${other.status} ${other.text}`);
+            const agent = await makeAgent(BASE, A, ['storage:read']);
+            const byAgent = await call('/v1/file-store', { token: agent.token, method: 'PUT', body: { name: 'docs' } });
+            assert(byAgent.status === 403, `an agent without secrets:manage tested a store: ${byAgent.status}`);
         });
 
         await test('files move between stores, and a store is removed only once empty', async () => {

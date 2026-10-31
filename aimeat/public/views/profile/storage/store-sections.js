@@ -15,6 +15,8 @@
  *   notTakingWords · destinations
  * @usage html`<${PlacesSection} v=${v} moving=${moving} onMove=${moveAll} onStop=${stop} />`
  * @version-history
+ *   v1.1.0 — 2026-10-31 — A store box says whether a browser may send files straight to the store, shows
+ *     the CORS rule to add while it may not (browser-access.js), and has Test again.
  *   v1.0.0 — 2026-10-30 — Initial: the one-store section of storage-tab.js became these two, for named
  *     stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
  */
@@ -35,6 +37,7 @@ import { List, Row, Name, Num } from '/components/List.js';
 import { Stack, Space } from '/components/Layout.js';
 import { S, placeWords } from './connect-form.js';
 import { storeWords, RefusalNote } from './store-words.js';
+import { browserAccessRow, CorsRule } from './browser-access.js';
 
 const html = htm.bind(h);
 
@@ -157,9 +160,11 @@ export function PlacesSection({ number, v, moving, onMove, onStop }) {
 }
 
 /** One of the person's stores: its facts, the Default mark, and its actions. */
-function StoreBox({ v, s, moving, onMove, onStop, onDefault, onDisconnect }) {
+function StoreBox({ v, s, moving, onMove, onStop, onDefault, onTest, onDisconnect }) {
   const [movingOut, setMovingOut] = useState(false);
+  const [testing, setTesting] = useState(false);
   const running = !!(moving && moving.running);
+  const test = async () => { setTesting(true); try { await onTest(s); } finally { setTesting(false); } };
   const choosable = (v.choices || []).some((c) => c.store === s.choice);
   const full = s.files.count > 0;
   return html`
@@ -167,6 +172,7 @@ function StoreBox({ v, s, moving, onMove, onStop, onDefault, onDisconnect }) {
       marks=${s.default ? html`<${Mark} kind="status" tone="fine">${S('store.default')}<//>` : null}
       doors=${html`
         ${s.default ? null : html`<${Action} small control disabled=${running} onClick=${() => onDefault(s)}>${S('store.makeDefault')}<//>`}
+        <${Action} small control disabled=${running || testing} onClick=${test}>${testing ? S('store.testing') : S('store.testAgain')}<//>
         <${Action} small control disabled=${running || !choosable} onClick=${() => onMove({ to: s.choice }, s.choice)}>${S('move.here')}<//>
         <${Action} small control disabled=${running || !full} onClick=${() => setMovingOut(!movingOut)}>${S('move.out')}<//>
         <${Action} small control tone="danger" disabled=${running || full} onClick=${() => onDisconnect(s)}>${S('store.disconnect')}<//>`}>
@@ -175,8 +181,10 @@ function StoreBox({ v, s, moving, onMove, onStop, onDefault, onDisconnect }) {
         s.prefix && { key: 'folder', k: S('store.folder'), v: s.prefix, mono: true },
         { key: 'since', k: S('store.since'), v: date(s.connected_at), sub: byWords(s.connected_by) },
         { key: 'check', k: S('store.check'), v: checkWords(s.last_check), warn: !!(s.last_check && !s.last_check.ok) },
+        browserAccessRow(s.browser_access),
         { key: 'files', k: S('store.inIt'), v: S('store.files', { n: num(s.files.count), size: fileSize(s.files.bytes) }) },
       ]} />
+      <${Space} above="medium"><${CorsRule} access=${s.browser_access} kind=${s.kind} /><//>
       <${Note} kind="hint">${full ? S('store.disconnectFirst', { n: num(s.files.count) }) : choosable ? S('store.disconnectHint') : S('store.notChoosable')}<//>
       ${movingOut && full ? html`
         <${Space} above="medium">
@@ -187,7 +195,7 @@ function StoreBox({ v, s, moving, onMove, onStop, onDefault, onDisconnect }) {
 }
 
 /** "Your stores": a box per store of the person's own, or a line saying there is none. */
-export function StoresSection({ number, v, moving, onMove, onStop, onDefault, onDisconnect }) {
+export function StoresSection({ number, v, moving, onMove, onStop, onDefault, onTest, onDisconnect }) {
   const stores = v.stores || [];
   const away = v.files.elsewhere;
   return html`
@@ -196,6 +204,6 @@ export function StoresSection({ number, v, moving, onMove, onStop, onDefault, on
         ? html`<${Note} kind="quiet">${S('store.none', { n: num(away.count), size: fileSize(away.bytes) })}<//>`
         : html`<${Stack} gap="medium">${stores.map((s) => html`
             <${StoreBox} key=${s.name} v=${v} s=${s} moving=${moving} onMove=${onMove} onStop=${onStop}
-              onDefault=${onDefault} onDisconnect=${onDisconnect} />`)}<//>`}
+              onDefault=${onDefault} onTest=${onTest} onDisconnect=${onDisconnect} />`)}<//>`}
     <//>`;
 }

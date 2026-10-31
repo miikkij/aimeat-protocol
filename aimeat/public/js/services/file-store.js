@@ -11,12 +11,14 @@
  *   moving files between places, and the decisions on people's own stores) serves the admin page "File
  *   storage" (views/admin/file-stores-tab.js). Every call resolves to the AIMEAT envelope and throws
  *   on a refusal, with the server's `code` and `status` on the error.
- * @structure getMyFileStore · connectMyFileStore · makeMyStoreDefault · removeMyFileStore · moveMyFiles ·
- *   getNodeFileStore · setNodeStore · removeNodeStore · testNodeFileStore · moveNodeFiles ·
+ * @structure getMyFileStore · connectMyFileStore · makeMyStoreDefault · testMyStore · removeMyFileStore ·
+ *   moveMyFiles · getNodeFileStore · setNodeStore · removeNodeStore · testNodeFileStore · moveNodeFiles ·
  *   decideOwnerFileStore · fileSize
  * @usage import { getMyFileStore } from '/js/services/file-store.js';
  *        const r = await getMyFileStore(); r.data.stores
  * @version-history
+ *   v1.3.0 — 2026-10-31 — testMyStore: test one's own store again, for the browser check after a CORS rule
+ *     was added.
  *   v1.2.0 — 2026-10-30 — Named stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-):
  *     makeMyStoreDefault; removeMyFileStore(name); moveMyFiles({ to, from, limit }) replaces
  *     moveMyFiles(direction, limit); setNodeStore and removeNodeStore for the server's named stores;
@@ -65,8 +67,13 @@ export const getMyFileStore = () => apiGet('/v1/file-store');
  * `test.steps` and the new `view`. `make_default: true` makes it the default.
  */
 export const connectMyFileStore = (body) => apiPut('/v1/file-store', body);
-/** Make one of the person's stores the default: no test, outcome 'updated'. */
+/** Make one of the person's stores the default; it is tested again on the way, outcome 'updated'. */
 export const makeMyStoreDefault = (name) => apiPut('/v1/file-store', { name, make_default: true });
+/**
+ * Test one of the person's stores again with the key it was connected with: `test` (null when the
+ * node cannot open the key) and the new `view`, whose store carries its new `browser_access`.
+ */
+export const testMyStore = (name) => apiPut('/v1/file-store', { name });
 /** Disconnect the store `name`; refused with FILES_IN_STORE while any file is still in it. */
 export const removeMyFileStore = (name) => apiDelete(`/v1/file-store${name ? `?name=${enc(name)}` : ''}`);
 /**
