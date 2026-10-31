@@ -26,6 +26,9 @@
  *     PATCH /v1/agents/:name/tags does (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
+ *   2026-10-31 — aimeat_connector_program_set: allow or stop a program a computer may start for an
+ *     agent, through services/connector-programs.ts, the function the REST route calls
+ *     (wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   2026-10-18 — aimeat_agent_propose's next_step says when the proposed agent may invite people (proposalNextStep with the proposal's permissions).
  *   2026-10-14 — aimeat_connector_list answers `tunnel_enabled` too, through connectorListAnswer, the
  *     function GET /v1/agents/v2/connectors calls.
@@ -75,6 +78,7 @@ import { setAgentTags, setAgentMode, setAgentRunMode, setAgentRuntimeSource, set
 import { describeBasicAgents, requestBasicAgents } from '../services/basic-agents.js';
 import { proposeAgent, proposalApprovalUrl, proposalNextStep } from '../services/agent-proposals.js';
 import { connectorListAnswer, renameConnector } from '../services/connector-registry.js';
+import { setProgramDecision } from '../services/connector-programs.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from '../tool-catalog/shape.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
@@ -358,6 +362,25 @@ export function registerAgentManagementTools(
             const out = await renameConnector({ config, storage }, who.owner, String(connector ?? ''), name);
             if (!out.ok) return refused(out.code, out.message);
             return { content: [{ type: 'text' as const, text: JSON.stringify({ connector: out.connector }, null, 2) }] };
+        },
+    );
+
+    // ── Tool: aimeat_connector_program_set ──
+    // Allow or stop a program a computer may start for an agent: the same service function
+    // PUT /v1/agents/v2/connectors/:id/programs/:hash calls, which asks agent:write.
+    mcp.registerTool(
+        'aimeat_connector_program_set',
+        {
+            description: descriptionFor('aimeat_connector_program_set'),
+            inputSchema: zodShapeFor('aimeat_connector_program_set'),
+            annotations: annotationsFor('aimeat_connector_program_set'),
+        },
+        async ({ connector, hash, decision }) => {
+            const out = await setProgramDecision({ config, storage }, { caller: caller() }, String(connector ?? ''), String(hash ?? ''), decision);
+            // The failure in the result shape the success uses, code first as toolError writes it,
+            // so the handler has one return type (as aimeat_connector_rename).
+            if (!out.ok) return { content: [{ type: 'text' as const, text: `${out.code}: ${out.message}` }], isError: true };
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ programs: out.programs }, null, 2) }] };
         },
     );
 

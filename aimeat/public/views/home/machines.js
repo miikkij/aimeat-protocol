@@ -28,6 +28,9 @@
  *   every sentence on the page says computer.
  * @usage routed at /v1/home?computers=1 by spa.html (the older /v1/home?machines=1 opens it too)
  * @version-history
+ *   v1.3.0 — 2026-10-31 — Each computer lists the programs it may start for its agents, and the person
+ *     allows or stops each one; a copyable prompt does the same from their own AI (./machine-programs.js;
+ *     wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v1.2.0 — 2026-10-14 — A node whose connector tunnel is off (tunnel_enabled false) shows no "Add a
  *     computer" and no commands: it asks the operator to turn computer connections on and restart,
  *     and tells an operator the setting (Jouni, 2026-10-14, after orgnode.example answered 502).
@@ -67,6 +70,8 @@ import { ConnectorSteps, NoComputersHere } from '/views/profile/agents/agent-gui
 import { moveAgent } from '/js/services/agent-draft.js';
 import { machineName } from '/views/home/agents-band.js';
 import { storeHref, storeOpensSoon } from '/js/site.js';
+import { PromptCard } from '/components/PromptCard.js';
+import { MachinePrograms, programsPrompt } from './machine-programs.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const m = (key, fallback) => tr('home.machines.' + key, fallback);
@@ -173,6 +178,7 @@ function Machine({ c, others, onChanged, confirm }) {
       <//>`}>
       <${Stack} gap="small">
         <${Facts} wide rows=${rows} />
+        <${MachinePrograms} c=${c} onChanged=${onChanged} />
 
         ${naming && html`
           <${Fields}>
@@ -262,6 +268,9 @@ export default function MachinesView({ navigate }) {
     : html`<${Stack} gap="medium">
         ${machines.map((c) => html`
           <${Machine} key=${c.id} c=${c} others=${machines.filter((o) => o.id !== c.id)} onChanged=${load} confirm=${confirm} />`)}
+        ${machines.some((c) => c.programs?.length) && html`
+          <${PromptCard} label=${tr('home.machines.programs.ownAi', 'Manage the programs from your own AI')} prompt=${programsPrompt()}
+            copyLabel=${tr('home.machines.programs.copyPrompt', 'Copy the prompt')} />`}
       <//>`;
 
   return html`

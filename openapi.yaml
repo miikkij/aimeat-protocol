@@ -1167,6 +1167,44 @@ components:
           type: array
           items: { type: string }
           description: Names of agents ordered to it that have no key yet
+        programs:
+          type: array
+          nullable: true
+          items: { $ref: '#/components/schemas/ConnectorProgram' }
+          description: |
+            The programs it may start for the agents on it, one row per program, with the owner's
+            decision on each (PUT /v1/agents/v2/connectors/{id}/programs/{hash}). Null when the
+            connector never reported any: one older than this list.
+        programs_reported_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: When it last reported its programs, so a reader can tell how old the list is
+    ConnectorProgram:
+      type: object
+      description: |
+        One program a connector may start for one agent: its runner (started for each task) or its wake
+        command (started on new work). An agent's runner and wake command are held under one hash on
+        the machine and are allowed or stopped together.
+      required: [agent, use, command, hash, status, applied, source, since, reported_at, request_id]
+      properties:
+        agent: { type: string, description: The agent it is for }
+        use: { type: string, enum: [runner, wake] }
+        command: { type: string, description: The command as the connector reported it }
+        hash: { type: string, description: 'The hash the connector holds the agent''s commands under; what a decision names' }
+        status:
+          type: string
+          enum: [allowed, waiting, declined]
+          description: 'allowed: it runs, or runs from the next connection. waiting: the owner has not decided. declined: it does not run.'
+        applied: { type: boolean, description: False while the connector has not yet acted on the owner's decision; it does at its next connection }
+        source:
+          type: string
+          nullable: true
+          enum: [connected, adopted, approved, null]
+          description: 'For an allowed program, how the machine came to trust it: connected there with aimeat connect, adopted at the first start, or approved by the owner on the node'
+        since: { type: string, format: date-time, nullable: true, description: When the machine came to trust it }
+        reported_at: { type: string, format: date-time }
+        request_id: { type: string, nullable: true, description: The approval request that waits for the owner, while one does }
     AimeatEnvelope:
       type: object
       required: [ok, protocol, version, node, timestamp, request_id]
@@ -10564,6 +10602,130 @@ paths:
         '403': { description: Not the account holder in person }
         '404': { description: No such connector on this account }
         '409': { description: The connector is connected right now }
+
+  /v1/agents/v2/connectors/{id}/programs/{hash}:
+    put:
+      operationId: setConnectorProgramDecision
+      summary: Allow or stop the programs a connector holds under one hash
+      description: |
+        The owner, or an agent of theirs holding `agent:write`, decides on the programs one connector
+        reported under `hash` (GET /v1/agents/v2/connectors lists them). `allow` lets the connector
+        start them from its next connection; `deny` stops them there, and the connector keeps them
+        until they are allowed again. A question that waits for the same programs (an approval
+        request of kind `connector-program`) is answered with the same decision.
+
+        The node sends the connector no command. Its agents are told over the tunnel
+        (`connector.programs_decided`), report again, and the connector acts only on a hash it holds
+        itself. A "no" takes effect only when it is newer than the machine's own trust of the
+        programs: a connect at the machine after it is the person changing their mind there.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: The install id, or the connector's present name
+          schema: { type: string }
+        - name: hash
+          in: path
+          required: true
+          description: The programs' hash from the connector's `programs`
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [decision]
+              properties:
+                decision: { type: string, enum: [allow, deny] }
+      responses:
+        '200':
+          description: The programs under that hash, as the owner now reads them
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          programs:
+                            type: array
+                            items: { $ref: '#/components/schemas/ConnectorProgram' }
+        '400': { description: A decision that is not allow or deny }
+        '403': { description: 'No agent:write (SCOPE_DENIED), or an app or ecosystem principal' }
+        '404': { description: No such connector on this account, or it reports no programs under that hash }
+        '409': { description: The name given as address fits more than one connector (AMBIGUOUS_CONNECTOR) }
+
+  /v1/agents/{name}/programs:
+    put:
+      operationId: reportAgentPrograms
+      summary: A connector reports the programs it may start for one agent
+      description: |
+        THE AGENT ITSELF, on the connector that holds its tunnel socket now. `aimeat connect serve`
+        calls it for each agent after the agent attaches, on every reconnect, and when it hears
+        `connector.programs_decided`. The node finds the connector from the live tunnel, never from
+        the request, so an agent reports only for the computer it runs on. The owner reports nothing.
+
+        `hash` is the hash the connector holds the agent's runner and wake command under. `status` is
+        `allowed` when the machine runs them, `waiting` when it holds them. A waiting report with no
+        decision and no open question files an approval request of kind `connector-program` that asks
+        the owner once. `hash: null` says the agent has no runner and no wake command, and clears its
+        row.
+
+        The answer is the owner's decision on that hash, which the connector acts on: it takes into
+        use an allowed hash it holds, and stops a hash it runs when the "no" is newer than its own trust.
+      tags: [Identity]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: name
+          in: path
+          required: true
+          description: The reporting agent's own name
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                hash: { type: string, nullable: true, pattern: '^[0-9a-f]{64}$' }
+                status: { type: string, enum: [allowed, waiting] }
+                runner: { type: string, nullable: true, maxLength: 1000, description: The runner command and its arguments }
+                wake: { type: string, nullable: true, maxLength: 1000, description: The wake command }
+                source: { type: string, nullable: true, enum: [connected, adopted, approved, null], description: For an allowed hash, how the machine came to trust it }
+                since: { type: string, format: date-time, nullable: true, description: For an allowed hash, when }
+      responses:
+        '200':
+          description: The owner's decision on the reported hash
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          connector: { type: string, description: The install id the report was stored on }
+                          hash: { type: string, nullable: true }
+                          status: { type: string, enum: [allowed, waiting, declined] }
+                          applied: { type: boolean }
+                          decision: { type: string, nullable: true, enum: [allowed, declined, null] }
+                          decided_at: { type: string, format: date-time, nullable: true }
+                          request_id: { type: string, nullable: true, description: The approval request that waits for the owner }
+                          approve_url: { type: string, description: Where the owner answers, while the programs wait }
+        '400': { description: A malformed hash, status or command, or a hash with no command }
+        '403': { description: Not the agent itself (another agent, the owner, an app) }
+        '409': { description: 'The agent is not on a connected computer right now (NOT_ON_A_CONNECTOR)' }
 
   /v1/agents/v2/agents/{name}/attach:
     post:

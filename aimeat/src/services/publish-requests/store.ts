@@ -37,6 +37,9 @@
  *     (commerce/card-adult-ask.ts). An approval may say that only the owner in person allows it
  *     (`in_person`) and name its buttons (`labels`), and an applier is told who pressed approve
  *     (PublishDecidedBy) (secaudit2026oct26 round 8c, commerce-07).
+ *   2026-10-31 — The kind `connector-program`: a program a computer holds for an agent, allowed or not
+ *     allowed by the owner (services/connector-programs.ts;
+ *     wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   2026-10-31 — The kind `portfolio-memory-read`: the owner's welcome page reads their memory when the
  *     owner opens it only once the owner allowed a page a writer without memory:read wrote
  *     (services/portfolio-read-hold.ts; audit H-9).
@@ -146,7 +149,9 @@ export type PublishKind =
   // A credit card payment only the seller's own Stripe account attests, confirmed by the buyer in person (commerce/card-adult-ask.ts).
   | 'card-adult-confirm'
   // The owner's welcome page reading their memory, when a writer without memory:read wrote it (services/portfolio-read-hold.ts).
-  | 'portfolio-memory-read';
+  | 'portfolio-memory-read'
+  // A program a computer holds for an agent, allowed by the owner (services/connector-programs.ts).
+  | 'connector-program';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';

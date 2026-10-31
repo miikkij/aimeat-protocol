@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.19.0 — 2026-10-31 — A program a computer holds for an agent, allowed or not allowed by the owner
+ *     (apply-connector-program.ts; wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v1.18.0 — 2026-10-31 — The owner's welcome page may read their memory when they open it, allowed by
  *     the owner for a page a writer without memory:read wrote (apply-portfolio-memory-read.ts; audit H-9).
  *   v1.17.0 — 2026-10-30 — A credit card payment only the seller's account attests, confirmed by the
@@ -82,6 +84,7 @@ import { applyRefineryDefinition } from './apply-refinery-definition.js';
 import { applyDelegationBinding } from './apply-delegation-binding.js';
 import { applyExtensionCode } from './apply-extension-code.js';
 import { applyCortexHolder } from './apply-cortex-holder.js';
+import { applyConnectorProgram, declineConnectorProgram } from './apply-connector-program.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -114,13 +117,17 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'accountant-grant': applyAccountantGrant,
   'card-adult-confirm': applyCardAdultConfirm,
   'portfolio-memory-read': applyPortfolioMemoryRead,
+  'connector-program': applyConnectorProgram,
 };
 
 /**
  * What a declined request does, for the kinds where "Don't allow" changes something rather than
  * leaving it as it was: an older accountant grant the client did not allow is removed
- * (finance/accountant-grant-ask.ts). decide.ts runs it after the request is settled declined.
+ * (finance/accountant-grant-ask.ts), and a program a computer holds is recorded as not allowed, so
+ * the page shows the answer (apply-connector-program.ts). decide.ts runs it after the request is
+ * settled declined.
  */
 export const PUBLISH_DECLINERS: Partial<Record<PublishKind, (ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest) => Promise<void>>> = {
   'accountant-grant': declineAccountantGrant,
+  'connector-program': declineConnectorProgram,
 };
