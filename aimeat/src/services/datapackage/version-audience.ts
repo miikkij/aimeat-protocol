@@ -11,10 +11,13 @@
  *   listing. It now gives the version's files, the pointer and the catalogue entry the audience asked
  *   for, and an approved publish request calls the same function (services/publish-requests/
  *   apply-datapackage.ts; plan doc-mvcn6c7e4e5q, V4).
- * @structure readPointer · writeLatest · upsertCatalogueEntry · setVersionAudience
+ * @structure readPointer · readTrustedVisibility · writeLatest · upsertCatalogueEntry · setVersionAudience
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.2.0 -- 2026-10-31 -- writeLatest records the package's and the version's audience in the
+ *     service-owned record the reads decide on (./audience-record.ts), and readTrustedVisibility answers
+ *     that audience for the publish gate (secaudit2026oct31w2 round 10).
  *   v1.1.0 — 2026-10-21 — setVersionAudience records the audience on the version's descriptor file as a
  *     tag (./audience.ts withAudienceTag) and keeps a file's tags when it re-tiers it (secaudit 2026-10 v42).
  *   v1.0.0 — 2026-10-18 — Extracted from ./store.ts (writeLatest, upsertCatalogueEntry) with
@@ -29,6 +32,7 @@ import {
 } from './contract.js';
 import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
 import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
+import { recordPackageAudience, trustedAudienceOf } from './audience-record.js';
 
 /**
  * The storage, the config and, from ./store.ts, the MCP resource notifications a file write sends. A
@@ -50,6 +54,17 @@ export async function readPointer(deps: StoreDeps, ownerGhii: string, name: stri
     }
 }
 
+/**
+ * The audience a package has now, as the publish gate compares a publish with: undefined when no
+ * version is published, else the audience the service recorded (./audience-record.ts). A pointer
+ * written past the service names no audience the gate trusts.
+ */
+export async function readTrustedVisibility(deps: StoreDeps, ownerGhii: string, name: string): Promise<string | undefined> {
+    const pointer = await readPointer(deps, ownerGhii, name);
+    if (!pointer?.contentHash) return undefined;
+    return (await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer)).visibility ?? 'public';
+}
+
 /** The mutable pointer for a consumer following the newest version. Clears any recorded failure:
  *  a successful publish IS the answer to "the last attempt broke". */
 export async function writeLatest(
@@ -60,6 +75,9 @@ export async function writeLatest(
         packageId: packageId(localAccountName(ownerGhii), name),
         name, contentHash, descriptorUrl, updatedAt: at, visibility,
     };
+    // The audience the reads decide on, written before the pointer moves, so the pointer never names
+    // a version the record does not (./audience-record.ts).
+    await recordPackageAudience(deps.storage, ownerGhii, name, contentHash, visibility);
     await writeStorageFile(deps, ownerGhii, {
         key: latestKey(name),
         data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),

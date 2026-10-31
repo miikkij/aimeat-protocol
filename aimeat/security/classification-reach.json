@@ -1452,7 +1452,15 @@
         "getStorageFile": 8,
         "listStorageFiles": 3
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: A published data package: public by the owner's publish, and the publish step passes leave(). 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry."
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10, W2-15): the rows of a resource reach a caller only through loadResourceRows, which passes the CSV through the classification reader (readerFor(...).show with fileTarget), as GET /v1/pub does for the same bytes. The other reads are the node's own: the latest.json pointer and the version descriptors a read decides the package's audience and version on (their content is the package's metadata, returned only after the audience decision), the version list, and the pointer read before a publish. 2026-10-18: the catalogue rows' two reads moved to ./version-audience.ts with upsertCatalogueEntry."
+    },
+    "src/services/datapackage/audience-record.ts": {
+      "reads": {
+        "getMemory": 2,
+        "listStorageFilesForOwners": 1,
+        "getStorageFile": 1
+      },
+      "why": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10), the node's own read: the service-owned audience record and the boot step's record, and in the once-only boot step every namespace's file list and data package pointers, to record each package's audience. Nothing read is returned to a caller."
     },
     "src/services/datapackage/version-audience.ts": {
       "reads": {
