@@ -21,6 +21,9 @@
  * @structure CorrectInput · correctFacts
  * @usage const { facts, review } = await correctFacts(deps, caller, source, { classes: ['invoice'] });
  * @version-history
+ *   v1.0.1 — 2026-10-31 — The model's decision is reviewed after the fields are checked and the facts
+ *     are stored, not as soon as the classes are: a call whose fields were refused left the decision
+ *     record saying a person had overridden the classes (secaudit 2026-10-31 inv-16).
  *   v1.0.0 — 2026-10-21 — Initial.
  */
 import type { Storage } from '../../storage/interface.js';
@@ -92,17 +95,20 @@ export async function correctFacts(
   const facts = structuredClone(found);
   const known = new Map((await listClasses(deps.storage, caller.ownerGhii)).map((c) => [c.id, c]));
   const now = new Date().toISOString();
-  let review: unknown = null;
+  // The classes as the model left them, when this call changes them. The decision is reviewed only
+  // after every part of the call is checked and the facts are stored: a call whose fields are
+  // refused must not leave a decision record saying a person corrected the classes.
+  let classesBefore: ClassMembership[] | null = null;
 
   if (input.classes !== undefined) {
     const before = facts.classes ?? [];
+    classesBefore = before;
     facts.classes = nextClasses(before, input.classes, known);
     const keep = new Set(facts.classes.map((m) => m.id));
     if (facts.entities) for (const id of Object.keys(facts.entities)) if (!keep.has(id)) delete facts.entities[id];
     // A class added without its fields leaves the extract step undone, so the next inspection with
     // the step on picks them out (the values a person corrected stay, pipeline.ts).
     if (facts.classes.some((m) => !facts.entities?.[m.id] && known.get(m.id)?.process && known.get(m.id)!.properties.length)) delete facts.stages.extract;
-    review = await reviewModelDecision(deps, caller, before, facts.classes);
   }
 
   if (input.fields !== undefined) {
@@ -133,6 +139,7 @@ export async function correctFacts(
   facts.updatedAt = now;
   const writer = { principal: caller.ownerGhii, ownerGhii: caller.ownerGhii, scopes: [] as string[], roles: ['owner'] };
   await putFacts(deps, writer, facts);
+  const review = classesBefore ? await reviewModelDecision(deps, caller, classesBefore, facts.classes ?? []) : null;
   emitChange('contentclass', caller.ownerGhii);
   return { facts, review };
 }

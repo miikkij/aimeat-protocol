@@ -43,6 +43,9 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.3 — 2026-10-31 — isOpenRoute tests the open patterns case-insensitively, as Express routes
+ *     paths: /v1/auth/Anonymous and /v1/portfolio/Members passed the gate as open and reached the
+ *     handlers the patterns leave out (secaudit 2026-10-31 inv-07).
  *   v1.4.2 — 2026-10-30 — The SPA page addresses come from data/spa-page-paths.ts, the list
  *     routes/portal.ts serves spa.html on. The gate's own copy had missed /v1/appcat/structure,
  *     /v1/secret-allow and /v1/eco-capability-allow, so a link to the structure page an AI handed out
@@ -176,10 +179,21 @@ function pageMirrors(): RegExp {
   return new RegExp(`^(${paths.map(p => p.replace(/[.*+?^${}()|[\]\\/]/g, '\\$&')).join('|')})$`);
 }
 
+/**
+ * OPEN_ROUTES as the gate tests them: case-insensitively. Express routes a path whatever its letter
+ * case (no router on this node sets caseSensitive), so /v1/auth/Anonymous reaches the
+ * /v1/auth/anonymous handler, and a pattern tested case-sensitively let such a spelling past the
+ * routes a pattern leaves out by name (secaudit 2026-10-31 inv-07).
+ */
+const OPEN_ROUTE_TESTS = OPEN_ROUTES.map(r => ({
+  method: r.method,
+  path: r.path.flags.includes('i') ? r.path : new RegExp(r.path.source, `${r.path.flags}i`),
+}));
+
 export function isOpenRoute(method: string, rawPath: string): boolean {
   const path = rawPath.length > 1 ? rawPath.replace(/\/+$/, '') : rawPath;
   const m = method === 'HEAD' ? 'GET' : method;
-  return OPEN_ROUTES.some(r => (r.method === null || r.method === m) && r.path.test(path));
+  return OPEN_ROUTE_TESTS.some(r => (r.method === null || r.method === m) && r.path.test(path));
 }
 
 /** The paths an app origin serves in this mode: the app page itself, which asks for a grant. */
