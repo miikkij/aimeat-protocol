@@ -14,7 +14,9 @@
     else document.documentElement.removeAttribute('data-palette');
   }
   try {
-    mode(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    // Light unless the person chose: 'dark' is dark, 'auto' follows the OS (Jouni, v31 K65).
+    var m = localStorage.getItem('aimeat-theme');
+    mode(m === 'auto' && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : m);
     pal(localStorage.getItem('aimeat-palette'));
   } catch (e) { /* storage blocked — defaults stand */ }
 })();
