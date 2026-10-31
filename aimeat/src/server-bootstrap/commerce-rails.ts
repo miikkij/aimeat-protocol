@@ -7,6 +7,8 @@
  * @structure registerCommerceRails(config, peers)
  * @usage await registerCommerceRails(config, peers);   // before the commerce routers mount
  * @version-history
+ *   v1.1.0 — 2026-10-31 — The `package-account` kind: a package its author sells to accounts of this
+ *     node (services/packages/sale/package-account-checkout.ts).
  *   v1.0.0 — 2026-10-18 — Moved from routes-loader.ts (pure extraction), with the two registrations of
  *     the same change: the hosted card page handler and the subscription kind (Comicland v3 A-4, A-5).
  */
@@ -20,6 +22,7 @@ import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { testMoneyHandlerActive } from '../utils/test-money-guard.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver, pacingPackSellableResolver } from '../commerce/sellable-resolvers.js';
 import { packageSellableResolver } from '../services/packages/sale/package-sale-checkout.js';
+import { packageAccountSellableResolver } from '../services/packages/sale/package-account-checkout.js';
 
 export async function registerCommerceRails(config: AimeatConfig, peers: Map<string, PeerInfo>): Promise<void> {
   resetPaymentHandlers();
@@ -35,6 +38,7 @@ export async function registerCommerceRails(config: AimeatConfig, peers: Map<str
   registerSellableResolver(appToolSellableResolver());
   registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
   registerSellableResolver(packageSellableResolver(peers));   // a package this node sells, priced from its catalogue
+  registerSellableResolver(packageAccountSellableResolver());   // a package its author sells to accounts of this node
   registerSellableResolver(pacingPackSellableResolver());   // pacing capacity the operator sells for money
   registerSellableResolver(subscriptionSellableResolver());   // one period of an extension's plan (commerce/subscriptions.ts)
   // A fake EUR/USD rail with no real PSP, on any node while the flag is on; a public node warns (utils/test-money-guard.ts).
