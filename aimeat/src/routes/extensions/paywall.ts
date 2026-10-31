@@ -15,6 +15,10 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   2026-10-31 — Step 3.05 also asks, without charging, whether the caller covers the pacing before it
+ *     asks for the pay token (refusePacingShortfall in pacing.ts), so a caller short of morsels gets
+ *     INSUFFICIENT_MORSELS first and does not pay money for a call the pacing refuses (secaudit
+ *     2026-10-31 inv-08, capability-loss review).
  *   2026-10-31 — Step 3.05: a money-priced action asks the hosted-app spend permission and checks the
  *     pay token before the pacing is charged at 3.1; they were asked after it, and the reversal of a
  *     refused call gives back only what the owner still holds of its credit (secaudit 2026-10-31
@@ -83,7 +87,7 @@ import { AppToolsDocSchema, appToolsKey } from '../../models/app-tool-schemas.js
 import { listInterfaceVersions } from '../../services/app-tool-interfaces.js';
 import { appSpendRefusal } from '../../services/metered-access.js';
 import { respondMeteredRefusal } from './metered-response.js';
-import { burnPacingToll, resolvePacingToll } from './pacing.js';
+import { burnPacingToll, refusePacingShortfall, resolvePacingToll } from './pacing.js';
 import { resolveGatedApp } from './permissions.js';
 import { membersOnlyRefusal, MEMBERS_ONLY_MESSAGE } from '../../services/members-only.js';
 import { localAccountName } from '../../utils/gaii.js';
@@ -401,8 +405,10 @@ export async function enforcePaywall(args: {
   //      this uncontracted channel settles on its own, so it asks the same question, and only here: a
   //      free action is answered below and must not need a money permission at all. The pay token is
   //      only checked here; it is spent at step 4, after the pacing, so a caller short of morsels keeps
-  //      the call they paid for.
+  //      the call they paid for. A caller short of the pacing is told so before the pay token is asked
+  //      for, so they do not pay money for a call the pacing then refuses.
   const payMoney = action.commercial?.payMoney;
+  const pacingToll = resolvePacingToll(config, toll, action.commercial?.payMorsels);
   const paymentRequired = (m: NonNullable<typeof payMoney>, reason?: string) => {
     res.status(402).json({ ...error(config.nodeId, 'PAYMENT_REQUIRED',
       `This call costs ${m.amount / 1_000_000} ${m.currency}. Settle it with a checkout `
@@ -417,6 +423,8 @@ export async function enforcePaywall(args: {
       respondMeteredRefusal(config, res, spendRefusal, `${ext.name}/${action.id}`);
       return { ok: false };
     }
+    const covered = await refusePacingShortfall({ config, storage, callerGaii, providerOwner: ownerName, toll: pacingToll, res });
+    if (!covered.ok) return { ok: false };
     const usable = await checkExtPayToken(storage, payToken, tokenFor);
     if (!usable.ok) {
       paymentRequired(payMoney, usable.reason);
@@ -428,7 +436,7 @@ export async function enforcePaywall(args: {
   //     now and joins the toll in this one charge: part burns, the rest is credited to the owner (M1).
   const paced = await burnPacingToll({
     config, storage, callerGaii, providerOwner: ownerName,
-    label: `ext:${ext.name}:${action.id}`, toll: resolvePacingToll(config, toll, action.commercial?.payMorsels), res,
+    label: `ext:${ext.name}:${action.id}`, toll: pacingToll, res,
   });
   if (!paced.ok) return { ok: false };
 
