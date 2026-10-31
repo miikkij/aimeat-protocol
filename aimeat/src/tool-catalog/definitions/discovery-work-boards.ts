@@ -320,7 +320,8 @@ export const discoveryWorkBoardsTools = [
         annotations: { title: 'Withdraw Data Package', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
         // The word DELETE /v1/datapackages/{owner}/{name} asks a principal of the owner.
         scope: 'storage:write',
-        surfaces: ['appdev', 'agent', 'service', 'commerce'],
+        // Three surfaces, not the four publish and export are on: commerce sells data, it does not take it back.
+        surfaces: ['appdev', 'agent', 'service'],
         input: {
             ref: { type: 'string', required: true, description: 'pkg:owner/name of the package. A version pin (@sha256:...) is ignored: a withdrawal covers every version.', zod: z.string().max(INPUT_LIMITS.id) },
             purge: { type: 'boolean', description: 'true also deletes every stored file of the package and its pointer. Default false: the files stay and a new publish restores the package.' },

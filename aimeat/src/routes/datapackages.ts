@@ -277,7 +277,9 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * the pointer. The owner in person, or the owner's principal with storage:write; every refusal comes
      * before any write. The shared anonymous principal is refused with 401 as on the publish.
      */
-    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), async (req, res) => {
+    // requireScope answers a principal without storage:write before the service; the service asks the
+    // same word again for the MCP tool, which reaches it without this middleware.
+    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope(DATAPACKAGE_WITHDRAW_SCOPE), async (req, res) => {
         const purge = req.query.purge === 'true' || req.query.purge === '1';
         const out = await withdrawPackage(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string, { purge });
         if (!out.ok) {
