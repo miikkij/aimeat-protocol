@@ -70,6 +70,11 @@ Status words: **met** · **met (4.0.0)** (met from the release the requirement i
 | ID-10 | met | `aimeat/src/routes/ghii/web-verify.ts` (the verification tokens carry a session row) | Closed 2026-10-12: deleting the agent revokes these tokens with its other sessions. |
 | ID-11 | **gap** | `aimeat/src/services/owner-erasure.ts:90-273`; `aimeat/src/storage/providers/sqlite/methods/identity.ts:88-185`; Postgres cascade `aimeat/src/storage/providers/postgres-kysely/methods/owner-cascade.ts:191-283` | Erasure looks memberships up by GHII (`owner-erasure.ts:124`) while memberships are keyed by the bare owner name (`aimeat/src/services/organism-namespace-access.ts:53-54`), so organism memberships may survive. Not verified that organism content written by the deleted owner loses the name. |
 | ID-12 | met | `aimeat/src/routes/owners/export.ts:97` | Files are exported as metadata, without bytes. |
+| ID-13 | met | `aimeat/src/services/parties/keys.ts` (32 random bytes, SHA-256, `timingSafeEqual`); `aimeat/src/services/parties/token.ts` (`typ: 'party'`, refused by `verifyJWT`); `aimeat/src/auth/middleware.ts` (`optionalAuth` answers 401 for a party token outside `PARTY_TOKEN_ROUTES`, `aimeat/src/services/parties/contract.ts`) | `aimeat/test/e2e-party.ts` (five node routes refuse a party token). Added 2026-11-01. |
+| ID-14 | met | `aimeat/src/services/audience.ts` (`isNodeAccount` refuses a reader with `party`); `aimeat/src/services/datapackage/audience.ts` (`datapackageReadable` admits a party only to the package its share names; `versionOpenTo` to the pinned version) | `aimeat/test/e2e-party.ts` D2.8, `aimeat/test/unit/party-contract.test.ts`. |
+| ID-15 | met | `aimeat/src/services/parties/verify.ts` (the `parties` record read per request, the token by uid and key id); `aimeat/src/services/parties/read-gate.ts` (the share per read) | `aimeat/test/e2e-party.ts` invariant 19, `aimeat/test/e2e-data-share.ts` (revoke with an earlier token). |
+| ID-16 | met | `aimeat/src/routes/parties.ts`, `aimeat/src/services/parties/service.ts` (`party:manage`, outside every wildcard in `aimeat/src/utils/scope-coverage.ts`); read log `aimeat/src/services/parties/activity.ts` | |
+| ID-17 | met | `aimeat/src/services/parties/admin.ts`; `POST /v1/admin/parties/{owner}/{name}/stop` | `aimeat/test/e2e-party.ts` D2.9. |
 
 ## 4. Authentication
 

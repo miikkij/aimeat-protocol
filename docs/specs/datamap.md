@@ -65,7 +65,8 @@ The node never guesses a map: an app that states nothing has a map that says the
 invents.
 
 **`machinery`**: `iam-and-roles`, `workflows`, `extensions`, `cortex`, `ai-generation`,
-`scheduling`, `connections-and-publish`, `payments`, `federation`, `invites-people`.
+`scheduling`, `connections-and-publish`, `payments`, `federation`, `invites-people`,
+`registers-parties`.
 
 **An app that invites people says so.** An app whose `<meta name="aimeat-scopes">` asks for
 `organism:invite` can invite people into the organisms its user belongs to, and an invitation can
@@ -75,6 +76,14 @@ word `invites-people`, the `invites` statement, or both. **`invites.does`**:
 `sends-email-invitations`, `mints-access-codes`, `creates-accounts`, `grants-workspace-access`,
 `manages-members`. An app that asks for the scope and states neither has the finding
 `DATAMAP_INVITES_UNSTATED`.
+
+**An app that registers people says so.** When the node lets people without an account register to
+apps (`AIMEAT_PARTY_SELF_REGISTRATION`) and an app opens its signup, the people who register become
+outside parties of the app's owner, and the owner holds their e-mail addresses and what they keep in
+the app. The map states it with the machinery word `registers-parties`, the app-level `registers`
+statement `{ "who": "buyers and sellers of the market", "keeps": ["e-mail address", "listings"] }`,
+or both. An app whose signup is open and that states neither has the finding
+`DATAMAP_REGISTERS_UNSTATED`, and the records of processing list the registrations either way.
 
 ### A row: one key family
 
@@ -101,6 +110,7 @@ One row per key family or record type, never one per key: `news.<date>.*`, not 3
 | `agent` | no | The local name of one of the owner's agents whose work this row reads. It ties the app to that agent on both pages; it grants nothing. |
 | `madeFor` | no | With `agent`: true when the app was built for that agent's work. |
 | `domains` | no, but asked for every row with personal data | The regulated data domains the family's personal data falls in, by id: `health`, `special-category`, `biometric-genetic`, `children`, `criminal`, `employment`, `payment-financial`, `public-authority`, `defence-classified`, `export-controlled`, `privileged-trade-secret`. `[]` is a considered "none of these"; leaving the field out is silence. `GET /v1/compliance/catalog` lists them with the laws each one brings. |
+| `publishable` | no | `true` when the family may be published as a data package: a data product reads it as material (an `app` source of `/v1/dataproducts`). Absent or `false` is not offered. A statement, not a permission: the product decides who reads the package, and a row that also marks its data personal keeps every column out of a public package until the owner confirms. |
 
 **Why the domain is on the row.** The domain decides what follows the data: the lowest
 classification its container may carry, whether an impact assessment is owed, whether an outside
@@ -135,7 +145,7 @@ belong in the row store.
 The node never invents a map; it reads the stated one, folds it into one line for a list, and names
 what is missing. The findings, worst first: `DATAMAP_MISSING`, `DATAMAP_NO_PURPOSE`,
 `DATAMAP_NO_ARRANGEMENT`, `DATAMAP_FORM_UNSTATED`, `DATAMAP_FORM_CONTRADICTED`,
-`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`,
+`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_PUBLISHABLE`,
 `DATAMAP_ROW_BAD_CLASSIFICATION`, `DATAMAP_ROW_BAD_DOMAIN`, `DATAMAP_PERSONAL_NO_DOMAIN`. The node reads the app's declared scopes for the invites finding,
 and an app with no map that asks for `organism:invite` has it beside `DATAMAP_MISSING`.
 A finding never refuses a map. The owner sees it; everyone else reads the map without it.
@@ -157,5 +167,6 @@ and its declared hosts there; the declaration on the extension is the source for
 
 `/2` replaced `/1` on 2026-08-25: `/1` described key families and their compliance columns and never
 said what the app was for. Optional fields added since (`organism-rows`, `classification`, `agent`,
-`madeFor`, `invites`, the machinery word `invites-people` and the row's `domains`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
+`madeFor`, `invites`, the machinery word `invites-people`, the row's `domains`, `registers` and the
+machinery word `registers-parties`) are additive and keep the format at `/2`; a map carries its own `spec` so a newer node can
 read an older map.

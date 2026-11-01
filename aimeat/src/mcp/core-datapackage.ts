@@ -23,12 +23,18 @@
  *
  *   AND A THIRD FOR TAKING ONE BACK. aimeat_datapackage_withdraw calls the service DELETE
  *   /v1/datapackages/{owner}/{name} calls; neither of the other two tools has a shape that holds it.
+ *
+ *   AND A FOURTH FOR SELLING ONE. aimeat_datapackage_sell sets the EXCHANGE sale terms through the
+ *   service PUT /v1/datapackages/{owner}/{name}/exchange calls (plan doc-mvwxcas3dom3, D5.1).
  * @structure registerCoreDataPackageTools() — aimeat_datapackage_publish, aimeat_datapackage_export,
- *   aimeat_datapackage_withdraw
+ *   aimeat_datapackage_withdraw, aimeat_datapackage_sell
  * @usage
  *   import { registerCoreDataPackageTools } from './core-datapackage.js';
  *   registerCoreDataPackageTools(mcp, storage, config, getAgentGaii, caller);
  * @version-history
+ *   2026-11-01 — aimeat_datapackage_sell: a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5.1, D5.2).
+ *   2026-11-01 — Registers aimeat_party (mcp/party.ts; plan doc-mvwxcas3dom3, D2, D3.4).
+ *   2026-11-01 — Registers aimeat_dataproduct (mcp/dataproduct.ts; plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 — Registers the resource template aimeat://datapackage/{owner}/{name} (mcp/datapackage-resource.ts;
  *     plan doc-mvwxcas3dom3, D1.6).
  *   2026-11-01 — aimeat_datapackage_withdraw withdraws a package (purge deletes its files), through the
@@ -70,12 +76,16 @@ import { publishPackage, openPackage, readRows, parseRef } from '../services/dat
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE, type DatapackageReader } from '../services/datapackage/audience.js';
 import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
 import { scopeDeniedText } from './scope-denied-answer.js';
+import { setPackageExchange, EXCHANGE_WRITE_SCOPE } from '../services/exchange-datapackage.js';
+import { exchangeOutcome, reconcileAfterPackageWrite } from '../services/exchange-projection.js';
 import { toCsv } from '../services/datapackage/table.js';
 import type { TableSchema } from '../services/datapackage/contract.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import { isAnonymousPrincipal, ANONYMOUS_PRINCIPAL_REFUSAL } from '../auth/anonymous-principal.js';
 import { toolError } from './tool-error.js';
 import { registerDatapackageResource } from './datapackage-resource.js';
+import { registerDataProductTool } from './dataproduct.js';
+import { registerPartyTool } from './party.js';
 
 /** What one tool call may carry as rows. Same number as the sandbox bridge, for one reason a person
  *  can remember: "8 MB is what crosses in one call, wherever you are standing". */
@@ -114,6 +124,10 @@ export function registerCoreDataPackageTools(
 
     // aimeat://datapackage/{owner}/{name}: the descriptor and a first-rows sample, read as this session.
     registerDatapackageResource(mcp, storage, config, caller);
+    // aimeat_dataproduct: a definition that builds a package version from material (mcp/dataproduct.ts).
+    registerDataProductTool(mcp, config, storage, caller);
+    // aimeat_party: outside parties and the named shares of packages to them (mcp/party.ts).
+    registerPartyTool(mcp, config, storage, caller);
 
     /**
      * The refusal REST gives (GET /v1/datapackages/..., 403 SCOPE_DENIED naming storage:read) when this
@@ -323,6 +337,34 @@ export function registerCoreDataPackageTools(
                     ? 'The package and every stored file of it are deleted. Its addresses answer 404 now.'
                     : 'Withdrawn: every read of the package answers 410 and it is out of the catalogue. Publishing a version again restores it.',
             });
+        },
+    );
+
+    // ── aimeat_datapackage_sell ──
+    // The same service PUT /v1/datapackages/{owner}/{name}/exchange calls (services/exchange-datapackage.ts),
+    // which decides who may sell (the owner's principal with exchange:write) and asks the data
+    // intermediation setting before a new listing.
+    mcp.registerTool(
+        'aimeat_datapackage_sell',
+        {
+            description: descriptionFor('aimeat_datapackage_sell'),
+            inputSchema: zodShapeFor('aimeat_datapackage_sell'),
+            annotations: annotationsFor('aimeat_datapackage_sell'),
+        },
+        async (args) => {
+            if (isAnonymousPrincipal({ sub: agentGaii })) return toolError('AUTH_REQUIRED', ANONYMOUS_PRINCIPAL_REFUSAL);
+            const { ref, ...terms } = args as { ref: string } & Record<string, unknown>;
+            const m = /^pkg:([^/@]+)\/([^@]+)(?:@sha256:[a-f0-9]{64})?$/.exec(ref);
+            if (!m) return toolError('INVALID_INPUT', 'ref must look like "pkg:owner/name".');
+            const out = await setPackageExchange(store, caller(), m[1]!, m[2]!, terms,
+                async (ownerGhii, name) => exchangeOutcome(await reconcileAfterPackageWrite(storage, ownerGhii, name), 'aimeat_datapackage_sell again'));
+            if (!out.ok) {
+                if (out.code === 'SCOPE_DENIED') {
+                    return { content: [{ type: 'text' as const, text: scopeDeniedText('aimeat_datapackage_sell', [EXCHANGE_WRITE_SCOPE], { baseUrl: config.baseUrl, agentGaii }) }], isError: true as const };
+                }
+                return toolError(out.code, out.message);
+            }
+            return jsonContent({ exchange: out.terms, listing: out.listing });
         },
     );
 }

@@ -12,6 +12,8 @@
  * @structure appManageCall
  * @usage return out(await appManageCall(client, owner, input));
  * @version-history
+ *   2026-11-01 -- member_set forwards `party`; parties, party_remove and party_registration_set reach
+ *     /v1/apps/{owner}/{app}/parties (plan doc-mvwxcas3dom3, D4).
  *   2026-10-31 -- settings forwards `screenshot_public` (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-30 -- structure_set forwards `proposals`.
  *   2026-10-29 -- structure, structure_set and plans over GET and PUT .../structure and GET /v1/app-plans.
@@ -167,10 +169,16 @@ export async function appManageCall(client: AimeatClient, owner: string, input: 
         case 'members':
             return client.get(`/v1/apps/${enc(ownerName)}/${file}/members${query(input, ['q', 'limit', 'offset'])}`);
         case 'member_set': {
-            const body: Input = pick(input, ['account', 'email', 'locale', 'role', 'level', 'note', 'offerings', 'days']);
+            const body: Input = pick(input, ['account', 'email', 'party', 'locale', 'role', 'level', 'note', 'offerings', 'days']);
             if (input.expires_at !== undefined && input.expires_at !== null) body.expiresAt = input.expires_at === '' ? null : input.expires_at;
             return client.post(`/v1/apps/${enc(ownerName)}/${file}/members`, body);
         }
+        case 'parties':
+            return client.get(`/v1/apps/${enc(ownerName)}/${file}/parties`);
+        case 'party_remove':
+            return client.delete(`/v1/apps/${enc(ownerName)}/${file}/parties/${enc(String(input.party_name))}`);
+        case 'party_registration_set':
+            return client.put(`/v1/apps/${enc(ownerName)}/${file}/parties/registration`, pick(input, ['open', 'role']));
         case 'member_remove':
             return client.delete(`/v1/apps/${enc(ownerName)}/${file}/members/${enc(String(input.account))}`);
         case 'member_decline':

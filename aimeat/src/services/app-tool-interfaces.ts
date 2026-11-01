@@ -30,6 +30,8 @@
  *   const pinned = await getInterfaceVersion(storage, providerGhii, appId, tool, ent.surface.ifaceVersion);
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial pinned-interface versioning (append-only snapshots + latest pointer + freeze).
+ *   v1.0.2 — 2026-11-01 — hashDef is exported: a data package's Table Schemas are an interface too, and its
+ *     versions are matched to a contract's interface by the same hash (services/exchange-datapackage.ts; plan D5.1).
  *   v1.0.1 — 2026-09-26 — The provider's account name comes from localAccountName (utils/gaii.ts), which keeps an identity of another node whole, so it never names the local namesake (secaudit 2026-09, F-1).
  */
 import { createHash } from 'node:crypto';
@@ -70,7 +72,7 @@ const versionKey = (base: string, n: number): string => `${base}.v${n}`;
 const latestKey = (base: string): string => `${base}.latest`;
 
 /** The content identity of an interface: republishing an identical schema+binding is idempotent. */
-function hashDef(def: InterfaceDef): string {
+export function hashDef(def: InterfaceDef): string {
   const canonical = JSON.stringify({ i: def.inputSchema ?? {}, o: def.outputSchema ?? {}, b: def.binding ?? null });
   return createHash('sha256').update(canonical).digest('hex').slice(0, 32);
 }

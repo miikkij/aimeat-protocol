@@ -28,6 +28,14 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — pruneOldVersions moved to ./retention.ts, where a version a live named share pins is
+ *     kept; a successful publish emits the `datapackages` change to the owner's streams, and a new
+ *     version tells the parties whose share pins the superseded one (./share-notices.ts; plan D6.2, D6.4).
+ *   2026-11-01 — openPackage names the package to datapackageReadable, so an outside party's reader opens
+ *     the package its share names; its rows pass the classification reader as no account (plan D3.2).
+ *   2026-11-01 — publishPackage takes `{ dryRun: true }`: every check runs and the version is built,
+ *     nothing is stored and no provenance record is made; a data product preview reads it (plan
+ *     doc-mvwxcas3dom3, D9.4). ProducedBy.kind may be 'dataproduct'.
  *   2026-11-01 — A publish to public whose producer's data map marks its data personal is refused with
  *     PERSONAL_DATA_PUBLIC before any write, unless the input confirms (confirmPersonalPublic); the
  *     confirmation is recorded on the pointer (./personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
@@ -104,6 +112,10 @@ import { signedInOnly } from '../../config-visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
 import { personalPublicGuard, PERSONAL_DATA_PUBLIC } from './personal-guard.js';
+import { pruneOldVersions } from './retention.js';
+import { noticeSuperseded } from './share-notices.js';
+import { emitChange } from '../event-bus.js';
+import { DATAPACKAGES_DOMAIN } from './contract.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -142,7 +154,9 @@ export type PublishResult =
         /** Versions the owner's retention policy removed on this publish. Empty when no policy is
          *  set, which is the default: keep everything. Returned so the answer can SAY what was
          *  deleted — a deletion nobody can see is how a history disappears unnoticed. */
-        pruned: string[] }
+        pruned: string[];
+        /** True for a dry run: nothing was stored. */
+        dryRun?: boolean }
     | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE' | 'NOT_ORGANISM_MEMBER' | typeof PERSONAL_DATA_PUBLIC; message: string; issues: ValidationIssue[] };
 
 /**
@@ -155,6 +169,8 @@ export type PublishResult =
  */
 export async function publishPackage(
     deps: StoreDeps, ownerGhii: string, input: PublishInput, producedBy: ProducedBy,
+    /** dryRun: check and build the version, store nothing (services/dataproduct preview). */
+    opts: { dryRun?: boolean } = {},
 ): Promise<PublishResult> {
     const { storage, config } = deps;
     const ownerName = localAccountName(ownerGhii);
@@ -276,6 +292,7 @@ export async function publishPackage(
         resources,
         ...(input.title ? { title: input.title } : {}),
         ...(input.description ? { description: input.description } : {}),
+        ...(input.keywords?.length ? { keywords: input.keywords } : {}),
         ...(input.provenance?.license ? { licenses: [{ name: input.provenance.license }] } : {}),
         created: now,
         aimeat: {
@@ -296,6 +313,18 @@ export async function publishPackage(
     };
     const contentHash = contentHashOf(withoutHash);
     const descriptor: Descriptor = { ...withoutHash, aimeat: { ...withoutHash.aimeat, contentHash } };
+
+    // A dry run (a data product preview) stops here: every refusal above was asked, nothing is stored,
+    // no provenance record is made, and the answer says whether these bytes are already published.
+    if (opts.dryRun) {
+        const dryKey = descriptorKey(input.name, contentHash);
+        return {
+            ok: true, dryRun: true, descriptor, contentHash, pruned: [],
+            descriptorUrl: publicUrl(config.baseUrl, ownerGhii, dryKey),
+            unchanged: !!(await storage.getStorageFileMeta(ownerGhii, dryKey)),
+            resources: bodies.map(b => ({ name: b.name, url: publicUrl(config.baseUrl, ownerGhii, resourceKey(input.name, contentHash, b.name)), rowCount: b.rows.length, bytes: b.data.length })),
+        };
+    }
 
     // TARGET-058: an agent publishing a package is model-touched output, and that gets DECLARED
     // rather than inferred from the shape of the caller. `provenanceForWrite` decides from the
@@ -351,6 +380,8 @@ export async function publishPackage(
             ...(personalPublicConfirmed ? { personalPublicConfirmed } : {}),
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
+        // The run succeeded, so the package's freshness moved: the owner's open pages re-read (D6).
+        emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
         // out, and a re-publish of existing content pushed nothing out.
         return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: true, resources: resourceUrls, pruned: [] };
@@ -409,76 +440,15 @@ export async function publishPackage(
             package: descriptor.aimeat.packageId, error: String(err),
         });
     });
+    // A new version is live: the owner's open pages re-read (D6), and each party whose share pins the
+    // version this one superseded is told by mail (./share-notices.ts, D6.2). In the background.
+    emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
+    if (previous?.contentHash && bare(previous.contentHash) !== bare(contentHash)) {
+        void noticeSuperseded(deps, ownerGhii, input.name, previous.contentHash, contentHash)
+            .catch(err => logger.warn('datapackage: the superseded notices failed', { package: descriptor.aimeat.packageId, error: String(err) }));
+    }
 
     return { ok: true, descriptor, contentHash, descriptorUrl, unchanged: false, resources: resourceUrls, pruned };
-}
-
-/**
- * Apply the owner's retention policy: keep the newest N versions, or everything published within the
- * last N months, and remove the rest.
- *
- * FOUR RULES, because this deletes published data at a permanent address:
- *
- * 1. IT ONLY RUNS WHEN THE OWNER ASKED. No policy means keep everything, for ever. A default that
- *    quietly deleted somebody's history would be the worst possible default here.
- * 2. THE CURRENT VERSION IS NEVER PRUNED, whatever the arithmetic says. `keep: 0` removes every old
- *    version and leaves the one the pointer names, because a package with no readable version is not
- *    a retention policy, it is a deletion.
- * 3. A PRUNED VERSION IS GONE, and a consumer pinned to it gets a 404 rather than different bytes.
- *    That is the honest failure: the owner chose a retention window, and the descriptor carries the
- *    policy so a consumer can see how long a pin is good for before they rely on one.
- * 4. WHAT WAS REMOVED IS RETURNED AND LOGGED. A deletion nobody can see is how a history disappears
- *    without anyone noticing which run did it.
- */
-async function pruneOldVersions(
-    deps: StoreDeps, ownerGhii: string, name: string,
-    policy: NonNullable<PublishInput['retentionPolicy']>, currentHash: string,
-): Promise<string[]> {
-    const keep = Number(policy.keep);
-    if (!Number.isFinite(keep) || keep < 0) return [];
-
-    // Every stored file of this package, grouped into versions by the hash segment of its key.
-    const root = `${packageKeyRoot(name)}/`;
-    const files = (await deps.storage.listStorageFiles(ownerGhii))
-        .filter(f => f.key.startsWith(root) && !f.key.endsWith('/latest.json'));
-    const versions = new Map<string, { keys: string[]; at: number }>();
-    for (const f of files) {
-        const hash = f.key.slice(root.length).split('/')[0];
-        if (!/^[a-f0-9]{64}$/.test(hash)) continue;
-        const at = Date.parse(f.createdAt);
-        const entry = versions.get(hash) ?? { keys: [], at: 0 };
-        entry.keys.push(f.key);
-        entry.at = Math.max(entry.at, Number.isFinite(at) ? at : 0);
-        versions.set(hash, entry);
-    }
-
-    const current = bare(currentHash);
-    const ordered = [...versions.entries()]
-        .filter(([hash]) => hash !== current)   // rule 2
-        .sort((a, b) => b[1].at - a[1].at);     // newest first
-
-    let doomed: Array<[string, { keys: string[]; at: number }]>;
-    if (policy.unit === 'months') {
-        const cutoff = Date.now() - keep * 30 * 24 * 3600_000;
-        doomed = ordered.filter(([, v]) => v.at < cutoff);
-    } else {
-        // `keep` counts versions INCLUDING the current one, which is what an owner means by "keep the
-        // last 30" — so the others list is trimmed to keep-1.
-        doomed = ordered.slice(Math.max(0, keep - 1));
-    }
-
-    const removed: string[] = [];
-    for (const [hash, v] of doomed) {
-        for (const key of v.keys) await deps.storage.deleteStorageFile(ownerGhii, key);
-        removed.push(`sha256:${hash}`);
-    }
-    if (removed.length) {
-        logger.info('datapackage: retention removed old versions', {
-            package: `${ownerGhii}/${name}`, policy: `${policy.keep} ${policy.unit}`,
-            removed: removed.length, versions: removed,
-        });
-    }
-    return removed;
 }
 
 /** The pointer as it stands now, or null when this package has never published a version. A pointer
@@ -557,7 +527,7 @@ export async function openPackage(
     const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
     const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
     const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
-    if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader))) return null;
+    if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader, name))) return null;
     // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
     if (pointer?.status === 'withdrawn') return null;
 
@@ -641,7 +611,11 @@ async function loadResourceRows(
     // The classification reader GET /v1/pub runs on the same CSV (routes/storage-files.ts): a label
     // that hides the file from this reader, or ranks above an agent's clearance, hides its rows too,
     // and the read answers as a missing resource, as /v1/pub answers 404.
-    const [shown] = await readerFor(deps, reader?.sub ? reader as ReaderAuth : null).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
+    // An outside party reads as a principal of no account and no recognised role, which classification
+    // reads the stricter way (services/classification/reader-kind.ts): a label that keeps content inside
+    // the owner's account or an organism hides it from the party too.
+    const asReader = reader?.party ? { sub: reader.sub ?? '', owner: '', roles: ['party'] } : reader?.sub ? reader as ReaderAuth : null;
+    const [shown] = await readerFor(deps, asReader).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
     if (!shown) return null;
     return { all: fromCsv(shown.data, res.schema), res };
 }

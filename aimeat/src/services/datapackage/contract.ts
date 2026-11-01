@@ -34,6 +34,13 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.6.0 -- 2026-11-01 -- LatestPointer.exchange: the package's EXCHANGE sale terms, the source its
+ *     listing is projected from, kept on every later pointer (services/exchange-datapackage.ts; plan D5.1).
+ *   v1.5.0 -- 2026-11-01 -- DATAPACKAGES_DOMAIN, the live change a publish and a withdrawal emit to the
+ *     owner's streams (plan doc-mvwxcas3dom3, D6).
+ *   v1.4.0 -- 2026-11-01 -- A producer of kind 'dataproduct'; a source names its kind, address and
+ *     licence; AimeatBlock.sourcesFetchedAt (outside the content hash) says when each source of a data
+ *     product build was read (plan doc-mvwxcas3dom3, D9).
  *   v1.3.0 -- 2026-11-01 -- PublishInput.confirmPersonalPublic and LatestPointer.personalPublicConfirmed:
  *     a public package from personal data waits for the owner's confirmation (./personal-guard.ts; plan
  *     doc-mvwxcas3dom3, D1.7).
@@ -82,13 +89,18 @@ export interface AimeatBlock {
     /** REQUIRED. What changed against the previous version and why. A version nobody explained is a
      *  version a consumer cannot decide about. */
     changes: string;
-    producer: { kind: 'workflow' | 'extension' | 'agent' | 'app' | 'manual'; ref?: string; schedule?: string };
+    producer: { kind: 'workflow' | 'extension' | 'agent' | 'app' | 'manual' | 'dataproduct'; ref?: string; schedule?: string };
     producedBy: { gaii: string; run?: string; at: string };
     /** Whether the Table Schemas were declared by the producer or proposed by inference. A consumer
      *  reading `inferred` knows the types are a guess nobody has confirmed yet. */
     schemaSource: 'declared' | 'inferred' | 'mixed';
     parameters?: Record<string, unknown>;
-    sources?: Array<{ url?: string; title?: string; retrievedAt?: string; role?: string }>;
+    /** Where the data came from. A data product build names each source's `kind` (records, app,
+     *  memory, extension, file, datapackage), its `address` and `license` when known; the fetch times
+     *  are in `sourcesFetchedAt`, outside the hash, so the same rows keep one address. */
+    sources?: Array<{ url?: string; title?: string; retrievedAt?: string; role?: string; kind?: string; address?: string; license?: string; id?: string }>;
+    /** When each source of a data product build was read, by source id. Outside the content hash. */
+    sourcesFetchedAt?: Record<string, string>;
     lineage?: string[];
     transformations?: Array<{ by: string; what: string }>;
     legalBasis?: string;
@@ -131,6 +143,8 @@ export interface Descriptor {
     resources: DescriptorResource[];
     title?: string;
     description?: string;
+    /** Frictionless `keywords`. Inside the content hash; absent on every version before 2026-11-01. */
+    keywords?: string[];
     licenses?: Array<{ name: string; path?: string }>;
     created: string;
     aimeat: AimeatBlock;
@@ -143,9 +157,10 @@ export interface PublishInput {
     resources: ResourceInput[];
     title?: string;
     description?: string;
+    keywords?: string[];
     producer?: Partial<AimeatBlock['producer']>;
     parameters?: Record<string, unknown>;
-    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes'>;
+    provenance?: Pick<AimeatBlock, 'sources' | 'lineage' | 'transformations' | 'legalBasis' | 'consentStatus' | 'retention' | 'license' | 'supersedes' | 'sourcesFetchedAt'>;
     retentionPolicy?: AimeatBlock['retentionPolicy'];
     /** What the caller said about how this was made (TARGET-058). Threaded to provenanceForWrite. */
     declaredProvenance?: unknown;
@@ -183,6 +198,13 @@ export const resourceKey = (name: string, contentHash: string, resource: string)
 export const resourcePath = (resource: string): string => `data/${resource}.csv`;
 /** The MUTABLE pointer for a consumer following the newest version. */
 export const latestKey = (name: string): string => `${packageKeyRoot(name)}/latest.json`;
+
+/**
+ * The change domain a publish (a new version, or a run whose bytes were already there) and a
+ * withdrawal emit on the SSE stream, to the owner's streams only (services/event-bus.ts). A page that
+ * shows the owner's packages, their freshness or their versions re-reads on it instead of polling.
+ */
+export const DATAPACKAGES_DOMAIN = 'datapackages';
 
 /** `sha256:abc…` → `abc…`. Every key uses the bare digest; every field carries the prefix. */
 export function bare(hash: string): string {
@@ -245,6 +267,8 @@ export function contentHashOf(descriptor: Omit<Descriptor, 'aimeat'> & { aimeat:
         resources: descriptor.resources,
         title: descriptor.title,
         description: descriptor.description,
+        // Absent before 2026-11-01, and an absent key is not serialised, so no earlier hash moves.
+        keywords: descriptor.keywords,
         licenses: descriptor.licenses,
         aimeat: {
             packageId: a.packageId,
@@ -290,4 +314,36 @@ export interface LatestPointer {
      *  personal (./personal-guard.ts): when, and the principal whose request carried it. Kept on every
      *  later pointer, so the producer's next public versions are not asked again. */
     personalPublicConfirmed?: { at: string; by: string };
+    /** The package's EXCHANGE sale terms (services/exchange-datapackage.ts), the source its listing is
+     *  projected from. Kept on every later pointer, as the confirmation above is. */
+    exchange?: DatapackageExchangeTerms;
+}
+
+/**
+ * How a data package is sold on EXCHANGE (plan doc-mvwxcas3dom3, D5.1, D5.2). A morsel is pacing,
+ * never a price: `pricesMoney` is the price (6-decimal micro-units), and `tollMorsels` (or the 3.x
+ * shaped `price.morsels`) is the pacing each read carries for an account consumer.
+ */
+export interface DatapackageExchangeTerms {
+    /** The sale switch: true lists the package, false delists it. */
+    exchange: boolean;
+    /** A month of reads (`per_month`), or each read (`per_read`: one OData, row or CSV request). */
+    model: 'per_month' | 'per_read';
+    pricesMoney: Array<{ amount: number; currency: string }>;
+    tollMorsels?: number | null;
+    price?: { morsels?: number };
+    /** How a buyer may use the data. Required, as for every other kind of offering. */
+    usageTerms: { derivatives?: boolean; resale?: boolean; attribution?: boolean; note?: string };
+    /** A `per_month` contract's reads per minute. Default 60. */
+    readsPerMinute?: number;
+    /** The provider's own statement that the offering delivers data. A package does unless it says otherwise. */
+    deliversData?: boolean;
+    title?: string;
+    description?: string;
+    tags?: string[];
+    /** ODPS authoring fields and the provenance attestation, as an offering carries them. */
+    odps?: Record<string, unknown> | null;
+    provenance?: Record<string, unknown> | null;
+    updatedAt: string;
+    updatedBy: string;
 }

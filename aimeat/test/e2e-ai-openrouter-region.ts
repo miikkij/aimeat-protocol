@@ -30,6 +30,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-openrouter-region
  * @version-history
+ *   v1.1.1 -- 2026-11-01 -- R8: /v1/privacy?lang=fi reaches the Finnish page.
  *   v1.1.0 -- 2026-11-01 -- R10, R11: tool calling in the region's list, and the buyer's choice eu-only (Jouni, 2026-11-01).
  *   v1.0.0 -- 2026-10-31 -- Initial (Jouni, 2026-10-31).
  */
@@ -240,6 +241,13 @@ const arrivals = (stub: FakeAiProvider, marker: string) =>
       assert(en.includes('Standard Contractual Clauses') && !en.includes('{{aiRegionNotice}}'), 'English: the transfer basis, and no placeholder left');
       const fi = await fetch(`${BASE}/v1/privacy/fi`).then(r => r.text());
       assert(fi.includes('osoitteessa eu.openrouter.ai') && fi.includes('Voit valita alueen'), 'Finnish: region and choice');
+      // ?lang=fi on the bare path reaches the Finnish page, as ?lang does on the other pages (crew45, 2026-11-01).
+      const viaLang = await fetch(`${BASE}/v1/privacy?lang=fi`, { redirect: 'manual' });
+      assert(viaLang.status === 302 && viaLang.headers.get('location') === '/v1/privacy/fi', `?lang=fi: ${viaLang.status} ${viaLang.headers.get('location')}`);
+      const followed = await fetch(`${BASE}/v1/privacy?lang=fi`).then(r => r.text());
+      assert(followed.includes('osoitteessa eu.openrouter.ai'), '?lang=fi followed: Finnish');
+      const plain = await fetch(`${BASE}/v1/privacy?lang=en`, { redirect: 'manual' });
+      assert(plain.status === 200, `?lang=en stays on the English page: ${plain.status}`);
     });
 
     await test('R10. a chat call with tools passes over an EU endpoint without tool calling and runs in the US, recorded', async () => {

@@ -80,7 +80,7 @@
     </div>
 
     <h2>1. Sopijapuolet</h2>
-    <p>Nämä ehdot ovat sopimus sinun (palvelun käyttäjän) ja {{operatorName}}:n välillä, joka on {{operatorTypeLabel}}{{operatorBusinessIdClause}} osoitteessa {{operatorAddress}} ("ylläpitäjä", "me"). Ylläpitäjä on sama taho, joka on nimetty rekisterinpitäjäksi <a href="/v1/privacy/fi">tietosuojaselosteessa</a>.</p>
+    <p>Nämä ehdot ovat sopimus sinun (palvelun käyttäjän) ja {{operatorName}}:n välillä, joka on {{operatorTypeLabel}}{{operatorBusinessIdClause}}{{operatorAddressClause}} ("ylläpitäjä", "me"). Ylläpitäjä on sama taho, joka on nimetty rekisterinpitäjäksi <a href="/v1/privacy/fi">tietosuojaselosteessa</a>.</p>
 
     <h2>2. Palvelu</h2>
     <p>AIMEAT on avoin, federoitu protokolla tekoälymuistille ja agenttitoiminnalle. {{nodeName}}-solmu on ylläpitäjän asennus AIMEAT-viitetoteutuksesta. Palvelu sisältää:</p>
@@ -164,7 +164,7 @@
     <p>AIMEAT-ohjelmisto on lisensoitu MIT-lisenssillä (katso projektin repositorio osoitteessa <a href="https://github.com/miikkij/aimeat-protocol">github.com/miikkij/aimeat-protocol</a>). Lisenssi koskee <em>ohjelmistoa</em>; nämä ehdot koskevat {{nodeName}}-solmun <em>operointia</em>. Voit ajaa omaa solmua samalla MIT-lisenssillä, jolloin sinusta tulee kyseisen solmun ylläpitäjä eivätkä nämä ehdot koske sitä.</p>
 
     <h2>18. Sovellettava laki ja riidat</h2>
-    <p>Näihin ehtoihin sovelletaan {{operatorCountry}}n lakia ottamatta huomioon sen lainvalintasääntöjä. Kaikki näistä ehdoista tai palvelusta aiheutuvat tai niihin liittyvät riidat ratkaistaan yksinomaisesti {{operatorCountry}}n toimivaltaisissa tuomioistuimissa, paitsi että kuluttajilla voi olla paikalliseen lakiin perustuvia oikeuksia, joista ei voi luopua sopimuksella.</p>
+    <p>Näihin ehtoihin sovelletaan {{operatorCountryOf}} lakia ottamatta huomioon sen lainvalintasääntöjä. Kaikki näistä ehdoista tai palvelusta aiheutuvat tai niihin liittyvät riidat ratkaistaan yksinomaisesti {{operatorCountryOf}} toimivaltaisissa tuomioistuimissa, paitsi että kuluttajilla voi olla paikalliseen lakiin perustuvia oikeuksia, joista ei voi luopua sopimuksella.</p>
 
     <h2>19. Yleiset ehdot</h2>
     <p><strong>Koko sopimus.</strong> Nämä ehdot yhdessä <a href="/v1/privacy/fi">tietosuojaselosteen</a> kanssa muodostavat koko sopimuksen sinun ja ylläpitäjän välillä palvelusta.</p>
@@ -201,8 +201,7 @@
     <p>Ylläpitäjä käsittelee ilmoitukset ja voi poistaa sisältöä tai rajoittaa tiliä. Jos päätös menee sinua vastaan, saat perustelun ja voit valittaa siitä. Toistuvat osion 4 rikkomukset voivat johtaa tilin sulkemiseen. Ylläpitäjä ei valvo kaikkea täällä julkaistua eikä ole siihen velvollinen; tämä osio on se tapa jolla sille kerrotaan.</p>
 
     <h2>25. Yhteystiedot</h2>
-    <p>Käyttöehtoja koskevat kysymykset: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a><br>
-    Postiosoite: {{operatorAddress}}</p>
+    <p>Käyttöehtoja koskevat kysymykset: <a href="mailto:{{operatorEmail}}">{{operatorEmail}}</a>{{operatorAddressContact}}</p>
 </main>
 
 </div>

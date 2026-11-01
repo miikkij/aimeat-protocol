@@ -248,6 +248,8 @@ tags:
     description: Scheduled jobs and recurring automation triggers
   - name: Data Packages
     description: Frictionless Data Packages with AIMEAT provenance — publish, validate, read
+  - name: Parties
+    description: Outside parties (people and programs with no account here) and the named shares of data packages to them
   - name: Workflows
     description: Multi-step agent workflows — save, run, answer human-input steps, and inspect pending inputs
   - name: Public
@@ -303,6 +305,24 @@ components:
         task:read, task:write (create/start tasks for your own agents — grantable to an H-2 app
         so a control-plane app can drive your own fleet on your behalf; an app may only reach its
         own owner's agents), workflow:read, workflow:write (see/create/run your automations),
+    PartyBasicAuth:
+      type: http
+      scheme: basic
+      description: >
+        An outside party (a person or a program with no account on this node) reading a data package
+        shared with it: user `<owner>/<party name>`, password the party key. What Excel, Power BI and
+        Tableau send to an OData feed. Accepted only on the data package reads, the OData feed, the
+        package files under /v1/pub and /v1/parties/me; a wrong key on the OData feed answers 401 with
+        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node.
+    PartyTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: aimeat_party_<jwt>
+      description: >
+        An outside party's access token from `POST /v1/parties/token` (OAuth 2.0 client credentials),
+        about 15 minutes. Accepted on the same endpoints as PartyBasicAuth; on every other endpoint it
+        answers 401. Every request re-checks the party, its key and its share, so a deleted party,
+        a deleted key or an ended share refuses the next read with an earlier token.
     SignatureAuth:
       type: apiKey
       in: header
@@ -318,6 +338,7 @@ components:
         link: { type: integer }
         signed-in: { type: integer }
         organism: { type: integer }
+        named: { type: integer, description: 'Named shares and outside parties: one person or program the owner chose by name, with no account here.' }
     InternetOpeningForm:
       type: object
       description: One public intake form an opened app submits to (/v1/intake/{org}/{ws}/{form_id}).
@@ -6619,12 +6640,91 @@ components:
         params: { type: object, example: { limit: 7 } }
         state: { type: object }
 
+    DataProductDefinitionInput:
+      type: object
+      description: >
+        A data product definition (services/dataproduct/definition.ts): how to build a data package
+        version from material. The name is the path parameter and the package name.
+      properties:
+        title: { type: string, maxLength: 500 }
+        description: { type: string, maxLength: 10000 }
+        keywords: { type: array, items: { type: string }, maxItems: 20 }
+        license: { type: string, description: 'e.g. CC-BY-4.0' }
+        sources:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            required: [kind]
+            properties:
+              id: { type: string, description: 'A, B, ...: the name the column mapping and the join key use. Default A, B, C in order.' }
+              kind: { type: string, enum: [records, app, memory, extension, file, datapackage] }
+              organism_id: { type: string, description: 'records' }
+              ws: { type: string, description: 'records' }
+              space: { type: string, description: 'records: the records space (name or namespace)' }
+              app: { type: string, description: 'app: the caller''s own app (filename)' }
+              key_prefix: { type: string, description: 'app' }
+              key: { type: string, description: 'memory: the record key; file: the storage key (or <owner ghii>/<key>)' }
+              owner: { type: string, description: 'memory: another account whose record it is; datapackage: the package owner' }
+              rows_at: { type: string, description: 'memory, app, extension: the dotted path to the rows' }
+              ext: { type: string, description: 'extension' }
+              action: { type: string, description: 'extension' }
+              input: { type: object, description: 'extension: the action''s input' }
+              instance_id: { type: string, description: 'extension' }
+              sheet: { type: string, description: 'file: the XLSX sheet (default the first)' }
+              name: { type: string, description: 'datapackage: the package name' }
+              resource: { type: string, description: 'datapackage: the resource (default the first)' }
+              resource_name: { type: string, description: 'tables: the resource this source becomes' }
+              columns:
+                description: A list of column names to keep, or a map of column name to a dotted path.
+                oneOf:
+                  - { type: array, items: { type: string } }
+                  - { type: object, additionalProperties: { type: string } }
+        combine:
+          type: object
+          properties:
+            mode: { type: string, enum: [tables, union, join] }
+            key:
+              type: object
+              properties:
+                left: { type: string, example: A.kunta }
+                right:
+                  oneOf:
+                    - { type: string, example: B.kunta }
+                    - { type: array, items: { type: string } }
+        columns:
+          type: array
+          items:
+            type: object
+            required: [source, from]
+            properties:
+              source: { type: string }
+              from: { type: string }
+              name: { type: string }
+              type: { type: string, enum: [string, integer, number, boolean, date, datetime, any] }
+              description: { type: string }
+              include: { type: boolean, description: 'false leaves the column out; true includes a column the data map marks personal' }
+        filter:
+          type: [object, 'null']
+          properties:
+            column: { type: string }
+            op: { type: string, enum: [eq, ne, gt, gte, lt, lte, contains, in] }
+            value: {}
+        schedule:
+          type: [object, 'null']
+          properties:
+            cron: { type: string, example: '0 6 * * 1' }
+            timezone: { type: string, example: Europe/Helsinki }
+        visibility: { type: string, description: 'private (the default), members, organism:<id> or public' }
+        confirm_personal_public: { type: boolean }
+
     Schedule:
       type: object
       description: A recurring schedule owned by the server clock (reuses ScheduledJobRecord).
       properties:
         id: { type: string }
-        type: { type: string, enum: [extension, core, ai, agent_task, eco-capability, connections-publish, refinery] }
+        type: { type: string, enum: [extension, core, ai, agent_task, eco-capability, connections-publish, refinery, dataproduct] }
         cron: { type: string }
         enabled: { type: boolean }
         timezone: { type: string, description: IANA timezone }
@@ -6649,7 +6749,7 @@ components:
       type: object
       required: [kind, cron, display_name]
       properties:
-        kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish, refinery] }
+        kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish, refinery, dataproduct] }
         cron: { type: string, example: '0 7 * * *' }
         display_name: { type: string }
         timezone: { type: string, example: Europe/Helsinki }
@@ -6684,6 +6784,11 @@ components:
             `<prefix>.config` on each fire. The creator needs connections:read-through, ai:use,
             organism:rows and memory:write; the schedule runs as its creator, so an agent's
             refinery schedule reads only a mailbox that agent connected.
+
+            For `dataproduct` it is `{ name }`: one build of the data product definition
+            `dataproducts.<name>` on each fire (services/dataproduct/). The creator needs storage:write
+            and memory:write; the build reads every source as the creator. PUT /v1/dataproducts/{name}
+            with `schedule` makes and removes this schedule; deleting the definition removes it.
 
             For `connections-publish` it is the post itself:
             `{ connection_id, caption?, storage_key?, params?, ref? }`. The connection must be one the
@@ -18511,7 +18616,10 @@ paths:
                 ({ does, into }): the app invites people into organisms and an invitation can create
                 an account. An app whose declared scopes cover organism:invite and whose map has
                 neither invites nor the machinery word invites-people has the finding
-                DATAMAP_INVITES_UNSTATED.
+                DATAMAP_INVITES_UNSTATED. A held row may carry `publishable: true`: the family may be
+                published as a data package, and a data product's app source reads only the families
+                marked so; a `publishable` that is not a boolean is the finding
+                DATAMAP_ROW_BAD_PUBLISHABLE.
       responses:
         '200':
           description: Stored. `hints` says what is still unfinished; it never refuses.
@@ -23066,7 +23174,11 @@ paths:
         detection, labelling, code_of_practice, posture }`.
 
         `ai_processing_region` is where the node's own AI key has prompts processed: `{ mode,
-        mode_limits?, node_key, region?, host?, fallback?, regions_in_use?, note }`. `mode` is the AI
+        mode_limits?, node_key, default_model?, picture_model?, eu_only_model?, region?, host?,
+        fallback?, regions_in_use?, note }`. `default_model` is the model the chat and the agents use
+        when nobody chose one (the node's chat, then execution, then reasoning default);
+        `picture_model` the node's vision default when it is another model;
+        `eu_only_model` is the model eu-only uses in its place when the EU does not offer it. `mode` is the AI
         region choice made when the node was bought (`ai.region_mode`: `eu`, `eu-only`, `own`, or null
         when none was made) and `mode_limits` what it switches off; the region fields appear when the
         node holds its own key.
@@ -23160,7 +23272,22 @@ paths:
         labelling, node-wide AI usage, consent grants - to the use-case register the operator wrote,
         and reports what is in one and not the other.
 
-        Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail }`.
+        Response `data`: `{ scope, not_covered, derived, register, gaps, unlabelled_detail,
+        data_intermediation }`.
+
+        `data_intermediation` is section 12 (Data Governance Act 2022/868): `{ section, mode,
+        mode_code, mode_text, notification, providers, findings, totals, art12, regulation, edit,
+        note }`. `mode` is AIMEAT_DATA_INTERMEDIATION (report, none, node, owners). `findings` holds
+        `{ id, kind, count, items, reason, code, regulation, source, review?, proposal?, owner? }`:
+        data offerings listed to everyone, contracts with outside buyers, organisms anyone may join
+        that carry data packages (each with the proposal to require approval, a PUT the organism's
+        creator or admin makes), apps with open party registration and commerce, priced named
+        shares, person parties whose contact the account holds, a missing notification record, and
+        the node's own AI reading exchanged data. `source` is `proposed` until a review in the
+        compliance document `intermediation` names the finding's id. `art12` holds the Article 12
+        rows (a, c, d, h, i, k, n, o), each `{ point, code, title, status: evidence | check |
+        missing, evidence, text }`. The owner's slice (GET /v1/compliance/report/mine) holds only that
+        account's own findings.
 
         `gaps` is the part worth reading. Each entry is one of: a model used on this node that no
         use case mentions; a use case with unanswered questions and therefore no risk class; public
@@ -23683,7 +23810,14 @@ paths:
       - name: kind
         in: path
         required: true
-        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks] }
+        schema: { type: string, enum: [registers, processors, requests, breaches, dpias, frameworks, intermediation] }
+        description: >-
+          `intermediation` (node and organism) holds the data intermediation notification record (an
+          item `{ id, type: notification, legalName, businessId, notifiedAt?, authorityRef?,
+          euRegisterUrl?, confirmedAt?, scope }`, Data Governance Act 2022/868 art. 11) and a
+          person's review of each data intermediation finding of the compliance report (an item
+          `{ id: <the finding's id>, type: review, decision: accepted | dismissed, note?, reviewedAt? }`).
+          A finding without a review reads source `proposed`.
       - name: scope
         in: query
         required: false
@@ -25756,6 +25890,11 @@ paths:
         is read as a free offering with `basePrice` as its pacing, and responses keep those two fields
         as deprecated mirrors beside a `deprecated` object that names them. From 4.0.0 they are
         refused on write (400 MORSEL_PRICE_REMOVED) and not sent.
+        An `ext-action` offering delivers data, and every listing reaches everyone: when
+        AIMEAT_DATA_INTERMEDIATION is `none`, or `owners` and the provider manages no organism that
+        keeps a data intermediation notification record, it is refused 403
+        DATA_INTERMEDIATION_NOT_OFFERED before anything is written (`details.setting` names the
+        setting). A listing that already exists stays, and the compliance report lists it.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
@@ -25807,6 +25946,92 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
+  /v1/exchange/offerings/{id}/buy:
+    post:
+      operationId: exchangePartyBuy
+      summary: A buyer with no AIMEAT account buys a data package (outside party)
+      description: |
+        Opens a purchase of a `datapackage` offering for a buyer that has no account here (plan
+        doc-mvwxcas3dom3, D5.4). The price comes from the listing: `months` (1 to 12) of a `per_month`
+        offering, or `reads` (1 to 1000000) of a `per_read` one, paid in advance. `handler` is
+        `com.stripe.checkout` (the answer's `pay.card_page_url` is the provider's Stripe card page) or,
+        on a node that runs it, the test double `test.money`. The purchase waits an hour; complete it at
+        `pay.complete_url`. A party buying again sends its own credential (HTTP Basic `<owner>/<party>`
+        and its key, or a party token) and no `party` block: the purchase tops up its contract and the
+        same key keeps working. A signed-in account is told to accept the offering instead (409
+        USE_YOUR_ACCOUNT).
+      tags: [Commerce]
+      security: [{}, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                party:
+                  type: object
+                  properties:
+                    display_name: { type: string }
+                    kind: { type: string, enum: [person, program], default: person }
+                    contact: { type: string, description: 'An e-mail address; required for a person.' }
+                    name: { type: string, description: 'The party name; default a slug of display_name with a random tail.' }
+                months: { type: integer, minimum: 1, maximum: 12 }
+                reads: { type: integer, minimum: 1, maximum: 1000000 }
+                handler: { type: string, enum: [com.stripe.checkout, test.money] }
+                return_url: { type: string, description: 'https address the card page returns the buyer to.' }
+      responses:
+        '201': { description: '`{ purchase, pay }`: the open purchase and how to pay it (`complete_url`, and `card_page_url` for the card page).' }
+        '400': { description: INVALID_INPUT }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+        '403': { description: FORBIDDEN. The party credential belongs to another provider }
+        '404': { description: No such listed offering }
+        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price) or USE_YOUR_ACCOUNT' }
+        '422': { description: UNKNOWN_PAYMENT_HANDLER }
+        '429': { description: TOO_MANY_PURCHASES }
+  /v1/exchange/purchases/{id}/complete:
+    post:
+      operationId: exchangePartyPurchaseComplete
+      summary: Pay a purchase and receive the key, the contract and the connection file
+      description: |
+        Collects the payment (`instrument`: the Stripe session id the card page returned, or any text
+        with test.money) and only then delivers: the outside party of the provider with its key (new
+        buyers), the prepaid contract, the named share bound to it, and the connection file (OData
+        endpoint, CSV addresses, HTTP Basic user and the key, the token endpoint). The key is in this
+        answer only. Each data read is metered against the contract (402 PREPAID_ENDED when it is
+        used up); the read log and the per-party rate limit are the named share's. A delivery that
+        fails after the payment refunds it and reopens the purchase.
+      tags: [Commerce]
+      security: [{}]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                handler: { type: string }
+                instrument: { type: string }
+      responses:
+        '200': { description: '`{ purchase, party, share, contract, connection, key_note?, say }`' }
+        '402': { description: The payment did not go through }
+        '404': { description: No such purchase }
+        '409': { description: 'ALREADY_COMPLETED or PURCHASE_BUSY' }
+        '410': { description: PURCHASE_EXPIRED }
+        '422': { description: 'HANDLER_MISMATCH or UNKNOWN_PAYMENT_HANDLER' }
+  /v1/exchange/purchases/{id}:
+    get:
+      operationId: exchangePartyPurchase
+      summary: The state of one purchase by an outside party
+      tags: [Commerce]
+      security: [{}]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ purchase }`: status open, completing or completed, the amount and the model.' }
+        '404': { description: No such purchase }
   /v1/exchange/offerings/{id}:
     get:
       operationId: exchangeOfferingDetail
@@ -27804,7 +28029,7 @@ paths:
         published or last set at: an earlier private version of a package made public later answers
         404 to anyone who does not read as the owner.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27820,7 +28045,19 @@ paths:
             for a public package only. The same readers as the descriptor read.
       responses:
         '200':
-          description: The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS product sheet (`odps_url`), of its schema.org description (`schema_org_url`), and the latest pointer when unpinned; with format=schemaorg the schema.org Dataset JSON-LD instead
+          description: >-
+            The descriptor, its permanent URL (`descriptor_url`), the address of this version's ODPS
+            product sheet (`odps_url`), of its schema.org description (`schema_org_url`), the latest
+            pointer when unpinned, and `freshness`: the package's state against its producer's promise,
+            computed when it is read. `state` is fresh (the last successful run is within one promised
+            interval plus grace), late (within three), stale (past three, or a workflow or extension
+            producer with no schedule silent for 30 days) or unscheduled (nothing is promised; never
+            called fresh). `promise` names the cron (a data product's schedule wins over the producer's)
+            and its interval, `last_success_at` the last run that succeeded (a new version or the same
+            bytes again), `due_at` and `stale_at` the next deadlines, `last_error` a newer failed run,
+            and for a data product built from other packages `sources` with each one's state and
+            `limited_by` the least fresh one, which the product's state follows. With format=schemaorg
+            the schema.org Dataset JSON-LD instead.
         '403':
           description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
         '404':
@@ -27852,7 +28089,7 @@ paths:
         - { name: purge, in: query, required: false, schema: { type: boolean, default: false }, description: 'true also deletes every stored file of the package and its pointer.' }
       responses:
         '200':
-          description: '`{ package_id, name, status: "withdrawn", withdrawn_at, purged, already_withdrawn, files_deleted, catalogue_removed }`'
+          description: '`{ package_id, name, status: "withdrawn", withdrawn_at, purged, already_withdrawn, files_deleted, catalogue_removed, shares_ended }`. Its named shares to outside parties end with it (status revoked, ended_reason package-withdrawn).'
         '400':
           description: INVALID_INPUT. The name is not a package name
         '401':
@@ -27861,6 +28098,73 @@ paths:
           description: FORBIDDEN for another account; SCOPE_DENIED for a principal of the owner without storage:write
         '404':
           description: No such package
+
+  /v1/datapackages/{owner}/{name}/exchange:
+    put:
+      operationId: setDataPackageExchange
+      summary: Sell a data package on EXCHANGE, change its terms, or take it off
+      description: |
+        Stores the package's sale terms on its pointer and projects its EXCHANGE listing from them
+        before it answers (kind `datapackage`, coordinate `datapkg:{owner}/{name}` + `read`, plan
+        doc-mvwxcas3dom3, D5.1, D5.2). `model` is `per_month` (a 30-day subscription of reads, the
+        default) or `per_read` (each OData entity set, row window or CSV request is charged).
+        `prices_money` are the prices in 6-decimal micro-units; `toll_morsels` is pacing per read for a
+        buyer with an account, never a price. `usage_terms` are required. `exchange: false` delists the
+        package; contracts already signed keep their price and the versions they cover.
+
+        The package's Table Schemas are its interface: each distinct set of schemas is an interface
+        version, the listing names the current one, and a contract reads the stored versions whose
+        schemas are the interface it was signed on (its pinned version range). A new version with
+        changed schemas updates the same listing to the next interface; an earlier contract stays on
+        the versions of its own.
+
+        A reader the package's audience already admits reads it free; the contract admits a buyer the
+        audience does not. The owner in person, or the owner's principal with `exchange:write`. A new
+        listing of data asks the node's data intermediation setting first: under `none`, or `owners`
+        without a declared provider, it is 403 DATA_INTERMEDIATION_NOT_OFFERED before anything is
+        written. MCP: aimeat_datapackage_sell.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                exchange: { type: boolean, default: true }
+                model: { type: string, enum: [per_month, per_read], default: per_month }
+                prices_money:
+                  type: array
+                  maxItems: 2
+                  items: { type: object, properties: { amount: { type: integer, minimum: 1 }, currency: { type: string, enum: [EUR, USD] } }, required: [amount, currency] }
+                toll_morsels: { type: integer, minimum: 0, maximum: 100 }
+                usage_terms:
+                  type: object
+                  properties: { derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } }
+                reads_per_minute: { type: integer, minimum: 1, maximum: 6000 }
+                delivers_data: { type: boolean, description: 'Default true: a package delivers data.' }
+                title: { type: string }
+                description: { type: string }
+                tags: { type: array, items: { type: string } }
+                odps: { type: object, additionalProperties: true }
+                provenance: { type: object, additionalProperties: true }
+      responses:
+        '200':
+          description: '`{ exchange, listing }`: the stored terms and what the projection did (`listing.listed`, `skipped` with the reason, `delisted`, `warnings`).'
+        '400':
+          description: INVALID_INPUT, USAGE_TERMS_REQUIRED, NOT_PRICED, INVALID_ODPS or INVALID_PROVENANCE
+        '401':
+          description: AUTH_REQUIRED
+        '403':
+          description: FORBIDDEN (another account's package), SCOPE_DENIED (no exchange:write) or DATA_INTERMEDIATION_NOT_OFFERED
+        '404':
+          description: No such package
+        '409':
+          description: PACKAGE_WITHDRAWN
 
   /v1/datapackages/{owner}/{name}/odps:
     get:
@@ -27879,7 +28183,7 @@ paths:
         version published before 2026-11-01 also has an `odps.yaml` stored beside its descriptor; its
         /v1/pub address redirects here.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27915,8 +28219,18 @@ paths:
         nobody can see is not a history a consumer can rely on. A non-public package answers as the
         descriptor does. The list is the caller's: an earlier version whose own audience does not
         admit the caller (an earlier private version of a package made public later) is not listed.
+
+        The owner in person, or the owner's agent, app grant or ecosystem app holding `storage:read`,
+        also reads which versions are in use: each version carries `in_use` with
+        `pinned_by_shares` (the live named shares to outside parties that pin it), `party_reads_30d`
+        and `last_party_read_at` (served reads by outside parties in the last 30 days, from the party
+        read log; a read that named no version counts on the version that was newest then) and
+        `removed_next` (the next publish removes it under the retention policy of the current
+        version). The answer adds `retention_policy` (`{ keep, unit }` or null) and
+        `read_window_days`. A version a live named share pins is never removed by the retention
+        policy. Anyone else gets the list without these fields.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27943,7 +28257,7 @@ paths:
         `GET /v1/pub` runs on the same CSV: a resource whose label hides it from the caller (an agent's
         clearance, a label that hides content from AI) answers 404, as `/v1/pub` does.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27952,15 +28266,213 @@ paths:
         - { name: offset, in: query, required: false, schema: { type: integer, default: 0 } }
         - { name: limit, in: query, required: false, schema: { type: integer, default: 500, maximum: 5000 } }
         - { name: select, in: query, required: false, schema: { type: string }, description: 'Comma-separated field names.' }
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [csv] }
+          description: 'csv answers the whole resource as text/csv: a stable address that follows the newest version (or the version a share pins), for a spreadsheet.'
+        - name: key
+          in: query
+          required: false
+          schema: { type: string }
+          description: 'With format=csv only: an outside party''s key in the address, for a client that cannot send headers (Google Sheets). Accepted only when the share allows it (allow_url_key); otherwise 403 URL_KEY_NOT_ALLOWED.'
       responses:
         '200':
-          description: rows, total, and the Table Schema of what was returned
+          description: rows, total, and the Table Schema of what was returned; with format=csv the whole resource as text/csv
+        '401':
+          description: INVALID_PARTY_CREDENTIAL. A party credential that names no live party and key
         '403':
-          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private. For an outside party (PartyBasicAuth, PartyTokenAuth, or the key in the address) PARTY_STOPPED, NOT_SHARED, SHARE_ENDED, SHARE_EXPIRED, VERSION_NOT_SHARED, URL_KEY_NOT_ALLOWED or TERMS_NOT_ACCEPTED (with details.accept_url)
+        '429':
+          description: RATE_LIMITED. The party made more reads this minute than AIMEAT_PARTY_READS_PER_MINUTE allows
         '404':
           description: No such package, version or resource
         '410':
           description: GONE. The owner withdrew the package
+
+  # ── Data products ──────────────────────────────────────────
+  # A definition that builds a data package version from material the owner holds (plan
+  # doc-mvwxcas3dom3, D9; services/dataproduct/). MCP: aimeat_dataproduct.
+  /v1/dataproducts:
+    get:
+      operationId: listDataProducts
+      summary: The caller's data product definitions
+      description: |
+        Every data product of the caller's account, newest first: its name (also the package name),
+        audience, sources, combine mode, schedule and the last run. The owner in person, or the
+        owner's agent, app grant or ecosystem app with `storage:read`.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: '`{ products: [{ name, title, visibility, sources: [{ id, kind }], combine, schedule, last_run, updated_at }], total }`'
+        '401':
+          description: AUTH_REQUIRED. No credential, or the shared anonymous principal
+        '403':
+          description: SCOPE_DENIED without storage:read; FORBIDDEN for a session of another node
+  /v1/dataproducts/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,62}[a-z0-9]$' }, description: 'The product, which is also the data package name.' }
+    get:
+      operationId: getDataProduct
+      summary: One data product definition
+      description: |
+        The definition (the memory record `dataproducts.{name}` of the caller's account), its schedule
+        and the package it builds (`package`: id, newest version, audience, last error). A name the
+        caller's account does not hold answers 404, so one account never reads another's.
+        Needs `storage:read` from a principal other than the owner in person.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: '`{ definition, schedule: { id, cron, timezone, enabled, next_run_at } | null, package | null }`'
+        '403':
+          description: SCOPE_DENIED without storage:read
+        '404':
+          description: NOT_FOUND. The caller's account has no such product
+    put:
+      operationId: defineDataProduct
+      summary: Define or replace a data product
+      description: |
+        Stores the definition after reading every source as the caller, so a source the caller may
+        not read, a column the mapping names and the source lacks, and an audience wider than a source
+        allows are refused here and not at the first scheduled run. Nothing is published: run it with
+        POST /v1/dataproducts/{name}/run, or look first with .../preview.
+
+        Sources (1 to 10), each `{ id, kind, ... }`:
+        - `records { organism_id, ws, space }`: each published record of a workspace records space is
+          a row; the space's locked JSON Schema gives the types. Needs `organism:read` and the
+          workspace read aimeat_workspace_read makes. The product's audience is at most the organism.
+        - `app { app, key_prefix, rows_at? }`: the caller's own app's records under the prefix, only
+          those in a family its data map marks `publishable: true`. Needs `memory:read`.
+        - `memory { key, rows_at?, owner? }`: the array at `rows_at` of one record; another account's
+          record only when its visibility admits the caller. Needs `memory:read`; a private record of
+          the owner or a sibling agent needs `memory:read-as-owner`.
+        - `extension { ext, action, input?, rows_at?, instance_id? }`: the owner's own active
+          extension's action, run by the node. Needs `ext:invoke`.
+        - `file { key, sheet? }`: a stored CSV or XLSX. Needs `storage:read`.
+        - `datapackage { name, owner?, resource? }`: another data package the caller may read; its
+          version goes into the new version's lineage.
+        A source may name `columns`: a list to keep, or a map of column name to a dotted path.
+
+        `combine.mode`: `tables` (each source its own resource), `union` (rows appended; a column
+        mismatch after the mapping is 400 UNION_COLUMNS_MISMATCH), `join` with `key { left, right }`
+        (a left join of the first source; unmatched rows kept with nulls; a right key matching
+        several rows is 400 JOIN_DUPLICATE_KEY). `columns` maps the output, `filter` keeps rows,
+        `schedule { cron, timezone? }` makes one schedule of kind `dataproduct` (null removes it).
+
+        `visibility` (private by default, members, organism:<id>, public) may not be wider than the
+        narrowest source: 409 AUDIENCE_WIDER_THAN_SOURCE. A column the data map marks personal is
+        left out unless `columns` includes it, and then a public product is 409 PERSONAL_DATA_PUBLIC
+        until the body says `confirm_personal_public: true`.
+
+        The owner in person, or the owner's agent, app grant or ecosystem app with `storage:write` and
+        `memory:write`, the words a data package publish asks.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DataProductDefinitionInput' }
+      responses:
+        '200':
+          description: 'Replaced. `{ definition, created: false, schedule }`'
+        '201':
+          description: 'Defined. `{ definition, created: true, schedule }`'
+        '400':
+          description: INVALID_INPUT, UNKNOWN_COLUMN, NOT_ROWS, NOT_PUBLISHABLE, UNION_COLUMNS_MISMATCH or JOIN_DUPLICATE_KEY; `details.source` names the source
+        '401':
+          description: AUTH_REQUIRED
+        '403':
+          description: SCOPE_DENIED (a word the definition or a source needs), FORBIDDEN (a source the caller may not read), CLASSIFIED (a record whose classification may not leave)
+        '404':
+          description: NOT_FOUND or NO_DATA_MAP. A source names nothing the caller can reach
+        '409':
+          description: AUDIENCE_WIDER_THAN_SOURCE or PERSONAL_DATA_PUBLIC
+    delete:
+      operationId: deleteDataProduct
+      summary: Delete a data product and its schedules
+      description: |
+        Deletes the definition and every schedule of kind `dataproduct` that builds it, whoever made
+        the schedule. The data package and its versions stay; withdraw them with DELETE
+        /v1/datapackages/{owner}/{name}. Needs `storage:write` and `memory:write`.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200':
+          description: '`{ name, deleted: true, schedules_removed: [ids], package_kept }`'
+        '403':
+          description: SCOPE_DENIED
+        '404':
+          description: NOT_FOUND
+  /v1/dataproducts/{name}/preview:
+    post:
+      operationId: previewDataProduct
+      summary: Build a data product without publishing
+      description: |
+        Runs the build and stores nothing: per resource the first 20 rows, the row count and the
+        Table Schema; the validation result (the check POST /v1/datapackages/validate makes); the
+        transformations; each source's rows and the audience it allows; and, when nothing refuses,
+        the content hash, whether those bytes are already published (`unchanged`), and the ODPS sheet
+        the version would get (`odps`, `odps_yaml`). `publish_check` says whether a run would publish,
+        and the code it would refuse with. A body carrying `sources` previews that draft without
+        storing it; an empty body previews the stored definition. Needs `storage:read`, and each
+        source's own word.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DataProductDefinitionInput' }
+      responses:
+        '200':
+          description: '`{ name, audience, allowed_audience, sources, resources: [{ name, row_count, schema, rows }], transformations, validation: { ok, issues }, publish_check: { ok, code?, message? }, published: false, content_hash?, unchanged?, odps?, odps_yaml? }`'
+        '400':
+          description: A source or the combine was refused; `details.source` names the source
+        '403':
+          description: SCOPE_DENIED or FORBIDDEN
+        '404':
+          description: NOT_FOUND
+  /v1/dataproducts/{name}/run:
+    post:
+      operationId: runDataProduct
+      summary: Build and publish one version of a data product
+      description: |
+        Reads every source as the caller, combines, and publishes one version through the data
+        package publish (POST /v1/datapackages's code path, its publish gate included): versions, the
+        content hash, `supersedes`, the audience, provenance (`aimeat.sources`, `transformations`,
+        `lineage`, `sourcesFetchedAt`) and the catalogue entry. The same rows give no new version
+        (200 `unchanged: true`). A source that fails, or a refusal, writes no version: the package
+        stays on its previous one, the definition's `lastRun` names the error and the source, and the
+        package pointer records the failure when the package exists. An agent without publish:public
+        publishing to public gets 202 with `publish_request`. Needs `storage:write` and `memory:write`.
+      tags: [Data Packages]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: 'Unchanged: the same bytes are the newest version already'
+        '201':
+          description: '`{ package_id, content_hash, descriptor_url, odps_url, unchanged, rows, resources, sources, last_run }`'
+        '202':
+          description: Published at the audience the package had; making it public waits for the owner (`publish_request`)
+        '400':
+          description: A source or the combine was refused; `details.source` names the source
+        '403':
+          description: SCOPE_DENIED, FORBIDDEN or CLASSIFIED
+        '404':
+          description: NOT_FOUND
+        '409':
+          description: AUDIENCE_WIDER_THAN_SOURCE or PERSONAL_DATA_PUBLIC
+        '422':
+          description: QUALITY_GATE. A row fails its schema
+        '502':
+          description: SOURCE_FAILED. An extension source's action failed
 
   # ── OData v4 feed ──────────────────────────────────────────
   # The surface Excel, Power BI and Tableau connect to natively and then refresh by themselves. A
@@ -27989,8 +28501,15 @@ paths:
         Paste this URL into Excel's "From OData Feed" or Power BI's OData connector and the rest is
         automatic — and the workbook refreshes itself afterwards, which is the whole reason this
         exists next to the CSV address.
+
+        AN OUTSIDE PARTY. A package shared by name with a party (services/parties/) is read here with
+        HTTP Basic, user `<owner>/<party name>` and the party key as the password, which is what the
+        connectors ask for, or with a party token. A wrong key answers 401 with
+        `WWW-Authenticate: Basic realm="aimeat"` so the client asks for it again; a stopped party, an
+        ended or expired share, unaccepted terms or another version than the share pins answer 403 with
+        a code. The same applies to `$metadata` and the entity sets.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28002,8 +28521,12 @@ paths:
       responses:
         '200':
           description: '{ "@odata.context": …, "value": [ { name, kind, url } ] }'
+        '401':
+          description: 'INVALID_PARTY_CREDENTIAL. An outside party''s key or token is wrong; the answer carries `WWW-Authenticate: Basic realm="aimeat"` (OData error shape)'
         '403':
-          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
+          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape). An outside party gets PARTY_STOPPED, NOT_SHARED, SHARE_ENDED, SHARE_EXPIRED, VERSION_NOT_SHARED or TERMS_NOT_ACCEPTED
+        '429':
+          description: RATE_LIMITED. The party made more reads this minute than AIMEAT_PARTY_READS_PER_MINUTE allows
         '404':
           description: No such package (OData error shape, not the node envelope)
         '410':
@@ -28026,7 +28549,7 @@ paths:
         precisely because the version is immutable. Every other property is nullable: a Table Schema's
         `primaryKey` is the only statement anybody made about required-ness.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28077,7 +28600,7 @@ paths:
         `$metadata` answer the same way. The rows pass the classification reader `GET /v1/pub` runs
         on the same CSV: a resource whose label hides it from the caller answers 404.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28102,6 +28625,329 @@ paths:
           description: The owner withdrew the package (OData error shape, code Gone)
         '501':
           description: A query construct this feed does not implement — refused rather than ignored
+
+  # ── Outside parties and named shares ───────────────────────
+  # A person or a program with no account here, reading the data packages its owner shared with it by
+  # name (plan doc-mvwxcas3dom3, D2, D3; services/parties/). MCP: aimeat_party, aimeat_consent_grant.
+  /v1/parties:
+    get:
+      operationId: listParties
+      summary: The caller's outside parties
+      description: |
+        Every party of the caller's account with its keys (ids and dates, never the key), its
+        status, the wrong keys presented, and each of its shares with `last_read_at` and `reads_7d`.
+        The owner in person, or a principal of the owner holding `party:manage` (no wildcard carries it).
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ parties: [ { uid, name, party_ref, display_name, kind, status, keys, failed_attempts, last_seen_at, shares } ], total }`' }
+        '403': { description: SCOPE_DENIED (party:manage) or FORBIDDEN (a visitor) }
+    post:
+      operationId: createParty
+      summary: Make an outside party
+      description: |
+        `{ name, kind?: program | person | dataspace, display_name?, contact?, with_key?: true }`. The
+        party's identity is `party:<owner>/<name>@<node>`, the recipient a share names. Its first key
+        is in this answer only (`key`, `key_id`); the node keeps its SHA-256. A person's contact is
+        personal data the owner holds. Names are 1 to 40 of a-z, 0-9 and dashes, unique per owner;
+        `me`, `token` and `share` are taken by the endpoints.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,39}$' }
+                kind: { type: string, enum: [program, person, dataspace] }
+                display_name: { type: string, maxLength: 120 }
+                contact: { type: string, maxLength: 320 }
+                with_key: { type: boolean }
+      responses:
+        '201': { description: '`{ party, key, key_id, key_note }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '409': { description: PARTY_EXISTS }
+        '413': { description: QUOTA_EXCEEDED. At most 100 parties per account }
+  /v1/parties/share:
+    post:
+      operationId: shareWithParty
+      summary: Share one data package with a party, in one call
+      description: |
+        `{ name, package, purpose, days? | expires?, kind?, display_name?, contact?, pinned_version?,
+        allow_url_key?, terms_required?, new_key? }`. Makes the party when it does not exist (with a
+        key), makes a key when it has none or `new_key` is true, and grants the share through
+        POST /v1/consent's code path (its checks, audit entry and account event). Answers the
+        party, the share, the connection file (a Delta Sharing style profile:
+        `shareCredentialsVersion`, `endpoint` (the OData service), `partyId`, `key` when one was made,
+        `expirationTime`, `package`, `resources: [{ name, csvUrl, odataEntitySet }]`) and `say`, the
+        one sentence to tell the owner: what the party gets, until when, that ending the share stops
+        the next read and that copies already taken cannot be called back. A party made for a share
+        that is then refused is removed again.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, package, purpose]
+              properties:
+                name: { type: string }
+                package: { type: string }
+                purpose: { type: string }
+                days: { type: number }
+                expires: { type: string, format: date-time }
+                kind: { type: string, enum: [program, person, dataspace] }
+                display_name: { type: string }
+                contact: { type: string }
+                pinned_version: { type: string }
+                allow_url_key: { type: boolean }
+                terms_required: { type: boolean }
+                new_key: { type: boolean }
+      responses:
+        '201': { description: '`{ party, party_created, share, connection, key_note, say }`' }
+        '400': { description: INVALID_INPUT or SHARE_TOO_LONG }
+        '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
+        '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
+        '409': { description: PARTY_STOPPED or PACKAGE_WITHDRAWN }
+  /v1/parties/token:
+    post:
+      operationId: partyToken
+      summary: A party's key for an access token (OAuth 2.0 client credentials)
+      description: |
+        `grant_type=client_credentials`, `client_id=<owner>/<party name>`, `client_secret=<key>`, as a
+        form, JSON, or HTTP Basic with the same pair. Answers `{ access_token, token_type: Bearer,
+        expires_in, party_ref }`: a purpose token (`aimeat_party_…`, about 15 minutes) that is never a
+        node session. It reads the data package endpoints, OData, the package files and /v1/parties/me;
+        any other endpoint answers 401 for it. Errors are the OAuth shape `{ error, error_description }`.
+      tags: [Parties]
+      security: [{}, { PartyBasicAuth: [] }]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string }
+          application/json:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string }
+      responses:
+        '200': { description: '`{ access_token, token_type, expires_in, party_ref }`' }
+        '400': { description: 'unsupported_grant_type, or unauthorized_client for a stopped party' }
+        '401': { description: 'invalid_client, with WWW-Authenticate: Basic realm="aimeat"' }
+        '429': { description: slow_down. Too many requests for this party this minute }
+  /v1/parties/me:
+    get:
+      operationId: partyMe
+      summary: The party and what was shared with it
+      description: |
+        For the party itself, with HTTP Basic or a party token: its name and kind, and every share it
+        holds, live ones first, with the package's title, the purpose, the end, whether the terms are
+        accepted, and the address of the share's connection file.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      responses:
+        '200': { description: '`{ party, shares, total, note }`' }
+        '401': { description: AUTH_REQUIRED or INVALID_PARTY_CREDENTIAL }
+        '403': { description: PARTY_STOPPED }
+  /v1/parties/me/keys/rotate:
+    post:
+      operationId: partyRotateKey
+      summary: A new key for the party
+      description: The new key is in this answer only. The key the request was made with stops working at once, and so do the tokens made with it.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      responses:
+        '200': { description: '`{ key, key_id, retired_key_id, key_note }`' }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+        '403': { description: PARTY_STOPPED }
+  /v1/parties/me/shares/{id}/connection:
+    get:
+      operationId: partyShareConnection
+      summary: A share's connection file
+      description: The connection file of one live share of this party, without the key.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ connection }`' }
+        '403': { description: SHARE_ENDED or PARTY_STOPPED }
+        '404': { description: NOT_FOUND. No share with this id belongs to this party }
+  /v1/parties/me/shares/{id}/accept:
+    post:
+      operationId: partyAcceptShareTerms
+      summary: Accept a share's terms
+      description: |
+        The purpose and the licence of the shared data. Until a share that requires them is
+        accepted, its reads answer 403 TERMS_NOT_ACCEPTED with this address. The time is written on
+        the share.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ share, accepted }` or `{ share, already_accepted }`' }
+        '403': { description: SHARE_ENDED or PARTY_STOPPED }
+        '404': { description: NOT_FOUND }
+  /v1/parties/me/shares/{id}/decline:
+    post:
+      operationId: partyDeclineShare
+      summary: End a share the party no longer needs
+      description: The share ends at once (status revoked, ended_reason declined), and the owner's list says the party declined it.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ share, declined }` or `{ share, already_ended }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getParty
+      summary: One party, its keys and its shares
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ party }` with `shares` (each with last_read_at and reads_7d)' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+    patch:
+      operationId: updateParty
+      summary: Change a party's display name, contact or kind
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                contact: { type: [string, 'null'] }
+                kind: { type: string, enum: [program, person, dataspace] }
+      responses:
+        '200': { description: '`{ party }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+    delete:
+      operationId: deleteParty
+      summary: Delete a party
+      description: Its keys and tokens end at once (the next request is 401), then every share it held (status revoked, ended_reason party-deleted). A party made later under the same name has a new uid and none of it.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ deleted, name, uid, shares_ended }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/keys:
+    post:
+      operationId: createPartyKey
+      summary: A new key for the party
+      description: Shown in this answer only. A party holds at most 5 keys.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: '`{ name, key, key_id, key_note }`' }
+        '404': { description: NOT_FOUND }
+        '409': { description: TOO_MANY_KEYS }
+  /v1/parties/{name}/keys/{keyId}:
+    delete:
+      operationId: deletePartyKey
+      summary: Delete one key
+      description: Every token made with it ends on its next request.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: keyId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ name, key_id, deleted }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/stop:
+    post:
+      operationId: stopParty
+      summary: Stop a party
+      description: A stopped party reads nothing (403 PARTY_STOPPED) until it is resumed. Its keys and shares stay.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/resume:
+    post:
+      operationId: resumeParty
+      summary: Resume a stopped party
+      description: A party the operator stopped stays stopped (409 STOPPED_BY_OPERATOR) until the operator resumes it.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party }`' }
+        '404': { description: NOT_FOUND }
+        '409': { description: STOPPED_BY_OPERATOR }
+  /v1/parties/{name}/reads:
+    get:
+      operationId: partyReads
+      summary: What the party read, and what was refused
+      description: |
+        The party's entries of the owner's read log (`party-reads.<yyyy-mm>`, this month and last),
+        newest first: `{ at, share, party, uid, what, rows?, verdict: served | refused, code? }`. A
+        month keeps at most 4000 entries; past that they are counted in `not_kept_this_period`.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 2000 } }
+      responses:
+        '200': { description: '`{ name, uid, reads, total, not_kept_this_period }`' }
+        '404': { description: NOT_FOUND }
+  /v1/admin/parties/{owner}/{name}/stop:
+    post:
+      operationId: adminStopParty
+      summary: Stop any account's party (operator)
+      description: For abuse (regulation (EU) 2022/868 art. 12 (g)). The owner cannot resume it; the operator does. `{ reason? }` is kept on the party. The Security overview counts the parties, the stopped ones and the refused reads.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ owner, party }`' }
+        '403': { description: Not the operator (operator:admin) }
+        '404': { description: NOT_FOUND }
+  /v1/admin/parties/{owner}/{name}/resume:
+    post:
+      operationId: adminResumeParty
+      summary: Resume a party (operator)
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ owner, party }`' }
+        '403': { description: Not the operator (operator:admin) }
+        '404': { description: NOT_FOUND }
 
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
@@ -37988,6 +38834,256 @@ paths:
         '403': { description: Lifecycle moves belong to the operator (retiring your own part excepted) }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/apps/{owner}/{filename}/parties/signup:
+    post:
+      operationId: appPartySignup
+      summary: A person without an account registers to an app
+      description: |
+        Plan doc-mvwxcas3dom3, D4.2. Refused 403 PARTY_REGISTRATION_OFF unless the node's
+        AIMEAT_PARTY_SELF_REGISTRATION lets people register (and never on a node that shows its
+        content to signed-in accounts only), and 403 PARTY_REGISTRATION_CLOSED unless the app's owner
+        opened the signup (under apps-ask, and the operator approved it). 503 MAIL_NOT_CONFIGURED on a
+        node that sends no mail. A new address makes a pending person party of the app's owner,
+        `party:<owner>/ap-<hex>@<node>`, and mails a link to the app's address with
+        `?aimeat_party_link=`, good for 30 minutes and once. The answer is the same 202 for an address
+        already registered, so it says nothing about who is. Browser: AIMEAT.parties.signUp(email).
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string }, display_name: { type: string }, lang: { type: string, enum: [en, fi, es] } } }
+      responses:
+        '202': { description: '`{ sent: true, note }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: 'PARTY_REGISTRATION_OFF or PARTY_REGISTRATION_CLOSED' }
+        '404': { description: No such app }
+        '429': { description: TOO_MANY_PARTIES }
+        '503': { description: MAIL_NOT_CONFIGURED }
+  /v1/apps/{owner}/{filename}/parties/signin:
+    post:
+      operationId: appPartySignin
+      summary: A registered person asks for a new sign-in link
+      description: The same 202 whether or not the address is registered. 403 PARTY_REGISTRATION_OFF when the node lets nobody register.
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string }, lang: { type: string } } }
+      responses:
+        '202': { description: '`{ sent: true, note }`' }
+        '403': { description: PARTY_REGISTRATION_OFF }
+        '503': { description: MAIL_NOT_CONFIGURED }
+  /v1/apps/{owner}/{filename}/parties/verify:
+    post:
+      operationId: appPartyVerify
+      summary: Open a mailed link and receive the session
+      description: |
+        Activates a pending person, puts them on the app's roster with the signup's role (no grant), and
+        answers a purpose token (`aimeat_party_…`, `typ: party`) that names this app: it opens this
+        app's party endpoints only, never a node session and never another app (lead decision L2). It
+        lasts 7 days and ends at a sign-out or a removal. A used, expired or unknown link is 401
+        LINK_INVALID. A later passkey sign-in is an extension point, not built.
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: '`{ token, token_type, expires_in, party, role }`' }
+        '401': { description: LINK_INVALID }
+        '403': { description: PARTY_REGISTRATION_OFF }
+  /v1/apps/{owner}/{filename}/parties/me:
+    get:
+      operationId: appPartyMe
+      summary: The signed-in person's own standing in the app
+      description: With the app party token. Every request re-reads the party; a token of another app is 401, a stopped party 403, an Origin that is neither the app's nor the node's 403 ORIGIN_MISMATCH.
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party, role, app }`' }
+        '401': { description: 'AUTH_REQUIRED or INVALID_PARTY_CREDENTIAL' }
+        '403': { description: 'PARTY_STOPPED, PARTY_REGISTRATION_OFF or ORIGIN_MISMATCH' }
+  /v1/apps/{owner}/{filename}/parties/signout:
+    post:
+      operationId: appPartySignout
+      summary: End every session of the signed-in person in the app
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ signed_out: true }`' }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+  /v1/apps/{owner}/{filename}/parties/registration:
+    get:
+      operationId: appPartyRegistrationGet
+      summary: Whether people may register to the app now
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ open, effective }`: effective is the node setting as it stands (off, apps-ask, on)' }
+    put:
+      operationId: appPartyRegistrationSet
+      summary: The owner opens or closes the app's signup
+      description: |
+        The app's owner (app:manage, or the app's own token). Under the node setting `on` it opens at
+        once; under `apps-ask` opening files a request (state `requested`) the operator approves at
+        POST /v1/admin/app-party-registrations/{owner}/{filename}; closing needs nobody. 403
+        PARTY_REGISTRATION_OFF under `off` or on a node that shows its content to signed-in accounts
+        only. `role` is the roster role a registered person gets (default member). MCP: aimeat_app_manage
+        action party_registration_set.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [open], properties: { open: { type: boolean }, role: { type: string } } }
+      responses:
+        '200': { description: '`{ registration: { node_setting, effective, state, open, role }, note? }`' }
+        '403': { description: 'FORBIDDEN (not the owner), SCOPE_DENIED or PARTY_REGISTRATION_OFF' }
+  /v1/apps/{owner}/{filename}/parties:
+    get:
+      operationId: appPartiesList
+      summary: The people without an account who registered to the app
+      description: The app's owner (app:write). Each person's e-mail address, state, role and dates, and the signup setting. MCP aimeat_app_manage action parties.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ registration, parties, total, personal_data }`' }
+        '403': { description: 'FORBIDDEN or SCOPE_DENIED' }
+  /v1/apps/{owner}/{filename}/parties/{name}:
+    delete:
+      operationId: appPartyRemove
+      summary: Remove one registered person
+      description: The app's owner (app:manage). Their token answers 401 on the next request, they leave the roster, and every collection they kept in the app is deleted. MCP aimeat_app_manage action party_remove.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ removed: true, name, uid, data_deleted }`' }
+        '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/party-data/{key}:
+    get:
+      operationId: appPartyDataGet
+      summary: One collection the signed-in person keeps in the app
+      description: With the app party token. `shared=true` reads a collection the app shares to every person registered to it. Stored under the app owner, one record per person per collection; a person reaches only their own.
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+        - { name: shared, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200': { description: '`{ key, shared, value, version, updated_at }` (value null when nothing is kept)' }
+        '400': { description: INVALID_INPUT }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+    put:
+      operationId: appPartyDataPut
+      summary: Replace one collection of the signed-in person
+      description: '`{ value }`, any JSON of at most 64 kB; at most 20 collections per person per app.'
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { value: {} } }
+      responses:
+        '200': { description: '`{ key, stored, version, updated_at }`' }
+        '413': { description: 'TOO_LARGE or QUOTA_EXCEEDED' }
+    delete:
+      operationId: appPartyDataDelete
+      summary: Delete one collection of the signed-in person
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ key, deleted }`' }
+  /v1/apps/{owner}/{filename}/party-data-shared/{key}:
+    put:
+      operationId: appPartyDataSharedPut
+      summary: Write a collection the app shares to every registered person
+      description: The app's owner (app:write) or the app's own token. `{ value }`; a null value deletes it.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { value: {} } }
+      responses:
+        '200': { description: '`{ key, shared, stored, version }`' }
+        '403': { description: FORBIDDEN }
+  /v1/admin/app-party-registrations:
+    get:
+      operationId: adminAppPartyRegistrations
+      summary: The apps that let, or asked to let, people register without an account
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ setting, effective, apps: [{ owner, state, open, role, parties, ... }], total }`' }
+        '403': { description: Not the operator }
+  /v1/admin/app-party-registrations/{owner}/{filename}:
+    post:
+      operationId: adminAppPartyRegistrationDecide
+      summary: The operator approves or refuses an app's request (apps-ask)
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [approve, refuse] }, reason: { type: string } } }
+      responses:
+        '200': { description: '`{ app, registration }`' }
+        '409': { description: 'NOT_REQUESTED or PARTY_REGISTRATION_OFF' }
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList
@@ -38054,7 +39150,11 @@ paths:
         member's own profile language (en, fi or es). `since` survives a role change. The owner
         cannot be a member of their own app. Body:
         `{ account, role, level?, note?, offerings?, days?, expiresAt? }` or
-        `{ email, role, note?, locale?, level?, days?, expiresAt? }`. Returns
+        `{ email, role, note?, locale?, level?, days?, expiresAt? }` or
+        `{ party, role, note? }`, where `party` is an outside party of the app's owner,
+        `party:<owner>/<name>@<node>` (a person registered to the app, or a party of the owner): it
+        joins the roster with the role and no grant, because a party holds no account (plan
+        doc-mvwxcas3dom3, D4.1). Returns
         `{ member, created, access }`, where `access` reports which grants were issued, withdrawn or
         left alone - an approval that only set a role would be a sentence with nothing behind it.
         Every approval and role change writes a row to the roster's audit trail (`.../members/audit`).
@@ -41312,6 +42412,23 @@ paths:
         the answer is 403 `PUBLISH_REQUESTED` and the request waits on the
         owner's list at /v1/publish-requests, where approving it grants the
         consent.
+
+        A NAMED SHARE. Recipient `party:<owner>/<name>@<node>` is one of the
+        caller's outside parties (/v1/parties), and `data_pattern`
+        `datapkg:<package>` names one data package: the party reads that package
+        and nothing else, over the data package reads, OData and the package files.
+        It needs `party:manage` (no wildcard carries it) besides `consent:manage`,
+        is filed under the owner's GHII with the reach `local`, and must end within
+        AIMEAT_SHARE_MAX_DAYS (absent `expires`: that many days; later: 400
+        SHARE_TOO_LONG). `metadata` may carry `pinned_version` (sha256:<hex>),
+        `allow_url_key` and `terms_required` (default true for a person party, false
+        for a program); the node writes `partyUid`, `pinnedVersion`, `allowUrlKey`,
+        `termsRequired` and later `termsAcceptedAt` itself and drops a request's own
+        values for them. Refusals: 400 INVALID_RECIPIENT, 403 FORBIDDEN (another
+        account's party), 403 SCOPE_DENIED (party:manage), 404 PARTY_NOT_FOUND,
+        404 NOT_FOUND (the package), 404 VERSION_NOT_FOUND, 409 PARTY_STOPPED,
+        409 PACKAGE_WITHDRAWN. Revoking the consent ends the share: the party's next
+        read is refused, with a token minted before the revoke too.
       tags: [Consent]
       security:
         - BearerAuth: []
@@ -71600,7 +72717,9 @@ paths:
         (an incident may carry `params`, the values the page's own sentence for its type names,
         beside the English `detail`), who holds the operator role and which accounts are deactivated or use two-step sign-in,
         how apps are kept apart (`apps`, with a warning and the settings to change on a node several
-        people share with no app origin), and the door settings. The same data the
+        people share with no app origin), the outside parties (`parties`: total, stopped,
+        stopped_by_operator, failed_key_attempts, refused_reads_7d, served_reads_7d; stop one with
+        POST /v1/admin/parties/{owner}/{name}/stop), and the door settings. The same data the
         `aimeat_admin_security_overview` tool returns.
         Requires the `operator` role.
       security:

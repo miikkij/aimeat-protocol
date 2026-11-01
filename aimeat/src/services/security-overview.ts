@@ -27,6 +27,8 @@
  * @usage
  *   const overview = await buildSecurityOverview(config, storage);
  * @version-history
+ *   2026-11-01 -- `parties`: the outside parties, the stopped ones, the wrong keys and the reads of the
+ *     last seven days, for the Security page (services/parties/admin.ts; plan doc-mvwxcas3dom3, D2.9).
  *   2026-10-16 -- `now.test_switches`: the other test-only settings in force on a non-loopback node,
  *     critical with one sentence each (utils/test-switches.ts; QA audit D8-01).
  *   v1.3.0 -- 2026-10-13 -- `now.test_money_handler` follows the ruling
@@ -53,6 +55,7 @@ import { getStats } from './stats.js';
 import { appIsolationStatus, type AppIsolationStatus } from './app-isolation-status.js';
 import { testMoneyHandlerActive, testMoneyHandlerOnPublicNode } from '../utils/test-money-guard.js';
 import { testSwitchesOnPublicNode } from '../utils/test-switches.js';
+import { partySecurityCounts } from './parties/admin.js';
 
 /** The rolling window the headline counts cover. */
 export const REFUSAL_WINDOW_HOURS = 24;
@@ -131,6 +134,12 @@ export interface SecurityOverview {
   };
   /** How apps are kept apart from the sign-in of whoever opens them, and what to set when it can be better. */
   apps: AppIsolationStatus;
+  /**
+   * Outside parties (services/parties/admin.ts, plan doc-mvwxcas3dom3 D2.9): how many, how many are
+   * stopped and by the operator, the wrong keys presented, and the reads of the last seven days.
+   * The operator stops one with POST /v1/admin/parties/{owner}/{name}/stop.
+   */
+  parties: Record<string, number>;
   settings: {
     login_rate_limit: { max: number; window_ms: number };
     /** Agent credentials minted per minute per IP (POST /v1/agents/v2/token). */
@@ -303,6 +312,7 @@ export async function buildSecurityOverview(config: AimeatConfig, storage: Stora
       sso_enabled: config.ssoEnabled,
     },
     apps: await appIsolationStatus(config, storage),
+    parties: await partySecurityCounts(storage),
     settings: {
       login_rate_limit: { max: config.loginRateLimitMax, window_ms: config.loginRateLimitWindowMs },
       agent_token_rate_limit: { max: config.agentTokenRateLimitMax, window_ms: 60_000 },

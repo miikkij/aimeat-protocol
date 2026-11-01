@@ -16,6 +16,8 @@
  * @usage
  *   import { missingOperatorConfig } from './config-operator.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — missingOperatorConfig asks a private person for no postal address: their
+ *     pages give the email only (Jouni, 2026-11-01 11.39). A company, organisation or association still must give one.
  *   v1.2.0 — 2026-10-24 — operatorFromEnv(): the operator block read from the environment, moved from config.ts
  *     unchanged (max-file-lines), with the three agreement settings (plan doc-mvmr4i2wdk0p D1.4).
  *   v1.1.0 — 2026-08-12 — operatorTypeLabel takes the shared Locale type and carries Spanish, so a
@@ -63,9 +65,11 @@ export function operatorFromEnv(env: NodeJS.ProcessEnv): OperatorConfig {
  * must not ship the upstream author's name and address as a default.
  */
 export function missingOperatorConfig(operator: OperatorConfig): string[] {
+  // A private person's pages give the email only, not an address (services/operator-place.ts), so
+  // only a company, an organisation or an association must give one.
   const required: Array<keyof OperatorConfig> = [
     'name',
-    'address',
+    ...(operator.type === 'natural_person' ? [] : ['address' as const]),
     'country',
     'email',
     'hostingName',

@@ -8,6 +8,8 @@
  * @structure parseSiteContacts() · siteLinksFromEnv()
  * @usage import { siteLinksFromEnv } from './config-site-contacts.js';
  * @version-history
+ *   v1.8.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE removed the same night: no message counts
+ *     are shown to a customer (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.7.0 — 2026-11-01 — AIMEAT_SITE_AI_EUR_PER_MESSAGE, kept only when it is a positive decimal up to 1.
  *   v1.6.0 — 2026-10-31 — AIMEAT_SITE_AI_CREDIT_EUR_PER_USD, kept only when it is a positive decimal.
  *   v1.5.0 — 2026-10-30 — AIMEAT_SITE_DEV_LINKS ('auto' unless it says 'show' or 'hide').
@@ -24,7 +26,7 @@
  */
 import type { SiteContact, SiteLinksConfig } from './config-types.js';
 import { logger } from './utils/logger.js';
-import { isEurPerUsd, isEurPerMessage } from './utils/eur-per-usd.js';
+import { isEurPerUsd } from './utils/eur-per-usd.js';
 
 /**
  * The people printed on the public pages, from `AIMEAT_SITE_CONTACTS` (a JSON array of
@@ -99,9 +101,6 @@ export function siteLinksFromEnv(): SiteLinksConfig {
     // A rate that does not read as a positive decimal is no rate: the pages count a dollar as a euro.
     aiCreditEurPerUsd: isEurPerUsd((process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim())
         ? (process.env.AIMEAT_SITE_AI_CREDIT_EUR_PER_USD ?? '').trim() : '',
-    // The same for the price of one ordinary message: not a positive decimal, no message count.
-    aiEurPerMessage: isEurPerMessage((process.env.AIMEAT_SITE_AI_EUR_PER_MESSAGE ?? '').trim())
-        ? (process.env.AIMEAT_SITE_AI_EUR_PER_MESSAGE ?? '').trim() : '',
     storeOrders: (process.env.AIMEAT_SITE_STORE_ORDERS_URL ?? '').trim(),
     purchasePlan: (process.env.AIMEAT_SITE_PURCHASE_PLAN ?? '').trim(),
     purchasePackage: (process.env.AIMEAT_SITE_PURCHASE_PACKAGE ?? '').trim(),

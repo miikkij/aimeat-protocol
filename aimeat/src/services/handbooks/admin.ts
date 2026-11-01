@@ -6,6 +6,8 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.30.0 -- 2026-11-01 -- Data intermediation: the setting, section 12 of the report and the part
+ *     `intermediation` (plan doc-mvwxcas3dom3, D7).
  *   v1.29.0 -- 2026-10-31 -- A store test's browser_access and the CORS rule it gives.
  *   v1.28.0 -- 2026-10-30 -- Named node stores: aimeat_admin_file_store_set and _remove, the default, the
  *     stores everyone may choose, a move between node stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -228,6 +230,16 @@ register of its own only when someone other than its user sees its personal data
 regulated data: \`aimeat_compliance_report\` with \`scope: "node"\` lists every app's \`reach\` in
 \`processing.apps\`, and what a person keeps through an app only they see is in the node's record
 \`node-user-content\`.
+
+**Data intermediation (operator).** The setting AIMEAT_DATA_INTERMEDIATION (Config, consent) says
+whether this node runs a data intermediation service under the EU Data Governance Act: \`report\`
+(nothing refused), \`none\` (an offering that delivers data is not listed to everyone), \`node\` (the
+operator is the provider) or \`owners\` (an organism that declared itself a provider may list data to
+everyone). \`aimeat_compliance_report\` with \`scope: "node"\` carries it as \`data_intermediation\`:
+the findings, each a proposal with its reason and article, and the Article 12 rows with their
+evidence. Record the provider's notification and a person's decision on a finding with
+\`aimeat_compliance_register_write\` (\`part: "intermediation"\`, items of \`type\` notification or
+review). Say that it is a reading of the regulation, not a legal opinion.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:

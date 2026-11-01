@@ -21,6 +21,7 @@
  * @structure memorySource · fileSource · knowledgeSource · skillSource · datapackageSource
  * @usage import { memorySource } from './sources-records.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A data package item carries its freshness (plan doc-mvwxcas3dom3, D6.1).
  *   v1.1.0 — 2026-11-01 — datapackageSource lists each package at its own audience (members as
  *     signed-in, organism:<id> as organism) and leaves out a private, a withdrawn and a never-published
  *     one; it listed every package as public. how_to_close names the withdrawal (DELETE
@@ -30,6 +31,7 @@
  */
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
 import { listPackages as listDataPackages } from '../datapackage/store.js';
+import { packageFreshness } from '../datapackage/freshness-read.js';
 import { MANIFEST_KEY_RE } from '../skill-refs.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import {
@@ -189,10 +191,13 @@ export const datapackageSource: ExposureSource = {
       const lv = levelOfVisibility(p.visibility ?? 'public');
       if (!lv) continue;
       const path = `/v1/datapackages/${enc(ownerName)}/${enc(p.name)}`;
+      // Against its producer's promise (services/datapackage/freshness.ts, plan D6.1).
+      const fresh = await packageFreshness({ storage: ctx.storage, config: ctx.config }, ownerGhii, p.name, { pointer: p, now: new Date(ctx.nowMs) });
       out.push({
         kind: 'datapackage', id: p.packageId, title: p.name, ...lv,
         ...(lv.level === 'public' ? { url: p.descriptorUrl } : {}),
         how_to_close: `Withdraw it with aimeat_datapackage_withdraw and ref "${p.packageId}" (DELETE ${path}): every read answers 410 and it leaves the catalogue; add ?purge=true to delete its files too. To narrow who reads it instead, publish it again with visibility "private".`,
+        ...(fresh ? { freshness: fresh.state } : {}),
       });
     }
     return out;

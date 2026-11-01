@@ -7,6 +7,10 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
+ *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
+ *   v1.24.0 — 2026-11-01 — shareMaxDays and partyReadsPerMinute: the named share's longest life and an
+ *     outside party's read rate (plan doc-mvwxcas3dom3, D2.9, D3.1).
  *   v1.23.0 — 2026-10-29 — FileStoreConfig mixed in (config-file-store.ts): where stored files keep their bytes.
  *   v1.22.1 — 2026-10-25 — personalNodeMaxPerOwner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   v1.22.0 — 2026-10-25 — NodeLimitsConfig mixed in (config-node-limits.ts; secaudit2026oct22).
@@ -125,7 +129,7 @@ import type { AccountSecurityConfig } from './config-types-account-security.js';
 import type { CapabilitiesConfig } from './config-types-capabilities.js';
 import type { ThemesConfig } from './config-themes.js';
 import type { PackagesConfig } from './config-types-packages.js';
-import type { ClassificationConfig } from './config-data-access.js';
+import type { ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config-data-access.js';
 import type { UpdateCheckConfig } from './config-update-check.js';
 import type { AppAuditConfig } from './config-app-audit.js';
 import type { AgentAccessConfig } from './config-types-agent-access.js';
@@ -470,6 +474,14 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
   consentAuditRetentionDays: number;
+  /** The longest a named share to an outside party may last, in days (services/parties/shares.ts). */
+  shareMaxDays: number;
+  /** Reads one outside party may make a minute before 429 (services/parties/read-gate.ts). */
+  partyReadsPerMinute: number;
+  /** Whether this node runs a data intermediation service and who provides it (services/data-intermediation/). */
+  dataIntermediation: DataIntermediationMode;
+  /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */
+  partySelfRegistration: PartySelfRegistration;
   /**
    * How many events stay in an account's "what has happened" window before the oldest move to the
    * archive. A COUNT rather than a number of days: recency is relative to how much happens to

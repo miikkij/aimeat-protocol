@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description Use-case preset defaults and CONFIG_DEFAULTS map for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-11-01 — CONFIG_DEFAULTS states AIMEAT_DATA_INTERMEDIATION's code default, report (plan D7.1).
  *   v1.1.0 — 2026-10-18 — NEW_NODE_CONTENT_DEFAULTS, the content starting levels a new node is written with; CONFIG_DEFAULTS states their code defaults (plan doc-mvcn6c7e4e5q, V5).
  *   v1.0.1 — 2026-10-16 — CONFIG_DEFAULTS says what the loader does for extensions (on, any owner installs), push (on) and the burn rate, held by a unit test (QA audit D8-04).
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
@@ -88,6 +89,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   AIMEAT_DEV_MODE: 'false',
   AIMEAT_ANONYMOUS: 'false',
   AIMEAT_PUBLISH_GATE: 'off',
+  AIMEAT_DATA_INTERMEDIATION: 'report',
   AIMEAT_DEFAULT_MEMORY_VISIBILITY: 'private',
   AIMEAT_DEFAULT_FILE_VISIBILITY: 'private',
   AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY: 'public',
