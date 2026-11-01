@@ -7,7 +7,7 @@
  *
  *   ONE THING, ONE KIND. Several kinds are stored as memory records or files: a skill is a manifest
  *   record under `skills.`, a knowledge package a manifest under `packages/<id>/`, an exchange
- *   offering a public record under `exchange.offering.`, a data package public files under `datapkg/`
+ *   offering a public record under `exchange.offering.`, a data package files under `datapkg/`
  *   plus a catalogue manifest. Each of those is counted once, by the kind a person knows it as, and
  *   the memory and file sources leave it out, so the report says "a skill" and not "a skill and two
  *   memory records".
@@ -21,6 +21,11 @@
  * @structure memorySource · fileSource · knowledgeSource · skillSource · datapackageSource
  * @usage import { memorySource } from './sources-records.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — datapackageSource lists each package at its own audience (members as
+ *     signed-in, organism:<id> as organism) and leaves out a private, a withdrawn and a never-published
+ *     one; it listed every package as public. how_to_close names the withdrawal (DELETE
+ *     /v1/datapackages/{owner}/{name}, aimeat_datapackage_withdraw) instead of deleting files by hand
+ *     (plan doc-mvwxcas3dom3, D0.2).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
@@ -173,13 +178,23 @@ export const skillSource: ExposureSource = {
 
 export const datapackageSource: ExposureSource = {
   kind: 'datapackage',
-  async list(ctx, _ownerName, ownerGhii) {
-    // Every data package is public: its files have a permanent address that any program reads
-    // without signing in (services/datapackage/store.ts).
+  async list(ctx, ownerName, ownerGhii) {
+    // Each package at its own audience, kept on its pointer (services/datapackage/audience.ts): public,
+    // members as signed-in, organism:<id> as organism. A private package is exposed to nobody, and a
+    // withdrawn one, or one with only a failed run, has no version anyone reads.
     const pointers = await listDataPackages({ storage: ctx.storage, config: ctx.config }, ownerGhii);
-    return pointers.map((p): ExposureItem => ({
-      kind: 'datapackage', id: p.packageId, title: p.name, level: 'public', url: p.descriptorUrl,
-      how_to_close: `A data package stays at its address once published; to take it away, remove its files under datapkg/${p.name}/ with aimeat_storage_delete (DELETE /v1/storage/datapkg/${enc(p.name)}/...) and its catalogue record with aimeat_memory_delete.`,
-    }));
+    const out: ExposureItem[] = [];
+    for (const p of pointers) {
+      if (!p.contentHash || p.status === 'withdrawn') continue;
+      const lv = levelOfVisibility(p.visibility ?? 'public');
+      if (!lv) continue;
+      const path = `/v1/datapackages/${enc(ownerName)}/${enc(p.name)}`;
+      out.push({
+        kind: 'datapackage', id: p.packageId, title: p.name, ...lv,
+        ...(lv.level === 'public' ? { url: p.descriptorUrl } : {}),
+        how_to_close: `Withdraw it with aimeat_datapackage_withdraw and ref "${p.packageId}" (DELETE ${path}): every read answers 410 and it leaves the catalogue; add ?purge=true to delete its files too. To narrow who reads it instead, publish it again with visibility "private".`,
+      });
+    }
+    return out;
   },
 };

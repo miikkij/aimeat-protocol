@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-01 — Section 4: a data package is withdrawn with aimeat_datapackage_withdraw, and with purge
+ *     its files are deleted at once (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-31 — Section 3: an app's write is named as the app in the hands, not as the person
  *     (secaudit2026oct31w2 round 10, services/data-map/tally-writer.ts, routes/memory/bulk.ts).
  *   2026-10-29 — Section 6: the old portfolio address clears the old page's browser storage the same way
@@ -223,6 +225,9 @@ What an export leaves out, and why:
 - workspace rows (\`aimeat_workspace_rows_delete\`) and a whole workspace: these need
   \`memory:purge\`;
 - a stored file (\`aimeat_storage_delete\`);
+- a data package withdrawn with \`purge: true\` (\`aimeat_datapackage_withdraw\`): every stored version
+  goes. Without \`purge\` a withdrawal stops every read of the package and takes it out of the
+  catalogue, the files stay, and publishing a version again brings the package back;
 - an app (\`aimeat_app_delete\`: the app and its versions are removed; only an apps backup taken
   earlier brings it back);
 - an agent: deleting it removes every record and file under its identity at once;

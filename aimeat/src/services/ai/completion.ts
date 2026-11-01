@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.16.0 -- 2026-10-31 -- settleAiCall passes media.genRules to the record; a call with none states none, so a node-observed record never reads as an arrival.
  *   v3.15.1 -- 2026-10-27 -- prepareAiCall tells the owner once when a bare allowlist entry lets another author's app in (ai/app-name-notice.ts; secaudit2026oct26).
  *   v3.15.0 -- 2026-10-27 -- completeForOwner records and debits the text attempts that answered nothing, and prices a node-key
  *     call by its pictures and files too (estimate.inputTokens); AiCallOutcome and AiCallSettlement moved to ai/call-outcome.ts (secaudit2026oct26).
@@ -594,6 +595,8 @@ export async function settleAiCall(
         mediaKind: outcome.media?.mediaKind ?? (outcome.contentHash ? undefined : 'text'),
         mediaType: outcome.media?.mediaType,
         surface: outcome.media?.surface,
+        // An image call states what its rules did; any other call has no rules to state.
+        genRules: outcome.media?.genRules ?? [],
         ...(outcome.contentHash ? { contentHash: outcome.contentHash } : { content: outcome.content }),
         generator: {
           model: outcome.model,

@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-01 — aimeat_datapackage_withdraw is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-25 — aimeat_publish_requests is probed with a request_id, which `account` rides on (secaudit2026oct22).
  *   2026-10-20 — The McpServer fake takes registerTool(name, config, handler), the form every tool registers with since the MCP SDK v2 migration step 3.
  *   2026-10-12 — The 30 tools that got a CLI dispatch definition are invoked here like every other one.
@@ -109,6 +110,8 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // decides WHICH request is made: the default 'url' fetches the descriptor and touches none of
     // resource / limit / offset / select.
     aimeat_datapackage_export: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' }, always: { format: 'json' } },
+    // ref is matched against the same pattern; owner and name go into the DELETE path.
+    aimeat_datapackage_withdraw: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' } },
     // `account` names whose request an operator reads or answers, so it rides on one request (request_id);
     // the list is always the caller's own account.
     aimeat_publish_requests: { always: { request_id: 'zqxrequest_idzqx' } },

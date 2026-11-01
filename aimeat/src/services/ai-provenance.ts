@@ -44,6 +44,10 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.5.0 — 2026-10-31 — The record lists the generation rules in force for an image or a video
+ *     (`rules`): what the node gave the model (`genRules`, from services/ai-image.ts), or on arrival
+ *     what the writer declared it followed (`rulesFollowed`) and `unknown` for the rest. Content with
+ *     no statement is marked, never refused (wish-image-and-video-generation-people-only-in-an-artistic-non-ph).
  *   v1.4.2 — 2026-10-31 — provenanceForWrite and stampAgentWrite take no content for a file a client put
  *     straight in an object store; the record then names no hash
  *     (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
@@ -89,8 +93,9 @@ import {
   AI_PROVENANCE_SPEC_V1, AiProvenanceSchema,
   type AiProvenance, type AiProvenanceLevel, type AiProvenanceMethod, type AiHumanInvolvement,
   type AiStampedBy, type AiProvenanceGenerator, type AiProvenanceSource, type AiDisclosureBlock,
-  type LocalizedText, type AiMediaKind, type AiResemblesReal,
+  type LocalizedText, type AiMediaKind, type AiResemblesReal, type AiGenRuleMark as GenRuleMark,
 } from '../models/ai-provenance-schemas.js';
+import { arrivalGenRuleMarks } from './ai/gen-rules-store.js';
 import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './ai-disclosure.js';
 import { disclosureWording } from './ai-disclosure-served.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
@@ -172,6 +177,14 @@ export interface MintProvenanceInput extends MediaStatement {
   nodeId: string;
   /** The node's public base URL, so `attestation.recordUrl` resolves for a third party. */
   baseUrl?: string;
+  /**
+   * What the generation rules did, when THIS node gave them to the model (services/ai-image.ts). Absent,
+   * the rules in force for an image or a video are recorded as an arrival: `declared` for each rule
+   * in `rulesFollowed`, `unknown` for the rest (services/ai/gen-rules-store.ts arrivalGenRuleMarks).
+   */
+  genRules?: GenRuleMark[];
+  /** The generation rules the writer says it followed, for content made elsewhere. */
+  rulesFollowed?: string[];
 }
 
 /** SHA-256 identity of the exact bytes, `sha256:` prefixed. node:crypto — no dependency. */
@@ -266,6 +279,11 @@ export async function mintProvenance(
   const mediaType = input.mediaType?.split(';')[0]?.trim().toLowerCase();
   if (mediaType) draft.mediaType = mediaType;
   if (input.resemblesReal) draft.resemblesReal = input.resemblesReal;
+  // A record about content no model made says nothing about rules given to a model.
+  const rules = input.genRules ?? (input.level === 'original' ? undefined : await arrivalGenRuleMarks(storage, {
+    ownerGhii: input.ownerGhii, principal: input.principal, mediaKind: draft.mediaKind, rulesFollowed: input.rulesFollowed,
+  }));
+  if (rules?.length) draft.rules = rules;
   if (input.sources?.length) draft.sources = input.sources;
   if (input.derivedFrom?.length) draft.derivedFrom = input.derivedFrom;
   if (input.notes) draft.notes = input.notes;
@@ -418,6 +436,8 @@ export interface DeclaredProvenance extends MediaStatement {
   provider?: string;
   sources?: AiProvenanceSource[];
   notes?: string;
+  /** The generation rules (services/ai/gen-rules.ts) the declarer followed when it made an image or a video. */
+  rulesFollowed?: string[];
 }
 
 /**
@@ -563,6 +583,7 @@ export async function provenanceForWrite(
         ...(input.pipeline ? { pipeline: input.pipeline } : {}),
       },
       sources: input.declared.sources,
+      ...(input.declared.rulesFollowed?.length ? { rulesFollowed: input.declared.rulesFollowed } : {}),
       notes: input.declared.notes ?? DECLARED_BY_PRINCIPAL_NOTE,
       surface: input.surface,
       labelPolicy: input.labelPolicy,

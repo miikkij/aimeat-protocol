@@ -11,6 +11,7 @@
  *   wrong answer, so the tests below name each one.
  * @usage cd aimeat && pnpm exec vitest run test/unit/datapackage-odps.test.ts
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- The audience: visibility, authenticationMethod and x-aimeat.audience follow it (plan doc-mvwxcas3dom3, D0.1).
  *   v1.0.0 -- 2026-08-15 -- Initial (TARGET-063 vaihe 1).
  */
 import { describe, it, expect } from 'vitest';
@@ -187,5 +188,43 @@ describe('what x-aimeat carries, being everything the enums cannot', () => {
     it('the version note IS the required change description — never empty', () => {
         const doc = project(descriptor()) as any;
         expect(doc.product.details.en.versionNotes).toBe('Two products entered the shortage list.');
+    });
+});
+
+describe('the sheet states who reads the version (plan doc-mvwxcas3dom3, D0.1)', () => {
+    const withAudience = (audience?: string) => descriptorToOdps({
+        descriptor: descriptor(), ownerGhii: 'alice@node', baseUrl: 'https://aimeat.io',
+        descriptorUrl: 'https://aimeat.io/v1/pub/alice%40node/datapkg/shortages-weekly/aaa/datapackage.json',
+        resourceUrls: { rows: 'https://aimeat.io/v1/pub/alice%40node/datapkg/shortages-weekly/aaa/data/rows.csv' },
+        ...(audience ? { audience } : {}),
+    }) as any;
+    const methods = (doc: any) => Object.values(doc.product.dataAccess).map((p: any) => p.authenticationMethod);
+
+    it('no audience is a public package: public, no authentication', () => {
+        const doc = withAudience();
+        expect(doc.product.details.en.visibility).toBe('public');
+        expect(methods(doc)).toEqual(['none', 'none']);
+        expect(doc.product['x-aimeat'].audience).toBe('public');
+    });
+
+    it.each([
+        ['members', 'dataspace'],
+        ['organism:org-1', 'organisation'],
+        ['private', 'private'],
+    ])('%s maps to the ODPS visibility %s, a token, and no "No authentication" text', (audience, visibility) => {
+        const doc = withAudience(audience);
+        expect(validate(doc).errors).toEqual([]);
+        expect(doc.product.details.en.visibility).toBe(visibility);
+        expect(methods(doc)).toEqual(['Token', 'Token']);
+        expect(doc.product['x-aimeat'].audience).toBe(audience);
+        expect(JSON.stringify(doc.product.dataAccess)).not.toMatch(/No authentication/);
+        expect(JSON.stringify(doc.product.dataAccess)).toMatch(/bearer token/);
+    });
+
+    it('authenticationMethod stays on the ODPS v4.1 enum', () => {
+        const allowed = odpsSchema.$defs.DataAccessItem.properties.authenticationMethod.enum as string[];
+        for (const a of ['public', 'members', 'organism:o', 'private']) {
+            for (const m of methods(withAudience(a))) expect(allowed).toContain(m);
+        }
     });
 });
