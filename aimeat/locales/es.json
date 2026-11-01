@@ -14242,7 +14242,7 @@
       "position": "Estás en el puesto {n} de {total} solicitudes en la cola.",
       "stateLabel": "Estado",
       "state": {
-        "received": "Enviada. Espera a que la cola la confirme.",
+        "received": "Enviada a quien gestiona el servicio, que la pasa a la cola.",
         "queued": "En la cola",
         "building": "En construcción",
         "invited": "Invitación enviada",
