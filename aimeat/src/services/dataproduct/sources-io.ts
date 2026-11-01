@@ -19,6 +19,8 @@
  * @structure readExtensionSource · readFileSource · readDatapackageSource · typedFromStrings
  * @usage const src = await readFileSource(call, exporting);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — An extension action's output schema gives its columns' types and descriptions,
+ *     and another package's Table Schema its descriptions (WP9c, the wizard's step 2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9.1).
  */
 import type { FieldType } from '../datapackage/contract.js';
@@ -32,6 +34,9 @@ import { fromCsv } from '../datapackage/table.js';
 import { openPackage, readAllRows } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';
 import { atPath } from '../workflow/engine-step-rows.js';
+import { findExtension } from '../component-address.js';
+import { logger } from '../../utils/logger.js';
+import { descriptionsOfJson, fieldTypeOfJson } from './sources-memory.js';
 import {
     type ResolvedSource, type SourceCall, sourceError, needWord, shapeRows, tableOf, audienceOfStored,
 } from './source-common.js';
@@ -59,12 +64,38 @@ export async function readExtensionSource(call: SourceCall): Promise<ResolvedSou
     if (!Array.isArray(found)) {
         throw sourceError(spec, 'NOT_ROWS', `the answer of ${spec.ext}/${spec.action} has no array${spec.rows_at ? ` at "${spec.rows_at}"` : ''}. Name the path to the rows in rows_at.`);
     }
-    const table = tableOf(spec.id, shapeRows(found, spec.columns));
+    // The action's output schema, at the rows: what each column is and its type, where it says so.
+    const rowSchema = await actionRowSchema(call);
+    const types: Record<string, FieldType | undefined> = {};
+    if (!spec.columns) for (const [col, p] of Object.entries(rowSchema ?? {})) types[col] = fieldTypeOfJson(p);
+    const table = tableOf(spec.id, shapeRows(found, spec.columns), types);
     const personal = (await personalRowsFor(deps.storage, caller.ownerGhii, call.productName, { extension: spec.ext! })).length > 0;
     return {
-        ...table, personal: personal ? new Set(table.columns) : new Set(), audience: 'public', fetchedAt: now(),
+        ...table, ...(rowSchema && !spec.columns ? { descriptions: descriptionsOfJson(rowSchema) } : {}),
+        personal: personal ? new Set(table.columns) : new Set(), audience: 'public', fetchedAt: now(),
         provenance: { kind: 'extension', address: `ext:${spec.ext}/${spec.action}` },
     };
+}
+
+/**
+ * The properties of one row in an extension action's declared output schema: the schema walked down
+ * `rows_at`, then into the array's items. Null when the action declares none, or the path leads to no
+ * array of objects.
+ */
+async function actionRowSchema(call: SourceCall): Promise<Record<string, unknown> | null> {
+    const { deps, caller, spec } = call;
+    // The schema only describes the columns: a lookup that fails leaves them undescribed, said in the log.
+    const ext = await findExtension(deps.storage, spec.ext!, caller.owner, 'manage').catch((err: unknown) => {
+        logger.debug('dataproduct: the extension\'s output schema could not be read', { ext: spec.ext, error: String(err) });
+        return null;
+    });
+    let node = (ext?.actions.find(a => a.id === spec.action) as { outputSchema?: unknown } | undefined)?.outputSchema as Record<string, unknown> | undefined;
+    for (const seg of (spec.rows_at ?? '').split('.').filter(Boolean)) {
+        node = (node?.properties as Record<string, Record<string, unknown>> | undefined)?.[seg];
+    }
+    const items = node?.type === 'array' ? node.items as Record<string, unknown> | undefined : undefined;
+    const props = items?.properties;
+    return props && typeof props === 'object' ? props as Record<string, unknown> : null;
 }
 
 /** Strings from a CSV, typed: a column whose every value is a number becomes a number column. */
@@ -152,11 +183,13 @@ export async function readDatapackageSource(call: SourceCall): Promise<ResolvedS
     const types = Object.fromEntries(all.schema.fields.map(f => [f.name, f.type]));
     const shaped = spec.columns ? shapeRows(all.rows, spec.columns) : all.rows;
     const table = tableOf(spec.id, shaped, spec.columns ? {} : types, new Set(), spec.columns ? [] : all.schema.fields.map(f => f.name));
+    // The other package's Table Schema says what each column is.
+    const descriptions = spec.columns ? {} : Object.fromEntries(all.schema.fields.filter(f => f.description).map(f => [f.name, String(f.description)]));
     const ownerGhii = owner.includes('@') ? owner : `${owner}@${deps.config.nodeId}`;
     const pointer = await readPointer(deps, ownerGhii, spec.name!);
     const license = d.licenses?.[0]?.name ?? d.aimeat.license;
     return {
-        ...table, audience: audienceOfStored(pointer?.visibility ?? 'public'), fetchedAt: now(),
+        ...table, descriptions, audience: audienceOfStored(pointer?.visibility ?? 'public'), fetchedAt: now(),
         lineage: `${d.aimeat.packageId}@${d.aimeat.contentHash}`,
         provenance: { kind: 'datapackage', address: opened.descriptorUrl, ...(d.title ? { title: d.title } : {}), ...(license ? { license } : {}) },
     };

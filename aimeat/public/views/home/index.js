@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-01: Under the welcome, on a customer's node, "Rakennamme kanssasi" (build-with-you.js):
+ *     the offer once the node opens it, then the request's place in the queue (Jouni, 1.11 16.22).
  *   2026-10-31: The welcome takes no navigate: its sentence field went with v31 K26. It leaves once the
  *     getting-started steps say the AI is connected, not only after the full first-connection proof:
  *     the v32 shots showed "connect your AI" above a ticked "Yhdistä tekoälysi".
@@ -81,6 +83,7 @@ import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { CustomerWelcome } from './customer-welcome.js';
+import { BuildWithYou } from './build-with-you.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -170,6 +173,9 @@ export default function HomeView({ navigate }) {
       ${/* A buyer's first page on the node the store made for them says what they bought and what to
             do first (customer-welcome.js); it draws nothing anywhere else. */''}
       <${CustomerWelcome} session=${session} initialized=${connected} />
+      ${/* On the same node, once the node opens it: "Rakennamme kanssasi", the offer and then the
+            request's way through the queue (build-with-you.js). */''}
+      <${BuildWithYou} />
       <${SurfaceRenderer}
         layout=${surface.layout}
         freeform=${surface.freeform}

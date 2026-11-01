@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.19.0 — 2026-11-01 — The data table paragraph names a run on a source change, a share to someone on
+ *     another AIMEAT by `recipient`, and the AI's description draft (WP9c).
  *   v1.18.0 — 2026-11-01 — Offering data as a table: one proposal (preview, define, run, share), and the
  *     four follow-ups (what do I offer, who reads it, is any of it out of date, withdraw it) (WP9a).
  *   v1.17.0 — 2026-11-01 — The discover paragraph names datasets, the published tables (plan doc-mvwxcas3dom3, D1.1).
@@ -93,7 +95,11 @@ Mondays at 06:00) and the audience, and show the person the source, the columns,
 map marks personal that you left out, the row count, the schedule, who may use it and the licence.
 When they agree, \`define\` and \`run\` it, then \`aimeat_party\` action \`share\` with the name, the
 package, the purpose and \`days\`. Then say in one sentence what the recipient gets and when it ends,
-and that ending the share refuses the next read while copies already taken stay. The Offers page
+and that ending the share refuses the next read while copies already taken stay. "Update it when the
+source changes" is the schedule \`{ on: "change" }\` (not for an extension source); someone with an
+AIMEAT account on another server is shared with by \`recipient: "name@their-server"\` instead of a
+name, with no key; and \`aimeat_dataproduct\` action \`describe\` drafts the description with the
+person's own AI for them to change. The Offers page
 shows the same product, where the person changes it. The follow-ups work the same way:
 "What data do I offer?" and "Is any of my data out of date?" are \`aimeat_dataproduct\` action
 \`list\` (each product with its freshness: up to date, late, out of date or no schedule; who may use

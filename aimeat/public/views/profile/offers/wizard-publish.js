@@ -13,6 +13,9 @@
  * @structure stepSchedule · stepWho · stepDone · ShareQueue
  * @usage const body = stepSchedule(s);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Step 4 "When the source changes", refused next to the option for a product with
+ *     an extension source; step 5's shares take a person on another AIMEAT node by their account; step 6
+ *     says each share's sentence and key note in the page's language (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D9.5, D3, D5, D6.1).
  */
 import { h } from 'preact';
@@ -32,9 +35,9 @@ import { List, Row, Name, Who, Doors } from '/components/List.js';
 import { Mark, Code } from '/components/Mark.js';
 import { Note } from '/components/Note.js';
 import { Action, Actions, Loud } from '/components/Action.js';
-import { d, scheduleWords, cronFor } from './data-model.js';
+import { d, scheduleWords, cronFor, shareSentence, keyNote } from './data-model.js';
 import { SellFields } from './sell-dialog.js';
-import { partyNameOf } from './share-dialog.js';
+import { partyNameOf, VisitorRead, SHARE_HOWS, isAccount } from './share-dialog.js';
 import { ConnectSteps } from './data-connect.js';
 
 const DAY = 86_400_000;
@@ -49,29 +52,43 @@ export function stepSchedule(s) {
   const sch = draft.schedule;
   const set = (patch) => setDraft((cur) => ({ schedule: { ...cur.schedule, ...patch } }));
   const cron = cronFor(sch);
+  const onChange = sch.freq === 'change';
+  // An extension's result has no change the server can see (the node answers NO_CHANGE_SIGNAL).
+  const blind = draft.sources.some((src) => src.kind === 'extension');
   const interval = { daily: 'day', weekly: 'week', monthly: 'month' }[sch.freq];
   const days = sch.freq === 'weekly'
     ? [1, 2, 3, 4, 5, 6, 0].map((n) => [n, d('day.' + n)])
     : Array.from({ length: 28 }, (_, i) => [i + 1, String(i + 1)]);
+  const keep = html`<${Select} label=${d('sched.keep')} value=${draft.keep} onChange=${(v) => setDraft({ keep: v })}
+    options=${[['12', d('sched.keep12')], ['all', d('sched.keepAll')], ['6m', d('sched.keep6m')]]} />`;
+  const paces = [
+    ...['once', 'daily', 'weekly', 'monthly'].map((k) => ({ value: k, label: d('sched.' + k) })),
+    { value: 'change', label: d('sched.change'), disabled: blind, ...(blind ? { title: d('sched.changeBlocked') } : {}) },
+  ];
+  const freshRows = onChange ? [
+    { k: d('fresh.fresh'), state: 'fine', v: d('sched.freshChange.fresh') },
+    { k: d('fresh.late'), state: 'attention', v: d('sched.freshChange.late') },
+    { k: d('fresh.stale'), state: 'danger', v: d('sched.freshChange.stale') },
+  ] : interval ? [
+    { k: d('fresh.fresh'), state: 'fine', v: d('sched.freshFresh') },
+    { k: d('fresh.late'), state: 'attention', v: d('sched.freshLate.' + interval) },
+    { k: d('fresh.stale'), state: 'danger', v: d('sched.freshStale.' + interval) },
+  ] : [{ k: d('fresh.unscheduled'), state: 'off', v: d('sched.freshNone') }];
   return html`
-    <${Section} id="wz-pace" title=${d('sched.title')} count=${scheduleWords(cron ? { cron } : null)} first=${true}>
-      <${Choice} label=${d('sched.pace')} value=${sch.freq} onChange=${(v) => set({ freq: v })}
-        options=${['once', 'daily', 'weekly', 'monthly'].map((k) => [k, d('sched.' + k)])} />
-      ${sch.freq !== 'once' ? html`<${Fields} cols=${3}>
+    <${Section} id="wz-pace" title=${d('sched.title')} count=${scheduleWords(onChange ? { on: 'change' } : cron ? { cron } : null)} first=${true}>
+      <${Choice} label=${d('sched.pace')} value=${sch.freq} onChange=${(v) => set({ freq: v })} options=${paces} />
+      ${blind ? html`<${Note} kind="aside" size="small">${d('sched.changeBlocked')}<//>` : null}
+      ${onChange ? html`<${Fields} cols=${3}>${keep}<//><${Note}>${d('sched.changeNote')}<//>`
+        : sch.freq !== 'once' ? html`<${Fields} cols=${3}>
         ${sch.freq !== 'daily' ? html`<${Select} label=${sch.freq === 'weekly' ? d('sched.weekday') : d('sched.monthday')} value=${String(sch.day)}
           options=${days.map(([v, l]) => [String(v), l])} onChange=${(v) => set({ day: Number(v) })} />` : null}
         <${TextField} label=${d('sched.time')} type="time" size="short" value=${sch.time} onInput=${(v) => set({ time: v })} />
-        <${Select} label=${d('sched.keep')} value=${draft.keep} onChange=${(v) => setDraft({ keep: v })}
-          options=${[['12', d('sched.keep12')], ['all', d('sched.keepAll')], ['6m', d('sched.keep6m')]]} />
+        ${keep}
       <//>` : html`<${Note}>${d('sched.onceNote')}<//>`}
     <//>
     <${Section} id="wz-fresh" title=${d('sched.freshTitle')}>
-      <${Facts} rows=${interval ? [
-        { k: d('fresh.fresh'), state: 'fine', v: d('sched.freshFresh') },
-        { k: d('fresh.late'), state: 'attention', v: d('sched.freshLate.' + interval) },
-        { k: d('fresh.stale'), state: 'danger', v: d('sched.freshStale.' + interval) },
-      ] : [{ k: d('fresh.unscheduled'), state: 'off', v: d('sched.freshNone') }]} />
-      <${Note}>${d('sched.nodeNote')}<//>
+      <${Facts} rows=${freshRows} />
+      <${Note}>${onChange ? d('sched.changeNodeNote') : d('sched.nodeNote')}<//>
     <//>`;
 }
 
@@ -79,18 +96,19 @@ export function stepSchedule(s) {
 
 /** The named shares made when the product is published: a short form and the list of them. */
 function ShareQueue({ draft, setDraft, maxDays = 365 }) {
-  const empty = { who: '', how: 'program', email: '', purpose: '', until: isoDay(Date.now() + 30 * DAY) };
+  const empty = { who: '', how: 'program', email: '', account: '', purpose: '', until: isoDay(Date.now() + 30 * DAY) };
   const [form, setForm] = useState(null);
   const set = (patch) => setForm((f) => ({ ...f, ...patch }));
   const add = () => {
-    setDraft((cur) => ({ shares: [...cur.shares, { ...form, who: form.who.trim(), party: partyNameOf(form.who), purpose: form.purpose.trim(), email: form.email.trim() }] }));
+    setDraft((cur) => ({ shares: [...cur.shares, { ...form, who: form.who.trim(), party: partyNameOf(form.who), purpose: form.purpose.trim(), email: form.email.trim(), account: form.account.trim() }] }));
     setForm(null);
   };
-  const ok = form && partyNameOf(form.who) && form.purpose.trim() && form.until && (form.how !== 'person' || /\S+@\S+/.test(form.email));
+  const ok = form && partyNameOf(form.who) && form.purpose.trim() && form.until && (form.how !== 'person' || /\S+@\S+/.test(form.email))
+    && (form.how !== 'aimeat' || isAccount(form.account));
   return html`
     <${List} cols="name-who-doors" empty=${d('who.noShares')} rows=${draft.shares} render=${(sh, i) => html`
       <${Row} key=${sh.party + i}>
-        <${Name} meta=${[d('party.kind.' + sh.how), sh.purpose].join(' · ')}>${sh.who}<//>
+        <${Name} meta=${[d('party.kind.' + sh.how), sh.how === 'aimeat' ? sh.account : '', sh.purpose].filter(Boolean).join(' · ')}>${sh.who}<//>
         <${Who}>${d('product.until', { date: fmtDate(`${sh.until}T12:00:00`) })}<//>
         <${Doors}><${Action} small row soft tone="danger" onClick=${() => setDraft((cur) => ({ shares: cur.shares.filter((_, j) => j !== i) }))}>${d('src.remove')}<//><//>
       <//>`} />
@@ -98,8 +116,10 @@ function ShareQueue({ draft, setDraft, maxDays = 365 }) {
       <${Fields} cols=${2}>
         <${TextField} label=${d('share.who')} value=${form.who} onInput=${(v) => set({ who: v })} placeholder=${d('share.whoPlaceholder')} />
         <${Choice} label=${d('share.how')} value=${form.how} onChange=${(v) => set({ how: v })}
-          options=${[['program', d('share.howProgram')], ['person', d('share.howBrowser')]]} />
-        <${TextField} label=${d('share.email')} type="email" value=${form.email} onInput=${(v) => set({ email: v })} placeholder=${d('share.emailPlaceholder')} />
+          options=${SHARE_HOWS.map(([k, key]) => [k, d('share.' + key)])} />
+        ${form.how === 'aimeat'
+          ? html`<${TextField} label=${d('share.account')} value=${form.account} onInput=${(v) => set({ account: v })} placeholder=${d('share.accountPlaceholder')} hint=${d('share.accountHint')} />`
+          : html`<${TextField} label=${d('share.email')} type="email" value=${form.email} onInput=${(v) => set({ email: v })} placeholder=${d('share.emailPlaceholder')} />`}
         <${TextField} label=${d('share.purpose')} value=${form.purpose} onInput=${(v) => set({ purpose: v })} placeholder=${d('share.purposePlaceholder')} />
         <${TextField} label=${d('share.until')} type="date" value=${form.until} min=${isoDay(Date.now() + DAY)} max=${isoDay(Date.now() + maxDays * DAY)} onInput=${(v) => set({ until: v })} />
       <//>
@@ -158,11 +178,12 @@ export function stepDone(s) {
         ${result.shares.map((sh, i) => (sh.error
           ? html`<${Box} key=${i} tone="attention" name=${sh.who}><${Note} kind="message" error>${sh.error}<//><//>`
           : html`<${Box} key=${i} name=${sh.who} marks=${html`<${Mark}>${d('party.kind.' + sh.how)}<//>`}>
-              <${Note} kind="lead">${sh.out.say}<//>
+              <${Note} kind="lead">${shareSentence(sh.out, sh.who)}<//>
               ${sh.link && !sh.link.sent ? html`<${Note} kind="aside" size="small">${d('share.notSent', { email: sh.email })}<//>` : null}
-              <${Note}>${sh.out.key_note}<//>
-              <${Code} block scroll>${JSON.stringify(sh.out.connection, null, 2)}<//>
-              <${Actions}><${Action} small copy=${JSON.stringify(sh.out.connection, null, 2)}>${d('share.copyFile')}<//><//>
+              ${sh.out.recipient_kind === 'visitor' ? html`<${VisitorRead} out=${sh.out} />` : html`
+                <${Note}>${keyNote(sh.out, sh.who)}<//>
+                <${Code} block scroll>${JSON.stringify(sh.out.connection, null, 2)}<//>
+                <${Actions}><${Action} small copy=${JSON.stringify(sh.out.connection, null, 2)}>${d('share.copyFile')}<//><//>`}
             <//>`))}
       <//>
     <//>` : null}

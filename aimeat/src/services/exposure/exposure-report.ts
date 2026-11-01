@@ -39,6 +39,9 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.8.0 — 2026-11-01 — Each item carries `close` and, where the node words its title, `title_parts`;
+ *     the report carries `note_codes` and `item_cap` beside `notes`, so a page says them in its language
+ *     while the English sentences stay for an AI (WP9c).
  *   v1.7.0 — 2026-11-01 — An item carries its freshness, a named share's facts (`share`) and an outside
  *     party's (`party`) out of the report; outward() dropped the freshness the sources attached (WP9a).
  *   v1.6.0 — 2026-11-01 — The counts carry the level `named` (outside parties, plan doc-mvwxcas3dom3, D3).
@@ -60,7 +63,7 @@ import { signedInOnly } from '../../config-visibility.js';
 import { openingOfApp } from '../internet-opening/opening-registry.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureKind, type ExposureLevel,
-  KINDS, LEVELS, EXPOSURE_ITEM_CAP,
+  KINDS, LEVELS, EXPOSURE_ITEM_CAP, closeAs,
 } from './exposure-types.js';
 import { EXPOSURE_SOURCES } from './exposure-sources.js';
 import { classifyExposure, type ItemClassification } from './exposure-classification.js';
@@ -104,6 +107,9 @@ export interface ExposureReport {
   hidden_by_classification: number;
   /** What the report does not count, and why. */
   notes: string[];
+  /** The code of each note, in the same order, and the item cap one of them names: a page's own words. */
+  note_codes: string[];
+  item_cap: number;
 }
 
 export interface NodeExposureReport {
@@ -157,6 +163,10 @@ function lowerToSignedIn(f: ExposureFound, ownerName: string): ExposureFound {
         ...f, level: 'public',
         how_to_close: `It is open to everyone on the internet until ${(opening.until ?? '').slice(0, 10)}, by an opening with its own reason and history. `
           + `Close it with aimeat_app_internet_close (DELETE /v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(f.id)}/internet-opening); it then reads as signed-in again.`,
+        close: closeAs('app-internet', {
+          date: (opening.until ?? '').slice(0, 10), tool: 'aimeat_app_internet_close',
+          route: `DELETE /v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(f.id)}/internet-opening`,
+        }),
       };
     }
   }
@@ -170,6 +180,14 @@ function notesFor(ctx: ExposureContext): string[] {
     : [...EXPOSURE_NOTES];
 }
 
+/** The code of each EXPOSURE_NOTES sentence, in order: what a page says in its language. */
+export const EXPOSURE_NOTE_CODES: readonly string[] = ['presigned', 'access-code', 'named-readers', 'workspace-page', 'market-record', 'item-cap', 'store-limit'];
+
+/** The notes' codes, in the order of notesFor. */
+function noteCodesFor(ctx: ExposureContext): string[] {
+  return signedInOnly(ctx.config) ? ['signed-in-node', ...EXPOSURE_NOTE_CODES] : [...EXPOSURE_NOTE_CODES];
+}
+
 export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signed-in accounts only (the operator\'s setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts. The one exception is an app opened to the internet, with the forms it uses: it is listed as public until its opening ends.';
 
 /**
@@ -179,9 +197,11 @@ export const NODE_SIGNED_IN_NOTE = 'This node shows its content to its own signe
 function outward(f: ExposureFound, cls?: ItemClassification): ReportedItem {
   return {
     kind: f.kind, id: f.id, title: f.title, level: f.level,
+    ...(f.title_parts ? { title_parts: f.title_parts } : {}),
     ...(f.organism_id ? { organism_id: f.organism_id } : {}),
     ...(f.url ? { url: f.url } : {}),
     how_to_close: f.how_to_close,
+    ...(f.close ? { close: f.close } : {}),
     ...(f.freshness ? { freshness: f.freshness } : {}),
     ...(f.share ? { share: f.share } : {}),
     ...(f.party ? { party: f.party } : {}),
@@ -272,6 +292,8 @@ export async function buildExposureReport(ctx: ExposureContext, ownerName: strin
     failed,
     hidden_by_classification: hidden,
     notes: notesFor(ctx),
+    note_codes: noteCodesFor(ctx),
+    item_cap: EXPOSURE_ITEM_CAP,
   };
 }
 

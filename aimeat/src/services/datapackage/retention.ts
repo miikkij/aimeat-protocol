@@ -19,6 +19,7 @@
  * @structure RetentionPolicy · VersionAge · doomedVersions · pinnedVersionsOf · pruneOldVersions
  * @usage const removed = await pruneOldVersions(deps, ownerGhii, name, policy, contentHash);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A pin of a share to a person on another AIMEAT node is kept too (isNamedShare; WP9c).
  *   v1.1.0 — 2026-11-01 — The newest version of each interface a live EXCHANGE contract pins is kept too,
  *     named `contract:<entitlement id>` (plan D5.1).
  *   v1.0.0 — 2026-11-01 — pruneOldVersions moved from ./store.ts unchanged; doomedVersions extracted as
@@ -26,7 +27,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { bare, packageKeyRoot, type PublishInput } from './contract.js';
-import { isLiveShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
+import { isLiveShare, isNamedShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
 import { logger } from '../../utils/logger.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { listEntitlementsByProvider } from '../metered-entitlements.js';
@@ -62,7 +63,7 @@ export async function pinnedVersionsOf(deps: StoreDeps, ownerGhii: string, name:
     const out = new Map<string, string[]>();
     const consents = await deps.storage.listConsents(ownerGhii, { status: 'active' });
     for (const c of consents) {
-        if (!c.recipient.startsWith('party:') || packageOfPattern(c.dataPattern) !== name || !isLiveShare(c)) continue;
+        if (!isNamedShare(c) || packageOfPattern(c.dataPattern) !== name || !isLiveShare(c)) continue;
         const pin = shareMetaOf(c).pinnedVersion;
         if (!pin) continue;
         const h = bare(pin);

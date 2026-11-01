@@ -15,12 +15,14 @@
  *   HOW TO CLOSE, on this page. Where the person can close a thing with one press, the row offers it
  *   (a record, a file, a board, a skill or a package made private; a workspace page no longer shared)
  *   and asks first in the site's own confirm dialog (components/Modal.js useConfirm). Where the control lives on another page, the row opens that page. Every row can
- *   also copy the report's `how_to_close` for the person's AI, which names the tool and the route.
+ *   also copy how to close it for the person's AI, which names the tool and the route, said in the
+ *   page's language from the report's `close` (exposure/words.js; the English `how_to_close` stays the
+ *   fallback).
  *
  *   HONEST ABOUT ITS EDGES. A kind the report could not read (`failed`) is named, and its count is
  *   missing rather than zero; a kind cut at the list's cap (`capped`) is named, with its count whole;
  *   what the person's classification hides from this view (`hidden_by_classification`) is counted;
- *   and the report's `notes` say what it does not count. The notes are the server's own sentences.
+ *   and the report's `notes` say what it does not count, said in the page's language from `note_codes`.
  *
  *   Live data by the `aimeat-live-update` event: the report is read again when something it lists
  *   changes, never on a timer.
@@ -37,6 +39,8 @@
  * @structure LEVELS · KINDS · closeOf(item) · lowerOf(item) · placeOf(item) · ExposureTab (default)
  * @usage Registered in views/profile.js as the `exposure` tab; menu entry in landing-page.cards.js (Account).
  * @version-history
+ *   v1.5.0 — 2026-11-01 — How to close an item, a title the node words and the notes in the page's
+ *     language, from the report's `close`, `title_parts` and `note_codes` (exposure/words.js; WP9c).
  *   v1.4.0 — 2026-11-01 — LEVELS gains `named`, outside the widest-first order a cap reads; the strip
  *     counts the named shares and the outside parties; sections for the named shares ("End share"),
  *     the outside parties ("Manage" in the Data Wallet) and every data package at its own level
@@ -73,6 +77,7 @@ import { openTab } from '/components/Rail.js';
 import { useConfirm } from '/components/Modal.js';
 import * as dp from '/js/services/dataproducts.js';
 import { secNamedShares, secParties, secProducts, NAMED_KINDS } from './exposure/named.js';
+import { closeText, titleOf, noteTexts } from './exposure/words.js';
 
 const html = htm.bind(h);
 const x = (key, vars) => t(`exposure.${key}`, vars);
@@ -235,10 +240,10 @@ function ItemRow({ item, busy, onClose, onCopied }) {
   const close = closeOf(item);
   const place = close ? null : PLACE[item.kind];
   const appHref = !close && item.kind === 'app' ? `/v1/appcat?q=${enc(item.title)}` : null;
-  const forAi = x('aiPrompt', { title: item.title, how: item.how_to_close });
+  const forAi = x('aiPrompt', { title: titleOf(item), how: closeText(item) });
   return html`
     <${Row}>
-      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')}>${item.title}<//>
+      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')}>${titleOf(item)}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
       <${WhoCell} item=${item} />
       <${Doors}>
@@ -259,10 +264,10 @@ function ConflictRow({ item, busy, onLower, onCopied }) {
   const place = lower ? null : PLACE[item.kind];
   const appHref = !lower && item.kind === 'app' ? `/v1/appcat?q=${enc(item.title)}` : null;
   const c = item.classification;
-  const forAi = x('cls.aiPrompt', { title: item.title, label: labelName(c), cap: levelWords(c.max_audience), how: item.how_to_close });
+  const forAi = x('cls.aiPrompt', { title: titleOf(item), label: labelName(c), cap: levelWords(c.max_audience), how: closeText(item) });
   return html`
     <${Row} rail="notice">
-      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')} desc=${capSentence(item, 'cls.capSentence')}>${item.title}<//>
+      <${Name} href=${item.url || undefined} newTab meta=${item.url || x('noAddress')} desc=${capSentence(item, 'cls.capSentence')}>${titleOf(item)}<//>
       <${Cell} meta>${kindWord(item.kind)}<//>
       <${WhoCell} item=${item} />
       <${Doors}>
@@ -306,7 +311,7 @@ export default function ExposureTab({ showToast }) {
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
 
-  const onClose = (item, close) => confirm(x('closeConfirm', { title: item.title }), () => runClose(item, close),
+  const onClose = (item, close) => confirm(x('closeConfirm', { title: titleOf(item) }), () => runClose(item, close),
     { title: x('closeTitle'), confirmLabel: x('closeIt'), danger: true });
 
   const runClose = async (item, close) => {
@@ -315,7 +320,7 @@ export default function ExposureTab({ showToast }) {
     setMessage('');
     try {
       await close();
-      setMessage(x('closed', { title: item.title }));
+      setMessage(x('closed', { title: titleOf(item) }));
       await load();
     } catch (err) {
       swallowed('exposure-tab: close failed', err);
@@ -327,7 +332,7 @@ export default function ExposureTab({ showToast }) {
 
   const onLower = (item, lower) => {
     const to = levelWords(item.classification.lower_to.level);
-    confirm(x('cls.lowerConfirm', { title: item.title, level: to, label: labelName(item.classification) }), () => runLower(item, lower, to),
+    confirm(x('cls.lowerConfirm', { title: titleOf(item), level: to, label: labelName(item.classification) }), () => runLower(item, lower, to),
       { title: x('cls.lowerTitle'), confirmLabel: x('cls.lowerIt') });
   };
 
@@ -339,7 +344,7 @@ export default function ExposureTab({ showToast }) {
       const out = await lower();
       // Some services answer a refusal as { ok: false } rather than throwing (services/organisms.js).
       if (out && out.ok === false) throw new Error(out.error?.message || x('cls.lowerFailed'));
-      setMessage(x('cls.lowered', { title: item.title, level: to }));
+      setMessage(x('cls.lowered', { title: titleOf(item), level: to }));
       await load();
     } catch (err) {
       swallowed('exposure-tab: lower failed', err);
@@ -413,7 +418,7 @@ export default function ExposureTab({ showToast }) {
           <${Note} kind="hint">${x('askYourAi')}<//>
         <//>
         <${Section} fold id="ex-notes" num=${num(5)} title=${x('notesTitle')} sub=${x('notesSub')}>
-          ${report.notes.map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
+          ${noteTexts(report).map((n, i) => html`<${Note} key=${i} kind="hint">${n}<//>`)}
         <//>` : null}
     <//>`;
 }

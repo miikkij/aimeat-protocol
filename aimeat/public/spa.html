@@ -1248,6 +1248,10 @@
       if (pathname === '/v1/home' && /[?&]history=/.test(search)) {
         return () => import('/views/home/history.js' + B);
       }
+      // The place's activity log, every action done in it (/v1/home?trail=1, "Rakennamme kanssasi").
+      if (pathname === '/v1/home' && /[?&]trail=/.test(search)) {
+        return () => import('/views/home/trail.js' + B);
+      }
       // The home's agent pages: a new agent before it exists (/v1/home?new-agent=1), one agent at
       // work (/v1/home?agent=<name>), and the computers agents run on (/v1/home?computers=1; the
       // address it had first, ?machines=1, still opens it).

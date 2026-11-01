@@ -19,6 +19,9 @@
  *   stopParty · resumeParty · deleteParty · createKey · deleteKey · readsOfParty · shareWithParty
  * @usage const out = await createParty({ deps, caller }, body); if (!out.ok) render(out);
  * @version-history
+ *   v1.3.0 — 2026-11-01 — shareWithParty takes `recipient` (name@their-node): a share to a person on
+ *     another AIMEAT node, who reads signed in as a visitor (shareWithVisitor, `sign_in`, `read`). A
+ *     share's answer carries `key_shown` and `package_title`, the facts its sentences are made of (WP9c).
  *   v1.2.0 — 2026-11-01 — The list answers `share_max_days`, the longest share this node grants, so a
  *     share form caps its end date before it asks, and `dataspace`, whether the Dataspace Protocol is on (WP9a).
  *   v1.1.0 — 2026-11-01 — Each share in a party's view carries `package_freshness` (plan D6.1).
@@ -38,7 +41,8 @@ import {
 import { newPartyKey, newPartyKeyId, newPartyUid } from './keys.js';
 import { readParties, findParty, insertParty, changeParty, removeParty } from './store.js';
 import { flushOwner } from './activity.js';
-import { connectionFileOf, descriptorFor, endShares, packageOfPattern, partySharesOf, shareMetaOf, shareView, sharePatternOf } from './shares.js';
+import { connectionFileOf, descriptorFor, endShares, isVisitorRecipient, packageOfPattern, partySharesOf, shareMetaOf, shareView, sharePatternOf } from './shares.js';
+import { homeNodeSignIn } from '../../auth/visitor-peer.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
 import { partyReads, shareReadStats } from './read-stats.js';
 
@@ -253,6 +257,7 @@ function shareSentence(party: PartyRecord, title: string, expires: string | null
 export async function shareWithParty(ctx: PartyServiceCtx, body: Record<string, unknown>): Promise<PartyAnswer<Record<string, unknown>>> {
     const denied = managerRefusal(ctx.caller);
     if (denied) return denied;
+    if (typeof body.recipient === 'string') return shareWithVisitor(ctx, body);
     const { storage, config } = ctx.deps;
     const name = typeof body.name === 'string' ? body.name.trim() : '';
     const pkg = typeof body.package === 'string' ? body.package.trim() : '';
@@ -308,7 +313,70 @@ export async function shareWithParty(ctx: PartyServiceCtx, body: Record<string, 
             share: shareView(share),
             connection: await connectionFileOf(ctx.deps, ctx.caller.ownerGhii, party, share, key),
             ...(key ? { key_note: 'The key is in the connection file and is shown once. Give the file to the party now.' } : { key_note: 'The party already has a key; the connection file names how to use it. Pass new_key true to make a new one.' }),
+            // The facts the sentences are made of, so a page says them in its own language (WP9c).
+            key_shown: !!key, package_title: descriptor?.title || pkg,
             say: shareSentence(party, descriptor?.title || pkg, share.expires),
         },
     };
 }
+
+/**
+ * Share one data package with a person on another AIMEAT node, by their home account `recipient`
+ * (name@their-node; canvas board Jako, "Toiselta AIMEATilta"). No party and no key: they sign in on
+ * this node as a visitor from their home node, and the package reads admit exactly that account
+ * (./visitor-read.ts). The answer says whether this node accepts sign-ins from their node now
+ * (`sign_in`: ready, or why not), so the owner can tell them before they try.
+ */
+async function shareWithVisitor(ctx: PartyServiceCtx, body: Record<string, unknown>): Promise<PartyAnswer<Record<string, unknown>>> {
+    const { storage, config } = ctx.deps;
+    const recipient = String(body.recipient).trim();
+    const pkg = typeof body.package === 'string' ? body.package.trim() : '';
+    const purpose = str(body.purpose, 512);
+    if (!isVisitorRecipient(recipient, config.nodeId)) {
+        return refuse(400, 'INVALID_RECIPIENT', `recipient is the person's account on their own AIMEAT node: name@their-node. An account on this node (${config.nodeId}) reads through the package's audience; someone with no account gets a party (name instead of recipient).`);
+    }
+    if (!pkg) return refuse(400, 'INVALID_INPUT', 'package is the name of the data package to share.');
+    if (!purpose) return refuse(400, 'INVALID_INPUT', 'purpose says what the person uses the data for, in a sentence.');
+    let expires: string | undefined = str(body.expires, 64);
+    if (!expires && typeof body.days === 'number' && Number.isFinite(body.days) && body.days > 0) {
+        expires = new Date(Date.now() + Math.round(body.days * 86_400_000)).toISOString();
+    }
+    const displayName = str(body.display_name, 120);
+    const granted = await grantConsent({ storage, config }, {
+        ownerGaii: ctx.caller.principal, scopes: [...ctx.caller.scopes], roles: [...ctx.caller.roles],
+        collectionMethod: consentCollectionMethod(ctx.door ?? 'rest', ctx.caller),
+    }, {
+        recipient, dataPattern: sharePatternOf(pkg), purpose, ...(expires ? { expires } : {}),
+        metadata: {
+            ...(body.pinned_version !== undefined ? { pinned_version: body.pinned_version } : {}),
+            ...(displayName ? { displayName } : {}),
+        },
+    });
+    if (!granted.ok) return refuse(granted.status, granted.code, granted.message);
+    const share: ConsentRecord = granted.value;
+    const descriptor = await descriptorFor(storage, ctx.caller.ownerGhii, pkg, shareMetaOf(share).pinnedVersion);
+    const title = descriptor?.title || pkg;
+    const base = config.baseUrl.replace(/\/+$/, '');
+    const enc = encodeURIComponent;
+    const owner = ctx.caller.owner;
+    const pin = shareMetaOf(share).pinnedVersion;
+    const q = pin ? `?version=${enc(pin)}` : '';
+    const homeNode = recipient.slice(recipient.lastIndexOf('@') + 1);
+    const until = share.expires ? share.expires.slice(0, 10) : 'you end it';
+    return {
+        ok: true, data: {
+            recipient, recipient_kind: 'visitor', display_name: displayName ?? recipient,
+            share: shareView(share), package_title: title, key_shown: false,
+            sign_in: homeNodeSignIn(homeNode),
+            read: {
+                // The front page: its sign-in dialog takes name@their-server and asks their home node.
+                sign_in_url: `${base}/`, account: recipient,
+                descriptor_url: `${base}/v1/datapackages/${enc(owner)}/${enc(pkg)}${q}`,
+                odata_url: `${base}/v1/odata/${enc(owner)}/${enc(pkg)}${q}`,
+                resources: (descriptor?.resources ?? []).map(r => ({ name: r.name, rows_url: `${base}/v1/datapackages/${enc(owner)}/${enc(pkg)}/rows/${enc(r.name)}${q}`, csv_url: `${base}/v1/datapackages/${enc(owner)}/${enc(pkg)}/rows/${enc(r.name)}?format=csv${pin ? `&version=${enc(pin)}` : ''}` })),
+            },
+            say: `${displayName ?? recipient} can now read "${title}" until ${until}, signed in on this node with their own account ${recipient}. You can end the share at any time and the next read is refused, but copies already taken cannot be called back.`,
+        },
+    };
+}
+

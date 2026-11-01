@@ -10,6 +10,7 @@
  * @structure SHELL_DEMOS — { [id]: { variants: [{ name, render(ex) }], height?, emptyNote? } }
  * @usage import { SHELL_DEMOS } from './demos-shell.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — DataTable form + stack: a table of fields that stacks on a phone (WP9c).
  *   v1.4.0 — 2026-09-30 — NodeUpdateNotice's tag.
  *   v1.3.0 — 2026-09-27 — The start page setting's dialog and footer drawn by the component (live: they
  *     read this account's choice), beside its markup; the toast drawn by ToastBox, with hold and role.
@@ -29,6 +30,7 @@ import { DataTable } from '/components/DataTable.js';
 import { Check } from '/components/Check.js';
 import { Mark } from '/components/Mark.js';
 import { Select } from '/components/Select.js';
+import { TextField } from '/components/TextField.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { KeyValueRow } from '/components/KeyValueRow.js';
 import { Pagination, LoadMore } from '/components/Pagination.js';
@@ -86,6 +88,13 @@ export const SHELL_DEMOS = {
       [html`<${Check} checked=${true} onChange=${noop} ariaLabel="Harbour Studio" />`, 'Harbour Studio', '3', html`<${Mark} kind="status" tone="fine">new<//>`],
       [html`<${Check} checked=${false} onChange=${noop} ariaLabel="Lumo Bakery" />`, 'Lumo Bakery', '1',
         html`<${Mark} kind="status" tone="attention">exists<//><br /><${Select} fit ariaLabel="Status" value="skip" onChange=${noop} options=${[['skip', 'Skip'], ['replace', 'Replace'], ['new', 'Import as new']]} />`],
+    ]} />` },
+    { name: 'form + stack: fields per row, one block per row on a phone', render: () => html`<${DataTable} form stack headers=${['Included', 'Source field', 'Name out', 'Type', 'Description']} rows=${[
+      [html`<${Check} checked=${true} onChange=${noop} ariaLabel="municipality" />`, { text: 'A.municipality', mono: true },
+        html`<${TextField} code ariaLabel="Name out" value="kunta" onInput=${noop} />`,
+        html`<${Select} ariaLabel="Type" value="string" onChange=${noop} options=${['string', 'integer', 'date']} />`,
+        html`<${TextField} ariaLabel="Description" value="Kunnan nimi" onInput=${noop} />`],
+      [html`<${Check} checked=${false} onChange=${noop} ariaLabel="contactPerson" />`, { text: 'A.contactPerson', mono: true }, null, null, null],
     ]} />` },
   ] },
   'usage-chart': one('frame', () => html`<div class="usage-chart"><p>The chart's canvas sits here; its data comes from the node.</p></div>`),
