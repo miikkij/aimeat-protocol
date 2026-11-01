@@ -16,6 +16,9 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-02: Under the welcome, on a customer's node, the first visit's morning digest offer and the
+ *     third visit's work made for the person (morning-digest.js, made-for-you.js, timed by visits.js;
+ *     Jouni 2.11 00.52, "three visits" a and c).
  *   2026-11-01: Under the welcome, on a customer's node, "Rakennamme kanssasi" (build-with-you.js):
  *     the offer once the node opens it, then the request's place in the queue (Jouni, 1.11 16.22).
  *   2026-10-31: The welcome takes no navigate: its sentence field went with v31 K26. It leaves once the
@@ -84,6 +87,9 @@ import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { CustomerWelcome } from './customer-welcome.js';
 import { BuildWithYou } from './build-with-you.js';
+import { MorningDigestOffer } from './morning-digest.js';
+import { MadeForYouOffer } from './made-for-you.js';
+import { useHomeVisit } from './visits.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -102,6 +108,8 @@ export default function HomeView({ navigate }) {
   const finished = useSurfaceLayout('home');
   const onboarding = useSurfaceLayout('home-onboarding');
   const surface = state?.initialized ? finished : onboarding;
+  // Which visit this is: the store's place times its two offers by it (visits.js).
+  const visit = useHomeVisit(!!session);
 
   // One line of feedback, and only for things that went wrong: the steps themselves report by
   // changing, which is louder than a message that fades.
@@ -173,6 +181,10 @@ export default function HomeView({ navigate }) {
       ${/* A buyer's first page on the node the store made for them says what they bought and what to
             do first (customer-welcome.js); it draws nothing anywhere else. */''}
       <${CustomerWelcome} session=${session} initialized=${connected} />
+      ${/* On the same node, the first visit's offer of a morning digest agent and, from the third,
+            one piece of work made from the person's profile (morning-digest.js, made-for-you.js). */''}
+      <${MorningDigestOffer} visit=${visit} />
+      <${MadeForYouOffer} visit=${visit} />
       ${/* On the same node, once the node opens it: "Rakennamme kanssasi", the offer and then the
             request's way through the queue (build-with-you.js). */''}
       <${BuildWithYou} />
