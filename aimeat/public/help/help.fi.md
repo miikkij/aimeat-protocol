@@ -66,7 +66,7 @@ Hyväksyt agentin kerran. Sen jälkeen sen ajot näkyvät [Ajastimessa](/v1/prof
 
 Voit tuoda AIMEATiisi tekoälyjä ja agentteja muualta. Ne käyttävät samaa muistia, samoja agentteja ja samoja sovelluksia kuin sinä. Mitä useampi tekoäly tekee työtä kanssasi, sitä enemmän AIMEATisi saa aikaan.
 
-**Tekoäly, jota jo käytät.** Claude, ChatGPT, Grok ja Cursor yhdistyvät MCP:llä. Avaa [Yhdistä tekoälysi](/v1/profile?tab=mcp) ja valitse tekoälysi, niin sivu näyttää vaiheet. Lopuksi AIMEATisi kysyy, mitä tekoäly saa tehdä, ja sinä hyväksyt yhteyden.
+**Tekoäly, jota jo käytät.** Claude, ChatGPT, Grok ja Cursor yhdistyvät MCP:llä. MCP (Model Context Protocol) on avoin standardi, jolla tekoäly saa yhteyden muihin palveluihin. Lue lisää: [modelcontextprotocol.io](https://modelcontextprotocol.io) (englanniksi). Avaa [Yhdistä tekoälysi](/v1/profile?tab=mcp) ja valitse tekoälysi, niin sivu näyttää vaiheet. Lopuksi AIMEATisi kysyy, mitä tekoäly saa tehdä, ja sinä hyväksyt yhteyden.
 
 **Agentti, joka toimii muualla**, esimerkiksi Grok-botti tai CrewAI-agentti. Ohjeet ovat [Agentit-sivulla](/v1/profile?tab=agents) kohdassa Liitä tekoäly, jota jo käytät. Agentti pyytää pääsyä, ja pyyntö näkyy samalla sivulla kohdassa Odottavat agenttipyynnöt. Sinä hyväksyt sen.
 
@@ -75,7 +75,7 @@ Kun hyväksyt, valitset, mitä tekoäly tai agentti saa tehdä: Vain luku, Vakio
 Voit muuttaa tai perua pääsyn milloin vain, ja muutos tulee voimaan heti:
 
 - Yhdistetyn tekoälyn irrotat [Yhdistä tekoälysi -sivulla](/v1/profile?tab=mcp) painikkeella Katkaise yhteys.
-- Agentin oikeudet muutat [Agentit-sivulla](/v1/profile?tab=agents): avaa agentti ja muuta sen oikeuksia tai paina Poista agentti. Myös yhdistetyt tekoälyt näkyvät siellä agentteina.
+- Agentin oikeudet muutat [Agentit-sivulla](/v1/profile?tab=agents): avaa agentti ja muuta sen oikeuksia tai paina Poista agentti. Yhdistämäsi tekoäly näkyy Agentit-sivulla omana rivinään.
 <!--/store-->
 
 ## Sovellukset {#apps}
