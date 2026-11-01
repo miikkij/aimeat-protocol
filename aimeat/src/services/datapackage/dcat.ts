@@ -31,6 +31,7 @@
  *   const graph = buildDcatGraph({ config, facts: page, total, page: 1, pageSize: 100, format: 'jsonld' });
  *   res.type('application/ld+json').send(JSON.stringify(dcatToJsonLd(graph)));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The producer schedule `on-change` is the frequency IRREG (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.3).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -76,10 +77,12 @@ const isNode = (v: RdfValue): v is RdfNode => 'types' in v;
 /**
  * A cron expression as an EU frequency word, or null when the expression has no exact word. Coarse on
  * purpose and never rounded: `0 6 * * *` is DAILY, `0 6 * * 1` WEEKLY, `0 6 1 * *` MONTHLY, but a cron
- * every three days or on four weekdays has no word in the vocabulary and gets none.
+ * every three days or on four weekdays has no word in the vocabulary and gets none. A data product that
+ * runs when its source changes (`on-change`) is IRREG, the vocabulary's word for no fixed interval.
  */
 export function accrualPeriodicityOf(cron: string | undefined): string | null {
   if (!cron) return null;
+  if (cron === 'on-change') return 'IRREG';
   const parts = cron.trim().split(/\s+/);
   if (parts.length !== 5) return null;
   const [minute, hour, dom, month, dow] = parts;

@@ -23,10 +23,18 @@
  *
  *   SOURCES. A product built from other data packages is as fresh as its least fresh source (D9.9): the
  *   worst state wins, and `limited_by` names the source that set it.
+ *
+ *   A PRODUCT THAT RUNS WHEN ITS SOURCE CHANGES (`onChange`) promises no clock, so no clock makes it
+ *   late. Its own state is fresh while its newest run succeeded, and late when a run after a change
+ *   failed (the newest version is older than its source). Late and stale beyond that come from its
+ *   sources' own freshness, as above: a source package that is late or stale makes the product so.
+ *   `trigger: 'change'` says which rule was used.
  * @structure FRESHNESS_STATES · FreshnessState · FreshnessPromise · Freshness · FreshnessInput ·
  *   SCHEDULED_BY_NATURE · STALE_UNPROMISED_DAYS · freshnessOf · freshnessBrief · worstOf
  * @usage const f = freshnessOf({ promise: { cron: '0 6 * * *', source: 'producer' }, lastSuccessAt, now: new Date() });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — `onChange`: a product that runs when its source changes follows its sources'
+ *     freshness and its own newest run, not a clock (reason codes on-change, on-change-run-failed; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.1, D9.9).
  */
 import { Cron } from 'croner';
@@ -63,6 +71,8 @@ export interface Freshness {
     limited_by?: string;
     /** The source packages read, each with its own state. */
     sources?: Array<{ package: string; state: FreshnessState }>;
+    /** `change`: the product runs when its source changes, and the state follows its sources and its newest run. */
+    trigger?: 'change';
 }
 
 export interface FreshnessInput {
@@ -73,6 +83,8 @@ export interface FreshnessInput {
     lastError?: { at: string; message: string } | null;
     /** The freshness of each source package, for a product built from packages. */
     sources?: Array<{ package: string; freshness: Freshness }>;
+    /** The product runs when its source changes: no clock is promised. */
+    onChange?: boolean;
     now: Date;
 }
 
@@ -134,6 +146,14 @@ export function freshnessOf(input: FreshnessInput): Freshness {
 
 function ownFreshness(input: FreshnessInput, last: string | null, now: number): Freshness {
     const base = { last_success_at: last, due_at: null, stale_at: null };
+    if (input.onChange) {
+        const failedSince = !!input.lastError && (!last || input.lastError.at > last);
+        return failedSince
+            ? { ...base, state: 'late', promise: null, trigger: 'change', reason_code: 'on-change-run-failed',
+                reason: 'This product runs when its source changes. The source changed, and the run after it failed, so the newest version is older than the source.' }
+            : { ...base, state: 'fresh', promise: null, trigger: 'change', reason_code: 'on-change',
+                reason: 'This product runs when its source changes, and its newest run succeeded.' };
+    }
     if (!input.promise) {
         const idleDays = last ? (now - Date.parse(last)) / 86_400_000 : Infinity;
         if (SCHEDULED_BY_NATURE.includes(input.producerKind ?? '') && idleDays > STALE_UNPROMISED_DAYS) {

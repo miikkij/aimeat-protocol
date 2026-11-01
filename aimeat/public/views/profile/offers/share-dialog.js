@@ -12,11 +12,16 @@
  *   it sends, the dialog says the link was not sent and hands over the file.
  *
  *   The dialog is the site's Modal: the X, Escape and a click outside close it only while nothing has
- *   been typed. "Another AIMEAT" is not offered: a share reaches an outside party, and a visitor
- *   account from another node has no share of its own on the node yet.
- * @structure ShareDialog · partyNameOf
+ *   been typed. "From another AIMEAT" shares with a person by their own account on their own server
+ *   (name@server): no party and no key; they sign in here as a visitor and read it, and the answer
+ *   says whether this server takes sign-ins from theirs (WP9c). Every sentence the dialog shows is
+ *   made from the answer's facts in the page's language (data-model.js shareSentence, keyNote,
+ *   errText); the node's English `say` stays for an AI.
+ * @structure ShareDialog · partyNameOf · VisitorRead · SHARE_HOWS · isAccount
  * @usage html`<${ShareDialog} open=${o} onClose=${close} product=${{ name, title }} versions=${versions} onShared=${reload} />`
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "From another AIMEAT" (a share to a person's own account on another node, the
+ *     sign-in state and the addresses they read); the sentences and refusals in the page's language (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D3.3, D3.4, D3.6).
  */
 import { h } from 'preact';
@@ -34,10 +39,35 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { swallowed } from '/js/swallowed.js';
 import { date as fmtDate } from '/js/format.js';
 import * as dp from '/js/services/dataproducts.js';
-import { d, shortHash, versionNumber } from './data-model.js';
+import { Facts } from '/components/Facts.js';
+import { d, shortHash, versionNumber, shareSentence, keyNote, errText } from './data-model.js';
 
 const DAY = 86_400_000;
 const isoDay = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+/** How a recipient reads, and the words of each: with a program, in a browser, from another AIMEAT. */
+export const SHARE_HOWS = [['program', 'howProgram'], ['person', 'howBrowser'], ['aimeat', 'howAimeat']];
+
+/** An account on an AIMEAT server, as a person writes it: name@server. */
+export const isAccount = (v) => /^[a-z0-9][a-z0-9._-]{0,63}@[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(String(v || '').trim());
+
+/**
+ * What a person on another AIMEAT node needs: whether this server takes their sign-in now, where they
+ * sign in and with which account, and the addresses they read.
+ */
+export function VisitorRead({ out }) {
+  const node = String(out?.recipient || '').split('@').pop();
+  const who = out?.display_name || out?.recipient;
+  const r = out?.read || {};
+  return html`
+    <${Note} kind="aside" size="small" tone=${out?.sign_in === 'ready' ? undefined : 'irreversible'}>${d('share.signIn.' + (out?.sign_in || 'ready'), { node, who })}<//>
+    <${Facts} rows=${[
+      { k: d('share.signInAt'), v: r.sign_in_url, mono: true },
+      { k: d('share.account'), v: r.account, mono: true },
+      { k: d('connect.odata'), v: r.odata_url, mono: true },
+      { k: d('connect.descriptor'), v: r.descriptor_url, mono: true },
+    ].filter((row) => row.v)} />`;
+}
 
 /** The party's name from what the owner typed: lowercase letters, digits and dashes, at most 40. */
 export function partyNameOf(words) {
@@ -51,6 +81,7 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
   const [who, setWho] = useState('');
   const [how, setHow] = useState('program');
   const [email, setEmail] = useState('');
+  const [account, setAccount] = useState('');
   const [purpose, setPurpose] = useState('');
   const [until, setUntil] = useState(() => isoDay(Date.now() + 30 * DAY));
   const [pin, setPin] = useState('');
@@ -68,7 +99,8 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
 
   const name = partyNameOf(who);
   const max = isoDay(Date.now() + limits.maxDays * DAY);
-  const ready = !!name && !!purpose.trim() && !!until && (how !== 'person' || /\S+@\S+/.test(email));
+  const visitor = how === 'aimeat';
+  const ready = !!name && !!purpose.trim() && !!until && (how !== 'person' || /\S+@\S+/.test(email)) && (!visitor || isAccount(account));
   const file = done ? JSON.stringify(done.connection, null, 2) : '';
   const fileUrl = useMemo(() => (file ? URL.createObjectURL(new Blob([file], { type: 'application/json' })) : ''), [file]);
   useEffect(() => () => { if (fileUrl) URL.revokeObjectURL(fileUrl); }, [fileUrl]);
@@ -76,29 +108,30 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
   const share = async () => {
     setBusy(true); setError('');
     try {
-      const out = await dp.shareWithParty({
-        name, display_name: who.trim(), kind: how, package: product.name, purpose: purpose.trim(),
-        expires: new Date(`${until}T23:59:59`).toISOString(),
-        ...(email.trim() ? { contact: email.trim() } : {}),
-        ...(pin ? { pinned_version: pin } : {}),
-      });
+      const expires = new Date(`${until}T23:59:59`).toISOString();
+      const out = await dp.shareWithParty(visitor
+        ? { recipient: account.trim(), display_name: who.trim(), package: product.name, purpose: purpose.trim(), expires, ...(pin ? { pinned_version: pin } : {}) }
+        : {
+          name, display_name: who.trim(), kind: how, package: product.name, purpose: purpose.trim(), expires,
+          ...(email.trim() ? { contact: email.trim() } : {}),
+          ...(pin ? { pinned_version: pin } : {}),
+        });
       setDone(out);
-      if (email.trim()) setSent(await dp.sendShareLink(out, email.trim()));
-      // The dialog says the share's sentence itself; the toast only stands in when it has none.
-      if (!out?.say) showToast?.(d('share.done'));
+      if (!visitor && email.trim()) setSent(await dp.sendShareLink(out, email.trim()));
+      // The dialog says the share's sentence itself; the toast only stands in when it has no facts to say it with.
+      if (!out?.share) showToast?.(d('share.done'));
       onShared?.(out);
-    } catch (err) { setError(err?.message || d('share.failed')); }
+    } catch (err) { setError(errText(err, 'share.failed')); }
     setBusy(false);
   };
 
-  const close = () => { setWho(''); setEmail(''); setPurpose(''); setPin(''); setDone(null); onClose(); };
+  const close = () => { setWho(''); setEmail(''); setAccount(''); setPurpose(''); setPin(''); setDone(null); onClose(); };
   const footer = done
     ? html`<${Loud} control onClick=${close}>${d('share.close')}<//>`
     : html`<${Action} onClick=${close}>${d('share.cancel')}<//>
-        <${Loud} control disabled=${!ready || busy} onClick=${share}>${email.trim() ? d('share.submitSend') : d('share.submit')}<//>`;
+        <${Loud} control disabled=${!ready || busy} onClick=${share}>${!visitor && email.trim() ? d('share.submitSend') : d('share.submit')}<//>`;
   const hows = [
-    { value: 'program', label: d('share.howProgram'), hint: d('share.howProgramHint') },
-    { value: 'person', label: d('share.howBrowser'), hint: d('share.howBrowserHint') },
+    ...SHARE_HOWS.map(([value, key]) => ({ value, label: d('share.' + key), hint: d('share.' + key + 'Hint') })),
     limits.dataspace ? { value: 'dataspace', label: d('share.howDataspace'), hint: d('share.howDataspaceHint') } : null,
   ].filter(Boolean);
   const versionOptions = [['', d('share.versionLatest')],
@@ -106,26 +139,29 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
 
   return html`<${Modal} open=${open} onClose=${close} size="md" title=${done ? d('share.doneTitle') : d('share.title')} titleRef=${product?.title || product?.name} footer=${footer}>
     ${done ? html`
-      <${Note} kind="lead">${done.say}<//>
+      <${Note} kind="lead">${shareSentence(done, who.trim())}<//>
       ${sent && !sent.sent ? html`<${Note} kind="aside" size="small">${d('share.notSent', { email })}<//>` : null}
-      <${Note}>${done.key_note}<//>
-      <${Code} block scroll>${file}<//>
-      <${Actions}>
-        <${Action} small copy=${file}>${d('share.copyFile')}<//>
-        <${Action} small href=${fileUrl} download=${`${product.name}-${name}.json`}>${d('share.downloadFile')}<//>
-      <//>` : html`
+      ${done.recipient_kind === 'visitor' ? html`<${VisitorRead} out=${done} />` : html`
+        <${Note}>${keyNote(done, who.trim())}<//>
+        <${Code} block scroll>${file}<//>
+        <${Actions}>
+          <${Action} small copy=${file}>${d('share.copyFile')}<//>
+          <${Action} small href=${fileUrl} download=${`${product.name}-${name}.json`}>${d('share.downloadFile')}<//>
+        <//>`}` : html`
       <${Fields}>
         <${TextField} label=${d('share.who')} value=${who} onInput=${setWho} placeholder=${d('share.whoPlaceholder')}
-          hint=${name ? d('share.whoHint', { name }) : undefined} />
+          hint=${name && !visitor ? d('share.whoHint', { name }) : undefined} />
         <${Choice} label=${d('share.how')} boxed cols=${hows.length} dot name="share-how" value=${how} onChange=${setHow} options=${hows} />
-        <${TextField} label=${d('share.email')} type="email" value=${email} onInput=${setEmail} placeholder=${d('share.emailPlaceholder')}
-          hint=${how === 'person' ? d('share.emailNeeded') : d('share.emailHint')} />
+        ${visitor
+          ? html`<${TextField} label=${d('share.account')} value=${account} onInput=${setAccount} placeholder=${d('share.accountPlaceholder')} hint=${d('share.accountHint')} />`
+          : html`<${TextField} label=${d('share.email')} type="email" value=${email} onInput=${setEmail} placeholder=${d('share.emailPlaceholder')}
+          hint=${how === 'person' ? d('share.emailNeeded') : d('share.emailHint')} />`}
         <${TextField} label=${d('share.purpose')} value=${purpose} onInput=${setPurpose} placeholder=${d('share.purposePlaceholder')} />
         <${TextField} label=${d('share.until')} type="date" value=${until} onInput=${setUntil}
           hint=${d('share.untilHint', { n: limits.maxDays, date: fmtDate(max) })} min=${isoDay(Date.now() + DAY)} max=${max} />
         <${Select} label=${d('share.version')} value=${pin} onChange=${setPin} options=${versionOptions} />
       <//>
-      <${Note} kind="aside" size="small">${d('share.sentences', { who: who.trim() || d('share.theRecipient') })}<//>
+      <${Note} kind="aside" size="small">${d(visitor ? 'share.sentencesAimeat' : 'share.sentences', { who: who.trim() || d('share.theRecipient') })}<//>
       ${error ? html`<${Note} kind="message" error>${error}<//>` : null}`}
   <//>`;
 }

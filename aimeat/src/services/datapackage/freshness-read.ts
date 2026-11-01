@@ -13,6 +13,7 @@
  * @structure packageFreshness · PackageFreshnessOpts
  * @usage const f = await packageFreshness({ storage, config }, ownerGhii, name, { pointer });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A product that runs when its source changes is read with `onChange` (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.1, D9.9).
  */
 import type { StoreDeps } from './store.js';
@@ -20,7 +21,7 @@ import { descriptorKey, type Descriptor, type LatestPointer } from './contract.j
 import { readPointer } from './version-audience.js';
 import { trustedAudienceOf } from './audience-record.js';
 import { freshnessOf, type Freshness, type FreshnessPromise } from './freshness.js';
-import { asDefinition, dataProductKey } from '../dataproduct/definition.js';
+import { asDefinition, dataProductKey, runsOnChange } from '../dataproduct/definition.js';
 import { logger } from '../../utils/logger.js';
 
 export interface PackageFreshnessOpts {
@@ -50,6 +51,7 @@ export async function packageFreshness(
     const def = asDefinition((await deps.storage.getMemory(ownerGhii, dataProductKey(name)))?.value);
     let promise: FreshnessPromise | null = null;
     let producerKind = opts.producerKind;
+    const onChange = !!def && runsOnChange(def);
     if (def) {
         producerKind = 'dataproduct';
         if (def.schedule?.cron) promise = { cron: def.schedule.cron, ...(def.schedule.timezone ? { timezone: def.schedule.timezone } : {}), source: 'dataproduct' };
@@ -84,7 +86,7 @@ export async function packageFreshness(
             if (f) sources.push({ package: srcPointer.packageId || `pkg:${srcOwner}/${s.name}`, freshness: f });
         }
     }
-    return freshnessOf({ promise, lastSuccessAt, ...(producerKind ? { producerKind } : {}), lastError, ...(sources.length ? { sources } : {}), now });
+    return freshnessOf({ promise, lastSuccessAt, ...(producerKind ? { producerKind } : {}), lastError, ...(sources.length ? { sources } : {}), ...(onChange ? { onChange } : {}), now });
 }
 
 async function descriptorOf(deps: StoreDeps, ownerGhii: string, name: string, hash: string): Promise<Descriptor | null> {

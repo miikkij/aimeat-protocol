@@ -13,7 +13,7 @@ const html = htm.bind(h);
  *   truth that flips correctly in dark mode. Unlike the admin `DataTable` (which
  *   wraps this in an `.adm-card`), this component renders NO card/container — the
  *   caller supplies its own wrapper (`.card`, `.adm-card`, etc.).
- * @structure DataTable({ headers, rows, scroll, className })
+ * @structure DataTable({ headers, rows, scroll, className, compact, stack, form })
  *   - headers: array of column header cells (string or VNode)
  *   - rows: array of rows; each row is an array of cells. A cell may be:
  *       • a primitive/VNode → rendered as plain `<td>`
@@ -24,6 +24,11 @@ const html = htm.bind(h);
  *     or per-view tweaks)
  *   - compact: a table to choose from inside a dialog: ink words at .85rem, 6px 8px cells, small
  *     controls, no hover (the app catalogue's backup import)
+ *   - stack: on a phone (560px and narrower) each row becomes one block and each cell is labelled with
+ *     its column head (a string head; a cell under a head that is not a string has no label). A table
+ *     of controls, one row per item, edited on a phone too (the data product wizard's columns).
+ *   - form: the cells hold controls (a check, a text field, a select): a control fills its cell, the
+ *     cells sit on one middle line, and a row does not change colour under the pointer.
  * @usage
  *   import { DataTable } from '/components/index.js';
  *   html`<div class="card"><${DataTable} headers=${['Key','Value']} rows=${rows} /></div>`
@@ -34,6 +39,9 @@ const html = htm.bind(h);
  * server-generated markup like badges.
  *
  * @version-history
+ *   v1.2.0 — 2026-11-01 — `stack` (one block per row on a phone, each cell labelled with its head) and
+ *     `form` (cells that hold controls); additive, data-table.css .data-table--stack, .data-table--form
+ *     (the data product wizard's step 2, WP9c).
  *   2026-09-28 — The table sits in .data-table-wrap, which scrolls sideways when the columns are wider than the
  *     page; at 390 px the admin sharing-groups table lost its last column to the page's overflow.
  *   v1.1.0 — 2026-09-27 — `compact`: the old app catalogue's backup import table (.backup-table), for
@@ -42,23 +50,26 @@ const html = htm.bind(h);
  *     DataTable (same _html/mono cell protocol as admin's), backing the shared
  *     .data-table CSS. The admin shared.js DataTable now wraps this in .adm-card.
  */
-export function DataTable({ headers, rows, scroll, className, compact }) {
+export function DataTable({ headers, rows, scroll, className, compact, stack, form }) {
   // compact (added by appcat's dialogs, parity): a table to choose from inside a dialog, its words in
   // ink at .85rem in close cells, its controls small (the old catalogue's backup import, .backup-table).
-  const cls = `data-table${compact ? ' data-table--compact' : ''}${className ? ` ${className}` : ''}`;
+  // stack and form (added by the data product wizard, WP9c): a table of controls that stacks on a phone.
+  const cls = `data-table${compact ? ' data-table--compact' : ''}${stack ? ' data-table--stack' : ''}${form ? ' data-table--form' : ''}${className ? ` ${className}` : ''}`;
+  // Each cell's label on a stacked phone row: its column head, when the head is words.
+  const labelOf = (i) => (stack && typeof headers[i] === 'string' ? headers[i] : undefined);
   const table = html`<table class=${cls}>
     <thead><tr>${headers.map(hd => html`<th>${hd}</th>`)}</tr></thead>
     <tbody>
       ${rows.map(row => html`<tr>
-        ${row.map(cell => {
+        ${row.map((cell, i) => {
           if (cell && typeof cell === 'object' && cell._html) {
-            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''}
+            return html`<td class=${cell.mono ? 'mono' : ''} title=${cell.title || ''} data-label=${labelOf(i)}
               dangerouslySetInnerHTML=${{ __html: cell.text }}></td>`;
           }
           if (cell && typeof cell === 'object' && cell.mono) {
-            return html`<td class="mono" title=${cell.title || ''}>${cell.text}</td>`;
+            return html`<td class="mono" title=${cell.title || ''} data-label=${labelOf(i)}>${cell.text}</td>`;
           }
-          return html`<td>${cell}</td>`;
+          return html`<td data-label=${labelOf(i)}>${cell}</td>`;
         })}
       </tr>`)}
     </tbody>

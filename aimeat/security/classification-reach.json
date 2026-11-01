@@ -3120,11 +3120,24 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Manifest namespace policy and the latest version for write guards."
     },
+    "src/services/dataproduct/on-change.ts": {
+      "reads": {
+        "listMemoryKeysByPrefix": 1,
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: at start, the addresses of every data product definition (dataproducts.*, a reserved, service-owned prefix) and each definition, to know which products run when a source changes and which sources they read. Nothing is shown to anyone; the run itself reads the sources through the source readers, which pass the classification reader."
+    },
     "src/services/dataproduct/schedule-input.ts": {
       "reads": {
         "getMemory": 1
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.5), the node's own read: whether the data product definition a dataproduct schedule names exists. No content is shown."
+    },
+    "src/services/dataproduct/scheduled-job.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (WP9c), the node's own read: the data product definition (dataproducts.<name>, service-owned) a run after a source change is for, to find its maker (runAs). Nothing is shown; the run reads the sources through the source readers."
     },
     "src/services/dataproduct/service.ts": {
       "reads": {
