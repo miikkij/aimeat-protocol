@@ -10,9 +10,11 @@
  *   A SOURCE IS READ ONLY WHEN ITS STATE TELLS NOTHING NEW. A source package of the same owner, or a
  *   public one, is read; a non-public package of another account is left out, because its freshness is
  *   that account's to show. Sources are read two levels deep, each package once.
- * @structure packageFreshness · PackageFreshnessOpts
+ * @structure packageFreshness · PackageFreshnessOpts · FreshnessDeps
  * @usage const f = await packageFreshness({ storage, config }, ownerGhii, name, { pointer });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Takes the storage and the node id only (FreshnessDeps), so the EXCHANGE
+ *     projection, which runs without the node config, reads freshness the same way (plan D6).
  *   v1.1.0 — 2026-11-01 — A product that runs when its source changes is read with `onChange` (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D6.1, D9.9).
  */
@@ -38,9 +40,12 @@ export interface PackageFreshnessOpts {
 
 const MAX_DEPTH = 2;
 
+/** What the read needs: the storage, and the node a source owner without one belongs to. */
+export type FreshnessDeps = Pick<StoreDeps, 'storage'> & { config: Pick<StoreDeps['config'], 'nodeId'> };
+
 /** The freshness of `name` of `ownerGhii`, or null when the package has no published version. */
 export async function packageFreshness(
-    deps: StoreDeps, ownerGhii: string, name: string, opts: PackageFreshnessOpts = {},
+    deps: FreshnessDeps, ownerGhii: string, name: string, opts: PackageFreshnessOpts = {},
 ): Promise<Freshness | null> {
     const pointer = opts.pointer !== undefined ? opts.pointer : await readPointer(deps, ownerGhii, name);
     if (!pointer?.contentHash) return null;
@@ -89,7 +94,7 @@ export async function packageFreshness(
     return freshnessOf({ promise, lastSuccessAt, ...(producerKind ? { producerKind } : {}), lastError, ...(sources.length ? { sources } : {}), ...(onChange ? { onChange } : {}), now });
 }
 
-async function descriptorOf(deps: StoreDeps, ownerGhii: string, name: string, hash: string): Promise<Descriptor | null> {
+async function descriptorOf(deps: FreshnessDeps,ownerGhii: string, name: string, hash: string): Promise<Descriptor | null> {
     const file = await deps.storage.getStorageFile(ownerGhii, descriptorKey(name, hash));
     if (!file) return null;
     try {

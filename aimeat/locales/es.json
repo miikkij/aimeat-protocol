@@ -4476,7 +4476,8 @@
       "every": { "daily": "a diario", "monthly": "cada mes", "change": "al cambiar la fuente", "weekly": { "0": "los domingos", "1": "los lunes", "2": "los martes", "3": "los miércoles", "4": "los jueves", "5": "los viernes", "6": "los sábados" } },
       "step1": "Acepta las condiciones", "step2": "Guarda la clave", "step3": "Conecta tu programa",
       "terms": "Uso los datos para la finalidad «{purpose}» y respeto la licencia {licence}. Entiendo que {owner} ve cuándo los leo.",
-      "thePurpose": "indicada arriba", "noLicence": "(sin indicar)",
+      "termsNoPurpose": "Respeto la licencia {licence} cuando uso los datos. Entiendo que {owner} ve cuándo los leo.",
+      "noLicence": "(sin indicar)",
       "termsAccepted": "Aceptaste las condiciones el {date}.",
       "termsNone": "Este acceso no tiene condiciones que aceptar.", "termsNoneYet": "Este acceso no tiene condiciones que aceptar. Presiona el botón para crear tu clave.",
       "acceptAndShow": "Aceptar y mostrar la clave", "show": "Mostrar la clave",
@@ -12773,10 +12774,10 @@
     "cfgOpt_classification_mode_off": "Desactivada",
     "cfgOpt_classification_mode_owner": "Cada propietario decide",
     "cfgOpt_classification_mode_all": "Activada para todos",
-    "cfgOpt_consent_data_intermediation_report": "Solo informe, sin bloqueos",
-    "cfgOpt_consent_data_intermediation_none": "Este servidor no intermedia datos entre otros",
-    "cfgOpt_consent_data_intermediation_node": "Lo presta el operador",
-    "cfgOpt_consent_data_intermediation_owners": "Pueden prestarlo los proveedores declarados",
+    "cfgOpt_consent_data_intermediation_report": "Solo informe",
+    "cfgOpt_consent_data_intermediation_none": "Sin intermediación",
+    "cfgOpt_consent_data_intermediation_node": "La instalación intermedia",
+    "cfgOpt_consent_data_intermediation_owners": "Los propietarios intermedian",
     "cfgOpt_consent_party_self_registration_off": "Nadie se registra en una aplicación",
     "cfgOpt_consent_party_self_registration_apps-ask": "El propietario de la aplicación lo pide y el operador lo aprueba",
     "cfgOpt_consent_party_self_registration_on": "El propietario de la aplicación abre el registro",
@@ -13205,7 +13206,7 @@
       "dcatFeed": "Dirección",
       "dcatSub": "Los productos de datos públicos como una lista legible por máquina que pueden leer avoindata.fi y data.europa.eu. No tiene interruptor: un producto de datos aparece en ella mientras es público.",
       "open": "Abrir",
-      "aside": "Un servidor instalado con aimeat init empieza con «Este servidor no intermedia datos entre otros». Mantén un servidor público en «Solo informe» hasta que hayas comprobado su actividad y hecho la notificación a la autoridad."
+      "aside": "Un servidor instalado con aimeat init empieza con «Sin intermediación». Mantén un servidor público en «Solo informe» hasta que hayas comprobado su actividad y hecho la notificación a la autoridad."
     },
     "cfgGroup_ai": "IA: claves, modelos y saldo",
     "cfgGroup_decide": "Modelo de decisión (TypeSafe)",
@@ -27069,11 +27070,11 @@
         "data_intermediation": {
           "title": "Servicio de intermediación de datos",
           "short": "Si este servidor presta un servicio de intermediación de datos según el Reglamento de Gobernanza de Datos de la UE (2022/868), y quién lo presta. «Solo informe» no bloquea nada y muestra lo que encuentra en la página de Compliance.",
-          "what": "Un servicio de intermediación de datos pone en contacto comercial a quienes tienen datos y a quienes los usan, por ejemplo un mercado donde cualquiera ofrece datos y cualquiera los compra. En este servidor el ajuste decide una cosa: si una oferta de EXCHANGE que entrega datos puede publicarse para todos. «Solo informe» y «Lo presta el operador» no bloquean nada. «Este servidor no intermedia datos entre otros» rechaza esa publicación; entonces los datos llegan solo a destinatarios con nombre, con un acceso compartido a una parte externa. «Pueden prestarlo los proveedores declarados» funciona igual, salvo para un propietario que administra un organismo con su propia notificación registrada. La comprobación se hace al publicar: una oferta publicada antes de un cambio se queda, y la página de Compliance la muestra como un hallazgo para que una persona decida. La sección 12 de la página de Compliance muestra los hallazgos y las condiciones del artículo 12 en todos los modos.",
-          "range": "Uno de cuatro: «Solo informe» (el valor por defecto del código), «Este servidor no intermedia datos entre otros», «Lo presta el operador», «Pueden prestarlo los proveedores declarados». Un servidor instalado con aimeat init empieza con «Este servidor no intermedia datos entre otros».",
-          "ex1": "«Este servidor no intermedia datos entre otros»: el servidor de una empresa o de una persona que comparte datos solo con socios con nombre.",
-          "ex2": "«Lo presta el operador»: un servidor cuyo operador ha hecho la notificación a la autoridad y mantiene un mercado de datos abierto.",
-          "tip": "Elige «Lo presta el operador» solo cuando la notificación esté hecha y registrada en la página de Compliance. Es una lectura del reglamento, no asesoramiento jurídico."
+          "what": "Un servicio de intermediación de datos pone en contacto comercial a quienes tienen datos y a quienes los usan, por ejemplo un mercado donde cualquiera ofrece datos y cualquiera los compra. En este servidor el ajuste decide una cosa: si una oferta de EXCHANGE que entrega datos puede publicarse para todos. «Solo informe» y «La instalación intermedia» no bloquean nada. «Sin intermediación» rechaza esa publicación; entonces los datos llegan solo a destinatarios con nombre, con un acceso compartido a una parte externa. «Los propietarios intermedian» funciona igual, salvo para un propietario que administra un organismo con su propia notificación registrada. La comprobación se hace al publicar: una oferta publicada antes de un cambio se queda, y la página de Compliance la muestra como un hallazgo para que una persona decida. La sección 12 de la página de Compliance muestra los hallazgos y las condiciones del artículo 12 en todos los modos.",
+          "range": "Uno de cuatro: «Solo informe» (el valor por defecto del código), «Sin intermediación», «La instalación intermedia» o «Los propietarios intermedian». Un servidor instalado con aimeat init empieza con «Sin intermediación».",
+          "ex1": "«Sin intermediación»: el servidor de una empresa o de una persona que comparte datos solo con socios con nombre.",
+          "ex2": "«La instalación intermedia»: un servidor cuyo operador ha hecho la notificación a la autoridad y mantiene un mercado de datos abierto.",
+          "tip": "Elige «La instalación intermedia» solo cuando la notificación esté hecha y registrada en la página de Compliance. Es una lectura del reglamento, no asesoramiento jurídico."
         },
         "party_self_registration": {
           "title": "Registro en aplicaciones sin una cuenta",
