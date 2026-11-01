@@ -28,6 +28,11 @@
  *   startBuildWithYou · stopBuildWithYou
  * @usage res.json(success(nodeId, await submitOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The store's build code (site.build_code). Jouni rejected the queue submit
+ *     agent (1.11 18.18), so the request goes with the person's OWN aimeat.io account: a place with a
+ *     code answers buildCode and `send` (the queue's app tool submitRequest, called through aimeat.io's
+ *     MCP with aimeat_app_tool_invoke), has its offer open, and refuses its own local request
+ *     (BUILD_REQUEST_ELSEWHERE). The relay routes stay, inert without a queue.
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", part B).
  */
 import { randomUUID } from 'node:crypto';
@@ -35,11 +40,12 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import type { CallerContext } from './caller-context.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { emitChange } from './event-bus.js';
+import { emitChange, onChangeEvent, offChangeEvent } from './event-bus.js';
 import { onUsageRecorded } from './usage/usage-buffer.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { readJson } from '../utils/read-capped.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
+import { BUILD_CODE } from '../utils/build-code.js';
 import { logger } from '../utils/logger.js';
 
 export const BUILD_DOMAIN = 'build-with-you';
@@ -113,13 +119,47 @@ function originOf(base: string): string | null {
   return URL.canParse(base) ? new URL(base).origin : null;
 }
 
+/** The store's build code for this place, or null when none is set or it is not in the code's format. */
+function buildCodeOf(config: AimeatConfig): string | null {
+  const code = (config.buildCode ?? '').trim();
+  return BUILD_CODE.test(code) ? code : null;
+}
+
+/**
+ * Where the person's own AI sends the request with the person's own account. site.build_queue_url names
+ * the queue (`<origin>/v1/ext/<owner>/<name>`); the queue's app of the same name offers its tools to any
+ * account (`<name>.html`, the builders' own word: rakennamme 2.0.1), called through that origin's MCP
+ * with aimeat_app_tool_invoke, because aimeat_extension_invoke reaches only the caller's own
+ * extensions. Null when the setting names no queue. The place itself sends nothing.
+ */
+function sendVia(config: AimeatConfig, base: string, code: string) {
+  if (!URL.canParse(base)) return null;
+  const url = new URL(base);
+  const m = /^\/v1\/ext\/([^/]+)\/([^/]+)\/?$/.exec(url.pathname);
+  if (!m) return null;
+  return {
+    mcp: `${url.origin}/v1/mcp`,
+    tool: 'aimeat_app_tool_invoke',
+    arguments: {
+      owner: decodeURIComponent(m[1]),
+      app: `${decodeURIComponent(m[2])}.html`,
+      tool: 'submitRequest',
+      input: { code, nodeId: config.nodeId, lang: '<the person\'s language: en, fi or es>', spec: { what: '', forWhom: '', use: '', readyWhen: '' } },
+    },
+  };
+}
+
 function view(config: AimeatConfig, rec: BuildWithYouRecord) {
   const base = queueBase(config);
   const queueOrigin = base ? originOf(base) : null;
   const r = rec.request;
-  const reason = !base ? 'off' : r ? 'used' : !rec.offeredAt ? 'not-yet' : null;
+  const buildCode = buildCodeOf(config);
+  // A place with the store's build code has its offer open: the request goes with the person's own account.
+  const reason = buildCode ? null : !base ? 'off' : r ? 'used' : !rec.offeredAt ? 'not-yet' : null;
   return {
     queueOrigin,
+    buildCode,
+    send: buildCode && base ? sendVia(config, base, buildCode) : null,
     offer: { available: reason === null, reason, offeredAt: rec.offeredAt ?? null, trigger: rec.via ?? null },
     request: r ? {
       id: r.id, state: r.state, position: r.position, queueLength: r.queueLength,
@@ -161,6 +201,9 @@ function specOf(body: Record<string, unknown>): Spec {
 export async function submitOp(deps: Deps, caller: CallerContext, body: Record<string, unknown>) {
   access(caller, 'write');
   const spec = specOf(body);
+  if (buildCodeOf(deps.config)) {
+    throw new BuildError(409, 'BUILD_REQUEST_ELSEWHERE', 'This place sends its build request with your own account on the builders\' node: read aimeat_build_request_status (GET /v1/build-with-you/request) for the build code and where to send it.');
+  }
   if (!queueBase(deps.config)) throw new BuildError(409, 'BUILD_WITH_YOU_OFF', 'This node has no build queue, so a build request cannot be sent from here.');
   // The account's language and notification address are defaults only; without them the request still goes.
   const ghii = await deps.storage.getGHII(caller.ownerGhii).catch((e: Error) => {
@@ -311,6 +354,7 @@ export async function openBuildOffer(deps: Deps, via: 'mcp' | 'chat', ownerGhii:
 }
 
 let stopListener: (() => void) | null = null;
+let stopConfig: (() => void) | null = null;
 let sweepTimer: ReturnType<typeof setInterval> | null = null;
 
 /** The usage listener that opens the offer on an outside AI's first MCP call, and the sweep. */
@@ -324,6 +368,11 @@ export function startBuildWithYou(storage: Storage, config: AimeatConfig): void 
     if (call.actorKind !== 'owner' && call.actorKind !== 'agent') return;
     void openBuildOffer(deps, 'mcp', call.ownerGhii).catch((e: Error) => logger.warn(`[build-with-you] the offer was not opened: ${e.message}`));
   });
+  // A changed setting may be the build code or the queue, which the card reads: tell it in its own
+  // domain, so a page listens to one.
+  const onConfig = (evt: { domain: string }) => { if (evt.domain === 'config') emitChange(BUILD_DOMAIN); };
+  onChangeEvent(onConfig);
+  stopConfig = () => offChangeEvent(onConfig);
   sweepTimer = setInterval(() => {
     void (async () => {
       const r = (await readRecord(deps)).request;
@@ -338,6 +387,8 @@ export function startBuildWithYou(storage: Storage, config: AimeatConfig): void 
 export function stopBuildWithYou(): void {
   stopListener?.();
   stopListener = null;
+  stopConfig?.();
+  stopConfig = null;
   if (sweepTimer) clearInterval(sweepTimer);
   sweepTimer = null;
 }

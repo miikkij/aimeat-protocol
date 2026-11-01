@@ -268,6 +268,31 @@ try {
         assert(approved, 'agent.approved when the customer made the agent');
     });
 
+    await test('a store place\'s build code: the owner reads it and where the request goes, and the place\'s own submit is refused', async () => {
+        const put = (path: string, value: unknown) => json('/v1/admin/config', bearer(operatorToken, {
+            method: 'PUT', body: JSON.stringify({ changes: [{ path, value }] }),
+        }));
+        const bad = await put('site.build_code', 'RK-IIII-0000-0000');
+        assert(bad.status === 400, `a code with I is refused: ${bad.status}`);
+        assert((await put('site.build_code', 'RK-0000-1111-2222')).status === 200, 'the code is set');
+        assert((await put('site.build_queue_url', `${queueUrl}/v1/ext/builder/rakennamme`)).status === 200, 'the queue names the extension');
+        try {
+            const read = await json('/v1/build-with-you/request', bearer(customerToken));
+            const d = read.body.data;
+            assert(d.buildCode === 'RK-0000-1111-2222' && d.offer.available === true, `code and offer ${JSON.stringify({ code: d.buildCode, offer: d.offer })}`);
+            assert(d.send?.mcp === `${queueUrl}/v1/mcp` && d.send.tool === 'aimeat_app_tool_invoke', `send ${JSON.stringify(d.send)}`);
+            assert(d.send.arguments.owner === 'builder' && d.send.arguments.app === 'rakennamme.html' && d.send.arguments.tool === 'submitRequest'
+                && d.send.arguments.input.code === 'RK-0000-1111-2222' && d.send.arguments.input.nodeId === NODE_ID, `send arguments ${JSON.stringify(d.send.arguments)}`);
+            const own = await json('/v1/build-with-you/request', bearer(customerToken, { method: 'POST', body: JSON.stringify(spec) }));
+            assert(own.status === 409 && own.body.error?.code === 'BUILD_REQUEST_ELSEWHERE', `own submit ${own.status} ${own.text}`);
+            const site = await fetch(`${BASE}/v1/chat`).then((r) => r.text());
+            assert(!site.includes('RK-0000-1111-2222'), 'the code is not on a page a visitor loads');
+        } finally {
+            await put('site.build_code', '');
+            await put('site.build_queue_url', queueUrl);
+        }
+    });
+
     // Last: it locks this address out of the password for the window.
     await test('after five wrong admin passwords even the right one is refused for the window', async () => {
         // One wrong password was sent above; four more reach the count.

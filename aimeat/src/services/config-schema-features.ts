@@ -18,12 +18,14 @@
  *   switch, whose legal coercion lives in the loader (config-ai-label.ts).
  * @structure FEATURE_CONFIG_FIELDS
  * @version-history
+ *   v1.1.0 — 2026-11-01 — site.build_code: the store's build code for a place ("Rakennamme kanssasi").
  *   v1.0.0 — 2026-10-25 — Initial.
  */
 // Typed by the keys alone, not AimeatConfig, which would close an import cycle through
 // config-types.ts; config-schema.ts checks each key against AimeatConfig where it spreads the rows.
 import type { ConfigFieldShape } from './config-field-def.js';
 import { oneOf, isEmptyOrHttpUrl } from './config-schema-validators.js';
+import { BUILD_CODE } from '../utils/build-code.js';
 
 const whole = (min: number) => (v: unknown): boolean => typeof v === 'number' && Number.isInteger(v) && v >= min;
 const bool = (v: unknown): boolean => typeof v === 'boolean';
@@ -44,7 +46,7 @@ type FeatureKey = 'aiProvenance' | 'aiProvenanceDetail' | 'aiProviderAllowlist' 
   | 'finvoiceOperator' | 'finvoiceOperatorUrl' | 'finvoiceOperatorApiKey' | 'outboundDailyLimit' | 'messageRetryIntervalMs'
   | 'messageRetryTtlHours' | 'taskStallThresholdMinutes' | 'executionLogRetentionDays' | 'organismDecisionLogCap'
   | 'workspaceMaxVersions' | 'appAssetProbe' | 'screenshotAutoCapture' | 'screenshotIntervalMin' | 'screenshotSettleMs'
-  | 'screenshotOnDemandPerHour' | 'homeRoomMonetise' | 'siteKv' | 'inactivityNudge';
+  | 'screenshotOnDemandPerHour' | 'homeRoomMonetise' | 'buildCode' | 'siteKv' | 'inactivityNudge';
 
 export const FEATURE_CONFIG_FIELDS: ConfigFieldShape<FeatureKey>[] = [
   // ── AI: the compliance statement, provenance and speech limits ──
@@ -108,6 +110,7 @@ export const FEATURE_CONFIG_FIELDS: ConfigFieldShape<FeatureKey>[] = [
   { key: 'screenshotSettleMs', dotPath: 'apps.screenshot_settle_ms', envVar: 'AIMEAT_SCREENSHOT_SETTLE_MS', type: 'number', validate: whole(0), immutable: false, description: 'Milliseconds to wait after an app loads before its picture is taken (default 6000)', range: '0-60000' },
   { key: 'screenshotOnDemandPerHour', dotPath: 'apps.screenshot_on_demand_per_hour', envVar: 'AIMEAT_SCREENSHOT_ONDEMAND_PER_HOUR', type: 'number', validate: whole(0), immutable: false, description: 'App pictures one account may ask for in an hour (default 20)', range: '0-10000' },
   { key: 'homeRoomMonetise', dotPath: 'site.home_room_monetise', envVar: 'AIMEAT_HOME_ROOM_MONETISE', type: 'boolean', validate: bool, immutable: false, description: 'Show the front page\'s third room, which sells. Off until the operator has checked that it leads somewhere' },
+  { key: 'buildCode', dotPath: 'site.build_code', envVar: 'AIMEAT_SITE_BUILD_CODE', type: 'string', validate: (v) => v === '' || (typeof v === 'string' && BUILD_CODE.test(v)), immutable: false, description: 'The store\'s build code for this place (RK-XXXX-XXXX-XXXX), set by the store\'s fleet service for a paid order. The owner and their AI read it to send the place\'s one build request with their own account; visitors never see it. Empty: no code' },
   { key: 'siteKv', dotPath: 'site.kv', envVar: 'AIMEAT_SITE_KV', type: 'object', validate: textPairs, immutable: false, description: 'Values the site templates read by name, as JSON {"name": "text"}. Each AIMEAT_SITE_KV_<NAME> variable adds one and wins over the same name here' },
   { key: 'inactivityNudge', dotPath: 'features.inactivity_nudge', envVar: 'AIMEAT_INACTIVITY_NUDGE', type: 'boolean', validate: bool, immutable: false, description: 'Email a person who has not been here for two weeks. Off by default: it is mail nobody asked for' },
 ];

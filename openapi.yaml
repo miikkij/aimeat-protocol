@@ -24467,8 +24467,12 @@ paths:
         was sent), the queue's origin, and the request as it stands: state (waiting-for-operator until the
         operator takes it to the queue, then queued, building, invited, done or declined), position and
         queueLength (no time estimate), and the organism and invitation address once the builders invited
-        the person. A status older than a minute is asked again from the queue. The owner, or the owner's
-        agent with `memory:read`. Live domain `build-with-you`. MCP: aimeat_build_request_status.
+        the person. A status older than a minute is asked again from the queue. On a place the store sold,
+        `buildCode` is the store's code for the one request (site.build_code, RK-XXXX-XXXX-XXXX) and `send`
+        says where the person's own AI sends it with the person's own account: the MCP server `send.mcp`,
+        the tool `send.tool`, the arguments `send.arguments`; the offer is then open. The code is never on a
+        page a visitor loads. The owner, or the owner's agent with `memory:read`. Live domain
+        `build-with-you`, also when a setting changes. MCP: aimeat_build_request_status.
       security:
         - BearerAuth: []
       responses:
@@ -24481,8 +24485,9 @@ paths:
       tags: [Build With You]
       description: >
         Stores the place's one build request for the operator to take to the build queue: one agent or one
-        small app. A second request is refused. The owner, or the owner's agent with `memory:write`. MCP:
-        aimeat_build_request_submit.
+        small app. A second request is refused. A place with a build code refuses it with
+        BUILD_REQUEST_ELSEWHERE: there the request goes with the person's own account, as GET says in `send`.
+        The owner, or the owner's agent with `memory:write`. MCP: aimeat_build_request_submit.
       security:
         - BearerAuth: []
       requestBody:

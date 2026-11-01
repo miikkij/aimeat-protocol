@@ -15,6 +15,7 @@
  *   - loadConfig() (function)
  *   - missingOperatorConfig() / operatorTypeLabel() (helpers)
  * @version-history
+ *   v1.37.0 — 2026-11-01 — buildCode (AIMEAT_SITE_BUILD_CODE, config-site-contacts.ts): the store's build code for a place.
  *   v1.36.0 — 2026-10-29 — fileStoreDefaults() (config-file-store.ts): where stored files keep their bytes; the x402 lines move to config-x402.ts unchanged (max-file-lines).
  *   v1.35.0 -- 2026-10-27 -- The default profile comes from defaultSecurityProfile (config-private-host.ts): never local when AIMEAT_BIND_HOST is beyond this computer (secaudit2026oct26).
  *   v1.34.0 — 2026-10-25 — AIMEAT_PERSONAL_NODE_MAX_PER_OWNER, default 3, and nodeLimitsDefaults() (config-node-limits.ts) (secaudit2026oct22).
@@ -98,7 +99,7 @@
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
 import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
-import { siteLinksFromEnv } from './config-site-contacts.js';
+import { siteLinksFromEnv, buildCodeFromEnv } from './config-site-contacts.js';
 import { loadConnectionsConfig } from './config-load-connections.js';
 import { securityDoorDefaults } from './config-security.js';
 import { aiJobDefaults } from './config-ai-jobs.js';
@@ -754,6 +755,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     rlAuthChallenge,
 
     homeRoomMonetise,
+    buildCode: buildCodeFromEnv(),
     inactivityNudge,
     rateLimits: {
       global: { windowMs: 1_000, max: rlGlobal },
