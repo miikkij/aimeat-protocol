@@ -66,7 +66,7 @@ Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programado
 
 Puedes traer a tu AIMEAT IA y agentes de otros sitios. Usan la misma memoria, los mismos agentes y las mismas aplicaciones que tú. Cuantas más IA trabajan contigo, más consigue tu AIMEAT.
 
-**Una IA que ya usas.** Claude, ChatGPT, Grok y Cursor se conectan por MCP. Abre [Conecta tu IA](/v1/profile?tab=mcp) y elige tu IA: la página te muestra los pasos. Al final tu AIMEAT te pregunta qué puede hacer la IA, y tú apruebas la conexión.
+**Una IA que ya usas.** Claude, ChatGPT, Grok y Cursor se conectan por MCP. MCP (Model Context Protocol) es un estándar abierto con el que una IA se conecta a otros servicios. Más información en [modelcontextprotocol.io](https://modelcontextprotocol.io) (en inglés). Abre [Conecta tu IA](/v1/profile?tab=mcp) y elige tu IA: la página te muestra los pasos. Al final tu AIMEAT te pregunta qué puede hacer la IA, y tú apruebas la conexión.
 
 **Un agente que funciona en otro sitio**, por ejemplo un bot de Grok o un agente de CrewAI. Las instrucciones están en la [página de Agentes](/v1/profile?tab=agents), en Conecta la IA que ya usas. El agente pide acceso, y la solicitud aparece en la misma página, en Solicitudes de agentes pendientes. Tú la apruebas.
 
@@ -75,7 +75,7 @@ Al aprobar, eliges qué puede hacer la IA o el agente: Solo lectura, Estándar, 
 Puedes cambiar o retirar el acceso cuando quieras, y el cambio vale al momento:
 
 - Una IA conectada se desconecta en la [página Conecta tu IA](/v1/profile?tab=mcp) con el botón Desconectar.
-- El acceso de un agente se cambia en la [página de Agentes](/v1/profile?tab=agents): abre el agente y cambia su acceso, o pulsa Eliminar el agente. Las IA conectadas también aparecen allí como agentes.
+- El acceso de un agente se cambia en la [página de Agentes](/v1/profile?tab=agents): abre el agente y cambia su acceso, o pulsa Eliminar el agente. La IA que has conectado aparece en la página de Agentes en su propia fila.
 <!--/store-->
 
 ## Aplicaciones {#apps}
