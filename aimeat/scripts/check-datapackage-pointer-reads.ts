@@ -37,6 +37,8 @@
  *   cd aimeat && pnpm check:datapackage-pointer-reads          # the gate
  *   cd aimeat && pnpm check:datapackage-pointer-reads --list   # every finding, allowed or not
  * @version-history
+ *   v1.0.3 — 2026-11-01 — routes/datapackages.ts no longer reads the pointer: the schema.org block is built
+ *     by services/datapackage/landing-page.ts, inside the service (WP9b).
  *   v1.0.2 — 2026-11-01 — The ten DEBT entries are gone: withdraw.ts, dataspace/catalog.ts,
  *     dataproduct/sources-io.ts, parties/shares.ts and exchange-datapackage.ts decide on the service's
  *     records (trustedPackageOf, saleTermsOf) and read no pointer (WP9e, cc-jouni-dataulos).
@@ -202,9 +204,6 @@ export const ALLOWED: Record<string, Record<string, string>> = {
   },
 
   // ── Outside the service: the pointer is read for display, freshness or the record's own input ──
-  'src/routes/datapackages.ts': {
-    'readPointer(store, ownerGhii, d.name)': 'Feeds the schema.org block of a version the caller already opened through openPackage (which decided on the record); the audience only selects whether the public landing address is shown.',
-  },
   'src/services/publish-requests/apply-datapackage.ts': {
     'readPointer(ctx, ownerGhii, name)': 'Tells a deleted package and hands the pointer to trustedAudienceOf; the version, the audience and the answered address are the record\'s.',
   },
