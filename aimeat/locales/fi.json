@@ -16278,6 +16278,7 @@
       "stepsLabel": "Kaksi askelta",
       "step2": "Kerro yhdellä lauseella, mitä haluat saada tehdyksi. AIMEAT tekee siihen agentin ja näyttää sen sinulle ennen kuin se aloittaa.",
       "step2Waits": "Tämä aukeaa, kun tekoälysi on yhdistetty.",
+      "step2Open": "Avaa chat",
       "settings": "Asetukset"
     },
     "buildWithYou": {
@@ -24300,6 +24301,7 @@
   },
   "setup": {
     "pickTool": "Mihin AI-työkaluun kytket? Askeleet eroavat sen verran että yleisversiosta ei ole hyötyä.",
+    "moreTools": "Muut tekoälytyökalut ({n})",
     "recommendedBadge": "suositus aloitukseen",
     "paramsTitle": "Mitä mihinkin kenttään laitetaan",
     "copyCmd": "Kopioi komento",

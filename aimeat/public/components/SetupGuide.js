@@ -17,10 +17,16 @@
  *   - `facts`: the field table is the Facts (css/components/facts.css) instead of the classic rows.
  *   - `stepRows`: the steps are the numbered list's rows (IndexList) instead of the classic list.
  *   The tool the reader picks is remembered in this browser (localStorage aimeat.setup.tool).
- * @structure SetupGuide({ poster, asideInstall, facts, stepRows }) · InstructionsDialog({ open, onClose }) ·
+ *   - `lead={false}`: no question above the tabs, for a page whose own lead already asks it.
+ *   On a node the store sold, the tabs show the chat AIs (Claude, ChatGPT, Grok) and one link opens
+ *   the rest.
+ * @structure SetupGuide({ poster, asideInstall, facts, stepRows, lead }) · InstructionsDialog({ open, onClose }) ·
  *   rememberTool(id)
  * @usage html`<${SetupGuide} poster facts stepRows />` · html`<${InstructionsDialog} open=${o} onClose=${close} />`
  * @version-history
+ *   v1.3.0 — 2026-11-01 — On a node the store sold the tool tabs are the chat AIs, with "Other AI
+ *     tools (N)" for the rest; `lead={false}` drops the question the MCP page already asks above it
+ *     (commercial's crew52 check: the page read as developer text and said the same thing twice).
  *   v1.2.0 — 2026-10-31 — rememberTool() exported, so a page can open the guide on one tool.
  *   v1.1.0 — 2026-10-01 — `claudeNote` replaces claude.ai's model line: the home's free road
  *     recommends Opus, which the free plan does not have (Jouni's decision).
@@ -48,6 +54,7 @@ import { InstructionBlock } from '/components/InstructionBlock.js';
 import { useAiTools } from '/views/profile/ai-tool-setup.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { customerNode } from '/js/site.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -64,6 +71,13 @@ export const rememberTool = (id) => {
 };
 
 const pickTool = (tools, id) => tools.find(x => x.id === id) || tools[0];
+
+/**
+ * The chat AIs a buyer on a node the store sold most likely has, as GET /v1/ai-tools names them;
+ * the developer tools (Claude Code, Cursor, VS Code, LM Studio and the rest) wait behind one link
+ * (commercial's crew52 check, 2026-11-01: the connect page read as developer text).
+ */
+const BUYER_TOOLS = ['claude-web', 'claude-desktop', 'chatgpt', 'grok'];
 
 /** The tool's name, with the small "recommended" word after the one a first-timer should take. */
 const toolWords = (tool) => html`${tool.label}${tool.recommended
@@ -122,21 +136,29 @@ function Params({ params, facts = false }) {
  * How to attach this node to one AI tool: the steps as things to click or type, every field value,
  * and the vendor's own page.
  * @param {{ poster?: boolean, asideInstall?: boolean, facts?: boolean, stepRows?: boolean,
- *   claudeNote?: string|null }} [props] claudeNote replaces claude.ai's model line, for a road on its free plan.
+ *   claudeNote?: string|null, lead?: boolean }} [props] claudeNote replaces claude.ai's model line, for a road
+ *   on its free plan; lead false leaves out the question above the tabs.
  */
-export function SetupGuide({ poster = false, asideInstall = false, facts = false, stepRows = false, claudeNote = null } = {}) {
+export function SetupGuide({ poster = false, asideInstall = false, facts = false, stepRows = false, claudeNote = null, lead = true } = {}) {
   const tools = useAiTools();
   const [toolId, setToolId] = useState(rememberedTool);
+  const [allTools, setAllTools] = useState(false);
   const pick = (id) => { setToolId(id); rememberTool(id); };
   if (!tools) return html`<p class="setup-guide-note">${tr('setup.loadingTools', 'Reading the setup instructions from this node…')}</p>`;
   if (!tools.length) return html`<p class="setup-guide-note">${tr('setup.toolsFailed', 'Could not read the setup instructions just now. The connect page has the same steps.')}</p>`;
   const tool = pickTool(tools, toolId);
   const cmd = tool.mcp.command || null;
+  // On a node the store sold, the chat AIs first and the rest behind one link; a remembered tool
+  // outside them shows the whole list, so the guide never opens on a tool the tabs do not show.
+  const buyerTools = customerNode() ? tools.filter((x) => BUYER_TOOLS.includes(x.id)) : [];
+  const short = buyerTools.length > 0 && buyerTools.length < tools.length && !allTools && buyerTools.includes(tool);
+  const shown = short ? buyerTools : tools;
 
   return html`
     <div class="setup-guide">
-      <p class="setup-guide-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>
-      <${ToolPicker} tools=${tools} value=${tool.id} onPick=${pick} poster=${poster} />
+      ${lead && html`<p class="setup-guide-lead">${tr('setup.pickTool', 'Which AI tool are you connecting? The steps differ enough that the general version is not usable.')}</p>`}
+      <${ToolPicker} tools=${shown} value=${tool.id} onPick=${pick} poster=${poster} />
+      ${short && html`<${Action} small soft onClick=${() => setAllTools(true)}>${tr('setup.moreTools', 'Other AI tools ({n})').replace('{n}', String(tools.length - buyerTools.length))} →<//>`}
 
       <!-- The short way in comes first, and removes none of the steps below it: a one-click link is
            blocked on a managed machine and does nothing where the client is not installed. -->
