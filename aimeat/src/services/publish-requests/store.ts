@@ -32,6 +32,8 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-11-01 — An ask again that moves a waiting publish request to other content asks the owner again,
+ *     as the approval standard does (secaudit2026oct31w2 round 12).
  *   2026-11-01 — The kind `company-page-write`: a writer without company:write may change a company's page
  *     through the file routes once the owner allows it (services/company/company-page-key.ts;
  *     secaudit2026oct31w2 round 11).
@@ -272,6 +274,17 @@ function contentBindingMoved(prev: Record<string, unknown>, next: Record<string,
 }
 
 /**
+ * Does `next` name other content than `prev`? A `digest` covers a whole memory value, skill or cortex,
+ * so the same digest under a new version is the same content; anything else (knowledge entry digests
+ * leave the manifest out) compares every binding field.
+ */
+function contentMoved(prev: Record<string, unknown>, next: Record<string, unknown>): boolean {
+  const whole = (t: Record<string, unknown>) => typeof t.digest === 'string' && t.entry_digests === undefined;
+  if (whole(prev) && whole(next)) return prev.digest !== next.digest;
+  return contentBindingMoved(prev, next);
+}
+
+/**
  * Take a waiting question back from its approvers without deciding it: its list items close and its
  * notices lose their buttons, shown as outdated. The request itself stays waiting.
  */
@@ -411,7 +424,8 @@ export type PublishRequestDraft = Pick<PublishRequest, 'kind' | 'target' | 'titl
  * Put a request in front of the owner. Changes nothing about the target. Returns the standing
  * request when the same principal already asked for the same change of the same target and it is
  * still waiting; when the target was written again in between, the standing request now names the
- * new version, because the one who asked has asked again for what is there now.
+ * new version, because the one who asked has asked again for what is there now. When that moves it to
+ * other content, its old notices and items close as outdated and it is announced again.
  */
 export async function filePublishRequest(
   ctx: PublishStoreCtx, ownerGhii: string, draft: PublishRequestDraft,
@@ -443,6 +457,19 @@ export async function filePublishRequest(
         const asked: PublishRequest = { ...moved, approval: words, item_id: null };
         delete asked.approver_items;
         await announceApproval(ctx, ownerGhii, asked, words, requesterName(draft.requested_by));
+        return { ok: true as const, request: asked, alreadyWaiting: true };
+      }
+      // An ordinary request is asked again the same way when its content changed (secaudit2026oct31w2
+      // round 12). A part is a file request, whose target binds no content field, so it never moves.
+      if (!words && !same.part_of && contentMoved(same.target, draft.target)) {
+        await withdrawQuestion(ctx, ownerGhii, same);
+        const asked: PublishRequest = { ...moved, item_id: null };
+        const who = requesterName(draft.requested_by);
+        await announcePublish(ctx, ownerGhii, asked, who);
+        for (const id of asked.parts ?? []) {
+          const part = await readPublishRequest(storage, ownerGhii, id);
+          if (part && part.state === 'awaiting_owner' && part.part_of === asked.id) await announcePart(ctx, ownerGhii, who, asked, part);
+        }
         return { ok: true as const, request: asked, alreadyWaiting: true };
       }
       await putRequest(storage, ownerGhii, moved);
@@ -482,38 +509,47 @@ export async function filePublishRequest(
       await announceApproval(ctx, ownerGhii, request, draft.approval, who);
       return { ok: true as const, request, alreadyWaiting: false };
     }
-    const item = await addItem(storage, ownerGhii, {
-      title: `${who} asks to make ${draft.title} public`.slice(0, 200),
-      kind: 'decision',
-      origin: draft.requested_by.principal,
-      object: { type: 'publish-request', id: request.id },
-      by: 'ai',
-    });
-    request.item_id = item?.id ?? null;
-    await putRequest(storage, ownerGhii, request);
-
-    const door = `/v1/publish-requests/${request.id}/decision`;
-    // The English here is the fallback and what a push carries; the page says it from the i18n key.
-    await notify(storage, ownerGhii, {
-      type: 'publish_request',
-      title: `${who} asks to make ${draft.title} public`,
-      body: `Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.`,
-      link: '/v1/profile?tab=notifications',
-      i18n: { key: 'publish_request', vars: { who, what: draft.name } },
-      ref: questionRef(request.id),
-      actions: [
-        { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
-        { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline' }, style: 'default' },
-      ],
-    });
-    emitChange('open-items', ownerGhii);
-    emitChange('notifications', ownerGhii);
+    await announcePublish(ctx, ownerGhii, request, who);
     logger.info('Publish request filed', {
       event: 'publish.request_filed', owner: ownerGhii, id: request.id, kind: draft.kind,
       by: draft.requested_by.principal, item: request.item_id,
     });
     return { ok: true as const, request, alreadyWaiting: false };
   });
+}
+
+/**
+ * Put a publish request in front of the owner: an item on the owner's list and a notice with Approve
+ * and Decline on the decision door. Stores the request with its item.
+ */
+async function announcePublish(ctx: PublishStoreCtx, ownerGhii: string, request: PublishRequest, who: string): Promise<void> {
+  const { storage } = ctx;
+  const item = await addItem(storage, ownerGhii, {
+    title: `${who} asks to make ${request.title} public`.slice(0, 200),
+    kind: 'decision',
+    origin: request.requested_by.principal,
+    object: { type: 'publish-request', id: request.id },
+    by: 'ai',
+  });
+  request.item_id = item?.id ?? null;
+  await putRequest(storage, ownerGhii, request);
+
+  const door = `/v1/publish-requests/${request.id}/decision`;
+  // The English here is the fallback and what a push carries; the page says it from the i18n key.
+  await notify(storage, ownerGhii, {
+    type: 'publish_request',
+    title: `${who} asks to make ${request.title} public`,
+    body: `Public means anyone can read it, also people who are not signed in. If you approve, it is public at once. If you decline, it stays as it is.`,
+    link: '/v1/profile?tab=notifications',
+    i18n: { key: 'publish_request', vars: { who, what: request.name } },
+    ref: questionRef(request.id),
+    actions: [
+      { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'approve' }, style: 'primary' },
+      { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: door, body: { decision: 'decline' }, style: 'default' },
+    ],
+  });
+  emitChange('open-items', ownerGhii);
+  emitChange('notifications', ownerGhii);
 }
 
 /**
