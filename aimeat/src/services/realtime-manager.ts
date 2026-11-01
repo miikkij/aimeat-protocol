@@ -14,6 +14,9 @@
  *   - Cleanup + metrics: idle-room reaper, message/peer counters, getStats()
  *
  * @version-history
+ *   2026-10-31 — createRoom refuses past realtime.rooms_per_owner (OwnerRoomLimitError): one owner and
+ *     their agents hold a share of the rooms, inside realtime.max_rooms (secaudit2026oct31w2 round 10,
+ *     f-2026aug-dos-ratelimit-3). Open rooms stay.
  *   2026-10-27 — secaudit2026oct26: a room keeps the state of at most realtime.max_docs_per_room
  *     documents and tells the sender of one more (DOC_LIMIT_REACHED, still relayed); an anonymous
  *     echat room keeps none. The shutdown write moved to ./realtime-yjs.ts and skips echat rooms.
@@ -41,7 +44,7 @@ import type { WebSocket } from 'ws';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-import { runAsNode } from '../utils/gaii.js';
+import { runAsNode, isSameOwner } from '../utils/gaii.js';
 import { emitChange } from './event-bus.js';
 import { keepYjsSnapshot, saveYjsSnapshots } from './realtime-yjs.js';
 
@@ -64,6 +67,13 @@ export type {
   CreateRoomOpts,
   RealtimeStats,
 } from './realtime-types.js';
+
+/** createRoom refuses past realtime.rooms_per_owner: the rooms the caller's owner holds, and the limit. */
+export class OwnerRoomLimitError extends Error {
+  constructor(public readonly roomIds: string[], public readonly limit: number) {
+    super('OWNER_ROOM_LIMIT_REACHED');
+  }
+}
 
 export class RealtimeManager {
   private rooms = new Map<string, RealtimeRoom>();
@@ -96,6 +106,14 @@ export class RealtimeManager {
   async createRoom(opts: CreateRoomOpts): Promise<RealtimeRoom> {
     if (this.rooms.size >= this.config.realtimeMaxRooms) {
       throw new Error('ROOM_LIMIT_REACHED');
+    }
+    // One owner and their agents hold at most realtime.rooms_per_owner rooms, inside the node cap, so
+    // one account cannot take every room. The anonymous echat creator names no owner and has its own
+    // share (realtime-upgrade-guards.ts EchatDoor).
+    const perOwner = this.config.realtimeRoomsPerOwner;
+    if (perOwner > 0 && opts.createdBy.includes('@')) {
+      const held = [...this.rooms.values()].filter(r => r.createdBy.includes('@') && isSameOwner(r.createdBy, opts.createdBy));
+      if (held.length >= perOwner) throw new OwnerRoomLimitError(held.map(r => r.id), perOwner);
     }
 
     const now = new Date();

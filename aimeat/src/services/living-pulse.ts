@@ -25,6 +25,12 @@
  *   members- and public-visibility ones (services/owner-scope-read.ts ownerScopeView). The same rule
  *   decides which agent deliverable an agent section folds in.
  * @version-history
+ *   2026-10-31 — SECURITY: the model is called for a config only when its holder or latest writer may
+ *     use the owner's AI (ai:use), or the owner allowed it with one press; otherwise the section waits
+ *     (`derive-waiting`, status.ai_spend_request) and the owner is asked once (living-pulse-spend.ts).
+ *     An app without ai:use wrote a config and the pulse spent the owner's AI for it (secaudit2026oct31w2
+ *     round 10, f-2026aug-ai-paths-3). pulseReader reads an app grant's tally row, now named as the
+ *     app, as the holder's, as before.
  *   2026-10-27 — SECURITY: a config held under the owner's own identity and written last by an agent
  *     that does not read as the owner is gathered and folded with that agent's reach (pulseReader, from
  *     the memory write tally). An agent with Full access wrote one there and the pulse read the owner's
@@ -77,6 +83,7 @@ import { emitDelivery } from './event-bus.js';
 import { OWNER_CALLER } from './ai/caller-context.js';
 import { updateRecord } from './record-cas.js';
 import { flushWriteTallyBuffer } from './data-map/write-tally-buffer.js';
+import { livingSpendHold } from './living-pulse-spend.js';
 
 /** Optional notify services for stop/retire alerts (web-push + email). The in-UI retired badge + ledger
  *  are written regardless; these are the extra out-of-app nudges. */
@@ -258,11 +265,14 @@ async function pulseReader(storage: Storage, config: AimeatConfig, holder: strin
   const owner = localAccountName(holder);
   const rows = (await storage.listMemoryWriteTally({ ownerGaii: holder, key })).filter((r) => {
     if (r.writerPrincipal === holder) return true;
+    // An app grant of this owner, recorded as the app since 2026-10-31 (data-map/tally-writer.ts): its
+    // writes are the owner's identity, so it reads as the holder, as it did when it was recorded so.
+    if (isGEAI(r.writerPrincipal)) return localAccountName(r.writerPrincipal) === owner;
     const agent = parseGAII(r.writerPrincipal);
     return !!agent && agent.owner === owner && agent.node === config.nodeId;
   });
   const latest = rows.reduce<typeof rows[number] | null>((a, r) => (!a || r.lastAt > a.lastAt ? r : a), null);
-  if (!latest || latest.writerPrincipal === holder) return holder;
+  if (!latest || latest.writerPrincipal === holder || isGEAI(latest.writerPrincipal)) return holder;
   return (await holderReadsAsOwner(storage, latest.writerPrincipal)) ? holder : latest.writerPrincipal;
 }
 
@@ -411,6 +421,8 @@ export async function pulseInstanceServer(
   const readsAll = await holderReadsAsOwner(storage, reader);
   // ...and with the organism rule the reader meets on GET /v1/memory/:key (secaudit 2026-10, v57 shape).
   const organismCaller = await holderCaller(storage, config, reader);
+  // Decided when the first section reaches the model, so a pulse with nothing to derive reads nothing.
+  let spendHold: Awaited<ReturnType<typeof livingSpendHold>> | undefined;
 
   for (const sec of sections) {
     const slot = String(sec.slot);
@@ -451,6 +463,13 @@ export async function pulseInstanceServer(
     const activeRecs = items.filter(i => (i.value as Src)?.slot === slot && (i.value as Src).active !== false);
     const active = activeRecs.map(i => i.value as Src);
     if (!active.length) continue;
+    // The owner's AI is called for the owner's own config or a writer that may use it (ai:use);
+    // otherwise the owner is asked once and the section waits (living-pulse-spend.ts).
+    if (spendHold === undefined) spendHold = await livingSpendHold({ storage, config }, ownerGaii, configKey(loc), String(cfg.title || 'Living document'));
+    if (spendHold) {
+      await addLedger(storage, ownerGaii, loc, { event: 'derive-waiting', slot, request_id: spendHold.requestId, declined: spendHold.declined });
+      continue;
+    }
     try {
       // The sources go to a model: the classification component decides first (TARGET-082). A
       // refusal fails this derive the way any other failure does, into the ledger.
@@ -490,6 +509,9 @@ export async function pulseInstanceServer(
     cost: Number(((Number(status.cost) || 0) + costUsd).toFixed(4)),
   };
   if (stopReason) nextStatus.retired_reason = stopReason;
+  // The question the sections wait on, for the writer and the page to read; gone once the AI may run.
+  if (spendHold?.requestId) nextStatus.ai_spend_request = spendHold.requestId;
+  else if (spendHold === null) delete nextStatus.ai_spend_request;
   await upsert(storage, ownerGaii, configKey(loc), { ...cfg, status: nextStatus });
   await addLedger(storage, ownerGaii, loc, { event: 'pulse', slots: derived, costUsd: Number(costUsd.toFixed(4)) });
   if (stopReason) {

@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description App, subdomain, CSM/MSM/schema and system-prompt record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-10-31 — AppManifest gains `screenshotPublic`: the owner shows the screenshot of an app that
+ *     opens for fewer people to everyone (secaudit2026oct31w2 round 10, W2-12). Manifest JSON.
  *   v1.24.0 — 2026-10-27 — AppManifest gains `publishedByApp`, the app whose grant published the
  *     version (secaudit2026oct26, own-app-consent:app-grant-publisher-reads-as-owner). Manifest JSON.
  *   v1.23.0 — 2026-10-25 — AppManifest gains `publishedBy`, the principal that published the version
@@ -183,6 +185,13 @@ export interface AppManifest {
    * write of the spec and copied forward by every publish.
    */
   designSpec?: { at: string; by: string; version: number; revision: number; bytes: number };
+  /**
+   * The owner's choice to show the app's screenshot to everyone while the app itself opens for fewer
+   * people (signed-in, or one organism). Absent or false: the screenshot follows who may open the app
+   * (routes/apps/open.ts screenshotGateRefused). Set through the app's settings, copied forward by
+   * every publish. No effect on an app anyone may open.
+   */
+  screenshotPublic?: boolean;
   /**
    * Who published this version: the principal of the publish (a GHII, a GAII or an `eco:` app).
    * Public provenance. Absent on versions published before 2026-10-25. The owner's own app asks the

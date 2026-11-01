@@ -38,6 +38,10 @@
  *   2026-11-01 — A publish stores no odps.yaml: the product sheet is projected when it is read, from the
  *     version's audience (./odps-read.ts). The stored one said public and "No authentication" for every
  *     package (plan doc-mvwxcas3dom3, D0.1).
+ *   2026-10-31 — The reads decide on the audience the service recorded (./audience-record.ts), not on
+ *     the pointer's or the tag's own word, which the generic storage routes write; openPackage answers
+ *     openToAnyone for the OData cache header; the rows of a resource pass the classification
+ *     reader GET /v1/pub runs on the same CSV (secaudit2026oct31w2 round 10, W2-14, W2-15, W2-20).
  *   2026-10-21 — The descriptor file of a new version carries the version's audience as a tag, and an
  *     earlier version is opened and listed on that audience (capability-loss review of v42: an
  *     organism or members reader keeps the earlier versions after the newest goes public).
@@ -92,7 +96,10 @@ import { checkAudienceWrite } from '../audience-write.js';
 import {
     DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable, versionOpenTo, withAudienceTag, type DatapackageReader,
 } from './audience.js';
-import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer } from './version-audience.js';
+import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer, readTrustedVisibility } from './version-audience.js';
+import { trustedAudienceOf } from './audience-record.js';
+import { readerFor, type ReaderAuth } from '../classification/reader.js';
+import { fileTarget } from '../classification/labels.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
@@ -172,9 +179,8 @@ export async function publishPackage(
     // V1.6). POST /v1/datapackages and the MCP tool lowered it already at the gate and say so; this
     // covers the extension capability and the workflow step, which call here directly.
     if (visibility === 'public' && signedInOnly(config)) {
-        const pointer = await readPointer(deps, ownerGhii, input.name);
         visibility = closedNodeLevel(config, visibility, 'members' as const, {
-            from: pointer?.contentHash ? (pointer.visibility ?? 'public') : undefined,
+            from: await readTrustedVisibility(deps, ownerGhii, input.name),
         }).level;
     }
     const audience = await checkAudienceWrite(storage, visibility, { sub: producedBy.gaii, owner: ownerName }, DATAPACKAGE_LEVELS);
@@ -340,7 +346,8 @@ export async function publishPackage(
         // before, so the files kept the tier they were first written at (./version-audience.ts).
         // A withdrawn package lost its catalogue entry, so publishing it again writes the entry back.
         const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
-            catalogue: (previous?.visibility ?? 'public') !== visibility || previous?.status === 'withdrawn',
+            catalogue: ((await readTrustedVisibility(deps, ownerGhii, input.name)) ?? 'public') !== visibility
+                || previous?.status === 'withdrawn',
             ...(personalPublicConfirmed ? { personalPublicConfirmed } : {}),
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
@@ -513,16 +520,24 @@ export async function recordFailure(
         };
     }
     pointer.lastError = { at: new Date().toISOString(), message: message.slice(0, 1000) };
+    // The pointer keeps the package's audience, the one the service recorded for a published package
+    // (./audience-record.ts); a pointer with none is a public package's.
+    const audience = pointer.contentHash
+        ? (await readTrustedVisibility(deps, ownerGhii, name)) ?? 'public'
+        : pointer.visibility ?? 'public';
     await writeStorageFile({ storage: deps.storage, config: deps.config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
         key,
         data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),
         mimeType: 'application/json; charset=utf-8',
-        // The pointer keeps the package's audience; a pointer with none is a public package's.
-        visibility: fileVisibilityOf(pointer.visibility ?? 'public'),
+        visibility: fileVisibilityOf(audience),
     });
 }
 
-export interface OpenedPackage { descriptor: Descriptor; descriptorUrl: string; latest?: LatestPointer }
+export interface OpenedPackage {
+    descriptor: Descriptor; descriptorUrl: string; latest?: LatestPointer;
+    /** True when anyone, signed in or not, opens this version: the package and the version are public. */
+    openToAnyone: boolean;
+}
 
 /**
  * Read a package back. `ref` is `pkg:{owner}/{name}` for the newest version, or
@@ -536,11 +551,13 @@ export async function openPackage(
     if (!parsed) return null;
     const { ownerGhii, name, contentHash } = parsed;
 
-    // The pointer carries the package's audience (./audience.ts), so it is read for a pinned version
-    // too. A package this reader may not read answers like a missing one. No reader is anonymous.
+    // The package's audience is the one the service recorded (./audience-record.ts), read for a pinned
+    // version too; the pointer file is read for the version it names and its recorded failure. A
+    // package this reader may not read answers like a missing one. No reader is anonymous.
     const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
     const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
-    if (!(await datapackageReadable(deps.storage, ownerGhii, pointer?.visibility, reader))) return null;
+    const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
+    if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader))) return null;
     // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
     if (pointer?.status === 'withdrawn') return null;
 
@@ -548,19 +565,28 @@ export async function openPackage(
     let latest: LatestPointer | undefined;
     if (!hash) {
         if (!pointer) return null;
-        latest = pointer;
+        // A pointer that names another version than the service recorded was written past it: the
+        // recorded version and audience stand in for its own.
+        const current = trusted.pointer?.contentHash;
+        latest = current && current !== pointer.contentHash
+            ? { ...pointer, contentHash: current, ...(trusted.visibility !== undefined ? { visibility: trusted.visibility } : {}) }
+            : pointer;
         if (!latest.contentHash) return null;   // only a failure has ever been recorded
         hash = latest.contentHash;
     }
     const file = await deps.storage.getStorageFile(ownerGhii, descriptorKey(name, hash));
     if (!file) return null;
-    // A pinned earlier version keeps the tier it was stored at: the pointer's audience covers the
-    // version it names, and approving one version public opens no other (./audience.ts).
-    if (!(await versionOpenTo(deps.storage, ownerGhii, reader, pointer, hash, file))) return null;
+    // A pinned earlier version keeps its own audience: the package's audience covers the version it
+    // points at, and approving one version public opens no other (./audience.ts).
+    const versionFile = trusted.versionFile(hash, file);
+    if (!(await versionOpenTo(deps.storage, ownerGhii, reader, trusted.pointer, hash, versionFile))) return null;
+    const openToAnyone = await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, null)
+        && await versionOpenTo(deps.storage, ownerGhii, null, trusted.pointer, hash, versionFile);
     return {
         descriptor: JSON.parse(file.data.toString('utf8')) as Descriptor,
         descriptorUrl: publicUrl(deps.config.baseUrl, ownerGhii, descriptorKey(name, hash)),
         ...(latest ? { latest } : {}),
+        openToAnyone,
     };
 }
 
@@ -609,9 +635,15 @@ async function loadResourceRows(
     const res = opened.descriptor.resources.find(r => r.name === resource);
     if (!res) return null;
     const hash = opened.descriptor.aimeat.contentHash;
-    const file = await deps.storage.getStorageFile(parsed.ownerGhii, resourceKey(parsed.name, hash, resource));
+    const key = resourceKey(parsed.name, hash, resource);
+    const file = await deps.storage.getStorageFile(parsed.ownerGhii, key);
     if (!file) return null;
-    return { all: fromCsv(file.data, res.schema), res };
+    // The classification reader GET /v1/pub runs on the same CSV (routes/storage-files.ts): a label
+    // that hides the file from this reader, or ranks above an agent's clearance, hides its rows too,
+    // and the read answers as a missing resource, as /v1/pub answers 404.
+    const [shown] = await readerFor(deps, reader?.sub ? reader as ReaderAuth : null).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
+    if (!shown) return null;
+    return { all: fromCsv(shown.data, res.schema), res };
 }
 
 /** Every package one owner has, newest version each, with any recorded failure. */
@@ -623,7 +655,11 @@ export async function listPackages(deps: StoreDeps, ownerGhii: string): Promise<
     const out: LatestPointer[] = [];
     for (const name of names) {
         const file = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
-        if (file) out.push(JSON.parse(file.data.toString('utf8')) as LatestPointer);
+        if (!file) continue;
+        const pointer = JSON.parse(file.data.toString('utf8')) as LatestPointer;
+        // A published package lists with the audience its reads decide on (./audience-record.ts).
+        const trusted = pointer.contentHash ? (await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer)).visibility : undefined;
+        out.push(trusted !== undefined && trusted !== (pointer.visibility ?? 'public') ? { ...pointer, visibility: trusted } : pointer);
     }
     return out.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
@@ -664,7 +700,9 @@ export async function listVersions(
 ): Promise<VersionEntry[]> {
     const root = `${packageKeyRoot(name)}/`;
     const pointer = await readLatestPointer(deps, ownerGhii, name);
-    const currentHash = pointer?.contentHash ?? '';
+    // The version the package points at and each version's audience, as the service recorded them.
+    const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
+    const currentHash = trusted.pointer?.contentHash ?? pointer?.contentHash ?? '';
     const files = (await deps.storage.listStorageFiles(ownerGhii))
         .filter(f => f.key.startsWith(root) && f.key.endsWith('/datapackage.json'));
 
@@ -672,7 +710,7 @@ export async function listVersions(
     for (const f of files) {
         const hash = f.key.slice(root.length).split('/')[0];
         if (!/^[a-f0-9]{64}$/.test(hash)) continue;
-        if (!(await versionOpenTo(deps.storage, ownerGhii, reader, pointer ?? undefined, hash, f))) continue;
+        if (!(await versionOpenTo(deps.storage, ownerGhii, reader, trusted.pointer, hash, trusted.versionFile(hash, f)))) continue;
         const body = await deps.storage.getStorageFile(ownerGhii, f.key);
         if (!body) continue;
         let descriptor: Descriptor;

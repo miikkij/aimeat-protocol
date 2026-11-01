@@ -7,13 +7,15 @@
  *   sessionStorage `aimeat.ws.{org}.{ws}.openDoc` = { namespace, id } or { key } (read once the
  *   workspace's manifest has loaded), or sends the window event `aimeat-open-doc` { orgId, wsId, key }
  *   (heard while the workspace is already open). With a whole memory key the space is the one whose
- *   namespace the key continues, so a namespace with a dot in it (shared.wish) resolves too, and the
- *   id is the next segment. Moved out of workspace.js (max-file-lines) when the key and the event
- *   were added.
+ *   longest namespace the key continues, so a namespace with a dot in it (shared.wish) resolves too,
+ *   and the id is the rest of the key less its role suffix, so an id may hold a dot. Moved out of
+ *   workspace.js (max-file-lines) when the key and the event were added.
  * @structure useWorkspaceOpenDoc({ ws, orgId, wsId, setTab, setActiveDoc, setExpandedRec })
  *   (a record space opens the record's row, as the overview does; a document space the page)
  * @usage useWorkspaceOpenDoc({ ws, orgId, wsId, setTab, setActiveDoc, setExpandedRec });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A key resolves to the longest declared namespace it continues, and the id
+ *     keeps its dots (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.0.0 — 2026-10-16 — Extracted from workspace.js; the request may carry the record's key, and the
  *     event opens it in a workspace that is already open (Jouni: the search went to the organism, not
  *     to the record).
@@ -34,8 +36,11 @@ export function useWorkspaceOpenDoc({ ws, orgId, wsId, setTab, setActiveDoc, set
     let ot = null;
     let id = req.id;
     if (req.key) {
-      ot = types.find((o) => o.namespace && req.key.startsWith(`organism.${orgId}.w.${wsId}.${o.namespace}.`));
-      if (ot) id = req.key.slice(`organism.${orgId}.w.${wsId}.${ot.namespace}.`.length).split('.')[0];
+      // The longest declared namespace the key starts with, and the id is the rest less its role
+      // suffix: an id may hold a dot (services/workspace-record-key.ts recordAt reads it the same way).
+      ot = types.filter((o) => o.namespace && req.key.startsWith(`organism.${orgId}.w.${wsId}.${o.namespace}.`))
+        .sort((a, b) => b.namespace.length - a.namespace.length)[0] || null;
+      if (ot) id = req.key.slice(`organism.${orgId}.w.${wsId}.${ot.namespace}.`.length).replace(/\.(draft|latest|version\.\d+)$/, '');
     } else if (req.namespace) {
       ot = types.find((o) => o.namespace === req.namespace);
     }

@@ -19,6 +19,9 @@
  *   v0.11.0 — 2026-11-01 — A data package's catalogue manifest and resource entries are left to the
  *     `datasets` source, which lists the package once as type `dataset`; they arrived here as two or
  *     more `knowledge` records (plan doc-mvwxcas3dom3, D1.1).
+ *   2026-10-31 — A flagged record leaves discovery on an actioned flag or on the auto-hide threshold
+ *     (withoutFlagHiddenMemory), not on one unreviewed flag, and a dismissed flag stops counting; it
+ *     read `maxFlags: 0` (secaudit2026oct31w2 round 10, W2-9).
  *   v0.10.0 — 2026-10-20 — The own scope asks the organism read rule (organismReadableRecords with
  *     ctx.organismCaller) after ownerScopeView: an agent that a 'listed' organism does not admit got
  *     that organism's records as entries, while GET /v1/memory/:key answered it 403 (secaudit
@@ -74,6 +77,7 @@ import { readWorkspaceManifest } from '../../workspace-meta.js';
 import { shownMemoryValue } from '../../secret-records.js';
 import { appIdFromToolsKey } from '../../../models/app-tool-schemas.js';
 import type { DiscoveryPlace } from '../types.js';
+import { withoutFlagHiddenMemory } from '../../moderation-flags.js';
 
 export const MEMORY_SOURCE_ID = 'memory-fts';
 const MAX_LIMIT = 100;
@@ -283,12 +287,15 @@ async function enumerateShared(storage: Storage, config: AimeatConfig, ctx: Disc
     const prefix = `organism.${orgId}.w.`;
     let pairs: Array<{ rec: MemoryRecord; score: number }>;
     if (q) {
-      const raw = await storage.searchText(q, { keyPrefix: prefix, limit, maxFlags: 0 });
+      const raw = await storage.searchText(q, { keyPrefix: prefix, limit });
       pairs = raw.map(r => ({ rec: r.record, score: r.score }));
     } else {
       const { items } = await storage.listAllMemory({ prefix, limit });
-      pairs = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => ({ rec, score: 0 }));
+      pairs = items.map(rec => ({ rec, score: 0 }));
     }
+    // A flag hides a record on review or on the threshold, not on its own (moderation-flags.ts, W2-9).
+    const shownRecs = new Set(await withoutFlagHiddenMemory({ storage, config }, pairs.map(p => p.rec)));
+    pairs = pairs.filter(p => shownRecs.has(p.rec));
 
     for (const { rec, score } of pairs) {
       const m = WS_KEY.exec(rec.key);
@@ -342,20 +349,22 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
           ownerGaiis: ownerGaiis ?? undefined,
           visibility: ownerGaiis ? undefined : 'public',
           limit,
-          maxFlags: 0,
         });
         hits = raw.map(({ record, score }) => toMemHit(record, score));
       } else if (ownerGaiis) {
         // No-query own scope: list each identity's memory, merge, slice.
         const lists = await Promise.all(
-          ownerGaiis.map(gaii => storage.listMemory(gaii, { maxFlags: 0 })),
+          ownerGaiis.map(gaii => storage.listMemory(gaii)),
         );
         hits = lists.flat().map(rec => toMemHit(rec, 0));
       } else {
         // No-query public scope: list public memory node-wide.
         const { items } = await storage.listAllMemory({ visibility: 'public', limit });
-        hits = items.filter(r => (r.flagCount ?? 0) === 0).map(rec => toMemHit(rec, 0));
+        hits = items.map(rec => toMemHit(rec, 0));
       }
+      // A flag hides a record on review or on the threshold, not on its own, and a dismissed flag
+      // stops counting (moderation-flags.ts withoutFlagHiddenMemory, W2-9). Every scope reads it.
+      hits = await withoutFlagHiddenMemory({ storage, config }, hits);
 
       let candidates = hits.filter(h => !isOwnedElsewhere(h.key, h.tags) && !isCopyOrMeta(h.key));
       // The owner's identity set holds more than this caller may read. The owner in person, an app

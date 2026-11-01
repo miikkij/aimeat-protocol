@@ -23,6 +23,8 @@
  * @usage pnpm exec vitest run test/unit/connect-mcp-error-flag.test.ts
  * @version-history
  *   2026-11-01 — PROBE_SETUP for aimeat_datapackage_withdraw (a package ref, as for the export tool).
+ *   2026-10-31 — PROBE_SETUP for aimeat_admin_federation_settlement_ceiling_set (a ceiling, or "node";
+ *     secaudit2026oct31w2 round 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-30 — PROBE_SETUP for aimeat_designbook_kit_default (a kit id, or clear).
  *   2026-10-24 — PROBE_SETUP for aimeat_compliance_register_write, whose value is optional now.
@@ -76,6 +78,8 @@ const PROBE_SETUP: Record<string, Record<string, unknown>> = {
   aimeat_datapackage_export: { ref: 'pkg:someone/thing' },
   // The ref is parsed before the call (owner/name, or pkg:owner/name), as for the export tool.
   aimeat_datapackage_withdraw: { ref: 'pkg:someone/thing' },
+  // The ceiling is a whole number, "none" or "node" on the catalog's pattern; 'probe' is none of them.
+  aimeat_admin_federation_settlement_ceiling_set: { settlement_ceiling: 'node' },
   // Neither field is required, because clear: true takes the place of the kit, so the probe names one.
   aimeat_designbook_kit_default: { kit: 'kit-probe' },
   // value became optional (item_id + set change one entry instead), so the probe sends the document.

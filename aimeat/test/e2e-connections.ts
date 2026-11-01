@@ -19,6 +19,9 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   2026-10-31 — Phase 2b-https: over https the round's cookie is one a same-site page cannot write; the
+ *     binding value under the plain name finishes nothing, and the starter's browser finishes as before
+ *     (secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-29 — Phase 11c: a delegation named by file name alone belongs to one author's app: the
  *     channel owner's own app binds it (at creation, or at an older one's first use with one notice),
  *     another author's app waits for the channel owner's Allow, and a look-alike of the same file name
@@ -394,6 +397,48 @@ async function main(): Promise<void> {
       const row = await readRoundRow(start.data.data.state as string);
       assert(row !== null, 'the stored round could not be read from the server database');
       assert(/^v2:[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/.test(String(row.nonce)), `the verifier is stored in plain text: ${String(row.nonce).slice(0, 12)}…`);
+    });
+
+    console.log('\nPhase 2b-https — Over https the round cookie is one a same-site page cannot write');
+    // secaudit2026oct31w2 W2-19: the round cookie was the plain aimeat_oauth_<hash> name, which an
+    // app, portfolio or company page on a sibling host can set for the apex. The requests below come
+    // as through the node's https proxy (X-Forwarded-Proto: https).
+    const HTTPS = { 'X-Forwarded-Proto': 'https' };
+    /** Every cookie a response set, as `name=value` pairs, whatever the name's prefix. */
+    const jarOf = (res: Response): string[] => res.headers.getSetCookie().map(c => c.split(';')[0]!).filter(p => p.includes('aimeat_oauth_') && !p.endsWith('='));
+    const plainName = (state: string) => `aimeat_oauth_${createHash('sha256').update(state).digest('hex').slice(0, 16)}`;
+    const httpsStart = async (bearer: string) => {
+      const res = await fetch(`${BASE}/v1/connections/start`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...BROWSER_START, ...HTTPS, Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ provider: 'fake' }),
+      });
+      const body = await res.json() as any;
+      return { status: res.status, state: body.data?.state as string, jar: jarOf(res) };
+    };
+    const httpsCallback = (state: string, code: string, cookie: string) => fetch(`${BASE}/v1/connections/callback?state=${encodeURIComponent(state)}&code=${code}`, {
+      redirect: 'manual', headers: { ...HTTPS, ...(cookie ? { Cookie: cookie } : {}) },
+    });
+    await test('over https, the binding value under the plain cookie name (what a same-site page can write) finishes nothing', async () => {
+      const before = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections.length;
+      const start = await httpsStart(jwtA);
+      assert(start.status === 200 && start.jar.length > 0, `https start: ${start.status} ${start.jar.join('; ')}`);
+      const value = start.jar[0]!.slice(start.jar[0]!.indexOf('=') + 1);
+      const planted = await httpsCallback(start.state, 'code-planted', `${plainName(start.state)}=${value}`);
+      const said = await planted.text();
+      assert(planted.status === 403, `SECURITY: a plain-name cookie finished an https round: ${planted.status} ${said.slice(0, 200)}`);
+      const after = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections as any[];
+      assert(after.length === before && !after.some(c => c.accountLabel === 'Test account planted'), 'the planted account was connected');
+    });
+    await test('usage: over https, the browser that started the round finishes it with the cookie it was given', async () => {
+      const start = await httpsStart(jwtA);
+      assert(start.status === 200 && start.jar.length > 0, `https start: ${start.status}`);
+      const res = await httpsCallback(start.state, 'code-httpsown', start.jar.join('; '));
+      assert(res.status === 302, `the starter's own https callback: ${res.status} ${(await res.text()).slice(0, 200)}`);
+      const list = (await api('/v1/connections', { method: 'GET', bearer: jwtA })).data.data.connections as any[];
+      const own = list.find(c => c.accountLabel === 'Test account httpsown');
+      assert(!!own, `the starter's account is not connected: ${JSON.stringify(list.map(c => c.accountLabel))}`);
+      const gone = await api(`/v1/connections/${own.id}`, { method: 'DELETE', bearer: jwtA });
+      assert(gone.status === 200, `clean up the https connection: ${gone.status}`);
     });
 
     console.log('\nPhase 2c — An agent asks, and the owner confirms in their own browser');

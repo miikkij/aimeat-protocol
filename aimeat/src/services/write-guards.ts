@@ -19,6 +19,10 @@
  * @usage Called from validateMemoryWrite (every write surface funnels through it) and from the
  *   external delete routes. The publish path passes { viaPublish, expectedVersion }.
  * @version-history
+ *   2026-11-01 — getNamespacePolicy reads the guard of the declared space a key is in: the asked
+ *     namespace, or the longest declared namespace it continues. A record whose id holds a dot was
+ *     parsed into a namespace no manifest declares, and an append-only or versioned space's guard let
+ *     it be published over and deleted (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.1.0 — 2026-08-15 — getNamespacePolicy folds the guard flags across EVERY copy of the manifest
  *     instead of taking the first row a scan returns. The key is unique per owner, not per node, so
  *     a member's own copy without `create_only` could resolve here and turn an append-only namespace
@@ -30,6 +34,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { ValidationResult } from './schema-validator.js';
+import { declaredNamespaceOf } from './workspace-record-key.js';
 
 export interface WriteGuardCtx {
   /** True when the write arrives through the draft → publish path (organisms/MCP publish). */
@@ -73,6 +78,8 @@ export function parseWorkspaceRecordKey(key: string): WorkspaceRecordKeyParts | 
 export interface NamespaceGuardPolicy {
   createOnly: boolean;
   requiresExpectedVersion: boolean;
+  /** The declared namespace whose guard this is (the asked one, or the space it continues). */
+  namespace: string;
 }
 
 /**
@@ -104,18 +111,33 @@ export async function getNamespacePolicy(
   let createOnly = false;
   let requiresExpectedVersion = false;
   let found = false;
+  let space = namespace;
   for (const rec of items) {
     if (rec.key !== mkey) continue;
     const man = rec.value as
       { objectTypes?: Array<{ namespace?: string; create_only?: boolean; requires_expected_version?: boolean }> } | undefined;
-    const ot = (man?.objectTypes ?? []).find(o => o?.namespace === namespace);
+    // The declared space the key is in: `namespace` itself, or the longest declared namespace it
+    // continues. parseWorkspaceRecordKey takes the id's last part as the id, so the record `e1.2`
+    // of `logs` arrives as `logs.e1`, and an exact match let it past the space's guard
+    // (secaudit2026oct31w2 round 10b, dotted record ids).
+    const declared = declaredNamespaceOf(namespace, (man?.objectTypes ?? []).map(o => o?.namespace).filter((n): n is string => typeof n === 'string' && !!n));
+    const ot = declared ? (man?.objectTypes ?? []).find(o => o?.namespace === declared) : undefined;
     if (!ot) continue;
     found = true;
     if (ot.create_only === true) createOnly = true;
     if (ot.requires_expected_version === true) requiresExpectedVersion = true;
+    if (declared && (ot.create_only === true || ot.requires_expected_version === true)) space = declared;
   }
   if (!found || (!createOnly && !requiresExpectedVersion)) return null;
-  return { createOnly, requiresExpectedVersion };
+  return { createOnly, requiresExpectedVersion, namespace: space };
+}
+
+/** The record's namespace and id as its declared space reads them: the id is what follows the space. */
+function recordInSpace(parts: WorkspaceRecordKeyParts, policy: NamespaceGuardPolicy): { namespace: string; instance: string } {
+  const whole = `${parts.namespace}.${parts.instance}`;
+  return whole.startsWith(`${policy.namespace}.`)
+    ? { namespace: policy.namespace, instance: whole.slice(policy.namespace.length + 1) }
+    : { namespace: parts.namespace, instance: parts.instance };
 }
 
 const fresher = <T extends { updatedAt: string }>(a: T | null, b: T): T =>
@@ -144,6 +166,7 @@ export async function checkWriteGuard(
   if (!parts || parts.role === 'draft') return { valid: true };
   const policy = await getNamespacePolicy(storage, parts.organismId, parts.ws, parts.namespace);
   if (!policy) return { valid: true };
+  const rec = recordInSpace(parts, policy);
 
   const base = `organism.${parts.organismId}.w.${parts.ws}.${parts.namespace}.${parts.instance}`;
   const latest = await readLatest(storage, base);
@@ -153,14 +176,14 @@ export async function checkWriteGuard(
 
   if (!ctx?.viaPublish) {
     return guardError('write_guard_protected',
-      `namespace "${parts.namespace}" is write-guarded: publish through the draft flow (direct .latest/.version writes are refused)`,
-      { namespace: parts.namespace, key });
+      `namespace "${rec.namespace}" is write-guarded: publish through the draft flow (direct .latest/.version writes are refused)`,
+      { namespace: rec.namespace, key });
   }
 
   if (policy.createOnly && latest) {
     return guardError('write_guard_conflict',
-      `record "${parts.instance}" already exists in append-only namespace "${parts.namespace}" (current version ${latest.version}, updated ${latest.updatedAt}) — create refused, nothing was written`,
-      { namespace: parts.namespace, instance: parts.instance, current_version: latest.version, updated_at: latest.updatedAt });
+      `record "${rec.instance}" already exists in append-only namespace "${rec.namespace}" (current version ${latest.version}, updated ${latest.updatedAt}) — create refused, nothing was written`,
+      { namespace: rec.namespace, instance: rec.instance, current_version: latest.version, updated_at: latest.updatedAt });
   }
 
   if (policy.requiresExpectedVersion) {
@@ -168,20 +191,20 @@ export async function checkWriteGuard(
     if (!latest) {
       if (expected != null && expected !== 0) {
         return guardError('write_guard_version_mismatch',
-          `record "${parts.instance}" does not exist yet (expected_version ${expected} given) — nothing was written`,
-          { namespace: parts.namespace, instance: parts.instance, current_version: 0 });
+          `record "${rec.instance}" does not exist yet (expected_version ${expected} given) — nothing was written`,
+          { namespace: rec.namespace, instance: rec.instance, current_version: 0 });
       }
       return { valid: true };
     }
     if (expected == null) {
       return guardError('write_guard_version_required',
-        `namespace "${parts.namespace}" requires expected_version on update (current version ${latest.version}, updated ${latest.updatedAt}) — pass the version you read`,
-        { namespace: parts.namespace, instance: parts.instance, current_version: latest.version, updated_at: latest.updatedAt });
+        `namespace "${rec.namespace}" requires expected_version on update (current version ${latest.version}, updated ${latest.updatedAt}) — pass the version you read`,
+        { namespace: rec.namespace, instance: rec.instance, current_version: latest.version, updated_at: latest.updatedAt });
     }
     if (expected !== latest.version) {
       return guardError('write_guard_version_mismatch',
         `expected_version ${expected} does not match current version ${latest.version} (updated ${latest.updatedAt}) — nothing was written; re-read and retry`,
-        { namespace: parts.namespace, instance: parts.instance, current_version: latest.version, updated_at: latest.updatedAt });
+        { namespace: rec.namespace, instance: rec.instance, current_version: latest.version, updated_at: latest.updatedAt });
     }
   }
   return { valid: true };
@@ -193,7 +216,8 @@ export async function checkDeleteGuard(key: string, storage: Storage): Promise<V
   if (!parts || parts.role === 'draft') return { valid: true };
   const policy = await getNamespacePolicy(storage, parts.organismId, parts.ws, parts.namespace);
   if (!policy?.createOnly) return { valid: true };
+  const rec = recordInSpace(parts, policy);
   return guardError('write_guard_append_only',
-    `namespace "${parts.namespace}" is append-only: existing records cannot be deleted`,
-    { namespace: parts.namespace, instance: parts.instance, key });
+    `namespace "${rec.namespace}" is append-only: existing records cannot be deleted`,
+    { namespace: rec.namespace, instance: rec.instance, key });
 }

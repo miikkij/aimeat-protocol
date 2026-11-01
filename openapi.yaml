@@ -4829,6 +4829,7 @@ components:
             set: `anyone`, `signed-in` or `organism:<id>`. Everyone else reads the level only:
             `anyone`, `signed-in` or `organism`, without the organism's id. On a node set to show its
             content to signed-in accounts only, `anyone` still needs a sign-in.
+        screenshot_public: { type: boolean, description: "The owner's own rows only: true when the owner shows the screenshot of an app that opens for fewer people to everyone (PATCH /v1/apps/{filename} `screenshot_public`)." }
         parked: { type: boolean, description: True when the app is off every public surface (listing community or unlisted). Kept for older clients; read `listing`. }
         forkable: { type: boolean, description: True when other users are allowed to fork this app (the owner and their agents can always fork it) }
         has_draft: { type: boolean, description: True for a pending draft when the viewer owns the app or explicitly requests building=true and holds its development right. False for other viewers. }
@@ -4843,7 +4844,7 @@ components:
         downloads: { type: integer }
         forks: { type: integer, description: Number of direct forks of this app }
         download_url: { type: string }
-        screenshot_url: { type: string, nullable: true }
+        screenshot_url: { type: string, nullable: true, description: "Null when the app has no screenshot, or when its screenshot follows who may open it and the caller may not. For a caller who may open such an app the address carries a screenshot grant (`shot`)." }
         created_at: { type: string, format: date-time }
         ai_posture:
           allOf: [{ $ref: '#/components/schemas/AppAiPosture' }]
@@ -20051,6 +20052,12 @@ paths:
           description: INTERNAL_ERROR - the node failed while handling the call; it is logged for the operator.
         '502':
           description: PROVIDER_ERROR (the provider failed; see AiProviderFailure) or EMPTY_COMPLETION (every attempt answered with no content; the message names the finish_reason).
+        '503':
+          description: >
+            EXTENSION_RUNS_BUSY - the call is served by an extension provider, and the account's share of
+            extension runs (extensions.run_slots_per_account) or the node's pool (extensions.run_slots)
+            stayed full for one run's wall clock while the call waited for a slot; `details.retry_after_sec`
+            says when to try again.
 
   /v1/ai/policy:
     get:
@@ -23054,7 +23061,10 @@ paths:
         detection, labelling, code_of_practice, posture }`.
 
         `ai_processing_region` is where the node's own AI key has prompts processed: `{ mode,
-        mode_limits?, node_key, region?, host?, fallback?, regions_in_use?, note }`. `mode` is the AI
+        mode_limits?, node_key, default_model?, eu_only_model?, region?, host?, fallback?,
+        regions_in_use?, note }`. `default_model` is the model the chat and the agents use when
+        nobody chose one (the node's chat, then execution, then reasoning default);
+        `eu_only_model` is the model eu-only uses in its place when the EU does not offer it. `mode` is the AI
         region choice made when the node was bought (`ai.region_mode`: `eu`, `eu-only`, `own`, or null
         when none was made) and `mode_limits` what it switches off; the region fields appear when the
         node holds its own key.
@@ -27919,6 +27929,10 @@ paths:
         A paginated read for a UI or an agent that wants to look rather than download. For anything
         larger, read the resource's CSV from its permanent address — that is what it is for, and it
         answers byte ranges. A non-public package answers 404 to a caller its visibility does not admit.
+        The package's visibility is the one its publish recorded, never what a file under `datapkg/`
+        written through the storage routes says. The rows pass the classification reader that
+        `GET /v1/pub` runs on the same CSV: a resource whose label hides it from the caller (an agent's
+        clearance, a label that hides content from AI) answers 404, as `/v1/pub` does.
       tags: [Data Packages]
       security: [{}, { BearerAuth: [] }]
       parameters:
@@ -28046,6 +28060,13 @@ paths:
         reduced by what this page carried, and `version` pinned to the content hash the page was
         read from, so every page of one answer comes from the same rows. Excel, Power BI and
         Tableau follow it by themselves; a client that does not reads only the first page.
+
+        CACHING. An answer without `version` is `Cache-Control: no-cache`. A pinned answer is
+        `public, max-age=300` when anyone opens that version (a public package), and
+        `private, max-age=300` with `Vary: Authorization` otherwise, so a shared cache never hands a
+        members, organism or private package's answer to another caller. The service document and
+        `$metadata` answer the same way. The rows pass the classification reader `GET /v1/pub` runs
+        on the same CSV: a resource whose label hides it from the caller answers 404.
       tags: [Data Packages]
       security: []
       parameters:
@@ -32638,11 +32659,24 @@ paths:
                     the node's; `node` or null follows the node's setting again. The same as
                     PUT /v1/federation/peers/{nodeId}/relay-claim. 400 INVALID_INPUT for any other
                     word, before anything is written.
+                settlement_ceiling:
+                  nullable: true
+                  oneOf:
+                    - type: integer
+                      minimum: 1
+                    - type: string
+                      description: '"none", "node", or a whole number as digits'
+                  description: >-
+                    How many morsels this peer's settlements may add a day: a whole number of its own,
+                    "none" for no limit, or "node" (or null) for this node's daily ceiling on morsels
+                    added from nothing. The same as PUT /v1/federation/peers/{nodeId}/settlement-ceiling.
+                    The answer carries the setting back as `settlement_ceiling` (a number, "none", or
+                    null). 400 INVALID_INPUT for any other value, before anything is written.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '400':
-          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null. Nothing is written.
+          description: INVALID_INPUT, a `relay_claim` that is not optional, required, node or null, or a `settlement_ceiling` that is not a whole number of at least 1, none, node or null. Nothing is written.
         '404':
           description: No peer with that node id
         '409':
@@ -32744,6 +32778,60 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '400':
           description: INVALID_INPUT, a missing value or any word but optional, required and node. Nothing is written.
+        '403':
+          description: Not an operator
+        '404':
+          description: NOT_FOUND, no peer with that node id
+
+  /v1/federation/peers/{nodeId}/settlement-ceiling:
+    put:
+      operationId: setPeerSettlementCeiling
+      summary: Set how many morsels one peer's settlements may add a day (operator)
+      description: |
+        A signed settlement (POST /v1/federation/settle) adds morsels no balance on this node paid.
+        By default (`node`) a peer's settlement fits in what is left today (UTC) of this node's daily
+        ceiling on morsels added from nothing, AIMEAT_MAX_OPERATOR_MINT_PER_DAY, counting mints,
+        pacing-pack sales and every peer's settlements together; the mint and the pack sale do not
+        count settlements. A whole number gives this peer a ceiling of its own, counted over its own
+        settlements; `none` takes the limit away. A settlement past the ceiling answers 429
+        QUOTA_EXCEEDED, credits nothing, and is recorded on the Security page with a notice to the
+        operators. The same write as `aimeat_admin_federation_settlement_ceiling_set`.
+      tags: [Federation]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: nodeId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [settlement_ceiling]
+              properties:
+                settlement_ceiling:
+                  nullable: true
+                  oneOf:
+                    - type: integer
+                      minimum: 1
+                    - type: string
+                      description: '"none", "node", or a whole number as digits'
+      responses:
+        '200':
+          description: >-
+            `node_id` and `settlement_ceiling`: `setting` (a number, "none", or null for the node's),
+            `daily_limit` (morsels a day, null for no limit), `counts_against` (peer, node or none)
+            and `credited_today` (what this peer's settlements added since the start of the UTC day).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '400':
+          description: INVALID_INPUT, anything but a whole number of at least 1, none, node or null. Nothing is written.
         '403':
           description: Not an operator
         '404':
@@ -36218,6 +36306,13 @@ paths:
                     which asks POST /v1/apps/{owner}/{filename}/open with the session. A node set to
                     signed-in content access treats every app as at least `signed-in`. The answer
                     carries `open_to`.
+                screenshot_public:
+                  type: boolean
+                  description: >-
+                    For an app that opens for fewer people than anyone: true shows its screenshot to
+                    everyone, false (the default) shows it only to the people who may open the app
+                    (GET /v1/apps/{owner}/{filename}/screenshot). No effect on an app anyone may open.
+                    The icon is always public. The answer carries `screenshot_public`.
                 parked:
                   type: boolean
                   description: >-
@@ -36336,6 +36431,7 @@ paths:
                           description: { type: string }
                           protected: { type: boolean }
                           listing: { type: string, enum: [listed, community, unlisted] }
+                          screenshot_public: { type: boolean, description: True when the owner shows the screenshot to everyone }
                           parked: { type: boolean }
                           forkable: { type: boolean }
                           protection: { type: object, nullable: true, description: The app's current copy-protection flags (null when none) }
@@ -40139,10 +40235,22 @@ paths:
       operationId: getAppScreenshot
       summary: Serve an app's screenshot image
       description: >
-        Returns the stored screenshot for the app, or 404 if none. No auth. Only a PNG, JPEG, WebP, GIF or AVIF
+        Returns the stored screenshot for the app, or 404 if none. No auth for an app anyone may open,
+        cached `public`. For an app that needs a sign-in (its `open_to`, or a node set to signed-in
+        content access) the screenshot follows who may open the app, unless its owner set
+        `screenshot_public`: the caller the app opens for gets it (the owner, an operator, an account
+        the app's setting admits, a grant from POST .../open in `access`, or the screenshot grant a
+        listing puts in `shot`), cached `private`; anybody else gets the app's own refusal, 401
+        SIGN_IN_REQUIRED or 403 ACCESS_DENIED. The icon stays public. Only a PNG, JPEG, WebP, GIF or AVIF
         image is served, with the type its bytes are rather than the type it was stored with; any
         other stored file answers 404.
       tags: [App Store]
+      parameters:
+        - name: shot
+          in: query
+          required: false
+          schema: { type: string }
+          description: The screenshot grant from a listing's `screenshot_url`; it shows this app's screenshot and opens nothing else.
       responses:
         '200':
           description: Screenshot image bytes
@@ -40161,6 +40269,10 @@ paths:
                 format: binary
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          description: SIGN_IN_REQUIRED. The app needs a sign-in, its screenshot follows who may open it, and the caller has no account here.
+        '403':
+          description: ACCESS_DENIED. The app opens for people the caller is not among, and its screenshot follows who may open it.
         '404':
           description: The app has no screenshot, or the stored file is not a PNG, JPEG, WebP, GIF or AVIF image
     post:
@@ -54678,6 +54790,8 @@ paths:
         optionalAuth: when a session is present the response also carries a `viewer` object
         { owner, has_verified_email, email_matches } so the accept page can warn — before the button —
         that the signed-in account cannot accept (its verified email doesn't match the invited address).
+        `token` may also be the invitation's id (the in-app notification's link), which answers only
+        the invited person signed in in person and 404 for anyone else.
       tags: [Organisms]
       security: []
       parameters:
@@ -54706,6 +54820,12 @@ paths:
         place it answers `app_waiting` with a `reason`, the account stays signed in and the link stays
         usable. An `app` link whose app invitation is no longer open answers 404 before any account
         is made.
+
+        `token` may also be the invitation's id, which is what the in-app notification of an
+        invitation to an existing account links to. An id opens the invitation only for the invited
+        person signed in in person (an owner session or owner-level token whose verified email is the
+        invited address), on this route and on GET /v1/invitations/{token}; for anyone else it
+        answers 404, so it can never create an account.
       tags: [Organisms]
       security: []
       parameters:
@@ -55477,7 +55597,10 @@ paths:
         over `{from_node, to_node, gaii, amount, tracking_code, reason, timestamp}`; `to_node` must be
         this node, `timestamp` must be within five minutes of this node's clock (400 STALE_TIMESTAMP
         otherwise), and a tracking code is credited once (409 CONFLICT the second time, also for
-        copies of one settlement that arrive at the same moment).
+        copies of one settlement that arrive at the same moment). A settlement credits at most what
+        is left today (UTC) of the daily ceiling for the sending peer: this node's ceiling on morsels
+        added from nothing, or the ceiling or no limit the operator set for that peer
+        (PUT /v1/federation/peers/{nodeId}/settlement-ceiling).
       tags: [Federation]
       requestBody:
         required: true
@@ -55490,6 +55613,12 @@ paths:
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '429':
+          description: >-
+            QUOTA_EXCEEDED, the settlement would pass the daily ceiling for the sending peer. Nothing
+            is credited and the tracking code stays unused; the refusal is recorded on this node's
+            Security page and its operators are told. Send it again after the operator raised the
+            ceiling, or after midnight UTC.
 
   /v1/federation/settle/outbound:
     post:
@@ -59902,9 +60031,24 @@ paths:
                         properties:
                           schedule: { $ref: '#/components/schemas/Schedule' }
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: >
+            Among the refusals: `INVALID_CRON`, and `SCHEDULE_TOO_FREQUENT`: the cron runs more often
+            than the node's `schedules.min_interval_seconds` allows (default 60, so once a minute is
+            accepted; 0 is no limit). The message names the setting.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: >
+            `SCHEDULE_LIMIT` — the owner already keeps `schedules.max_per_owner` schedules (default 1000,
+            0 is no limit), their agents' and apps' included. Delete one and make this one again.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '403':
           description: >
             `SCOPE_DENIED` — the caller lacks the scope the schedule's kind drives.
@@ -60062,7 +60206,10 @@ paths:
                         type: array
                         items: { type: object, properties: { code: { type: string }, message: { type: string } } }
         '400':
-          description: INVALID_CRON, INVALID_INPUT (an empty prompt) or NO_PROMPT (a kind that has no prompt)
+          description: >
+            INVALID_CRON, INVALID_INPUT (an empty prompt), NO_PROMPT (a kind that has no prompt) or
+            SCHEDULE_TOO_FREQUENT (a new cron that runs more often than `schedules.min_interval_seconds`
+            allows; a cron the schedule already has is not asked)
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -60296,7 +60443,9 @@ paths:
                             properties:
                               warnings: { type: array, items: { type: string }, description: 'Present only when something in the body did nothing.' }
         '400':
-          description: Validation failed (error.details.errors[] lists the problems)
+          description: >
+            Validation failed (error.details.errors[] lists the problems). Among them: a scheduled
+            trigger given a new cron that runs more often than `schedules.min_interval_seconds` allows.
           content:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
@@ -70779,7 +70928,15 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
         '429':
-          $ref: '#/components/responses/RateLimited'
+          description: >
+            `QUOTA_EXCEEDED` — the node holds `realtime.max_rooms` rooms. `OWNER_ROOM_LIMIT` — the
+            caller's owner and their agents hold `realtime.rooms_per_owner` rooms (default 50, 0 is no
+            separate limit); `error.details.your_rooms` lists them, and closing one
+            (DELETE /v1/realtime/rooms/{roomId}) frees the share.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '503':
           description: Realtime disabled on this node
     get:

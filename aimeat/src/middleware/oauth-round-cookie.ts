@@ -15,9 +15,12 @@
  *   other start is left unbound and handed the confirmation page instead. A client that fakes the
  *   header only changes which address it is given: the cookie then sits in that client, and the
  *   person who approves at the provider in their own browser is still refused.
- * @structure browserCanBind · issueRoundBinding · newRoundBinding · setRoundBinding · readRoundBinding · clearRoundBinding
- * @usage const bind = browserCanBind(req, caller.inPerson) ? issueRoundBinding(req, res, state, path, ttl) : null;
+ * @structure browserCanBind · issueRoundBinding · roundCookieKind · browserRoundBinding · roundCookiesOf · endRoundBinding · newRoundBinding · setRoundBinding · readRoundBinding · clearRoundBinding
+ * @usage ...(browserCanBind(req, caller.inPerson) ? browserRoundBinding(req, res, callbackPath) : {})
  * @version-history
+ *   2026-10-31 — The outside-account and remote MCP server rounds use the `__Host-` cookie over https
+ *     too: browserRoundBinding (start), roundCookiesOf and endRoundBinding (callback), roundCookieKind
+ *     (the owner's confirmation); issueRoundBinding takes `host` (secaudit2026oct31w2 round 10, W2-19).
  *   2026-10-27 — setRoundBinding, readRoundBinding and clearRoundBinding take `host`: the `__Host-` cookie,
  *     Secure with Path=/, which a same-site app, portfolio or company page cannot write; the sign-in
  *     rounds use it on https (secaudit2026oct26, login-round-binding-cookie-settable-from-same-site-author-origin).
@@ -30,7 +33,7 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 import type { Request, Response } from 'express';
-import { bindingHash } from '../services/oauth-round-secrets.js';
+import { bindingHash, type RoundBindCookie, type RoundCookies } from '../services/oauth-round-secrets.js';
 import { logger } from '../utils/logger.js';
 
 const COOKIE_PREFIX = 'aimeat_oauth_';
@@ -59,11 +62,44 @@ export function browserCanBind(req: Request, ownerInPerson: boolean): boolean {
  * the hash the round stores.
  */
 export function issueRoundBinding(
-  req: Request, res: Response, state: string, callbackPath: string, ttlMs: number,
+  req: Request, res: Response, state: string, callbackPath: string, ttlMs: number, host = false,
 ): string {
   const binding = newRoundBinding();
-  setRoundBinding(req, res, state, callbackPath, ttlMs, binding.value);
+  setRoundBinding(req, res, state, callbackPath, ttlMs, binding.value, 'lax', host);
   return binding.hash;
+}
+
+/** The cookie a round bound by this request uses: the `__Host-` one over https, else the plain one. */
+export function roundCookieKind(req: Request): RoundBindCookie {
+  return cookieSecure(req) ? 'host' : 'plain';
+}
+
+/**
+ * The start inputs that bind an outside-account or remote MCP server round to this browser
+ * (`bindBrowser`), and which cookie they set (`bindCookie`, stored on the round). Over https the
+ * cookie is the `__Host-` one, as for the sign-in rounds (./login-round-binding.ts), because a
+ * same-site app, portfolio or company page can write the plain name for the apex
+ * (secaudit2026oct31w2, W2-19).
+ */
+export function browserRoundBinding(
+  req: Request, res: Response, callbackPath: string,
+): { bindBrowser: (state: string, ttlMs: number) => string; bindCookie: RoundBindCookie } {
+  const bindCookie = roundCookieKind(req);
+  return {
+    bindBrowser: (state, ttlMs) => issueRoundBinding(req, res, state, callbackPath, ttlMs, bindCookie === 'host'),
+    bindCookie,
+  };
+}
+
+/** Both round cookies this callback request carries for `state`, and whether it came over https. */
+export function roundCookiesOf(req: Request, state: string): RoundCookies {
+  return { binding: readRoundBinding(req, state), hostBinding: readRoundBinding(req, state, true), secure: cookieSecure(req) };
+}
+
+/** Remove both of the round's cookies at its callback: the round is finished or refused either way. */
+export function endRoundBinding(req: Request, res: Response, state: string, callbackPath: string): void {
+  clearRoundBinding(req, res, state, callbackPath);
+  if (cookieSecure(req)) clearRoundBinding(req, res, state, callbackPath, 'lax', true);
 }
 
 /**

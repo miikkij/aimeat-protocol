@@ -24,12 +24,15 @@
  *   writePendingPeer() · deletePendingPeer() · listPendingPeers() · pendingRegistrationView() · revokePeerApprovals() ·
  *   forgetPeer()
  * @version-history
+ *   v1.3.0 — 2026-10-31 — forgetPeer also removes the settlement ceiling the operator gave the peer
+ *     (services/settlement-ceiling.ts; secaudit2026oct31w2 round 10).
  *   v1.2.0 — 2026-10-23 — revokePeerApprovals, called by forgetPeer: a removed peer's approved peering
  *     requests are marked revoked, so a key exchange cannot re-admit it (Core FED-15; secaudit2026oct22).
  *   v1.1.0 — 2026-10-01 — forgetPeer also removes the markers of the peer's Security page events.
  *   v1.0.0 — 2026-10-01 — Initial (the peer-registration incident, finding F).
  */
 import type { Storage } from '../storage/interface.js';
+import { forgetPeerSettlementCeiling } from './settlement-ceiling.js';
 
 export const NS_PEER_ORIGIN = 'federation-peer-origin';
 
@@ -152,6 +155,9 @@ export async function forgetPeer(storage: Storage, nodeId: string): Promise<void
     await revokePeerApprovals(storage, nodeId);
     await storage.deleteMemory(NS_PEER_ORIGIN, originKey(nodeId));
     await storage.deleteMemory(NS_PEER_ORIGIN, pendingKey(nodeId));
+    // A ceiling the operator gave this peer goes with it: a node that peers again under the id starts
+    // on the node's ceiling (services/settlement-ceiling.ts).
+    await forgetPeerSettlementCeiling(storage, nodeId);
     for (const r of await storage.listMemory(NS_PEER_ORIGIN, { prefix: `incident.${nodeId}.` })) {
         if ((r.value as { nodeId?: string } | undefined)?.nodeId === nodeId) await storage.deleteMemory(NS_PEER_ORIGIN, r.key);
     }

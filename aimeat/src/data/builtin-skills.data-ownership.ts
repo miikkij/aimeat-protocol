@@ -29,6 +29,8 @@
  * @version-history
  *   2026-11-01 — Section 4: a data package is withdrawn with aimeat_datapackage_withdraw, and with purge
  *     its files are deleted at once (plan doc-mvwxcas3dom3, D0.3).
+ *   2026-10-31 — Section 3: an app's write is named as the app in the hands, not as the person
+ *     (secaudit2026oct31w2 round 10, services/data-map/tally-writer.ts, routes/memory/bulk.ts).
  *   2026-10-29 — Section 6: the old portfolio address clears the old page's browser storage the same way
  *     (secaudit2026oct26 round 8c, origin-handed-to-next-name-holder).
  *   2026-10-27 — Section 6: erasure also takes back an accountant role and the beneficiary check, and an
@@ -169,7 +171,8 @@ What an export leaves out, and why:
 
 - \`aimeat_memory_hands\` with \`key\`: who wrote and deleted that record, how many times and when, newest first,
   across the person and all their agents and apps: what they saved themselves, what their agents
-  saved, workspace writes, extensions and scheduled jobs. The answer's \`not_covered\` says what it
+  saved, workspace writes, extensions and scheduled jobs. An app the person signed in to is named as the
+  app (\`eco:<app>#<person>@<node>\`), not as the person, from 2026-10-31. The answer's \`not_covered\` says what it
   cannot see: writes from before counting started, and writes the node makes on its own behalf.
   An agent without \`memory:read-as-owner\` sees the hands only on records it may read; the answer's
   \`note\` then says so.

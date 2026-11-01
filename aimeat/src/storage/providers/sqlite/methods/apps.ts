@@ -23,6 +23,7 @@
  *   v1.8.0 — 2026-09-26 — revokeTokenIfAbsent: INSERT OR IGNORE, true when this call filed the hash
  *     (the one-time assertion spend, secaudit 2026-09 N5).
  *   v1.9.0 — 2026-10-02 — updateAppMeta replaces or takes off `designSpec`, the design spec's stamp.
+ *   2026-10-31 — updateAppMeta sets or takes off `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
  *   v1.10.0 — 2026-10-05 — revokeToken, revokeTokenIfAbsent, isTokenRevoked, cleanExpiredRevocations moved to
  *     identity.ts; createSubdomainSite, getSubdomainSite, listSubdomainSites, updateSubdomainSite,
  *     deleteSubdomainSite, deserializeSubdomainSite moved to subdomain-sites.ts; createAppGrant, getAppGrant,
@@ -157,6 +158,7 @@ export const appMethods = {
       marks?: Partial<AppMarks>; authorship?: AppAuthorship | null; authorshipLog?: AppAuthorshipLogEntry[];
       legal?: Partial<Record<AppLegalKind, AppLegalDoc | null>>;
       designSpec?: AppManifest['designSpec'] | null;
+      screenshotPublic?: boolean | null;
     },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
@@ -195,6 +197,11 @@ export const appMethods = {
     if (meta.designSpec !== undefined) {
       if (meta.designSpec === null) delete manifest.designSpec;
       else manifest.designSpec = meta.designSpec;
+    }
+    // The owner's "show the screenshot to everyone": stored only when on.
+    if (meta.screenshotPublic !== undefined) {
+      if (meta.screenshotPublic === true) manifest.screenshotPublic = true;
+      else delete manifest.screenshotPublic;
     }
     const result = this.db.prepare(
       'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'

@@ -30,6 +30,9 @@
  *   const standing = await workspaceStanding(deps, caller, orgId, ws);
  *   if (isRefusal(standing)) return standing;
  * @version-history
+ *   2026-11-01 — existingDocIds reads a page's id from the end of its key (recordRowAt), so a page
+ *     whose id holds a dot counts as present; it read as gone, and unfiling it passed as housekeeping
+ *     (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.1.0 — 2026-10-13 — ChangeCaller carries the session's scopes, and applySpaces takes the
  *     caller and compares the manifest before and after with fenceChangeRefusal
  *     (services/fenced-space.ts) before it locks a schema or writes: every code path that writes a
@@ -49,6 +52,7 @@ import { archivedRefusal } from './workspace-write-guards.js';
 import { isPlatformWorkspaceNamespace } from './workspace-write-items.js';
 import { validateMemoryWrite } from './schema-validator.js';
 import { readStoredSections, type Section } from './workspace-sections.js';
+import { recordRowAt } from './workspace-record-key.js';
 import { attachedAsParticipant } from './organism-agent-access.js';
 import { fenceChangeRefusal } from './fenced-space.js';
 
@@ -305,6 +309,9 @@ export async function existingDocIds(
     const keys = deps.storage.listMemoryKeysByPrefix
         ? (await deps.storage.listMemoryKeysByPrefix(prefix)).map(r => r.key)
         : (await deps.storage.listAllMemory({ prefix, limit: 10000, archived: 'include' })).items.map(r => r.key);
-    const present = new Set(keys.map(k => k.slice(prefix.length).split('.')[0]));
+    // The id is read from the end of the key (recordRowAt), so a page whose id holds a dot is found
+    // under its whole id; split on the first dot it read as gone (secaudit2026oct31w2 round 10b). A
+    // bare rest with a dot in it is taken whole, as such a page's id.
+    const present = new Set(keys.map(k => { const rest = k.slice(prefix.length); return recordRowAt(rest)?.id ?? rest; }));
     return new Set(ids.filter(id => present.has(id)));
 }

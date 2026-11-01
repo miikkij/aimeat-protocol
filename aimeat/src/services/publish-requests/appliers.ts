@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.20.0 — 2026-10-31 — A living document refreshing itself with the owner's AI, set up by a writer
+ *     without ai:use, allowed by the owner (apply-living-ai-spend.ts; secaudit2026oct31w2 round 10).
  *   v1.19.0 — 2026-10-31 — A program a computer holds for an agent, allowed or not allowed by the owner
  *     (apply-connector-program.ts; wish-koneen-ohjelmaluettelo-nodeen-sallitut-ja-hyv-ksynt-odottava).
  *   v1.18.0 — 2026-10-31 — The owner's welcome page may read their memory when they open it, allowed by
@@ -85,6 +87,7 @@ import { applyDelegationBinding } from './apply-delegation-binding.js';
 import { applyExtensionCode } from './apply-extension-code.js';
 import { applyCortexHolder } from './apply-cortex-holder.js';
 import { applyConnectorProgram, declineConnectorProgram } from './apply-connector-program.js';
+import { applyLivingAiSpend } from './apply-living-ai-spend.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -118,6 +121,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'card-adult-confirm': applyCardAdultConfirm,
   'portfolio-memory-read': applyPortfolioMemoryRead,
   'connector-program': applyConnectorProgram,
+  'living-ai-spend': applyLivingAiSpend,
 };
 
 /**

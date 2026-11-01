@@ -192,8 +192,8 @@
       "sha": "7a3bb7d232431a2c"
     },
     "test/e2e-unfurl.ts": {
-      "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",
-      "sha": "53f7392fc4b34ad2"
+      "reason": "Reviewed 2026-10-31 (secaudit2026oct31w2 round 10): GET /v1/unfurl and /v1/unfurl/image read a public web address the caller names and hold nothing of any account; routes/unfurl.ts caches the answer by the address alone, so every signed-in principal gets the same answer and there is no second principal to refuse. The refusals that matter are the sign-in (401) and the private-address guard (422), both asserted.",
+      "sha": "ab1a51c9649eec07"
     },
     "test/e2e-agent-telemetry.ts": {
       "reason": "Seeded 2026-10-16 from the QA audit (P3-08). NOT YET REVIEWED: the only refusal this suite asserts is an anonymous 401, which proves the sign-in check and nothing about whether another signed-in principal is kept out. Add a cross-owner or cross-scope refusal (a 403 or a refused MCP call), or replace this line with why the surface has no second principal to refuse.",

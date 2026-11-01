@@ -40,6 +40,7 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   2026-10-31 — A new version keeps the owner's `screenshotPublic` (secaudit2026oct31w2 round 10, W2-12).
  *   2026-10-27 — A version published through an app's grant also names that app (`publishedByApp`), and the owner hears of it when the app is another author's (services/app-published-by-app.ts; secaudit2026oct26).
  *   2026-10-25 — Every version's manifest names who published it (`publishedBy`), so the owner's own app asks the owner before a version another account published gets a permission the owner's grant lacks (services/own-app-consent.ts; secaudit2026oct22).
  *   2026-10-25 — The aimeat-intake declaration is read from the bytes (services/app-intake-forms.ts): a form the publisher does not manage refuses the publish, a form the code calls undeclared is a warning, and the forms go on the manifest. A new version of an app open to the internet is handed to services/internet-opening/. The input types (RequestedManifest, PublishAppInput, PublishAppRefusal) moved unchanged to app-publish-types.ts (line limit) and are re-exported.
@@ -471,6 +472,8 @@ export async function publishApp(
   if (prev?.authorshipLog?.length) manifest.authorshipLog = prev.authorshipLog;
   // The app's legal pages are the owner's standing statements about the app, not about one build.
   if (prev?.legal) manifest.legal = prev.legal;
+  // The owner's "show the screenshot to everyone" is a settings choice no publish door carries.
+  if (prev?.screenshotPublic) manifest.screenshotPublic = true;
 
   // What the app DECLARES survives a version whose author forgot the meta tag; what the node
   // OBSERVES is re-measured from the bytes being published, never carried. HTML only — there is
