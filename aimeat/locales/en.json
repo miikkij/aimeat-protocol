@@ -16084,6 +16084,7 @@
       "stepsLabel": "Two steps",
       "step2": "Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.",
       "step2Waits": "This opens when your AI is connected.",
+      "step2Open": "Open the chat",
       "settings": "Settings"
     },
     "buildWithYou": {
@@ -24106,6 +24107,7 @@
   },
   "setup": {
     "pickTool": "Which AI tool are you connecting? The steps differ enough that the general version is not usable.",
+    "moreTools": "Other AI tools ({n})",
     "recommendedBadge": "recommended to start",
     "paramsTitle": "What to put in each field",
     "copyCmd": "Copy the command",

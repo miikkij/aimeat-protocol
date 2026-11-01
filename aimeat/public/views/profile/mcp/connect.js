@@ -10,6 +10,9 @@
  * @structure secConnect · quickWays · proofBlock · failList
  * @usage import { secConnect } from './connect.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-01 -- The guide drops its own question under the section's lead, which asked
+ *     the same; on a node the store sold the short ways in (developer tools) are left out
+ *     (commercial's crew52 check).
  *   v2.1.0 -- 2026-09-29 -- The desktop app is the first row of the short ways in (`install.app` in
  *     the tool table): one row, because it attaches Claude Code, Cursor and VS Code at once, with
  *     the visitor's own platform first and the others soft.
@@ -60,12 +63,17 @@ import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { SetupGuide } from '/components/SetupGuide.js';
 import { m, day } from './frame.js';
 import { ownPlatform } from '/js/desktop-download.js';
+import { customerNode } from '/js/site.js';
 
-/** The per-tool setup guide: the tool tabs, the install row in the attention note, facts, numbered steps. */
-const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows />`;
+/**
+ * The per-tool setup guide: the tool tabs, the install row in the attention note, facts, numbered
+ * steps. Without its own question: the section's lead above it already asks which tool.
+ */
+const guide = () => html`<${SetupGuide} poster asideInstall facts stepRows lead=${false} />`;
 
 export function secConnect(ctx, proven) {
-  const toolCount = Array.isArray(ctx.tools) ? ctx.tools.length : null;
+  // A buyer's guide shows the chat AIs first, so a count of every tool would not match the tabs.
+  const toolCount = Array.isArray(ctx.tools) && !customerNode() ? ctx.tools.length : null;
   return html`
     <${Section} id="mcp-connect" num="02" title=${proven ? m('secConnect') : m('secConnectFirst')} count=${toolCount ? m('toolCount', { n: toolCount }) : null}>
       ${proven ? html`
@@ -116,6 +124,9 @@ function appRow(app) {
 
 /** Every tool that can be attached without walking its settings menu, from the tool table. */
 function quickWays(ctx) {
+  // A buyer on a node the store sold connects a chat AI; these short ways in are for the developer
+  // tools (the desktop app, Cursor, VS Code), which the guide's "Other AI tools" link still reaches.
+  if (customerNode()) return null;
   const tools = (ctx.tools || []).filter((tool) => tool?.mcp?.install && (tool.mcp.install.link || tool.mcp.install.scripts?.length || tool.mcp.install.file));
   if (!tools.length) return null;
   const app = tools.find((tool) => tool.mcp.install.app)?.mcp.install.app;

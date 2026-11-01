@@ -14425,6 +14425,7 @@
       "stepsLabel": "Dos pasos",
       "step2": "Di en una frase lo que quieres conseguir. AIMEAT crea un agente para ello y te lo muestra antes de que empiece.",
       "step2Waits": "Esto se abre cuando tu IA esté conectada.",
+      "step2Open": "Abrir el chat",
       "settings": "Ajustes"
     },
     "buildWithYou": {
@@ -22193,6 +22194,7 @@
   },
   "setup": {
     "pickTool": "¿Qué herramienta de IA vas a conectar? Los pasos cambian lo bastante como para que la versión general no sirva.",
+    "moreTools": "Otras herramientas de IA ({n})",
     "recommendedBadge": "recomendada para empezar",
     "paramsTitle": "Qué poner en cada campo",
     "copyCmd": "Copiar el comando",
