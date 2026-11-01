@@ -10,6 +10,7 @@
  *   a pointer rewritten with other terms or with its withdrawal cleared changes no answer.
  * @usage cd aimeat && pnpm exec vitest run test/unit/datapackage-pointer-state.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The public confirmation of plan D1.7: copied once, a forged one counts for nothing.
  *   v1.0.0 — 2026-11-01 — Initial (WP9e, cc-jouni-dataulos).
  */
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
@@ -18,7 +19,7 @@ import { createStorage } from '../../src/storage/storage-factory.js';
 import { setThisNodeId } from '../../src/utils/gaii.js';
 import type { Storage } from '../../src/storage/interface.js';
 import type { AimeatConfig } from '../../src/config.js';
-import { recordDatapackageAudiencesOnce, trustedPackageOf } from '../../src/services/datapackage/audience-record.js';
+import { recordDatapackageAudiencesOnce, recordPackageAudience, trustedPackageOf } from '../../src/services/datapackage/audience-record.js';
 import { recordPointerStateOnce, saleTermsOf, saleTermsKey } from '../../src/services/datapackage/sale-terms-record.js';
 import { isServiceOwnedKey } from '../../src/utils/reserved-keys.js';
 
@@ -31,6 +32,7 @@ let storage: Storage;
 const H = (c: string) => c.repeat(64);
 
 const TERMS = { exchange: true, model: 'per_read', pricesMoney: [{ amount: 10_000, currency: 'EUR' }], usageTerms: { resale: false } };
+const CONFIRMED = { at: '2026-10-15T00:00:00.000Z', by: `${OWNER}@${NODE}` };
 const FORGED = { exchange: true, model: 'per_read', pricesMoney: [{ amount: 1, currency: 'EUR' }], usageTerms: { resale: true } };
 
 async function put(key: string, data: unknown): Promise<void> {
@@ -75,12 +77,17 @@ describe('the sale terms and withdrawals of the existing pointers', () => {
         expect(await storage.getMemory(`system@${NODE}`, 'migrations.datapackage-pointer-state')).toBeNull();
     });
 
-    it('after the audience step, copies the terms and the withdrawal once, and skips a pointer that is not JSON', async () => {
+    it('after the audience step, copies the terms, the withdrawal and the confirmation once, and skips a pointer that is not JSON', async () => {
         await recordDatapackageAudiencesOnce(storage, config);
         // The audience step carries the withdrawal of a package it records.
         expect((await trustedPackageOf(storage, NODE, GHII, 'gone'))?.trusted.withdrawnAt).toBe('2026-10-20T00:00:00.000Z');
+        // A package recorded before the record carried the confirmation (a node that ran the audience
+        // step earlier): its pointer's confirmation counts until the pointer-state step has run.
+        await recordPackageAudience(storage, GHII, 'conf', `sha256:${H('4')}`, 'public');
+        await put('datapkg/conf/latest.json', pointer('conf', H('4'), { visibility: 'public', personalPublicConfirmed: CONFIRMED }));
+        expect((await trustedPackageOf(storage, NODE, GHII, 'conf'))?.trusted.personalPublicConfirmed).toEqual(CONFIRMED);
         const first = await recordPointerStateOnce(storage, config);
-        expect(first).toEqual({ ran: true, terms: 1, withdrawals: 0 });
+        expect(first).toEqual({ ran: true, terms: 1, withdrawals: 0, confirmations: 1 });
         expect(await recordPointerStateOnce(storage, config)).toEqual({ ran: false });
         expect(await saleTermsOf(storage, NODE, GHII, 'sold', null)).toEqual(TERMS);
         expect(await saleTermsOf(storage, NODE, GHII, 'plain', null)).toBeNull();
@@ -96,5 +103,12 @@ describe('the sale terms and withdrawals of the existing pointers', () => {
         expect(sold?.trusted.current).toBe(`sha256:${H('1')}`);
         expect(sold?.trusted.visibility).toBe('private');
         expect((await trustedPackageOf(storage, NODE, GHII, 'gone'))?.trusted.withdrawnAt).toBe('2026-10-20T00:00:00.000Z');
+    });
+
+    it('after the step, a confirmation written onto the pointer counts for nothing, and the recorded one stays', async () => {
+        await put('datapkg/plain/latest.json', pointer('plain', H('3'), { personalPublicConfirmed: { at: '2026-11-01T00:00:00.000Z', by: 'forged' } }));
+        expect((await trustedPackageOf(storage, NODE, GHII, 'plain'))?.trusted.personalPublicConfirmed).toBeUndefined();
+        await put('datapkg/conf/latest.json', pointer('conf', H('4'), { visibility: 'public' }));
+        expect((await trustedPackageOf(storage, NODE, GHII, 'conf'))?.trusted.personalPublicConfirmed).toEqual(CONFIRMED);
     });
 });

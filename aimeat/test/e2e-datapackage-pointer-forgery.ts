@@ -20,9 +20,13 @@
  *         refused the terms write, and another owner the withdrawal; X2 the terms write keeps the
  *         pointer file private.
  *     D1  a Dataspace participant's catalogue offers the recorded usage terms, not the pointer's.
+ *     G1  a confirmation of a public package from personal data written onto the pointer skips no
+ *         question: the app's public publish without the confirmation is refused 409
+ *         PERSONAL_DATA_PUBLIC (plan D1.7); G2 the confirmed publish and the next version still work.
  *   Each test fails on the code before WP9e.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-datapackage-pointer-forgery
  * @version-history
+ *   v1.1.0 — 2026-11-01 — G1, G2: the personal-data guard's confirmation (WP9e, plan D1.7).
  *   v1.0.0 — 2026-11-01 — Initial (WP9e, cc-jouni-dataulos).
  */
 import { registerOwner, setupOperator, type RegisteredOwner } from './helpers/owner-login.js';
@@ -81,7 +85,7 @@ await test('Setup: an operator, owner A with an app grant (storage:write, no exc
     OP = await setupOperator(BASE, ADMIN_PW, `pfop${stamp}`);
     A = await registerOwner(BASE, `pfa${stamp}`);
     B = await registerOwner(BASE, `pfb${stamp}`);
-    app = await appGrantToken(A, `pf${stamp}.html`, 'storage:read storage:write memory:read', PAGE, BASE);
+    app = await appGrantToken(A, `pf${stamp}.html`, 'storage:read storage:write memory:read memory:write', PAGE, BASE);
 });
 
 // ── Incident ...-mvxmm7ex: withdraw.ts ────────────────────────────────────────────────────────────
@@ -164,6 +168,44 @@ await test('P1. A private source whose pointer an app makes say public: a public
     assert(d.status === 409 && codeOf(d) === 'AUDIENCE_WIDER_THAN_SOURCE', `define: ${show(d)}`);
     const ok = await call('PUT', `/v1/dataproducts/pfp1own${stamp}`, A.token, { visibility: 'private', sources: [{ kind: 'datapackage', name: src }] });
     assert(ok.status === 201, `a private product from it still works: ${show(ok)}`);
+});
+
+console.log('\nThe personal-data guard (datapackage/personal-guard.ts, plan D1.7)');
+
+const APP = `pf${stamp}.html`;
+const personalRow = {
+    what: 'customers.*', holds: 'the customers', kind: 'register', usedFor: 'shown-as-a-list', where: 'owner-memory-private', owner: 'person',
+    readers: 'owner-only', writers: ['the-app-for-the-person'], shape: 'one-per-thing', keptFor: 'until-deleted', lossRisk: 'only-copy',
+    personalData: 'yes', domains: ['health'], why: 'test',
+};
+const appPublish = (name: string, visibility: string, extra: Body = {}) =>
+    call('POST', '/v1/datapackages', app, { name, changes: 'a version', visibility, resources: rows(`G-${visibility}`), ...extra });
+
+await test('G1. A confirmation an app writes onto the pointer skips no question: a public publish without the confirmation is refused 409', async () => {
+    const m = await call('PUT', `/v1/datamap/apps/${A.name}/${APP}`, A.token, {
+        spec: 'aimeat.datamap/2', what: 'A forgery test app.', usedFor: 'Testing.', form: 'one-person', arrangement: 'Memory.',
+        machinery: [], leaves: [], elsewhere: [], held: [personalRow],
+    });
+    assert(m.status === 200, `the app's data map: ${show(m)}`);
+    const name = `pfg1${stamp}`;
+    const mem = await appPublish(name, 'members');
+    assert(mem.status === 201, `members is not asked: ${show(mem)}`);
+    await forgePointer(app, name, {
+        contentHash: mem.body.data.content_hash, visibility: 'members',
+        personalPublicConfirmed: { at: new Date().toISOString(), by: `${A.name}@forged` },
+    });
+    const pub = await appPublish(name, 'public');
+    assert(pub.status === 409 && codeOf(pub) === 'PERSONAL_DATA_PUBLIC', `public without the confirmation: ${show(pub)}`);
+    assert((await call('GET', `/v1/datapackages/${A.name}/${name}/rows/items`)).status === 404, 'anonymous reads the package');
+});
+
+await test('G2. Usage: with the confirmation the app\'s publish goes public, and its next public version is not asked again', async () => {
+    const name = `pfg1${stamp}`;
+    const ok = await appPublish(name, 'public', { confirm_personal_public: true });
+    assert(ok.status === 201, `confirmed: ${show(ok)}`);
+    const next = await call('POST', '/v1/datapackages', app, { name, changes: 'second', visibility: 'public', resources: rows('G-next') });
+    assert(next.status === 201, `the next public version was asked again: ${show(next)}`);
+    assert((await call('GET', `/v1/datapackages/${A.name}/${name}/rows/items`)).status === 200, 'anonymous reads the confirmed public package');
 });
 
 console.log('\nThe sale on EXCHANGE (exchange-datapackage.ts)');

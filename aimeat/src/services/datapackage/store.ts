@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — The personal-data guard reads the confirmation the service recorded on the audience
+ *     record, not the pointer's (WP9e, plan D1.7).
  *   2026-11-01 — openPackage, and a publish of the same bytes after a withdrawal, take the withdrawal
  *     from the service's record (./audience-record.ts trustedAudienceOf withdrawnAt), not the pointer's
  *     mark alone (WP9e).
@@ -207,10 +209,13 @@ export async function publishPackage(
     const fileVisibility = fileVisibilityOf(visibility);
     // Public from personal data: the producer's data map marks its data personal, so the owner
     // confirms first (./personal-guard.ts). Refused before any write; a confirmation is recorded on
-    // the pointer this publish writes.
+    // the service's audience record this publish writes (./audience-record.ts), and an earlier one is
+    // read from there, never from the pointer file an app can rewrite.
+    const recordedConfirmation = (await trustedAudienceOf(storage, config.nodeId, ownerGhii, input.name,
+        await readPointer(deps, ownerGhii, input.name))).personalPublicConfirmed;
     const guard = await personalPublicGuard(deps, ownerGhii, input.name, visibility,
         { ...(producedBy.app ? { app: producedBy.app } : {}), ...(producedBy.extension ? { extension: producedBy.extension } : {}) },
-        input.confirmPersonalPublic, await readPointer(deps, ownerGhii, input.name));
+        input.confirmPersonalPublic, recordedConfirmation);
     if (!guard.ok) return { ok: false, code: guard.code, message: guard.message, issues: [] };
     const personalPublicConfirmed = guard.confirmedAt ? { at: guard.confirmedAt, by: producedBy.gaii } : undefined;
 
