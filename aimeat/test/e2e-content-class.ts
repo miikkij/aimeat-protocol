@@ -25,7 +25,9 @@
  *     without ai:use asking for a model step, and an agent without memory:write-reserved changing
  *     the settings, answer 403; an unknown setting answers 400 naming it; a token without
  *     storage:read is refused on every content route;
- *   - the five MCP tools answer as the routes do, and refuse what the routes refuse.
+ *   - the five MCP tools answer as the routes do, and refuse what the routes refuse;
+ *   - a picture whose metadata read never ends leaves the node answering, and at the media read time
+ *     limit its facts keep the format and size and name the limit and its setting.
  *
  *   WHY IT OWNS ITS SERVER. The model addresses and loopback egress are boot-time settings. It
  *   follows the runner's backend: Postgres when the env file names it, a temporary SQLite file
@@ -33,6 +35,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-content-class.ts
  *   cd aimeat && pnpm exec node --env-file=.env.test.postgres-kysely --import tsx test/e2e-content-class.ts
  * @version-history
+ *   2026-11-01 — Test 11: a HEIF whose box walk never ends does not hold the node; the facts name
+ *     content_class.media_read_seconds (secaudit2026oct31w2 round 12).
  *   2026-10-31 — Test 9b: a correction whose fields are refused leaves the classes and the model's
  *     decision record as they were (secaudit 2026-10-31 inv-16).
  *   v1.0.0 — 2026-10-20 — Initial.
@@ -94,6 +98,20 @@ function aiMarkedPng(): Buffer {
   const xmp = buildXmp({ digitalSourceType: 'http://cv.iptc.org/newscodes/digitalsourcetype/trainedAlgorithmicMedia',
     description: 'Made by an AI model.', records: [], markedAt: '2026-10-20T00:00:00Z', tool: 'AIMEAT e2e' });
   return markPng(png, xmp, 'Made by an AI model.');
+}
+
+/**
+ * A HEIF that exifr opens, whose second top-level box declares length 0: exifr's box walk stays on
+ * that offset until the media read time limit ends it (services/content/media-read-bounded.ts).
+ */
+function heifZeroBox(): Buffer {
+  const ftyp = Buffer.alloc(24);
+  ftyp.writeUInt32BE(24, 0);
+  ftyp.write('ftypheic', 4, 'latin1');
+  ftyp.write('mif1heic', 16, 'latin1');
+  const box = Buffer.alloc(16);
+  box.write('free', 4, 'latin1');
+  return Buffer.concat([ftyp, box, Buffer.alloc(64)]);
 }
 
 /** A one-page invoice with Title and Author in its Info dictionary and a text layer. */
@@ -470,6 +488,28 @@ async function factsOnArrival(owner: Owner, key: string, kind = 'file'): Promise
     const mine = await mcpCall(agent, 'aimeat_content_correct', { kind: 'file', key: 'mcp/corr.pdf', classes: ['contract'], fields: { contract: { subject: 'Lease' } } });
     assert(!mine?.result?.isError && toolText(mine).includes('cc:contract.subject'), `correct over MCP ${toolText(mine).slice(0, 300)}`);
     await json('/v1/content/settings', { method: 'PUT', headers: auth(A.token), body: JSON.stringify({ stages: { extract: false } }) });
+  });
+
+  await test('11. a picture whose metadata read never ends does not hold the node; its facts name the limit that ended it', async () => {
+    const C = await setupOwner('c');
+    await store(C, 'pics/endless.heic', heifZeroBox(), 'image/heic');
+    // The arrival read of the picture starts now. Every other request is answered meanwhile.
+    for (let i = 0; i < 6; i++) {
+      const t0 = Date.now();
+      const r = await fetch(`${BASE}/v1/build`, { signal: AbortSignal.timeout(3000) }).catch((err: Error) => ({ ok: false, status: err.name }));
+      assert(r.ok && Date.now() - t0 < 2000, `GET /v1/build ${r.status} after ${Date.now() - t0} ms`);
+      await sleep(500);
+    }
+    // At the time limit (content_class.media_read_seconds, 30 s by default) the facts are kept.
+    let f: any = null;
+    for (let i = 0; i < 120 && !f; i++) {
+      const r = await json(factsPath('pics/endless.heic'), { headers: auth(C.token) });
+      if (r.status === 200) f = r.body.data.facts;
+      else await sleep(500);
+    }
+    assert(!!f, 'no facts after the time limit');
+    assert(f.technical.kind === 'image' && f.technical.image?.format === 'heic' && f.technical.size === heifZeroBox().length, `image ${JSON.stringify(f.technical.image)}`);
+    assert(/longer than the limit of 30 s.*content_class\.media_read_seconds/.test(f.technical.errors?.exif ?? ''), `errors ${JSON.stringify(f.technical.errors)}`);
   });
 
   await stopServer(server);
