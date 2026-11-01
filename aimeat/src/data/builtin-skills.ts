@@ -11,6 +11,8 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-11-01 -- aimeat-node-guide: an agent keeps the node id and the node's address with its key and
+ *     signs a return proof only toward that address (secaudit2026oct31w2 round 11).
  *   2026-10-31 -- aimeat-gen-rules joins the list after aimeat-ai-model-policy.
  *   2026-10-31 -- diagnose-a-workflow, step 7: a 400 AI_MODEL_NOT_IN_REGION is a model the owner's
  *     OpenRouter region does not offer, with no allowed fallback region.
@@ -347,7 +349,9 @@ An agent that already exists and comes back (its token expired) proves it in ste
 its last approval gave it: \`proof: { signed_at, signature }\`, an Ed25519 signature over
 \`aimeat-device-return:v2\\n<node id>\\n<owner>\\n<agent name>\\n<signed_at>\` made within five
 minutes, where the node id is \`node_id\` from \`GET /.well-known/aimeat\` (\`aimeat connect add\` does
-this). A proof counts once, and the older v1 text without the node id is still accepted. The owner then sees the agent coming back. Without that proof the
+this). Keep the node id (the device-token answer gives it as \`next_steps.keep_your_key.node_id\`) and
+this node's address with the key, and sign a proof only when you connect to that same address: a
+server at another address can report any node id. A proof counts once, and the older v1 text without the node id is still accepted. The owner then sees the agent coming back. Without that proof the
 owner sees a new device taking the agent over, the approval is recorded in the owner's account
 events, and the owner may sign the agent out everywhere else with it.
 
