@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.59.0 -- 2026-11-01 -- Discover names aimeat_party "share" with `email` and "send_link": the one-time share link (WP9b).
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
  *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
  *   v1.56.0 -- 2026-11-01 -- Discover names aimeat_datapackage_sell: a package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5).
@@ -350,7 +351,10 @@ a person with an AIMEAT account on another server, \`aimeat_party\` \`share\` ta
 "name@their-server"\` in place of a name and makes no key. To give one package to someone with no
 account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a
 name, the package, the purpose and \`days\`: it answers a key, a connection file and the one sentence to
-tell the person (until when, ending it stops the next read, copies already taken stay). It needs
+tell the person (until when, ending it stops the next read, copies already taken stay). With the
+person's e-mail, pass \`email\` (and \`locale\`): the node mails a one-time link where they accept the
+terms and take a key of their own; \`link.sent\` false means no mail goes out here, so hand the owner
+\`link.link\` to pass on, and \`send_link\` sends a new one. It needs
 \`party:manage\`, which the owner ticks on its own. A request that asks for both ("make a data product
 of X, update it on Mondays and share it with Matti for a month") is ONE proposal: \`preview\` first and
 show the person the source, the columns, a personal column left out, the rows, the schedule and who

@@ -42,6 +42,7 @@
  * @usage
  *   app.use(robotsHeader(config));   // after subdomainMiddleware, before static files and routes
  * @version-history
+ *   v2.0.1 — 2026-11-01 — /v1/dataset/ decides its own indexing, by the package (WP9b).
  *   v2.0.0 — 2026-09-30 — noindex for every non-HTML response and for every apex HTML page the
  *     public-page registry does not name (wish-bing-noindex-kirjautumissivut-ja-konetiedostot).
  *     Mounted in server.ts ahead of the static files; from routes-loader it never reached them.
@@ -64,7 +65,8 @@ export interface RobotsTagInput {
 }
 
 /** HTML families under /v1 whose route makes its own indexing decision. */
-const OWN_DECISION_PREFIXES = ['/v1/apps/', '/v1/portfolio/', '/v1/designbook', '/v1/provenance'];
+// /v1/dataset/: the public dataset page decides by the package (routes/portal.ts, WP9b).
+const OWN_DECISION_PREFIXES = ['/v1/apps/', '/v1/portfolio/', '/v1/designbook', '/v1/provenance', '/v1/dataset/'];
 
 /** Addresses a search engine reads as instructions, never as pages. */
 function isCrawlerInstruction(path: string, indexNowKey?: string): boolean {

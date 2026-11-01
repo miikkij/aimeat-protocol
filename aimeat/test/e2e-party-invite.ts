@@ -144,7 +144,7 @@ async function run(): Promise<void> {
         assert(mail.subject.includes('jakoi sinulle') && mail.text.includes('Kuntien budjettisignaalit') && mail.text.includes('Raportointi'), `the mail: ${mail.subject} / ${mail.text.slice(0, 400)}`);
         assert(r.body.data.link.link.endsWith(encodeURIComponent(code)), 'the owner\'s link is the mailed link');
         const party = await call('/v1/parties/matti', { token: A.token });
-        assert(party.body.data.party.contact === mattiMail && party.body.data.party.invites?.[0]?.used_at === null && !JSON.stringify(party.body).includes('"hash"'), `the party lists the link without its hash: ${show(party)}`);
+        assert(party.body.data.party.contact === mattiMail && party.body.data.party.share_links?.[0]?.used_at === null && !JSON.stringify(party.body).includes('"hash"'), `the party lists the link without its hash: ${show(party)}`);
     });
 
     await test('The code is never a read credential: as ?key=, as a Basic password, as a Bearer value', async () => {

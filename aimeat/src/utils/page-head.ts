@@ -26,6 +26,8 @@
  *   html = injectPageHead(html, findPublicPage('/v1/connect'), config, nonceAttr);
  *   html = injectStaticPageHead(html, '/', findPublicPage('/'), config, nonceAttr);
  * @version-history
+ *   2026-11-01 - A page's own `jsonLd` (the public dataset page's schema.org Dataset) is written beside
+ *     the WebPage block (WP9b).
  *   2026-10-27 - injectStaticPageHead: the static front pages (AIMEAT_FRONT_PAGE) are stamped like
  *     the shell. They were sent as read from disk, so from 2026-10-21 the page aimeat.io serves at
  *     `/` had no canonical link, no og:* and no JSON-LD, and AGENTSCAN 1.1.0 scored it 82 (S10, S12,
@@ -258,6 +260,11 @@ export function injectPageHead(
       isPartOf: { '@type': 'WebSite', name: config.seoSiteName, url: `${b}/` },
     });
     out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(jsonLd)}</script>\n</head>`);
+  }
+  // A page that is about one thing carries that thing's own structured data beside the WebPage block:
+  // the public dataset page its schema.org Dataset (services/datapackage/landing-page.ts).
+  if (page.jsonLd) {
+    out = out.replace('</head>', `<script type="application/ld+json"${nonceAttr}>${jsonLdSafe(JSON.stringify(page.jsonLd))}</script>\n</head>`);
   }
   return out;
 }

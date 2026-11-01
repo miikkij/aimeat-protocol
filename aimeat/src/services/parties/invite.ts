@@ -146,9 +146,9 @@ export async function sendShareLink(
     const after = await changeParty(storage, c.ownerGhii, name, p => {
         if (p.uid !== party.uid) return UNCHANGED;
         // An unused earlier link of the same share stops working: the newest link is the one that counts.
-        const kept = (p.invites ?? []).filter(i => !(i.share === share.id && !i.usedAt));
+        const kept = (p.shareLinks ?? []).filter(i => !(i.share === share.id && !i.usedAt));
         return {
-            ...p, invites: [...kept, invite].slice(-MAX_INVITES_PER_PARTY),
+            ...p, shareLinks: [...kept, invite].slice(-MAX_INVITES_PER_PARTY),
             ...(!p.contact ? { contact: email } : {}),
         };
     });
@@ -187,12 +187,14 @@ export async function sendShareLink(
  * without `email` this is shareWithParty unchanged.
  */
 export async function shareAndSend(ctx: PartyServiceCtx, body: Record<string, unknown>): Promise<PartyAnswer<Record<string, unknown>>> {
-    const { email, locale, ...rest } = body;
-    if (email === undefined || email === null || email === '') return shareWithParty(ctx, rest);
+    // shareWithParty reads its own fields by name, so `email` and `locale` pass through it unread.
+    const email = body.email;
+    const locale = body.locale;
+    if (email === undefined || email === null || email === '') return shareWithParty(ctx, body);
     if (typeof email !== 'string' || !EMAIL_RE.test(email.trim()) || email.length > 320) return refuse(400, 'INVALID_INPUT', 'email is one e-mail address, the one the share link goes to.');
-    if (typeof rest.recipient === 'string') return refuse(400, 'INVALID_INPUT', 'A person on another AIMEAT node signs in with their own account and needs no link: leave email out, or share with a party (name).');
-    if (rest.kind === 'dataspace') return refuse(400, 'INVALID_INPUT', 'A data space participant connects with its own credential and takes no link.');
-    const shared = await shareWithParty(ctx, rest);
+    if (typeof body.recipient === 'string') return refuse(400, 'INVALID_INPUT', 'A person on another AIMEAT node signs in with their own account and needs no link: leave email out, or share with a party (name).');
+    if (body.kind === 'dataspace') return refuse(400, 'INVALID_INPUT', 'A data space participant connects with its own credential and takes no link.');
+    const shared = await shareWithParty(ctx, body);
     if (!shared.ok) return shared;
     const party = shared.data.party as { name: string };
     const share = shared.data.share as { id: string };
@@ -215,7 +217,7 @@ async function inviteOf(deps: Deps, code: unknown): Promise<
     let invite: PartyInvite | undefined;
     // Every stored hash is compared, so the time does not say which party holds the link.
     for (const p of (await readParties(deps.storage, ownerGhii)).parties) {
-        for (const i of p.invites ?? []) {
+        for (const i of p.shareLinks ?? []) {
             if (sameHash(hash, i.hash) && !invite) { party = p; invite = i; }
         }
     }
@@ -282,12 +284,12 @@ export async function redeemInvite(deps: Deps, code: unknown, body: { accept_ter
     const after = await changeParty(deps.storage, ownerGhii, party.name, p => {
         outcome = 'gone'; retired = [];
         if (p.uid !== party.uid) return UNCHANGED;
-        const mine = (p.invites ?? []).find(i => i.id === invite.id);
+        const mine = (p.shareLinks ?? []).find(i => i.id === invite.id);
         if (!mine) return UNCHANGED;
         if (mine.usedAt) { outcome = 'used'; return UNCHANGED; }
         // The key the owner saw when sharing (never used, made before this link) and the key an earlier
         // link of this share made stop working: the recipient's key is one nobody else has held.
-        const earlier = new Set((p.invites ?? []).filter(i => i.share === invite.share && i.usedAt && i.keyId).map(i => i.keyId!));
+        const earlier = new Set((p.shareLinks ?? []).filter(i => i.share === invite.share && i.usedAt && i.keyId).map(i => i.keyId!));
         const keep = p.keys.filter(k => {
             const shown = !k.lastUsedAt && !k.share && Date.parse(k.createdAt) <= Date.parse(mine.createdAt);
             if (shown || earlier.has(k.id)) { retired.push(k.id); return false; }
@@ -298,7 +300,7 @@ export async function redeemInvite(deps: Deps, code: unknown, body: { accept_ter
         return {
             ...p,
             keys: [...keep, { id: keyId, hash: fresh.hash, createdAt: at, lastUsedAt: null }],
-            invites: (p.invites ?? []).map(i => (i.id === invite.id ? { ...i, usedAt: at, keyId } : i)),
+            shareLinks: (p.shareLinks ?? []).map(i => (i.id === invite.id ? { ...i, usedAt: at, keyId } : i)),
         };
     });
     if (outcome === 'used') return refuse(410, 'INVITE_USED', 'This link was used already. Ask the person who shared the data for a new link.');
