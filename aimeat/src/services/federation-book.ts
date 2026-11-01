@@ -11,6 +11,7 @@
  *   Reuses the signed-doc pattern from network-policy.ts: read straight from storage (no module
  *   cache → safe for multiple node instances in one test process); sign/verify with the node key.
  * @structure
+ *   - NODE_CARD_MAX_BYTES · BOOK_MAX_BYTES — the read ceilings for a peer's card and a primary's book
  *   - NodeCard / FederationBook types
  *   - buildNodeCard(config, storage) — this node's card (or { listed:false } when opted out)
  *   - bookSignString() · legacyBookSignString() · verifyBookSignature() · getActiveBook() · storeActiveBook()
@@ -28,6 +29,9 @@
  *   v1.1.0 — 2026-10-16 — getActiveBook and storeActiveBook let a failed read propagate instead of
  *     answering "no book": pullBook no longer replaces a newer stored book and assembleBook no longer
  *     restarts book_version at 1 after a failed read (QA audit F2-06).
+ *   v1.1.1 — 2026-11-01 — assembleBook reads each peer's node card under NODE_CARD_MAX_BYTES and
+ *     skips a card over it with a warning; pullBook reads the book under BOOK_MAX_BYTES and answers
+ *     FETCH_FAILED over it. Both used resp.json() with no ceiling (secaudit2026oct31w2 round 11).
  */
 import { createHash } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
@@ -37,6 +41,7 @@ import { buildNodeDescriptor } from '../utils/node-descriptor.js';
 import { isOperatorAccount } from '../utils/operator-account.js';
 import { computeServiceSummary } from '../utils/service-summary.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
+import { readJson, ResponseTooLargeError } from '../utils/read-capped.js';
 import { sign, verify } from '../auth/keypair.js';
 import { peerKeyCache } from './federation-helpers.js';
 import { logger } from '../utils/logger.js';
@@ -44,6 +49,15 @@ import { canonicalJson } from '../utils/memory-content.js';
 
 export const FEDERATION_BOOK_GAII = '__federation_book__';
 export const FEDERATION_BOOK_KEY = 'federation-book.active';
+
+/**
+ * The most this node reads of one peer's node card and of a primary's book. A card is a few
+ * kilobytes (operators, counts, five highlights, the curated settings), so 256 KB is far above any
+ * real card; 4 MB holds a book of several hundred such cards. The network policy pull beside these
+ * reads under 1 MB (routes/federation-peer/policy-book.ts).
+ */
+export const NODE_CARD_MAX_BYTES = 256 * 1024;
+export const BOOK_MAX_BYTES = 4 * 1024 * 1024;
 
 export interface NodeCardOperator { ghii: string; display_name: string; avatar: string | null }
 export interface NodeCardResources { actions: number; agents: number; boards: number; csms: number; highlights: string[] }
@@ -204,7 +218,16 @@ export async function assembleBook(config: AimeatConfig, storage: Storage, peers
       // safeFetch re-validates each redirect hop; peer.url is remote-supplied (CodeQL request-forgery).
       const resp = await safeFetch(`${peer.url}/v1/federation/node-card`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
       if (!resp.ok) continue;
-      const body = await resp.json() as { data?: NodeCard };
+      let body: { data?: NodeCard };
+      try {
+        body = await readJson(resp, NODE_CARD_MAX_BYTES) as { data?: NodeCard };
+      } catch (err) {
+        if (err instanceof ResponseTooLargeError) {
+          logger.warn('assembleBook: skip a node card over the byte ceiling', { peer: peer.nodeId, maxBytes: NODE_CARD_MAX_BYTES });
+          continue;
+        }
+        throw err;
+      }
       const card = body?.data;
       if (card && card.listed) {
         nodes.push(card);
@@ -259,7 +282,8 @@ export async function pullBook(config: AimeatConfig, storage: Storage, peers: Ma
     // safeFetch re-validates each redirect hop; source is remote-supplied (CodeQL request-forgery).
     const resp = await safeFetch(`${source.replace(/\/+$/, '')}/v1/federation/book`, { signal: AbortSignal.timeout(config.federationTimeoutMs ?? 5_000) });
     if (!resp.ok) return { ok: false, status: 502, code: 'FETCH_FAILED', message: `Source returned ${resp.status}` };
-    const body = await resp.json() as { data?: { book?: FederationBook } };
+    // A ResponseTooLargeError lands in the catch below as FETCH_FAILED, with its own message.
+    const body = await readJson(resp, BOOK_MAX_BYTES) as { data?: { book?: FederationBook } };
     book = body?.data?.book as FederationBook;
     if (!book || !Array.isArray(book.nodes)) return { ok: false, status: 502, code: 'FETCH_FAILED', message: 'Source returned no book' };
   } catch (e) {
