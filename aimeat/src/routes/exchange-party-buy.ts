@@ -14,6 +14,7 @@
  * @usage app.use(exchangePartyBuyRouter(config, storage))
  * @version-history
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.4).
+ *   v1.0.1 — 2026-11-01 — The signed-in refusal tests for a session, not its `sub` (check:identity-resolution).
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -37,7 +38,8 @@ export function exchangePartyBuyRouter(config: AimeatConfig, storage: Storage): 
             const verdict = await verifyParty(deps, cred);
             if (!verdict.ok) { res.status(verdict.status).json(error(config.nodeId, verdict.code, verdict.message)); return; }
             renewal = verdict.ctx;
-        } else if (req.auth?.sub && !req.auth.anonymous) {
+        } else if (req.auth && !req.auth.anonymous) {
+            // Only whether a session is present decides this refusal; no identity is stored or compared.
             res.status(409).json(error(config.nodeId, 'USE_YOUR_ACCOUNT',
                 'You are signed in to an account here. Accept the offering with your account instead: buying here is for someone with no account.',
                 undefined, { accept: { method: 'POST', url: '/v1/exchange/entitlements', body: { offering_id: req.params.id } } }));

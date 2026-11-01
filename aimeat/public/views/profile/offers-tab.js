@@ -10,6 +10,8 @@
  *   router, the builder, billing, rating, and a delivery's content.
  * @structure default OffersTab({ session, showToast }) — state, loads, handlers, the ctx bag, render
  * @version-history
+ *   v2.5.0 -- 2026-11-01 -- The data products: read with the offers and again on every live update
+ *     (GET /v1/dataproducts), carried to the pages as ctx.data; ?product=<name> opens one (WP9a).
  *   v2.4.0 -- 2026-10-11 -- saveBilling passes the offer's pacing amount (tollMorsels) and money price, not a morsel price.
  *   v2.3.0 -- 2026-09-26 -- The line while the feed loads is the Note's loading kind; the tab writes no
  *     class (page group G6).
@@ -37,6 +39,8 @@ import { t } from '/js/i18n.js';
 import { useConfirm } from '/components/Modal.js';
 import { Note } from '/components/Note.js';
 import * as offersService from '/js/services/offers.js';
+import * as dataService from '/js/services/dataproducts.js';
+import { getOrganismsTab } from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
 import { buildModel } from './offers/model.js';
 import { renderOffersView } from './offers/cover.js';
@@ -68,8 +72,22 @@ export default function OffersTab({ session, showToast }) {
     catch { return null; }
   });
   const urlOfferDone = useRef(false);
+  // ?product=<name> opens that data product's page (the "Change" door of What others can see).
+  const [urlProduct] = useState(() => new URLSearchParams(window.location.search).get('product'));
+  const [products, setProducts] = useState(null);   // null = loading
+  const [intermediation, setIntermediation] = useState('report');
+  const [orgNames, setOrgNames] = useState({});
+
+  const loadProducts = useCallback(async () => {
+    try {
+      const r = await dataService.listProducts();
+      setProducts(r?.products || []);
+      if (r?.data_intermediation) setIntermediation(r.data_intermediation);
+    } catch (err) { swallowed('offers-tab: data products', err); setProducts([]); }
+  }, []);
 
   const load = useCallback(async () => {
+    loadProducts();
     try {
       const r = await offersService.listOffers();
       setFeed(r?.data?.agents || []);
@@ -78,8 +96,15 @@ export default function OffersTab({ session, showToast }) {
       const r = await offersService.listDeliverables();
       setDeliverables(r?.data?.deliverables || []);
     } catch (err) { swallowed('offers-tab: deliverables', err); setDeliverables([]); }
-  }, []);
+  }, [loadProducts]);
   useEffect(() => { if (session) load(); }, [session, load]);
+  // The organisms' names, for a product that only one organism's members may use.
+  useEffect(() => {
+    if (!session) return;
+    getOrganismsTab().then((tab) => setOrgNames(Object.fromEntries((tab?.mine || []).map((o) => [o.id, o.name || o.id]))))
+      .catch((err) => swallowed('offers-tab: organisms', err));
+  }, [session]);
+  useEffect(() => { if (urlProduct) setView({ kind: 'product', name: urlProduct }); }, [urlProduct]);
   useEffect(() => { if (session) offersService.aiAvailable().then(setAiOn).catch(() => setAiOn(false)); }, [session]);
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => {
@@ -185,7 +210,8 @@ export default function OffersTab({ session, showToast }) {
     showToast, model, builder, busy, loadingDeliveries: deliverables === null,
     view, pickView, q, setQ: (v) => { setQ(v); if (aiResult) setAiResult(null); }, axis, setAxis, aiOn, aiResult, runNeedSearch, clearAi, buildForNeed,
     offlineOpen, setOfflineOpen, sellOpen, setSellOpen, sellFoldOpen, setSellFoldOpen, inboxFilter, setInboxFilter, moreOpen, toggleMore,
-    askInput, setAskInput, askResult, ask, saveBilling, rate, contentOf, openTab,
+    askInput, setAskInput, askResult, ask, saveBilling, rate, contentOf, openTab, confirm, session,
+    data: { products, intermediation, orgNames, owner: session?.owner || '', reload: loadProducts },
   };
   return html`${renderOffersView(ctx)}<${ConfirmUI} />`;
 }

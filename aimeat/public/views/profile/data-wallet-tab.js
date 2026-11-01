@@ -15,6 +15,8 @@
  * @structure DataWalletTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'dataWallet'
  * @version-history
+ *   v2.3.0 — 2026-11-01 — The outside parties (WP9a): their state is useParties (data-wallet/parties.js),
+ *     ctx.parties.
  *   v2.2.0 — 2026-10-20 — What is known about your content (wish-sis-ll-n-purku-luokittelu-ja-owl):
  *     its state is useContentClasses (data-wallet/content-classes.js), ctx.content.
  *   v2.1.0 — 2026-09-29 — The classification section (TARGET-082 V5): its state is
@@ -40,6 +42,7 @@ import { x, targetRows, targetOf, targetWords, whoOf, roleOf, consentEvents, ope
 import { groupId } from './data-wallet/rows.js';
 import { useClassification } from './data-wallet/classification.js';
 import { useContentClasses } from './data-wallet/content-classes.js';
+import { useParties } from './data-wallet/parties.js';
 
 const ENTRY_LIMIT = 20;
 const ROWS_PAGE = 50;
@@ -73,6 +76,7 @@ export default function DataWalletTab({ session, showToast }) {
   const federated = !!session?.federated;
   const cls = useClassification({ federated, confirm, toast });
   const content = useContentClasses({ federated, confirm, toast });
+  const parties = useParties({ federated, confirm, toast });
 
   /* ── Reads ─────────────────────────────────────────────────────────────────────────────────── */
 
@@ -277,7 +281,7 @@ export default function DataWalletTab({ session, showToast }) {
   const ctx = {
     session, federated, ov, failed, names, consents, active, revokedList, targets, people, kinds, groups, events, trail, shownTrail,
     days, reloading, deniedCount, deniedGroups: deniedGroupsList.length, manifestDenied, manifestShare: deniedCount ? manifestDenied / deniedCount : 0,
-    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content,
+    swapped, expiring, quota, filter, trailFilter, personFocus, openTarget, openGroup, groupRows, form, orgs, formMsg, exportMsg, exporting, exportName, busy, ConfirmUI, cls, content, parties,
     setDays, setFilter, setTrailFilter, toggleTarget, toggleGroup, showMoreTrail, showPerson, loadGroupRows, setForm, toggleForm, prefillGrant, submitGrant, revoke, exportAll,
     openOrganisms: () => openTab('organisms'),
     openAgents: () => openTab('agents'),

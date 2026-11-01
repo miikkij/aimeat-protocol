@@ -10,6 +10,9 @@
  *   deliveryRows · rel · crumb · pageLinks · renderPage
  * @usage import { renderPage, c, deliveryRows } from './frame.js';
  * @version-history
+ *   v2.1.0 -- 2026-11-01 -- The rail's pages end with the data products, "Data products · n", and
+ *     "Out of date · n" while a product is late or stale; renderPage passes a `label` over the title
+ *     and what the page draws `after` its frame (its dialogs) (WP9a).
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
  *     of a page inside the Offers page is SettingsPage (page), its crumb and rail data (the rail's
  *     own groups: the way back, the page's own lists, the sibling pages), the deliveries the List
@@ -105,21 +108,28 @@ export function crumb(ctx, parts) {
 }
 
 const PAGES = [['inbox', 'inbox'], ['map', 'map'], ['sell', 'sell']];
-/** The Offers pages in the rail: → the page, its count (or →), the one open marked on. */
+/** The Offers pages in the rail: → the page, its count (or →), the one open marked on. The data
+ *  products page comes after them, its out-of-date filter beside it while anything is late or stale. */
 export function pageLinks(ctx, current) {
   const m = ctx.model;
   const n = { inbox: m.latest.length, sell: m.selling.length };
-  return PAGES.map(([id, key]) => ({ key: id, mark: '→', label: c(key), count: id in n ? n[id] : '→', on: current === id, onClick: () => ctx.pickView({ kind: 'page', id }) }));
+  const products = ctx.data?.products || [];
+  const old = products.filter((p) => ['late', 'stale'].includes(p.freshness?.state)).length;
+  return [
+    ...PAGES.map(([id, key]) => ({ key: id, mark: '→', label: c(key), count: id in n ? n[id] : '→', on: current === id, onClick: () => ctx.pickView({ kind: 'page', id }) })),
+    { key: 'data', mark: '→', label: t('dataout.list.filterAll'), count: products.length, on: current === 'data' && ctx.view.filter !== 'old', onClick: () => ctx.pickView({ kind: 'page', id: 'data' }) },
+    old ? { key: 'data-old', mark: '→', label: t('dataout.list.filterOld'), count: old, on: current === 'data' && ctx.view.filter === 'old', onClick: () => ctx.pickView({ kind: 'page', id: 'data', filter: 'old' }) } : null,
+  ].filter(Boolean);
 }
 
 /**
  * A page inside the Offers page. `marks` are its tags as data, `actions` its doors, `desc` its line
  * under the head, `rail` more groups of the rail ([{ label, items }]) after the way back.
  */
-export function renderPage(ctx, { id, crumbs, title, marks = null, actions = null, desc = null, strip = null, rail = null, children }) {
+export function renderPage(ctx, { id, crumbs, label = null, title, marks = null, actions = null, desc = null, strip = null, rail = null, after = null, children }) {
   return html`
-    <${SettingsPage} name="op" page crumb=${crumb(ctx, crumbs)} title=${title} marks=${marks}
-      desc=${desc} actions=${actions ? html`<${Actions}>${actions}<//>` : null} strip=${strip}
+    <${SettingsPage} name="op" page crumb=${crumb(ctx, crumbs)} label=${label} title=${title} marks=${marks}
+      desc=${desc} actions=${actions ? html`<${Actions}>${actions}<//>` : null} strip=${strip} after=${after}
       rail=${{
         title: c('railTitle'),
         groups: [
