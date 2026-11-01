@@ -8,6 +8,7 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.17.0 — 2026-11-01 — The discover paragraph names datasets, the published tables (plan doc-mvwxcas3dom3, D1.1).
  *   v1.16.0 — 2026-10-30 — The Apps line says how a look the person wants again becomes a style kit and its default.
  *   v1.15.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew (proposals).
  *   v1.14.0 — 2026-10-29 — The Apps line: a new app's first message carries its structure page. A cold
@@ -100,7 +101,8 @@ card. Their subscriptions to plans extensions offer are \`aimeat_subscription_li
 
 **When you do not know where something is, or what the person can reach, start with
 \`aimeat_discover\`.** It is the master directory: one query across every kind of content
-(capabilities, workflows, knowledge, documents, apps, skills, memory and more). \`mode: "map"\`
+(capabilities, workflows, knowledge, documents, apps, skills, datasets, memory and more); a
+\`dataset\` entry is a published table with its row count and the addresses to read it from. \`mode: "map"\`
 is a cheap count of WHAT exists by type and tag; \`mode: "find"\` with \`q\`, \`type\` or \`tags\`
 returns the entries. It looks in one reach at a time: \`scope: "own"\` (the default) is the
 person's own content, \`"shared"\` is what the organisms they belong to share with them, and

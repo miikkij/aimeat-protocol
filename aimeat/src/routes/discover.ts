@@ -15,6 +15,8 @@
  *   - GET /v1/discover · GET /v1/discover/facets
  * @usage app.use(discoverRouter(config, storage))
  * @version-history
+ *   2026-11-01 — `dataset` is a type filter (a data package, plan doc-mvwxcas3dom3 D1.1); the type list is
+ *     DISCOVERY_TYPES (services/discovery/types.ts); the context carries the caller as a package reader.
  *   2026-10-25 — scope=shared on GET /v1/discover and /v1/discover/facets asks organism:read of every
  *     principal but the owner in person, as every other workspace read door does: 403 SCOPE_DENIED
  *     names the word (secaudit2026oct22, discover-shared-scope-skips-organism-read).
@@ -46,16 +48,14 @@ import {
   buildDiscoveryRegistry,
   runDiscovery,
   computeFacets,
+  DISCOVERY_TYPES,
   type DiscoveryContext,
   type DiscoveryFilters,
   type DiscoveryType,
 } from '../services/discovery/index.js';
 
 const MAX_PER_PAGE = 100;
-const VALID_TYPES = new Set<DiscoveryType>([
-  'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-  'company', 'offering', 'document', 'organism', 'app', 'tool', 'template', 'skill', 'designbook', 'memory',
-]);
+const VALID_TYPES = new Set<DiscoveryType>(DISCOVERY_TYPES);
 
 /** Split a CSV query param into a trimmed, non-empty list. */
 function csv(v: unknown): string[] {
@@ -116,6 +116,8 @@ function buildContext(
     ...(req.auth && !isAnonymousPrincipal(req.auth)
       ? { organismCaller: callerFromAuth({ ...req.auth, scopes: req.auth.scopes ?? [] }, config.nodeId, storage) }
       : {}),
+    // The data package audience rule asks the caller's roles and scopes (sources/dataset-source.ts).
+    ...(req.auth ? { readerAuth: { ...req.auth, scopes: req.auth.scopes ?? [] } } : {}),
     scope,
     filters,
     nodeId: config.nodeId,

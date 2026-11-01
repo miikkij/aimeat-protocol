@@ -10,8 +10,8 @@
  *   the path isitagentready.com checks. Both paths answer the same document, which validates against
  *   both schemas: ARD reads `entries` and ignores the rest, ai-catalog allows exactly specVersion,
  *   host and entries. Every entry points at a document another route already serves, so nothing is
- *   described twice: the MCP server card, the OpenAPI contract, the A2A card of each agent whose
- *   owner published an offering, and each public node skill.
+ *   described twice: the MCP server card, the OpenAPI contract, the DCAT data catalogue, the A2A card
+ *   of each agent whose owner published an offering, and each public node skill.
  * @structure
  *   - GET /.well-known/ard.json, /.well-known/ai-catalog.json — the manifest (apex only, CORS *)
  *   - buildAiCatalog(config, storage) — the manifest, exported for the unit test
@@ -20,6 +20,8 @@
  *   import { aiCatalogRouter } from './ard-manifest.js';
  *   router.use(aiCatalogRouter(config, storage));  // inside wellknownRouter (routes/wellknown.ts)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — An entry for the data catalogue: the DCAT-AP feed of the public data packages
+ *     at /v1/catalogue/dcat (plan doc-mvwxcas3dom3, D1.5).
  *   v1.0.1 — 2026-10-27 — The MCP entry names the SEP-2127 card at /v1/mcp/server-card.
  *   v1.0.0 — 2026-10-26 — Initial (wish-ai-catalog-well-known-ai-catalog-json-ard).
  */
@@ -42,6 +44,8 @@ const TYPE = {
   a2a: 'application/a2a-agent-card+json',
   skill: 'application/agent-skills+md',
   openapi: 'application/vnd.oai.openapi',
+  /** The DCAT catalogue, served as JSON-LD. */
+  dcat: 'application/ld+json',
 } as const;
 
 export interface AiCatalogEntry {
@@ -110,6 +114,23 @@ export async function buildAiCatalog(config: AimeatConfig, storage: Storage): Pr
       representativeQueries: queries(
         'the REST API of this AIMEAT node',
         'how to authenticate an agent with device authorization',
+      ),
+      version,
+    },
+    {
+      // The public data packages as a DCAT-AP 3.0 catalogue (routes/catalogue-dcat.ts). Each dataset in
+      // it names its CSV files, its OData v4 service and its Frictionless descriptor.
+      identifier: urnFor(host, 'data', 'dcat'),
+      displayName: `AIMEAT data catalogue (${config.nodeId})`,
+      type: TYPE.dcat,
+      url: `${base}/v1/catalogue/dcat`,
+      description: 'The public data packages of this node as a DCAT-AP 3.0 catalogue (JSON-LD; Turtle with ?format=ttl): each table with its CSV files, its OData v4 feed at /v1/odata/{owner}/{name} and its Frictionless descriptor. The descriptor read is GET /v1/datapackages/{owner}/{name}.',
+      tags: ['dcat', 'datasets', 'open-data', 'odata', 'frictionless'],
+      representativeQueries: queries(
+        'find a public dataset on this node',
+        'download a table as CSV',
+        'read a dataset over OData in Excel',
+        'harvest the open data catalogue',
       ),
       version,
     },

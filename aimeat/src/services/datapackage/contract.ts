@@ -34,6 +34,9 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.3.0 -- 2026-11-01 -- PublishInput.confirmPersonalPublic and LatestPointer.personalPublicConfirmed:
+ *     a public package from personal data waits for the owner's confirmation (./personal-guard.ts; plan
+ *     doc-mvwxcas3dom3, D1.7).
  *   v1.2.0 -- 2026-11-01 -- LatestPointer.status and withdrawnAt: a withdrawn package (./withdraw.ts;
  *     plan doc-mvwxcas3dom3, D0.3).
  *   v1.1.0 -- 2026-10-17 -- PublishInput.visibility and LatestPointer.visibility: public (default),
@@ -150,6 +153,9 @@ export interface PublishInput {
     declaredProvenanceId?: string;
     /** Who reads it: 'public' (default), 'members', 'organism:<id>' or 'private' (./audience.ts). */
     visibility?: string;
+    /** The owner confirms a public package whose producer's data map marks its data personal
+     *  (./personal-guard.ts). Not in the content hash. */
+    confirmPersonalPublic?: boolean;
 }
 
 /** A package name is an address segment, so it is constrained like one. */
@@ -280,4 +286,8 @@ export interface LatestPointer {
     status?: 'withdrawn';
     /** When the package was withdrawn. Present exactly when `status` is 'withdrawn'. */
     withdrawnAt?: string;
+    /** The confirmation that this package goes public although its producer's data map marks its data
+     *  personal (./personal-guard.ts): when, and the principal whose request carried it. Kept on every
+     *  later pointer, so the producer's next public versions are not asked again. */
+    personalPublicConfirmed?: { at: string; by: string };
 }
