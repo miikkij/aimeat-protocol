@@ -27,10 +27,12 @@
  *   EMAIL. Only to a verified notification address, only while the switch `email.agentAsks` on the
  *   Email page is on (it is unless switched off), and logged in the mail log as `agent_ask`.
  * @structure PERMISSION_ASK_TYPE · permissionAskNotice(agent, words, baseUrl) ·
- *   permissionPageNotice(agent, words, baseUrl) · tellPermissionAnswer(deps, agent, words, outcome, by) ·
- *   sendPermissionAsk(deps, ownerGhii, agent, words)
+ *   permissionPageNotice(agent, words, baseUrl) · withheldDmNotice(agent, words, baseUrl) ·
+ *   tellPermissionAnswer(deps, agent, words, outcome, by) · sendPermissionAsk(deps, ownerGhii, agent, words, call?)
  * @usage initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
  * @version-history
+ *   2026-10-31 — withheldDmNotice: a direct message the agent may not read is asked about in words of
+ *     its own, with the same Allow and Don't allow (secaudit2026oct31w2 round 10, ruling 2).
  *   v1.4.0 — 2026-10-28 — The page notice carries Don't allow and its question's ref too, so the
  *     person answers "no" from the bell and the answer closes the notice (Jouni 2026-10-28).
  *   2026-10-27 — The email's heading escapes its subject, which carries the agent's display name
@@ -58,6 +60,7 @@ import { isOperatorAccount } from '../utils/operator-account.js';
 import { escapeHtml as esc } from '../utils/html-escape.js';
 import { logger } from '../utils/logger.js';
 import { tellAsker, closeQuestion } from './approval-standard.js';
+import { WITHHELD_DM_CALL } from './connect-tunnel-dm-reach.js';
 
 export const PERMISSION_ASK_TYPE = 'agent_permission_ask';
 /** The i18n key of the notice whose permission is given on the agent's page, not with one press. */
@@ -135,6 +138,27 @@ export function permissionPageNotice(agent: AgentRecord, words: readonly string[
       style: 'default',
       i18n: { key: `${PAGE_KEY}.deny` },
     }, { id: 'open', label: "Open the agent's page", kind: 'navigate', link: path, style: 'primary', i18n: { key: `${PAGE_KEY}.open` } }],
+  };
+}
+
+/** The i18n key of the notice about a direct message the agent could not read. */
+const DM_KEY = 'agent_permission_ask_dm';
+
+/**
+ * The bell notice when an agent was sent a direct message it may not read (the developer's ruling 2
+ * of 2026-10-31): the same question, ref, Allow and Don't allow as permissionAskNotice, in words
+ * about the message. It never repeats the message itself.
+ */
+export function withheldDmNotice(agent: AgentRecord, words: readonly string[], baseUrl: string): NotifyInput {
+  const base = permissionAskNotice(agent, words, baseUrl);
+  const name = agentLabel(agent);
+  return {
+    ...base,
+    title: `${name} received a message it cannot read`,
+    body: `Someone sent ${name} a direct message. ${name} may not read messages, so it was told only that a message arrived. `
+      + 'Allow it to read the messages sent to it? The message waits in its inbox.',
+    i18n: { key: DM_KEY, vars: { agent: name } },
+    actions: base.actions?.map((a) => ({ ...a, i18n: { key: `${DM_KEY}.${a.id}` } })),
   };
 }
 
@@ -218,14 +242,17 @@ export async function sendPermissionAsk(
   ownerGhii: string,
   agent: AgentRecord,
   refused: readonly string[],
+  call?: string,
 ): Promise<void> {
   try {
     const onePress = oneClickWords(refused);
     const words = onePress ? [...refused] : await wordsToTell(deps.storage, ownerGhii, refused);
     if (words.length === 0) return;
-    const notice = onePress
-      ? permissionAskNotice(agent, words, deps.config.baseUrl)
-      : permissionPageNotice(agent, words, deps.config.baseUrl);
+    const notice = !onePress
+      ? permissionPageNotice(agent, words, deps.config.baseUrl)
+      : call === WITHHELD_DM_CALL
+        ? withheldDmNotice(agent, words, deps.config.baseUrl)
+        : permissionAskNotice(agent, words, deps.config.baseUrl);
     await notify(deps.storage, ownerGhii, notice);
     const email = getActiveEmailService();
     if (!email?.enabled) return;

@@ -21,6 +21,9 @@
  *   const resolved = norm.items.map(it => resolveWriteItem(it, objectTypes));
  *   const refusal = await undeclaredSpaceForKey(storage, key);   // before anything is written
  * @version-history
+ *   v1.6.2 — 2026-11-01 — undeclaredSpaceForKey() reads a key's space as the longest declared
+ *     namespace the parsed one continues, so a memory write of a record whose id has a dot is no
+ *     longer refused as UNDECLARED_SPACE (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.6.1 — 2026-10-31 — readPublishSpace() refuses a namespace under `w.` when no ws is given: the
  *     publish, batch publish and reopen doors built that workspace record's key at the organism root
  *     and ran none of their workspace checks, so a member with no grant reopened a workspace's
@@ -57,6 +60,7 @@
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { isMemoryBackedSpace, workspaceMetaReader } from './workspace-meta.js';
 import { parseWorkspaceRecordKey } from './write-guards.js';
+import { declaredNamespaceOf } from './workspace-record-key.js';
 
 /** One tool call may carry this many items. Past this the caller should split the migration. */
 export const MAX_BATCH_ITEMS = 50;
@@ -351,9 +355,10 @@ export function undeclaredSpaceRefusal(
  * and fence checks only when ws is given (secaudit 2026-10-31 inv-06).
  */
 export async function readPublishSpace(
-    storage: Storage, organismId: string, ws: string | undefined, namespace: string,
-    opts?: { audience?: UndeclaredSpaceAudience; nodeId?: string },
+    storage: Storage, organismId: string, ws: string | undefined, given: string,
+    opts?: { audience?: UndeclaredSpaceAudience; nodeId?: string; parsedFromKey?: boolean },
 ): Promise<{ ot: PublishObjectType | undefined; refusal: UndeclaredSpaceRefusal | null }> {
+    let namespace = given;
     if (!ws && (namespace === 'w' || namespace.startsWith('w.'))) {
         const how = 'Name the workspace in ws and the space in namespace, for example ws: "<workspace id>", namespace: "shared.notes".';
         return { ot: undefined, refusal: { ok: false, status: 422, code: 'UNDECLARED_SPACE',
@@ -364,6 +369,14 @@ export async function readPublishSpace(
     const copies = (await storage.listAllMemory({ prefix: mkey, limit: 10, archived: 'include' })).items.filter(r => r.key === mkey);
     const typesOf = (r: MemoryRecord | null | undefined): PublishObjectType[] =>
         (r?.value as { objectTypes?: PublishObjectType[] } | undefined)?.objectTypes ?? [];
+    // A namespace parsed out of a key (parseWorkspaceRecordKey takes the last part before the role as
+    // the id) holds the first parts of an id with a dot in it: `logs.e1` for the record `e1.2` of
+    // `logs`. The space is then the longest declared namespace it continues, as the write guard reads
+    // it (secaudit2026oct31w2 round 10b, dotted record ids).
+    if (opts?.parsedFromKey) {
+        const declared = copies.flatMap(typesOf).map(o => o?.namespace).filter((n): n is string => typeof n === 'string' && !!n);
+        namespace = declaredNamespaceOf(namespace, declared) ?? namespace;
+    }
     const live = copies.filter(r => !r.archived);
     const counted = !ws ? (live[0] ?? copies[0])
         : opts?.nodeId ? await workspaceMetaReader(storage, organismId, opts.nodeId).pick(ws, 'meta.manifest', live.length ? live : copies)
@@ -407,7 +420,7 @@ export async function undeclaredSpaceForKey(
 ): Promise<UndeclaredSpaceRefusal | null> {
     const parts = parseWorkspaceRecordKey(key);
     if (!parts) return null;
-    return (await readPublishSpace(storage, parts.organismId, parts.ws, parts.namespace, opts)).refusal;
+    return (await readPublishSpace(storage, parts.organismId, parts.ws, parts.namespace, { ...opts, parsedFromKey: true })).refusal;
 }
 
 /**

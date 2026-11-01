@@ -8,6 +8,8 @@
  * @structure walletMethods
  * @usage Object.assign(SqliteStorage.prototype, walletMethods) in ../index.ts
  * @version-history
+ *   2026-10-31 — sumTransactionsSince takes an optional counterparty, for the per-peer settlement ceiling
+ *     (services/settlement-ceiling.ts; secaudit2026oct31w2 round 10).
  *   2026-10-16 — getTransactions returns newest first, as PostgreSQL does; it reversed its newest-first
  *     window, so page 1 of the wallet history was the oldest rows here (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals in one GROUP BY (feature-list audit #169).
@@ -121,12 +123,13 @@ export const walletMethods = {
     return rows.map(r => ({ type: r.type, count: Number(r.count), total: Number(r.total), absTotal: Number(r.absTotal) }));
   },
 
-  async sumTransactionsSince(this: SqliteStorage, types: readonly string[], since: string): Promise<number> {
+  async sumTransactionsSince(this: SqliteStorage, types: readonly string[], since: string, counterparty?: string): Promise<number> {
     if (types.length === 0) return 0;
+    const byCounterparty = counterparty !== undefined;
     const row = this.db.prepare(
       `SELECT COALESCE(SUM(CASE WHEN amount > 0 THEN amount ELSE 0 END), 0) AS total FROM wallet_transactions
-       WHERE type IN (${types.map(() => '?').join(', ')}) AND timestamp >= ?`,
-    ).get(...types, since) as { total: number };
+       WHERE type IN (${types.map(() => '?').join(', ')}) AND timestamp >= ?${byCounterparty ? ' AND counterpartyGaii = ?' : ''}`,
+    ).get(...types, since, ...(byCounterparty ? [counterparty] : [])) as { total: number };
     return Number(row.total);
   },
 

@@ -13,6 +13,10 @@
  *   - GenesisSyncResult: per-run tally (peers checked/updated/failed, entries fetched/stored/removed, hash)
  *
  * @version-history
+ *   2026-10-31 — syncSubscribedMemory sends a record only when one of its owner's active federation
+ *     consents covers its key (federationConsentCovers), as memory replication does, and obeys only the
+ *     subscription record the operator's PUT wrote (its tag). A peer's catalogue entry is stored under
+ *     genesisPeerKey, which never names the operator's subscription record (secaudit2026oct31w2 round 10).
  *   v1.5.0 — 2026-10-11 — The catalogue push sends an action's pricing as toll_morsels, the pacing
  *     amount, with base_morsels as a deprecated mirror until 4.0.0 (a morsel is pacing, not a price).
  *   v1.4.1 — 2026-10-06 — syncSubscribedMemory signs the seven fields /v1/federation/replicate verifies
@@ -38,6 +42,10 @@ import { deliveryProof } from './signed-node-request.js';
 import { logger } from '../utils/logger.js';
 import { leaveToPeer } from './classification/egress.js';
 import { presentActionPricing } from './action-pacing.js';
+import { federationConsentCovers } from './memory-replication.js';
+import {
+  GENESIS_CACHE_TAG, GENESIS_SUBSCRIPTION_TAG, genesisPeerKey, genesisSubscriptionKey, isGenesisSubscriptionRecord,
+} from './genesis-memory-cache.js';
 
 /** System GAII used to store genesis catalogue entries as memory. */
 const GENESIS_SYSTEM_GAII = '__genesis__';
@@ -230,7 +238,9 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
 
     for (const entry of entries) {
       const entryId = (entry.id ?? entry.name ?? `entry-${stored}`) as string;
-      const key = `${genesisPrefix}${entryId}`;
+      // The peer chose the id, so the key is built by genesisPeerKey: never the operator's
+      // subscription record (secaudit2026oct31w2 round 10).
+      const key = genesisPeerKey(peerId, String(entryId));
       incomingKeys.add(key);
 
       await storage.setMemory({
@@ -261,7 +271,7 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
         // memory cache. Until 2026-09-08 the prune took all three, so a subscription lasted
         // exactly one sync and syncSubscribedMemory, later in the same cycle, never saw one
         // (e2e-genesis-federation).
-        if (existing.key.endsWith(':subscriptions') || (existing.tags ?? []).includes('genesis-cache')) continue;
+        if (isGenesisSubscriptionRecord(existing) || (existing.tags ?? []).includes(GENESIS_CACHE_TAG)) continue;
         if (!incomingKeys.has(existing.key)) {
           await storage.deleteMemory(GENESIS_SYSTEM_GAII, existing.key);
           removed++;
@@ -281,10 +291,12 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
    */
   async function syncSubscribedMemory(peer: GenesisPeerRecord): Promise<number> {
     // Check if peer has subscribed prefixes (stored in peer metadata)
-    const subscriptionKey = `genesis:${peer.genesisNodeId}:subscriptions`;
+    const subscriptionKey = genesisSubscriptionKey(peer.genesisNodeId);
     const subscriptionRecord = await storage.getMemory(GENESIS_SYSTEM_GAII, subscriptionKey);
 
-    if (!subscriptionRecord) return 0;
+    // Only the record the operator's PUT wrote, which carries its tag. A record a peer's entry
+    // overwrote before peer keys were kept apart carries the catalogue's tags and is not obeyed.
+    if (!subscriptionRecord || !(subscriptionRecord.tags ?? []).includes(GENESIS_SUBSCRIPTION_TAG)) return 0;
 
     const subscriptions = subscriptionRecord.value as { prefixes?: string[] };
     if (!subscriptions.prefixes || subscriptions.prefixes.length === 0) return 0;
@@ -316,14 +328,13 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
             });
           }
 
+          // The owner's federation consent decides what leaves, key by key, as memory replication and
+          // the answering side of the genesis read decide it (federationConsentCovers). Asking only
+          // whether SOME federation consent existed sent every public key under the operator's prefix
+          // (secaudit2026oct31w2 round 10, genesis-sync:subscribed-push-ignores-consent-pattern).
+          const consents = memories.length > 0 ? await storage.listConsents(agent.gaii) : [];
           for (const memory of memories) {
-
-            // Check for active federation consent
-            const consents = await storage.listConsents(agent.gaii);
-            const hasConsent = consents.some(c =>
-              c.status === 'active' && c.scope === 'federation',
-            );
-            if (!hasConsent) continue;
+            if (!federationConsentCovers(consents, memory.key)) continue;
 
             // Push to peer
             try {

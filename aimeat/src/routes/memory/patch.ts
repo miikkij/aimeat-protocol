@@ -25,6 +25,7 @@
  * @structure registerPatchRoutes(router, ctx) -> PATCH /v1/memory/:key
  * @usage mounted from src/routes/memory.ts alongside registerCrudRoutes
  * @version-history
+ *   2026-10-31 — The write tally names an app grant as the app (data-map/tally-writer.ts; secaudit2026oct31w2 round 10).
  *   2026-10-27 — A merge that changes where a mail refinery reads and files mail, by an app or an agent
  *     that may not run it, stores the rest and answers 202 with the owner's request (secaudit2026oct26).
  *   2026-10-27 — A merge of the welcome page's switch (portfolio.config) asks the publish gate as
@@ -89,6 +90,7 @@ import { callerOf } from '../../middleware/caller.js';
 import { memoryCapRefusal } from '../../services/memory-publish-gate.js';
 import { memoryTarget } from '../../services/classification/label-rows.js';
 import { recordMemoryTouch } from '../../services/data-map/write-tally-buffer.js';
+import { tallyWriterOf } from '../../services/data-map/tally-writer.js';
 import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { checkMemoryQuotaAlarm } from '../../services/quota-alarm.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
@@ -457,7 +459,9 @@ export function registerPatchRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // `gaii` is where it LANDED — an owner-scope write redirects it — so the hand is resolved from
     // the session instead, which is the only thing that names who actually did this.
     recordMemoryTouch({
-      ownerGaii: gaii, key, writerPrincipal: resolveIdentity(req.auth!, config.nodeId), kind: 'write',
+      ownerGaii: gaii, key, kind: 'write',
+      // An app grant is named as the app (data-map/tally-writer.ts); anyone else as before.
+      writerPrincipal: req.auth!.app ? tallyWriterOf(callerOf(req, config.nodeId, storage), config.nodeId, req.auth!.app) : resolveIdentity(req.auth!, config.nodeId),
     });
 
     emitResourceUpdated(gaii, `aimeat://memory/${encodeURIComponent(key)}`);

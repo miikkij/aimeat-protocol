@@ -29,6 +29,9 @@
  *   const refs = await listVersionRefs(storage, base);
  *   const n = maxVersionOf(refs) + 1;
  * @version-history
+ *   2026-11-01 — compactWorkspaceVersions finds a record's space as the declared namespace the
+ *     key continues (declaredNamespaceOf), so the history of a record whose id holds a dot keeps its
+ *     space's window, and an append-only space's is never pruned (secaudit2026oct31w2 round 10b).
  *   v1.1.0 — 2026-07-16 — Retention (P2): per-space maxVersions window pruned on publish +
  *     compactWorkspaceVersions one-shot sweep. Append-only (create_only) spaces are never pruned;
  *     a workspace whose manifest cannot be found is skipped entirely (fail-safe).
@@ -38,6 +41,7 @@
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { parseWorkspaceRecordKey } from './write-guards.js';
+import { declaredNamespaceOf } from './workspace-record-key.js';
 import { logger } from '../utils/logger.js';
 
 /** The address of one `.version.N` history row — no value loaded. */
@@ -221,7 +225,11 @@ export async function compactWorkspaceVersions(
     if (!parts) continue;
     const man = await readManifest(parts.organismId, parts.ws);
     if (!man) { skippedWs.add(`${parts.organismId}/${parts.ws}`); continue; }
-    const ot = (man.objectTypes ?? []).find(o => o?.namespace === parts.namespace) ?? null;
+    // The record's space: the declared namespace the key continues. The parser takes an id's last
+    // part as the id, so a dotted id's history was matched to no space and pruned to the default
+    // window, an append-only space's too (secaudit2026oct31w2 round 10b).
+    const space = declaredNamespaceOf(parts.namespace, (man.objectTypes ?? []).flatMap(o => (typeof o?.namespace === 'string' && o.namespace ? [o.namespace] : [])));
+    const ot = space ? (man.objectTypes ?? []).find(o => o?.namespace === space) ?? null : null;
     const window = effectiveMaxVersions(config, ot);
     if (window <= 0) continue;   // keep-all (or append-only)
     const cut = versionRefsToPrune(refs, maxVersionOf(refs), window);

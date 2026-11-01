@@ -17,6 +17,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.22.0 — 2026-11-01 — On a customer's node a menu item reads its `Place` words when they exist:
+ *     "Tekoälysaldo" (Jouni's review of v33). "Yhdistä ChatGPT, Claude tai Grok" did not fit the menu's width, so that item keeps "Yhdistä tekoälysi".
  *   v3.21.0 — 2026-10-29 — On a customer's node (site.js customerNode()) the menu before "Show all
  *     tools" is the eight Jouni chose, with no default pins; a "Your purchase" group links the
  *     store's orders and invoices and support; the node's maintenance is a link in the operator's
@@ -155,6 +157,15 @@ import { customerNode, storeOrdersHref, contactHref } from '/js/site.js';
 
 /** The menu before "Show all tools": the customer's eight on a node the store made, else the basic one. */
 const basicTabs = () => (customerNode() ? CUSTOMER_TAB_IDS : BASIC_TAB_IDS);
+
+/** A menu item's name; on a customer's node its `<labelKey>Place` words when there are some (review of v33). */
+const labelOf = (it) => {
+  if (customerNode()) {
+    const place = t(it.labelKey + 'Place');
+    if (place && place !== it.labelKey + 'Place') return place;
+  }
+  return t(it.labelKey);
+};
 
 /* ───── Tier heuristic ───── */
 
@@ -481,7 +492,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
               pin=${{ on: pins.includes(it.id),
                 title: pins.includes(it.id) ? (t('profile.landing.pinRemove') || 'Unpin') : (t('profile.landing.pinAdd') || 'Pin'),
                 onToggle: () => togglePin(it.id) }}>
-              ${t(it.labelKey)}
+              ${labelOf(it)}
             <//>`;
           const pinnedItems = pins.map(id => SIDEBAR_ITEM_BY_ID[id]).filter(Boolean)
             .filter(it => !(INFRA_TAB_IDS.has(it.id) && !isOperator));

@@ -20,6 +20,9 @@
  * @structure AppCat({ navigate }) (default) · readView() · writeView(v)
  * @usage routed at /v1/appcat by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The page opens the live stream (relayLiveUpdates). The started apps and the
+ *     internet-opening section listened for `aimeat-live-update` and nothing on this route dispatched
+ *     it, so they showed what they read at load.
  *   v1.3.0 — 2026-10-29 — The apps the person started and has not published (started.js) stand over
  *     their own list, each with the way to its structure page.
  *   v1.2.0 — 2026-10-18 — ?app=<owner>/<filename> opens one app's details in its own view (Your apps,
@@ -34,7 +37,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import htm from 'htm';
 import { IndexFrame } from '/components/IndexFrame.js';
 import { ToastBox } from '/components/Toast.js';
-import { onAuthChange, authLoaded } from '/js/services/auth.js';
+import { onAuthChange, authLoaded, getSession } from '/js/services/auth.js';
+import { useSession } from '/js/use-session.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { onLocaleChange } from '/js/i18n.js';
 import { x } from '/views/appcat/i18n.js';
 import { useCatalog, reloadCatalog, closeDetail, clearNotice, appRef, findApp, isOwn, openDetail, notice } from '/views/appcat/store.js';
@@ -79,6 +84,11 @@ export default function AppCat() {
   const [sort, setSort] = useState('newest');
   const [tagsOpen, setTagsOpen] = useState(false);
   const viewer = useRef(null);
+  const session = useSession();
+
+  // The stream that dispatches `aimeat-live-update` to the blocks that listen for it (started.js,
+  // sections/internet.js): this route opens it, as the home's routes do.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
 
   // The listing: on load, on a sign-in or sign-out, and on a language change (F120, F86, F342).
   useEffect(() => {

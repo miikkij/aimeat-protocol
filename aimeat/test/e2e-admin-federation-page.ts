@@ -21,6 +21,9 @@
  *   made appeared under "asking to join" with Approve and Refuse beside it, naming this node as the
  *   asker. Found by driving the browser on 2026-09-12.
  * @version-history
+ *   2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set: the operator's agent gives a peer a
+ *     daily settlement ceiling of its own and hands it back, and the peer list shows it
+ *     (secaudit2026oct31w2 round 10, W2-4).
  *   v1.6.0 -- 2026-10-12 -- Node 4.0.0 removes the relay-claim setting `optional`
  *     (RELAY_CLAIM_OPTIONAL_REMOVED_IN). The three relay-claim tests that keep a peer on optional ask
  *     the node its release: before 4.0.0 they assert what they asserted; from 4.0.0 the REST door
@@ -401,6 +404,21 @@ await test("In chat, the operator's agent removes a peer and frees its node id; 
     assert(!rosterRow((await overview()).body.data, 'peer-gone-001'), 'the page no longer lists it');
     const again = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_peer_remove', arguments: { node_id: 'peer-gone-001', emergency: true } }, 6);
     assert(again?.result?.isError === true && String(again.result.content[0].text).startsWith('NOT_FOUND'), `a second call: ${JSON.stringify(again?.result).slice(0, 300)}`);
+});
+
+await test("In chat, the operator's agent sets a peer's daily settlement ceiling and hands it back to the node's", async () => {
+    const set = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_settlement_ceiling_set', arguments: { node_id: 'peer-waiting-001', settlement_ceiling: '500' } }, 7);
+    assert(set?.result?.isError !== true, `the tool refused: ${JSON.stringify(set?.result ?? set).slice(0, 300)}`);
+    const out = JSON.parse(set.result.content[0].text);
+    assert(out.settlement_ceiling.setting === 500 && out.settlement_ceiling.daily_limit === 500 && out.settlement_ceiling.counts_against === 'peer',
+        `the tool answers the setting: ${set.result.content[0].text}`);
+    const peersList = await json('/v1/federation/peers', { headers: { Authorization: `Bearer ${opToken}` } });
+    const row = (peersList.body.data?.peers ?? []).find((p: any) => p.node_id === 'peer-waiting-001');
+    assert(row?.settlement_ceiling === 500, `the peer list shows it: ${JSON.stringify(row)}`);
+    const back = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_settlement_ceiling_set', arguments: { node_id: 'peer-waiting-001', settlement_ceiling: 'node' } }, 8);
+    assert(JSON.parse(back.result.content[0].text).settlement_ceiling.setting === null, `back to the node's: ${back.result.content[0].text}`);
+    const ghost = await mcpRpc('tools/call', { name: 'aimeat_admin_federation_settlement_ceiling_set', arguments: { node_id: 'peer-nobody-001', settlement_ceiling: 'none' } }, 9);
+    assert(ghost?.result?.isError === true && String(ghost.result.content[0].text).startsWith('NOT_FOUND'), `an unknown peer: ${JSON.stringify(ghost?.result).slice(0, 300)}`);
 });
 
 await test('The door is operator-only', async () => {

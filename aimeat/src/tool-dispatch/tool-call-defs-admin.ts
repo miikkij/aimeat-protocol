@@ -9,6 +9,8 @@
  * @structure adminCliTools[] -- the shell handler table, registered by tool-call.ts
  * @usage import { adminCliTools } from './tool-call-defs-admin.js';
  * @version-history
+ *   v1.12.0 -- 2026-10-31 -- aimeat_admin_federation_settlement_ceiling_set (PUT /v1/federation/peers/
+ *     :nodeId/settlement-ceiling; secaudit2026oct31w2 round 10).
  *   v1.11.0 -- 2026-10-02 -- aimeat_package_sale action review (POST /v1/package-sales/catalogue/review).
  *   v1.10.0 -- 2026-10-02 -- aimeat_package_sale gains offer, claim, catalogue, price, requests and decide;
  *     aimeat_package_claim (POST /v1/package-claims). Package sale design, phase 3.
@@ -53,6 +55,14 @@ export const adminCliTools: ConnectCliToolDefinition[] = [
         handler: ({ client }, input) =>
             client.put(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}/relay-claim`,
                 { relay_claim: requiredString(input, 'relay_claim') }),
+    },
+    {
+        // THE THIRD SURFACE forwards both: `node_id` picks the peer in the path, `settlement_ceiling`
+        // is the body, and the route refuses anything but a whole number, none and node.
+        name: 'aimeat_admin_federation_settlement_ceiling_set',
+        handler: ({ client }, input) =>
+            client.put(`/v1/federation/peers/${encodeURIComponent(requiredString(input, 'node_id'))}/settlement-ceiling`,
+                { settlement_ceiling: requiredString(input, 'settlement_ceiling') }),
     },
     {
         // THE THIRD SURFACE forwards all three: `node_id` in the path, `emergency` and `reason` as the

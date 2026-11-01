@@ -31,6 +31,10 @@
  *   the 404s and the denials
  * @usage cd aimeat && node --import tsx test/e2e-genesis-federation.ts
  * @version-history
+ *   2026-10-31 — Phase 9b: the subscribed push sends only keys the owner's federation consent names, a
+ *     peer's catalogue or ingest entry named "subscriptions" leaves the operator's subscription alone,
+ *     the public cross-catalogue does not list cached answers, and a catalogue entry is never served
+ *     as a cached answer (secaudit2026oct31w2 round 10).
  *   2026-10-16 — The node this suite starts follows the run's backend (test/helpers/own-node-db.ts);
  *     it was SQLite on both runs (QA audit P1-02).
  *   2026-10-15 — Phase 7 reads as the approved fake federation, signed for this node; an unsigned read is
@@ -839,6 +843,105 @@ async function run(): Promise<void> {
                 `a refused replicate is not a sent one, got ${result.memorySubscriptionsSent}`);
         } finally {
             peer!.replicateStatus = 200;
+        }
+    });
+
+    // ─── Phase 9b: what a peer supplies, and what the owner's consent names ───
+    // secaudit2026oct31w2 round 10: the subscribed push asked only whether SOME federation consent
+    // existed (genesis-sync:subscribed-push-ignores-consent-pattern), and a peer's catalogue entry,
+    // ingested entry or cached answer shared the key of the operator's subscription record, and the
+    // public cross-catalogue listed the cache (genesis:shared-prefix-peer-entries-collide-...).
+    console.log('\nPhase 9b — Peer-supplied keys, the cache and the consent pattern');
+
+    const UNCOVERED_KEY = `other.secret${stamp}`;
+    const subscriptionsNow = async () =>
+        (await json(`/v1/federation/genesis-peer/${peerId}/subscriptions`, { headers: auth(operatorToken) })).body.data.subscribed_prefixes as string[];
+    const putSubscriptions = (prefixes: string[]) => json(`/v1/federation/genesis-peer/${peerId}/subscriptions`, {
+        method: 'PUT', headers: auth(operatorToken), body: JSON.stringify({ prefixes }),
+    });
+
+    await test('a subscribed prefix sends only the keys the owner\'s federation consent names', async () => {
+        const write = await json('/v1/memory', {
+            method: 'POST', headers: auth(agentToken),
+            body: JSON.stringify({ key: UNCOVERED_KEY, value: { kept: 'home' }, visibility: 'public' }),
+        });
+        assert(write.status === 201, `write: ${write.status} ${JSON.stringify(write.body?.error)}`);
+        const put = await putSubscriptions(['note.', 'other.']);
+        assert(put.status === 200, `subscriptions: ${put.status} ${JSON.stringify(put.body?.error)}`);
+        const before = peer!.seen('POST', '/v1/federation/replicate').length;
+        try {
+            const result = await syncService!.syncNow();
+            const keys = peer!.seen('POST', '/v1/federation/replicate').slice(before).map(s => (s.body as any).key);
+            assert(!keys.includes(UNCOVERED_KEY),
+                `a public key the consent (note.*) does not name stays home, sent: ${JSON.stringify(keys)}`);
+            assert(keys.includes(AGENT_KEY) && result.memorySubscriptionsSent === 1,
+                `the consented key under a subscribed prefix still goes: ${JSON.stringify(keys)} ${JSON.stringify(result)}`);
+        } finally {
+            await putSubscriptions(['note.']);
+        }
+    });
+
+    await test('a peer catalogue entry named "subscriptions" does not replace the operator\'s subscription, and stays in the catalogue', async () => {
+        peer!.catalogueEntries = [{ id: 'sync-a', name: 'A' }, { id: 'subscriptions', name: 'Subscription service', prefixes: ['other.'] }];
+        try {
+            const result = await syncService!.syncNow();
+            assert((await subscriptionsNow()).join(',') === 'note.',
+                `the operator's subscription is the operator's: ${JSON.stringify(await subscriptionsNow())}`);
+            assert(result.memorySubscriptionsSent === 1, `only the operator's prefix was pushed: ${JSON.stringify(result)}`);
+            const cat = await json('/v1/federation/cross-catalogue?source=genesis');
+            assert(cat.body.data.entries.some((e: any) => e.remote_id === 'subscriptions' && e.source_genesis === REMOTE_NODE),
+                `the peer's entry is still offered: ${JSON.stringify(cat.body.data.entries.map((e: any) => e.id))}`);
+        } finally {
+            peer!.catalogueEntries = [{ id: 'sync-a', name: 'A' }];
+            await putSubscriptions(['note.']);
+        }
+    });
+
+    await test('a signed ingest entry named "subscriptions" does not replace the operator\'s subscription', async () => {
+        const payload = { source_node: REMOTE_NODE, entries: [{ id: 'subscriptions', name: 'Ingested', prefixes: ['other.'] }], csms: [], catalogue_hash: 'ingest-subs' };
+        const signature = await peer!.sign(JSON.stringify(payload));
+        const proof = await deliveryProof(peer!.privateKey, JSON.stringify(payload), NODE_ID);
+        try {
+            const { status, body } = await json('/v1/federation/genesis-catalogue-ingest', {
+                method: 'POST', body: JSON.stringify({ ...payload, signature, ...proof }),
+            });
+            assert(status === 200 && body.data.stored === 1, `the ingest is taken: ${status} ${JSON.stringify(body)}`);
+            assert((await subscriptionsNow()).join(',') === 'note.',
+                `the operator's subscription is the operator's: ${JSON.stringify(await subscriptionsNow())}`);
+        } finally {
+            await putSubscriptions(['note.']);
+        }
+    });
+
+    await test('a cached cross-genesis answer is not listed in the public cross-catalogue', async () => {
+        const cached = await storage.getMemory('__genesis__', `genesis:${REMOTE_NODE}:${PROBE_KEY}`);
+        assert(!!cached, 'the cached answer is still stored');
+        const cat = await json('/v1/federation/cross-catalogue?source=genesis');
+        const ids = cat.body.data.entries.map((e: any) => e.id);
+        assert(!ids.includes(`genesis:${REMOTE_NODE}:${PROBE_KEY}`), `the cache row is not a catalogue entry: ${JSON.stringify(ids)}`);
+        assert(ids.includes(`genesis:${REMOTE_NODE}:sync-a`), `a catalogue entry is: ${JSON.stringify(ids)}`);
+    });
+
+    await test('a peer catalogue entry is never served as a cached answer, and a real cached answer still is', async () => {
+        const probe = `peer.kelp.other${stamp}`;
+        peer!.catalogueEntries = [{ id: 'sync-a', name: 'A' }, { id: 'look-alike', key: probe, gaii: `kelp@${REMOTE_NODE}`, value: { forged: true } }];
+        try {
+            await syncService!.syncNow();
+            peer!.memoryResults = [{ key: probe, gaii: `kelp@${REMOTE_NODE}`, value: { depth_m: 3 }, visibility: 'public', version: 1, source_node: REMOTE_NODE }];
+            const asked = peer!.count('GET', '/v1/federation/genesis-memory-read');
+            const fresh = await json('/v1/federation/genesis-memory-read', {
+                method: 'POST', headers: auth(operatorToken), body: JSON.stringify({ key: probe, target_scope: 'genesis' }),
+            });
+            assert(fresh.status === 200 && fresh.body.data.from_cache === false,
+                `a catalogue entry carrying the key is not a cached answer: ${JSON.stringify(fresh.body.data)}`);
+            assert(peer!.count('GET', '/v1/federation/genesis-memory-read') === asked + 1, 'the peer was asked');
+            const again = await json('/v1/federation/genesis-memory-read', {
+                method: 'POST', headers: auth(operatorToken), body: JSON.stringify({ key: PROBE_KEY, target_scope: 'genesis' }),
+            });
+            assert(again.body.data.from_cache === true, `the earlier cached answer is still served: ${JSON.stringify(again.body.data)}`);
+        } finally {
+            peer!.catalogueEntries = [{ id: 'sync-a', name: 'A' }];
+            await syncService!.syncNow();
         }
     });
 

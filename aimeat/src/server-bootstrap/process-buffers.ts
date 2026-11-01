@@ -18,6 +18,7 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-10-31 — The refusal listener passes the refused call on (secaudit2026oct31w2 round 10).
  *   2026-10-25 — The usage and tally buffers take their flush intervals from the config, and the usage
  *     settings are bound (services/usage/usage-settings.ts), so the admin Config tab reaches them.
  *   2026-10-17 — initAgentRefusals gets the listener that asks the person when a refusal opens
@@ -95,7 +96,7 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // (services/agent-refusals.ts). Armed with the refusal log, before any route can refuse. A newly
   // opened refusal the person can allow with one press asks them in the bell and by email
   // (services/permission-ask-notice.ts).
-  initAgentRefusals(storage, (owner, agent, words) => sendPermissionAsk({ storage, config }, owner, agent, words));
+  initAgentRefusals(storage, (owner, agent, words, call) => sendPermissionAsk({ storage, config }, owner, agent, words, call));
 
   // Generic read-cache invalidation: translate every mutation (`emitChange(domain, ownerGaii?)`)
   // into cache tag drops. The broad `domain:<d>` tag is the safety net for write paths that don't

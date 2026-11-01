@@ -4,6 +4,15 @@ ChatGPT, Claude or Grok is your right hand: it remembers your things and takes c
 
 AIMEAT is your own place where all this happens. Everything in it is yours.
 
+<!--store-->
+Your [Home](/v1/home) has four first steps. Do them in order, because each step opens the next:
+
+1. **Connect your AI.** On your Home, press the button for ChatGPT, Claude or Grok. Your AI gets its memory from here and can take care of things for you.
+2. **Tell about yourself.** Answer a few questions about your work in the [chat](/v1/chat). The answers become your profile.
+3. **Give an agent its first job.** In the chat or on your Home, say in one sentence what you want done, for example "Gather the industry news every weekday morning and write a short summary." AIMEAT makes an agent from it, and you see it before it starts.
+4. **Make your first app.** Ask for an app in the chat, and you get a link to the finished app.
+<!--/store-->
+<!--nostore-->
 Start with one sentence. Open your [Home](/v1/home), your own page here, and write in the field what you want done, for example:
 
 > Gather the industry news every weekday morning and write a short summary.
@@ -13,17 +22,18 @@ AIMEAT makes an agent from it. An agent is an AI that does one job for you, also
 You can also talk with the AI directly in the [chat](/v1/chat).
 
 If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your right hand: it sees the same information and does the same things as the chat. The buttons to connect are on your Home.
+<!--/nostore-->
 
 (The connection uses the open MCP standard (Model Context Protocol), which ChatGPT, Claude and Grok support. Want to know more? Read [modelcontextprotocol.io](https://modelcontextprotocol.io) or ask your AI: "What does MCP mean and how does it work?")
 
 ## AI credit and what this costs {#cost}
 
 <!--store-->
-Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left on your Home under your name, in the chat and on the [AI page](/v1/profile?tab=ai).
+Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left at the top of your Home, in the chat and on the [AI credit page](/v1/profile?tab=ai).
 
 The credit is used when the AI answers or does work. To get more AI, press Buy more AI next to the credit on your Home. It is a one-off payment, and no new subscription is needed. You can do it at any time.
 
-When the credit is used up, AIMEAT tells you and shows how to go on.
+When the credit is used up, you get a notice on your Home and in the chat. You can then buy more AI or start using an AI account of your own.
 
 The monthly fee and the invoices are in the store. You find them in Settings, under Orders and invoices.
 <!--/store-->
@@ -37,7 +47,7 @@ When the credit is used up, AIMEAT tells you and shows how to go on, for example
 
 Everything you save is private at first. Only you see it.
 
-You decide what you share. You can share a workspace, a collection of documents, with the people you invite, or publish something for everyone. What you share is seen only by those you shared it with.
+You decide what you share. You can invite people to a shared place and share its workspaces with them. You can also publish something for everyone. What you share is seen only by those you shared it with.
 
 An agent or a connected AI may do only what you allow it. You see every permission, and can take it back, on the [Access and security page](/v1/profile?tab=access).
 
@@ -47,7 +57,7 @@ You can export all your data and delete your account in Settings.
 
 An agent is an AI that does one job for you, also when you are away.
 
-Say in one sentence on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
+Say in one sentence in the [chat](/v1/chat) or on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
 
 You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, under What has happened. If you want, the agent also sends it to your email. You can stop an agent at any time.
 
@@ -62,7 +72,9 @@ Ask for an app in the [chat](/v1/chat), for example: "Make me an app to follow m
 You sign in with a sign-in link. Write your address in the sign-in window, and the link comes to your email. The link works once and for 15 minutes, and you need no password.
 
 <!--store-->
-The demo ([aimeat.io](https://aimeat.io)), the store ([store.aimeat.io](https://store.aimeat.io)) and your own AIMEAT are three separate accounts. If something happens in one, it does not affect the others.
+The demo, the store and your own AIMEAT are three separate accounts. If something happens in one, it does not affect the others.
+
+In the store ([store.aimeat.io](https://store.aimeat.io)) you find your invoices and your order. In your own AIMEAT you do your work. The demo ([aimeat.io](https://aimeat.io)) is a page open to everyone, to get to know AIMEAT.
 
 ![The demo, the store and your own AIMEAT are three separate accounts](/help/img/three-accounts-en.png)
 <!--/store-->
@@ -81,7 +93,12 @@ If something does not work, write to [support@aimeat.io](mailto:support@aimeat.i
 
 You need this part only if you want to use an AI service you pay for yourself, for example OpenRouter.
 
+<!--store-->
+Save that service's key under [Advanced settings on the AI credit page](/v1/profile?tab=ai). Then the AI work the key covers is billed to your account at that service. Advanced settings show which parts the key covers.
+<!--/store-->
+<!--nostore-->
 Save that service's key in the [AI settings](/v1/profile?tab=ai). Then the AI work the key covers is billed to your account at that service. The AI settings show which parts the key covers.
+<!--/nostore-->
 
 ## Knowledge and packages {#knowledge}
 

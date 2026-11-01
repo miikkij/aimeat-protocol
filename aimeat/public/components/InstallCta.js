@@ -12,6 +12,8 @@
  * @structure InstallCta({ compact }) — compact drops the body line for tight surfaces (chat).
  * @usage import { InstallCta } from '/components/InstallCta.js';  html`<${InstallCta} />`
  * @version-history
+ *   v1.4.0 — 2026-11-01 — On a node the store sold, the body says what the buyer gets in plain words
+ *     (install.bodyBuyer), not "jaot" (Jouni's review of v34).
  *   v1.3.0 — 2026-10-31 — On a node the store sold, the title names the buyer's own AIMEAT, not
  *     AIMEAT.IO, which is a different place (install.titleBuyer; seen on the v32 Home shot).
  *   v1.2.0 — 2026-09-24 — "Not now" is the action link's text tone (Jouni's decision "Dismiss").
@@ -54,7 +56,9 @@ export function InstallCta({ compact = false }) {
                     : tr('install.title', 'Put AIMEAT.IO behind its own button')}</span>
                 ${!compact && html`<span class="install-cta-body">
                     ${offer
-                        ? tr('install.body', 'Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.')
+                        ? (customerNode()
+                            ? tr('install.bodyBuyer', 'You get AIMEAT as its own icon on your phone or desktop.')
+                            : tr('install.body', 'Installed, it opens in its own window, shows unread counts on its icon, and takes shares straight into your chat.'))
                         : tr('install.iosBody', 'On iPhone and iPad: open the Share menu and choose "Add to Home Screen".')}
                 </span>`}
                 ${compact && !offer && html`<span class="install-cta-body">

@@ -9,6 +9,8 @@
  * @structure NODE_LIMITS_CONFIG_FIELDS
  * @usage import { NODE_LIMITS_CONFIG_FIELDS } from './config-schema-node-limits.js';
  * @version-history
+ *   2026-10-31 — schedules.max_per_owner, schedules.min_interval_seconds and realtime.rooms_per_owner
+ *     (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-2 and -3).
  *   2026-10-29 — federation.resolve_max_peers (secaudit2026oct26 round 8c, federation-03).
  *   2026-10-29 — federation.peering_request_days (secaudit2026oct26 round 8c, federation-06).
  *   v1.4.0 — 2026-10-27 — federation.introductions_per_hour (secaudit2026oct26, unbounded pending peering requests).
@@ -63,4 +65,13 @@ export const NODE_LIMITS_CONFIG_FIELDS: ConfigFieldShape<keyof NodeLimitsConfig>
   { key: 'appRendersAtOnce', dotPath: 'apps.renders_at_once', envVar: 'AIMEAT_APP_RENDERS_AT_ONCE', type: 'number', validate: wholeOrOff, immutable: false,
     description: 'App pictures asked for now and Design Book benches the node renders at once, each in its own headless browser; one past it is told to try again in a minute (default 4, 0 = no limit)',
     range: '0-1000' },
+  { key: 'scheduleMaxPerOwner', dotPath: 'schedules.max_per_owner', envVar: 'AIMEAT_SCHEDULE_MAX_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most schedules one owner keeps, their agents\' and apps\' included, so one account cannot load the scheduler every other account shares. Schedules that exist stay; the next one past it is refused with a message that says how many there are. 0 = no limit',
+    range: '0-1000000' },
+  { key: 'scheduleMinIntervalSeconds', dotPath: 'schedules.min_interval_seconds', envVar: 'AIMEAT_SCHEDULE_MIN_INTERVAL_SECONDS', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The shortest time in seconds between two runs of a schedule that is made or given a new time. The default 60 keeps every once-a-minute schedule working. Schedules that exist keep their time. 0 = no limit',
+    range: '0-86400' },
+  { key: 'realtimeRoomsPerOwner', dotPath: 'realtime.rooms_per_owner', envVar: 'AIMEAT_REALTIME_ROOMS_PER_OWNER', type: 'number', validate: wholeOrOff, immutable: false,
+    description: 'The most realtime rooms one owner and their agents hold open together, inside realtime.max_rooms, so one account cannot take every room. Rooms that are open stay. 0 = no separate limit',
+    range: '0-10000' },
 ];

@@ -10,6 +10,8 @@
  * @structure HEART_SVG, RULE_MARKS (the dialog's two marks) · MODAL_CSS (one string, injected by modal.js into its own <style>).
  * @usage import { MODAL_CSS } from './modal-styles.js';
  * @version-history
+ *   v1.5.0 — 2026-11-01 — The node's address in the crumb is shown whole and wraps when long, not cut
+ *     with an ellipsis (Jouni's review of v33, K24).
  *   v1.4.0 — 2026-10-31 — HEART_SVG and RULE_MARKS moved here from modal.js unchanged (pure extraction,
  *     for the line ceiling).
  *   v1.3.0 — 2026-09-29 — The link row under the sign-in form wraps: with the third link (the emailed
@@ -66,7 +68,8 @@ export var MODAL_CSS = [
     'font-size:15px;letter-spacing:-.01em;line-height:1;color:' + ink + '}',
   '.aimeat-mark svg{width:13px;height:13px;fill:' + accent + '}',
   '.aimeat-mark b{font-weight:inherit;color:' + accent + '}',
-  '.aimeat-host{font:400 12px/1 ' + mono + ';color:' + dim + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+  // The whole address, wrapped when it is long, never cut to "koeajo-uusi4172…" (review of v33, K24).
+  '.aimeat-host{font:400 12px/1.3 ' + mono + ';color:' + dim + ';overflow-wrap:anywhere;min-width:0}',
   '.aimeat-crumb-right{display:flex;align-items:center;gap:8px;flex:0 0 auto}',
   '.aimeat-close{appearance:none;width:26px;height:26px;padding:0;margin:0;display:inline-flex;align-items:center;justify-content:center;',
     'border:2px solid ' + ink + ';background:transparent;color:' + ink + ';cursor:pointer;transition:color .12s,border-color .12s}',

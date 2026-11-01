@@ -9,11 +9,14 @@
  *   listing and aimeat_board_read call this, so the rule has one home.
  *
  * @version-history
+ *   2026-10-31 — The threshold counts reporting accounts, not flags: one person and their own agents
+ *     are one reporter (secaudit2026oct31w2 round 10, W2-8).
  *   v1.0.0 — 2026-08-30 — Initial.
  */
 import type { Storage } from '../storage/interface.js';
 import type { BoardPostRecord, BoardRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config-types.js';
+import { activeReporterCount } from './moderation-flags.js';
 
 export type BoardModerationDeps = { storage: Storage; config: AimeatConfig };
 
@@ -27,9 +30,11 @@ export async function hiddenBoardPostIds(deps: BoardModerationDeps, postIds: str
     const hidden = new Set<string>();
     const threshold = config.autoHideThreshold;
     if (!Number.isFinite(threshold) || threshold <= 0) return hidden;
+    // One reporting account is one vote: a person's session and their own agents count once
+    // (services/moderation-flags.ts activeReporterCount).
     await Promise.all(postIds.map(async id => {
         const flags = await storage.getFlagsByTarget('board_post', id);
-        if (flags.filter(f => f.status === 'active').length >= threshold) hidden.add(id);
+        if (activeReporterCount(flags, config.nodeId) >= threshold) hidden.add(id);
     }));
     return hidden;
 }

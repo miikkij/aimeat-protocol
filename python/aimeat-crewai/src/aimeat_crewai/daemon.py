@@ -14,6 +14,9 @@ This is the second half of the AIMEAT-CrewAI integration story:
     them up automatically.
 
 Changelog:
+  unreleased -- 2026-10-31 -- A dm.inbound wake marked readable false (an agent without messages:read,
+    node 4.2, secaudit2026oct31w2 round 10) starts no crew run; the daemon prints one line. A caller's
+    on_dm still gets the event.
   0.33.0 -- 2026-10-11 -- The owner can stop an agent (a node built after 2026-10-11), and the daemon knows. The
     node does the holding: a stopped agent's own task list and inbox carry no waiting task and no
     message and say `agent_stopped: true`, and nothing that would wake it is pushed. The daemon
@@ -2080,6 +2083,15 @@ def run_crew_daemon(
                             on_error(inner)
                         except Exception:  # noqa: BLE001, S110 -- the error callback is the user's code too; a reporter that fails has nothing left to report with
                             pass
+                return
+            # Node 4.2 (secaudit2026oct31w2 round 10, W2-13): an agent without messages:read gets only
+            # the arrival of a message, marked readable false, and its owner gets a one-press question.
+            # A crew run on it would have no sender, subject or text to work with, so none starts.
+            if event.get("readable") is False:
+                print(
+                    f"[daemon:{agent_name}] a direct message arrived that this agent may not read; "
+                    "its owner was asked to allow it (needs messages:read)"
+                )
                 return
             did = f"dm-{event.get('id')}"
             synthetic_task = {
