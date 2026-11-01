@@ -13,6 +13,8 @@
  *   secRouting · secPolicy
  * @usage import { secProviders, secRouting, secPolicy } from './ai/providers.js';
  * @version-history
+ *   v1.9.0 — 2026-11-01 — The routing rules name the server's AI region choice (ai.region_mode) and
+ *     what it means; on the own-key choice the line asks for one's own key until it is there.
  *   v1.8.0 — 2026-10-31 — The routing rules end with where OpenRouter processes the server's-key calls
  *     and what happens to a model the region does not offer (regionRows), a select each when the
  *     operator lets people choose (Jouni, 2026-10-31).
@@ -373,10 +375,17 @@ function freeModelRow(fm, r, e, pv) {
  * Where OpenRouter processes the server's-key calls (openrouter_region of GET /v1/ai/providers): the
  * region and what happens to a model it does not offer. A select each when the operator lets people
  * choose, among the regions the operator allows; otherwise what applies, and that the operator chose.
- * Shown only where the server has its own OpenRouter key.
+ * Shown only where the server has its own OpenRouter key. The server's AI region choice (`mode`,
+ * ai.region_mode) comes first when one was made; on the own-key choice it is the only row, and it says
+ * to add one's own key.
  */
 function regionRows(reg, r, e, pv) {
-  if (!reg?.node_key) return [];
+  const mode = reg?.mode?.id;
+  const modeRow = mode ? {
+    key: 'region-mode', k: named('ai.region_mode', x('rt.regionMode')), v: x('rt.regionMode.' + mode),
+    sub: x('rt.regionModeSub.' + mode), ...(mode === 'own' && !pv.providers.some((p) => p.type === 'openrouter' && p.source === 'owner') ? { subTone: 'notice' } : {}),
+  } : null;
+  if (!reg?.node_key || mode === 'own') return modeRow ? [modeRow] : [];
   const node = reg.node || {};
   const allowed = node.allowed || [];
   const now = reg.in_effect?.node_key || {};
@@ -405,7 +414,7 @@ function regionRows(reg, r, e, pv) {
       : fallbackWord(now.fallback),
     sub: x('rt.regionFallbackSub'),
   };
-  return [region, fallback];
+  return [modeRow, region, fallback];
 }
 
 export function secRouting(ctx, num) {

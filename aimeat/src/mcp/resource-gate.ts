@@ -16,6 +16,7 @@
  * @structure RESOURCE_READ_TOOL · withResourceGate(register, opts)
  * @usage patchable.registerResource = withResourceGate(originalRegisterResource, { allows, agentGaii, storage });
  * @version-history
+ *   2026-11-01 — aimeat://datapackage/{owner}/{name} answers under aimeat_datapackage_export's scope (plan doc-mvwxcas3dom3, D1.6).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   v1.0.0 — 2026-10-05 — Initial (secaudit 2026-10, AUTH-2).
  */
@@ -29,6 +30,7 @@ export const RESOURCE_READ_TOOL: Readonly<Record<string, string>> = {
   'board-posts': 'aimeat_board_read',
   'chat-instance': 'aimeat_instance_status',
   'consent-record': 'aimeat_consent_list',
+  'datapackage': 'aimeat_datapackage_export',
   'agent-memory': 'aimeat_memory_read',
   'agent-storage': 'aimeat_storage_download',
   'agent-wallet': 'aimeat_wallet_balance',

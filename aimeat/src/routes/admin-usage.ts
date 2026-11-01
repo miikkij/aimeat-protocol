@@ -28,6 +28,7 @@
  *   import { adminUsageRouter } from './routes/admin-usage.js';
  *   app.use(adminUsageRouter(config, storage));
  * @version-history
+ *   v1.4.1 — 2026-11-01 — free_fallback_model is null in eu-only (ai.region_mode), where the free router does not run.
  *   v1.4.0 — 2026-10-25 — The hot window and the hour-rollup window come from the config
  *     (usage.hot_days, usage.hour_rollup_days), so the admin Config tab shows and changes them.
  *   v1.3.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2). The raw-calls audit row names the calling agent as the actor when an agent reads.
@@ -52,6 +53,8 @@ import { rebuildUsageRollup } from '../services/usage/rollup-engine.js';
 import { recordUsageCall, pendingUsageCalls } from '../services/usage/usage-buffer.js';
 import { buildUsagePage } from '../services/usage-page.js';
 import { chatUsesSharedKey } from '../services/goose-env.js';
+import { freeModelOf } from '../services/ai/openrouter-region.js';
+import { nodeOpenRouterKey } from '../services/ai/node-openrouter-key.js';
 import { logger } from '../utils/logger.js';
 
 const ISO_DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -227,9 +230,9 @@ export function adminUsageRouter(config: AimeatConfig, storage: Storage): Router
       res.json(success(config.nodeId, {
         from,
         to,
-        house_key_configured: !!config.openrouterInstanceKey,
+        house_key_configured: !!nodeOpenRouterKey(config),
         free_allowance_usd: config.chatFreeAllowanceUsd,
-        free_fallback_model: config.modelFreeFallback || null,
+        free_fallback_model: freeModelOf(config) || null,
         by_key_scope: {
           node: { cost_usd: scopes.node.cost_usd, calls: scopes.node.calls, people: scopes.node.owners.size },
           own: { cost_usd: scopes.own.cost_usd, calls: scopes.own.calls, people: scopes.own.owners.size },

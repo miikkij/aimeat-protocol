@@ -25,14 +25,25 @@
  *   operator left out of ai.openrouter_regions is never used, as a choice or as a fallback. On the
  *   person's or an agent's own OpenRouter key: the person's rule, and with none, any, the address that
  *   key always used, because their own key may not be on the plan the in-region addresses need.
- * @structure OpenRouterRegion · RegionFallback · REGION_HOSTS · regionBaseUrl · allowedRegions ·
- *   RegionChoice · regionChoiceFor · regionModelIds · RegionDecision · decideRegion · regionsInUse ·
- *   REGION_COUNTRY · regionView · resetRegionModelsForTests
+ *
+ *   THE BUYER'S MODE (ai.region_mode, Jouni 2026-11-01). A node sold from the store is set up with one
+ *   of three choices, and the choice decides the four ai.openrouter_* settings (regionSettingsOf), the
+ *   free model, the text model eu-only uses, the records of processing and the privacy page, all read
+ *   through the helpers here. Empty is no mode: the four settings decide as before, as on aimeat.io.
+ * @structure OpenRouterRegion · RegionFallback · REGION_HOSTS · regionBaseUrl · RegionMode ·
+ *   regionModeOf · regionSettingsOf · freeModelOf · freeLastResortOf · EU_ONLY_TEXT_MODEL ·
+ *   allowedRegions · RegionChoice · regionChoiceFor · RegionModels · regionModels · regionModelIds ·
+ *   RegionNeeds · RegionDecision · decideRegion · euOnlyModelFor · regionsInUse · REGION_MODE_LIMITS ·
+ *   REGION_COUNTRY · regionView · regionDeclaration · resetRegionModelsForTests
  * @usage
  *   const choice = regionChoiceFor(config, rules, candidate.keyScope);
  *   const d = await decideRegion(config, choice, model);
  *   if (!d.ok) reject(d.message); else target.baseUrl = d.baseUrl;
  * @version-history
+ *   v1.1.0 — 2026-11-01 — ai.region_mode (eu, eu-only, own) decides the region settings; a region's
+ *     list records which models it offers without tool calling, and a call that sends tools does not
+ *     go to such an endpoint; eu-only replaces a node-chosen model the EU does not offer and has no
+ *     free model (Jouni, 2026-11-01 01.17).
  *   v1.0.0 — 2026-10-31 — Initial (Jouni, 2026-10-31).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -41,6 +52,7 @@ import { readJson } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { fixedBaseUrlOf, regionOverrideOf } from './providers.js';
 import type { RoutingRules } from './routing.js';
+import { nodeOpenRouterKey } from './node-openrouter-key.js';
 
 export type OpenRouterRegion = 'eu' | 'us' | 'any';
 export type RegionFallback = 'off' | 'us' | 'any';
@@ -62,9 +74,56 @@ export function regionBaseUrl(config: AimeatConfig, region: OpenRouterRegion): s
   return regionOverrideOf(config, region) ?? REGION_BASE[region];
 }
 
-/** The regions the operator lets the node's key go to (ai.openrouter_regions). Empty or unreadable: all three. */
+/**
+ * The choice a node's buyer makes once (ai.region_mode; Jouni, 2026-11-01): eu is the EU as far as it
+ * goes and elsewhere for the rest, each fallback recorded on the answer; eu-only is the EU and nothing
+ * else, with what the EU cannot give switched off; own is the person's own OpenRouter key and their
+ * own contract. Empty: no mode, and the four ai.openrouter_* settings decide as they did.
+ */
+export type RegionMode = '' | 'eu' | 'eu-only' | 'own';
+export const REGION_MODES: readonly RegionMode[] = ['eu', 'eu-only', 'own'];
+
+export function regionModeOf(config: AimeatConfig): RegionMode {
+  const m = (config.aiRegionMode ?? '').trim();
+  return (REGION_MODES as readonly string[]).includes(m) ? m as RegionMode : '';
+}
+
+/** The node's region settings in effect: the mode's when one is set, else the four settings as stored. */
+export interface RegionSettings { region: OpenRouterRegion; fallback: RegionFallback; regions: string; personChoice: boolean }
+
+export function regionSettingsOf(config: AimeatConfig): RegionSettings {
+  switch (regionModeOf(config)) {
+    case 'eu': return { region: 'eu', fallback: 'any', regions: 'eu,us,any', personChoice: config.aiOpenrouterRegionPersonChoice !== false };
+    case 'eu-only': return { region: 'eu', fallback: 'off', regions: 'eu', personChoice: false };
+    // The node holds no key of its own here; a person's own key follows their own rule (regionChoiceFor).
+    case 'own': return { region: 'any', fallback: 'us', regions: 'eu,us,any', personChoice: true };
+    default: return {
+      region: config.aiOpenrouterRegion ?? 'any', fallback: config.aiOpenrouterRegionFallback ?? 'us',
+      regions: config.aiOpenrouterRegions ?? '', personChoice: config.aiOpenrouterRegionPersonChoice !== false,
+    };
+  }
+}
+
+/** OpenRouter's free-models router, or '' when the mode keeps calls where it does not run (eu-only). */
+export function freeModelOf(config: AimeatConfig): string {
+  return regionModeOf(config) === 'eu-only' ? '' : (config.modelFreeFallback ?? '');
+}
+
+/** The node's default for the free model as the last resort; never in eu-only, where it does not run. */
+export function freeLastResortOf(config: AimeatConfig): boolean {
+  return regionModeOf(config) !== 'eu-only' && config.aiFreeModelLastResort !== false;
+}
+
+/**
+ * The text model eu-only uses when the model the node chose is not offered in the EU: on the EU list
+ * with tool calling, image input and a low price (measured 2026-11-01 on eu.openrouter.ai/api/v1/models:
+ * 69 models; openai/gpt-oss-120b is listed there without tool calling).
+ */
+export const EU_ONLY_TEXT_MODEL = 'mistralai/mistral-small-2603';
+
+/** The regions the operator lets the node's key go to (ai.openrouter_regions, or the mode's). Empty or unreadable: all three. */
 export function allowedRegions(config: AimeatConfig): OpenRouterRegion[] {
-  const listed = (config.aiOpenrouterRegions ?? '').split(',').map(s => s.trim().toLowerCase())
+  const listed = regionSettingsOf(config).regions.split(',').map(s => s.trim().toLowerCase())
     .filter((s): s is OpenRouterRegion => (OPENROUTER_REGIONS as readonly string[]).includes(s));
   return listed.length ? OPENROUTER_REGIONS.filter(r => listed.includes(r)) : [...OPENROUTER_REGIONS];
 }
@@ -82,7 +141,8 @@ export interface RegionChoice {
 export function regionChoiceFor(
   config: AimeatConfig, rules: Pick<RoutingRules, 'openrouterRegion' | 'openrouterRegionFallback'>, keyScope: 'agent' | 'own' | 'node',
 ): RegionChoice {
-  const nodeFallback = config.aiOpenrouterRegionFallback ?? 'us';
+  const settings = regionSettingsOf(config);
+  const nodeFallback = settings.fallback;
   if (keyScope !== 'node') {
     return {
       region: rules.openrouterRegion ?? 'any', fallback: rules.openrouterRegionFallback ?? nodeFallback,
@@ -90,8 +150,8 @@ export function regionChoiceFor(
     };
   }
   const allowed = allowedRegions(config);
-  const personMay = config.aiOpenrouterRegionPersonChoice !== false;
-  const nodeRegion = allowed.includes(config.aiOpenrouterRegion ?? 'any') ? (config.aiOpenrouterRegion ?? 'any') : allowed[0];
+  const personMay = settings.personChoice;
+  const nodeRegion = allowed.includes(settings.region) ? settings.region : allowed[0];
   const personRegion = personMay && rules.openrouterRegion && allowed.includes(rules.openrouterRegion) ? rules.openrouterRegion : null;
   const personFallback = personMay ? rules.openrouterRegionFallback : null;
   return {
@@ -102,33 +162,45 @@ export function regionChoiceFor(
   };
 }
 
+/**
+ * A region's models: every id it offers, and the ids it lists WITHOUT tool calling. A model whose
+ * entry names no supported parameters is not counted as lacking them, so a list that does not say
+ * leaves the region to decide, as an unreadable list does.
+ */
+export interface RegionModels { ids: Set<string>; noTools: Set<string> }
+
 /** A region's model list: what was read and when, null when it could not be read. */
-const lists = new Map<string, { at: number; ids: Set<string> | null }>();
-const inFlight = new Map<string, Promise<Set<string> | null>>();
+const lists = new Map<string, { at: number; models: RegionModels | null }>();
+const inFlight = new Map<string, Promise<RegionModels | null>>();
 const LIST_TTL_MS = 6 * 60 * 60_000;
 const FAILED_TTL_MS = 5 * 60_000;
 const LIST_TIMEOUT_MS = 10_000;
 /** The global list is about a megabyte; a regional one far less. */
 const LIST_READ_BYTES = 8 * 1024 * 1024;
 
-/** The ids of the models a region offers, or null when its list could not be read. */
-export async function regionModelIds(config: AimeatConfig, region: 'eu' | 'us'): Promise<Set<string> | null> {
+/** The models a region offers, or null when its list could not be read. */
+export async function regionModels(config: AimeatConfig, region: 'eu' | 'us'): Promise<RegionModels | null> {
   const base = regionBaseUrl(config, region);
   const cached = lists.get(base);
-  if (cached && Date.now() - cached.at < (cached.ids ? LIST_TTL_MS : FAILED_TTL_MS)) return cached.ids;
+  if (cached && Date.now() - cached.at < (cached.models ? LIST_TTL_MS : FAILED_TTL_MS)) return cached.models;
   const running = inFlight.get(base);
   if (running) return running;
   const read = (async () => {
     try {
       const res = await safeFetch(`${base}/models`, { signal: AbortSignal.timeout(LIST_TIMEOUT_MS) });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const body = await readJson(res, LIST_READ_BYTES) as { data?: Array<{ id?: unknown }> } | null;
-      const ids = new Set((body?.data ?? []).map(m => m?.id).filter((id): id is string => typeof id === 'string'));
-      lists.set(base, { at: Date.now(), ids });
-      return ids;
+      const body = await readJson(res, LIST_READ_BYTES) as { data?: Array<{ id?: unknown; supported_parameters?: unknown }> } | null;
+      const models: RegionModels = { ids: new Set(), noTools: new Set() };
+      for (const m of body?.data ?? []) {
+        if (typeof m?.id !== 'string') continue;
+        models.ids.add(m.id);
+        if (Array.isArray(m.supported_parameters) && !m.supported_parameters.includes('tools')) models.noTools.add(m.id);
+      }
+      lists.set(base, { at: Date.now(), models });
+      return models;
     } catch (err) {
       logger.warn('[ai] OpenRouter did not list a region\'s models; calls go to the region and it decides', { region, error: String(err) });
-      lists.set(base, { at: Date.now(), ids: null });
+      lists.set(base, { at: Date.now(), models: null });
       return null;
     } finally {
       inFlight.delete(base);
@@ -136,6 +208,19 @@ export async function regionModelIds(config: AimeatConfig, region: 'eu' | 'us'):
   })();
   inFlight.set(base, read);
   return read;
+}
+
+/** The ids of the models a region offers, or null when its list could not be read. */
+export async function regionModelIds(config: AimeatConfig, region: 'eu' | 'us'): Promise<Set<string> | null> {
+  return (await regionModels(config, region))?.ids ?? null;
+}
+
+/** What a call needs from the region's endpoint beyond the model itself. */
+export interface RegionNeeds { tools?: boolean }
+
+/** Whether a region's list offers this model for this call: listed, and with tool calling when the call sends tools. */
+function offers(models: RegionModels, id: string, needs: RegionNeeds): boolean {
+  return models.ids.has(id) && !(needs.tools && models.noTools.has(id));
 }
 
 export type RegionDecision =
@@ -155,26 +240,52 @@ function regionOrder(choice: RegionChoice): OpenRouterRegion[] {
  * OpenRouter's id (`anthropic/claude-sonnet-5.5`); a reference with the `openrouter:` prefix is read
  * the same.
  */
-export async function decideRegion(config: AimeatConfig, choice: RegionChoice, model: string): Promise<RegionDecision> {
+export async function decideRegion(config: AimeatConfig, choice: RegionChoice, model: string, needs: RegionNeeds = {}): Promise<RegionDecision> {
   const id = model.startsWith('openrouter:') ? model.slice('openrouter:'.length) : model;
   for (const region of regionOrder(choice)) {
-    const ids = region === 'any' ? null : await regionModelIds(config, region);
+    const models = region === 'any' ? null : await regionModels(config, region);
     // `any` takes every model; a list that could not be read lets the region decide, and it refuses
-    // rather than leave the region.
-    if (region === 'any' || ids === null || ids.has(id)) {
+    // rather than leave the region. A model listed without tool calling does not take a call that
+    // sends tools: on crew36 openai/gpt-oss-120b is on the EU list with no tool calling there.
+    if (region === 'any' || models === null || offers(models, id, needs)) {
       return { ok: true, region, wanted: choice.region, baseUrl: regionBaseUrl(config, region), fellBack: region !== choice.region };
     }
   }
   const wanted = choice.region;
-  const offered = wanted === 'any' ? [] : [...((await regionModelIds(config, wanted)) ?? [])].sort().slice(0, 12);
-  const how = choice.source === 'person' || config.aiOpenrouterRegionPersonChoice !== false
+  const listed = wanted === 'any' ? null : await regionModels(config, wanted);
+  const offered = listed ? [...listed.ids].filter(m => offers(listed, m, needs)).sort().slice(0, 12) : [];
+  const toolsOnly = !!(needs.tools && listed?.ids.has(id));
+  const what = toolsOnly ? `${id} is offered at ${REGION_HOSTS[wanted]} without tool calling, which this call needs`
+    : `${id} is not offered at ${REGION_HOSTS[wanted]}`;
+  if (choice.source === 'node' && regionModeOf(config) === 'eu-only') {
+    return {
+      ok: false, wanted, offered,
+      message: `This node keeps every AI call in the EU (EU only), and ${what}, so this is off here.`
+        + `${offered.length ? ` Models offered there include ${offered.join(', ')}.` : ''}`,
+    };
+  }
+  const how = choice.source === 'person' || regionSettingsOf(config).personChoice
     ? ` To let such a model run in the United States, set your AI routing rule openrouterRegionFallback to us${choice.allowed.includes('any') ? ', or to any for any country' : ''}.`
     : '';
   return {
     ok: false, wanted, offered,
-    message: `${id} is not offered at ${REGION_HOSTS[wanted]}, where your calls on this node are processed, `
+    message: `${what}, where your calls on this node are processed, `
       + `and no fallback region is allowed for it.${offered.length ? ` Models offered there include ${offered.join(', ')}.` : ''}${how}`,
   };
+}
+
+/**
+ * The model a call on the node's key uses in eu-only: the model the node chose when the EU offers it
+ * for this call, else EU_ONLY_TEXT_MODEL for a text or picture call. Every other mode, a model the
+ * caller named, and any other capability keep their model, and the region decides (refusing in eu-only).
+ */
+export async function euOnlyModelFor(
+  config: AimeatConfig, model: string, capability: string, needs: RegionNeeds, callerNamed: boolean,
+): Promise<string> {
+  if (regionModeOf(config) !== 'eu-only' || callerNamed || !['text', 'vision', 'files'].includes(capability)) return model;
+  const id = model.startsWith('openrouter:') ? model.slice('openrouter:'.length) : model;
+  const eu = await regionModels(config, 'eu');
+  return eu === null || offers(eu, id, needs) ? model : EU_ONLY_TEXT_MODEL;
 }
 
 /**
@@ -184,10 +295,20 @@ export async function decideRegion(config: AimeatConfig, choice: RegionChoice, m
  */
 export function regionsInUse(config: AimeatConfig): OpenRouterRegion[] {
   const allowed = allowedRegions(config);
-  if (config.aiOpenrouterRegionPersonChoice !== false) return allowed;
+  if (regionSettingsOf(config).personChoice) return allowed;
   const choice = regionChoiceFor(config, { openrouterRegion: null, openrouterRegionFallback: null }, 'node');
   return regionOrder(choice);
 }
+
+/**
+ * What each mode switches off or leaves to the person, as an AI reads it (the person reads the same in
+ * their language: aiRegion.mode.<id>.limits). Facts from the code above and the EU list of 2026-11-01.
+ */
+export const REGION_MODE_LIMITS: Readonly<Record<Exclude<RegionMode, ''>, string>> = {
+  eu: 'Calls go to eu.openrouter.ai first. A model the EU does not offer, or offers without the tool calling the call needs, runs at us.openrouter.ai and then openrouter.ai, and the answer records where it ran.',
+  'eu-only': `Every call on the node's key stays at eu.openrouter.ai. A model the EU does not offer is replaced by ${EU_ONLY_TEXT_MODEL} for text and pictures; speech-to-text, speech, image generation, embeddings and the free models are off, because the EU list offers none of them.`,
+  own: 'The node has no shared AI key. Each person adds their own OpenRouter key on the AI settings page and answers for it under their own contract with OpenRouter; nothing falls back to a shared key.',
+};
 
 /** Where each region processes a prompt, as the records of processing write a country. */
 export const REGION_COUNTRY: Readonly<Record<OpenRouterRegion, string>> = {
@@ -203,19 +324,44 @@ export const REGION_COUNTRY: Readonly<Record<OpenRouterRegion, string>> = {
 export function regionView(config: AimeatConfig, rules: Pick<RoutingRules, 'openrouterRegion' | 'openrouterRegionFallback'>): Record<string, unknown> {
   const onNode = regionChoiceFor(config, rules, 'node');
   const onOwn = regionChoiceFor(config, rules, 'own');
+  const settings = regionSettingsOf(config);
+  const mode = regionModeOf(config);
   return {
     hosts: REGION_HOSTS,
     /** Whether the node has an OpenRouter key of its own, so the node's choice reaches anyone at all. */
-    node_key: !!(config.openrouterInstanceKey ?? '').trim(),
+    node_key: !!nodeOpenRouterKey(config),
+    /** The buyer's choice (ai.region_mode), null when none is set; `limits` names what it switches off. */
+    mode: mode ? { id: mode, limits: REGION_MODE_LIMITS[mode] } : null,
     node: {
-      region: config.aiOpenrouterRegion ?? 'any', fallback: config.aiOpenrouterRegionFallback ?? 'us',
-      allowed: allowedRegions(config), person_may_choose: config.aiOpenrouterRegionPersonChoice !== false,
+      region: settings.region, fallback: settings.fallback,
+      allowed: allowedRegions(config), person_may_choose: settings.personChoice,
     },
     in_effect: {
       node_key: { region: onNode.region, fallback: onNode.fallback, source: onNode.source },
       own_key: { region: onOwn.region, fallback: onOwn.fallback, source: onOwn.source },
     },
     note: 'eu and us keep the prompt and the answer in that region. OpenRouter keeps account, billing and security records in the United States whatever is chosen, and any may send the prompt to a provider in any country.',
+  };
+}
+
+/**
+ * Where the node's own AI key has prompts processed, for the AI transparency statement
+ * (routes/ai-transparency.ts): the buyer's choice and its limits, the region, the fallback and the
+ * regions in use. A node without its own key says so; on the own-key choice each person's key decides.
+ */
+export function regionDeclaration(config: AimeatConfig): Record<string, unknown> {
+  const mode = regionModeOf(config);
+  const settings = regionSettingsOf(config);
+  const nodeKey = !!nodeOpenRouterKey(config);
+  return {
+    mode: mode || null,
+    ...(mode ? { mode_limits: REGION_MODE_LIMITS[mode] } : {}),
+    node_key: nodeKey,
+    ...(nodeKey ? {
+      region: settings.region, host: REGION_HOSTS[settings.region], fallback: settings.fallback,
+      regions_in_use: regionsInUse(config).map(r => ({ region: r, host: REGION_HOSTS[r], country: REGION_COUNTRY[r] })),
+    } : {}),
+    note: 'eu keeps the prompt and the answer in the EU/EEA, the United Kingdom or Switzerland; us in the United States; any lets the model\'s provider be in any country. OpenRouter keeps account, billing and security records in the United States whatever is chosen. Each answer records where it ran.',
   };
 }
 

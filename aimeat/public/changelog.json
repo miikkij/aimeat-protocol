@@ -4,6 +4,28 @@
     {
       "date": "2026-11-01",
       "kind": "feature",
+      "id": "2026-11-01-choose-once-where-your-aimeat-s-ai-runs",
+      "highlight": true,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Choose once where your AIMEAT's AI runs",
+        "fi": "Valitse kerran, missä AIMEATisi tekoäly toimii"
+      },
+      "summary": {
+        "en": "EU first, EU only or your own key: the privacy page and the records follow your choice.",
+        "fi": "EU ensin, vain EU tai oma avain: tietosuojaseloste ja selosteet seuraavat valintaasi."
+      },
+      "body": {
+        "en": "When you buy your AIMEAT you choose where its AI runs. EU first: your questions go to the EU, and a model only the United States offers still works, with each answer saying where it ran. EU only: nothing leaves the EU; speech, image generation and the free models are off, and the AIMEAT says why when you ask for one. Your own key: you add your own OpenRouter key and answer for it. The privacy page, the records of processing and the AI transparency statement follow the choice, and the AI page shows it. The operator can change it later on the Config tab.",
+        "fi": "Kun ostat AIMEATin, valitset, missä sen tekoäly toimii. EU ensin: kysymyksesi menevät EU:hun, ja malli, joka on vain Yhdysvalloissa, toimii silti. Jokainen vastaus kertoo, missä se käsiteltiin. Vain EU: mikään ei lähde EU:sta. Puhe, kuvien luonti ja ilmaiset mallit eivät ole käytössä, ja AIMEAT kertoo syyn, jos pyydät niitä. Oma avain: lisäät oman OpenRouter-avaimesi ja vastaat siitä itse. Tietosuojaseloste, käsittelytoimien seloste ja tekoälyn läpinäkyvyysseloste seuraavat valintaa, ja tekoälysivu näyttää sen. Ylläpitäjä voi vaihtaa valinnan myöhemmin Asetukset-välilehdellä."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
       "id": "2026-11-01-choose-where-your-ai-calls-are-processed",
       "highlight": false,
       "audience": [

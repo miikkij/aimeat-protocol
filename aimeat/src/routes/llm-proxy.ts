@@ -27,6 +27,7 @@
  *   - llmProxyRouter(config, storage) — POST /v1/llm/chat/completions, GET /v1/llm/models
  * @usage mounted in server-bootstrap/routes-loader.ts; an agent uses <node>/v1/llm as its base URL
  * @version-history
+ *   v1.14.0 -- 2026-11-01 -- A call with tools says so (`requires.tools`), so its OpenRouter region must offer the model with tool calling.
  *   v1.13.0 -- 2026-10-27 -- A stream the provider answered and then broke off is settled from what came
  *     (its usage frame, else the text seen), where it was only logged; a node-key call is priced by its
  *     tools and response format too (estimate.inputTokens, services/ai/call-size.ts). secaudit2026oct26:
@@ -218,6 +219,9 @@ export function llmProxyRouter(config: AimeatConfig, storage: Storage): Router {
             // caller named one. The owner's own price ceiling reads the messages, as before.
             plan = await prepareAiCall(storage, config, gaii, {
                 appId: 'llm-proxy', ...(agent ? { agent } : {}), ...aiCallerOf(req, config.nodeId), ...(role ? { role } : {}),
+                // A call that sends tools needs a model endpoint with tool calling in its region
+                // (ai/openrouter-region.ts; on crew36 gpt-oss-120b is on the EU list without it).
+                ...(Array.isArray(body.tools) && body.tools.length ? { requires: { tools: true } } : {}),
                 estimate: {
                     promptTokens: Math.ceil(JSON.stringify(body.messages).length / 4),
                     inputTokens: chatCallInputTokens(body),

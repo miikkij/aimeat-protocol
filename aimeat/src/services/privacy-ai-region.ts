@@ -17,11 +17,14 @@
  * @structure aiRegionNotice(config, locale)
  * @usage vars.aiRegionNotice = aiRegionNotice(config, locale)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The buyer's AI region choice (ai.region_mode): the settings in effect come
+ *     from regionSettingsOf, eu-only names what is off, and own says each person brings their own key.
  *   v1.0.0 — 2026-10-31 — Initial (Jouni, 2026-10-31).
  */
 import type { AimeatConfig } from '../config.js';
 import { typeAllowed } from './ai/providers.js';
-import { allowedRegions, REGION_HOSTS, type OpenRouterRegion, type RegionFallback } from './ai/openrouter-region.js';
+import { allowedRegions, regionModeOf, regionSettingsOf, REGION_HOSTS, type OpenRouterRegion, type RegionFallback } from './ai/openrouter-region.js';
+import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 
 type Lang = 'en' | 'fi' | 'es';
 
@@ -37,6 +40,10 @@ interface Words {
   nodeChooses: string;
   tail: string;
   or: string;
+  /** ai.region_mode eu-only: what is off because the EU does not offer it. */
+  euOnly: string;
+  /** ai.region_mode own: the node has no key of its own, and each person brings theirs. */
+  own: string;
 }
 
 const WORDS: Record<Lang, Words> = {
@@ -58,6 +65,8 @@ const WORDS: Record<Lang, Words> = {
     nodeChooses: 'The operator chooses this for everyone on this node.',
     tail: 'Whatever the region, OpenRouter keeps account, billing and security records in the United States. That transfer, and every request processed outside the EEA, relies on the EU Standard Contractual Clauses in OpenRouter\'s data processing agreement. Each answer records where it was processed.',
     or: 'or',
+    euOnly: 'This node was set up to use AI in the EU only. Speech-to-text, read-aloud, image generation, embeddings and the free models are therefore off here, because the EU region offers none of them.',
+    own: 'This node has no shared AI key. Each person adds their own OpenRouter key in their AI settings and uses it under their own agreement with OpenRouter, Inc., a company in the United States. Where your requests are processed is your own choice in your AI settings.',
   },
   fi: {
     title: 'Missä tämän solmun tekoälyn tarjoaja käsittelee pyyntösi.',
@@ -77,6 +86,8 @@ const WORDS: Record<Lang, Words> = {
     nodeChooses: 'Ylläpitäjä valitsee tämän kaikille tämän solmun käyttäjille.',
     tail: 'Alueesta riippumatta OpenRouter säilyttää tili-, laskutus- ja tietoturvatiedot Yhdysvalloissa. Tämä siirto ja jokainen ETA-alueen ulkopuolella käsitelty pyyntö perustuvat EU:n vakiosopimuslausekkeisiin, jotka ovat osa OpenRouterin tietojenkäsittelysopimusta. Jokaiseen vastaukseen tallentuu, missä se käsiteltiin.',
     or: 'tai',
+    euOnly: 'Tämä solmu on otettu käyttöön niin, että tekoäly toimii vain EU:ssa. Siksi puheentunnistus, ääneen luku, kuvien luonti, upotukset ja ilmaiset mallit eivät ole käytössä. EU-alueella ei ole niistä yhtäkään.',
+    own: 'Tällä solmulla ei ole yhteistä tekoälyavainta. Jokainen lisää oman OpenRouter-avaimensa tekoälyasetuksiinsa ja käyttää sitä oman sopimuksensa mukaan. OpenRouter, Inc. on yhdysvaltalainen yritys. Sinä valitset tekoälyasetuksissasi, missä pyyntösi käsitellään.',
   },
   es: {
     title: 'Dónde procesa tu solicitud el proveedor de IA de este nodo.',
@@ -96,6 +107,8 @@ const WORDS: Record<Lang, Words> = {
     nodeChooses: 'El operador elige esto para todos en este nodo.',
     tail: 'Sea cual sea la región, OpenRouter guarda los registros de cuenta, facturación y seguridad en Estados Unidos. Esa transferencia, y toda solicitud procesada fuera del EEE, se basa en las cláusulas contractuales tipo de la UE del acuerdo de tratamiento de datos de OpenRouter. Cada respuesta registra dónde se procesó.',
     or: 'o',
+    euOnly: 'Este nodo se configuró para usar la IA solo en la UE. Por eso aquí no funcionan el dictado por voz, la lectura en voz alta, la generación de imágenes, las incrustaciones ni los modelos gratuitos: la región de la UE no ofrece ninguno de ellos.',
+    own: 'Este nodo no tiene una clave de IA compartida. Cada persona añade su propia clave de OpenRouter en sus ajustes de IA y la usa según su propio acuerdo con OpenRouter, Inc., una empresa de Estados Unidos. Tú eliges en tus ajustes de IA dónde se procesan tus solicitudes.',
   },
 };
 
@@ -110,17 +123,23 @@ function fallbackOf(region: OpenRouterRegion, fallback: RegionFallback, allowed:
   return 'off';
 }
 
-/** The paragraph for this node, or '' when the node has no OpenRouter key of its own. */
+/**
+ * The paragraph for this node, or '' when the node has no OpenRouter key of its own. A node set up
+ * with the own-key choice (ai.region_mode own) says that each person brings their own key.
+ */
 export function aiRegionNotice(config: AimeatConfig, locale: string): string {
-  if (!(config.openrouterInstanceKey ?? '').trim() || !typeAllowed(config, 'openrouter')) return '';
   const w = WORDS[(locale === 'fi' || locale === 'es' ? locale : 'en') as Lang];
+  const mode = regionModeOf(config);
+  if (mode === 'own') return typeAllowed(config, 'openrouter') ? `<p><strong>${w.title}</strong> ${w.own}</p>` : '';
+  if (!nodeOpenRouterKey(config) || !typeAllowed(config, 'openrouter')) return '';
+  const settings = regionSettingsOf(config);
   const allowed = allowedRegions(config);
-  const region = allowed.includes(config.aiOpenrouterRegion ?? 'any') ? (config.aiOpenrouterRegion ?? 'any') : allowed[0];
-  const fb = fallbackOf(region, config.aiOpenrouterRegionFallback ?? 'us', allowed);
+  const region = allowed.includes(settings.region) ? settings.region : allowed[0];
+  const fb = fallbackOf(region, settings.fallback, allowed);
   const hosts = allowed.map(r => REGION_HOSTS[r]);
   const hostList = hosts.length > 1 ? `${hosts.slice(0, -1).join(', ')} ${w.or} ${hosts[hosts.length - 1]}` : hosts[0];
-  const choose = config.aiOpenrouterRegionPersonChoice !== false && allowed.length > 1
+  const choose = settings.personChoice && allowed.length > 1
     ? w.choose.replace('{hosts}', hostList) : w.nodeChooses;
-  const sentences = [w.key, w.region[region], fb ? w.fallback[fb] : '', choose, w.tail].filter(Boolean);
+  const sentences = [w.key, w.region[region], fb ? w.fallback[fb] : '', mode === 'eu-only' ? w.euOnly : '', choose, w.tail].filter(Boolean);
   return `<p><strong>${w.title}</strong> ${sentences.join(' ')}</p>`;
 }

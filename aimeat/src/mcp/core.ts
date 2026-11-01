@@ -11,6 +11,8 @@
  *   import { registerCoreTools } from './core.js';
  *   registerCoreTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, peers, caller);
  * @version-history
+ *   2026-11-01 — aimeat_discover takes type `dataset` (DISCOVERY_TYPES, the list the REST route reads) and
+ *     hands the session's caller to the data package audience rule (plan doc-mvwxcas3dom3, D1.1).
  *   2026-10-25 — aimeat_discover with scope 'shared' needs organism:read, as aimeat_workspace_read
  *     does; without it the tool answers SCOPE_DENIED naming the word (secaudit2026oct22).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
@@ -167,7 +169,7 @@ import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, structuredResult } from '../tool-catalog/shape.js';
-import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
+import { buildDiscoveryRegistry, runDiscovery, computeFacets, DISCOVERY_TYPES, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skill-agent-links.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
@@ -311,10 +313,7 @@ export function registerCoreTools(
     // Domain-agnostic discovery across every content type via the shared source registry. The agent
     // is the caller; its full-owner-set view is gated by the agent's own read-scopes (design §11.3).
     const discoveryRegistry = buildDiscoveryRegistry(storage, config);
-    const VALID_DISCOVER_TYPES = new Set<DiscoveryType>([
-        'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
-        'company', 'offering', 'document', 'organism', 'app', 'tool', 'template', 'skill', 'designbook', 'memory',
-    ]);
+    const VALID_DISCOVER_TYPES = new Set<DiscoveryType>(DISCOVERY_TYPES);
     const discoverCsv = (v: string | undefined): string[] =>
         typeof v === 'string' ? v.split(',').map(s => s.trim()).filter(Boolean) : [];
     mcp.registerTool(
@@ -348,6 +347,7 @@ export function registerCoreTools(
                     scopes: agent?.defaultScopes ?? [],
                 },
                 organismCaller: caller(),   // the organism read rule on the own scope (secaudit 2026-10, v57 shape)
+                readerAuth: caller().auth,  // the data package audience rule (sources/dataset-source.ts)
                 scope: (scope ?? 'own') as 'own' | 'public' | 'shared',
                 reader: readerForAgent({ storage, config }, agentGaii),
                 filters: {
