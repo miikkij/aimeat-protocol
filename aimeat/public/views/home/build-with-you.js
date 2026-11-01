@@ -20,7 +20,7 @@
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
  *   v1.0.1 — 2026-11-01 — The first state names the operator: the operator's agent takes the request
- *     to the queue, not the place.
+ *     to the queue, not the place. The node calls it 'waiting-for-operator' ('received' before).
  *   v1.0.0 — 2026-11-01 — Initial (Jouni, 1.11 16.22, via Grok and commercial-1c; the node's routes
  *     and the queue are aimeat-protocol-4e's and aimeat-apps-c9's).
  */
@@ -59,11 +59,14 @@ const SPEC = [
 ];
 
 /**
- * The queue's state words. 'received' is the node's own: stored here until the operator's agent
- * takes it to the queue (the place holds no key to the queue), so it names the operator.
+ * The queue's state words. 'waiting-for-operator' is the node's own: stored here until the
+ * operator's fleet takes it to the queue (the place holds no key to the queue), so it names the
+ * operator. 'received' was its first name and reads the same.
  */
+const WAITING = ['home.buildWithYou.state.received', 'Sent to the operator, who passes it to the queue.'];
 const STATE_WORDS = {
-  received: ['home.buildWithYou.state.received', 'Sent to the operator, who passes it to the queue.'],
+  'waiting-for-operator': WAITING,
+  received: WAITING,
   queued: ['home.buildWithYou.state.queued', 'In the queue'],
   building: ['home.buildWithYou.state.building', 'Being built'],
   invited: ['home.buildWithYou.state.invited', 'Invitation sent'],
