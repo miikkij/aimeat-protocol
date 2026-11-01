@@ -33,6 +33,8 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-11-01 — The authorization address carries ui_locales, the node's own language
+ *     (site.default_locale), so the far side's sign-in page can speak the buyer's language.
  *   2026-11-01 — A finished round writes the row's auth mode as 'oauth' with the token. A row attached
  *     to sign in afterwards was stored as `none`, so the token was kept and never sent, and every
  *     call to aimeat.io answered 401 (aimeat-commercial-1c, test lane).
@@ -67,6 +69,7 @@ import { mcpClientPool } from './pool.js';
 import { logger } from '../../utils/logger.js';
 import { roundBindingHeld, roundApprovalUrl, sealRoundSecret, openRoundSecret, type RoundBindCookie } from '../oauth-round-secrets.js';
 import { describeUpstreamError } from './upstream-error.js';
+import { LOCALES } from '../../i18n.js';
 
 /** How long a person has to finish the round in their browser before the state is dead. */
 const STATE_TTL_MS = 15 * 60_000;
@@ -263,6 +266,15 @@ export async function startMcpOAuth(input: {
         message: `"${server.slug}" did not offer an authorization address. It may not use OAuth; `
           + 'attach it with a token instead.',
       };
+    }
+    // The node's own language (site.default_locale: a node bought from the store speaks its buyer's
+    // language) as OAuth's ui_locales, so the far side's sign-in page can speak it too. A hint: a
+    // server that does not know the parameter ignores it.
+    const uiLocale = (config.siteLinks?.defaultLocale ?? '').trim();
+    if ((LOCALES as readonly string[]).includes(uiLocale)) {
+      const withLocale = new URL(provider.captured.authorizationUrl);
+      if (!withLocale.searchParams.has('ui_locales')) withLocale.searchParams.set('ui_locales', uiLocale);
+      provider.captured.authorizationUrl = withLocale.toString();
     }
   } catch (err) {
     // The reason is logged rather than returned: a discovery error can carry the endpoint, and the
