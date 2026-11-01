@@ -22,6 +22,8 @@
  *   const allow = allowedDomains(req.auth!.scopes);        // Set<string> | null (null = all)
  *   const visible = filterDomains(['memory', 'wallet'], allow);
  * @version-history
+ *   v1.10.0 — 2026-11-01 — `app-parties` passes for a principal holding app:write: the people registered
+ *     to an app without an account changed, so the owner's panels read the list again (WP9d).
  *   v1.9.0 — 2026-11-01 — `datapackages` passes for a principal holding storage:read: a data package of
  *     the owner was published or withdrawn (plan doc-mvwxcas3dom3, D6).
  *   v1.8.0 — 2026-10-29 — `app-plans` passes for a principal holding app:write: an app's plan changed,
@@ -80,6 +82,9 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // An app's plan changed: a choice on its structure page, or a line from the AI building it
   // (services/app-structure.ts). The word the plan's own read and write ask.
   'app-plans': 'app:write',
+  // The people registered to an app without an account changed (services/app-parties/store.ts).
+  // The word the list's own read asks (GET /v1/apps/{owner}/{filename}/parties).
+  'app-parties': 'app:write',
   'app-store': 'catalogue:read',
   site: 'catalogue:read',
 

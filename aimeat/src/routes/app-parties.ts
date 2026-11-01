@@ -14,12 +14,15 @@
  *   - PUT    /v1/apps/:owner/:filename/parties/registration  the owner opens or closes it (app:manage)
  *   - GET    /v1/apps/:owner/:filename/parties               the registered people (app:write)
  *   - DELETE /v1/apps/:owner/:filename/parties/:name         remove one (app:manage)
+ *   - POST   /v1/apps/:owner/:filename/parties/:name/stop    stop one: its sign-in is refused (app:manage)
+ *   - POST   /v1/apps/:owner/:filename/parties/:name/resume  let a stopped one in again (app:manage)
  *   - GET|PUT|DELETE /v1/apps/:owner/:filename/party-data/:key   the party's own collection (party token)
  *   - PUT    /v1/apps/:owner/:filename/party-data-shared/:key    the app's shared collection (app:write)
  *   - GET    /v1/admin/app-party-registrations               the apps that asked (operator)
  *   - POST   /v1/admin/app-party-registrations/:owner/:filename   approve or refuse (operator)
  * @usage router.use(appPartiesRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-11-01 — POST .../parties/{name}/stop and /resume (WP9d).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4.1 to D4.3).
  */
 import { Router, type Request, type Response } from 'express';
@@ -35,7 +38,7 @@ import {
     AppPartyDecisionSchema, EmptyBodySchema,
 } from '../models/app-party-schemas.js';
 import { signUp, signIn, verifyLink, partyMe, signOut, appPartyFromRequest, type AppPartyAnswer } from '../services/app-parties/service.js';
-import { getRegistration, setRegistration, listAppParties, removeAppParty, listRegistrationRequests, decideRegistration } from '../services/app-parties/owner.js';
+import { getRegistration, setRegistration, listAppParties, removeAppParty, setAppPartyStatus, listRegistrationRequests, decideRegistration } from '../services/app-parties/owner.js';
 import { getPartyData, putPartyData, deletePartyData, putSharedData } from '../services/app-parties/data.js';
 import { sendAppOp } from './app-op-answer.js';
 
@@ -80,6 +83,10 @@ export function appPartiesRouter(config: AimeatConfig, storage: Storage): Router
         sendAppOp(res, config.nodeId, await listAppParties(deps, req.auth!, refOf(req))));
     router.delete('/v1/apps/:owner/:filename/parties/:name', requireAuth(), requireScopeOrOwnApp('app:manage'), async (req, res) =>
         sendAppOp(res, config.nodeId, await removeAppParty(deps, req.auth!, refOf(req), String(req.params.name ?? ''))));
+    router.post('/v1/apps/:owner/:filename/parties/:name/stop', requireAuth(), requireScopeOrOwnApp('app:manage'), validateBody(EmptyBodySchema, config.nodeId), async (req, res) =>
+        sendAppOp(res, config.nodeId, await setAppPartyStatus(deps, req.auth!, refOf(req), String(req.params.name ?? ''), 'stopped')));
+    router.post('/v1/apps/:owner/:filename/parties/:name/resume', requireAuth(), requireScopeOrOwnApp('app:manage'), validateBody(EmptyBodySchema, config.nodeId), async (req, res) =>
+        sendAppOp(res, config.nodeId, await setAppPartyStatus(deps, req.auth!, refOf(req), String(req.params.name ?? ''), 'active')));
 
     router.get('/v1/apps/:owner/:filename/party-data/:key', async (req, res) => {
         const ctx = await partyOf(req, res);

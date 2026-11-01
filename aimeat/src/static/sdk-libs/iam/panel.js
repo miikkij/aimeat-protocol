@@ -25,6 +25,9 @@
  * @structure mountMemberAdmin(iam, target, opts) · mountJoinPanel(iam, target, opts)
  * @usage AIMEAT.iam.MemberAdmin({ target: '#members', appId: 'me/app.html', sections: [...] })
  * @version-history
+ *   v1.2.0 — 2026-11-01 — On the node roster, the people registered to the app without an account
+ *     have their own section (panel-parties.js): the signup setting, each person's role, stop, resume
+ *     and remove. They are no longer counted among the approved account holders (WP9d).
  *   v1.1.1 — 2026-10-11 — Morsels carried for a member read as pacing ("pacing 5 morsels"), never as
  *     a price (decision-morseli-on-tahdistus-ei-hinta-tarjouksen-kaksi-arvoa).
  *   v1.1.0 — 2026-10-01 — One click on Approve grants the role with the least power (or the panel's
@@ -37,6 +40,7 @@
  */
 import { el, injectPanelStyle, fmtDate } from './dom.js';
 import { t, pickLang } from './i18n.js';
+import { partiesSection, isAppPartyRow } from './panel-parties.js';
 
 const MODES = ['open', 'members-only', 'invite-only'];
 
@@ -283,9 +287,12 @@ export function mountMemberAdmin(iam, opts) {
     wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, gBody));
 
     // ── the roster ──
-    const mBody = [el('h3', { cls: cls('aim-iam-h'), text: S('membersTitle') + ': ' + roster.members.length })];
-    if (!roster.members.length) mBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('membersNone') }));
-    for (const m of roster.members) {
+    // The people registered to the app without an account have their own section below, with the
+    // actions that fit them (stop, remove with their data), so they are not listed twice.
+    const accounts = roster.members.filter((m) => !isAppPartyRow(m.id));
+    const mBody = [el('h3', { cls: cls('aim-iam-h'), text: S('membersTitle') + ': ' + accounts.length })];
+    if (!accounts.length) mBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('membersNone') }));
+    for (const m of accounts) {
       const sel = roles.length ? el('select', { attrs: { 'aria-label': S('colRole') } },
         roles.map((r) => el('option', { text: r, attrs: Object.assign({ value: r }, r === m.role ? { selected: 'selected' } : {}) }))) : null;
       if (sel) sel.addEventListener('change', () => act(() => iam.admin('assign',
@@ -304,6 +311,12 @@ export function mountMemberAdmin(iam, opts) {
       ]));
     }
     wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, mBody));
+
+    // ── the people registered without an account (aimeat-parties), on the node roster ──
+    if (nodeRoster) {
+      const people = await partiesSection(iam, { S, cls, act, roles });
+      if (people) wrap.appendChild(people);
+    }
 
     // ── the app's own settings, in the panel owners already open ──
     if (opts.sections && opts.sections.length) {

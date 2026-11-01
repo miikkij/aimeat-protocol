@@ -16,6 +16,7 @@
  * @structure appManageMemberAction(storage, config, caller, action, args) → ToolAnswer | null
  * @usage const out = await appManageMemberAction(storage, config, caller, action, args); if (out) return out;
  * @version-history
+ *   v1.5.0 — 2026-11-01 — party_stop and party_resume call setAppPartyStatus (WP9d).
  *   v1.4.0 — 2026-11-01 — member_set passes `party`; parties, party_remove and party_registration_set call
  *     services/app-parties/owner.ts (plan doc-mvwxcas3dom3, D4.1 to D4.3).
  *   v1.3.0 — 2026-10-30 — structure_set passes `proposals` on.
@@ -38,7 +39,7 @@ import { readScopeAllowanceFor, removeScopeAllowanceFor } from '../services/app-
 import { readStructureFor, writePlanFor, listPlansFor } from '../services/app-structure.js';
 import { archiveAuditFor, readAuditKeep, setAuditKeep } from '../services/app-audit-keep.js';
 import { opAnswer, type ToolAnswer } from './app-manage-answers.js';
-import { listAppParties, removeAppParty, setRegistration } from '../services/app-parties/owner.js';
+import { listAppParties, removeAppParty, setAppPartyStatus, setRegistration } from '../services/app-parties/owner.js';
 
 type Args = Record<string, unknown>;
 
@@ -77,6 +78,10 @@ export async function appManageMemberAction(
       return opAnswer(await listAppParties({ storage, config }, caller, ownRef));
     case 'party_remove':
       return opAnswer(await removeAppParty({ storage, config }, caller, ownRef, String(args.party_name ?? '')));
+    case 'party_stop':
+      return opAnswer(await setAppPartyStatus({ storage, config }, caller, ownRef, String(args.party_name ?? ''), 'stopped'));
+    case 'party_resume':
+      return opAnswer(await setAppPartyStatus({ storage, config }, caller, ownRef, String(args.party_name ?? ''), 'active'));
     case 'party_registration_set':
       return opAnswer(await setRegistration({ storage, config }, caller, ownRef, pick(args, ['open', 'role'])));
     case 'member_remove':

@@ -39720,6 +39720,46 @@ paths:
       responses:
         '200': { description: '`{ removed: true, name, uid, data_deleted }`' }
         '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/parties/{name}/stop:
+    post:
+      operationId: appPartyStop
+      summary: Stop one registered person
+      description: The app's owner (app:manage, or the app's own token). Every request with the person's sign-in answers 403 PARTY_STOPPED from now on and no new sign-in link is mailed; the roster row and the person's data stay, so resume puts them back. MCP aimeat_app_manage action party_stop.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200': { description: '`{ name, uid, status: "stopped" }`' }
+        '403': { description: 'FORBIDDEN (not the owner) or SCOPE_DENIED' }
+        '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/parties/{name}/resume:
+    post:
+      operationId: appPartyResume
+      summary: Let a stopped registered person in again
+      description: The app's owner (app:manage, or the app's own token). The person signs in again with the role and the data they had. A person who never opened the mailed link stays `pending`. MCP aimeat_app_manage action party_resume.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200': { description: '`{ name, uid, status: "active" | "pending" }`' }
+        '403': { description: 'FORBIDDEN (not the owner) or SCOPE_DENIED' }
+        '404': { description: No such registered person }
   /v1/apps/{owner}/{filename}/party-data/{key}:
     get:
       operationId: appPartyDataGet
@@ -40121,9 +40161,17 @@ paths:
         `requested` is the caller's own ask, `{ at, state, note, retryAt? }`, with state `pending`
         or `declined`; `retryAt` is when a declined person may ask again, present only while they
         must wait. Answers 404 when the app does not exist, and then records no visit.
+
+        A person registered to the app without an account calls it with the app party token
+        (`aimeat-iam.js` does when `aimeat-parties.js` holds a sign-in) and gets the same shape for
+        itself: `kind: 'party'`, `identity` (`party:<owner>/ap-…@<node>`), `member` (its roster row),
+        `role`, `displayName`, `party` (its own view), and `isOwner` and `canManage` false. The token
+        is checked as on `parties/me`: another app's token 401, an ended sign-in 401, a stopped person
+        403 PARTY_STOPPED, an Origin that is neither the app's nor the node's 403 ORIGIN_MISMATCH.
       tags: [Apps]
       security:
         - BearerAuth: []
+        - PartyTokenAuth: []
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
@@ -54181,9 +54229,21 @@ paths:
         (`alice%2Fweather`), is the exact address. A bare name is the bare record when there is one,
         else the signed-in caller's own `<caller>/<name>`, else the one account that holds that name
         under its own account; two such accounts answer 409 AMBIGUOUS_NAME, naming both.
+
+        A person registered to an app without an account (the app party token from
+        `/v1/apps/{owner}/{filename}/parties/verify`) calls here the IAM extension of THAT app: the
+        extension whose `config.app` names the app the token was made for. Any other extension, and
+        one that does not exist, answers 403 PARTY_NOT_FOR_EXTENSION; a priced action 403
+        PARTY_CANNOT_PAY; a token of another kind 401 INVALID_PARTY_CREDENTIAL; an ended sign-in 401,
+        a stopped person 403 PARTY_STOPPED. The run sees `ctx.caller.gaii` and `ctx.caller.owner` as
+        the person's identity `party:<owner>/ap-…@<node>`, `ctx.caller.party` with its name and app,
+        and `ctx.caller.member` as its row on the app's roster; it is never the app's owner. The
+        capabilities that act for an account are absent. The instance form of this path refuses the
+        token (401).
       tags: [Extensions]
       security:
         - BearerAuth: []
+        - PartyTokenAuth: []
         - {}
       parameters:
         - name: extName

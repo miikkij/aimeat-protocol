@@ -13,6 +13,8 @@
  * @structure nodeMe · nodeState · nodeAssign · nodeRevoke · nodeRequest
  * @usage AIMEAT.iam.init({ app: 'alice/app.html' })
  * @version-history
+ *   v1.3.0 — 2026-11-01 — nodeMe carries `kind` and `identity`: a person registered to the app answers
+ *     kind 'party' (WP9d).
  *   v1.2.3 — 2026-10-02 — nodeRequest's refusal carries the node's `code` and `details`, so a block
  *     can say REASK_TOO_SOON in the page's language with the date from details.retryAt.
  *   v1.2.2 — 2026-10-01 — A visitor row keeps the display name and the address the roster answers.
@@ -59,6 +61,9 @@ export async function nodeMe(call, appId) {
     // A member whose role the plan lists in manageRoles manages members too (not the plan).
     canManage: !!(d && (d.isOwner || d.canManage)),
     displayName: d && d.displayName ? d.displayName : null,
+    // A person registered to the app without an account (the node answers kind 'party' and the identity).
+    kind: d && d.kind === 'party' ? 'party' : 'account',
+    identity: d && d.identity ? d.identity : null,
   };
 }
 
