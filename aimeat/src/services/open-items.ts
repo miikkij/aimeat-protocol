@@ -37,6 +37,7 @@
  *   const open = await listItems(storage, config, ownerGhii, owner);
  *   const shown = await showItems(storage, config, readerFor({ storage, config }, req.auth), owner);
  * @version-history
+ *   v1.2.2 — 2026-11-01 — The hello_mcp check leaves out a proof key the node's own chat or basic agents wrote.
  *   v1.2.1 — 2026-10-18 — The portfolio keys come from services/portfolio-config.ts, not from the route.
  *   v1.2.0 — 2026-09-29 — TARGET-082 V4: showItems, the list as a caller may see it: the record passes
  *     the caller's ContentReader (presentMemory) and a list the reader may not see reads as empty.
@@ -51,9 +52,8 @@
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { getOwnerScopeMemory } from './owner-memory.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY } from './portfolio-config.js';
-import { HELLO_MCP_KEY } from './hello-mcp.js';
+import { hasHelloMcpProof } from './node-resident-agent.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { BASIC_AGENTS } from '../data/basic-agents.js';
 import { localAccountName } from '../utils/gaii.js';
@@ -280,8 +280,9 @@ export async function evaluateCloses(
 ): Promise<boolean> {
     switch (check) {
         case 'hello_mcp':
-            // Written by the AGENT under its own GAII, so this must read owner-scope.
-            return !!(await getOwnerScopeMemory(storage, config.nodeId, owner, HELLO_MCP_KEY));
+            // Written by the AGENT under its own GAII, so this must read owner-scope; a node-resident
+            // agent's copy does not count.
+            return hasHelloMcpProof(storage, config.nodeId, owner);
         case 'welcome_mat': {
             // The FILE, not the marker: a deleted portfolio must un-satisfy this.
             for (const gaii of await portfolioReadGaiis(storage, owner, config.nodeId)) {
