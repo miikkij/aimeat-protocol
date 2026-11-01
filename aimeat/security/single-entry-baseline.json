@@ -127,10 +127,6 @@
         "count": 2,
         "why": "UNREVIEWED"
       },
-      "src/services/federation-book.ts": {
-        "count": 2,
-        "why": "UNREVIEWED"
-      },
       "src/services/finance/finvoice-operator.ts": {
         "count": 2,
         "why": "UNREVIEWED"
