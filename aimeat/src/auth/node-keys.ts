@@ -14,6 +14,8 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.6.0 — 2026-11-01 — The node keys sign the outside party's access token too
+ *     (services/parties/token.ts; plan doc-mvwxcas3dom3, D2.1).
  *   v1.5.1 — 2026-10-31 — Every read of a key file goes through readKeyFileText, which retries the
  *     codes Windows gives an open during another process's rename over the file (EPERM, EBUSY,
  *     EACCES, ENOENT) for about 250 ms. A node that read the file in that instant refused to start
@@ -75,6 +77,7 @@ import { initUploadTokenKeys } from '../services/upload-token.js';
 import { initConfirmTokenKeys } from '../services/operator-confirm.js';
 import { initDownloadTokenKeys } from '../services/download-token.js';
 import { initShareTokenKeys } from '../services/share-token.js';
+import { initPartyTokenKeys } from '../services/parties/token.js';
 import { initPageFrameTokenKeys } from '../services/page-frame-token.js';
 import { initDesignBookPreviewTokenKeys } from '../services/design-book/preview-token.js';
 import { initDraftTokenKeys } from '../services/draft-token.js';
@@ -522,6 +525,7 @@ export async function initializeNode(config: AimeatConfig, storage: Storage): Pr
     initDownloadTokenKeys(privateKey, publicKey);
     initConfirmTokenKeys(privateKey, publicKey);
     initShareTokenKeys(privateKey, publicKey);
+    initPartyTokenKeys(privateKey, publicKey);
     initPageFrameTokenKeys(privateKey, publicKey);
     initDesignBookPreviewTokenKeys(privateKey, publicKey);
     initDraftTokenKeys(privateKey, publicKey);

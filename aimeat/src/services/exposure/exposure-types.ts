@@ -29,6 +29,8 @@
  *   const ctx = createExposureContext(storage, config);
  *   const items = await source.list(ctx, 'alice', 'alice@node');
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The level `named` and the kinds `named_share` and `outside_party`: what the
+ *     person shares with outside parties (./sources-parties.ts; plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -38,10 +40,14 @@ import type { ContentLabelTarget } from '../../storage/types/content-labels.js';
 import { parseAudience } from '../audience.js';
 
 /** Who can read a thing, from the widest to the narrowest. */
-export type ExposureLevel = 'public' | 'link' | 'signed-in' | 'organism';
+export type ExposureLevel = 'public' | 'link' | 'signed-in' | 'organism' | 'named';
 
-/** Every level, in the order the report counts them. */
-export const LEVELS: readonly ExposureLevel[] = ['public', 'link', 'signed-in', 'organism'];
+/**
+ * Every level, in the order the report counts them. `named` (2026-11-01, plan doc-mvwxcas3dom3 D3) is
+ * one outside party the owner chose by name: a person or a program with no account here, reading from
+ * outside the node with a key (services/parties/).
+ */
+export const LEVELS: readonly ExposureLevel[] = ['public', 'link', 'signed-in', 'organism', 'named'];
 
 /**
  * Every kind of content the report looks at. A fixed list: test/unit/exposure-sources.test.ts holds
@@ -49,7 +55,7 @@ export const LEVELS: readonly ExposureLevel[] = ['public', 'link', 'signed-in', 
  */
 export const KINDS = [
   'memory', 'file', 'app', 'workspace_share', 'organism', 'board', 'knowledge', 'package',
-  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent',
+  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent', 'named_share', 'outside_party',
 ] as const;
 
 export type ExposureKind = typeof KINDS[number];
@@ -120,7 +126,7 @@ export function createExposureContext(storage: Storage, config: AimeatConfig, no
  * kind stores (services/audience.ts parseAudience): 'public', 'members', 'organism:<id>'; 'private',
  * 'owner', 'group', 'workspace' and anything unknown are not exposure.
  */
-export function levelOfVisibility(visibility: unknown): { level: ExposureLevel; organism_id?: string } | null {
+export function levelOfVisibility(visibility: unknown): { level: Exclude<ExposureLevel, 'named'>; organism_id?: string } | null {
   const a = parseAudience(visibility);
   if (!a) return null;
   if (a.level === 'public') return { level: 'public' };

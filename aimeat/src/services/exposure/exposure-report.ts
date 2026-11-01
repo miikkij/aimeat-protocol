@@ -39,6 +39,7 @@
  * @usage
  *   const report = await buildExposureReport(createExposureContext(storage, config), 'alice', reader);
  * @version-history
+ *   v1.6.0 — 2026-11-01 — The counts carry the level `named` (outside parties, plan doc-mvwxcas3dom3, D3).
  *   v1.5.0 — 2026-10-25 — On a closed node an app opened to the internet stays public in the report,
  *     with how to close its opening (services/internet-opening/); the node note names the exception.
  *   v1.4.0 — 2026-10-18 — Each item's effective classification and audience cap, the conflicts listed
@@ -139,7 +140,7 @@ export const EXPOSURE_NOTES: readonly string[] = [
 ];
 
 function emptyLevels(): Record<ExposureLevel, number> {
-  return { public: 0, link: 0, 'signed-in': 0, organism: 0 };
+  return { public: 0, link: 0, 'signed-in': 0, organism: 0, named: 0 };
 }
 
 /**

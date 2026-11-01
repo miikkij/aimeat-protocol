@@ -8,6 +8,7 @@
  *   stood, so what matches first is unchanged.
  * @structure mountDataRouters(app, config, storage)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — partiesRouter: outside parties and named shares (plan doc-mvwxcas3dom3, D2, D3).
  *   v1.0.0 — 2026-11-01 — The data package and OData mounts moved from routes-loader.ts with their
  *     comments; dataProductsRouter mounted beside them (plan doc-mvwxcas3dom3, D9).
  */
@@ -17,6 +18,7 @@ import type { Storage } from '../storage/interface.js';
 import { dataPackagesRouter } from '../routes/datapackages.js';
 import { dataProductsRouter } from '../routes/dataproducts.js';
 import { odataRouter } from '../routes/odata.js';
+import { partiesRouter } from '../routes/parties.js';
 
 export function mountDataRouters(app: express.Express, config: AimeatConfig, storage: Storage): void {
   // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
@@ -30,4 +32,7 @@ export function mountDataRouters(app: express.Express, config: AimeatConfig, sto
   // extension surface is POST-only behind auth, the sandbox never sees the query string, and the
   // answer is envelope-wrapped — OData needs GET, query options, XML metadata and a bare body.
   app.use(odataRouter(config, storage));
+  // Outside parties and named shares: the owner's management, the party's own endpoints and token,
+  // and the operator's stop (services/parties/).
+  app.use(partiesRouter(config, storage));
 }

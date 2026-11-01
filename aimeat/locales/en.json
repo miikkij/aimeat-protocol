@@ -5885,7 +5885,8 @@
       "secrets": "the keys you keep here",
       "ext": "the extensions installed on your account",
       "mcp": "the MCP servers you have attached",
-      "publish": "making things public"
+      "publish": "making things public",
+      "party": "people and programs outside this server you share data with"
     },
     "scopeText": {
       "push": {
@@ -13886,6 +13887,8 @@
     "cfg_email_smtp_pass_configured": "SMTP Password Configured",
     "cfg_consent_enabled": "Consent Enabled",
     "cfg_consent_audit_retention_days": "Audit Retention (days)",
+    "cfg_consent_share_max_days": "Longest share to an outside party (days)",
+    "cfg_consent_party_reads_per_minute": "Reads an outside party may make a minute",
     "cfg_totp_enabled": "TOTP Enabled",
     "cfg_totp_period": "Code Period (seconds)",
     "cfg_totp_window": "Validation Window",
@@ -19871,6 +19874,9 @@
           "publish": {
             "public": "Make a record, a file, an app or a page public to anyone, without asking you first. Without this, the agent asks you, and you approve or decline. Not part of full access."
           },
+          "party": {
+            "manage": "Give a person or a program that has no account here a key, and share one of your data packages with it until a date. You see each one and can end it at any time. Not part of full access."
+          },
           "operator": {
             "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names.",
             "admin": "Administer this installation through this agent. It can, for example, close accounts, remove someone's two-step sign-in, and change organisation sign-in, the allowed origins, the hooks and the MCP servers every account is offered. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it."
@@ -19920,7 +19926,8 @@
         "domainSignals": "Reach",
         "domainSite": "The pages people arrive on",
         "domainMcp": "MCP servers you have attached",
-        "domainPublish": "Publishing to everyone"
+        "domainPublish": "Publishing to everyone",
+        "domainParty": "Sharing with people and programs outside this server"
       },
       "deviceAuth": {
         "title": "Device Authorization",
