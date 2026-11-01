@@ -101,6 +101,7 @@ One row per key family or record type, never one per key: `news.<date>.*`, not 3
 | `agent` | no | The local name of one of the owner's agents whose work this row reads. It ties the app to that agent on both pages; it grants nothing. |
 | `madeFor` | no | With `agent`: true when the app was built for that agent's work. |
 | `domains` | no, but asked for every row with personal data | The regulated data domains the family's personal data falls in, by id: `health`, `special-category`, `biometric-genetic`, `children`, `criminal`, `employment`, `payment-financial`, `public-authority`, `defence-classified`, `export-controlled`, `privileged-trade-secret`. `[]` is a considered "none of these"; leaving the field out is silence. `GET /v1/compliance/catalog` lists them with the laws each one brings. |
+| `publishable` | no | `true` when the family may be published as a data package: a data product reads it as material (an `app` source of `/v1/dataproducts`). Absent or `false` is not offered. A statement, not a permission: the product decides who reads the package, and a row that also marks its data personal keeps every column out of a public package until the owner confirms. |
 
 **Why the domain is on the row.** The domain decides what follows the data: the lowest
 classification its container may carry, whether an impact assessment is owed, whether an outside
@@ -135,7 +136,7 @@ belong in the row store.
 The node never invents a map; it reads the stated one, folds it into one line for a list, and names
 what is missing. The findings, worst first: `DATAMAP_MISSING`, `DATAMAP_NO_PURPOSE`,
 `DATAMAP_NO_ARRANGEMENT`, `DATAMAP_FORM_UNSTATED`, `DATAMAP_FORM_CONTRADICTED`,
-`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`,
+`DATAMAP_ROW_NO_WHY`, `DATAMAP_NO_ROWS`, `DATAMAP_INVITES_UNSTATED`, `DATAMAP_ROW_BAD_AGENT`, `DATAMAP_ROW_BAD_PUBLISHABLE`,
 `DATAMAP_ROW_BAD_CLASSIFICATION`, `DATAMAP_ROW_BAD_DOMAIN`, `DATAMAP_PERSONAL_NO_DOMAIN`. The node reads the app's declared scopes for the invites finding,
 and an app with no map that asks for `organism:invite` has it beside `DATAMAP_MISSING`.
 A finding never refuses a map. The owner sees it; everyone else reads the map without it.

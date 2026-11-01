@@ -17,6 +17,8 @@
  *   OwnAimeatBlock · TrustBlock · StepsBlock
  * @usage Reached through views/surface/block-map.js, never imported directly by a view.
  * @version-history
+ *   2026-11-01: The credit plate says no message count, only "Tekoälysaldoa jäljellä X €" (Jouni, 1.11
+ *     04.00: no promises about what the credit lasts).
  *   2026-11-01: The credit plate reads "Tekoälysaldoa jäljellä X € – saat vielä noin N viestiä" in the
  *     page's own type (N by the store's price of a message, js/ai-credit.js messagesFor), and "Osta
  *     lisää tekoälyä" is a small button (Jouni's review of v34, A3).
@@ -82,7 +84,7 @@ import { McpQuickConnect } from '/components/McpInstall.js';
 import { listApps } from '/js/services/apps.js';
 import { swallowed } from '/js/swallowed.js';
 import { storeHref, storeOpensSoon, storeSoonCode, customerNode } from '/js/site.js';
-import { aiCredit, messagesFor, topupHref } from '/js/ai-credit.js';
+import { aiCredit, topupHref } from '/js/ai-credit.js';
 import { Actions, Loud } from '/components/Action.js';
 import { money } from '/js/format.js';
 import { LinkLine } from '/components/LinkLine.js';
@@ -116,12 +118,9 @@ function CreditPlate() {
     off: tr('home.credit.off', 'the AI is switched off on this site'),
   }[credit.state];
   const topup = topupHref(getLocale());
-  // The credit in the page's own type, with how many messages it still buys when the store set the
-  // price of one; the state only when it is not the ordinary "ready" (Jouni's review of v34, A3).
-  const n = messagesFor(credit.eur);
-  const left = n
-    ? tr('home.credit.leftN', 'AI credit left {amount} – about {n} more messages').replace('{amount}', amount).replace('{n}', String(n))
-    : tr('home.credit.left', 'AI credit left {amount}').replace('{amount}', amount);
+  // The credit in euros in the page's own type, never as a count of messages (Jouni, 1.11 04.00); the
+  // state only when it is not the ordinary "ready" (Jouni's review of v34).
+  const left = tr('home.credit.left', 'AI credit left {amount}').replace('{amount}', amount);
   return html`
     <${Note} kind="lead">${credit.state === 'ready' ? left : `${left} · ${stateText}`}<//>
     ${topup && html`<${Actions}>

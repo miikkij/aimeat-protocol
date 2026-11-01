@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.15.0 — 2026-11-01 — ScheduledJobRecord and ExecutionLogEntry take the type 'dataproduct': one data
+ *     product build per fire, input { name } (services/dataproduct/; plan doc-mvwxcas3dom3, D9.5).
  *   v1.14.1 — 2026-10-23 — PeeringRequestRecord.status takes `revoked` (services/peer-origin.ts
  *     revokePeerApprovals; secaudit2026oct22).
  *   v1.14.0 — 2026-10-20 — The Knowledge System types move to types/knowledge.ts (pure extraction at
@@ -528,10 +530,12 @@ export interface ScheduledJobRecord {
    * A one-shot ("post this on Tuesday at 09:00") is this kind plus a
    * max_runs:1 constraint, which the scheduler already auto-disables after the
    * fire; there is deliberately no second queue table beside this one.
+   * 'dataproduct' builds one data product — its `input` is `{ name }`, the definition being the
+   * owner's memory record `dataproducts.<name>`.
    * 'refinery' runs one batch of a mail refinery definition — its `input` is `{ prefix }`, the
    * definition being the owner's memory record `<prefix>.config`.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery' | 'dataproduct';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -578,7 +582,7 @@ export interface ExecutionLogEntry {
   jobId: string;
   jobName: string;
   /** Mirrors ScheduledJobRecord['type'] — a run log that cannot name a kind cannot explain it. */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish' | 'refinery' | 'dataproduct';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';

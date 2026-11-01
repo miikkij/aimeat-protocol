@@ -31,6 +31,8 @@
  * @usage
  *   import { RECURRING_WORK_SKILL_ENTRIES } from './builtin-skills.recurring-work.js';
  * @version-history
+ *   2026-11-01 — Sections 4 and 5: `kind: "dataproduct"`, one data product build each fire, made with the
+ *     definition's own schedule (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-27 — Section 5: a sibling's new instruction to an ai schedule that reads more than the
  *     sibling may waits for the owner and answers approval_request (secaudit2026oct26).
  *   2026-10-25 — Section 5: aimeat_schedule_list lists the agents' schedules and those that target
@@ -164,6 +166,11 @@ Then offer what the node itself can do, cheapest first:
 - **\`kind: "refinery"\`** — one batch of a mail refinery (\`input: { prefix }\`) each fire: the
   mailbox read, sorted and filed as workspace rows. Right when the recurring work is "go through my
   mail". It runs as you, so its mailbox must be one you connected. Skill: aimeat-refinery.
+- **\`kind: "dataproduct"\`** — one build of a data product (\`input: { name }\`) each fire: a data
+  package version built from the person's records, files, extension actions or other packages.
+  Right when the recurring work is "keep this table up to date". Make it with the definition's own
+  \`schedule\` (\`aimeat_dataproduct\` action \`define\`), which also removes it when the product goes;
+  it runs as you and reads each source as you. Skill: aimeat-data-ownership, section 1.
 
 Prefer the extension whenever the work does not need reasoning. A model called on a clock to do
 something a script could do is a bill that arrives every week for no reason.
@@ -227,6 +234,7 @@ sees every schedule and can pause or delete any of them.
 | \`agent_task\` | \`target_agent\` (an agent of the same owner; yourself when left out), \`task_title\`, \`task_description\` | \`task:write\` |
 | \`extension\` | \`extension_name\`, \`action_id\`, \`input\` (the action's parameters on every fire), \`instance_id\` | \`ext:invoke\` |
 | \`refinery\` | \`input: { prefix }\` | \`connections:read-through\`, \`ai:use\`, \`organism:rows\`, \`memory:write\` |
+| \`dataproduct\` | \`input: { name }\` (a data product you defined; better made with the definition's \`schedule\`) | \`storage:write\`, \`memory:write\` |
 
 It answers \`schedule_id\`. \`aimeat_schedule_list\` lists the schedules you and your owner's other
 agents made and the ones that target you (\`detail: true\` adds each one's prompt); with

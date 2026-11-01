@@ -28,6 +28,9 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — publishPackage takes `{ dryRun: true }`: every check runs and the version is built,
+ *     nothing is stored and no provenance record is made; a data product preview reads it (plan
+ *     doc-mvwxcas3dom3, D9.4). ProducedBy.kind may be 'dataproduct'.
  *   2026-11-01 — A publish to public whose producer's data map marks its data personal is refused with
  *     PERSONAL_DATA_PUBLIC before any write, unless the input confirms (confirmPersonalPublic); the
  *     confirmation is recorded on the pointer (./personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
@@ -142,7 +145,9 @@ export type PublishResult =
         /** Versions the owner's retention policy removed on this publish. Empty when no policy is
          *  set, which is the default: keep everything. Returned so the answer can SAY what was
          *  deleted — a deletion nobody can see is how a history disappears unnoticed. */
-        pruned: string[] }
+        pruned: string[];
+        /** True for a dry run: nothing was stored. */
+        dryRun?: boolean }
     | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE' | 'NOT_ORGANISM_MEMBER' | typeof PERSONAL_DATA_PUBLIC; message: string; issues: ValidationIssue[] };
 
 /**
@@ -155,6 +160,8 @@ export type PublishResult =
  */
 export async function publishPackage(
     deps: StoreDeps, ownerGhii: string, input: PublishInput, producedBy: ProducedBy,
+    /** dryRun: check and build the version, store nothing (services/dataproduct preview). */
+    opts: { dryRun?: boolean } = {},
 ): Promise<PublishResult> {
     const { storage, config } = deps;
     const ownerName = localAccountName(ownerGhii);
@@ -276,6 +283,7 @@ export async function publishPackage(
         resources,
         ...(input.title ? { title: input.title } : {}),
         ...(input.description ? { description: input.description } : {}),
+        ...(input.keywords?.length ? { keywords: input.keywords } : {}),
         ...(input.provenance?.license ? { licenses: [{ name: input.provenance.license }] } : {}),
         created: now,
         aimeat: {
@@ -296,6 +304,18 @@ export async function publishPackage(
     };
     const contentHash = contentHashOf(withoutHash);
     const descriptor: Descriptor = { ...withoutHash, aimeat: { ...withoutHash.aimeat, contentHash } };
+
+    // A dry run (a data product preview) stops here: every refusal above was asked, nothing is stored,
+    // no provenance record is made, and the answer says whether these bytes are already published.
+    if (opts.dryRun) {
+        const dryKey = descriptorKey(input.name, contentHash);
+        return {
+            ok: true, dryRun: true, descriptor, contentHash, pruned: [],
+            descriptorUrl: publicUrl(config.baseUrl, ownerGhii, dryKey),
+            unchanged: !!(await storage.getStorageFileMeta(ownerGhii, dryKey)),
+            resources: bodies.map(b => ({ name: b.name, url: publicUrl(config.baseUrl, ownerGhii, resourceKey(input.name, contentHash, b.name)), rowCount: b.rows.length, bytes: b.data.length })),
+        };
+    }
 
     // TARGET-058: an agent publishing a package is model-touched output, and that gets DECLARED
     // rather than inferred from the shape of the caller. `provenanceForWrite` decides from the

@@ -16,6 +16,8 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.5.0 — 2026-11-01 — The catalogue manifest's tags carry the descriptor's keywords, so DCAT lists
+ *     them as dcat:keyword (a data product's keywords; plan doc-mvwxcas3dom3, D9).
  *   v1.4.0 — 2026-11-01 — The catalogue manifest's x_aimeat_datapackage carries the name, title,
  *     description, licence, producer schedule and kind, and each resource's byte size, so the DCAT
  *     feed, discovery and the sitemap list packages without a file read (./catalogue-facts.ts); a
@@ -129,7 +131,8 @@ export async function upsertCatalogueEntry(
         created: (existing?.value as { created?: string } | undefined)?.created ?? now,
         updated: now,
         content_type: 'dataset',
-        tags: ['data-package', 'frictionless', descriptor.name],
+        // The descriptor's keywords are the catalogue's tags, which DCAT reads as dcat:keyword.
+        tags: [...new Set(['data-package', 'frictionless', descriptor.name, ...(descriptor.keywords ?? [])])],
         language: 'en',
         maturity: 'stable',
         synthesis: { level: 'original', description: descriptor.aimeat.changes },

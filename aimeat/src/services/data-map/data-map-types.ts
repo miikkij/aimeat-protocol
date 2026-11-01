@@ -24,6 +24,8 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.7.0 — 2026-11-01 — A `held` row may carry `publishable`: the family may be read into a data
+ *     package by a data product (plan doc-mvwxcas3dom3, D9.1). Additive, so the spec stays /2.
  *   v2.6.0 — 2026-10-28 — The optional app-level `aiAct`: the maker's answers to the EU AI Act
  *     questions, with a reason each, which the register draft takes as the maker's for the
  *     administrator to approve (wish: the maker answers for their own app).
@@ -220,6 +222,15 @@ export interface DataMapRow {
    * classification floor and the AI Act register read: written here once, it reaches all three.
    */
   domains?: string[];
+  /**
+   * True when the app's builder says this family may be published as a data package: a data product
+   * may read it as material (services/dataproduct/, an `app` source). Absent or false: not offered.
+   *
+   * OPTIONAL, AND A STATEMENT RATHER THAN A PERMISSION. It says which of the app's data is meant to go
+   * out; who may read the package is still the product's audience, and a row that also marks its data
+   * personal keeps every column out of a public package until the owner confirms.
+   */
+  publishable?: boolean;
 }
 
 /** The second table: what is unresolved, or is not ours. */
