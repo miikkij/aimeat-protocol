@@ -19,6 +19,8 @@
  * @structure trailRecorder()
  * @usage app.use(optionalAuth()); app.use(trailRecorder(config, () => storage));   // server.ts
  * @version-history
+ *   v1.1.0 — 2026-11-02 — A request with no path target takes a string `key` from its body as the target
+ *     (POST /v1/memory), so the home's trail can file its own bookkeeping keys as routine (aimeat-protocol-bb).
  *   v1.0.0 — 2026-11-01 — Initial ("Rakennamme kanssasi", part C; Jouni, 1.11 16.22).
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -46,7 +48,11 @@ function targetOf(req: Request): string {
   const parts = Object.entries(params)
     .filter(([name]) => !SECRET_PARAM.test(name))
     .map(([, v]) => (Array.isArray(v) ? v.join('/') : String(v)));
-  return parts.join('/').slice(0, MAX_TARGET);
+  if (parts.length) return parts.join('/').slice(0, MAX_TARGET);
+  // A write that names its record in the body (POST /v1/memory { key }): the key is the target, so a
+  // reader of the trail can tell a page's own bookkeeping (home.visits) from what the person saved.
+  const key = (req.body as { key?: unknown } | undefined)?.key;
+  return typeof key === 'string' ? key.slice(0, MAX_TARGET) : '';
 }
 
 export function trailRecorder(config: AimeatConfig, storage: () => Storage | null) {
