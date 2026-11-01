@@ -20,6 +20,7 @@
  * @structure PartyReadTarget · PartyReadVerdict · partyReadVerdict
  * @usage const v = await partyReadVerdict(deps, ctx, { name, version, what: 'rows' }); if (!v.ok) refuse(v);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A served read names its version in the read log when it is known (plan D6.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.5, D2.9, D3.2, D3.5, D3.7).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
@@ -57,7 +58,7 @@ export async function partyReadVerdict(
 ): Promise<PartyReadVerdict> {
     const { storage, config } = deps;
     const what = `${target.name}/${target.what}`;
-    const log = (verdict: 'served' | 'refused', share: string | null, extra: { rows?: number; code?: string } = {}) =>
+    const log = (verdict: 'served' | 'refused', share: string | null, extra: { rows?: number; code?: string; version?: string } = {}) =>
         logPartyRead(storage, ctx.ownerGhii, { at: new Date().toISOString(), share, party: ctx.party.name, uid: ctx.party.uid, what, verdict, ...extra });
     const refuse = (status: 403 | 429, code: string, message: string, share: string | null, details?: Record<string, unknown>): PartyReadVerdict => {
         log('refused', share, { code });
@@ -104,5 +105,7 @@ export async function partyReadVerdict(
         party: { ownerGhii: ctx.ownerGhii, packageName: target.name, shareId: share.id, ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}) },
     };
     const shareId = share.id;
-    return { ok: true, reader, share, ...(version ? { version } : {}), served: (rows?: number) => log('served', shareId, rows === undefined ? {} : { rows }) };
+    const readVersion = version;
+    // The served entry names the version when the request or the share named one (D6.4).
+    return { ok: true, reader, share, ...(version ? { version } : {}), served: (rows?: number) => log('served', shareId, { ...(rows === undefined ? {} : { rows }), ...(readVersion ? { version: readVersion } : {}) }) };
 }

@@ -18,6 +18,8 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   2026-11-01 — listAllEntitlements is exported: the data intermediation findings count the contracts
+ *     with outside buyers (services/data-intermediation/findings.ts; plan doc-mvwxcas3dom3, D7.3).
  *   2026-10-27 — The lists read only the service's own namespaces (serviceRows): NS for contracts,
  *     NS_GRANT for grants, NS_HISTORY for past contracts. An entitlement., entgrant. or me-hist. record
  *     any account wrote into its own memory was listed beside the real ones, so a provider's bulk
@@ -322,7 +324,7 @@ export async function readEntitlementForCall(
  * of: what does this app cost me, who is using my capability, what am I carrying. A list that quietly
  * skipped grants would show a provider a customer roster with their guests missing from it.
  */
-async function listAllEntitlements(storage: Storage): Promise<MeteredEntitlement[]> {
+export async function listAllEntitlements(storage: Storage): Promise<MeteredEntitlement[]> {
   const [bought, granted] = await Promise.all([
     serviceRows(storage, NS, 'entitlement.'),
     serviceRows(storage, NS_GRANT, 'entgrant.'),

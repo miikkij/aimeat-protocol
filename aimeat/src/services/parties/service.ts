@@ -19,6 +19,7 @@
  *   stopParty · resumeParty · deleteParty · createKey · deleteKey · readsOfParty · shareWithParty
  * @usage const out = await createParty({ deps, caller }, body); if (!out.ok) render(out);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Each share in a party's view carries `package_freshness` (plan D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
@@ -35,7 +36,8 @@ import {
 import { newPartyKey, newPartyKeyId, newPartyUid } from './keys.js';
 import { readParties, findParty, insertParty, changeParty, removeParty } from './store.js';
 import { flushOwner } from './activity.js';
-import { connectionFileOf, descriptorFor, endShares, partySharesOf, shareMetaOf, shareView, sharePatternOf } from './shares.js';
+import { connectionFileOf, descriptorFor, endShares, packageOfPattern, partySharesOf, shareMetaOf, shareView, sharePatternOf } from './shares.js';
+import { packageFreshness } from '../datapackage/freshness-read.js';
 import { partyReads, shareReadStats } from './read-stats.js';
 
 export type PartyAnswer<T> =
@@ -73,9 +75,18 @@ async function partyWithShares(ctx: PartyServiceCtx, p: PartyRecord): Promise<Re
     const ownerGhii = ctx.caller.ownerGhii;
     const shares = await partySharesOf(storage, ownerGhii, p, config.nodeId);
     const stats = await shareReadStats(storage, ownerGhii);
+    // The freshness of each shared package, once per package (services/datapackage/freshness.ts, D6.1).
+    const fresh = new Map<string, string>();
+    for (const pkg of new Set(shares.map(c => packageOfPattern(c.dataPattern)).filter((x): x is string => !!x))) {
+        const f = await packageFreshness(ctx.deps, ownerGhii, pkg);
+        if (f) fresh.set(pkg, f.state);
+    }
     return {
         ...partyView(p, partyRefOf(ctx.caller.owner, p.name, config.nodeId)),
-        shares: shares.map(c => shareView(c, stats.get(c.id) ?? { last_read_at: null, reads_7d: 0 })),
+        shares: shares.map(c => {
+            const pkg = packageOfPattern(c.dataPattern);
+            return shareView(c, { ...(stats.get(c.id) ?? { last_read_at: null, reads_7d: 0 }), ...(pkg && fresh.get(pkg) ? { package_freshness: fresh.get(pkg) } : {}) });
+        }),
     };
 }
 

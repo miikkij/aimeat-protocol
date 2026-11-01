@@ -13,6 +13,9 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.8.0 — 2026-11-01 — POST /v1/exchange/offerings of an ext-action (which delivers data) answers 403
+ *     DATA_INTERMEDIATION_NOT_OFFERED before any write when AIMEAT_DATA_INTERMEDIATION is none, or owners
+ *     and the provider declared no notification (services/data-intermediation/gate.ts; plan D7.1).
  *   v1.7.2 — 2026-10-25 — An ext-action offering and a bid name the provider's own extension through
  *     services/component-address.ts (own first) and keep its stored name (owner namespaces wish,
  *     secaudit2026oct22). The call recipe encodes that name as one path segment and names the
@@ -68,6 +71,7 @@ import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-too
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
 import { logger } from '../utils/logger.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
+import { dataListingRefusal } from '../services/data-intermediation/gate.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -341,6 +345,10 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const dupExt = await refuseDuplicate(`ext:${ext}:${action}`, 'ext-action');
     if (dupExt) return dupExt;
+    // An extension action delivers data, and a listing reaches everyone: on a node that runs no data
+    // intermediation service it is refused before anything is written (plan D7.1).
+    const notIntermediated = await dataListingRefusal({ storage, config }, { providerOwner: owner, kind: 'ext-action' });
+    if (notIntermediated) return res.status(notIntermediated.status).json(error(config.nodeId, notIntermediated.code, notIntermediated.message, undefined, { setting: 'AIMEAT_DATA_INTERMEDIATION' }));
     const now = new Date().toISOString();
     const offering: Offering = {
       offeringId: newOfferingId(),

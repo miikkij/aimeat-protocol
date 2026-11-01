@@ -26,6 +26,9 @@
  * @usage
  *   const out = await withdrawPackage({ storage, config }, callerOf(req, nodeId, storage), owner, name, { purge });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The party of each share a withdrawal ends is mailed when it has an address
+ *     (./share-notices.ts), and the withdrawal emits the `datapackages` change to the owner's streams
+ *     (plan doc-mvwxcas3dom3, D6.2).
  *   v1.1.0 — 2026-11-01 — A withdrawal ends the package's named shares (status revoked, endedReason
  *     package-withdrawn) and answers how many (`sharesEnded`); the withdrawal a reader learns of names
  *     the package to datapackageReadable (plan doc-mvwxcas3dom3, D3).
@@ -43,7 +46,9 @@ import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import { invalidateDatasetFacts } from './catalogue-facts.js';
-import { endShares, packageOfPattern } from '../parties/shares.js';
+import { endSharesListed, packageOfPattern } from '../parties/shares.js';
+import { noticeWithdrawn } from './share-notices.js';
+import { DATAPACKAGES_DOMAIN } from './contract.js';
 
 /** The caller facts a withdrawal is decided on (services/caller-context.ts CallerContext). */
 export interface WithdrawCaller {
@@ -146,9 +151,16 @@ export async function withdrawPackage(
     }
     // Its named shares end with it (plan D0.3, D3): status revoked with endedReason package-withdrawn, so
     // the party reads SHARE_ENDED and a version published again later is not shared again by itself.
-    const sharesEnded = await endShares(storage, ownerGhii, c => packageOfPattern(c.dataPattern) === name, 'package-withdrawn');
+    const ended = await endSharesListed(storage, ownerGhii, c => packageOfPattern(c.dataPattern) === name, 'package-withdrawn');
+    const sharesEnded = ended.length;
     if (sharesEnded) emitChange('consent');
+    // Each party whose share ended is told by mail when it has an address and the node sends mail (D6.2).
+    if (sharesEnded) {
+        void noticeWithdrawn(deps, ownerGhii, name, ended)
+            .catch(err => logger.warn('datapackage: the withdrawal notices failed', { package: packageId, error: String(err) }));
+    }
     emitChange('files');
+    emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
     if (catalogueRemoved) emitChange('memory');
     return { ok: true, packageId, name, withdrawnAt, purged: opts.purge, alreadyWithdrawn: !!earlier && !opts.purge, filesDeleted, catalogueRemoved, sharesEnded };
 }

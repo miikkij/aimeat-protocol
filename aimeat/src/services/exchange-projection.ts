@@ -39,6 +39,7 @@
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  *   res.json({ ..., exchange: exchangeOutcome(await reconcileAfterSourceWrite(storage, gaii, key), ask) });
  * @version-history
+ *   v1.8.0 — 2026-11-01 — A new listing that delivers data is skipped with DATA_INTERMEDIATION_NOT_OFFERED under the node's data intermediation setting; an existing one is updated as before (plan D7.1).
  *   v1.7.2 — 2026-10-25 — A tool bound to the owner's own namespaced extension by its short name counts
  *     as selling that action (ownBindingExt; owner namespaces wish, secaudit2026oct22).
  *   v1.7.1 — 2026-10-19 — migrateLegacyOfferings sets the exchange flag on the source record's version
@@ -83,6 +84,7 @@ import type { ReconcileChange, ReconcileReport, DesiredListing } from './exchang
 import { logger } from '../utils/logger.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
 import { findExtension } from './component-address.js';
+import { dataListingRefusal } from './data-intermediation/gate.js';
 
 /** A tool binding's extension as stored: an owner's bare name for their own namespaced extension is that one. */
 async function ownBindingExt(storage: Storage, name: string, ownerName: string): Promise<string> {
@@ -383,6 +385,10 @@ export async function reconcileOwnerOfferings(
     wanted.add(d.key);
     const existing = byKey.get(d.key);
     if (!existing) {
+      // A NEW listing that delivers data waits for the node's data intermediation setting (plan D7.1);
+      // a listing that exists is updated below as before and reported by the compliance page instead.
+      const refused = await dataListingRefusal({ storage }, { providerOwner: ownerName, kind: d.kind });
+      if (refused) { skipped(changes, d, `${refused.code} ${refused.message}`); continue; }
       const offering: Offering = {
         offeringId: newOfferingId(), providerGhii: ownerGhii, providerOwner: ownerName,
         kind: d.kind, ext: d.ext, action: d.action, surface: d.surface,

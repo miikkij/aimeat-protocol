@@ -27,6 +27,11 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window, or ?format=csv the whole resource
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.9.0 -- 2026-11-01 -- The descriptor read answers `freshness` (services/datapackage/freshness.ts:
+ *     fresh, late, stale or unscheduled against the producer's promise). The versions list tells the
+ *     owner, per version, `in_use` (the live named shares that pin it, the outside parties' reads of the
+ *     last 30 days) and whether the retention policy removes it next, with `retention_policy`
+ *     (services/datapackage/versions-in-use.ts; plan doc-mvwxcas3dom3, D6.1, D6.4).
  *   v1.8.0 -- 2026-11-01 -- The four reads take an outside party (routes/party-read.ts): HTTP Basic or a
  *     party token, admitted by its named share to this package only, a pinned version served when the
  *     request names none; GET .../rows/:resource?format=csv answers the whole resource as CSV and is the
@@ -92,6 +97,8 @@ import { schemaOrgDataset } from '../services/datapackage/schema-org.js';
 import { readPointer, catalogueKeyRoot } from '../services/datapackage/version-audience.js';
 import { datasetLandingUrl } from '../services/datapackage/catalogue-facts.js';
 import { ODPS_VERSION } from '../services/exchange-odps.js';
+import { packageFreshness } from '../services/datapackage/freshness-read.js';
+import { versionsInUse } from '../services/datapackage/versions-in-use.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
  *  OPTIONAL on the wire — an app that hands over rows and nothing else is asking for a proposal — so
@@ -317,8 +324,12 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
         const schemaOrgUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/datapackages/${encodeURIComponent(req.params.owner as string)}/${encodeURIComponent(req.params.name as string)}?format=schemaorg`;
+        // The package's freshness against its producer's promise (services/datapackage/freshness.ts, D6.1).
+        const ownerGhii = parseRef(ref, config.nodeId)?.ownerGhii;
+        const freshness = ownerGhii ? await packageFreshness(store, ownerGhii, req.params.name as string, opened.latest ? { pointer: opened.latest } : {}) : null;
         res.json(success(config.nodeId, {
             descriptor: opened.descriptor,
+            ...(freshness ? { freshness } : {}),
             descriptor_url: opened.descriptorUrl,
             // The ODPS product sheet of this version, projected from its audience when it is read.
             odps_url: odpsUrl,
@@ -411,7 +422,19 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         const ownerGhii = owner.includes('@') ? owner : `${owner}@${config.nodeId}`;
         // The caller's history: an earlier version it may not open is not listed (secaudit 2026-10 v42).
         const versions = await listVersions(store, ownerGhii, name, who.reader);
-        res.json(success(config.nodeId, { package_id: opened.descriptor.aimeat.packageId, versions, total: versions.length }, [
+        // The owner's view (D6.4): which versions a named share pins or an outside party read within 30
+        // days, and which the retention policy removes next. The shares and the read log are the owner's,
+        // so only the owner in person, or the owner's principal with storage:read, is told.
+        const caller = who.party || !req.auth || req.auth.anonymous ? null : callerOf(req, config.nodeId, storage);
+        const ownersView = !!caller && !caller.visitor && caller.ownerGhii === ownerGhii && caller.has('storage:read');
+        const use = ownersView ? await versionsInUse(store, ownerGhii, name, versions) : null;
+        const shown = use
+            ? versions.map(v => ({ ...v, in_use: use.byHash.get(v.contentHash.replace(/^sha256:/, '')) ?? null }))
+            : versions;
+        res.json(success(config.nodeId, {
+            package_id: opened.descriptor.aimeat.packageId, versions: shown, total: versions.length,
+            ...(use ? { retention_policy: use.retention, read_window_days: 30 } : {}),
+        }, [
             { description: 'The newest version', method: 'GET', url: `/v1/datapackages/${owner}/${name}` },
         ]));
     });

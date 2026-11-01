@@ -34,6 +34,8 @@
  * @usage
  *   import { buildDescriptor, contentHashOf, descriptorKey } from './contract.js';
  * @version-history
+ *   v1.5.0 -- 2026-11-01 -- DATAPACKAGES_DOMAIN, the live change a publish and a withdrawal emit to the
+ *     owner's streams (plan doc-mvwxcas3dom3, D6).
  *   v1.4.0 -- 2026-11-01 -- A producer of kind 'dataproduct'; a source names its kind, address and
  *     licence; AimeatBlock.sourcesFetchedAt (outside the content hash) says when each source of a data
  *     product build was read (plan doc-mvwxcas3dom3, D9).
@@ -194,6 +196,13 @@ export const resourceKey = (name: string, contentHash: string, resource: string)
 export const resourcePath = (resource: string): string => `data/${resource}.csv`;
 /** The MUTABLE pointer for a consumer following the newest version. */
 export const latestKey = (name: string): string => `${packageKeyRoot(name)}/latest.json`;
+
+/**
+ * The change domain a publish (a new version, or a run whose bytes were already there) and a
+ * withdrawal emit on the SSE stream, to the owner's streams only (services/event-bus.ts). A page that
+ * shows the owner's packages, their freshness or their versions re-reads on it instead of polling.
+ */
+export const DATAPACKAGES_DOMAIN = 'datapackages';
 
 /** `sha256:abc…` → `abc…`. Every key uses the bare digest; every field carries the prefix. */
 export function bare(hash: string): string {
