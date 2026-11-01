@@ -21,6 +21,8 @@
  *   const capped = await requestCapRefusal(ctx, ownerGhii, request, { principal: by, kind: 'human' });
  *   if (capped) → settle outdated, answer 409 LABEL_CAPS_AUDIENCE
  * @version-history
+ *   2026-11-01 — shareAfter merges the request's end dates, so the recheck sees a page whose passed end
+ *     the request removes or moves as opened (secaudit2026oct31w2 round 12, openTargets ended-until).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.3).
  */
 import type { AppRecord } from '../../storage/interface.js';
@@ -50,14 +52,22 @@ function appAfter(app: AppRecord, field: string): Parameters<typeof appAudienceO
   };
 }
 
-/** The share with a request's held-back body merged in, as setWorkspaceShareOp merges a body. */
+/**
+ * The share with a request's held-back body merged in, as setWorkspaceShareOp merges a body: its end
+ * dates too (a date sets the end, null removes it), so a page whose passed end the request removes is
+ * held to its label as opened.
+ */
 function shareAfter(prev: ResolvedShare, body: Record<string, unknown>): ResolvedShare {
+  const until: Record<string, string> = { ...prev.until };
+  const untilIn = body.until && typeof body.until === 'object' && !Array.isArray(body.until) ? body.until as Record<string, unknown> : {};
+  for (const [k, d] of Object.entries(untilIn)) { if (d === null) delete until[k]; else if (typeof d === 'string') until[k] = d; }
   return {
     ...prev,
     public: typeof body.public === 'boolean' ? body.public : prev.public,
     spaces: { ...prev.spaces, ...((body.spaces as Record<string, boolean> | undefined) ?? {}) },
     docs: { ...prev.docs, ...((body.docs as Record<string, boolean> | undefined) ?? {}) },
     access: (body.access as ResolvedShare['access'] | undefined) ?? prev.access,
+    until,
   };
 }
 
