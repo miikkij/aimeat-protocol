@@ -44,8 +44,10 @@ under `left_out`, because they follow the group's rules. The account export incl
 names them under `classified_organism_content` (ruled 2026-09-30), because a person's right to their
 own data is not the group's to withhold.
 
-**Limits today.** None of these has an MCP tool, so a person's AI over MCP sends the person to the
-Data Wallet or Memory page instead of exporting for them. File bytes are in the bundle, not in the
+**Limits today.** The account export, the memory export, the bundle, the apps backup and the agent
+export have no MCP tool, so a person's AI over MCP sends the person to the Data Wallet or Memory page
+for those. Organisms export and import over MCP (`aimeat_organism_export`, `aimeat_organism_import`),
+and a stored file downloads with `aimeat_storage_download`. File bytes are in the bundle, not in the
 account export. Moving to another node is export there and import here, by hand.
 
 ## 3. A delete can be taken back for a while

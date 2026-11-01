@@ -253,7 +253,7 @@
       "digest": "sha256:83e26e7b02b3f6154df97a19"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
