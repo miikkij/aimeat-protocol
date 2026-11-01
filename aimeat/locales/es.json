@@ -4135,6 +4135,10 @@
       "other": "Otra o desconocida"
     }
   },
+  "appBadge": {
+    "label": "Publica tu propia aplicación en {{site}}",
+    "free": "Publica tu propia aplicación gratis"
+  },
   "aiUseBadge": {
     "title": "Usa esta aplicación con tu IA",
     "counts": "Herramientas de la aplicación: {{tools}} · Habilidades: {{skills}}",
@@ -5189,7 +5193,7 @@
   "chat.capOwnPlaceSoon": "Tu propio lugar: abre pronto",
   "chat.welcomeTitle": "Una IA que trabaja con tus cosas aquí",
   "chat.welcomeTrust": "Todo lo que haces aquí queda en tu propia cuenta, y nada se hace público hasta que tú mismo lo publiques.",
-  "chat.welcomeAtelier": "El Atelier es el taller donde la IA te construye una aplicación: di lo que necesitas y recibes el enlace a la aplicación terminada.",
+  "chat.welcomeAtelier": "También puedes pedir una aplicación: recibes el enlace a la aplicación terminada.",
   "chat.buyerTitle": "Di lo que quieres: tu IA lo hace.",
   "chat.buyerBody": "Ves cada paso en la pantalla, y todo se queda en tu propia cuenta.",
   "chat.buyerApp": "Hazme una aplicación de lista de la compra",
@@ -6855,10 +6859,12 @@
   "aipage.simple.titleSub": "tu saldo de IA y su uso",
   "aipage.simple.desc": "El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. El saldo se gasta cuando la IA responde o hace un trabajo. Si quieres usar una cuenta de IA propia, abre Ajustes avanzados al final de la página.",
   "aipage.simple.lasts": "alcanza para unos {n} mensajes normales",
+  "aipage.simple.lastsLine": "Tu saldo alcanza todavía para unos {n} mensajes normales.",
   "aipage.simple.underCent": "menos de 1 céntimo",
   "aipage.simple.topupNote": "Pago único. Sin suscripción nueva.",
   "aipage.simple.connTitle": "Tu propia cuenta de IA (opcional)",
   "aipage.simple.noKey": "Sin una clave propia, tu IA usa tu saldo de IA. Es la forma habitual.",
+  "aipage.simple.creditChoice": "Saldo de IA (predeterminado, sin clave)",
   "aipage.simple.stripCredit": "saldo de IA restante",
   "aipage.simple.stripLimit": "límite diario {n}",
   "aipage.simple.todayTitle": "Uso de hoy",
@@ -7916,12 +7922,14 @@
   "profile.security.signInMoved": "Cómo inicias sesión (verificación en dos pasos, llaves de acceso, sesiones abiertas) está en la página Acceso, en el grupo Cuenta.",
   "accesspage.titleSub": "quién entra a tu cuenta y con qué llave",
   "accesspage.desc": "Cada llave se dice con palabras en esta página. Al final están las direcciones con las que tu IA y otros servidores AIMEAT te encuentran.",
-  "accesspage.titleSubPlace": "cómo entras y quién actúa en tu nombre",
+  "accesspage.titleSubPlace": "quién entra a tu cuenta y cómo",
   "accesspage.descPlace": "Esta página muestra cómo entras y qué apps y agentes actúan en tu nombre. Al final están las direcciones con las que tu IA encuentra tu AIMEAT.",
   "accesspage.loading": "Cargando…",
   "accesspage.loadFailed": "No se pudo leer la página. Inténtalo de nuevo en un momento.",
   "accesspage.working": "Un momento…",
   "accesspage.railTitle": "En esta página",
+  "accesspage.moreSubPlace": "los permisos de aplicaciones y agentes, los tokens y las direcciones para tu IA",
+  "accesspage.morePlace": "Más detalles",
   "accesspage.pages": "Páginas relacionadas",
   "accesspage.operatorOnly": "operador",
   "accesspage.rail.signIn": "Tú",
@@ -7985,8 +7993,11 @@
   "accesspage.row.twoStepOff": "desactivada · pediría un código de tu celular después de la contraseña, y una contraseña robada ya no bastaría",
   "accesspage.row.twoStepOffPlace": "desactivada · pediría un código de tu teléfono después del enlace de acceso",
   "accesspage.row.sessions": "Sesiones",
+  "accesspage.row.sessionsPlace": "Dispositivos",
   "accesspage.row.sessionsSub": "{mine} tuyas y {agents} de tus agentes · cada una abierta 30 días · este navegador es una de ellas",
+  "accesspage.row.sessionsSubPlace": "Has entrado en {devices} dispositivos",
   "accesspage.doorSignOutOthers": "Cerrar sesión en todo lo demás",
+  "accesspage.doorSignOutOthersPlace": "Cerrar sesión en los otros dispositivos",
   "accesspage.col.device": "Dispositivo",
   "accesspage.col.sessions": "Sesiones",
   "accesspage.col.lastUsed": "Último uso",
@@ -11358,6 +11369,7 @@
     "cfg_site_store_soon_code": "Código de descuento de apertura",
     "cfg_site_store_topup_url": "Página de la tienda para comprar más saldo de IA",
     "cfg_site_ai_credit_eur_per_usd": "Euros de saldo de IA por dólar de la clave de IA",
+    "cfg_site_ai_eur_per_message": "Precio de un mensaje normal en euros de saldo de IA",
     "cfg_site_default_locale": "Idioma propio del servidor",
     "cfg_site_store_orders_url": "Página de la tienda para los pedidos y facturas del propietario",
     "cfg_site_purchase_plan": "Lo que compró el propietario",
@@ -13694,6 +13706,7 @@
     "titleBuyer": "Pon tu AIMEAT detrás de su propio botón",
     "body": "Instalada, se abre en su propia ventana, muestra lo no leído en su ícono y recibe lo que compartes directo en tu chat.",
     "iosBody": "En iPhone y iPad: abre el menú de compartir y elige \"Agregar a inicio\".",
+    "bodyBuyer": "Tienes AIMEAT como un icono propio en tu teléfono o en tu escritorio.",
     "install": "Instalar",
     "notNow": "Ahora no"
   },
@@ -13722,7 +13735,8 @@
     "agentLine": "Un agente hace un trabajo acordado con un horario, también cuando no estás.",
     "app": "Haz tu primera aplicación",
     "appShort": "Haz una aplicación",
-    "appLine": "Pide una aplicación en el chat y recibes un enlace a la aplicación terminada."
+    "appLine": "Pide una aplicación en el chat y recibes un enlace a la aplicación terminada.",
+    "locked": "Se abre cuando el paso anterior está hecho."
   },
   "homeJourney": {
     "promptFold": "Avanzado: una instrucción lista para una IA que usas en otro sitio",
@@ -13829,7 +13843,7 @@
   },
   "siteStart": {
     "signInPill": "Entrar",
-    "title": "Este es tu propio AIMEAT, {host}",
+    "title": "Esto es {host}: tu propio AIMEAT",
     "intro": "AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.",
     "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",
     "next": "Cuando hayas entrado, llegas a tu Inicio. Allí escribes en una frase lo que quieres conseguir. AIMEAT crea con ella un agente, y ves el agente antes de que empiece.",
@@ -13846,6 +13860,8 @@
   "home": {
     "credit": {
       "line": "Saldo de IA {amount}",
+      "left": "Saldo de IA restante {amount}",
+      "leftN": "Saldo de IA restante {amount}: unos {n} mensajes más",
       "ready": "tu propia IA está en uso",
       "low": "queda poco",
       "empty": "se ha agotado",
@@ -14602,6 +14618,7 @@
         "h": "Cruces"
       },
       "allControls": "Toda la configuración y los controles",
+      "one": "Configuración",
       "allControlsHint": "Agentes, memoria, aplicaciones, acceso y facturación: todo lo que hay detrás del hogar."
     },
     "startPage": {
@@ -15933,6 +15950,8 @@
     "loginLinkSendFirst": "Enviar el enlace de acceso",
     "loginLinkNoteFirst": "Recibirás un enlace de acceso en tu correo. Ábrelo en este mismo dispositivo en 15 minutos. No necesitas contraseña.",
     "loginLinkPasswordWhy": "Si has creado una contraseña, puedes usarla.",
+    "loginLinkOtherWays": "Otras formas de entrar",
+    "emailPlaceholder": "tu@ejemplo.com",
     "loginLinkPlacesFirst":"La demo, la tienda y tu propio AIMEAT son tres cuentas distintas. Si pasa algo en una, no afecta a las demás.",
     "authErrorUsedLink": "Este enlace de acceso ya se usó o no es válido. Pide uno nuevo abajo o inicia sesión de otra forma.",
     "authErrorExpired": "Este enlace de acceso caducó. Pide uno nuevo abajo.",
@@ -20518,6 +20537,7 @@
       "test_no_testable": "No hay componentes registrados que se puedan probar (extensión, cortex o aplicación)",
       "openrouter": {
         "title": "IA",
+        "titlePlace": "Saldo de IA",
         "apiKey": "Clave de API",
         "apiKeyPlaceholder": "sk-or-v1-...",
         "apiKeySaved": "Clave de API guardada",
@@ -22723,6 +22743,7 @@
   "profile.offers.cover.askAgain": "Pedir de nuevo",
   "profile.offers.cover.sellDesc": "Cada oferta con su visibilidad, su precio en dinero y su ritmo. Cada vez que otra persona la usa, los morsels de ritmo salen de su saldo: una parte se quema, el operador recibe su porción y el resto te llega a ti. El precio en dinero se paga en la caja. Tu propio uso no consume nada.",
   "profile.scheduler.cover.desc": "Aquí ves cuándo trabajan tus agentes por ti, también cuando no estás. Cuando apruebas un agente, sus ejecuciones aparecen aquí. También puedes crear una programación tú mismo.",
+  "profile.scheduler.cover.descEmpty": "Cuando apruebas un agente, ves aquí cuándo trabaja la próxima vez, por ejemplo cada mañana a las 7.",
   "profile.scheduler.cover.emptyAll": "Aquí aparecen las ejecuciones de tus agentes. Cuando apruebas un agente, su ejecución (por ejemplo cada mañana a las 7) aparece aquí.",
   "profile.scheduler.cover.firstAgent": "Crea tu primer agente →",
   "profile.scheduler.cover.orSchedule": "o programa una tarea tú mismo",
@@ -23592,6 +23613,7 @@
     "structure.ai": "Tu IA",
     "structure.live.working": "{who} está trabajando en ello",
     "structure.live.idle": "Esta página se actualiza sola cuando el trabajo avanza.",
+    "structure.live.last": "Última nota",
     "structure.steps": "Pasos",
     "structure.stepsCount": "{fine} / {total} listos",
     "structure.state.fine": "Listo",

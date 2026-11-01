@@ -20,6 +20,8 @@
  *   - the ARD manifest (/.well-known/ard.json, /.well-known/ai-catalog.json) is routes/ard-manifest.ts, mounted here
  *
  * @version-history
+ *   v1.15.0 — 2026-11-01 — api-catalog links the DCAT data catalogue (/v1/catalogue/dcat) and anchors the
+ *     data package API (/v1/datapackages) and the OData feeds (/v1/odata) to it (plan doc-mvwxcas3dom3, D1.5).
  *   v1.14.0 — 2026-10-27 — The SEP-2127 Server Card at /v1/mcp/server-card (the location the SEP
  *     reserves) and at /.well-known/mcp/server-card.json, which served the extended card until now;
  *     /.well-known/mcp.json keeps the extended card unchanged.
@@ -284,7 +286,19 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
             // researcher or a buyer's compliance officer needs, and it must be findable without
             // reading HTML.
             { href: `${b}/v1/ai-transparency`, type: 'application/json' },
+            // The public data packages as a DCAT-AP 3.0 catalogue (routes/catalogue-dcat.ts).
+            { href: `${b}/v1/catalogue/dcat`, type: 'application/ld+json' },
           ],
+        },
+        {
+          // The data package API: the descriptor and row reads, and the OData v4 feed of each package.
+          anchor: `${b}/v1/datapackages`,
+          'service-desc': [{ href: `${b}/v1/spec`, type: 'application/yaml' }],
+          'service-meta': [{ href: `${b}/v1/catalogue/dcat`, type: 'application/ld+json' }],
+        },
+        {
+          anchor: `${b}/v1/odata`,
+          'service-meta': [{ href: `${b}/v1/catalogue/dcat`, type: 'application/ld+json' }],
         },
         {
           anchor: `${b}/v1/mcp`,

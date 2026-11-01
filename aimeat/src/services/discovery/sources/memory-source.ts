@@ -16,6 +16,9 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.11.0 — 2026-11-01 — A data package's catalogue manifest and resource entries are left to the
+ *     `datasets` source, which lists the package once as type `dataset`; they arrived here as two or
+ *     more `knowledge` records (plan doc-mvwxcas3dom3, D1.1).
  *   2026-10-31 — A flagged record leaves discovery on an actioned flag or on the auto-hide threshold
  *     (withoutFlagHiddenMemory), not on one unreviewed flag, and a dismissed flag stops counting; it
  *     read `maxFlags: 0` (secaudit2026oct31w2 round 10, W2-9).
@@ -87,8 +90,15 @@ const OWNED_BY_OTHER_SOURCE = ['template.catalog.', 'atelier.book.'];
  *  than one per manifest. A prefix cannot express this: `apps.` also covers the ui, legal and cost
  *  records, which have no other home and must keep surfacing here — so the key is tested with the
  *  shared grammar instead. */
-const isOwnedElsewhere = (key: string) =>
-  OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p)) || appIdFromToolsKey(key) !== null;
+const isOwnedElsewhere = (key: string, tags: readonly string[] = []) =>
+  OWNED_BY_OTHER_SOURCE.some(p => key.startsWith(p)) || appIdFromToolsKey(key) !== null || isDataPackageCatalogue(key, tags);
+
+/** A data package's catalogue manifest or one of its resource entries: the `datasets` source lists the
+ *  package once, as type `dataset`, with its addresses (sources/dataset-source.ts). */
+function isDataPackageCatalogue(key: string, tags: readonly string[]): boolean {
+  if (!key.startsWith('packages/')) return false;
+  return tags.includes('data-package') || (tags.includes('dataset') && tags.includes('knowledge-entry'));
+}
 
 /** The uniform internal row both paths (searchText / listing) produce before normalization. */
 interface MemHit {
@@ -356,7 +366,7 @@ export function createMemorySource(storage: Storage, config: AimeatConfig): Disc
       // stops counting (moderation-flags.ts withoutFlagHiddenMemory, W2-9). Every scope reads it.
       hits = await withoutFlagHiddenMemory({ storage, config }, hits);
 
-      let candidates = hits.filter(h => !isOwnedElsewhere(h.key) && !isCopyOrMeta(h.key));
+      let candidates = hits.filter(h => !isOwnedElsewhere(h.key, h.tags) && !isCopyOrMeta(h.key));
       // The owner's identity set holds more than this caller may read. The owner in person, an app
       // grant and an agent holding memory:read-as-owner see every record; any other same-owner
       // caller sees its own plus the owner-, members- and public-visibility ones

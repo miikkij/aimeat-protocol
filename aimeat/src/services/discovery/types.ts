@@ -15,6 +15,9 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.8.0 — 2026-11-01 — +'dataset' (a data package, plan doc-mvwxcas3dom3 D1.1) with the entry's
+ *     `dataset` block, DiscoveryContext.readerAuth for the package audience rule, and DISCOVERY_TYPES,
+ *     the one list routes/discover.ts and mcp/core.ts now read instead of their hand copies.
  *   v0.7.0 — 2026-10-20 — DiscoveryContext.organismCaller: the session asking, for the organism read
  *     rule on the own scope (organismReadableRecords). Without it the memory source keeps no organism
  *     record for anyone but the owner in person and an app grant (secaudit 2026-10, the v57 shape).
@@ -55,7 +58,30 @@ export type DiscoveryType =
   | 'template'
   | 'skill'
   | 'designbook'
+  | 'dataset'
   | 'memory';
+
+/** Every word of DiscoveryType: the REST type filter and the MCP tool read this one list. */
+export const DISCOVERY_TYPES: readonly DiscoveryType[] = [
+  'capability', 'workflow', 'knowledge', 'decision', 'research', 'material',
+  'company', 'offering', 'document', 'organism', 'app', 'tool', 'template', 'skill', 'designbook', 'dataset', 'memory',
+];
+
+/** What a `dataset` entry carries beside the common fields: enough to decide and to read it. */
+export interface DiscoveryDataset {
+  /** `pkg:{owner}/{name}`. */
+  packageId: string;
+  /** Who reads it: public, members, organism:<id> or private. */
+  audience: string;
+  /** Rows across every resource of the newest version. */
+  rowCount: number;
+  resources: Array<{ name: string; rowCount: number; fields: number }>;
+  /** When the newest version was published. */
+  lastPublishedAt: string;
+  /** The newest run that failed, when it did: the package stays on the version above. */
+  lastError?: { at: string; message: string };
+  links: { api: string; descriptor: string; odata: string; odps: string; schemaOrg: string; landing?: string };
+}
 
 /** Canonical visibility ladder; every domain's native enum collapses into this (design §5). */
 export type CanonicalVisibility = 'private' | 'owner' | 'shared' | 'unlisted' | 'public';
@@ -90,6 +116,8 @@ export interface DiscoveryEntry {
   /** Set when an entry was deduped from another representation (e.g. a company-listed offer that
    *  originates from a specific agent). Names the underlying producer. */
   provenance?: string;
+  /** Present on a `dataset` entry: the package's audience, size, freshness and addresses. */
+  dataset?: DiscoveryDataset;
 }
 
 /** Filters parsed from the query string; all optional. */
@@ -137,6 +165,9 @@ export interface DiscoveryContext {
   /** The session asking, as the organism read rule takes it (services/organism-namespace-access.ts):
    *  callerOf on REST, the session's caller() on MCP. The own scope asks it of every organism key. */
   organismCaller?: OrganismListCaller;
+  /** The caller as a data package reader (roles and scopes too): the dataset source asks the package
+   *  audience rule (services/datapackage/audience.ts) with it. Absent for an anonymous caller. */
+  readerAuth?: { sub: string; owner: string; roles: readonly string[]; scopes: readonly string[]; anonymous?: boolean; federated?: boolean };
   scope: 'own' | 'public' | 'shared';
   filters: DiscoveryFilters;
   nodeId: string;

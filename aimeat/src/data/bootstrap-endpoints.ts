@@ -14,6 +14,8 @@
  *   import { BOOTSTRAP_ENDPOINT_CATALOGUE } from '../data/bootstrap-endpoints.js';
  *   res.json(success(nodeId, { ...rest, ...BOOTSTRAP_ENDPOINT_CATALOGUE }));
  * @version-history
+ *   v1.3.0 — 2026-11-01 — knowledge_and_ai names the data packages, their OData feeds and the DCAT data
+ *     catalogue (plan doc-mvwxcas3dom3, D1.5).
  *   v1.2.0 — 2026-10-14 — connect_agent and connectivity_key are gone with their routes (feature-list
  *     audit row 202); device_authorize is how an agent joins.
  *   v1.1.0 — 2026-10-03 — help_prompt_person: /v1/help/prompt/person.
@@ -58,6 +60,9 @@ export const BOOTSTRAP_ENDPOINT_CATALOGUE = {
     description: 'AI-powered knowledge management, service definitions, prompts, and extensibility.',
     endpoints: {
       packages: { method: 'CRUD', url: '/v1/knowledge/*', description: 'Knowledge packages — import, clone, export, link dependencies, review', tier: 1 },
+      data_packages: { method: 'GET/POST/DELETE', url: '/v1/datapackages', description: 'Data packages: tables published as Frictionless Data Packages (CSV with a Table Schema). Read one with GET /v1/datapackages/{owner}/{name} (no auth for a public one), its rows with /rows/{resource}, its ODPS sheet with /odps, its schema.org description with ?format=schemaorg. Find them with GET /v1/discover?type=dataset.', tier: 0 },
+      data_odata: { method: 'GET', url: '/v1/odata', description: 'Every data package as an OData v4 service at /v1/odata/{owner}/{name}, for Excel, Power BI and other OData clients', tier: 0 },
+      data_catalogue: { method: 'GET', url: '/v1/catalogue/dcat', description: 'The public data packages as a DCAT-AP 3.0 catalogue for open-data harvesters: JSON-LD, or Turtle with ?format=ttl; paged with ?page and ?page_size', tier: 0 },
       cortex: { method: 'CRUD', url: '/v1/cortex', description: 'AI backbone extensions with schemas, prompts, ontologies, and actions', tier: 1 },
       csm: { method: 'CRUD', url: '/v1/csm', description: 'Community Service Manifests — define data shape and rules for services', tier: 1, templates: '/v1/csm/templates' },
       msm: { method: 'CRUD', url: '/v1/msm', description: 'Machine Service Manifests — AI-consumable API integration definitions', tier: 1, templates: '/v1/msm/templates' },

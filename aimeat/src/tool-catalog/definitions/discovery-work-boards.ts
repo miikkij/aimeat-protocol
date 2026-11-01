@@ -5,6 +5,7 @@
  * @description Catalogue/discovery, action execution, work inbox, wallet balance, storage, admin read, and notification-board tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-01 — aimeat_discover names the `dataset` type and what its entry carries (plan doc-mvwxcas3dom3, D1.1).
  *   2026-11-01 — aimeat_datapackage_withdraw: withdraw a data package, or with purge delete its files,
  *     as DELETE /v1/datapackages/{owner}/{name} does (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-31 — aimeat_storage_upload takes `direct`, an upload straight to the file store (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
@@ -109,7 +110,7 @@ export const discoveryWorkBoardsTools = [
     },
     {
         name: 'aimeat_discover',
-        description: 'Master directory — discover what exists across the WHOLE node from one place: capabilities, workflows, knowledge, decisions, research, produced material, companies + offerings, live documents, apps, and memory. Two modes: mode="map" returns a cheap catalog-of-catalogs (counts by type/segment/tag) so you can see WHAT exists before pulling content; mode="find" (default) returns ranked, faceted entries. Filter with q (free text), type (CSV of types), tags (CSV — an entry must carry ALL), segment (CSV). scope: "own" (your owner\'s reachable content, default), "public" (public content node-wide), "shared" (content in organisms you belong to that you are allowed to read; needs the organism:read permission, as aimeat_workspace_read does). Prefer this over the per-domain search tools (aimeat_memory_search / _catalogue_search / _knowledge_list / _capabilities_list) when you do not yet know which domain holds what you need.',
+        description: 'Master directory — discover what exists across the WHOLE node from one place: capabilities, workflows, knowledge, decisions, research, produced material, companies + offerings, live documents, apps, datasets, and memory. A `dataset` entry is a published data package (a table): its `dataset` block gives the audience, the row count, the resources, when it was last published (and the last failed run, if any) and the addresses to read it from: the Frictionless descriptor, the OData feed, the ODPS sheet, the schema.org description and, for a public one, its public page. Read the rows with aimeat_datapackage_export. Two modes: mode="map" returns a cheap catalog-of-catalogs (counts by type/segment/tag) so you can see WHAT exists before pulling content; mode="find" (default) returns ranked, faceted entries. Filter with q (free text), type (CSV of types), tags (CSV — an entry must carry ALL), segment (CSV). scope: "own" (your owner\'s reachable content, default), "public" (public content node-wide), "shared" (content in organisms you belong to that you are allowed to read; needs the organism:read permission, as aimeat_workspace_read does). Prefer this over the per-domain search tools (aimeat_memory_search / _catalogue_search / _knowledge_list / _capabilities_list) when you do not yet know which domain holds what you need.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Discover (Master Directory)', readOnlyHint: true, openWorldHint: true },
@@ -121,7 +122,7 @@ export const discoveryWorkBoardsTools = [
         input: {
             mode: { type: 'string', enum: ['map', 'find'], description: '"find" (default) returns entries; "map" returns only facet counts (cheap probe).' },
             q: { type: 'string', description: 'Free-text query. Omit to browse by filters only.' },
-            type: { type: 'string', description: 'CSV of types: capability, workflow, knowledge, decision, research, material, company, offering, document, organism, app, tool, template, skill, designbook, memory.' },
+            type: { type: 'string', description: 'CSV of types: capability, workflow, knowledge, decision, research, material, company, offering, document, organism, app, tool, template, skill, designbook, dataset, memory.' },
             tags: { type: 'string', description: 'CSV of tags; an entry must carry ALL of them.' },
             segment: { type: 'string', description: 'CSV of segments (coarse area within a type) to include.' },
             scope: { type: 'string', enum: ['own', 'public', 'shared'], description: 'own (default), public, or shared.' },

@@ -27,6 +27,11 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.7.0 -- 2026-11-01 -- GET /v1/datapackages/:owner/:name?format=schemaorg answers the schema.org
+ *     Dataset JSON-LD of the version (services/datapackage/schema-org.ts), and the descriptor read names
+ *     it as `schema_org_url` (plan doc-mvwxcas3dom3, D1.4). POST answers 409 PERSONAL_DATA_PUBLIC when an
+ *     app grant publishes to public from data its app's data map marks personal, unless the body says
+ *     `confirm_personal_public: true` (D1.7).
  *   v1.6.0 -- 2026-11-01 -- DELETE /v1/datapackages/:owner/:name withdraws a package (?purge=true deletes
  *     its files and pointer); the reads answer 410 GONE for a withdrawn package to a reader its audience
  *     admits (plan doc-mvwxcas3dom3, D0.3).
@@ -72,9 +77,12 @@ import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapack
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403, deny403 } from '../auth/deny.js';
-import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
+import { withdrawPackage, withdrawalOfRef, withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
-import { odpsSheetFor, odpsAddress } from '../services/datapackage/odps-read.js';
+import { odpsSheetFor, odpsAddress, versionAudienceOf } from '../services/datapackage/odps-read.js';
+import { schemaOrgDataset } from '../services/datapackage/schema-org.js';
+import { readPointer, catalogueKeyRoot } from '../services/datapackage/version-audience.js';
+import { datasetLandingUrl } from '../services/datapackage/catalogue-facts.js';
 import { ODPS_VERSION } from '../services/exchange-odps.js';
 
 /** The request body a publish takes, loosely typed here and checked by the service. `schema` is
@@ -109,6 +117,21 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         denyScope403(req, res, [DATAPACKAGE_READ_SCOPE],
             'Reading a private data package of your owner, or a private earlier version of one, needs the "storage:read" scope. Ask the owner to grant it.');
         return true;
+    };
+
+    /** The schema.org Dataset JSON-LD of an opened version: the public page address for a public package only. */
+    const schemaOrgOf = async (opened: NonNullable<Awaited<ReturnType<typeof openPackage>>>) => {
+        const d = opened.descriptor;
+        const owner = /^pkg:([^/]+)\//.exec(d.aimeat.packageId)?.[1] ?? '';
+        const ownerGhii = `${owner}@${config.nodeId}`;
+        const audience = await versionAudienceOf(store, ownerGhii, d.name, d.aimeat.contentHash, opened.latest ?? await readPointer(store, ownerGhii, d.name));
+        const catalogueId = catalogueKeyRoot(d.aimeat.packageId).slice('packages/'.length);
+        return schemaOrgDataset({
+            baseUrl: config.baseUrl, siteName: config.seoSiteName || `AIMEAT node ${config.nodeId}`, ownerName: owner,
+            descriptor: d, descriptorUrl: opened.descriptorUrl, audience,
+            ...(audience === 'public' ? { landingUrl: datasetLandingUrl(config.baseUrl, catalogueId) } : {}),
+            ...(opened.latest?.updatedAt ? { modified: opened.latest.updatedAt } : {}),
+        });
     };
 
     /**
@@ -164,6 +187,8 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             // Who reads it: public (default), members, organism:<id> or private. The service checks it
             // before any write (services/datapackage/audience.ts).
             ...(gate.visibility !== undefined ? { visibility: gate.visibility } : {}),
+            // The owner's confirmation of a public package from personal data (personal-guard.ts).
+            ...((req.body as { confirm_personal_public?: unknown })?.confirm_personal_public === true ? { confirmPersonalPublic: true } : {}),
             // TARGET-058: what the caller says about how this was made. provenanceForWrite decides
             // from the PRINCIPAL whether anything is minted, so an owner publishing by hand is not
             // stamped and an app or agent is.
@@ -178,12 +203,16 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             // producer block can be set by its own request describes nothing a reader can rely on.
             kind: req.auth!.roles.includes('agent') ? 'agent' : req.auth!.roles.includes('app') ? 'app' : 'manual',
             ...(typeof body.producer?.ref === 'string' ? { ref: body.producer.ref } : {}),
+            // The app a grant belongs to, from the token and never from the body: its data map says
+            // whether the data is personal (services/datapackage/personal-guard.ts).
+            ...(req.auth!.roles.includes('app') && req.auth!.app ? { app: req.auth!.app } : {}),
         });
 
         if (!out.ok) {
             // 422 for the quality gate: the request was well-formed and the DATA was refused, which
             // is a different thing from a malformed body and reads differently in a client.
-            const status = out.code === 'QUALITY_GATE' ? 422 : 400;
+            // 409 for public from personal data: the request is right and waits for the owner's word.
+            const status = out.code === 'QUALITY_GATE' ? 422 : out.code === 'PERSONAL_DATA_PUBLIC' ? 409 : 400;
             res.status(status).json(error(config.nodeId, out.code, out.message, undefined, { issues: out.issues }));
             return;
         }
@@ -257,11 +286,19 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
         const odpsUrl = odpsAddress(config.baseUrl, req.params.owner as string, req.params.name as string, opened.descriptor.aimeat.contentHash);
+        if (req.query.format === 'schemaorg') {
+            // The schema.org Dataset JSON-LD the public dataset page embeds (services/datapackage/schema-org.ts).
+            res.type('application/ld+json; charset=utf-8').send(JSON.stringify(await schemaOrgOf(opened), null, 2));
+            return;
+        }
+        const schemaOrgUrl = `${config.baseUrl.replace(/\/+$/, '')}/v1/datapackages/${encodeURIComponent(req.params.owner as string)}/${encodeURIComponent(req.params.name as string)}?format=schemaorg`;
         res.json(success(config.nodeId, {
             descriptor: opened.descriptor,
             descriptor_url: opened.descriptorUrl,
             // The ODPS product sheet of this version, projected from its audience when it is read.
             odps_url: odpsUrl,
+            // The schema.org Dataset JSON-LD of the newest version, for a page to embed.
+            schema_org_url: schemaOrgUrl,
             // Present only on an unpinned read, and it is where a consumer learns that the LATEST
             // attempt failed while the version they are reading is the last good one.
             ...(opened.latest ? { latest: opened.latest } : {}),
@@ -278,12 +315,15 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * before any write. The shared anonymous principal is refused with 401 as on the publish.
      */
     // requireScope answers a principal without storage:write before the service; the service asks the
-    // same word again for the MCP tool, which reaches it without this middleware.
-    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope(DATAPACKAGE_WITHDRAW_SCOPE), async (req, res) => {
+    // same word again for the MCP tool, which reaches it without this middleware. The word is a literal
+    // here (it equals DATAPACKAGE_WITHDRAW_SCOPE) because the REST scope scanner reads literals only.
+    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:write'), async (req, res) => {
         const purge = req.query.purge === 'true' || req.query.purge === '1';
         const out = await withdrawPackage(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string, { purge });
         if (!out.ok) {
-            if (out.code === 'SCOPE_DENIED') { denyScope403(req, res, [DATAPACKAGE_WITHDRAW_SCOPE], out.message); return; }
+            // requireScope above already refused a principal without storage:write, so this branch is the
+            // service's own answer for the MCP path and is not reached from this route in practice.
+            if (out.code === 'SCOPE_DENIED') { deny403(req, res, out.code, out.message); return; }
             if (out.code === 'FORBIDDEN') { deny403(req, res, out.code, out.message); return; }
             res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;

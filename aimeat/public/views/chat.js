@@ -16,6 +16,9 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-11-01: The empty chat says "Voit myös pyytää sovellusta: saat linkin valmiiseen sovellukseen."
+ *     without the name Atelier, and "Aloita keskustelu alusta" shows only once the conversation has
+ *     a message (Jouni's review of v33, K32).
  *   2026-10-31: withoutToolMarkers also removes a tool call written in the model's own syntax (v31 K36).
  *   2026-10-31: Jouni's review of v31 (K32), on a node the store sold: the empty chat says "Kerro, mitä
  *     haluat – tekoälysi tekee sen.", one line on seeing every step and owning it, the Atelier line,
@@ -654,7 +657,7 @@ export default function ChatView() {
                       the drawer on a phone, so the column keeps its height for the words. */''}
                 <${ConversationAbout} label=${tr('chat.thisConversation', 'This conversation')}
                     name=${thread ? threadTitle(thread) : tr('chat.title', 'Chat')}>
-                    <${StatusBar} status=${status} onReset=${thread ? resetSession : null} />
+                    <${StatusBar} status=${status} onReset=${thread && turns.length > 0 ? resetSession : null} />
                     <${ResetConfirm} />
                     ${turns.length > 0 && html`<${ConversationCopy}
                         text=${conversationAsText(thread ? threadTitle(thread) : '', turns)}

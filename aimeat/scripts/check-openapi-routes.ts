@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.7 — 2026-11-01 — GET /sitemap-datasets.xml is answered as a static document, like the portfolio sitemap.
  *   v1.0.6 — 2026-10-27 — POST /v1/a2a/directory is declared in routes/a2a.ts with router.use.
  *   v1.0.5 — 2026-10-16 — The page host's three routes answered: the page frame (a page), its slash redirect, the holder script.
  *   v1.0.4 — 2026-10-11 — GET /docs/specs/{} answered as a redirect to GET /v1/specs/{name}.
@@ -90,6 +91,7 @@ const NOT_API: Record<string, string> = {
     'GET /manifest.webmanifest': ASSET,
     'GET /robots.txt': ASSET,
     'GET /sitemap-portfolios.xml': ASSET,
+    'GET /sitemap-datasets.xml': ASSET,
     'GET /sw.js': ASSET,
     'GET /{}.txt': ASSET,
     'GET /v1/portal/cookie-consent.js': ASSET,

@@ -8,6 +8,7 @@
  *   so the catalog order is what it was.
  * @usage imported by ./organisms-workspaces-apps.ts
  * @version-history
+ *   2026-11-01 — aimeat_seo_announce says the whole-site notice carries the public data packages' pages (plan doc-mvwxcas3dom3, D1.4).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-19 — aimeat_app_draft_save and aimeat_app_draft_publish take `version`, the display version the
  *     draft publishes with (wish-the-app-draft-tools-can-set-the-display-version).
@@ -295,7 +296,7 @@ export const appPublishTools = [
     },
     {
         name: 'aimeat_seo_announce',
-        description: 'Tell the search engines about the whole site now, through IndexNow: the node\'s pages and, by default, every findable application, sent as one batch per host under that host\'s own key file. It reaches Bing (and through Bing, Copilot and ChatGPT search), Yandex, Naver, Seznam and Yep; Google does not take part, so the sitemap stays the way Google hears. It is a knock, not an order: each engine decides whether to come and what to keep, and a site never verified in Bing Webmaster Tools gets little of Bing\'s time, so read aimeat_seo_status first and get the verification done. With plan: true it lists what would be sent, host by host, and sends nothing. Refuses when no IndexNow key is configured or when the node turns search engines away. Operator-only.',
+        description: 'Tell the search engines about the whole site now, through IndexNow: the node\'s pages and, by default, every findable application and the public page of every public data package, sent as one batch per host under that host\'s own key file. It reaches Bing (and through Bing, Copilot and ChatGPT search), Yandex, Naver, Seznam and Yep; Google does not take part, so the sitemap stays the way Google hears. It is a knock, not an order: each engine decides whether to come and what to keep, and a site never verified in Bing Webmaster Tools gets little of Bing\'s time, so read aimeat_seo_status first and get the verification done. With plan: true it lists what would be sent, host by host, and sends nothing. Refuses when no IndexNow key is configured or when the node turns search engines away. Operator-only.',
         caller: 'agent',
         visibility: agentEverywhere,
         // Open world: it posts to api.indexnow.org. Idempotent: the same notice twice is the same notice.

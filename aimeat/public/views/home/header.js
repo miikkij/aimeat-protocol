@@ -18,6 +18,8 @@
  *   import { HomeHeader } from '/views/home/header.js';
  *   html`<${HomeHeader} name=${name} onOpenSettings=${() => setOpen(true)} />`
  * @version-history
+ *   2026-11-01: On a node the store sold, one "Asetukset" link instead of "Kaikki asetukset ja hallinta"
+ *     beside "Kodin asetukset" (Jouni's review of v34).
  *   2026-10-31: `plate` passes a line under the name to the masthead: the AI credit on a node the
  *     store sold (blocks-home.js NameplateBlock, Jouni v27 P6).
  *   2026-09-27: The door to settings and controls is the Action component, the same link (page
@@ -47,6 +49,7 @@ import { t } from '/js/i18n.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import { Masthead, MastheadButton, MastheadCog } from '/components/Masthead.js';
 import { Action } from '/components/Action.js';
+import { customerNode } from '/js/site.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -58,12 +61,16 @@ export function HomeHeader({ name, owner, identity, plate, onOpenSettings }) {
       ${/* The door to everything behind the home. The header carries the same link, but a person
             reading the nameplate is not reading the header, and the relationship (home in front,
             controls behind) has to be visible on the page itself. */''}
-      <${Action} href="/v1/profile">
-        ${tr('home.settings.allControls', 'All settings and controls')} →
-      <//>
-      <${MastheadButton} onClick=${onOpenSettings}>
-        ${MastheadCog}
-        <span>${tr('home.settings.open', 'Home settings')}</span>
-      <//>
+      ${customerNode()
+        // A buyer gets one way to the settings, not two that read alike (Jouni's review of v34).
+        ? html`<${Action} href="/v1/profile">${tr('home.settings.one', 'Settings')} →<//>`
+        : html`
+          <${Action} href="/v1/profile">
+            ${tr('home.settings.allControls', 'All settings and controls')} →
+          <//>
+          <${MastheadButton} onClick=${onOpenSettings}>
+            ${MastheadCog}
+            <span>${tr('home.settings.open', 'Home settings')}</span>
+          <//>`}
     <//>`;
 }

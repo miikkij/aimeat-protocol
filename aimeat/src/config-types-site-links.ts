@@ -9,6 +9,8 @@
  * @structure SiteContact · SiteLinksConfig
  * @usage import type { SiteLinksConfig, SiteContact } from './config-types-site-links.js';
  * @version-history
+ *   v1.7.0 — 2026-11-01 — aiEurPerMessage: euros of AI credit per ordinary message, set by the fleet
+ *     service, so the store and the place count messages the same way (Jouni's review A3).
  *   v1.6.0 — 2026-10-31 — aiCreditEurPerUsd: euros of AI credit per dollar of the node's key, set
  *     by the fleet service, so the pages show the credit in euros at the rate it was bought at.
  *   v1.5.0 — 2026-10-30 — devLinks: whether the footer shows the developer links (Jouni, 2026-10-30).
@@ -112,6 +114,13 @@ export interface SiteLinksConfig {
    * 2026-10-31 were made (Jouni's C, 2026-10-31: "Asiakkaan UI näyttää saldon euroina").
    */
   aiCreditEurPerUsd: string;
+  /**
+   * Euros of AI credit one ordinary message costs, written by the store's fleet service. The place
+   * says "about N messages left" as the credit divided by it, and the store says "10 € is about N
+   * messages" with the same number (Jouni's review A3). A decimal as text, or empty: the place then
+   * counts from its own history, and says nothing until it has one.
+   */
+  aiEurPerMessage: string;
   /** The owner's orders and invoices in the store, set by the fleet service. The node adds `lang`. Empty hides the link. */
   storeOrders: string;
   /**

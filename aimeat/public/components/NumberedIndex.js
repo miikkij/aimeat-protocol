@@ -14,6 +14,8 @@
  *     ${items.map((i) => html`<${IndexItem} on=${…} expanded=${…} onClick=${…}>…<//>`)}
  *   <//>`
  * @version-history
+ *   v1.4.0 — 2026-11-01 — IndexStep `locked`: a step that does not open yet, without the arrow (the
+ *     store-sold Home's steps 3 and 4, Jouni's review of v34).
  *   v1.3.0 — 2026-09-26 — IndexStep `endWord`: the word before the arrow given as words, drawn as the
  *     fold row's mono word at the right (the basic agents' "you have it"), so a page passes no class
  *     (additive, G1a).
@@ -84,11 +86,12 @@ export function IndexList({ steps = false, className = '', children }) {
 
 /**
  * One step of a list of steps: a numbered row that opens nothing.
- * @param {{ line?: any, end?: any, endWord?: any, children?: any }} props
+ * `locked`: a step that does not open yet, drawn without the arrow.
+ * @param {{ line?: any, end?: any, endWord?: any, locked?: boolean, children?: any }} props
  */
-export function IndexStep({ line, end, endWord, children }) {
+export function IndexStep({ line, end, endWord, locked = false, children }) {
   const last = end || (endWord ? html`<span class="og-fold-r">${endWord}</span>` : null);
-  return html`<li class="poster-index-item poster-index-item--step">${rowBody(children, line, last, true)}</li>`;
+  return html`<li class=${'poster-index-item poster-index-item--step' + (locked ? ' poster-index-item--locked' : '')}>${rowBody(children, line, last, true)}</li>`;
 }
 
 /**

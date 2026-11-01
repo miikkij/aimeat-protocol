@@ -15,12 +15,18 @@
  *   THE CANVAS IS THE SPEC: the design accepted on 2026-10-29 (claude.ai artifact "Sovelluksesi
  *   rakenne", board 2). The status comes from the node (services/app-structure.ts), which the AI reads
  *   through aimeat_app_manage too, so the page and the AI see one answer. The page re-reads on the
- *   `app-plans` and `apps` live events, never on a timer.
+ *   `app-plans` and `apps` live events, never on a timer. It is a route of its own, so it opens the
+ *   stream itself (relayLiveUpdates); nothing else on this route does.
  *
  *   Writes no class; the parts are components.
- * @structure AppStructure (default) · StepsSection · SidePanel
+ * @structure AppStructure (default) · StepsSection · SidePanel · LiveLine
  * @usage routed at /v1/appcat/structure by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The page opens the live stream (relayLiveUpdates). Until now it listened for
+ *     `aimeat-live-update` and nothing on the route dispatched it, so an open page kept the state it
+ *     loaded with: QUANTA showed 4/8 and "working" after it was published at 8/8 (Jouni, 2026-11-01).
+ *     The plan's `now` line reads as the AI working only while the build step is in progress; after
+ *     that it is the last note.
  *   v1.0.0 — 2026-10-29 — Initial (wish-sovelluksen-rakenne-ja-tila-sivu-luonnoksesta-asti-josta-voi).
  */
 import { h } from 'preact';
@@ -38,7 +44,9 @@ import { List, Row, Name, Cell, Doors } from '/components/List.js';
 import { Action, Loud } from '/components/Action.js';
 import { Choice } from '/components/Choice.js';
 import { Row as Line, Stack, Beside } from '/components/Layout.js';
-import { onAuthChange, hasSession, showLoginModal } from '/js/services/auth.js';
+import { onAuthChange, hasSession, getSession, showLoginModal } from '/js/services/auth.js';
+import { useSession } from '/js/use-session.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { onLocaleChange } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
 import { time } from '/js/format.js';
@@ -145,13 +153,18 @@ function SidePanel({ s, appRef: ref, navigate }) {
   <//>`;
 }
 
-/** What the AI is doing now, said live, or that the page keeps itself up to date. */
+/**
+ * What the AI is doing now, said live, or that the page keeps itself up to date. The plan keeps its
+ * `now` line after the work ends, so the line reads as work going on only while the build step is in
+ * progress; otherwise it is the AI's last note.
+ */
 function LiveLine({ s }) {
   const now = s.plan?.now;
+  const working = !!now && s.steps.some((step) => step.id === 'build' && step.state === 'progress');
   const who = now?.by && now.by.includes('#') ? now.by.slice(0, now.by.indexOf('#')) : x('structure.ai');
   return html`<${Box}>
     <${Line} wrap align="center">
-      ${now ? html`<${Mark} live>${x('structure.live.working', { who })}<//>
+      ${now ? html`${working ? html`<${Mark} live>${x('structure.live.working', { who })}<//>` : html`<${Mark}>${x('structure.live.last')}<//>`}
         <${Note} inline>${now.text}<//><${Mark} kind="time">${time(now.at, { hour: '2-digit', minute: '2-digit' })}<//>`
         : html`<${Note} inline>${x('structure.live.idle')}<//>`}
     <//>
@@ -163,6 +176,7 @@ export default function AppStructure({ navigate }) {
   const [state, setState] = useState({ loading: true, s: null, error: null });
   const [step, setStep] = useState(readStep());
   const [, setTick] = useState(0);
+  const session = useSession();
 
   // The app is read from the address each time, so a step change in place reads the right one.
   const load = useCallback(async () => {
@@ -178,6 +192,8 @@ export default function AppStructure({ navigate }) {
   }, []);
 
   useEffect(() => { load(); }, [load]);
+  // The stream that dispatches `aimeat-live-update`: this route opens it, as the home's routes do.
+  useEffect(() => (session ? relayLiveUpdates(() => getSession()?.jwt) : undefined), [session]);
   // The node says when the plan or the app changed; the page reads again then, and never on a timer.
   useEffect(() => {
     const onLive = (e) => { const d = e.detail?.domains; if (d && !d.has('app-plans') && !d.has('apps')) return; load(); };
