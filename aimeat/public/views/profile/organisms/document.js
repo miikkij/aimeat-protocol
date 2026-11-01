@@ -9,6 +9,9 @@
  * @structure loadToastUI (internal), DocumentView, DocumentEditor
  * @usage import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
  * @version-history
+ *   2026-10-31 — The editor sanitizes HTML with js/editor-html-sanitizer.js instead of the DOMPurify
+ *     2.3.3 bundled in Toast UI, so another member's raw HTML reaches the Markdown preview as plain
+ *     inert markup (secaudit2026oct31w2 round 10).
  *   v1.13.1 — 2026-10-27 — A file link opens through fetchStorageTabUrl, an inert blob, so another
  *     member's stored HTML opens as text, not as a page of the node's origin (secaudit2026oct26).
  *   v1.13.0 — 2026-10-18 — A picture's visibility tag is the AudienceBadge (Private / Public in words), still the button that switches it (plan doc-mvcn6c7e4e5q, V6.4).
@@ -60,6 +63,7 @@ import { t } from '/js/i18n.js';
 import { AudienceBadge } from '/components/AudienceBadge.js';
 import { Markdown } from '/components/Markdown.js';
 import { DocView, DocSplit } from '/components/DocView.js';
+import { sanitizeEditorHtml } from '/js/editor-html-sanitizer.js';
 import { Facts } from '/components/Facts.js';
 import { Tabs, TabPanel } from '/components/Tabs.js';
 import { Action, Loud, Icon } from '/components/Action.js';
@@ -275,6 +279,8 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
         previewStyle: 'tab',
         initialValue: initial,
         usageStatistics: false,
+        // The page may hold raw HTML another member wrote; the bundled sanitizer is DOMPurify 2.3.3.
+        customHTMLSanitizer: sanitizeEditorHtml,
         // Drop Toast UI's own image button — its file popup is unreliable; the "📷 Insert image"
         // button above is the image path (and paste/drag still work via the hook below).
         toolbarItems: [

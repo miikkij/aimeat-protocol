@@ -38,6 +38,10 @@
  *   6 own node id · 7 replicas
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-federation-peer-bounds
  * @version-history
+ *   2026-10-31 — C1-C4: a peer's settlement past the node's daily ceiling is refused (429), recorded on
+ *     the Security page and told to the operators; the operator gives a peer no limit or a ceiling of
+ *     its own through the settlement-ceiling door or the peer policy door (secaudit2026oct31w2 round 10,
+ *     W2-4).
  *   v1.4.0 — 2026-10-29 — S3, S4: copies of one settlement taken by two settlement routers over one
  *     database (two node processes) credit once, and a settlement for an unknown identity leaves no
  *     ledger row (secaudit2026oct26 round 8c, federation-01).
@@ -284,6 +288,84 @@ try {
         const before = await balance();
         const ok = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 5, tracking_code: tc }) });
         assert(ok.status === 200 && await balance() === before + 5, `the owner's settlement with that code: ${ok.status} ${JSON.stringify(ok.body)}`);
+    });
+
+    // ── 1b. The daily ceiling on what a peer's settlements add ──
+    // secaudit2026oct31w2 round 10 (W2-4, ruling 3): a peer's settlement adds morsels from nothing, and
+    // it had no bound. On the node's setting it fits in what is left of the node's daily ceiling
+    // (AIMEAT_MAX_OPERATOR_MINT_PER_DAY, 10000 here, the default); the operator can give a peer its own
+    // ceiling or no limit. A refusal is recorded and the operators are told.
+    console.log('\nPhase 1b — a peer\'s settlements stay inside the daily ceiling');
+
+    const ceilingDoor = (value: unknown) => H.json(`/v1/federation/peers/${encodeURIComponent(P_ID)}/settlement-ceiling`, {
+        method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ settlement_ceiling: value }),
+    });
+
+    await test('C1. REFUSED — a settlement past the node\'s daily ceiling credits nothing, answers 429, is recorded, and the operator is told', async () => {
+        const over = H.config.maxOperatorMintPerDay + 1;
+        const before = await balance();
+        const tc = `tc-over-${stamp}`;
+        const r = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: over, tracking_code: tc }) });
+        assert(r.status === 429 && r.body.error?.code === 'QUOTA_EXCEEDED', `past the ceiling: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(await balance() === before && (await settlementRows(tc)).length === 0, 'nothing credited and no ledger row');
+        const again = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: over, tracking_code: `${tc}-2` }) });
+        assert(again.status === 429 && await balance() === before, `a second tracking code is refused too: ${again.status}`);
+        const inc = await H.json('/v1/admin/security/incidents', { headers: auth(H.ownerToken) });
+        const mine = (inc.body.data?.incidents ?? []).filter((i: any) => i.type === 'federation_settlement' && i.actor === P_ID);
+        assert(mine.length === 1 && mine[0].params?.count === '2' && mine[0].params?.morsels === String(over * 2),
+            `one incident for the peer and the day, with both refusals counted: ${JSON.stringify(mine)}`);
+        const notes = await H.json('/v1/notifications', { headers: auth(H.ownerToken) });
+        const told = (notes.body.data?.notifications ?? []).filter((n: any) => n.type === 'federation_settlement_refused');
+        assert(told.length === 1, `the operator is told once: ${JSON.stringify(told.map((n: any) => n.title))}`);
+    });
+
+    await test('C2. KEPT — with no limit set for P, the same settlement credits once, and the peer list shows the setting', async () => {
+        const set = await ceilingDoor('none');
+        assert(set.status === 200 && set.body.data?.settlement_ceiling?.setting === 'none', `set none: ${set.status} ${JSON.stringify(set.body)}`);
+        const over = H.config.maxOperatorMintPerDay + 1;
+        const before = await balance();
+        const tc = `tc-over-${stamp}`;
+        const r = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: over, tracking_code: tc }) });
+        assert(r.status === 200 && await balance() === before + over, `a trusted peer settles past the node's ceiling: ${r.status} ${JSON.stringify(r.body)}`);
+        assert((await settlementRows(tc)).length === 1, 'one ledger row');
+        assert((await peerRow(P_ID))?.settlement_ceiling === 'none', `peer row: ${JSON.stringify(await peerRow(P_ID))}`);
+    });
+
+    await test('C3. a ceiling of P\'s own holds P\'s settlements to it, and "node" hands P back to the node\'s', async () => {
+        const view = await ceilingDoor('node');
+        const used = view.body.data.settlement_ceiling.credited_today as number;
+        const set = await ceilingDoor(used + 10);
+        assert(set.status === 200 && set.body.data.settlement_ceiling.setting === used + 10 && set.body.data.settlement_ceiling.counts_against === 'peer',
+            `set a number: ${set.status} ${JSON.stringify(set.body)}`);
+        const fits = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 10, tracking_code: `tc-fits-${stamp}` }) });
+        assert(fits.status === 200, `ten more fit: ${fits.status} ${JSON.stringify(fits.body)}`);
+        const past = await H.json('/v1/federation/settle', { method: 'POST', body: await settlementBody({ gaii: H.ownerGhii, amount: 1, tracking_code: `tc-past-${stamp}` }) });
+        assert(past.status === 429, `one more does not: ${past.status} ${JSON.stringify(past.body)}`);
+        const back = await ceilingDoor('node');
+        assert(back.status === 200 && back.body.data.settlement_ceiling.setting === null && back.body.data.settlement_ceiling.counts_against === 'node',
+            `back to the node's: ${JSON.stringify(back.body)}`);
+        const bad = await ceilingDoor(0);
+        assert(bad.status === 400 && bad.body.error?.code === 'INVALID_INPUT', `0 is refused with the words to use: ${bad.status} ${JSON.stringify(bad.body)}`);
+        const plain = await registerOwner(H.baseUrl, `plainc${stamp}`);
+        const notOperator = await H.json(`/v1/federation/peers/${encodeURIComponent(P_ID)}/settlement-ceiling`, {
+            method: 'PUT', headers: auth(plain.token), body: JSON.stringify({ settlement_ceiling: 'none' }),
+        });
+        assert(notOperator.status === 403, `only an operator sets it: ${notOperator.status}`);
+    });
+
+    await test('C4. the peer policy door takes settlement_ceiling as well', async () => {
+        const r = await H.json(`/v1/federation/peers/${encodeURIComponent(P_ID)}`, {
+            method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ settlement_ceiling: 'none' }),
+        });
+        assert(r.status === 200 && r.body.data?.settlement_ceiling === 'none', `policy door: ${r.status} ${JSON.stringify(r.body)}`);
+        const back = await H.json(`/v1/federation/peers/${encodeURIComponent(P_ID)}`, {
+            method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ settlement_ceiling: 'node' }),
+        });
+        assert(back.status === 200 && back.body.data?.settlement_ceiling === null, `and back: ${JSON.stringify(back.body)}`);
+        const bad = await H.json(`/v1/federation/peers/${encodeURIComponent(P_ID)}`, {
+            method: 'PUT', headers: auth(H.ownerToken), body: JSON.stringify({ settlement_ceiling: 'lots', allow_settlement: false }),
+        });
+        assert(bad.status === 400 && (await peerRow(P_ID))?.allow_settlement === true, `a bad value changes nothing: ${bad.status}`);
     });
 
     // ── 2. Resolve ──

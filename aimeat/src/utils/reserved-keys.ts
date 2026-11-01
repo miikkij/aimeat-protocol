@@ -20,6 +20,12 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-10-31 -- `datapkg-audience.` is service-owned: who reads a data package, written only by the data
+ *     package service (services/datapackage/audience-record.ts; secaudit2026oct31w2 round 10). A new
+ *     prefix, so nothing wrote it through the memory API before.
+ *   2026-10-31 -- `living-spend-hold.` is service-owned: whether a living document set up by a writer
+ *     without ai:use may refresh itself with the owner's AI (services/living-pulse-spend.ts;
+ *     secaudit2026oct31w2 round 10). A new prefix, so nothing wrote it through the memory API before.
  *   2026-10-27 -- `commerce.platform-fee.` is service-owned and owner-removable: the operator's fee on
  *     a money sale, which the admin dashboard totals (commerce/platform-fee.ts is its one writer, straight
  *     to storage). An account and its agents wrote one through the memory API and moved the operator's
@@ -408,8 +414,14 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * receivable the admin dashboard totals per currency. commerce/platform-fee.ts is its one writer,
  * straight to storage; a record any account or agent wrote through a memory route raised, lowered or
  * broke the operator's figure. The account holder in person still removes one of their own.
+ *
+ * `datapkg-audience.` (2026-10-31, secaudit2026oct31w2 round 10) is who reads a data package and each
+ * of its versions (services/datapackage/audience-record.ts). The package reads decide on it, in place
+ * of the `latest.json` pointer and the descriptor tag, which the generic storage routes write. The
+ * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
+ * the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -428,6 +440,8 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
   ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
   ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
+  ['datapkg-audience.', 'who reads a data package, and only the data package service writes it. Publish with POST /v1/datapackages or the aimeat_datapackage_publish MCP tool, which takes the visibility.'],
+  ['living-spend-hold.', 'whether a living document may refresh itself with your AI, and only the node writes it. You allow it with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
 ];
 
 /**

@@ -27,6 +27,9 @@
  *     address unverified (secaudit 2026-10 follow-up, A1): C4 is a plain member's refused mint that
  *     makes no account, C4d the unverified address, C5 to C5c run on the owner's keys, and
  *     registerVerified marks the address verified with helpers/verified-email.ts.
+ *   v1.7.0 — 2026-10-31 — 11 and 11b: the bell notice of an email invitation to an existing account
+ *     gives a machine of the account nothing to register a new account with, and the invited person
+ *     opens it signed in and joins as before (secaudit2026oct31w2 round 10, R-f-2026sec-07-d7).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -605,7 +608,63 @@ await test('S1. organism:invite is enforced on the email-invite doors', async ()
     assert(ok.status === 200, `the scoped agent should list invitations, got ${ok.status}`);
 });
 
+// R-f-2026sec-07-d7 (secaudit2026oct31w2 round 10): the in-app notice of an email invitation to an
+// existing account carried the raw invitation token, and GET /v1/notifications serves the notice to
+// any principal of the account holding memory:read. The signed-out accept then made a NEW account
+// with that token and joined it with the inviter's role and workspace grants.
+let noticeLink = '';
+let N: { name: string; token: string; email: string };
+const hijackName = `invhijack${Date.now()}`;
+let hijackToken = '';
+await test('11. The bell notice of an invitation carries nothing a machine of the account can register a new account with', async () => {
+    const email = `notice.${Date.now()}@example.com`;
+    N = await registerVerified(email);
+    const reg = await json('/v1/agents', {
+        method: 'POST', headers: auth(N.token),
+        body: JSON.stringify({ name: 'bellreader', owner: N.name, capabilities: ['memory'], scopes: ['memory:read'] }),
+    });
+    assert(reg.status === 201, `agent: ${reg.status}`);
+    const ts = new Date().toISOString();
+    const gaii = reg.body.data.agent.gaii as string;
+    const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(reg.body.data.private_key, gaii + ts) }) });
+    assert(tok.body.ok === true, `agent token: ${JSON.stringify(tok.body.error)}`);
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, orgRole: 'admin', workspaces: [{ ws: WS, role: 'contributor' }] }) });
+    assert(c.status === 201, `invite: ${c.status} ${JSON.stringify(c.body.error)}`);
+    const bell = await json('/v1/notifications', { headers: auth(tok.body.data.token) });
+    assert(bell.status === 200, `the agent reads the bell: ${bell.status}`);
+    const notice = (bell.body.data.notifications as any[]).find(n => n.type === 'organism_invitation' && String(n.link).startsWith('/v1/invite?token='));
+    assert(!!notice, `the notice is in the bell: ${JSON.stringify(bell.body.data.notifications.map((n: any) => n.type))}`);
+    noticeLink = notice.link as string;
+    const t = tokenFrom(`${BASE}${noticeLink}`);
+    const hijack = await json(`/v1/invitations/${t}/accept`, { method: 'POST', body: JSON.stringify({ username: hijackName, password: 'InvPass1234' }) });
+    if (hijack.status === 200) hijackToken = hijack.body.data.token ?? '';
+    assert(hijack.status !== 200, `SECURITY: the bell notice's link made a new account and joined it: ${hijack.status} ${JSON.stringify(hijack.body.data ?? hijack.body.error)}`);
+    const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
+    assert(!(m.body.data.members || []).some((x: any) => x.ghii === hijackName), 'the new account is a member');
+});
+
+await test('11b. usage: the invited person opens the bell notice signed in and joins, as before', async () => {
+    const email = `noticeown.${Date.now()}@example.com`;
+    const P = await registerVerified(email);
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, orgRole: 'member', workspaces: [{ ws: WS, role: 'contributor' }] }) });
+    assert(c.status === 201, `invite: ${c.status} ${JSON.stringify(c.body.error)}`);
+    const bell = await json('/v1/notifications', { headers: auth(P.token) });
+    const notice = (bell.body.data.notifications as any[]).find(n => n.type === 'organism_invitation' && String(n.link).startsWith('/v1/invite?token='));
+    assert(!!notice, `the notice is in the person's bell: ${JSON.stringify(bell.body.data.notifications.map((n: any) => n.type))}`);
+    const t = tokenFrom(`${BASE}${notice.link}`);
+    const shown = await json(`/v1/invitations/${t}`, { headers: auth(P.token) });
+    assert(shown.status === 200 && shown.body.data.viewer?.email_matches === true, `the page for the notice: ${shown.status} ${JSON.stringify(shown.body.data?.viewer ?? shown.body.error)}`);
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(P.token), body: '{}' });
+    assert(acc.status === 200 && acc.body.data.status === 'joined' && acc.body.data.created_account === false, `the invited person joins from the notice: ${acc.status} ${JSON.stringify(acc.body.error)}`);
+    const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
+    assert((m.body.data.members || []).some((x: any) => x.ghii === P.name), 'the invited person is a member');
+    // The emailed link of the same invitation is used up by the join, as a link always was.
+    const link = tokenFrom(c.body.data.accept_url);
+    assert((await json(`/v1/invitations/${link}`)).status === 410, 'the emailed link of a joined invitation is spent');
+});
+
 await test('Cleanup', async () => {
+    if (hijackToken) await json(`/v1/owners/${hijackName}`, { method: 'DELETE', headers: auth(hijackToken) });
     // Delete any provisioned key accounts that still exist (login with the code, then delete self).
     for (const p of provisioned) {
         const lg = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: p.u, password: p.c }) });

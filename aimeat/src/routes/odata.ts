@@ -31,6 +31,9 @@
  * @version-history
  *   2026-11-01 -- A withdrawn package answers 410 Gone (OData error shape) to a reader its audience
  *     admits, 404 to anyone else (services/datapackage/withdraw.ts; plan doc-mvwxcas3dom3, D0.3).
+ *   2026-10-31 -- A pinned answer is `Cache-Control: public` only when anyone opens that version; a
+ *     members, organism or private package answers `private` with `Vary: Authorization`
+ *     (secaudit2026oct31w2 round 10, odata:pinned-feed-public-cache-on-audience-gated-response).
  *   2026-10-20 -- The feed reads with the caller's whole auth (roles and scopes): an agent, app grant or
  *     ecosystem app of the owner reads a private package only with storage:read, and gets 403
  *     Forbidden naming the word without it (secaudit 2026-10 v41, standing ruling 5). A pinned earlier
@@ -74,11 +77,16 @@ function sendODataJson(res: Response, body: unknown): void {
 }
 
 /** Every OData response says which version it is, and none of them may be cached as a document: the
- *  feed follows `latest` unless a version is pinned, and a stale answer is a wrong report. */
-function odataHeaders(res: Response, pinned: boolean): void {
+ *  feed follows `latest` unless a version is pinned, and a stale answer is a wrong report. A pinned
+ *  answer is shared-cacheable (`public`) only when anyone opens that version; an answer the package's
+ *  audience decided for this caller is `private`, with `Vary: Authorization`, so a shared cache never
+ *  hands it to another caller (secaudit2026oct31w2 round 10, W2-20). */
+function odataHeaders(res: Response, pinned: boolean, openToAnyone: boolean): void {
     res.setHeader('OData-Version', '4.0');
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Cache-Control', pinned ? 'public, max-age=300' : 'no-cache');
+    if (!pinned) { res.setHeader('Cache-Control', 'no-cache'); return; }
+    res.setHeader('Cache-Control', openToAnyone ? 'public, max-age=300' : 'private, max-age=300');
+    if (!openToAnyone) res.vary('Authorization');
 }
 
 export function odataRouter(config: AimeatConfig, storage: Storage): Router {
@@ -118,7 +126,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/odata/:owner/:name', async (req, res) => {
         const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
         if (!opened) { await notOpened(req, res, refOf(req)); return; }
-        odataHeaders(res, !!req.query.version);
+        odataHeaders(res, !!req.query.version, opened.openToAnyone);
         res.type('application/json;odata.metadata=minimal').send(JSON.stringify({
             '@odata.context': `${serviceRoot(req)}/$metadata`,
             value: opened.descriptor.resources.map(r => ({
@@ -134,7 +142,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
     router.get('/v1/odata/:owner/:name/\\$metadata', async (req, res) => {
         const opened = await openPackage(store, refOf(req), config.nodeId, req.auth);
         if (!opened) { await notOpened(req, res, refOf(req)); return; }
-        odataHeaders(res, !!req.query.version);
+        odataHeaders(res, !!req.query.version, opened.openToAnyone);
         res.type('application/xml; charset=utf-8')
             .send(toCsdl(opened.descriptor, namespaceFor(opened.descriptor)));
     });
@@ -177,7 +185,7 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
         if (!all) { odataError(res, 404, 'NotFound', `Could not read ${resource.name} of ${ref}`); return; }
 
         const page = applyQueryPaged(all.rows, parsed.value, resource.schema);
-        odataHeaders(res, !!req.query.version);
+        odataHeaders(res, !!req.query.version, opened.openToAnyone);
         const entitySetUrl = `${serviceRoot(req)}/${encodeURIComponent(edmName(resource.name))}`;
         const body: Record<string, unknown> = {
             '@odata.context': `${serviceRoot(req)}/$metadata#${edmName(resource.name)}`,

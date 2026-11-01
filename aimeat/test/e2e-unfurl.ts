@@ -9,6 +9,8 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=unfurl
  * @version-history
+ *   2026-10-31 — A page full of unclosed `<meta` openers is read in bounded time (secaudit2026oct31w2
+ *     round 10, f-2026aug-dos-ratelimit-1). Added beside the existing cases; none of them changed.
  *   v1.0.0 — 2026-07-21 — Initial: auth/validation, OG metadata happy path, image proxy, SSRF block.
  */
 import { createServer, type Server } from 'node:http';
@@ -58,6 +60,11 @@ function startFixture(): Promise<void> {
       } else if (req.url === '/img.png') {
         res.writeHead(200, { 'Content-Type': 'image/png' });
         res.end(PNG);
+      } else if (req.url === '/hostile') {
+        // A page of `<meta` openers with no `>`, the shape that cost the old patterns the square of
+        // its size (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end('<html><head><title>Hostile</title>' + '<meta '.repeat(34_000));
       } else if (req.url === '/notimage') {
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('not an image');
@@ -113,6 +120,17 @@ await test('A non-HTML target returns a hostname-only preview (no title)', async
   const d = body?.data ?? {};
   assert(d.title === null && d.image === null, `no title/image for a raw image, got ${JSON.stringify(d)}`);
   assert(d.siteName === '127.0.0.1', `hostname siteName, got ${JSON.stringify(d.siteName)}`);
+});
+
+await test('A page full of unclosed <meta openers is read in bounded time, and the node keeps answering', async () => {
+  const started = Date.now();
+  const { status, body } = await json(`/v1/unfurl?url=${encodeURIComponent(fixtureBase + '/hostile')}`, ownerAuth());
+  const ms = Date.now() - started;
+  assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+  assert(body?.data?.title === 'Hostile', `the <title> is still read, got ${JSON.stringify(body?.data?.title)}`);
+  assert(ms < 5000, `answered in ${ms} ms`);
+  const again = await json(`/v1/unfurl?url=${encodeURIComponent(fixtureBase + '/page')}`, ownerAuth());
+  assert(again.status === 200, `the node still answers: ${again.status}`);
 });
 
 console.log('\nPhase 3: image proxy');

@@ -39,6 +39,8 @@
  *     its AI-provenance record.
  *   2026-10-05 — The group is declared `as const satisfies`, its exact field schemas are here, and each
  *     definition carries its annotations, scope and surfaces (secaudit 2026-10, M3).
+ *   v1.15.0 — 2026-10-31 — aimeat_admin_federation_settlement_ceiling_set: how many morsels one peer's
+ *     settlements may add a day (secaudit2026oct31w2 round 10, W2-4).
  *   v1.14.0 — 2026-10-02 — aimeat_tools_find: the chat surface's door to the tools it keeps off.
  *   v1.13.0 — 2026-10-01 — aimeat_admin_federation_peer_remove: remove a peer, or free a node id held
  *     under another key, from chat (follow-up to the peer-registration incident, item 5).
@@ -609,7 +611,8 @@ export const discoveryWorkBoardsTools = [
         annotations: { title: 'Admin: Federation', readOnlyHint: true },
         scope: 'operator:admin',
         // On `admin`: The Federation page in one read: the peers, what waits on a person, and the book's age.
-        // And two writes beside it: a peer kept on its own relay-claim setting, and a peer removed.
+        // And three writes beside it: a peer kept on its own relay-claim setting, a peer's daily
+        // settlement ceiling, and a peer removed.
         surfaces: ['admin'],
         input: {},
     },
@@ -625,6 +628,20 @@ export const discoveryWorkBoardsTools = [
         input: {
             node_id: { type: 'string', required: true, description: 'The peer, by its node id as aimeat_admin_federation lists it.' },
             relay_claim: { type: 'string', required: true, enum: ['optional', 'required', 'node'], description: '"optional" or "required" for this peer alone, or "node" to follow this node\'s setting again.' },
+        },
+    },
+    {
+        name: 'aimeat_admin_federation_settlement_ceiling_set',
+        description: 'Operator-only. How many morsels one peer\'s signed settlements may add to this node in a UTC day. A settlement adds morsels no balance here paid, so by default ("node") a peer\'s settlement fits in what is left today of this node\'s daily ceiling on morsels added from nothing (AIMEAT_MAX_OPERATOR_MINT_PER_DAY, which mints and pacing-pack sales also count against). A whole number gives this peer a ceiling of its own, counted over its settlements alone; "none" takes the limit away for a peer the operator trusts. A settlement past the ceiling is refused with 429, nothing is credited, and the refusal is on the Security page with a notice to the operators; the sending node may send it again after the ceiling is raised. Say to the operator which peer and what number before you call this. To stop a peer settling at all, set allow_settlement off on PUT /v1/federation/peers/:nodeId instead. Returns the setting, the ceiling that applies and what the peer credited today; NOT_FOUND for a node that is not a peer, INVALID_INPUT for any other value, and an operator-role error for non-operators. The same as PUT /v1/federation/peers/:nodeId/settlement-ceiling.',
+        caller: 'operator',
+        visibility: agentEverywhere,
+        // Setting the same value twice leaves the same peer; the previous value was a setting, not data.
+        annotations: { title: 'Admin: Set a Peer\'s Daily Settlement Ceiling', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+        scope: 'operator:admin',
+        surfaces: ['admin'],
+        input: {
+            node_id: { type: 'string', required: true, description: 'The peer, by its node id as aimeat_admin_federation lists it.' },
+            settlement_ceiling: { type: 'string', required: true, description: 'A whole number of morsels a day (at least 1), "none" for no limit, or "node" to follow this node\'s daily ceiling again.', zod: z.string().max(INPUT_LIMITS.id).regex(/^(\d{1,13}|none|node)$/) },
         },
     },
     {

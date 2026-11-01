@@ -21,6 +21,9 @@
  *   import { parseWelcomeMat } from '../services/welcome-mat-parse.js';
  *   const parsed = parseWelcomeMat(req.body.paste);
  * @version-history
+ *   2026-10-31 — readWelcomeMatMeta reads the `<meta>` tags and the `<title>` in one linear pass
+ *     (utils/html-tag-scan.ts), in place of two patterns per field that cost the square of the paste's
+ *     size on a page full of `<meta` openers (secaudit2026oct31w2 round 10, f-2026aug-dos-ratelimit-1).
  *   v1.1.1 — 2026-10-05 — HTML is escaped with escapeHtml (utils/html-escape.ts), which escapes all five characters (secaudit 2026-10, C8).
  *   v1.1.0 — 2026-10-03 — The profile interview's answers travel in the page as one
  *     `<script type="application/json" id="aimeat-profile">` element. A successful parse returns
@@ -30,6 +33,7 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
  */
 import { escapeHtml } from '../utils/html-escape.js';
+import { metaTags, metaContentOf, titleText, type MetaAttributes } from '../utils/html-tag-scan.js';
 
 export const WELCOME_MAT_BEGIN = '<!-- AIMEAT WELCOME MAT BEGIN -->';
 export const WELCOME_MAT_END = '<!-- AIMEAT WELCOME MAT END -->';
@@ -187,40 +191,29 @@ function hasVisibleContent(html: string): boolean {
  * Read one `<meta name="X" content="Y">` value. Tolerates single quotes, attribute order and
  * arbitrary whitespace, because the page was written by a language model and not by a serializer.
  */
-function metaContent(html: string, name: string): string | null {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const patterns = [
-        // name= before content=
-        new RegExp(`<meta\\s[^>]*name\\s*=\\s*["']${escaped}["'][^>]*content\\s*=\\s*["']([^"']*)["']`, 'i'),
-        // content= before name=
-        new RegExp(`<meta\\s[^>]*content\\s*=\\s*["']([^"']*)["'][^>]*name\\s*=\\s*["']${escaped}["']`, 'i'),
-    ];
-    for (const re of patterns) {
-        const m = re.exec(html);
-        if (m && typeof m[1] === 'string') {
-            const v = m[1].trim();
-            if (v) return v;
-        }
-    }
-    return null;
+function metaContent(tags: MetaAttributes[], name: string): string | null {
+    const v = metaContentOf(tags, ['name'], name);
+    return v ? v.trim() : null;
 }
 
 /** The four ai-* fields plus the title. Everything is optional: a missing field costs one question. */
 export function readWelcomeMatMeta(html: string): WelcomeMatMeta {
-    const rawMcp = (metaContent(html, 'ai-can-mcp') ?? '').toLowerCase();
+    // The tags are read once, in one linear pass (utils/html-tag-scan.ts).
+    const tags = metaTags(html);
+    const rawMcp = (metaContent(tags, 'ai-can-mcp') ?? '').toLowerCase();
     const canMcp: WelcomeMatMeta['canMcp'] =
         rawMcp === 'yes' || rawMcp === 'true' ? 'yes'
             : rawMcp === 'no' || rawMcp === 'false' ? 'no'
                 : rawMcp ? 'unknown' : null;
-    const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html);
+    const titleMatch = titleText(html);
     return {
-        model: metaContent(html, 'ai-model'),
-        vendor: metaContent(html, 'ai-vendor'),
-        client: metaContent(html, 'ai-client'),
+        model: metaContent(tags, 'ai-model'),
+        vendor: metaContent(tags, 'ai-vendor'),
+        client: metaContent(tags, 'ai-client'),
         canMcp,
-        title: titleMatch ? titleMatch[1].trim().slice(0, 200) || null : null,
-        authorSays: metaContent(html, 'aimeat-author-says'),
-        declared: metaContent(html, 'aimeat-welcome-mat') !== null,
+        title: titleMatch !== null ? titleMatch.trim().slice(0, 200) || null : null,
+        authorSays: metaContent(tags, 'aimeat-author-says'),
+        declared: metaContent(tags, 'aimeat-welcome-mat') !== null,
     };
 }
 

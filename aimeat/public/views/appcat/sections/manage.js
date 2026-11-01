@@ -14,6 +14,9 @@
  * @structure meta · ManageSection({ d }) · AccessCode({ d, onSaved, onCancel }) · OpenTo({ d, raw, onSet, busy })
  * @usage const mod = await import('./sections/manage.js'); html`<${mod.default} d=${d} />`
  * @version-history
+ *   2026-10-31 — Who sees its screenshot, under who can open it, while the app opens for fewer people
+ *     than anyone: the people who can open it, or everyone (`screenshot_public` on PATCH
+ *     /v1/apps/:filename), with the sentence that says it (secaudit2026oct31w2 round 10, W2-12).
  *   v1.4.0 — 2026-10-18 — The app's classification under who can open it, which the owner changes there
  *     while classification is on (ContainerLabel; plan doc-mvdipuyqraas, L4.4).
  *   v1.3.0 — 2026-10-18 — Who can open it, under the listing: anyone with the link, people signed in
@@ -156,16 +159,17 @@ export default function ManageSection({ d }) {
   const [busy, setBusy] = useState(false);
   useEffect(() => { setLocal({}); setEditing(0); }, [d.ref]);
   // A fresh listing row is the truth again once it has come.
-  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected, app.open_to]);
+  useEffect(() => { setLocal({}); }, [app.listing, app.parked, app.forkable, app.protected, app.open_to, app.screenshot_public]);
 
   const listing = 'listing' in local ? local.listing : stateOf(app);
   const openTo = 'open_to' in local ? local.open_to : app.open_to;
   const forkable = 'forkable' in local ? local.forkable : !!app.forkable;
+  const shotPublic = 'screenshot_public' in local ? local.screenshot_public : !!app.screenshot_public;
   const hasCode = 'protected' in local ? local.protected : !!app.protected;
   const prot = (app.manifest && app.manifest.protection) || {};
   const anyProt = !!(prot.obfuscate || prot.domainLock || prot.watermark || prot.noRawDownload);
 
-  /** Set one switch on the record (listing, open_to or forkable). */
+  /** Set one switch on the record (listing, open_to, screenshot_public or forkable). */
   const flip = async (key, value) => {
     if (busy || (key === 'listing' && value === listing)) return;
     if (!getSession()?.jwt) { const t = x('common.loginRequired'); d.notice(t, noticeKind(t)); return; }
@@ -190,6 +194,13 @@ export default function ManageSection({ d }) {
     <//>
     <${Note} kind="quiet" chapter>${x('manage.listingHint.' + listing)}<//>
     <${OpenTo} d=${d} raw=${openTo} busy=${busy} onSet=${(v) => flip('open_to', v)} />
+    ${openTo && openTo !== 'anyone' ? html`
+      <${Fields} plain chapter>
+        <${Choice} label=${x('manage.shotLabel')} value=${shotPublic ? 'everyone' : 'access'}
+          onChange=${(v) => { if ((v === 'everyone') !== shotPublic) flip('screenshot_public', v === 'everyone'); }}
+          options=${['access', 'everyone'].map((v) => [v, x('manage.shot.' + v)])} />
+      <//>
+      <${Note} kind="quiet" chapter>${x('manage.shotHint.' + (shotPublic ? 'everyone' : 'access'))}<//>` : null}
     <${Fields} plain chapter>
       <${Space} below="medium">
         <${ContainerLabel} kind="app" app=${d.filename} canSet chapter showToast=${(m, kind) => d.notice(m, kind === 'success' || kind === 'error' ? kind : noticeKind(m))} />

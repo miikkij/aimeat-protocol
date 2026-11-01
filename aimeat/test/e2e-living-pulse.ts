@@ -7,6 +7,9 @@
  *   with an empty template pulses to completion without one, which is exactly what makes the scan
  *   path testable.
  * @version-history
+ *   2026-10-31 -- A config an app without ai:use wrote waits for the owner's one press before the pulse
+ *     calls the AI; the owner's own config, an app holding ai:use and a Full access agent spend as
+ *     before (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3).
  *   2026-10-27 -- A config a Full access agent wrote into the owner's namespace with owner_scope is
  *     gathered with that agent's reach; the owner's own save of it and an agent holding
  *     memory:read-as-owner keep the owner's reach (secaudit2026oct26).
@@ -38,6 +41,7 @@ async function json(path: string, opts: RequestInit = {}) {
     return { status: res.status, body };
 }
 
+import { createHash, randomBytes } from 'node:crypto';
 import { registerOwner } from './helpers/owner-login.js';
 import { makeAgent, type McpAgent } from './helpers/mcp-session.js';
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
@@ -256,6 +260,102 @@ await test('Usage: the owner saving the agent\'s config again, and a Full access
     assert(re.includes(secretKey(FULL_WORD.rewritten)), `the owner's own save did not give the reach back: ${JSON.stringify(re)}`);
     const tick = (await sourcesOf('fatdoc')).map(s => s.value?.origin);
     assert(tick.includes(secretKey(FULL_WORD.ticked)), `the ticked agent's config did not gather the private record: ${JSON.stringify(tick)}`);
+});
+
+// ── Whose permission a pulse spends the owner's AI under (secaudit2026oct31w2 round 10, f-2026aug-ai-paths-3) ──
+// A config last written by an app or an agent that may not use the owner's AI (ai:use) waits for the
+// owner's one press before the pulse calls the model. The owner's own config, an app holding ai:use
+// and a Full access agent spend as before. No AI key on the test node: an AI attempt shows in the
+// ledger as `derive-failed` (or `slot-derived` with a key), a held one as `derive-waiting`.
+const SPEND_FILE = `lpspend${stamp.toString(36)}.html`;
+const REDIRECT = 'http://localhost:9922/callback';
+const verifier = randomBytes(32).toString('base64url');
+const challenge = createHash('sha256').update(verifier).digest('base64url');
+async function grantApp(appRef: string, scopes: string[]): Promise<string> {
+    const q = new URLSearchParams({ app: appRef, response_type: 'code', scope: scopes.join(' '), redirect_uri: REDIRECT, state: 'x', code_challenge: challenge, code_challenge_method: 'S256' });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    assert(authz.status === 302, `authorize: ${authz.status}`);
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')![1]);
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(token), body: JSON.stringify({ request_id: rid }) });
+    assert(con.status === 200 && con.body.ok, `consent: ${con.status} ${JSON.stringify(con.body?.error)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }) });
+    assert(tok.status === 200 && tok.body.ok, `token: ${tok.status} ${JSON.stringify(tok.body?.error)}`);
+    return tok.body.data.access_token;
+}
+// Each config's section is a word one owner-visible record carries, so the gather finds a source and
+// the derive step is reached.
+const spendWord = (doc: string) => `lpspend${doc}${stamp}`;
+const spendConfig = (doc: string) => ({ type: 'living-config', title: `Spend ${doc}`, charter: { cadence_minutes: 0.001 }, template: [{ slot: 'a', section: spendWord(doc) }], status: {} });
+const spendKey = (doc: string) => `organism.${orgId}.w.${WS}.living.${doc}.latest`;
+const AI_ATTEMPT = ['derive-failed', 'slot-derived', 'pending'];
+async function ledgerEvents(doc: string): Promise<string[]> {
+    const r = await json(`/v1/memory?prefix=${encodeURIComponent(`organism.${orgId}.w.${WS}.living-ledger.${doc}__`)}`, { headers: auth(token) });
+    assert(r.status === 200, `ledger ${doc}: ${r.status}`);
+    return (r.body.data.items as Array<{ value: { event?: string } }>).map(i => String(i.value?.event ?? ''));
+}
+async function spendAsks(): Promise<any[]> {
+    const r = await json('/v1/publish-requests', { headers: auth(token) });
+    assert(r.status === 200, `publish requests: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    return (r.body.data.requests as any[]).filter(q => q.kind === 'living-ai-spend');
+}
+let appNoAi = '';
+let appWithAi = '';
+
+await test('Setup: an app the owner signed in to with the default permissions, and one that also holds ai:use', async () => {
+    const pub = await json('/v1/apps', { method: 'POST', headers: auth(token), body: JSON.stringify({
+        filename: SPEND_FILE, content: Buffer.from('<!DOCTYPE html><html><body>spend</body></html>').toString('base64'), name: 'Spend', description: 'writes a living config', category: 'utility' }) });
+    assert(pub.status === 201, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+    appNoAi = await grantApp(`${ownerName}/${SPEND_FILE}`, ['memory:read', 'memory:write']);
+    const pub2 = await json('/v1/apps', { method: 'POST', headers: auth(token), body: JSON.stringify({
+        filename: `ai${SPEND_FILE}`, content: Buffer.from('<!DOCTYPE html><html><body>spend ai</body></html>').toString('base64'), name: 'Spend AI', description: 'writes a living config', category: 'utility' }) });
+    assert(pub2.status === 201, `publish ${pub2.status}: ${JSON.stringify(pub2.body?.error)}`);
+    appWithAi = await grantApp(`${ownerName}/ai${SPEND_FILE}`, ['memory:read', 'memory:write', 'ai:use']);
+    for (const doc of ['appdoc', 'ownspend', 'appaispend', 'fullspend']) {
+        const v = await writeAs(token, `lpspendsrc.${doc}`, { text: `${spendWord(doc)} a note the owner shows their agents and apps` }, 'owner');
+        assert(v.status === 201, `source ${doc}: ${v.status}: ${JSON.stringify(v.body.error)}`);
+    }
+});
+
+await test('A config an app without ai:use wrote does not call the owner\'s AI; the owner is asked once', async () => {
+    const w = await writeAs(appNoAi, spendKey('appdoc'), spendConfig('appdoc'), 'private');
+    assert(w.status === 201, `app config write: ${w.status}: ${JSON.stringify(w.body.error)}`);
+    await triggerPulse();
+    const events = await ledgerEvents('appdoc');
+    assert(!events.some(e => AI_ATTEMPT.includes(e)), `the pulse called the owner's AI for the app's config: ${JSON.stringify(events)}`);
+    assert(events.includes('derive-waiting'), `the ledger says the section waits: ${JSON.stringify(events)}`);
+    const asks = (await spendAsks()).filter(q => q.target?.key === spendKey('appdoc'));
+    assert(asks.length === 1 && asks[0].state === 'awaiting_owner', `one waiting question for the app's config: ${JSON.stringify(asks)}`);
+    assert(String(asks[0].requested_by?.principal ?? '').startsWith('eco:'), `the question names the app: ${JSON.stringify(asks[0].requested_by)}`);
+    await triggerPulse();
+    assert((await spendAsks()).filter(q => q.target?.key === spendKey('appdoc')).length === 1, 'a second pulse asks again');
+});
+
+await test('Usage: the owner\'s own config, an app holding ai:use and a Full access agent call the AI as before, unasked', async () => {
+    const o = await writeAs(token, spendKey('ownspend'), spendConfig('ownspend'), 'private');
+    assert(o.status === 201, `owner config: ${o.status}: ${JSON.stringify(o.body.error)}`);
+    const a = await writeAs(appWithAi, spendKey('appaispend'), spendConfig('appaispend'), 'private');
+    assert(a.status === 201, `ai app config: ${a.status}: ${JSON.stringify(a.body.error)}`);
+    const f = await writeOwnerScope(fullAgent.token, spendKey('fullspend'), spendConfig('fullspend'));
+    assert(f.status === 201, `full agent config: ${f.status}: ${JSON.stringify(f.body.error)}`);
+    await triggerPulse();
+    for (const doc of ['ownspend', 'appaispend', 'fullspend']) {
+        const events = await ledgerEvents(doc);
+        assert(events.some(e => AI_ATTEMPT.includes(e)) && !events.includes('derive-waiting'), `${doc} did not call the AI as before: ${JSON.stringify(events)}`);
+    }
+    const keys = (await spendAsks()).map(q => q.target?.key);
+    assert(!keys.some(k => [spendKey('ownspend'), spendKey('appaispend'), spendKey('fullspend')].includes(k)), `asked about a config that spends as before: ${JSON.stringify(keys)}`);
+});
+
+await test('After the owner allows it, the app\'s config calls the AI on the next pulse', async () => {
+    const ask = (await spendAsks()).find(q => q.target?.key === spendKey('appdoc'));
+    assert(!!ask, 'the question is there');
+    const yes = await json(`/v1/publish-requests/${ask.id}/decision`, { method: 'POST', headers: auth(token), body: JSON.stringify({ decision: 'approve' }) });
+    assert(yes.status === 200, `approve: ${yes.status}: ${JSON.stringify(yes.body?.error)}`);
+    await new Promise(r => setTimeout(r, 50));
+    await triggerPulse();
+    const events = await ledgerEvents('appdoc');
+    assert(events.some(e => AI_ATTEMPT.includes(e)), `the allowed config did not call the AI: ${JSON.stringify(events)}`);
 });
 
 console.log(`\n=== Results: ${passed} passed, ${failed} failed out of ${passed + failed} ===`);

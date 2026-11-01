@@ -22,6 +22,9 @@
  * @structure registerAdminFederationTools(mcp, storage, config, peers, getAgentGaii, scopes) — one read, one write.
  * @usage registerAdminFederationTools(mcp, storage, config, peers, () => agentGaii, scopes);
  * @version-history
+ *   v1.4.0 — 2026-10-31 — aimeat_admin_federation_settlement_ceiling_set: how many morsels one peer's
+ *     settlements may add a day, through services/settlement-ceiling.ts, the one implementation
+ *     PUT /v1/federation/peers/:nodeId/settlement-ceiling calls too (secaudit2026oct31w2 round 10).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-05 — The input schemas are the catalog's: zodShapeFor(name) (secaudit 2026-10, M3).
@@ -45,6 +48,7 @@ import { buildFederationOverview } from '../services/federation-overview.js';
 import { setPeerRelayClaim, peerRelayClaimView } from '../services/relay-claim-policy.js';
 import { emitChange } from '../services/event-bus.js';
 import { removePeer } from '../services/federation-peer-remove.js';
+import { setPeerSettlementCeiling } from '../services/settlement-ceiling.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 
 const text = (payload: unknown) => ({ content: [{ type: 'text' as const, text: JSON.stringify(payload, null, 2) }] });
@@ -78,6 +82,17 @@ export function registerAdminFederationTools(
       if (!out.ok) return toolError(out.code, out.message);
       emitChange('federation');
       return text({ node_id: out.peer.nodeId, relay_claim: peerRelayClaimView(config, out.peer) });
+    });
+
+  mcp.registerTool('aimeat_admin_federation_settlement_ceiling_set', { description: descriptionFor('aimeat_admin_federation_settlement_ceiling_set'),
+    inputSchema: zodShapeFor('aimeat_admin_federation_settlement_ceiling_set'),
+    annotations: annotationsFor('aimeat_admin_federation_settlement_ceiling_set') },
+    async ({ node_id, settlement_ceiling }) => {
+      if (!(await resolveOperatorAgentName(storage, agentGaii, scopes))) return refuse(OPERATOR_AGENT_REFUSAL);
+      const out = await setPeerSettlementCeiling(config, storage, peers, node_id, settlement_ceiling, agentGaii);
+      if (!out.ok) return toolError(out.code, out.message);
+      emitChange('federation');
+      return text({ node_id: out.peer.nodeId, settlement_ceiling: out.view });
     });
 
   mcp.registerTool('aimeat_admin_federation_peer_remove', { description: descriptionFor('aimeat_admin_federation_peer_remove'),

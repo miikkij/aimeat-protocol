@@ -3,14 +3,17 @@
  * @author Jouni Miikki
  * SPDX-License-Identifier: MIT
  * @description Serves the canonical OpenAPI contract and interactive API docs — GET /v1/spec returns
- *   openapi.yaml as text/yaml; GET /v1/docs renders a Swagger UI page (with a relaxed CSP for the
- *   unpkg.com-hosted assets) pointed at /v1/spec.
+ *   openapi.yaml as text/yaml; GET /v1/docs renders a Swagger UI page pointed at /v1/spec, with the
+ *   Swagger UI bundle and stylesheet the node vendors under /lib/swagger-ui-dist@<version>/.
  *
  * @structure
  *   - specRouter(): mounts GET /v1/spec (locates + serves openapi.yaml) and GET /v1/docs (Swagger UI)
  *   - GET /v1/specs/:name: a public record contract as text/markdown; GET /docs/specs/:name redirects there
  *
  * @version-history
+ *   v1.5.0 — 2026-11-01 — /v1/docs loads Swagger UI 5.34.1 from the node's own /lib/ instead of
+ *     unpkg.com by the range @5 with no integrity, and its CSP names no outside host
+ *     (secaudit2026oct31w2 round 10b, W2-5).
  *   v1.4.0 — 2026-10-11 — GET /v1/specs/:name serves the public record contracts that signals,
  *     visibility and tracked-response records name in their `spec` field, and the old
  *     /docs/specs/:name address those records carried redirects to it.
@@ -34,6 +37,9 @@ import { apiIndexHtml } from '../services/api-index.js';
 import { findOpenApiFile } from '../services/openapi-file.js';
 import { findContractDoc, PUBLIC_CONTRACTS } from '../services/contract-docs.js';
 import { error } from '../middleware/envelope.js';
+
+/** The vendored Swagger UI (public/lib/VENDORED.md). A new version is a new directory. */
+const SWAGGER_UI = '/lib/swagger-ui-dist@5.34.1';
 
 export function specRouter(config: AimeatConfig): Router {
   const router = Router();
@@ -75,7 +81,7 @@ export function specRouter(config: AimeatConfig): Router {
     res.redirect(301, `/v1/specs/${encodeURIComponent(name)}`);
   });
 
-  // GET /v1/docs — Swagger UI with relaxed CSP for unpkg.com assets
+  // GET /v1/docs — Swagger UI from the node's own /lib/; the CSP names no outside host
   router.get('/v1/docs', (_req, res) => {
     const nonce = (res.locals.cspNonce as string) || '';
     // Markdown for Agents: the Swagger shell is an empty div until scripts run, so a client that
@@ -90,8 +96,8 @@ export function specRouter(config: AimeatConfig): Router {
 
     res.setHeader('Content-Security-Policy', [
       "default-src 'self'",
-      `script-src 'self' 'nonce-${nonce}' https://unpkg.com`,
-      `style-src 'self' 'unsafe-inline' https://unpkg.com`,
+      `script-src 'self' 'nonce-${nonce}'`,
+      "style-src 'self' 'unsafe-inline'",
       "connect-src 'self'",
       "img-src 'self' data:",
       "font-src 'self'",
@@ -120,7 +126,7 @@ export function specRouter(config: AimeatConfig): Router {
   <link rel="alternate" type="text/markdown" href="${b}/v1/docs.md">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/css/theme.css">
-  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
+  <link rel="stylesheet" href="${SWAGGER_UI}/swagger-ui.css" />
   <script type="application/ld+json" nonce="${nonce}">${JSON.stringify({
     '@context': 'https://schema.org', '@type': 'TechArticle',
     headline: title, description: desc, url: `${b}/v1/docs`,
@@ -138,7 +144,7 @@ export function specRouter(config: AimeatConfig): Router {
     <a href="${b}/AGENTS.md">AGENTS.md</a>
     <a href="${b}/v1/spec">API contract</a>
   </footer>
-  <script src="https://unpkg.com/swagger-ui-dist@5/swagger-ui-bundle.js" crossorigin></script>
+  <script src="${SWAGGER_UI}/swagger-ui-bundle.js"></script>
   <script nonce="${nonce}">
     SwaggerUIBundle({ url: '/v1/spec', dom_id: '#swagger-ui', deepLinking: true,
       onComplete: function () { var i = document.getElementById('api-index'); if (i) i.remove(); } });

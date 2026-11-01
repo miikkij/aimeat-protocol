@@ -46,6 +46,8 @@
  *     and `community` pair, so an app is listed, listed to signed-in members only, or unlisted.
  *   v1.12.0 — 2026-10-17 — setAppAccess(access): who may open the app, on every version row
  *     (null anyone, 'signed-in', 'organism:<id>'). Migration 0104.
+ *   2026-10-31 — updateAppMeta takes `screenshotPublic` (true sets it, false or null takes it off):
+ *     the owner shows the screenshot of an access-limited app to everyone (secaudit2026oct31w2 round 10, W2-12).
  */
 import type { AppRecord, AppSummaryRecord, AppVersionSize, AppDraftRecord, AppListOptions, AppForkRecord, AppListing } from '../interface.js';
 
@@ -154,6 +156,11 @@ export interface AppRepository {
              * the spec sends the new stamp, and null takes it off when the spec is removed.
              */
             designSpec?: import('../types/apps.js').AppManifest['designSpec'] | null;
+            /**
+             * The owner's "show the screenshot to everyone" for an app that opens for fewer people.
+             * true sets it; false or null takes it off (the screenshot follows who may open the app).
+             */
+            screenshotPublic?: boolean | null;
         },
     ): Promise<boolean>;
     /**

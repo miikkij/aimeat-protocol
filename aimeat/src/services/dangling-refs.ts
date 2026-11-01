@@ -22,6 +22,9 @@
  *   import { scanOrganismDanglingRefs } from '../services/dangling-refs.js';
  *   const { findings } = await scanOrganismDanglingRefs(storage, config, organism, readerFor({ storage, config }, req.auth), ws);
  * @version-history
+ *   2026-11-01 -- resolveRecord reads a record's id from the end of its key (recordRowAt), so a record
+ *     whose id holds a dot exists under its whole id and a reference to it is not reported as
+ *     dangling (secaudit2026oct31w2 round 10b, dotted record ids).
  *   v1.3.0 -- 2026-09-29 -- TARGET-082 V4: takes the caller's ContentReader instead of an identity. The
  *     source records whose title and refs become findings pass reader.show first, so a record the
  *     reader may not see gives no finding. The existence sets, the manifest gate and the workspace
@@ -41,6 +44,7 @@ import { isSameOwner } from '../utils/gaii.js';
 import { workspaceMetaReader } from './workspace-meta.js';
 import { memoryTarget } from './classification/labels.js';
 import type { ContentReader } from './classification/reader.js';
+import { recordRowAt } from './workspace-record-key.js';
 
 export interface DanglingRefFinding {
   ws: string;
@@ -90,11 +94,12 @@ function resolveRecord(
 ): { space: string; namespace: string; instance: string; role: string; mode: string } | null {
   const ot = types.find(t => rest.startsWith(t.ns + '.'));
   if (!ot) return null;
-  const tail = rest.slice(ot.ns.length + 1);
-  const dot = tail.indexOf('.');
-  const instance = dot < 0 ? tail : tail.slice(0, dot);
-  const role = dot < 0 ? '' : tail.slice(dot + 1);
-  return { space: ot.name, namespace: ot.ns, instance, role, mode: ot.mode };
+  // The id is read from the end of the key (recordRowAt), so a record whose id holds a dot exists
+  // under its whole id and a reference to it is not called dangling (secaudit2026oct31w2 round 10b).
+  const row = recordRowAt(rest.slice(ot.ns.length + 1));
+  if (!row) return null;
+  const role = row.copy === 'bare' ? '' : row.copy === 'version' ? 'version.' : row.copy;
+  return { space: ot.name, namespace: ot.ns, instance: row.id, role, mode: ot.mode };
 }
 
 /** The human title of a source record value. */

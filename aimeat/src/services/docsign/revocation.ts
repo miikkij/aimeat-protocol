@@ -13,6 +13,9 @@
  * @structure RevocationResult · checkRevocation · _setRevocationFetcher (test seam)
  * @usage const r = await checkRevocation(cert, issuer, { embeddedOcsp, online: true });
  * @version-history
+ *   2026-10-31 — secaudit2026oct31w2 round 10: an embedded good answer that does not cover a proven
+ *     signing time gives status unknown when no fresh answer can be had (offline, responder down,
+ *     budget spent), never good; the embedded answer stays as the source and in the notes.
  *   2026-10-27 — An OCSP request and a CRL download each take one from the check's outbound budget
  *     (online-budget.ts); when it is spent the note says so and the status stays unknown (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
@@ -263,8 +266,9 @@ export async function checkRevocation(
 
   // An embedded answer that says "revoked" is used as it is. One that says "good" speaks for its
   // own thisUpdate only, so it stands in for a fresh answer when it was made at or after a PROVEN
-  // signing time (PAdES-LT). Otherwise the responder is asked, and the embedded answer is kept as
-  // the fallback when no fresh answer can be had.
+  // signing time (PAdES-LT). Otherwise the responder is asked. When no fresh answer can be had
+  // (offline, responder down, outbound budget spent), the status is unknown: the stale answer is
+  // kept as the source and in the notes, never as a "good".
   let fallback: RevocationResult | null = null;
   for (const der of opts.embeddedOcsp ?? []) {
     const r = await readOcsp(der, cert, issuer, opts.trustResponder);
@@ -275,9 +279,13 @@ export async function checkRevocation(
     if (opts.provenTime && madeAt >= opts.provenTime.getTime()) return embedded;
     fallback ??= embedded;
   }
+  const staleUnknown = (f: RevocationResult, more: string[]): RevocationResult => ({
+    status: 'unknown', source: 'embedded-ocsp', revokedAt: null, producedAt: f.producedAt,
+    notes: [...f.notes, `the OCSP answer the signature carries said good on ${f.producedAt ?? 'an unstated date'}, which does not cover the signing time, and no fresh answer could be had`, ...more],
+  });
   if (fallback) notes.push('the OCSP answer the signature carries does not cover a proven signing time, so the responder was asked');
   if (!opts.online) {
-    return fallback ? { ...fallback, notes: [...fallback.notes, 'online checks are off on this node'] }
+    return fallback ? staleUnknown(fallback, ['online checks are off on this node'])
       : { status: 'unchecked', source: null, revokedAt: null, producedAt: null, notes: ['online checks are off on this node'] };
   }
 
@@ -313,7 +321,7 @@ export async function checkRevocation(
     }
   }
   if (!cert.ocspUrls.length && !cert.crlUrls.length) notes.push('the certificate names no OCSP responder and no CRL');
-  if (fallback) return { ...fallback, notes: [...fallback.notes, ...notes] };
+  if (fallback) return staleUnknown(fallback, notes);
   return { status: 'unknown', source: null, revokedAt: null, producedAt: null, notes };
 }
 

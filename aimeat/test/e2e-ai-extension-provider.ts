@@ -14,6 +14,8 @@
  *   name, which the provider run must refuse.
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-ai-extension-provider.ts
  * @version-history
+ *   v1.1.0 — 2026-10-31 — Test 8: provider runs take the owner's share of the extension run slots and
+ *     wait for one (secaudit2026oct31w2 round 10, W2-16).
  *   v1.0.0 — 2026-09-28 — Initial (V6 of the System 2 plan).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -49,6 +51,7 @@ const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
 
 interface Seen { method: string; path: string; host: string; authorization: string | undefined; body: string }
 const seen: Seen[] = [];
+const slow = { now: 0, max: 0 };
 async function startService(): Promise<{ server: Server; port: number }> {
   const server = createServer((req, res) => {
     const chunks: Buffer[] = [];
@@ -59,7 +62,14 @@ async function startService(): Promise<{ server: Server; port: number }> {
       const send = (status: number, value: unknown, headers: Record<string, string> = {}) => {
         res.writeHead(status, { 'content-type': 'application/json', ...headers }).end(JSON.stringify(value));
       };
-      if (req.url === '/chat') return send(200, { echo: (JSON.parse(body || '{}') as { text?: string }).text ?? '' });
+      if (req.url === '/chat') {
+        const text = (JSON.parse(body || '{}') as { text?: string }).text ?? '';
+        if (!text.startsWith('slow')) return send(200, { echo: text });
+        // A slow answer, counted while it is open: how many provider runs of one account are alive at once.
+        slow.now++; slow.max = Math.max(slow.max, slow.now);
+        setTimeout(() => { slow.now--; send(200, { echo: text }); }, 1500);
+        return;
+      }
       if (req.url === '/speak') return send(200, { audio: Buffer.from('ID3-extension-audio').toString('base64') });
       if (req.url === '/redirect') { res.writeHead(302, { location: `http://127.0.0.1:${(server.address() as AddressInfo).port}/landing` }).end(); return; }
       return send(200, { ok: true });
@@ -256,6 +266,23 @@ function scripts(port: number): Record<string, string> {
       const r = await json('/v1/ai/capabilities', { headers: auth(a.token) });
       const text = r.body.data.capabilities.text;
       assert(text.on === true && text.provider === 'my-ext' && text.model === 'extension:demo-1', `text: ${JSON.stringify(text)}`);
+    });
+
+    // secaudit2026oct31w2 round 10 (W2-16): a provider run takes a slot of the request-driven pool on
+    // the owner's share, as POST /v1/ext does. A call past the share waits for a slot and then
+    // answers, so no call that worked before is refused.
+    await test('8. with extensions.run_slots_per_account 1, three AI calls at once run one sandbox at a time and all answer', async () => {
+      const set = await json('/v1/admin/config', { method: 'PUT', headers: auth(a.token), body: JSON.stringify({ changes: [{ path: 'extensions.run_slots_per_account', value: 1 }] }) });
+      assert(set.status === 200, `PUT /v1/admin/config ${set.status}: ${JSON.stringify(set.body?.error ?? set.body?.data?.errors)}`);
+      try {
+        slow.now = 0; slow.max = 0;
+        const call = (n: number) => json('/v1/ai/complete', { method: 'POST', headers: auth(a.token), body: JSON.stringify({ prompt: `slow ${n}`, app_id: 'ext-e2e' }) });
+        const answers = await Promise.all([call(1), call(2), call(3)]);
+        assert(slow.max === 1, `provider runs alive at once for one account with a share of 1: ${slow.max}`);
+        for (const r of answers) assert(r.status === 200 && String(r.body.data.content).startsWith('echo:slow'), `a call waited and answered: ${r.status} ${JSON.stringify(r.body?.error)}`);
+      } finally {
+        await json('/v1/admin/config/extensions.run_slots_per_account', { method: 'DELETE', headers: auth(a.token) });
+      }
     });
   } finally {
     await stopServer(server);

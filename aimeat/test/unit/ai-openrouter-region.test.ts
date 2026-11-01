@@ -7,6 +7,7 @@
  *   themselves, and where they arrive, are test/e2e-ai-openrouter-region.ts.
  * @usage pnpm test -- ai-openrouter-region
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The default model named in the privacy paragraph, the records and the statement.
  *   v1.1.0 — 2026-11-01 — The buyer's AI region choice (ai.region_mode): the settings each mode sets,
  *     a call with tools passed over an endpoint without tool calling, the eu-only model and free
  *     model, the transfer basis per region, the own-key record, the privacy paragraph and the
@@ -19,7 +20,7 @@ import type { AddressInfo } from 'node:net';
 import type { AimeatConfig } from '../../src/config.js';
 import {
   regionChoiceFor, decideRegion, regionsInUse, allowedRegions, resetRegionModelsForTests,
-  regionModeOf, regionSettingsOf, euOnlyModelFor, EU_ONLY_TEXT_MODEL, freeModelOf, freeLastResortOf, regionDeclaration,
+  regionModeOf, regionSettingsOf, euOnlyModelFor, EU_ONLY_TEXT_MODEL, freeModelOf, freeLastResortOf, regionDeclaration, nodeTextModel,
 } from '../../src/services/ai/openrouter-region.js';
 import { derivedProcessors } from '../../src/services/compliance-derived.js';
 import { nodeOpenRouterKey } from '../../src/services/ai/node-openrouter-key.js';
@@ -205,6 +206,20 @@ describe('the buyer\'s AI region choice (ai.region_mode; Jouni, 2026-11-01)', ()
     expect(regionDeclaration(own)).toMatchObject({ mode: 'own', node_key: false });
     expect(aiRegionNotice(own, 'en')).toContain('has no shared AI key');
     expect(nodeOpenRouterKey(cfg({ aiRegionMode: 'eu', openrouterInstanceKey: ' sk-node ' }))).toBe('sk-node');
+  });
+
+  it('the privacy page, the records and the statement name the default model, chat first (Jouni, 2026-11-01 02.54)', () => {
+    const flash = 'deepseek/deepseek-v4-flash-0731';
+    const eu = cfg({ aiRegionMode: 'eu', modelDefaultChat: '', modelDefaultExecution: flash, modelDefaultReasoning: flash });
+    expect(nodeTextModel(eu)).toBe(flash);
+    expect(nodeTextModel(cfg({ modelDefaultChat: 'a/chat', modelDefaultExecution: 'b/exec' }))).toBe('a/chat');
+    expect(aiRegionNotice(eu, 'fi')).toContain(`käyttävät mallia ${flash}`);
+    expect(aiRegionNotice(eu, 'en')).toContain(`use the model ${flash}`);
+    expect(regionDeclaration(eu)).toMatchObject({ mode: 'eu', default_model: flash });
+    expect(regionDeclaration(cfg({ aiRegionMode: 'eu-only', modelDefaultExecution: flash }))).toMatchObject({ default_model: flash, eu_only_model: EU_ONLY_TEXT_MODEL });
+    expect(derivedProcessors(eu).find(p => p.id === 'ai-node-openrouter-eu')?.notes).toContain(flash);
+    // A node that names no model says nothing about one.
+    expect(aiRegionNotice(cfg({ aiRegionMode: 'eu' }), 'en')).not.toContain('use the model');
   });
 
   it('the privacy page and the transparency statement follow the choice', () => {

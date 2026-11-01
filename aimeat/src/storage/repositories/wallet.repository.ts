@@ -10,6 +10,7 @@
  *   - addTransaction / getTransactions(gaii) / listAllTransactions: append + per-gaii / global reads
  *
  * @version-history
+ *   2026-10-31 — sumTransactionsSince takes an optional counterparty (secaudit2026oct31w2 round 10).
  *   2026-10-16 — getTransactions states its order: newest first, on every backend (QA audit D4-04).
  *   2026-10-15 — sumTransactionsByType: per-type totals computed in the database, for the admin dashboard's all-time figures (feature-list audit #169).
  *   2026-10-15 — sumTransactionsSince: the positive amounts of some transaction types since a moment,
@@ -30,8 +31,9 @@ export interface WalletRepository {
    *  like a new one (audit: the June H-4 finding). */
   findTransactionByTrackingCode(gaii: string, trackingCode: string, type: string): Promise<WalletTransaction | null>;
   listAllTransactions(limit?: number): Promise<WalletTransaction[]>;
-  /** The sum of the positive amounts of these transaction types since `since` (ISO), by the database. */
-  sumTransactionsSince(types: readonly string[], since: string): Promise<number>;
+  /** The sum of the positive amounts of these transaction types since `since` (ISO), by the database;
+   *  with `counterparty`, only the rows that name it (a peer node's settlements, settlement-ceiling.ts). */
+  sumTransactionsSince(types: readonly string[], since: string, counterparty?: string): Promise<number>;
   /**
    * Totals per transaction type, computed in the database over the WHOLE ledger, or over the rows at
    * or after `since` (an ISO timestamp). listAllTransactions stops at the newest 10 000 rows, so an
