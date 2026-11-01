@@ -20,6 +20,9 @@
  *   v1.x, findings()).
  * @usage cd aimeat && pnpm exec vitest run test/unit/security-gates-fail.test.ts
  * @version-history
+ *   2026-11-01 — check:open-writes resolves a guard array in the route file that spreads it: its own
+ *     declaration, then a named import, then a name one file alone declares; two files declaring the
+ *     same name no longer overwrite each other (46a96ad53).
  *   2026-10-18 — check:browser-libs refuses a baseline missing a differing route and one listing a route
  *     that no longer differs.
  *   2026-10-18 — check:atomic-writes reports a planted read-then-write, directly and through wrappers,
@@ -285,6 +288,41 @@ describe('check:open-writes finds a writing REST route that admits a caller with
     });
     it('stays blind to a route registered outside src/routes (its documented limit, QA audit S10-03)', () => {
         expect(rows('src/mcp/fixture.ts', "app.post('/mcp/register', (req, res) => {});")).toEqual([]);
+    });
+});
+
+// A guard array is resolved for the route file that spreads it, not by its bare name across the tree
+// (46a96ad53: an `operator` declared in one route file changed the chains of four others).
+describe('check:open-writes resolves a guard array in the file that uses it', () => {
+    const doors = (files: Record<string, string>) => Object.fromEntries(collectDoors(
+        Object.entries(files).map(([path, text]) => source(join(AIMEAT, path), text)),
+    ).map(d => [d.id, d.guards.map(g => g.name)]));
+    it('gives each file its own guards when two files declare the same name', () => {
+        expect(doors({
+            'src/routes/fixture-a.ts': "const operator = [requireAuth(), requireRole('operator')];\nrouter.post('/v1/a', ...operator, (req, res) => {});",
+            'src/routes/fixture-b.ts': "const operator = [requireScope('fixture:b')];\nrouter.post('/v1/b', ...operator, (req, res) => {});",
+        })).toEqual({ 'POST /v1/a': ['requireAuth', 'requireRole'], 'POST /v1/b': ['requireScope'] });
+    });
+    it('takes a named import from the module it names, not from another file that declares the name', () => {
+        expect(doors({
+            'src/routes/fixture-shared.ts': 'export const gate = [requireAuth()];',
+            'src/routes/fixture-use.ts': "import { gate as signedIn } from './fixture-shared.js';\nrouter.post('/v1/use', ...signedIn, (req, res) => {});",
+            'src/routes/fixture-other.ts': "const signedIn = [apexOnly()];\nrouter.get('/v1/other', ...signedIn, (req, res) => {});",
+        })['POST /v1/use']).toEqual(['requireAuth']);
+    });
+    it('reports a route whose array name two other files declare and it does not import, rather than guessing', () => {
+        const found = openWriteDoors(toRows(collectDoors([
+            source(join(AIMEAT, 'src/routes/fixture-x.ts'), "const operator = [requireAuth()];\nrouter.get('/v1/x', ...operator, (req, res) => {});"),
+            source(join(AIMEAT, 'src/routes/fixture-y.ts'), "const operator = [requireAuth()];\nrouter.get('/v1/y', ...operator, (req, res) => {});"),
+            source(join(AIMEAT, 'src/routes/fixture-z.ts'), "router.post('/v1/z', ...operator, (req, res) => {});"),
+        ])));
+        expect(found.map(r => [r.id, r.unknownGuards])).toEqual([['POST /v1/z', ['...operator']]]);
+    });
+    it('still resolves a name one other file alone declares (organisms/shared.ts → workspace-access.ts)', () => {
+        expect(doors({
+            'src/routes/fixture-guards.ts': 'export const codeInviteGuards = [requireAuth()];',
+            'src/routes/fixture-invite.ts': "router.post('/v1/invite', ...codeInviteGuards, (req, res) => {});",
+        })['POST /v1/invite']).toEqual(['requireAuth']);
     });
 });
 
