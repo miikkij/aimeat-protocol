@@ -9,6 +9,7 @@
  * @structure OPERATOR_CONFIG_FIELDS
  * @usage import { OPERATOR_CONFIG_FIELDS } from './config-schema-operator.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — operator.address says a private person's pages give the email only, not the address.
  *   v1.1.0 — 2026-10-27 — operator.email_footer: the node's own mail foot (aimeat-commercial, Jouni: a shop's buyer
  *     reads "Sent by AIMEAT Protocol" and "Manage your notification settings in your AIMEAT profile" they do not have).
  *   v1.0.0 — 2026-10-24 — Moved from config-schema.ts, with the three agreement rows (dpo_contact, signer_name,
@@ -47,7 +48,7 @@ export const OPERATOR_CONFIG_FIELDS: ConfigFieldShape<OperatorFieldKey>[] = [
     description: 'Business or registration number (Y-tunnus, VAT id, company number). Empty for a private person; setting it is what makes this a company node' },
   { key: 'operator.address', dotPath: 'operator.address', envVar: 'AIMEAT_OPERATOR_ADDRESS', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 300, immutable: false,
-    description: 'Postal address of the controller. GDPR requires one that reaches a person' },
+    description: 'Postal address of the controller, printed on both public pages. For a private person (type natural_person) the pages give the email only, and this address is not printed or required' },
   { key: 'operator.country', dotPath: 'operator.country', envVar: 'AIMEAT_OPERATOR_COUNTRY', type: 'string',
     validate: v => typeof v === 'string' && (v as string).length <= 100, immutable: false,
     description: 'Country this node is operated from. Decides the governing law and the international-transfer wording' },
