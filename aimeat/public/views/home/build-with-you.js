@@ -27,7 +27,9 @@
  * @version-history
  *   v1.1.0 — 2026-11-01 — BuildCodeCard: the build code and three steps, shown when the node has a
  *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
- *     node's queueOrigin, and the place's chat is the second way in when the node has it.
+ *     node's queueOrigin, and the place's chat is the second way in when the node has it. Step 1
+ *     says to pick an agent with full access on aimeat.io's consent page: the queue's tool needs
+ *     exchange:write and ext:invoke.
  *   v1.0.1 — 2026-11-01 — The first state names the operator: the operator's agent takes the request
  *     to the queue, not the place. The node calls it 'waiting-for-operator' ('received' before).
  *   v1.0.0 — 2026-11-01 — Initial (Jouni, 1.11 16.22, via Grok and commercial-1c; the node's routes
@@ -135,6 +137,7 @@ function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
             <${Action} small href=${`${aimeatOrigin}/v1/profile?tab=mcp`} newTab>${fill(tr('home.buildWithYou.codeConnectThere', 'Connect to {host}'), { host })} →<//>
             <${Action} small href="/v1/profile?tab=mcp">${tr('home.buildWithYou.codeConnectHere', 'Connect to this place')} →<//>
           <//>
+          <${Note} kind="hint">${fill(tr('home.buildWithYou.codeFullAccess', 'When {host} asks, choose an agent with full access.'), { host })}<//>
           ${chatPath && html`
             <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use this place\'s chat: connect it to {host} under Access and security.'), { host })}<//>
             <${Actions}>

@@ -16313,6 +16313,7 @@
       "codeStepConnect": "Yhdistä oma tekoälysi (Claude, ChatGPT tai Grok) {host}:hon ja tähän paikkaan.",
       "codeConnectThere": "Yhdistä {host}:hon",
       "codeConnectHere": "Yhdistä tähän paikkaan",
+      "codeFullAccess": "Kun {host} kysyy, valitse agentti, jolla on täydet oikeudet.",
       "codeChatPath": "Voit käyttää myös tämän paikan chatia. Yhdistä se {host}:hon sivulla Pääsy ja turvallisuus.",
       "codeChatButton": "Yhdistä chat {host}:hon",
       "codeStepAsk": "Pyydä tekoälyäsi lähettämään rakennuspyyntösi tällä koodilla.",
