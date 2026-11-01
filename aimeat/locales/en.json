@@ -5499,7 +5499,8 @@
       "every": { "daily": "daily", "monthly": "monthly", "change": "on change", "weekly": { "0": "Sundays", "1": "Mondays", "2": "Tuesdays", "3": "Wednesdays", "4": "Thursdays", "5": "Fridays", "6": "Saturdays" } },
       "step1": "Accept the terms", "step2": "Take the key", "step3": "Connect your program",
       "terms": "I use the data for {purpose} and keep to the licence {licence}. I understand that {owner} sees when I read it.",
-      "thePurpose": "the purpose above", "noLicence": "(none given)",
+      "termsNoPurpose": "I keep to the licence {licence} when I use the data. I understand that {owner} sees when I read it.",
+      "noLicence": "(none given)",
       "termsAccepted": "You accepted the terms on {date}.",
       "termsNone": "This share has no terms to accept.", "termsNoneYet": "This share has no terms to accept. Press the button to make your key.",
       "acceptAndShow": "Accept and show the key", "show": "Show the key",
@@ -14196,10 +14197,10 @@
     "cfgOpt_classification_mode_off": "Off",
     "cfgOpt_classification_mode_owner": "Each owner decides",
     "cfgOpt_classification_mode_all": "On for everyone",
-    "cfgOpt_consent_data_intermediation_report": "Report only, refuse nothing",
-    "cfgOpt_consent_data_intermediation_none": "This server passes no data between others",
-    "cfgOpt_consent_data_intermediation_node": "The operator provides it",
-    "cfgOpt_consent_data_intermediation_owners": "Declared providers may provide it",
+    "cfgOpt_consent_data_intermediation_report": "Report only",
+    "cfgOpt_consent_data_intermediation_none": "No intermediation",
+    "cfgOpt_consent_data_intermediation_node": "This installation intermediates",
+    "cfgOpt_consent_data_intermediation_owners": "Owners intermediate",
     "cfgOpt_consent_party_self_registration_off": "Nobody registers to an app",
     "cfgOpt_consent_party_self_registration_apps-ask": "An app's owner asks, the operator approves",
     "cfgOpt_consent_party_self_registration_on": "An app's owner opens the signup",
@@ -14575,7 +14576,7 @@
     "cfgDomain_other": "Other",
     "cfgDomain_data_out": "Data out",
     "cfgGroup_data_out": "Data out",
-    "cfgDesc_consent_data_intermediation": "Whether this server passes data between others as a service. Report changes nothing: it shows what it finds on the Compliance page.",
+    "cfgDesc_consent_data_intermediation": "Whether this server passes data between others as a service. \"Report only\" changes nothing: it shows what it finds on the Compliance page.",
     "cfgDesc_consent_party_self_registration": "Whether an app may let people register without an account on this server. Always off on a server that shows its content to signed-in accounts only.",
     "cfgDesc_dataspace_enabled": "Opens this server to the connectors of EU data spaces. The trusted issuers are set one data space at a time.",
     "cfgDesc_consent_share_max_days": "How long an owner may share a data product with a named outside party.",
@@ -14628,7 +14629,7 @@
       "dcatFeed": "Address",
       "dcatSub": "Public data products as a machine-readable list that avoindata.fi and data.europa.eu can read. It has no switch: a data product is on it while it is public.",
       "open": "Open",
-      "aside": "A server that aimeat init sets up starts with \"This server passes no data between others\". Keep a public server on \"Report only\" until you have checked its activity and made the notification to the authority."
+      "aside": "A server that aimeat init sets up starts with \"No intermediation\". Keep a public server on \"Report only\" until you have checked its activity and made the notification to the authority."
     },
     "cfgGroup_ai": "AI: keys, models and the allowance",
     "cfgGroup_decide": "Decision model (TypeSafe)",
@@ -29249,12 +29250,12 @@
       "consent": {
         "data_intermediation": {
           "title": "Data intermediation service",
-          "short": "Whether this server runs a data intermediation service under the EU Data Governance Act (2022/868), and who provides it. Report only refuses nothing and lists what it finds on the Compliance page.",
-          "what": "A data intermediation service brings people who hold data and people who use it together commercially, for example a marketplace where anyone lists data and anyone buys it. On this server the setting decides one thing: whether an EXCHANGE offering that delivers data may be listed to everyone. Report only and The operator provides it refuse nothing. This server passes no data between others refuses such a listing; data then goes to named recipients only, with a named share to an outside party. Declared providers may provide it works the same way, except for an owner who manages an organism that keeps its own notification record. The check runs when a listing is made: a listing made before a change stays, and the Compliance page lists it as a finding for a person to decide. Section 12 of the Compliance page shows the findings and the Article 12 conditions in every mode.",
-          "range": "One of four: Report only (the code default), This server passes no data between others, The operator provides it, Declared providers may provide it. A server that aimeat init sets up starts with This server passes no data between others.",
-          "ex1": "This server passes no data between others: a company or personal server that shares data with named partners only.",
-          "ex2": "The operator provides it: a server whose operator has made the notification to the authority and runs an open data marketplace.",
-          "tip": "Choose The operator provides it only after the notification is made and recorded on the Compliance page. This is a reading of the regulation, not legal advice."
+          "short": "Whether this server runs a data intermediation service under the EU Data Governance Act (2022/868), and who provides it. \"Report only\" refuses nothing and lists what it finds on the Compliance page.",
+          "what": "A data intermediation service brings people who hold data and people who use it together commercially, for example a marketplace where anyone lists data and anyone buys it. On this server the setting decides one thing: whether an EXCHANGE offering that delivers data may be listed to everyone. \"Report only\" and \"This installation intermediates\" refuse nothing. \"No intermediation\" refuses such a listing; data then goes to named recipients only, with a named share to an outside party. \"Owners intermediate\" works the same way, except for an owner who manages an organism that keeps its own notification record. The check runs when a listing is made: a listing made before a change stays, and the Compliance page lists it as a finding for a person to decide. Section 12 of the Compliance page shows the findings and the Article 12 conditions in every mode.",
+          "range": "One of four: \"Report only\" (the code default), \"No intermediation\", \"This installation intermediates\" or \"Owners intermediate\". A server that aimeat init sets up starts with \"No intermediation\".",
+          "ex1": "\"No intermediation\": a company or personal server that shares data with named partners only.",
+          "ex2": "\"This installation intermediates\": a server whose operator has made the notification to the authority and runs an open data marketplace.",
+          "tip": "Choose \"This installation intermediates\" only after the notification is made and recorded on the Compliance page. This is a reading of the regulation, not legal advice."
         },
         "party_self_registration": {
           "title": "People register to apps without an account",

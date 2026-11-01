@@ -10,6 +10,7 @@
  * @usage
  *   import type { ReconcileChange, DesiredListing } from './exchange-projection-types.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — DesiredListing.freshness: a datapackage listing states its freshness (plan D6).
  *   v1.1.0 — 2026-11-01 — DesiredListing.deliversData: every listing says whether it delivers data (plan D5.5).
  *   v1.0.0 — 2026-09-13 — Extracted from services/exchange-projection.ts. ReconcileChange.reason and
  *     message now also describe the list-once skip (DUPLICATE_OF {app}/{tool} with a sentence).
@@ -76,4 +77,6 @@ export interface DesiredListing {
   lockedInput?: boolean;
   /** Whether the offering delivers data (plan D5.5): the source's own statement, else the node's proposal. */
   deliversData: boolean;
+  /** A datapackage listing's freshness (plan D6), part of its sourceHash so a state change updates the listing. */
+  freshness?: Offering['freshness'];
 }
