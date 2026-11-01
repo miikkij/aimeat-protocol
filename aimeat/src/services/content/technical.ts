@@ -12,6 +12,9 @@
  *   that throws is recorded in `errors` under its name and the facts from the rest are still
  *   returned. The readers themselves also report partial failures in `errors`.
  *
+ *   The picture and C2PA readers run under the node's media read limits (media-read-bounded.ts,
+ *   content_class.media_read_seconds and media_read_memory_mb); past one, the reader's error names it.
+ *
  *   TEXT. For a text file the bytes are decoded as UTF-8 and returned as `text` with
  *   `textFrom: 'file'`; for a PDF the text layer is returned with `textFrom: 'pdf-text-layer'`. The
  *   caller stores that text as its own file; only the counts go into the facts.
@@ -20,6 +23,8 @@
  *   const { technical, text, textFrom } = await readTechnicalFacts({ config, storage },
  *     { bytes, mimeType, filename, aiProvenanceId, ffprobePath: config.ffprobePath });
  * @version-history
+ *   v1.0.1 — 2026-11-01 — readImageFacts and readC2pa get the node's media read limits
+ *     (secaudit2026oct31w2 round 12).
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import { createHash } from 'node:crypto';
@@ -29,6 +34,7 @@ import { contentKindOf } from './kind.js';
 import { readPdfFacts } from './extract-pdf.js';
 import { readImageFacts } from './extract-image.js';
 import { readC2pa } from './extract-c2pa.js';
+import { mediaReadLimits } from './media-read-bounded.js';
 import { probeVideo } from './extract-video.js';
 import { measureText } from './extract-text.js';
 import { aiMarksOf } from './provenance-read.js';
@@ -79,6 +85,7 @@ export async function readTechnicalFacts(
   let nodeRecord: { id: string; level?: string } | null = null;
 
   const addErrors = (from: Record<string, string>): void => { Object.assign(errors, from); };
+  const mediaLimits = mediaReadLimits(deps.config);
 
   if (kind === 'pdf') {
     try {
@@ -95,7 +102,7 @@ export async function readTechnicalFacts(
     }
   } else if (kind === 'image') {
     try {
-      const got = await readImageFacts(bytes, mimeType);
+      const got = await readImageFacts(bytes, mimeType, mediaLimits);
       technical.image = got.facts;
       digitalSourceType = got.digitalSourceType;
       software = got.software;
@@ -122,7 +129,7 @@ export async function readTechnicalFacts(
 
   if (kind === 'image' || kind === 'video') {
     try {
-      c2pa = await readC2pa(bytes);
+      c2pa = await readC2pa(bytes, mediaLimits);
     } catch (err) {
       errors.c2pa = errText(err);
     }
