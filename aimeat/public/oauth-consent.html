@@ -8,6 +8,9 @@
     shared theme controller, the shared scope model and the shared consent vocabulary instead of
     private copies.
   @version-history
+    v1.10.2 — 2026-11-02 — Nothing is preselected unless the person named the agent at home or an
+      agent already carries the connecting AI's name: the create form opens, the list stays a choice,
+      and Approve waits for one (an agent the node made, such as a morning digest, was preselected).
     v1.10.1 — 2026-11-02 — The agent picker leaves out the node's own agents (the place's chat and the
       basic agents), so an outside AI is never preselected onto the chat; with no other agent the page
       opens on "create a new agent".
@@ -424,6 +427,8 @@
     // returning full-access agent must not be narrowed by a click that meant "yes, connect").
     let selectedPreset = 'keep';
     let customScopes = new Set();
+    // The create form opens by itself when no agent is chosen, the first time only.
+    let createOpenedOnce = false;
 
     // session.owner may be a string or { name: string } depending on the endpoint
     const getOwnerName = () => {
@@ -516,7 +521,10 @@
       // basic agents made with the account (tag crew.basic). Preselected, a connector bound itself to
       // the chat and a level choice rewrote the chat's permissions (commercial's own-AI test on
       // guestkoey3wfwk, 2026-11-02). Without them, a person with no other agent gets the create form.
-      const resident = (a) => a?.name === 'chat' || (Array.isArray(a?.tags) && a.tags.includes('crew.basic'));
+      // By name as well as by tag: the agents' runtime can rewrite an agent's tags, and on crew59 the
+      // concierge was still listed (data/basic-agents.ts names them concierge and workflow-manager).
+      const RESIDENT_NAMES = ['chat', 'concierge', 'workflow-manager'];
+      const resident = (a) => RESIDENT_NAMES.includes(a?.name) || (Array.isArray(a?.tags) && a.tags.includes('crew.basic'));
       const list = (d.data?.agents || d.data || []).filter((a) => !resident(a));
       // Alphabetical by the name a person sees (the node returns creation order); the browser's own
       // language decides the alphabet, as this page loads none of the SPA's format settings.
@@ -803,15 +811,22 @@
       }
 
       // Keep previous selection if valid; with none, prefer the agent whose name the person
-      // already chose at home; otherwise default to first.
+      // already chose at home, then an agent that already carries this AI's name. Otherwise nothing
+      // is chosen and the create form is open: an outside AI preselected onto an agent the node made
+      // (a morning digest, a concierge) would act as that agent with its permissions (commercial's
+      // crew59 test, 2026-11-02). The list stays as a choice.
       const prevGaii = selectedAgent?.gaii;
       const prevIdx = prevGaii ? agents.findIndex(a => a.gaii === prevGaii) : -1;
       const homeIdx = homeAgentName ? agents.findIndex(a => a.name === homeAgentName) : -1;
-      const selIdx = prevIdx >= 0 ? prevIdx : (homeIdx >= 0 ? homeIdx : 0);
-      selectedAgent = agents[selIdx];
+      const clientSlug = declaredName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+      const clientIdx = clientSlug.length >= 2 ? agents.findIndex((a) => a.name === clientSlug
+        || String(a.name || '').startsWith(clientSlug + '-')
+        || String(a.display_name || a.displayName || '').trim().toLowerCase() === declaredName.toLowerCase()) : -1;
+      const selIdx = prevIdx >= 0 ? prevIdx : (homeIdx >= 0 ? homeIdx : clientIdx);
+      selectedAgent = selIdx >= 0 ? agents[selIdx] : null;
       // The picker describes THIS agent: seed the custom list from what it holds, and start at
       // "keep" so approving without touching anything changes nothing.
-      customScopes = expandScopes(agentScopes(selectedAgent));
+      customScopes = selectedAgent ? expandScopes(agentScopes(selectedAgent)) : new Set();
 
       // One line per agent: the name a person gave it, and the short name under it only when the two
       // differ. The GAII and the balance stay off: agent balances are always 0 (the pace is the owner's).
@@ -832,13 +847,13 @@
         <div id="agentList">${agentListHtml}</div>
         <div class="create-agent-row" id="showCreateBtn">+ ${escHtml(t('createNewAgent'))}</div>
         <div id="inlineCreateContainer" class="hidden"></div>
-        <div id="scopeArea">${scopeSectionHtml()}</div>
+        <div id="scopeArea">${selectedAgent ? scopeSectionHtml() : ''}</div>
         ${boundaryHtml()}
         <div id="pacingSlot">${pacingHtml()}</div>
         <div id="approveError" class="error-msg"></div>
         <div class="btn-row">
           <button class="btn btn-deny" id="denyBtn">${escHtml(t('denyBtn'))}</button>
-          <button class="btn btn-approve" id="approveBtn">${escHtml(t('approveBtn'))}</button>
+          <button class="btn btn-approve" id="approveBtn" ${selectedAgent ? '' : 'disabled'}>${escHtml(t('approveBtn'))}</button>
         </div>
       `;
 
@@ -852,10 +867,11 @@
           selectedPreset = 'keep';
           customScopes = expandScopes(agentScopes(selectedAgent));
           document.getElementById('scopeArea').innerHTML = scopeSectionHtml();
+          document.getElementById('approveBtn').disabled = false;
           wireScopeSection();
         });
       });
-      wireScopeSection();
+      if (selectedAgent) wireScopeSection();
 
       document.getElementById('showCreateBtn').addEventListener('click', () => {
         document.getElementById('showCreateBtn').classList.add('hidden');
@@ -868,6 +884,12 @@
           renderApproval();
         });
       });
+      // Nothing chosen: the create form is the first thing in view, once. Its Cancel leaves the list
+      // and the "+" row, so the person can pick an existing agent instead.
+      if (!selectedAgent && !createOpenedOnce) {
+        createOpenedOnce = true;
+        document.getElementById('showCreateBtn').click();
+      }
 
       document.getElementById('denyBtn').addEventListener('click', deny);
       document.getElementById('approveBtn').addEventListener('click', async () => {
