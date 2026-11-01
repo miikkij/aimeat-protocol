@@ -5,6 +5,7 @@
  *   and the agent-registration discovery documents (/auth.md + the agent_auth block on
  *   /.well-known/oauth-authorization-server).
  * @version-history
+ *   v1.6.2 -- 2026-11-01 -- Test 5b: the authorize step passes OAuth's ui_locales to the consent page as lang.
  *   v1.6.1 -- 2026-10-20 -- Test 15 asserts the server does not declare resources.subscribe, which no
  *     handler serves (test 29 still accepts -32601 for the method).
  *   v1.6.0 -- 2026-10-12 -- MCP-06 (a code without PKCE) and MCP-07 (a foreign resource) ask the node
@@ -338,6 +339,22 @@ await test('5. Auth without signature → redirects to consent', async () => {
     assert(res.status === 302, `status ${res.status}`);
     const location = res.headers.get('location') ?? '';
     assert(location.includes('/v1/oauth/consent'), `redirect: ${location}`);
+});
+
+await test('5b. ui_locales becomes the consent page\'s lang, and only for a language this node ships', async () => {
+    const consentOf = async (uiLocales: string) => {
+        const params = new URLSearchParams({
+            response_type: 'code', client_id: clientId, ui_locales: uiLocales, ...authorizeParams(mcpPkce(BASE)),
+        });
+        const res = await fetch(`${BASE}/v1/mcp/authorize?${params}`, { redirect: 'manual' });
+        await res.arrayBuffer();
+        assert(res.status === 302, `status ${res.status}`);
+        return new URL(res.headers.get('location') ?? '', BASE).searchParams;
+    };
+    // A store place sends its buyer's language; the first one this node ships wins.
+    assert((await consentOf('fi')).get('lang') === 'fi', 'fi was not passed on');
+    assert((await consentOf('de es-CO')).get('lang') === 'es', 'the first shipped language of the list was not chosen');
+    assert(!(await consentOf('de')).has('lang'), 'a language this node does not ship was passed on');
 });
 
 await test('6. Auth with invalid signature → 401', async () => {

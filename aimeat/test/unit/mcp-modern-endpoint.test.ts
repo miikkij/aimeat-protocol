@@ -6,6 +6,8 @@
  *   handler hands the factory (mcp/modern-endpoint.ts), and the contact-record throttle a stateless
  *   request needs (services/mcp-agent-admission.ts), plus the admission refusals both eras share.
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- The first-MCP-call marker and the hello_mcp proof leave out the place's own
+ *     chat and the basic agents (services/node-resident-agent.ts).
  *   v1.0.0 -- 2026-10-20 -- Initial (MCP SDK v2 migration step 5).
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -22,12 +24,23 @@ vi.mock('../../src/services/onboarding-funnel.js', () => ({ recordFirstMcpCall }
 
 const { modernAuthInfo } = await import('../../src/mcp/modern-endpoint.js');
 const { admitMcpAgent, recordMcpContactThrottled, MCP_CONTACT_THROTTLE_MS } = await import('../../src/services/mcp-agent-admission.js');
+const { hasHelloMcpProof } = await import('../../src/services/node-resident-agent.js');
 
 const verified: VerifiedToken = {
     sub: 'claude#alice@test', owner: 'alice', node: 'test', roles: ['agent'],
     scopes: ['memory:read', 'memory:write'], exp: 1_900_000_000,
 };
-const deps = { storage: {} as Storage, config: { nodeId: 'test' } as AimeatConfig };
+// getAgent answers the agent's name from its GAII; a name in BASIC is tagged as a basic agent.
+const BASIC = new Set(['concierge']);
+const deps = {
+    storage: {
+        getAgent: async (gaii: string) => {
+            const name = gaii.split('#')[0];
+            return { name, gaii, tags: BASIC.has(name) ? ['crew.basic', 'role.concierge'] : [] };
+        },
+    } as unknown as Storage,
+    config: { nodeId: 'test' } as AimeatConfig,
+};
 
 describe('modernAuthInfo', () => {
     it('carries the token, the subject, a copy of the scopes, the expiry and the verified token itself', () => {
@@ -62,6 +75,39 @@ describe('recordMcpContactThrottled', () => {
         await recordMcpContactThrottled(deps, { gaii: 'a2#alice@test', owner: 'alice', platform: 'cursor' }, t0);
         await recordMcpContactThrottled(deps, { gaii: 'a3#alice@test', owner: 'alice', platform: 'claude' }, t0);
         expect(registerChatInstance).toHaveBeenCalledTimes(3);
+    });
+
+    it('records the first MCP call only for an AI from outside: never the place\'s own chat or a basic agent', async () => {
+        const t0 = 13_000_000;
+        await recordMcpContactThrottled(deps, { gaii: 'chat#alice@test', owner: 'alice', platform: 'goose' }, t0);
+        await recordMcpContactThrottled(deps, { gaii: 'concierge#alice@test', owner: 'alice', platform: 'goose' }, t0);
+        expect(registerChatInstance).toHaveBeenCalledTimes(2);
+        expect(recordFirstMcpCall).not.toHaveBeenCalled();
+
+        await recordMcpContactThrottled(deps, { gaii: 'claude#alice@test', owner: 'alice', platform: 'claude' }, t0);
+        expect(recordFirstMcpCall).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('hasHelloMcpProof', () => {
+    const memory = (ownerGaii: string) => ({ key: 'onboarding.hello_mcp', ownerGaii, value: { ok: true } });
+    const storageWith = (rows: Array<{ key: string; ownerGaii: string }>) => ({
+        getMemory: async () => null,
+        getAgentsByOwner: async () => [
+            { name: 'chat', gaii: 'chat#alice@test', tags: [] },
+            { name: 'concierge', gaii: 'concierge#alice@test', tags: ['crew.basic'] },
+            { name: 'claude', gaii: 'claude#alice@test', tags: [] },
+        ],
+        getEcosystemAppsByOwner: async () => [],
+        listMemoryForOwners: async (ids: string[]) => rows.filter(r => ids.includes(r.ownerGaii)),
+    }) as unknown as Storage;
+
+    it('does not take the proof key from the place\'s own chat or a basic agent', async () => {
+        expect(await hasHelloMcpProof(storageWith([memory('chat#alice@test'), memory('concierge#alice@test')]), 'test', 'alice')).toBe(false);
+    });
+
+    it('takes it from an AI the person connected', async () => {
+        expect(await hasHelloMcpProof(storageWith([memory('chat#alice@test'), memory('claude#alice@test')]), 'test', 'alice')).toBe(true);
     });
 });
 
