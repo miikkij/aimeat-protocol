@@ -38,6 +38,9 @@
  *   const opened = await openPartyPurchase(deps, offeringId, body, renewalCtx);
  *   const done = await completePartyPurchase(deps, purchaseId, { handler: 'test.money', instrument: 'x' });
  * @version-history
+ *   v1.0.1 — 2026-11-01 — The card page handler is refused with 409 PROVIDER_TAKES_NO_CARD before
+ *     anything is written when the provider has no Stripe account (it answered 500 and left an open
+ *     purchase); a card page Stripe refuses removes the purchase and answers Stripe's refusal (WP10d).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.4).
  */
 import { randomBytes } from 'node:crypto';
@@ -48,7 +51,8 @@ import { getOffering, type Offering } from './exchange-market.js';
 import { createEntitlement, readContractForCall, type PricingSpec, type DatapackageSurface } from './metered-entitlements.js';
 import { PER_MONTH_SECONDS } from './exchange-datapackage.js';
 import { updateRecord, UNCHANGED } from './record-cas.js';
-import { getPaymentHandler } from '../commerce/payment-handlers.js';
+import { getPaymentHandler, PaymentError } from '../commerce/payment-handlers.js';
+import { sellerKey } from '../commerce/stripe-handler.js';
 import { percentFee } from '../commerce/money.js';
 import { commerceFeePercent } from './marketplace-fee.js';
 import { bookSessionlessSale } from '../commerce/session-service.js';
@@ -132,6 +136,16 @@ function partyNameFor(asked: unknown, displayName: string): string | null {
     return `${slug}-${randomBytes(3).toString('hex')}`;
 }
 
+/** Whether the provider's payment settings hold a Stripe key the card page can use (the check sellerKey makes). */
+function sellerTakesCards(config: AimeatConfig, psp: unknown): boolean {
+    try {
+        return !!sellerKey(config, { psp });
+    } catch (err) {
+        if (err instanceof PaymentError && err.code === 'PSP_NOT_CONFIGURED') return false;
+        throw err;
+    }
+}
+
 /** The datapackage offering a party may buy, or the refusal. */
 async function buyable(storage: Storage, offeringId: string): Promise<{ ok: true; o: Offering; surface: DatapackageSurface } | Refusal> {
     const o = await getOffering(storage, offeringId);
@@ -158,6 +172,16 @@ export async function openPartyPurchase(
     const handler = HANDLERS.includes(handlerId) ? getPaymentHandler(handlerId) : undefined;
     if (!handler || !handler.currencies.includes(o.currency ?? 'EUR')) {
         return refuse(422, 'UNKNOWN_PAYMENT_HANDLER', `Pay with ${HANDLERS.filter(h => getPaymentHandler(h)).join(' or ') || 'a card'}: this node has no handler "${handlerId}" for ${o.currency}.`);
+    }
+    // The card page is the provider's own Stripe account. Without one nothing can be paid, so the
+    // purchase is refused here, before anything is written.
+    const psp = handler.id === STRIPE_CHECKOUT_HANDLER_ID ? await readPsp(storage, o.providerGhii) : null;
+    if (handler.id === STRIPE_CHECKOUT_HANDLER_ID && !sellerTakesCards(config, psp)) {
+        const others = HANDLERS.filter(h => h !== STRIPE_CHECKOUT_HANDLER_ID && getPaymentHandler(h)?.currencies.includes(o.currency ?? 'EUR'));
+        return refuse(409, 'PROVIDER_TAKES_NO_CARD', 'The seller cannot take card payments yet, because they have not connected a Stripe account. '
+            + (others.length
+                ? `This node also takes ${others.join(' or ')}: buy again with "handler": "${others[0]}".`
+                : 'This node has no other way to pay for it. Ask the seller to set up card payments, or to share the data with you by name.'));
     }
 
     // The party: the renewing one, or the new one the body names.
@@ -216,8 +240,18 @@ export async function openPartyPurchase(
             items: [{ title: `${o.title} (${surface.model === 'per_month' ? `${quantity} month(s)` : `${quantity} reads`})` }],
             updatedAt: createdAt, expiresAt: purchase.expiresAt,
         } as unknown as CheckoutSessionRecord;
-        const page = await openStripeCheckout(config, asSession, (await readPsp(storage, o.providerGhii)), returnUrl);
-        pay = { ...pay, card_page_url: page.url, note: 'Pay on the card page; you come back with stripe_session, which you POST to complete_url as the instrument.' };
+        let page: { url: string };
+        try {
+            page = await openStripeCheckout(config, asSession, psp, returnUrl);
+        } catch (err) {
+            // Stripe refused the page: the purchase can never be paid, so it does not stay open.
+            await updateRecord(storage, o.providerGhii, recordKey(monthOf(createdAt)), parseRecord,
+                cur => cur.purchases.some(p => p.id === id) ? { purchases: cur.purchases.filter(p => p.id !== id) } : UNCHANGED,
+                { tag: 'party-purchases' });
+            if (err instanceof PaymentError) return refuse(err.statusCode, err.code, err.message);
+            throw err;
+        }
+        pay ={ ...pay, card_page_url: page.url, note: 'Pay on the card page; you come back with stripe_session, which you POST to complete_url as the instrument.' };
     } else {
         pay = { ...pay, note: 'POST complete_url with { "handler": "test.money", "instrument": "<any text>" }: the test double settles with no real money.' };
     }
