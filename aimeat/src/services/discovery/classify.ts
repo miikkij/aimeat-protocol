@@ -13,6 +13,8 @@
  * @usage
  *   const { type, segment } = classifyMemoryKey(key, { tags, contentType });
  * @version-history
+ *   v0.4.0 — 2026-11-01 — A `packages/` record tagged `data-package` classifies as `dataset` (plan
+ *     doc-mvwxcas3dom3, D1.1); a knowledge package keeps `knowledge`.
  *   v0.3.0 — 2026-08-31 — apps.{appId}.tools classifies as `tool`, segment = the app. The
  *     app-tools source owns these records now, so this pattern is the belt to its braces: should a
  *     manifest reach the classifier by another road, it is typed rather than served raw.
@@ -80,6 +82,9 @@ export function classifyMemoryKey(
   let m: RegExpMatchArray | null;
 
   if (PKG_KEY.test(key)) {
+    // A data package's catalogue record is a dataset, not a knowledge package of memory entries.
+    // The `datasets` source owns these records; this is the classification should one arrive here.
+    if (hints.tags?.includes('data-package')) return { type: 'dataset', segment: null };
     return { type: 'knowledge', segment: hints.contentType ?? null };
   }
 

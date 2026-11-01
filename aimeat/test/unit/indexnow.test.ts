@@ -10,6 +10,8 @@
  *   so: the endpoint answers 202 and validates later. The test "groups by host" fails on that code.
  *
  * @version-history
+ *   v1.0.1 — 2026-11-01 — The fake storage answers the data package catalogue scan, which the "all"
+ *     plan now reads for the public dataset pages (plan doc-mvwxcas3dom3, D1.4); E2E covers its content.
  *   v1.0.0 — 2026-09-11 — Initial.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
@@ -65,6 +67,10 @@ function fakeStorage(opts: { apps?: AppSummaryRecord[]; sites?: Array<{ enabled:
     listApps: async () => ({ apps: opts.apps ?? [] }),
     listSubdomainSites: async () => opts.sites ?? [],
     updateAppMeta: async (ownerGaii: string, filename: string, meta: { seo?: unknown }) => { stamps.push({ ownerGaii, filename, seo: meta.seo }); return true; },
+    // The data package catalogue scan the "all" plan reads (services/datapackage/catalogue-facts.ts):
+    // no packages here.
+    listAllMemoryMeta: async () => ({ items: [], total: 0 }),
+    getMemoryByKeysAnyOwner: async () => [],
   } as unknown as Storage;
   return { storage, memory, stamps };
 }
