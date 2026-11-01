@@ -13,6 +13,7 @@
  *   wireRecoveryViews({ i, api, showView }) -> the forgot-password and forgot-username handlers
  * @usage import { recoveryViewsHtml, wireRecoveryViews } from './modal-recovery-views.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — The address fields' example is in the page's language (modal.emailPlaceholder).
  *   v1.1.0 — 2026-10-05 — wireRecoveryViews: the forgot-password and forgot-username handlers,
  *     extracted verbatim from modal.js, which the sign-up fix took past the 800-line ceiling.
  *   v1.0.0 — 2026-09-04 — Extracted verbatim from auth/modal.js.
@@ -56,7 +57,7 @@ export function recoveryViewsHtml(i, field) {
     + '<div id="aimeat-forgot-user-view" class="aimeat-body" style="display:none">'
     + '<h3 class="aimeat-sub-title">' + escHtml(i.recoverUsernameTitle || 'Recover Username') + '</h3>'
     + '<p class="aimeat-sub-desc">' + escHtml(i.recoverUsernameDesc || 'Enter the email address associated with your account.') + '</p>'
-    + field(i.emailLabel || 'Email', '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
+    + field(i.emailLabel || 'Email', '<input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="' + escHtml(i.emailPlaceholder || 'you@example.com') + '">')
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i.sendUsername || 'Send My Username') + '</button>'
     + '<button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'
@@ -68,7 +69,7 @@ export function recoveryViewsHtml(i, field) {
     + '<div id="aimeat-em-step1">'
     + '<h3 class="aimeat-sub-title">' + escHtml(i.completeAccountTitle || 'One last step') + '</h3>'
     + '<p class="aimeat-sub-desc">' + escHtml(i.completeAccountDesc || 'Add an email to finish setting up your account. We’ll send a verification code to confirm it.') + '</p>'
-    + field(i.emailLabel || 'Email', '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com">')
+    + field(i.emailLabel || 'Email', '<input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="' + escHtml(i.emailPlaceholder || 'you@example.com') + '">')
     + '<div class="aimeat-actions">'
     + '<button id="aimeat-em-send" class="aimeat-go">' + escHtml(i.sendVerificationCode || 'Send Verification Code') + '</button>'
     + '<button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i.backToLogin || 'Back to Login') + '</button>'

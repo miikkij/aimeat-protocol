@@ -22,6 +22,8 @@
  * @structure OwnerStart({ navigate })
  * @usage html`<${OwnerStart} navigate=${navigate} />` (landing.js)
  * @version-history
+ *   v1.3.0 — 2026-11-01 — The title reads "Tämä on <osoite> – oma AIMEAT", and signed out the top bar's
+ *     sign-in button is hidden while the page's own form shows (Jouni's review, K65-4).
  *   v1.2.0 — 2026-11-01 — The admin address and "visitors see this page" show only to a signed-in
  *     person; a visitor signed out sees the sign-in and nothing about running the site (Jouni, K65-4).
  *   v1.1.0 — 2026-10-31 — The page says what AIMEAT is, what happens after sign-in and how long the
@@ -66,6 +68,12 @@ export function OwnerStart({ navigate }) {
     window.addEventListener('aimeat-auth-change', onAuth);
     return () => { css.remove(); window.removeEventListener('aimeat-auth-change', onAuth); };
   }, []);
+
+  // While the page's own sign-in form shows, the top bar's sign-in button is not drawn beside it.
+  useEffect(() => {
+    document.documentElement.classList.toggle('owner-start-signin', !inside);
+    return () => document.documentElement.classList.remove('owner-start-signin');
+  }, [inside]);
 
   const host = window.location.host;
   const admin = `${window.location.origin}/v1/admin?tab=portal`;

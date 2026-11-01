@@ -27,6 +27,7 @@
  *   tokenFold · secAccounts · secMcp · secSecrets · hostAskSwitch · secretFold · secGroups · secAddresses · secRoads
  * @usage import { renderPage } from './access/page.js';
  * @version-history
+ *   v1.34.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of v33): "kuka pääsee tiliisi ja miten"; one button at the top, the fingerprint or face sign-in while there is none; no tags and no counters up front; the sign-in rows are the link, the fingerprint or face, two-step and "Olet kirjautuneena N laitteella" with "Kirjaudu ulos muilta laitteilta", without the other servers' row; everything else, counters included, is in one fold, "Lisätiedot".
  *   v1.33.0 -- 2026-11-01 -- On a node the store sold (Jouni's review of the Access page): the sign-in row is the emailed sign-in link, in use; no "set by the store" password, no coral two-step chip, no warning that anyone with the password gets in; the recovery key and the public key rows are left out, and the words come from the `Place` variants (frame.js x), which say permission where the page said key.
  *   v1.32.0 -- 2026-10-29 -- On a customer's node the password reads as the one the store set, which the buyer signing in by email link does not need (UX review 2026-10-29, D).
  *   v1.31.0 -- 2026-10-25 -- Section 05 carries the switch "Ask me before my secret is sent to a new
@@ -135,32 +136,44 @@ export function renderPage(ctx) {
     ['07', 'ac-addresses', x('rail.addresses'), ''],
     ['08', 'ac-roads', x('rail.ai'), ''],
   ];
+  // On a node the store sold the page leads with how the buyer signs in; the counters, the keys and
+  // everything for agents and developers wait in one fold, "Lisätiedot" (Jouni's review of v33).
+  const place = customerNode();
+  const sections = place
+    ? [{ id: 'ac-signin', num: '01', label: x('rail.signIn'), count: '' }, { id: 'ac-more', num: '02', label: x('morePlace'), count: '' }]
+    : rail.map(([num, id, label, count]) => ({ id, num, label, count }));
+  // Built only once the overview is in: every section reads it.
+  const rest = () => html`
+    ${secKeys(ctx)}
+    ${secAccounts(ctx)}
+    ${secMcp(ctx)}
+    ${secSecrets(ctx)}
+    ${secGroups(ctx)}
+    ${secAddresses(ctx)}
+    ${secRoads()}`;
   return html`
     <${SettingsPage} name="ac"
       crumb=${crumb()}
       title=${t('profile.tabs.access')} sub=${x('titleSub')} help="concept.scope"
-      marks=${marks(ctx)}
+      marks=${place ? [] : marks(ctx)}
       desc=${x('desc')}
       actions=${mastActions(ctx)}
       start=${customerNode()
         ? html`<${PageStart} id="access" purpose=${t('pageStart.access.purposePlace')} next=${t('pageStart.access.nextPlace')}
             action=${{ onClick: () => scrollToSection('ac-keys'), label: t('pageStart.access.actionPlace') }} />`
         : html`<${PageStart} id="access" action=${{ onClick: () => scrollToSection('ac-keys') }} />`}
-      strip=${strip(ctx)}
+      strip=${place ? null : strip(ctx)}
       railTitle=${x('railTitle')}
-      sections=${rail.map(([num, id, label, count]) => ({ id, num, label, count }))}
+      sections=${sections}
       pagesLabel=${x('pages')}
       pages=${pageLinks(ctx.isOperator)}
       after=${html`<${ctx.ConfirmUI} />`}>
       ${!ov ? html`<${Note} kind=${ctx.failed ? 'quiet' : 'loading'}>${ctx.failed ? x('loadFailed') : x('loading')}<//>` : html`
         ${secSignIn(ctx)}
-        ${secKeys(ctx)}
-        ${secAccounts(ctx)}
-        ${secMcp(ctx)}
-        ${secSecrets(ctx)}
-        ${secGroups(ctx)}
-        ${secAddresses(ctx)}
-        ${secRoads()}`}
+        ${place
+          ? html`<${Section} fold id="ac-more" num="02" title=${x('morePlace')} sub=${x('moreSubPlace')}
+              open=${ctx.moreOpen} onToggle=${() => ctx.setMoreOpen(!ctx.moreOpen)}>${ctx.moreOpen ? html`${strip(ctx)}${rest()}` : null}<//>`
+          : rest()}`}
     <//>`;
 }
 
@@ -183,6 +196,13 @@ function mastActions(ctx) {
   const ov = ctx.ov;
   const s = ov?.sign_in;
   const wantPasskey = ov && s.passkeys.available && s.passkeys.count === 0 && ctx.passkeysSupported && !s.managed_by;
+  // A buyer gets one button at the top, the fingerprint or face sign-in while there is none; the
+  // token and the doors for an AI are in Lisätiedot (Jouni's review of v33).
+  if (customerNode()) {
+    return wantPasskey
+      ? html`<${Loud} control disabled=${ctx.busy === 'passkey'} onClick=${() => ctx.addPasskeyNow()}>${ctx.busy === 'passkey' ? x('working') : x('slabPasskey')}<//>`
+      : null;
+  }
   return html`
     ${wantPasskey
       ? html`<${Loud} control disabled=${ctx.busy === 'passkey'} onClick=${() => ctx.addPasskeyNow()}>${ctx.busy === 'passkey' ? x('working') : x('slabPasskey')}<//><${Note} kind="hint" slab inline>${x('slabPasskeyHint')}<//>`
@@ -254,10 +274,14 @@ function secSignIn(ctx) {
           ? row('twoStep', x('row.twoStep'), tf.enabled ? x('row.twoStepOn', { n: tf.backup_codes_left }) : tf.pending ? x('row.twoStepPending') : x('row.twoStepOff'), state(tf.enabled, tf.enabled ? x('twoStep.onShort') : x('twoStep.offShort')),
             html`<${TwoFactorSection} inRow twoFactor=${tf} managed=${!!s.managed_by} showToast=${ctx.showToast} onChanged=${() => ctx.load()} />`)
           : null}
-        ${row('sessions', x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }),
-          html`<${Figure} small n=${n(s.sessions.mine.total)} />${s.sessions.mine.total > 1 ? html`<${Action} small disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}<//>` : null}`,
-          s.sessions.mine.total ? sessionsBlock(ctx) : null)}
-        ${row('federation', x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'),
+        ${customerNode()
+          // A buyer reads devices, not sessions, and one way to sign the others out (review of v33).
+          ? row('sessions', x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total, devices: s.sessions.mine.by_device.length }),
+              s.sessions.mine.by_device.length > 1 ? html`<${Action} small disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}<//>` : null)
+          : row('sessions', x('row.sessions'), x('row.sessionsSub', { mine: s.sessions.mine.total, agents: s.sessions.agents.total }),
+              html`<${Figure} small n=${n(s.sessions.mine.total)} />${s.sessions.mine.total > 1 ? html`<${Action} small disabled=${ctx.busy === 'sessions'} onClick=${() => ctx.signOutOthers()}>${x('doorSignOutOthers')}<//>` : null}`,
+              s.sessions.mine.total ? sessionsBlock(ctx) : null)}
+        ${customerNode() ? null : row('federation', x('row.federation'), ctx.fed.all ? x('row.federationAll') : ctx.fed.nodes.length ? x('row.federationList', { n: ctx.fed.nodes.length }) : x('row.federationNone'),
           html`<${Mark}>${ctx.fed.all ? x('fed.allChip') : x('fed.listChip', { n: ctx.fed.nodes.length })}<//><${Action} small disabled=${ctx.busy === 'fed'} onClick=${() => ctx.toggleFedAll()}>${ctx.fed.all ? x('fed.restrict') : x('fed.allowAll')}<//>`,
           federationBlock(ctx))}
         ${customerNode() ? null : row('recovery', x('row.recovery'), ctx.ownerKey ? x('row.recoveryHere') : x('row.recoveryNotHere'),

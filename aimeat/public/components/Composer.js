@@ -26,6 +26,8 @@
  *        html`<${Composer} tone="message" recipient=${peer} sendLabel=${t('inbox.reply')} sending=${sending}
  *          onSend=${(recipient, markdown, files, reset) => …} draftKey=${key} focusNonce=${n} />`
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The attach button has an accessible name ("Liitä tiedosto"), as the
+ *     microphone already had; the paperclip itself is hidden from screen readers (review of v33).
  *   v1.3.0 — 2026-09-26 — The chat's row takes `placeholder`, `sendLabel`, `sending`, `inputRef` and
  *     `suggest` (the slash commands over the field, from an agent's Messages tab, where main drew them
  *     as .pf-agd-autocomplete); additive, the chat's row is unchanged without them.
@@ -135,8 +137,8 @@ export function ChatComposer({ value, onInput, onSend, onStop, onSpeak, onAttach
                     <input type="file" multiple ref=${fileRef} class="poster-composer-file"
                         onChange=${(e) => { onAttach([...e.target.files]); e.target.value = ''; }} />
                     <button type="button" class="poster-icon poster-composer-tool" disabled=${disabled}
-                        title=${tr('chat.attachTitle', 'Attach a file')}
-                        onClick=${() => fileRef.current?.click()}>📎</button>` : ''}
+                        title=${tr('chat.attachTitle', 'Attach a file')} aria-label=${tr('chat.attachTitle', 'Attach a file')}
+                        onClick=${() => fileRef.current?.click()}><span aria-hidden="true">📎</span></button>` : ''}
                 ${onSpeak && !busy ? html`
                     <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} disabled=${disabled || listening}
                         className="poster-icon poster-composer-tool" plain=${true} onRecorded=${(file) => onSpeak(file)} />` : ''}

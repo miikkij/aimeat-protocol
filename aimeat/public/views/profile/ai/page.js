@@ -14,6 +14,7 @@
  * @version-history
  *   v1.38.0 -- 2026-11-01 -- Section 06, the rules for AI pictures and videos (gen-rules-section.js), in the full page and under the simple view's fold; budget and consumers move to 07 and 08.
  *   v1.37.0 -- 2026-10-31 -- Jouni's review of v31 (K58, K60): the credit shows once, on its own card, with "riittää noin N tavalliseen viestiin" when this place's 30-day average cost per call can tell (messagesLeft), and no tag; sums under a cent read "alle 1 snt" (creditWords); the daily limit says it protects the credit; under "Buy more credit" it says the same card pays and no new subscription is made; the decision model, transparency and compliance cards sit inside "Lisäasetukset" (ctx.extras); there the key section is "Oma tekoälytili (valinnainen)" and says that no own key is the usual way.
+ *   v1.38.0 -- 2026-11-01 -- The simple view (Jouni's review of v33): the title and menu say "Tekoälysaldo"; no 30-day figure in the strip and no monospace line on the meter; in Lisäasetukset the first and chosen radio is "Tekoälysaldo (oletus, ei avainta)", with "Ilman omaa avainta…" above the choice and the key field only after a service of one's own is picked (K60); "about N messages" by the store's price of one message when it set one (A3).
  *   v1.37.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
  *   v1.36.0 -- 2026-10-31 -- The simple view (renderSimple) on a node the store sold, for a person with no key of their own: the head says how much AI credit is left and offers only "Buy more credit"; the strip is the credit, today's use against the daily limit and the month, all in euros; section 01 is today's use (secToday); everything else, the key and the budget's edit included, is under one fold, "Lisäasetukset" (v31 K58, K60).
  *   v1.35.0 -- 2026-10-31 -- On a node the store sold, with no key of the person's own, the head's loud action is "Buy more credit" in the store (the top-up address in the page's language), "Get a key" a small link, and OpenRouter's balance page is not offered (v28 #19).
@@ -84,7 +85,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
-import { creditEur, topupHref } from '/js/ai-credit.js';
+import { creditEur, messagesFor, topupHref } from '/js/ai-credit.js';
 import { money as fmtMoney } from '/js/format.js';
 
 /** The allowance left on the node's key: euros of AI credit on a node the store sold, else dollars. */
@@ -108,6 +109,9 @@ const creditWords = (usd) => {
 function messagesLeft(ctx) {
   const r = ctx.roll;
   const left = Number(ctx.chat?.allowance_remaining_usd) || 0;
+  // The store's price of one message wins, so the store and this page say the same N (review A3).
+  const priced = messagesFor(creditEur(left) ?? left);
+  if (priced) return priced;
   if (!r || !(r.calls > 0) || !(r.cost > 0) || !(left > 0)) return null;
   const n = Math.floor(left / (r.cost / r.calls));
   return n >= 1 ? n : null;
@@ -188,7 +192,7 @@ function secToday(ctx) {
       <${Facts} rows=${[
         { key: 'today', k: x('simple.todayLabel'), v: html`
           <${FactLine} sub=${x('simple.limitNote', { budget: creditWords(budget) })}>${x('simple.todayLine', { spent: creditWords(spent), budget: creditWords(budget) })}<//>
-          <${Meter} quota pct=${pct} figure=${`${creditWords(spent)} / ${creditWords(budget)} · ${pct} %`} />` },
+          <${Meter} quota pct=${pct} />` },
         { key: 'month', k: x('monthLabel'), v: r && r.days ? x('simple.monthLine', { cost: creditWords(r.cost) }) : x('monthNone') },
       ]} />
     <//>`;
@@ -253,7 +257,7 @@ function mast(ctx) {
   if (simpleView(ctx)) {
     const topup = topupHref(getLocale());
     return {
-      title: t('profile.generator.openrouter.title'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
+      title: t('profile.generator.openrouter.titlePlace'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
       desc: !s ? '' : x('simple.desc'),
       actions: topup ? html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Note} kind="meta">${x('simple.topupNote')}<//>` : null,
     };
@@ -274,7 +278,7 @@ function strip(ctx) {
   const s = ctx.settings;
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!s) return html`<${FigureStrip} loading=${simpleView(ctx) ? 3 : 4} />`;
+  if (!s) return html`<${FigureStrip} loading=${simpleView(ctx) ? 2 : 4} />`;
   if (simpleView(ctx)) {
     // The credit once, on its own card, with what it buys when this place's history can tell (K58).
     const lasts = messagesLeft(ctx);
@@ -282,7 +286,6 @@ function strip(ctx) {
       { key: 'credit', n: ctx.chat ? creditWords(ctx.chat.allowance_remaining_usd || 0) : '…', tone: 'coral', label: x('simple.stripCredit'),
         sub: lasts ? x('simple.lasts', { n: lasts }) : '' },
       { key: 'today', n: u ? creditWords(u.spent_today_usd) : '…', label: x('stripToday'), sub: u ? x('simple.stripLimit', { n: creditWords(todayLimit(ctx)) }) : '' },
-      { key: 'month', n: r ? creditWords(r.cost) : '…', label: x('stripMonth') },
     ]} />`;
   }
   const rl = ctx.rl;
@@ -307,9 +310,14 @@ function secConnection(ctx) {
   const d = ctx.conn;   // the draft: provider, baseUrl, apiKey
   const isOr = d.provider === 'openrouter';
   const count = ctx.keyed ? x('secConnectionSub', { provider: x('provider.' + (s.provider || 'openrouter')) }) : x('secConnectionNone');
+  // A buyer with no key of their own: the AI credit is the first choice and the one chosen, and the
+  // key field shows only after they pick a service of their own (Jouni's review of v33, K60).
+  const creditFirst = simple && !ctx.keyed;
+  const own = !creditFirst || ctx.ownAi;
   const providers = html`
-    ${['openrouter', 'lmstudio', 'custom'].map((p) => html`<${Check} radio inline name="ai-provider" key=${p} checked=${d.provider === p} onChange=${() => ctx.setProvider(p)}>${x('providerChoice.' + p)}<//>`)}
-    ${!isOr ? html`<${TextField} box type="url" value=${d.baseUrl} placeholder="https://…/v1" ariaLabel=${x('baseUrl')} onInput=${(v) => ctx.setConn({ baseUrl: v })} />` : null}`;
+    ${creditFirst ? html`<${Check} radio inline name="ai-provider" key="credit" checked=${!own} onChange=${() => ctx.setOwnAi(false)}>${x('simple.creditChoice')}<//>` : null}
+    ${['openrouter', 'lmstudio', 'custom'].map((p) => html`<${Check} radio inline name="ai-provider" key=${p} checked=${own && d.provider === p} onChange=${() => { if (creditFirst) ctx.setOwnAi(true); ctx.setProvider(p); }}>${x('providerChoice.' + p)}<//>`)}
+    ${own && !isOr ? html`<${TextField} box type="url" value=${d.baseUrl} placeholder="https://…/v1" ariaLabel=${x('baseUrl')} onInput=${(v) => ctx.setConn({ baseUrl: v })} />` : null}`;
   const keyDoors = ctx.keyed ? html`
     <${Action} small soft disabled=${ctx.busy === 'test'} onClick=${() => ctx.testConnection()}>${ctx.busy === 'test' ? x('testing') : x('testConnection')}<//>
     ${s.hasApiKey ? html`<${Action} small soft tone="danger" onClick=${() => ctx.removeKey()}>${x('removeKey')}<//>` : null}` : null;
@@ -320,13 +328,12 @@ function secConnection(ctx) {
     ${msg(ctx.connMsg)}`;
   return html`
     <${PageSection} id="ai-connection" num="01" title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple ? null : count} first=${true}>
+      ${creditFirst ? html`<${Note} kind="lead">${x('simple.noKey')}<//>` : null}
       <${Facts} rows=${[
-        { k: x('providerLabel'), v: providers, sub: x('providerHint') },
-        { k: x('keyLabel'), v: key, sub: s.hasApiKey ? x('keyStoredHint') : x('keyHint'), actions: keyDoors },
-      ]} />
-      ${!ctx.keyed ? (simple
-        ? html`<${Note} kind="quiet">${x('simple.noKey')}<//>`
-        : html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>`) : null}
+        { k: x('providerLabel'), v: providers, sub: creditFirst ? null : x('providerHint') },
+        own ? { k: x('keyLabel'), v: key, sub: s.hasApiKey ? x('keyStoredHint') : x('keyHint'), actions: keyDoors } : null,
+      ].filter(Boolean)} />
+      ${!ctx.keyed && !simple ? html`<${Note} kind="quiet"><b>${x('noKeyLead')}</b> ${x('noKeyBody', { host: ctx.host })}<//>` : null}
     <//>`;
 }
 

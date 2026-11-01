@@ -16,6 +16,8 @@
  * @structure AiSettingsTab() — state + handlers (each a legacy call, and the provider call on a 410) → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'ai' (alias 'generator')
  * @version-history
+ *   v1.8.0 — 2026-11-01 — `ownAi`: in the simple view, whether the person chose an AI account of their
+ *     own over the AI credit, the first and default choice (Jouni's review of v33, K60).
  *   v1.7.0 — 2026-10-31 — `extras`: the cards the AI tab shows below the page (decision model,
  *     transparency, compliance), drawn by the page: after it, or inside "Lisäasetukset" in the simple
  *     view (v31 K58).
@@ -74,6 +76,9 @@ export default function AiSettingsTab({ navigate, showToast, extras = null }) {
   const [showAllApps, setShowAllApps] = useState(false);
   // The simple view's "Lisäasetukset" fold (ai/page.js renderSimple), shut until opened.
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // In the simple view, whether the person picked an AI account of their own over the AI credit,
+  // which is the first choice and the default (Jouni's review of v33, K60).
+  const [ownAi, setOwnAi] = useState(false);
   const [metric, setMetric] = useState('cost');
   const [busy, setBusy] = useState(false);
   const [connMsg, setConnMsg] = useState(null);
@@ -255,7 +260,7 @@ export default function AiSettingsTab({ navigate, showToast, extras = null }) {
     quotas: aiSettings?.app_quotas || {},
     roll: history ? rollup(history, usage, aiSettings?.app_quotas) : null,
     navigate, ConfirmUI, pv, rl, extras,
-    setConn, setProvider, saveConnection, testConnection, removeKey,
+    setConn, setProvider, saveConnection, testConnection, removeKey, ownAi, setOwnAi,
     setBudgetEditing, setBudgetDraft, saveBudget, setCapsEditing, setCap, saveCaps, setShowAllApps, setMetric,
   };
   return renderPage(ctx);
