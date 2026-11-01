@@ -26200,9 +26200,10 @@ paths:
         '401': { description: INVALID_PARTY_CREDENTIAL }
         '403': { description: FORBIDDEN. The party credential belongs to another provider }
         '404': { description: No such listed offering }
-        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price) or USE_YOUR_ACCOUNT' }
-        '422': { description: UNKNOWN_PAYMENT_HANDLER }
+        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price), USE_YOUR_ACCOUNT, or PROVIDER_TAKES_NO_CARD (`com.stripe.checkout` asked and the provider has connected no Stripe account; nothing is kept, and the message names the other handlers this node offers, if any)' }
+        '422': { description: 'UNKNOWN_PAYMENT_HANDLER, or Stripe refused to open the card page (its own code; the purchase is not kept)' }
         '429': { description: TOO_MANY_PURCHASES }
+        '502': { description: "The card payment provider failed on the seller's side or its own (the purchase is not kept)" }
   /v1/exchange/purchases/{id}/complete:
     post:
       operationId: exchangePartyPurchaseComplete
