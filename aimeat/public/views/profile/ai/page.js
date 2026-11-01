@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.42.0 -- 2026-11-01 -- No count of messages anywhere: messagesLeft and its 30-day history fallback are gone, and the head explains the credit in Jouni's words, that it is used according to the model and the amount of use (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.41.0 -- 2026-11-01 -- The simple view says what the credit still buys as a sentence in the head ("Saldosi riittää vielä noin N tavalliseen viestiin."), not in the strip's monospace line, and its crumb names the page Tekoälysaldo (commercial's check of 2c31d1d22).
  *   v1.40.0 -- 2026-11-01 -- The simple view (Jouni's review of v33): the title and menu say "Tekoälysaldo"; no 30-day figure in the strip and no monospace line on the meter; in Lisäasetukset the first and chosen radio is "Tekoälysaldo (oletus, ei avainta)", with "Ilman omaa avainta…" above the choice and the key field only after a service of one's own is picked (K60); "about N messages" by the store's price of one message when it set one (A3).
  *   v1.39.0 -- 2026-11-01 -- The simple view's daily limit is never more than today's use plus the credit left (todayLimit), and the head explains the credit in the help page's words (Jouni, K58).
@@ -86,7 +87,7 @@ import { Note } from '/components/Note.js';
 import { Action, Loud, Actions } from '/components/Action.js';
 import { Row as Line } from '/components/Layout.js';
 import { x, money, compact, dateWord, crumb, pageLinks } from './frame.js';
-import { creditEur, messagesFor, topupHref } from '/js/ai-credit.js';
+import { creditEur, topupHref } from '/js/ai-credit.js';
 import { money as fmtMoney } from '/js/format.js';
 
 /** The allowance left on the node's key: euros of AI credit on a node the store sold, else dollars. */
@@ -102,21 +103,6 @@ const creditWords = (usd) => {
   return allowanceMoney(usd);
 };
 
-/**
- * How many ordinary messages the credit left lasts, from THIS place's own average cost per AI call
- * over the last 30 days; null without that history, so nothing is guessed (v31 K58, the choice
- * reported to Jouni: "nykyisellä käytölläsi").
- */
-function messagesLeft(ctx) {
-  const r = ctx.roll;
-  const left = Number(ctx.chat?.allowance_remaining_usd) || 0;
-  // The store's price of one message wins, so the store and this page say the same N (review A3).
-  const priced = messagesFor(creditEur(left) ?? left);
-  if (priced) return priced;
-  if (!r || !(r.calls > 0) || !(r.cost > 0) || !(left > 0)) return null;
-  const n = Math.floor(left / (r.cost / r.calls));
-  return n >= 1 ? n : null;
-}
 import { appRow } from './rows.js';
 import { secProviders, secRouting, secPolicy } from './providers.js';
 import { secRoles, roleTitle } from './roles-section.js';
@@ -259,7 +245,7 @@ function mast(ctx) {
     const topup = topupHref(getLocale());
     return {
       title: t('profile.generator.openrouter.titlePlace'), sub: x('simple.titleSub'), help: 'concept.provider', marks,
-      desc: !s ? '' : (messagesLeft(ctx) ? `${x('simple.desc')} ${x('simple.lastsLine', { n: messagesLeft(ctx) })}` : x('simple.desc')),
+      desc: !s ? '' : x('simple.desc'),
       actions: topup ? html`<${Loud} href=${topup} newTab>${t('home.credit.topup')}<//><${Note} kind="meta">${x('simple.topupNote')}<//>` : null,
     };
   }

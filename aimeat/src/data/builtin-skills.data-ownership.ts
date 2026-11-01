@@ -27,6 +27,8 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-01 — Section 1: a data product (aimeat_dataproduct) builds a table from the person's own
+ *     material and refreshes it on a schedule (plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 — Section 4: a data package is withdrawn with aimeat_datapackage_withdraw, and with purge
  *     its files are deleted at once (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-31 — Section 3: an app's write is named as the app in the hands, not as the person
@@ -129,7 +131,23 @@ it for them.
 | Their apps, every version | \`GET /v1/apps/backup\` (a ZIP) | the person |
 | One file | \`aimeat_storage_download\` (a time-limited address) | the owner of the file |
 | A published data package | \`aimeat_datapackage_export\` (CSV, JSON or an address) | anyone who may read it |
+| A table built from their own material, again and again | \`aimeat_dataproduct\` (a data product, below) | the person; an agent with storage:write and memory:write |
 | One agent, to run it elsewhere | \`POST /v1/agents/{gaii}/export\` | the person |
+
+**A data product turns material into a table that refreshes itself.** When the person wants a table
+out of what they already have ("make a data product of the municipal budget signals, update it on
+Mondays"), use \`aimeat_dataproduct\`. Find the material first (\`aimeat_discover\`,
+\`aimeat_workspace_read\`), then \`action: "define"\` with \`sources\` (a workspace records space, an
+app's data its data map marks publishable, one record, an extension action, a stored CSV or Excel
+file, or another data package), \`combine\` (tables, union, or a join on a column), \`columns\`,
+\`filter\` and \`schedule: { cron: "0 6 * * 1" }\`. Then \`action: "preview"\` and tell the person
+what the first rows look like and who will read the table, before \`action: "run"\` publishes it.
+The table is private unless the person chooses otherwise, and it can never be wider than its
+narrowest source: a private record or an organisation's workspace refuses public. A column the
+data map marks personal stays out unless the person names it, and a public table with it waits for
+their yes (\`confirm_personal_public\`). Each version names its sources; the same rows make no new
+version; a source that fails leaves the previous version and the run says which source failed.
+\`action: "delete"\` removes the product and its schedule and keeps the package.
 
 What an export leaves out, and why:
 

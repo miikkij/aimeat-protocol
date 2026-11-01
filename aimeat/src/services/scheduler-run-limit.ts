@@ -14,6 +14,7 @@
  * @structure RUN_LIMIT_MS · runLimitFor(type, overrides) · RunTimeoutError · withRunLimit(work, ms) · describeMs(ms)
  * @usage const run = await withRunLimit(handler(), runLimitFor(job.type));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The dataproduct kind gets ten minutes (plan doc-mvwxcas3dom3, D9.5).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit E4-04).
  */
 import type { ScheduledJobRecord } from '../storage/interface.js';
@@ -37,6 +38,8 @@ export const RUN_LIMIT_MS: Readonly<Record<JobKind | 'default', number>> = {
   workflow: 5 * 60_000,
   'eco-capability': 5 * 60_000,
   'connections-publish': 5 * 60_000,
+  // A data product build reads every source, an extension action among them, and publishes once.
+  dataproduct: 10 * 60_000,
   default: 5 * 60_000,
 };
 
