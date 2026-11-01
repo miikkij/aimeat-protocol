@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
  *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
  *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-package-compose-holder.ts joins the list (not the guard tier): compose packages only a cortex the composer holds (secaudit2026oct31w2 round 11).
@@ -1298,6 +1299,9 @@ const ALL_SUITES = [
     // What a data package read trusts: the audience the service wrote, the classification reader, and
     // the OData cache header by the package's audience (secaudit2026oct31w2 round 10).
     'test/e2e-datapackage-trusted-reads.ts',
+    // The rest of the package reads decide on the service's record too: the withdrawal, a share, a data
+    // product source, the EXCHANGE sale terms and the Dataspace catalogue (WP9e).
+    'test/e2e-datapackage-pointer-forgery.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',

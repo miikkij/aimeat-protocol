@@ -22,13 +22,16 @@
  *   CATALOG_PAGE
  * @usage const list = await visibleDatasets(deps, participant); res.json(catalogJson(config, list));
  * @version-history
+ *   v1.0.1 — 2026-11-01 — A package's existence, withdrawal and usage terms come from the service's
+ *     records, not the latest.json pointer (WP9e, incident ...-mvxozs2r).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D8.2).
  */
 import type { Storage } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { publicDatasetFacts } from '../datapackage/catalogue-facts.js';
-import { readPointer } from '../datapackage/version-audience.js';
+import { trustedPackageOf } from '../datapackage/audience-record.js';
+import { saleTermsOf } from '../datapackage/sale-terms-record.js';
 import { descriptorFor, isLiveShare, packageOfPattern, partySharesOf } from '../parties/shares.js';
 import { listOfferings, type Offering } from '../exchange-market.js';
 import { dataListingRefusal } from '../data-intermediation/gate.js';
@@ -98,9 +101,11 @@ async function sourcesFor(deps: Deps, participant: Participant): Promise<OfferSo
 /** The offers of one package for the participant, or [] (the package is then no Dataset for it). */
 async function offersOf(deps: Deps, src: OfferSources, ownerGhii: string, name: string): Promise<{ offers: OfferEntry[]; view?: Omit<DatasetView, 'offers'> }> {
     const owner = localAccountName(ownerGhii);
-    const pointer = await readPointer(deps, ownerGhii, name);
-    if (!pointer?.contentHash || pointer.status === 'withdrawn') return { offers: [] };
-    const usage = pointer.exchange?.usageTerms ?? null;
+    // Existence, withdrawal and usage terms are the service's records, never the pointer file an app
+    // with storage:write rewrites (services/datapackage/audience-record.ts, sale-terms-record.ts).
+    const pkg = await trustedPackageOf(deps.storage, deps.config.nodeId, ownerGhii, name);
+    if (!pkg?.trusted.current || pkg.trusted.withdrawnAt) return { offers: [] };
+    const usage = (await saleTermsOf(deps.storage, deps.config.nodeId, ownerGhii, name, pkg.pointer))?.usageTerms ?? null;
     const offers: OfferEntry[] = [];
     if (src.publicKeys.has(`${owner}/${name}`) && await src.openAllowed(owner)) {
         offers.push({ kind: 'open', offer: offerOf(offerIdOf(owner, name, 'open'), { usage }) });

@@ -22,6 +22,9 @@
  * @structure AppStructure (default) · StepsSection · SidePanel · LiveLine
  * @usage routed at /v1/appcat/structure by spa.html (and portal.ts spaRoutes).
  * @version-history
+ *   v1.2.0 — 2026-11-01 — When the app is published and no step waits, the next-step box says so and
+ *     carries "Open the app", which opens the published app in a new tab (Jouni, 2026-11-01: "kun
+ *     kaikki on valmiina niin voisi olla nappi että avaa applikaatio").
  *   v1.1.0 — 2026-11-01 — The page opens the live stream (relayLiveUpdates). Until now it listened for
  *     `aimeat-live-update` and nothing on the route dispatched it, so an open page kept the state it
  *     loaded with: QUANTA showed 4/8 and "working" after it was published at 8/8 (Jouni, 2026-11-01).
@@ -53,6 +56,8 @@ import { time } from '/js/format.js';
 import { x } from '/views/appcat/i18n.js';
 import { appRefFromAddress, readStructure, writePlan, stepLine, choiceName } from '/views/appcat/structure-data.js';
 import { StructurePick } from '/views/appcat/structure-pick.js';
+import { openPublished, appUrl } from '/views/appcat/dialogs/app-io.js';
+import { findApp } from '/views/appcat/store.js';
 
 const html = htm.bind(h);
 
@@ -130,6 +135,13 @@ function StepsSection({ s, appRef: ref, navigate, onSaved }) {
   <//>`;
 }
 
+/**
+ * The published app in a new tab. The owner's access-coded app opens with its code when the catalogue
+ * listing is already read in this tab (it carries the code to the owner only); otherwise the app's own
+ * unlock page asks for it.
+ */
+const openTheApp = (ref) => openPublished(appUrl(ref.owner, ref.filename) + '?mode=inline', findApp(ref.owner, ref.filename));
+
 /** The side column: the next step, the reminder that the page is optional, the parts, where it is. */
 function SidePanel({ s, appRef: ref, navigate }) {
   const next = s.next;
@@ -138,6 +150,9 @@ function SidePanel({ s, appRef: ref, navigate }) {
     ${next ? html`<${Box} tone="raised" name=${x('structure.next')}>
       <${Note} kind="lead">${x(`structure.next.${next}`)}<//>
       ${nextDoor ? html`<${Loud} onClick=${nextDoor}>${x(`structure.door.${next}`)}<//>` : null}
+    <//>` : s.published ? html`<${Box} tone="raised" name=${x('structure.next')}>
+      <${Note} kind="lead">${x('structure.next.done')}<//>
+      <${Loud} onClick=${() => openTheApp(ref)}>${x('structure.door.app')}<//>
     <//>` : html`<${Box} tone="raised" name=${x('structure.next')}><${Note} kind="lead">${x('structure.next.none')}<//><//>`}
     <${Note} kind="aside">${x('structure.optional')}<//>
     <${Box} name=${x('structure.parts')}>
