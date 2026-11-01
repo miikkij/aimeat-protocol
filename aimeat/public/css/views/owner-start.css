@@ -5,6 +5,8 @@
  * @description The width of the front page of a node the store sold (views/owner-start.js). The
  *   page is library components; this sheet only gives it a reading width and the page gutter.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — .owner-start-signin hides the top bar's sign-in button while the page's own
+ *     form shows (Jouni's review, K65-4).
  *   v1.0.0 — 2026-10-31 — Initial (Jouni v27 P3).
  */
 .owner-start {
@@ -16,6 +18,12 @@
 /* The administration address is printed whole; on a phone a long place name has to break. */
 .owner-start a {
   overflow-wrap: anywhere;
+}
+
+/* Signed out, the page itself is the sign-in, so the top bar's "Kirjaudu sisään" would be a second
+   one (Jouni's review, K65-4). owner-start.js sets the class while the form shows. */
+.owner-start-signin #aimeat-login-btn {
+  display: none;
 }
 
 .owner-start-line {

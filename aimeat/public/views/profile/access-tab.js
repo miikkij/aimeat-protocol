@@ -23,6 +23,8 @@
  * @structure AccessTab() — state + handlers → renderPage(ctx)
  * @usage registered in profile.js TABS as id 'access'
  * @version-history
+ *   v2.5.0 — 2026-11-01 — `moreOpen`: on a node the store sold, the "Lisätiedot" fold under the sign-in
+ *     (Jouni's review of v33, the Access page).
  *   v2.4.0 — 2026-10-25 — The switch "Ask me before my secret is sent to a new address for the first
  *     time" (GET/PUT /v1/ghii/me/secret-host-ask; secaudit2026oct22, Jouni 2026-10-25).
  *   v2.3.0 — 2026-10-21 — A secret takes an address on add and on replace, and its panel sets, changes
@@ -101,6 +103,8 @@ export default function AccessTab({ session, showToast }) {
   const [secrets, setSecrets] = useState(null);
   const [secretsFailed, setSecretsFailed] = useState(false);
   const [mcpCount, setMcpCount] = useState(null);
+  // On a node the store sold, everything after the sign-in is one fold, "Lisätiedot", shut until opened.
+  const [moreOpen, setMoreOpen] = useState(false);
   const [secretForm, setSecretFormState] = useState(EMPTY_SECRET);
   const [secretMsg, setSecretMsg] = useState(null);
   const [replaceName, setReplaceName] = useState(null);
@@ -461,7 +465,7 @@ export default function AccessTab({ session, showToast }) {
     session, ov, failed, rows, basePackage, baseHolders, fed, filter, openKey, shownKeys, form, created, formMsg, spendDraft, fedInput, keyShown, busy,
     secrets, secretsFailed, secretForm, secretMsg, replaceName, replaceValue, hostDraft, mcpCount,
     setSecretForm, toggleSecretForm, openReplace, setReplaceValue, setHostDraft, writeSecret, deleteSecret, saveSecretHost, withdrawApproval,
-    hostAsk, setHostAsk,
+    hostAsk, setHostAsk, moreOpen, setMoreOpen,
     isOperator, nodeUrl, nodeId, ghii, ownerKey, tokenScopes: TOKEN_SCOPES, passkeysSupported: passkeySupported(), showToast: toast, ConfirmUI,
     load, setFilter, toggleKey, showMoreKeys, setSpendDraft, revokeKey, takeAway, setSpendCap, revokeUnused, signOutOthers, addPasskeyNow,
     toggleFedAll, addFedNode, removeFedNode, setFedInput, setKeyShown, setForm, toggleForm, toggleScope, clearCreated, createToken,

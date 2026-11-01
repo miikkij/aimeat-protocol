@@ -8,6 +8,8 @@
  *   The GET / response includes AI-facing guidance sections (for_ai_assistants, for_ai_agents)
  *   and the full endpoint catalogue grouped by capability domain.
  * @version-history
+ *   2026-11-01 — The explore path names the public data packages in discovery and the DCAT data catalogue
+ *     (plan doc-mvwxcas3dom3, D1.5).
  *   2026-10-28 — GET /v1/health moved unchanged to ./health.ts (line ceiling, after a merge of main).
  *   2026-10-27 — secaudit2026oct26: GET /v1/health probes storage with one keyed read instead of
  *     listing every account, lists the personal nodes once, and reads one mailbox item per node.
@@ -429,6 +431,8 @@ export function bootstrapRouter(
               `GET ${base}/v1/apps - downloadable apps directory`,
               `GET ${base}/v1/boards - public discussion boards (read-only)`,
               `GET ${base}/v1/catalogue/knowledge - knowledge package catalogue`,
+              `GET ${base}/v1/discover?scope=public&type=dataset - the public data packages (tables), each with its descriptor, OData and ODPS addresses`,
+              `GET ${base}/v1/catalogue/dcat - the public data packages as a DCAT-AP 3.0 catalogue (JSON-LD; ?format=ttl for Turtle)`,
             ],
           },
           register_and_start: {

@@ -21,6 +21,8 @@
  * @usage
  *   const out = await announceEverything(config, storage, { scope: 'all', by: operatorName });
  * @version-history
+ *   v1.2.0 — 2026-11-01 — "all" carries the public data packages' pages too, the list of
+ *     /sitemap-datasets.xml (plan doc-mvwxcas3dom3, D1.4).
  *   v1.1.0 — 2026-10-01 — With seo.announce_apps off, "all" carries the pages alone.
  *   v1.0.0 — 2026-09-11 — Initial.
  */
@@ -31,6 +33,7 @@ import { sitemapPages } from '../data/public-pages.js';
 import { appSeoIndexable } from './app-seo.js';
 import { submitToIndexNow, appSubmitUrls, groupByHost, stampAnnounced } from './indexnow.js';
 import type { IndexNowRun } from './indexnow-log.js';
+import { publicDatasetPages } from './datapackage/catalogue-facts.js';
 
 /** What "everything" means: the pages, or the pages and every findable application. */
 export type AnnounceScope = 'pages' | 'all';
@@ -80,6 +83,9 @@ export async function planAnnouncement(
       urls.push(...appSubmitUrls(config, app, subdomain));
     }
   }
+
+  // The public data packages, at their public page: the same list /sitemap-datasets.xml carries.
+  if (scope === 'all') urls.push(...(await publicDatasetPages(config, storage)).map(p => p.loc));
 
   const unique = [...new Set(urls)];
   const hosts = [...groupByHost(unique).entries()].map(([host, list]) => ({ host, url_count: list.length }));

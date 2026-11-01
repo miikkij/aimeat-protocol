@@ -15,6 +15,9 @@
  *   trap all live ONCE in services/app-serve-marks.ts, which is what actually puts it in the page.
  * @usage import { badgeSnippet } from '../utils/app-badge.js';  // via applyServeMarks({ badge: true })
  * @version-history
+ *   v2.3.0 — 2026-11-01 — The words come from the caller in the visitor's language (BadgeWords): the
+ *     bolt's name and the pill read English on a Finnish place (review of 2026-11-01, the store page).
+ *     English, the default, is byte for byte what it was.
  *   v2.2.0 — 2026-09-29 — ONE COMPACT ROW, BOTTOM-LEFT (the developer's decision of 2026-09-29, after
  *     the marks covered app content in two corners). The badge is the 34px bolt on every viewport,
  *     not only below 640px; the pill opens above the bolt on hover, keyboard focus or a tap, and
@@ -62,6 +65,15 @@
 const AIMEAT_HOME = 'https://aimeat.io/';
 const AIMEAT_LABEL = 'aimeat.io';
 
+/**
+ * The badge's words in the visitor's language, from the caller (services/app-serve-marks.ts reads
+ * them from locales/, as it does for the app-info mark): `label` names the bolt and the link for a
+ * screen reader, `free` is the pill's second line. English when the caller gives none, which is the
+ * text every app carried before 2026-11-01.
+ */
+export interface BadgeWords { label: string; free: string }
+export const BADGE_WORDS_EN: BadgeWords = { label: 'Publish your own app on ' + AIMEAT_LABEL, free: 'Publish your own app for free' };
+
 /** Present in an already-badged document. The one string that makes a re-serve idempotent. */
 export const BADGE_MARK = 'id="aimeat-app-badge"';
 
@@ -108,7 +120,7 @@ const BOLT = '<svg viewBox="0 0 24 24" width="1em" height="1em" fill="currentCol
  * doesn't cover app UI; hover or keyboard focus shows the full pill above it, and a tap toggles it
  * via a hidden-checkbox CSS toggle (the only way to get tap-to-expand without a script).
  */
-export function badgeSnippet(): string {
+export function badgeSnippet(words: BadgeWords = BADGE_WORDS_EN): string {
     // Shared surface look for both the pill and the bolt button. Everything is !important so
     // arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
     //
@@ -168,11 +180,11 @@ export function badgeSnippet(): string {
     return '<div ' + BADGE_MARK + '>'
         + '<style>' + css + '</style>'
         + '<input type="checkbox" id="aimeat-app-badge-open">'
-        + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + BOLT + '</label>'
+        + '<label for="aimeat-app-badge-open" aria-label="' + entities(words.label) + '">' + BOLT + '</label>'
         + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
-        + 'aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">'
+        + 'aria-label="' + entities(words.label) + '">'
         + '<span>' + entities(AIMEAT_LABEL) + '</span>'
-        + '<span>' + entities('· Publish your own app for free') + '</span>'
+        + '<span>' + entities('· ' + words.free) + '</span>'
         + '</a>'
         + '</div>';
 }

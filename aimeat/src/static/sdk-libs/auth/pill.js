@@ -14,6 +14,8 @@
  *   container replaces the first.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.7.3 — 2026-11-01 — The signed-in pill carries a title ("kirjautuneena"), so its green dot is
+ *     explained under the pointer where a page hides the label (Jouni's review of v33).
  *   v1.7.2 — 2026-10-31 — On a page that names fewer than two languages the labels choose among the
  *     pill's own (en, fi, es) rather than English alone, so the place's language reaches them.
  *   v1.7.1 — 2026-10-01 — Languages passed as opts.locales mark <html lang> at mount, as the
@@ -128,7 +130,9 @@ export function mountPill(auth, selector, opts = {}) {
     if (stored) {
       // The pill is class-styled (ensureAuthPillStyles) and reads the page's own tokens, so it is
       // ink on paper here, light on a dark page, and whatever a palette says elsewhere.
-      var pillHtml = '<div class="aimeat-auth-pill">'
+      // The pill says in words what its green dot means, also where a page hides the label beside
+      // it (Jouni's review of v33: an unexplained green square in the top bar).
+      var pillHtml = '<div class="aimeat-auth-pill" title="' + escHtml(i.loggedIn || 'logged in') + '">'
         + '<span class="aimeat-auth-dot" aria-hidden="true"></span>'
         + '<span class="aimeat-auth-label">' + escHtml(i.loggedIn || 'logged in') + '</span>'
         + '<span class="aimeat-auth-ghii">' + escHtml(stored.displayName || stored.ghii || stored.owner) + '</span>'

@@ -15,9 +15,11 @@
  *   as a euro, which is how the keys before 2026-10-31 were made. Only on a node the store sold
  *   (site.js customerNode()); elsewhere the allowance stays in dollars, as the node's own key
  *   reports it.
- * @structure eurPerUsd() · aiCredit(status) · creditEur(usd) · topupHref()
+ * @structure eurPerUsd() · aiCredit(status) · creditEur(usd) · messagesFor(eur) · topupHref()
  * @usage const credit = aiCredit(chatStatus); // { eur, state } or null
  * @version-history
+ *   v1.3.0 — 2026-11-01 — messagesFor(eur): the messages the credit buys, by the store's price of one
+ *     message (site.ai_eur_per_message), so the store and the place say the same N (Jouni's review A3).
  *   v1.2.0 — 2026-10-31 — topupHref(locale) adds the page's language, as the server's notice does
  *     (ai-fix-words.ts balanceChoices); the Home and the AI page offer it at all times (v28 #19).
  *   v1.1.0 — 2026-10-31 — Euros come from site.ai_credit_eur_per_usd, the rate the store converted
@@ -61,6 +63,21 @@ export function aiCredit(status) {
       : status.allowance_low ? 'low'
         : 'ready';
   return { eur, state };
+}
+
+/**
+ * About how many ordinary messages `eur` of AI credit buys, by the store's price of one message
+ * (site.ai_eur_per_message), or null when the store set no price or the count is under one. The store
+ * divides by the same number, so its "10 € is about N messages" and this count agree (review A3).
+ * @param {number} eur
+ * @returns {number | null}
+ */
+export function messagesFor(eur) {
+  const per = Number(siteLink('aiEurPerMessage'));
+  if (!Number.isFinite(per) || !(per > 0)) return null;
+  // The small epsilon keeps 0,70 / 0,02 at 35: in floats it is 34.999…, and the store's count is 35.
+  const n = Math.floor(Math.max(0, Number(eur) || 0) / per + 1e-9);
+  return n >= 1 ? n : null;
 }
 
 /**

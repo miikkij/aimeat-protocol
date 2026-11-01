@@ -10,11 +10,13 @@
  *   rollup · dateWord · crumb · pageLinks · openTab
  * @usage import { x, ROLES, poolFor } from './frame.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — On a node the store sold the crumb is "Asetukset ja hallinta / Tekoälysaldo".
  *   v1.1.0 — 2026-09-26 — The crumb and the rail's sibling pages are data for SettingsPage; openTab is
  *     the Rail's (component plan C9); this file writes no markup (page group G8).
  *   v1.0.0 — 2026-09-03 — Initial (design canvas "AIMEAT Tekoäly-sivu", direction A).
  */
 import { t } from '/js/i18n.js';
+import { customerNode } from '/js/site.js';
 import { date as fmtDate, money as fmtMoney } from '/js/format.js';
 import {
   chatPriceLabel, audioPriceLabel, contextLabel, acceptsImages, answersInText, producesImages, priceVaries, isFree,
@@ -129,6 +131,8 @@ export function rollup(history, usage, quotas) {
 
 /** The crumb's steps (SettingsPage draws them). */
 export function crumb() {
+  // On a node the store sold the page is the buyer's AI credit, and the crumb names it so (review of v33).
+  if (customerNode()) return [t('nav.profile'), t('profile.generator.openrouter.titlePlace')];
   return [t('nav.profile'), t('profile.landing.menuBuildShare'), t('profile.generator.openrouter.title')];
 }
 

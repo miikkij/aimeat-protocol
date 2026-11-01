@@ -28,6 +28,10 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — A publish to public whose producer's data map marks its data personal is refused with
+ *     PERSONAL_DATA_PUBLIC before any write, unless the input confirms (confirmPersonalPublic); the
+ *     confirmation is recorded on the pointer (./personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
+ *     ProducedBy names the app or extension for that check; neither is stored.
  *   2026-11-01 — openPackage answers null for a withdrawn package (./withdraw.ts), so every read path
  *     refuses it; a publish of the same bytes after a withdrawal writes the catalogue entry back, and
  *     any publish writes a pointer without the withdrawal (plan doc-mvwxcas3dom3, D0.3).
@@ -92,13 +96,14 @@ import { checkAudienceWrite } from '../audience-write.js';
 import {
     DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable, versionOpenTo, withAudienceTag, type DatapackageReader,
 } from './audience.js';
-import { writeLatest, upsertCatalogueEntry, setVersionAudience, readTrustedVisibility } from './version-audience.js';
+import { writeLatest, upsertCatalogueEntry, setVersionAudience, readPointer, readTrustedVisibility } from './version-audience.js';
 import { trustedAudienceOf } from './audience-record.js';
 import { readerFor, type ReaderAuth } from '../classification/reader.js';
 import { fileTarget } from '../classification/labels.js';
 import { signedInOnly } from '../../config-visibility.js';
 import { closedNodeLevel } from '../closed-node-level.js';
 import { datapackageVisibilityDefault } from '../content-defaults.js';
+import { personalPublicGuard, PERSONAL_DATA_PUBLIC } from './personal-guard.js';
 
 export interface StoreDeps { storage: Storage; config: AimeatConfig }
 
@@ -124,6 +129,11 @@ export interface ProducedBy {
     ref?: string;
     schedule?: string;
     run?: string;
+    /** `owner/filename` of the app whose grant published (the token's own app id). Not stored: it
+     *  links the publish to the app's data map (./personal-guard.ts). */
+    app?: string;
+    /** The extension whose action published. Not stored, for the same check. */
+    extension?: string;
 }
 
 export type PublishResult =
@@ -133,7 +143,7 @@ export type PublishResult =
          *  set, which is the default: keep everything. Returned so the answer can SAY what was
          *  deleted — a deletion nobody can see is how a history disappears unnoticed. */
         pruned: string[] }
-    | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE' | 'NOT_ORGANISM_MEMBER'; message: string; issues: ValidationIssue[] };
+    | { ok: false; code: 'INVALID_INPUT' | 'QUALITY_GATE' | 'NOT_ORGANISM_MEMBER' | typeof PERSONAL_DATA_PUBLIC; message: string; issues: ValidationIssue[] };
 
 /**
  * Build, check and store one version.
@@ -176,6 +186,14 @@ export async function publishPackage(
     const audience = await checkAudienceWrite(storage, visibility, { sub: producedBy.gaii, owner: ownerName }, DATAPACKAGE_LEVELS);
     if (!audience.ok) return { ok: false, code: audience.code, message: audience.message, issues: [] };
     const fileVisibility = fileVisibilityOf(visibility);
+    // Public from personal data: the producer's data map marks its data personal, so the owner
+    // confirms first (./personal-guard.ts). Refused before any write; a confirmation is recorded on
+    // the pointer this publish writes.
+    const guard = await personalPublicGuard(deps, ownerGhii, input.name, visibility,
+        { ...(producedBy.app ? { app: producedBy.app } : {}), ...(producedBy.extension ? { extension: producedBy.extension } : {}) },
+        input.confirmPersonalPublic, await readPointer(deps, ownerGhii, input.name));
+    if (!guard.ok) return { ok: false, code: guard.code, message: guard.message, issues: [] };
+    const personalPublicConfirmed = guard.confirmedAt ? { at: guard.confirmedAt, by: producedBy.gaii } : undefined;
 
     // ── 0.5 Pictures. BEFORE inference and before the hash, because a rewritten reference changes
     //        the bytes, and two publishes of the same photographs must land on the same address.
@@ -330,6 +348,7 @@ export async function publishPackage(
         const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
             catalogue: ((await readTrustedVisibility(deps, ownerGhii, input.name)) ?? 'public') !== visibility
                 || previous?.status === 'withdrawn',
+            ...(personalPublicConfirmed ? { personalPublicConfirmed } : {}),
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
@@ -374,7 +393,8 @@ export async function publishPackage(
     // when it is read (./odps-read.ts, GET /v1/datapackages/{owner}/{name}/odps), so it states the
     // audience the version has now. A sheet stored at publish said public for every package.
 
-    await writeLatest({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
+    await writeLatest({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility,
+        personalPublicConfirmed ? { personalPublicConfirmed } : {});
     // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,
     // never before: pruning first would leave a window where the newest version is gone and the new
     // one is not yet published.

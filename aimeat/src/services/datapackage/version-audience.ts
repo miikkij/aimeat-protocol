@@ -16,6 +16,13 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The catalogue manifest's x_aimeat_datapackage carries the name, title,
+ *     description, licence, producer schedule and kind, and each resource's byte size, so the DCAT
+ *     feed, discovery and the sitemap list packages without a file read (./catalogue-facts.ts); a
+ *     catalogue write drops the cached scan (plan doc-mvwxcas3dom3, D1.1, D1.3). A public catalogue
+ *     entry sends the package's public page to IndexNow (./announce.ts, D1.4). catalogueKeyRoot moved
+ *     to ./catalogue-facts.ts and is re-exported. writeLatest and setVersionAudience keep, or record,
+ *     the owner's confirmation of a public package from personal data (./personal-guard.ts, D1.7).
  *   v1.3.0 — 2026-11-01 — catalogueKeyRoot names the catalogue entry's key root, which ./withdraw.ts
  *     removes on a withdrawal; upsertCatalogueEntry reads it from there (plan doc-mvwxcas3dom3, D0.3).
  *   v1.2.0 -- 2026-10-31 -- writeLatest records the package's and the version's audience in the
@@ -31,11 +38,13 @@ import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 import {
     type Descriptor, type LatestPointer,
-    bare, bytesHash, descriptorKey, latestKey, packageId, packageKeyRoot, publicUrl,
+    bare, descriptorKey, latestKey, packageId, packageKeyRoot, publicUrl,
 } from './contract.js';
 import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
 import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
 import { recordPackageAudience, trustedAudienceOf } from './audience-record.js';
+import { invalidateDatasetFacts, catalogueKeyRoot } from './catalogue-facts.js';
+import { announcePublicDataset } from './announce.js';
 
 /**
  * The storage, the config and, from ./store.ts, the MCP resource notifications a file write sends. A
@@ -72,11 +81,15 @@ export async function readTrustedVisibility(deps: StoreDeps, ownerGhii: string, 
  *  a successful publish IS the answer to "the last attempt broke". */
 export async function writeLatest(
     deps: StoreDeps, ownerGhii: string, name: string, contentHash: string, descriptorUrl: string, at: string,
-    visibility: string,
+    visibility: string, opts: { personalPublicConfirmed?: LatestPointer['personalPublicConfirmed'] } = {},
 ): Promise<void> {
+    // The owner's confirmation of a public package from personal data stays with the package
+    // (./personal-guard.ts); every other field of the earlier pointer is the old version's.
+    const confirmed = opts.personalPublicConfirmed ?? (await readPointer(deps, ownerGhii, name))?.personalPublicConfirmed;
     const pointer: LatestPointer = {
         packageId: packageId(localAccountName(ownerGhii), name),
         name, contentHash, descriptorUrl, updatedAt: at, visibility,
+        ...(confirmed ? { personalPublicConfirmed: confirmed } : {}),
     };
     // The audience the reads decide on, written before the pointer moves, so the pointer never names
     // a version the record does not (./audience-record.ts).
@@ -89,13 +102,8 @@ export async function writeLatest(
     });
 }
 
-/**
- * The memory key root of a package's catalogue entry: `packages/{id}` with a deterministic id from the
- * packageId. The manifest is `{root}/manifest` and each resource's entry `{root}/{resource}`.
- */
-export function catalogueKeyRoot(packageIdValue: string): string {
-    return `packages/${bare(bytesHash(Buffer.from(packageIdValue, 'utf8'))).slice(0, 32)}`;
-}
+/** catalogueKeyRoot lives beside the catalogue facts now (./catalogue-facts.ts) and is re-exported here. */
+export { catalogueKeyRoot };
 
 /**
  * The catalogue side: a knowledge package so the data package appears where people and agents look
@@ -141,7 +149,18 @@ export async function upsertCatalogueEntry(
             packageId: descriptor.aimeat.packageId,
             contentHash: descriptor.aimeat.contentHash,
             descriptorUrl,
-            resources: descriptor.resources.map(r => ({ name: r.name, rowCount: r.rowCount, fields: r.schema.fields.length })),
+            // What a listing of every package needs without reading a file (./catalogue-facts.ts):
+            // the DCAT feed, discovery and the sitemap read these and nothing else.
+            name: descriptor.name,
+            ...(descriptor.title ? { title: descriptor.title } : {}),
+            ...(descriptor.description ? { description: descriptor.description } : {}),
+            ...(licenseOf(descriptor) ? { license: licenseOf(descriptor) } : {}),
+            ...(descriptor.aimeat.producer?.schedule ? { schedule: descriptor.aimeat.producer.schedule } : {}),
+            producerKind: descriptor.aimeat.producer?.kind,
+            resources: descriptor.resources.map(r => ({
+                name: r.name, rowCount: r.rowCount, fields: r.schema.fields.length, bytes: r.bytes,
+                ...(r.title ? { title: r.title } : {}),
+            })),
         },
     };
     // The catalogue rows carry the descriptor's record: they describe the same version, publicly.
@@ -171,6 +190,15 @@ export async function upsertCatalogueEntry(
             createdAt: prev?.createdAt ?? now, updatedAt: now,
         });
     }
+    invalidateDatasetFacts();
+    // A public version landed (a new one, or the package raised to public): its public page goes to
+    // IndexNow, under the node's SEO switches (./announce.ts). In the background; it never fails this.
+    if (visibility === 'public') announcePublicDataset(deps, descriptor.aimeat.packageId);
+}
+
+/** The licence a version names: the provenance block's, else the descriptor's first licence. */
+export function licenseOf(descriptor: Descriptor): string | undefined {
+    return descriptor.aimeat.license ?? descriptor.licenses?.[0]?.name;
 }
 
 /**
@@ -181,7 +209,7 @@ export async function upsertCatalogueEntry(
  */
 export async function setVersionAudience(
     deps: StoreDeps, ownerGhii: string, name: string, contentHash: string, visibility: string,
-    opts: { catalogue: boolean },
+    opts: { catalogue: boolean; personalPublicConfirmed?: LatestPointer['personalPublicConfirmed'] },
 ): Promise<{ ok: true; descriptorUrl: string } | { ok: false; message: string }> {
     const dKey = descriptorKey(name, contentHash);
     const descriptorFile = await deps.storage.getStorageFile(ownerGhii, dKey);
@@ -203,7 +231,8 @@ export async function setVersionAudience(
     // organism audience and a private one share a tier, so the tier alone cannot say which it is.
     await deps.storage.updateFileTagsByKey(ownerGhii, dKey, withAudienceTag(descriptorFile.tags, visibility));
     const descriptorUrl = publicUrl(deps.config.baseUrl, ownerGhii, dKey);
-    await writeLatest(deps, ownerGhii, name, contentHash, descriptorUrl, new Date().toISOString(), visibility);
+    await writeLatest(deps, ownerGhii, name, contentHash, descriptorUrl, new Date().toISOString(), visibility,
+        opts.personalPublicConfirmed ? { personalPublicConfirmed: opts.personalPublicConfirmed } : {});
     if (opts.catalogue) {
         const descriptor = JSON.parse(descriptorFile.data.toString('utf8')) as Descriptor;
         await upsertCatalogueEntry(deps, ownerGhii, descriptor, descriptorUrl, visibility);

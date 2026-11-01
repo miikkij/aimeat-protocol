@@ -260,12 +260,12 @@
       "digest": "sha256:52ebcd099c3f0297a44fc1f2"
     },
     "node:manage-my-agents": {
-      "reviewedOn": "2026-10-31",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/mcp/core.ts",
         "aimeat/src/tool-catalog/definitions/agent-messaging.ts"
       ],
-      "digest": "sha256:cb5b3b898a8c4159b6b44226"
+      "digest": "sha256:6973b145c9228ce7e252cee1"
     },
     "node:manage-my-profile-data": {
       "reviewedOn": "2026-10-17",
@@ -639,7 +639,7 @@
       "aimeat/src/mcp/core-admin.ts": "487cb90f6512b381"
     },
     "node:manage-my-agents": {
-      "aimeat/src/mcp/core.ts": "877f825eb4828018",
+      "aimeat/src/mcp/core.ts": "e1f1561f60340d7c",
       "aimeat/src/tool-catalog/definitions/agent-messaging.ts": "9990120d7daac507"
     },
     "node:manage-my-profile-data": {

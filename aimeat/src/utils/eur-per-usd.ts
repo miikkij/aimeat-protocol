@@ -7,9 +7,11 @@
  *   (config-site-contacts.ts) and the settings row (services/config-schema-site-links.ts) use it,
  *   and the second already reaches the first through config-types.ts: a shared import in either
  *   direction is a cycle.
- * @structure isEurPerUsd(v)
+ * @structure isEurPerUsd(v) · isEurPerMessage(v)
  * @usage if (isEurPerUsd(raw)) siteLinks.aiCreditEurPerUsd = raw;
  * @version-history
+ *   v1.1.0 — 2026-11-01 — isEurPerMessage, for site.ai_eur_per_message (Jouni's review A3: one
+ *     count of messages for the store and the place).
  *   v1.0.0 — 2026-10-31 — Initial (Jouni's C, 2026-10-31: the AI credit in euros).
  */
 
@@ -22,4 +24,16 @@ export function isEurPerUsd(v: unknown): boolean {
   if (typeof v !== 'string' || !/^\d{1,2}(\.\d{1,8})?$/.test(v)) return false;
   const n = Number(v);
   return n > 0 && n <= 10;
+}
+
+/**
+ * Euros of AI credit one ordinary message costs, as the store writes it: empty, or a plain positive
+ * decimal up to 1 ("0.0021"). The store and the place divide by the same number, so "10 € is about
+ * N messages" in the store and "about N messages left" on the place agree (Jouni's review A3).
+ */
+export function isEurPerMessage(v: unknown): boolean {
+  if (v === '') return true;
+  if (typeof v !== 'string' || !/^\d(\.\d{1,8})?$/.test(v)) return false;
+  const n = Number(v);
+  return n > 0 && n <= 1;
 }

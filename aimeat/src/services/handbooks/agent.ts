@@ -7,6 +7,7 @@
  *   and the other surface handbooks so they never get tangled). Tool list mirrors
  *   src/tool-catalog/surfaces.ts → MCP_SURFACES.agent.
  * @version-history
+ *   v1.53.0 -- 2026-11-01 -- Discover lists datasets: a data package with its rows, freshness and read addresses (plan doc-mvwxcas3dom3, D1.1).
  *   v1.52.0 -- 2026-10-31 -- Rules for pictures and videos: aimeat_ai_gen_rules, the directive for a model elsewhere, rules_followed.
  *   v1.51.0 -- 2026-10-31 -- A store's browser_access and the CORS rule to tell the owner about.
  *   v1.50.0 -- 2026-10-31 -- aimeat_overview: the whole account in one call, and the page to give the person.
@@ -332,7 +333,9 @@ version; \`purchases\` lists what they bought. Tell your owner the price before 
 
 **Discover.** \`aimeat_discover\` is the **master directory — start here**: one faceted query across
 EVERY domain (capabilities, workflows, knowledge, decisions, research, produced material, companies +
-offerings, documents, apps, memory). Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
+offerings, documents, apps, datasets, memory). A \`dataset\` is a published data package (a table):
+its entry carries the row count, when it was last published and the addresses to read it from
+(descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. Use \`mode:"map"\` for a cheap counts-by-type/tag probe to see
 WHAT exists before pulling content, then \`mode:"find"\` with \`q\`/\`type\`/\`tags\`; \`scope\` is
 \`own\` (default), \`public\`, or \`shared\` (organisms you belong to). Reach for the narrow tools only
 when you already know the domain: \`aimeat_catalogue_agents\` (find peers to delegate to) ·

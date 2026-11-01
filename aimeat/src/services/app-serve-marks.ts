@@ -46,6 +46,8 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.9.0 — 2026-11-01 — The attribution badge speaks the visitor's language (appBadge.*), the one the
+ *     AI label and the other marks speak; it was English on every page.
  *   v1.8.1 — 2026-10-25 — aiDisclosureParts reads the author's document, so an app that declares its
  *     own `ai-disclosure` meta gets no second meta and no `<html>` attribute from the node.
  *   v1.8.0 — 2026-10-25 — `internetOpen`: the line at the end of an app a closed node opened to the
@@ -87,7 +89,7 @@
 import type { AimeatConfig } from '../config.js';
 import { createT, type Locale } from '../i18n.js';
 import { findOpenTag, injectBeforeClosingTag } from '../utils/html-inject.js';
-import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
+import { BADGE_MARK, BADGE_WORDS_EN, badgeSnippet, type BadgeWords } from '../utils/app-badge.js';
 import { AI_USE_MARK, aiUseBadgeSnippet, type AppAiUse } from '../utils/app-ai-use-badge.js';
 import { APP_INFO_MARK, appInfoBadgeSnippet } from '../utils/app-info-badge.js';
 import { INTERNET_OPEN_MARK, internetOpenSnippet, type InternetOpenBadgeSpec } from '../utils/app-internet-open-badge.js';
@@ -107,6 +109,13 @@ import {
 export const REVIEWED_MARK = 'name="aimeat-reviewed-by"';
 
 /** The "Use with your AI" mark in the visitor's language. */
+/** The attribution badge's words in the visitor's language; English, the badge's own default, without one. */
+function badgeWords(locale: Locale | undefined): BadgeWords {
+  if (!locale) return BADGE_WORDS_EN;
+  const t = createT(locale);
+  return { label: t('appBadge.label', { site: 'aimeat.io' }), free: t('appBadge.free') };
+}
+
 function aiUseMarkup(use: AppAiUse, locale: Locale): string {
   const t = createT(locale);
   return aiUseBadgeSnippet({
@@ -293,7 +302,7 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // the marks. Declaration only — an app that ignores it renders exactly as before.
     const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel) || spec.aiUse || spec.info;
     if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
-    if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
+    if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet(badgeWords(spec.visibleLabel?.locale ?? spec.aiUse?.locale)));
     if (spec.aiUse && !text.includes(AI_USE_MARK)) parts.push(aiUseMarkup(spec.aiUse.use, spec.aiUse.locale));
     if (spec.info && !text.includes(APP_INFO_MARK)) parts.push(infoMarkup(spec.info));
     if (spec.internetOpen && !text.includes(INTERNET_OPEN_MARK)) parts.push(internetOpenSnippet(spec.internetOpen));
