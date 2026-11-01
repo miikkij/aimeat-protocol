@@ -24,6 +24,7 @@
  *   noteFailedAttempt · takeReadSlot · flushOwner · flushAll · readLogKey · parseReadLog
  * @usage logPartyRead(storage, ownerGhii, { at, share, party, uid, what, verdict: 'served' });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A served entry names the version read when it is known (plan D6.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.9, D3.5).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -49,6 +50,10 @@ export interface PartyReadEntry {
     /** What was read: `<package>` or `<package>/<resource>`, and the endpoint kind. */
     what: string;
     rows?: number;
+    /** The version read, when the request or the share named one (sha256:<hex>). A read of the newest
+     *  version names none; services/datapackage/versions-in-use.ts places it on the version that was
+     *  newest at its time. */
+    version?: string;
     verdict: 'served' | 'refused';
     /** The refusal's code, for a refused read. */
     code?: string;

@@ -25,23 +25,42 @@
  *   goes from the owner to the program directly, so for kinds `program` and `dataspace` it defaults to
  *   false; the owner may set either value on the share.
  *
+ *   A SHARE TO A PERSON ON ANOTHER AIMEAT NODE (canvas board Jako, "Toiselta AIMEATilta"; WP9c). The
+ *   recipient is that person's home GHII (`bob@their-node`), never a local account: they sign in here as
+ *   a visitor from their home node (routes/ghii/register-login.ts), and the package reads admit the
+ *   visitor whose home GHII is exactly the recipient (routes/package-reader.ts, ./visitor-read.ts). The
+ *   metadata says `visitor: true`; no party, no key and no terms step (they read with their own
+ *   account). The members and organism audiences still never admit a visitor (services/audience.ts
+ *   isNodeAccount); only the share does.
+ *
  *   A share ends by revocation (aimeat_consent_revoke, DELETE /v1/consent/:id), by its expiry, by the
  *   party declining it, by the party's deletion, and by the package's withdrawal; each of the last
  *   three sets status `revoked` with `endedReason` (`declined`, `party-deleted`, `package-withdrawn`).
  * @structure SHARE_PATTERN_PREFIX · sharePatternOf · packageOfPattern · ShareMeta · shareMetaOf ·
- *   isLiveShare · partySharesOf · normalizePartyShare · endShares · setShareMeta · connectionFileOf ·
+ *   isLiveShare · partySharesOf · normalizePartyShare · endShares · endSharesListed · setShareMeta · connectionFileOf ·
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.4.1 — 2026-11-01 — Share creation and descriptorFor take the package's version and withdrawal
+ *     from the service's record (trustedPackageOf), not the latest.json pointer (WP9e, incident ...-mvxozs2r).
+ *   v1.4.0 — 2026-11-01 — A share to a person on another AIMEAT node (`visitor`, normalizeVisitorShare,
+ *     isVisitorRecipient); isNamedShare, the one test every list of shares asks (WP9c).
+ *   v1.3.0 — 2026-11-01 — A share may deliver a Dataspace Protocol agreement (`dspAgreement`,
+ *     node-written only; plan D8.3).
+ *   v1.2.0 — 2026-11-01 — A share may be bound to an EXCHANGE purchase (`contract`, node-written only):
+ *     its reads are metered against the purchase and cover the versions of its interface (plan D5.3, D5.4).
+ *   v1.1.0 — 2026-11-01 — endSharesListed answers the shares it ended, so a withdrawal mails their
+ *     parties (services/datapackage/share-notices.ts; plan D6.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3; lead decision L3).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
 import type { AimeatConfig } from '../../config.js';
-import { localAccountName, ownerGhiiOf } from '../../utils/gaii.js';
+import { localAccountName, ownerGhiiOf, currentNodeId } from '../../utils/gaii.js';
 import { callerFromAuth } from '../caller-context.js';
 import { logger } from '../../utils/logger.js';
 import { auditDataAccess } from '../consent.js';
-import { latestKey, descriptorKey, PACKAGE_NAME_RE, bare, type LatestPointer, type Descriptor } from '../datapackage/contract.js';
+import { descriptorKey, PACKAGE_NAME_RE, bare, type Descriptor } from '../datapackage/contract.js';
+import { trustedPackageOf } from '../datapackage/audience-record.js';
 import { edmName } from '../datapackage/odata.js';
 import { PARTY_MANAGE_SCOPE, parsePartyRef, partyRefOf, type PartyRecord } from './contract.js';
 import { findParty } from './store.js';
@@ -67,10 +86,19 @@ export interface ShareMeta {
     termsAcceptedAt?: string;
     declinedAt?: string;
     endedReason?: string;
+    /** The EXCHANGE purchase this share delivers (services/exchange-party-buy.ts): its reads are metered. */
+    contract?: ShareContract;
+    /** The Dataspace Protocol agreement this share delivers (services/dataspace/agreement.ts). */
+    dspAgreement?: string;
+    /** The recipient is a person on another AIMEAT node, who reads as a visitor of this node. */
+    visitor?: boolean;
 }
 
+/** What binds a share to a contract: the offering bought and the interface version its reads cover. */
+export interface ShareContract { offeringId: string; entitlementId: string; ifaceVersion: number }
+
 /** The metadata keys the node writes on a share; a request's own values under them are dropped. */
-const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason'] as const;
+const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract', 'dspAgreement', 'visitor'] as const;
 
 export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
     const m = (c.metadata ?? {}) as Record<string, unknown>;
@@ -82,7 +110,33 @@ export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
         ...(typeof m.termsAcceptedAt === 'string' ? { termsAcceptedAt: m.termsAcceptedAt } : {}),
         ...(typeof m.declinedAt === 'string' ? { declinedAt: m.declinedAt } : {}),
         ...(typeof m.endedReason === 'string' ? { endedReason: m.endedReason } : {}),
+        ...(contractOf(m.contract) ? { contract: contractOf(m.contract)! } : {}),
+        ...(typeof m.dspAgreement === 'string' && m.dspAgreement ? { dspAgreement: m.dspAgreement } : {}),
+        ...(m.visitor === true ? { visitor: true } : {}),
     };
+}
+
+/** A GHII of an account on another node, which a share to a visitor names: `bob@their-node`. */
+const FOREIGN_GHII_RE = /^[a-z0-9][a-z0-9._-]{0,63}@[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+
+/** Is `recipient` a person's home GHII on a node other than `nodeId`? */
+export function isVisitorRecipient(recipient: string, nodeId: string): boolean {
+    return FOREIGN_GHII_RE.test(recipient) && recipient.slice(recipient.lastIndexOf('@') + 1) !== nodeId;
+}
+
+/**
+ * Is this consent a named share of a data package: to an outside party, or to a person on another
+ * AIMEAT node? Every list of an owner's shares asks this one test.
+ */
+export function isNamedShare(c: Pick<ConsentRecord, 'recipient' | 'dataPattern' | 'metadata'>): boolean {
+    if (!packageOfPattern(c.dataPattern)) return false;
+    return c.recipient.startsWith('party:') || shareMetaOf(c).visitor === true;
+}
+
+function contractOf(v: unknown): ShareContract | null {
+    const c = v as Partial<ShareContract> | null | undefined;
+    return c && typeof c.offeringId === 'string' && typeof c.entitlementId === 'string' && typeof c.ifaceVersion === 'number'
+        ? { offeringId: c.offeringId, entitlementId: c.entitlementId, ifaceVersion: c.ifaceVersion } : null;
 }
 
 /** Active and not past its expiry. */
@@ -138,12 +192,65 @@ export async function normalizePartyShare(
     if (!party) return { ok: false, status: 404, code: 'PARTY_NOT_FOUND', message: `You have no party called "${ref.name}". Make it first with POST /v1/parties or aimeat_party.` };
     if (party.status !== 'active') return { ok: false, status: 409, code: 'PARTY_STOPPED', message: `The party "${ref.name}" is stopped. Resume it before you share anything with it.` };
 
+    const terms = await packageShareTerms(deps, ownerGhii, input);
+    if (!terms.ok) return terms;
+    const asked = input.metadata ?? {};
+    const flag = (snake: string, camel: string): boolean | undefined => {
+        const v = asked[snake] ?? asked[camel];
+        return typeof v === 'boolean' ? v : undefined;
+    };
+    const allowUrlKey = flag('allow_url_key', 'allowUrlKey') ?? false;
+    const termsRequired = flag('terms_required', 'termsRequired') ?? (party.kind === 'person');
+    return {
+        ok: true, fileUnder: ownerGhii, scope: 'local', expires: terms.expires, party, packageName: terms.packageName,
+        metadata: { ...terms.own, partyUid: party.uid, ...(terms.pinnedVersion ? { pinnedVersion: terms.pinnedVersion } : {}), allowUrlKey, termsRequired },
+    };
+}
+
+/** What a share to a visitor is, once checked: the grant to write, or a refusal. */
+export type VisitorShareNormal =
+    | { ok: true; fileUnder: string; scope: 'local'; expires: string; metadata: Record<string, unknown>; packageName: string }
+    | { ok: false; status: number; code: string; message: string };
+
+/**
+ * Check and complete a share whose recipient is a person on another AIMEAT node, by their home GHII.
+ * The same checks as a party share where they apply (party:manage, the package, the pin, the expiry);
+ * no party, no key, and no terms step, because the person reads with their own account.
+ */
+export async function normalizeVisitorShare(
+    deps: { storage: Storage; config: AimeatConfig }, caller: PartyShareCaller,
+    input: { recipient: string; dataPattern: string; expires?: string | null; metadata?: Record<string, unknown> },
+): Promise<VisitorShareNormal> {
+    const { storage, config } = deps;
+    if (!isVisitorRecipient(input.recipient, config.nodeId)) {
+        return { ok: false, status: 400, code: 'INVALID_RECIPIENT', message: `A share to a person on another AIMEAT node names their account there: name@their-node. An account on this node (${config.nodeId}) reads through the package's audience, and someone with no account through a party.` };
+    }
+    const ownerGhii = ownerGhiiOf(caller.ownerGaii);
+    const account = localAccountName(ownerGhii);
+    const asCaller = callerFromAuth({ sub: caller.ownerGaii, owner: account, roles: [...caller.roles], scopes: [...caller.scopes] }, config.nodeId, storage);
+    if (!asCaller.has(PARTY_MANAGE_SCOPE)) {
+        return { ok: false, status: 403, code: 'SCOPE_DENIED', message: `Sharing a data package with someone outside this node needs the "${PARTY_MANAGE_SCOPE}" permission, which only the owner gives, on the agent's page.` };
+    }
+    const terms = await packageShareTerms(deps, ownerGhii, input);
+    if (!terms.ok) return terms;
+    return {
+        ok: true, fileUnder: ownerGhii, scope: 'local', expires: terms.expires, packageName: terms.packageName,
+        metadata: { ...terms.own, visitor: true, ...(terms.pinnedVersion ? { pinnedVersion: terms.pinnedVersion } : {}), allowUrlKey: false, termsRequired: false },
+    };
+}
+
+/** The package, the pinned version and the end every named share checks, and the request's own metadata. */
+async function packageShareTerms(
+    deps: { storage: Storage; config: AimeatConfig }, ownerGhii: string,
+    input: { dataPattern: string; expires?: string | null; metadata?: Record<string, unknown> },
+): Promise<{ ok: true; packageName: string; pinnedVersion?: string; expires: string; own: Record<string, unknown> } | { ok: false; status: number; code: string; message: string }> {
+    const { storage, config } = deps;
     const packageName = packageOfPattern(input.dataPattern);
-    if (!packageName) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'A share to a party names one data package: data_pattern "datapkg:<package name>".' };
-    const pointerFile = await storage.getStorageFile(ownerGhii, latestKey(packageName));
-    const pointer = storedJson<LatestPointer>(pointerFile?.data, latestKey(packageName));
-    if (!pointer?.contentHash) return { ok: false, status: 404, code: 'NOT_FOUND', message: `You have no data package called "${packageName}".` };
-    if (pointer.status === 'withdrawn') return { ok: false, status: 409, code: 'PACKAGE_WITHDRAWN', message: `The data package "${packageName}" is withdrawn. Publish a version again before you share it.` };
+    if (!packageName) return { ok: false, status: 400, code: 'INVALID_INPUT', message: 'A named share names one data package: data_pattern "datapkg:<package name>".' };
+    // The version and the withdrawal are the service's record, never the pointer file an app can rewrite.
+    const pkg = await trustedPackageOf(storage, config.nodeId, ownerGhii, packageName);
+    if (!pkg?.trusted.current) return { ok: false, status: 404, code: 'NOT_FOUND', message: `You have no data package called "${packageName}".` };
+    if (pkg.trusted.withdrawnAt) return { ok: false, status: 409, code: 'PACKAGE_WITHDRAWN', message: `The data package "${packageName}" is withdrawn. Publish a version again before you share it.` };
 
     const asked = input.metadata ?? {};
     const pinRaw = asked.pinned_version ?? asked.pinnedVersion;
@@ -155,12 +262,6 @@ export async function normalizePartyShare(
             return { ok: false, status: 404, code: 'VERSION_NOT_FOUND', message: `The data package "${packageName}" has no version ${pinnedVersion}.` };
         }
     }
-    const flag = (snake: string, camel: string): boolean | undefined => {
-        const v = asked[snake] ?? asked[camel];
-        return typeof v === 'boolean' ? v : undefined;
-    };
-    const allowUrlKey = flag('allow_url_key', 'allowUrlKey') ?? false;
-    const termsRequired = flag('terms_required', 'termsRequired') ?? (party.kind === 'person');
 
     const now = Date.now();
     const maxDays = Math.max(1, config.shareMaxDays ?? 365);
@@ -178,10 +279,7 @@ export async function normalizePartyShare(
 
     const own = Object.fromEntries(Object.entries(asked).filter(([k]) =>
         !(NODE_KEYS as readonly string[]).includes(k) && !['pinned_version', 'allow_url_key', 'terms_required'].includes(k)));
-    return {
-        ok: true, fileUnder: ownerGhii, scope: 'local', expires, party, packageName,
-        metadata: { ...own, partyUid: party.uid, ...(pinnedVersion ? { pinnedVersion } : {}), allowUrlKey, termsRequired },
-    };
+    return { ok: true, packageName, ...(pinnedVersion ? { pinnedVersion } : {}), expires, own };
 }
 
 /** Change a share's node-written metadata (terms acceptance, a decline). Answers the share as written. */
@@ -197,20 +295,29 @@ export async function setShareMeta(storage: Storage, share: ConsentRecord, chang
  * audit entry each. Answers how many ended. The next read through any of them is refused.
  */
 export async function endShares(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<number> {
+    return (await endSharesListed(storage, ownerGhii, match, reason)).length;
+}
+
+/** endShares, answering the shares it ended as they were before, so a caller can tell their parties. */
+export async function endSharesListed(storage: Storage, ownerGhii: string, match: (c: ConsentRecord) => boolean, reason: string): Promise<ConsentRecord[]> {
     const active = await storage.listConsents(ownerGhii, { status: 'active' });
-    let ended = 0;
+    const ended: ConsentRecord[] = [];
     for (const c of active) {
-        if (!c.recipient.startsWith('party:') || !match(c)) continue;
+        if (!isNamedShare(c) || !match(c)) continue;
         await setShareMeta(storage, c, { endedReason: reason }, 'revoked');
         await auditDataAccess(storage, c.id, c.ownerGaii, c.recipient, c.dataPattern, 'revoke', true);
-        ended++;
+        ended.push(c);
     }
     return ended;
 }
 
-/** The descriptor a share reads now: its pinned version, or the package's newest. Null when neither is there. */
+/**
+ * The descriptor a share reads now: its pinned version, or the package's newest as the service
+ * recorded it (./audience-record.ts trustedPackageOf), which is the version a read through the share
+ * opens. Null when neither is there.
+ */
 export async function descriptorFor(storage: Storage, ownerGhii: string, name: string, pinned?: string): Promise<Descriptor | null> {
-    const hash = pinned ?? storedJson<LatestPointer>((await storage.getStorageFile(ownerGhii, latestKey(name)))?.data, latestKey(name))?.contentHash;
+    const hash = pinned ?? (await trustedPackageOf(storage, currentNodeId() ?? '', ownerGhii, name))?.trusted.current;
     if (!hash) return null;
     return storedJson<Descriptor>((await storage.getStorageFile(ownerGhii, descriptorKey(name, hash)))?.data, descriptorKey(name, hash));
 }
@@ -276,6 +383,8 @@ export function shareView(c: ConsentRecord, extra: Record<string, unknown> = {})
         terms_required: m.termsRequired, terms_accepted_at: m.termsAcceptedAt ?? null,
         ...(m.declinedAt ? { declined_at: m.declinedAt } : {}),
         ...(m.endedReason ? { ended_reason: m.endedReason } : {}),
+        ...(m.contract ? { contract: { offering_id: m.contract.offeringId, entitlement_id: m.contract.entitlementId, interface_version: m.contract.ifaceVersion } } : {}),
+        ...(m.dspAgreement ? { dsp_agreement: m.dspAgreement } : {}),
         ...extra,
     };
 }

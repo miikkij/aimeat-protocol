@@ -15,6 +15,7 @@
  * @usage
  *   import type { DiscoverySource, DiscoveryEntry } from '../discovery/types.js';
  * @version-history
+ *   v0.8.1 — 2026-11-01 — DiscoveryDataset.freshness (plan doc-mvwxcas3dom3, D6.1).
  *   v0.8.0 — 2026-11-01 — +'dataset' (a data package, plan doc-mvwxcas3dom3 D1.1) with the entry's
  *     `dataset` block, DiscoveryContext.readerAuth for the package audience rule, and DISCOVERY_TYPES,
  *     the one list routes/discover.ts and mcp/core.ts now read instead of their hand copies.
@@ -80,6 +81,8 @@ export interface DiscoveryDataset {
   lastPublishedAt: string;
   /** The newest run that failed, when it did: the package stays on the version above. */
   lastError?: { at: string; message: string };
+  /** Fresh, late, stale or unscheduled against the producer's promise (services/datapackage/freshness.ts). */
+  freshness?: { state: string; reason: string; reason_code: string; due_at: string | null; last_success_at: string | null; limited_by?: string };
   links: { api: string; descriptor: string; odata: string; odps: string; schemaOrg: string; landing?: string };
 }
 

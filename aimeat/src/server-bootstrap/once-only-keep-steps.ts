@@ -21,6 +21,10 @@
  * @structure runOnceOnlyKeepSteps(storage, config)
  * @usage await runOnceOnlyKeepSteps(storage, config);   // server-bootstrap/service-init.ts
  * @version-history
+ *   2026-11-01 -- recordPointerStateOnce, right after the data package audience step: the sale terms and
+ *     the withdrawal mark of every existing package pointer are copied onto the service's records (WP9e).
+ *   2026-11-01 -- markExistingPortfolioPagesOnce, after the data package step: every welcome page that
+ *     exists at the update is recorded as allowed to read its owner's memory (secaudit2026oct31w2 round 11).
  *   2026-10-31 -- recordDatapackageAudiencesOnce, after the ai schedule step: every existing data package
  *     gets the service-owned record of its audience (secaudit2026oct31w2 round 10).
  *   2026-10-29 -- askUncertainAccountantGrantsOnce, last: an older accountant grant whose holder the
@@ -88,6 +92,8 @@ import { keepExtensionPublishOnce } from '../services/extension-publish-keep.js'
 import { keepAppToolInvokeOnce } from '../services/app-tool-invoke-keep.js';
 import { placeKnowledgeLinkOwnersOnce } from '../services/knowledge-link-owner-keep.js';
 import { recordDatapackageAudiencesOnce } from '../services/datapackage/audience-record.js';
+import { recordPointerStateOnce } from '../services/datapackage/sale-terms-record.js';
+import { markExistingPortfolioPagesOnce } from '../services/portfolio-read-hold-keep.js';
 import { keepTaskContentForAppGrantsOnce } from '../services/account-event-task-keep.js';
 import { disableMalformedExtensionRefsOnce } from '../services/capability-extension-ref.js';
 import { classifySubdomainSiteOriginsOnce, addSubdomainIncidentEntriesOnce, keepOperatorOwnAddressesOnce } from '../services/subdomain-site-origin-keep.js';
@@ -114,6 +120,16 @@ export async function runOnceOnlyKeepSteps(storage: Storage, config: AimeatConfi
   // audience-record.ts). Awaited, so no read meets a package without its record.
   await recordDatapackageAudiencesOnce(storage, config)
     .catch(err => logger.error('Failed to record the audience of the existing data packages; the next boot tries again', { error: String(err) }));
+  // The sale terms and the withdrawal mark each package pointer carries go onto the service's records
+  // (services/datapackage/sale-terms-record.ts), so a package on sale stays listed and a withdrawn one
+  // stays withdrawn when the reads stop taking the pointer's word. Waits for the audience records above.
+  await recordPointerStateOnce(storage, config)
+    .catch(err => logger.error('Failed to record the sale terms and withdrawals of the existing data packages; the next boot tries again', { error: String(err) }));
+  // Every welcome page that exists at the update is recorded as allowed to read its owner's memory, so
+  // a page with no record is afterwards one written since (services/portfolio-read-hold-keep.ts).
+  // Awaited, so no read meets a missing record first; until it has run, a missing record is adopted.
+  await markExistingPortfolioPagesOnce(storage, config)
+    .catch(err => logger.error('Failed to record the existing welcome pages; the next boot tries again', { error: String(err) }));
   // The knowledge link rows written before link rows carried their owner get the namespace that holds
   // their source package (services/knowledge-link-owner-keep.ts). Awaited, so a package's links show
   // from the first request.

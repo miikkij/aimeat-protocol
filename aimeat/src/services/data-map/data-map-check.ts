@@ -12,9 +12,12 @@
  *
  *   PURE. No storage, no clock: the caller passes `at`, so the same map always yields the same
  *   summary and a unit test can assert it.
- * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
+ * @structure summariseMap · checkMap · statesInvites · statesRegisters · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.8.0 — 2026-11-01 — DATAMAP_REGISTERS_UNSTATED: an app whose party signup is open (checkMap's
+ *     `registersParties`) and whose map has neither `registers-parties` nor a `registers` statement is a
+ *     finding, after the invites one, and never a refusal (plan doc-mvwxcas3dom3, D4.4).
  *   v1.7.0 — 2026-11-01 — DATAMAP_ROW_BAD_PUBLISHABLE: a row's optional `publishable` that is not a
  *     boolean is a finding, after the agent one, and never a refusal (plan doc-mvwxcas3dom3, D9.1).
  *   v1.6.0 — 2026-10-28 — DATAMAP_AI_ACT_UNANSWERED: the map says the app uses AI and its `aiAct`
@@ -57,6 +60,7 @@ export const FINDING_CODES = [
   'DATAMAP_ROW_NO_WHY',
   'DATAMAP_NO_ROWS',
   'DATAMAP_INVITES_UNSTATED',
+  'DATAMAP_REGISTERS_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
   'DATAMAP_ROW_BAD_PUBLISHABLE',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
@@ -116,6 +120,13 @@ export function statesInvites(map: DataMap): boolean {
   if (!inv || typeof inv !== 'object') return false;
   const does = Array.isArray(inv.does) ? inv.does.filter(d => typeof d === 'string' && d.trim()) : [];
   return does.length > 0 || (typeof inv.into === 'string' && inv.into.trim().length > 0);
+}
+
+/** True when the map says the app registers people: `registers-parties`, or a `registers` statement that names who. */
+export function statesRegisters(map: DataMap): boolean {
+  if (Array.isArray(map.machinery) && map.machinery.includes('registers-parties')) return true;
+  const r = map.registers;
+  return !!r && typeof r === 'object' && typeof r.who === 'string' && r.who.trim().length > 0;
 }
 
 /**
@@ -220,9 +231,19 @@ export interface MapCheck {
  * `declaredScopes` are the words of the app's `<meta name="aimeat-scopes">` (parseAppScopes). They
  * decide only whether the map has to say that the app invites people; omitted, nothing is asked.
  */
-export function checkMap(map: DataMap | null, at: string, declaredScopes: readonly string[] = []): MapCheck {
+export function checkMap(
+  map: DataMap | null, at: string, declaredScopes: readonly string[] = [],
+  /** The app's party signup is open (services/app-parties/): the map has to say whom it registers. */
+  opts: { registersParties?: boolean } = {},
+): MapCheck {
   const findings: { code: FindingCode; message: string }[] = [];
   const invites = invitesFinding(map, declaredScopes);
+  const registers = opts.registersParties && !(map && map.source !== 'none' && statesRegisters(map)) ? {
+    code: 'DATAMAP_REGISTERS_UNSTATED' as const,
+    message: 'People without an account register to this app, and the map does not say so. Add "registers-parties" to '
+      + '`machinery`, or a `registers` statement: { "who": "who registers", "keeps": ["e-mail address", "..."] }. '
+      + 'The owner holds their addresses, and the records of processing list them.',
+  } : null;
 
   if (!map || map.source === 'none') {
     findings.push({
@@ -231,9 +252,11 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
         + 'find out where its data goes, which is how data ends up wherever was easiest to reach.',
     });
     if (invites) findings.push(invites);
+    if (registers) findings.push(registers);
     return { findings, gap: { code: 'DATAMAP_MISSING', message: findings[0].message, at } };
   }
   if (invites) findings.push(invites);
+  if (registers) findings.push(registers);
 
   if (!map.what.trim() || !map.usedFor.trim()) {
     findings.push({

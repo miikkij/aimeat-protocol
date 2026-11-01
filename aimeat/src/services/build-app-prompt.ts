@@ -34,6 +34,7 @@
  *   2026-09-29 — ADDITIVE, one paragraph ending Data Storage on classified content (TARGET-082 V5). To stay
  *     under 800 lines, the provenance paragraph before it and the section "Reading data your AGENTS
  *     produced" moved verbatim to build-app-prompt-content.ts; the prompt text is unchanged there.
+ *   2026-11-01 — ADDITIVE, one paragraph after the agents section: an app whose users have no account uses parties (plan D4.4).
  *   2026-10-18 — ADDITIVE, three sentences ending the data-map section: an app with organism:invite states that it invites people.
  *   2026-10-11 — ADDITIVE, one sentence ending the data-map section: the optional `agent` and `madeFor` on a held row.
  *   2026-10-28 — ADDITIVE, three sentences ending the data-map section: an app that uses AI answers the EU AI Act questions in the map's `aiAct`.
@@ -182,7 +183,7 @@ import { buildPromptLibrarySections } from '../data/library-packs.js';
 import { buildPromptSessionSections } from './build-app-prompt-session.js';
 import { buildPromptDrivenSection } from './build-app-prompt-driven.js';
 import { buildDecideSection } from './build-app-prompt-decide.js';
-import { buildRenderedContentParagraphs, buildAgentDataSection } from './build-app-prompt-content.js';
+import { buildRenderedContentParagraphs, buildAgentDataSection, buildOutsideUsersParagraph } from './build-app-prompt-content.js';
 import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 import { classicLiveUpdatesSection } from './build-events-first.js';
 import { buildDataMapStep } from './build-data-map-step.js';
@@ -398,7 +399,7 @@ function composeAppPrompt(
   body += 'A space that does not name the app answers 403 and says so — show that sentence, and tell the person which organism admin can open it. Nothing else on the organism opens through this scope: no other space, no records, no documents. Put the space in the data map as `where: "organism-rows"`, and write `rowId` for anything that may be sent twice, so a retry replaces instead of duplicating.\n\n';
 
   // Reading what the owner's AGENTS produced: services/build-app-prompt-content.ts (moved verbatim).
-  body += buildAgentDataSection();
+  body += buildAgentDataSection() + buildOutsideUsersParagraph();
 
   // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's
   // space. Every other write path requires auth, so lead/contact/feedback/RSVP/survey forms need this.

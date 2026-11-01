@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Shared REST tool dispatch for node invoke, connector MCP and CLI.
  * @version-history
+ *   v1.20.0 -- 2026-11-01 -- dataspaceCliTools: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
+ *   v1.19.0 -- 2026-11-01 -- datapackageSellCliTools: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
  *   v1.18.0 -- 2026-11-01 -- partyCliTools: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
  *   v1.18.0 -- 2026-11-01 -- buildWithYouCliTools: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.17.0 -- 2026-11-01 -- dataProductCliTools: aimeat_dataproduct (plan doc-mvwxcas3dom3, D9).
@@ -82,6 +84,8 @@ import { dmGroupCliTools } from './tool-call-defs-dm-groups.js';
 import { dmReactionCliTools } from './tool-call-defs-dm-reactions.js';
 import { dataProductCliTools } from './tool-call-defs-dataproduct.js';
 import { partyCliTools } from './tool-call-defs-party.js';
+import { datapackageSellCliTools } from './tool-call-defs-datapackage-sell.js';
+import { dataspaceCliTools } from './tool-call-defs-dataspace.js';
 import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
@@ -138,6 +142,8 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...dmReactionCliTools,
     ...dataProductCliTools,
     ...partyCliTools,
+    ...datapackageSellCliTools,
+    ...dataspaceCliTools,
 ].map(withProvenanceCarrying).map(withDeclaredInputOnly);
 
 /**

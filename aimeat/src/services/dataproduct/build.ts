@@ -20,6 +20,8 @@
  * @structure BuildContext · prepareBuild · previewProduct · runProduct
  * @usage const out = await runProduct({ deps, caller }, definition);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A version a source change built records the producer schedule on-change (WP9c).
+ *   v1.1.0 — 2026-11-01 — A definition's `retention` is the version's retention policy (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { CallerContext } from '../caller-context.js';
@@ -33,7 +35,7 @@ import { odpsAddress } from '../datapackage/odps-read.js';
 import { dataHolderFor } from '../datapackage/data-holder.js';
 import { PERSONAL_DATA_PUBLIC } from '../datapackage/personal-guard.js';
 import { emitChange } from '../event-bus.js';
-import { DataProductError, type DataProductDefinition } from './definition.js';
+import { DataProductError, scheduleLabelOf, type DataProductDefinition } from './definition.js';
 import { combineSources, type Combined } from './combine.js';
 import { type ResolvedSource, type SourceCall, type SourceDeps, audienceFits, narrowest } from './source-common.js';
 import { readRecordsSource, readAppSource, readMemorySource } from './sources-memory.js';
@@ -111,6 +113,7 @@ export async function prepareBuild(ctx: BuildContext, def: DataProductDefinition
             sourcesFetchedAt: fetchedAt,
         },
         ...(def.confirmPersonalPublic ? { confirmPersonalPublic: true } : {}),
+        ...(def.retention ? { retentionPolicy: def.retention } : {}),
     };
     return { sources, combined, input, allowed, ...(refusal ? { refusal } : {}) };
 }
@@ -174,7 +177,7 @@ export async function runProduct(ctx: BuildContext, def: DataProductDefinition):
     if (gate.kind === 'refused') throw new DataProductError(gate.code, gate.message, gate.status);
     const out = await publishPackage(store, ownerGhii, { ...prepared.input, ...(gate.visibility !== undefined ? { visibility: gate.visibility } : {}) }, {
         gaii: ctx.caller.principal, kind: 'dataproduct', ref: `dataproducts.${def.name}`,
-        ...(ctx.schedule ? { schedule: ctx.schedule } : def.schedule?.cron ? { schedule: def.schedule.cron } : {}),
+        ...(ctx.schedule ? { schedule: ctx.schedule } : scheduleLabelOf(def) ? { schedule: scheduleLabelOf(def) } : {}),
     });
     if (!out.ok) {
         const first = out.issues?.[0];

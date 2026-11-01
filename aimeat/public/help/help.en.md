@@ -49,7 +49,7 @@ Everything you save is private at first. Only you see it.
 
 You decide what you share. You can invite people to a shared place and share its workspaces with them. You can also publish something for everyone. What you share is seen only by those you shared it with.
 
-An agent or a connected AI may do only what you allow it. You see every permission, and can take it back, on the [Access and security page](/v1/profile?tab=access).
+An agent or a connected AI may do only what you allow it. You see your agents and connected AIs on the [Agents page](/v1/profile?tab=agents), and there you can change or take back their access. App permissions and access tokens are on the [Access and security page](/v1/profile?tab=access).
 
 You can export all your data and delete your account in Settings.
 
@@ -60,6 +60,23 @@ An agent is an AI that does one job for you, also when you are away.
 Say in one sentence in the [chat](/v1/chat) or on your [Home](/v1/home) what you want. AIMEAT makes the agent and shows it to you before it starts. If the work repeats, say so: for example "every weekday at 8 in the morning". Then the agent does the work on that schedule.
 
 You approve the agent once. After that its runs show in the [Scheduler](/v1/profile?tab=scheduler), the list of when each agent works next. You see the finished work on your Home, under What has happened. If you want, the agent also sends it to your email. You can stop an agent at any time.
+
+<!--store-->
+## AIs and agents from outside {#outside}
+
+You can bring AIs and agents from elsewhere into your AIMEAT. They use the same memory, the same agents and the same apps as you. The more AIs work with you, the more your AIMEAT gets done.
+
+**An AI you already use.** Claude, ChatGPT, Grok and Cursor connect over MCP. MCP (Model Context Protocol) is an open standard that lets an AI connect to other services. Read more at [modelcontextprotocol.io](https://modelcontextprotocol.io). Open [Connect your AI](/v1/profile?tab=mcp) and pick your AI, and the page shows the steps. At the end your AIMEAT asks what the AI may do, and you approve the connection.
+
+**An agent that runs elsewhere**, for example a Grok bot or a CrewAI agent. The instructions are on the [Agents page](/v1/profile?tab=agents), under Connect the AI you already use. The agent asks for access, and the request shows on the same page under Pending Agent Requests. You approve it.
+
+When you approve, you choose what the AI or agent may do: Read only, Standard, Full access or Custom. With full access it can do almost everything you can in your AIMEAT: write to memory, make agents and apps, and do work for you. Your account's security, secrets, payments, sharing and changes to permissions stay with you, unless you allow them one by one under Custom.
+
+You can change or take back access at any time, and the change takes effect at once:
+
+- You disconnect a connected AI on the [Connect your AI page](/v1/profile?tab=mcp) with the Disconnect button.
+- You change an agent's access on the [Agents page](/v1/profile?tab=agents): open the agent and change its access, or press Delete agent. An AI you connected shows on the Agents page as a row of its own.
+<!--/store-->
 
 ## Apps {#apps}
 

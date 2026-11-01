@@ -10,6 +10,7 @@
  * @structure SHELL_ENTRIES
  * @usage import { SHELL_ENTRIES } from './entries-shell.js';
  * @version-history
+ *   v1.8.0 — 2026-11-01 — DataTable's `stack` and `form` (the data product wizard's columns, WP9c).
  *   v1.7.0 — 2026-09-30 — NodeUpdateNotice: the operator's new-version tag and its dialog.
  *   v1.6.0 — 2026-09-27 — StartPageSetting's dialog (and its footer, named) and ToastBox's hold and role: the
  *     home and the pop-out windows pass meanings, not classes.
@@ -191,20 +192,24 @@ export const SHELL_ENTRIES: UiEntryWritten[] = [
         summary: 'Rows and columns of records: grey capitals over the columns, a hairline under each row, a soft ground under the pointer. The compact table is closer and quieter, for choosing rows inside a dialog.',
         module: '/components/DataTable.js', sheet: '/css/components/data-table.css',
         data: {
-            shape: 'DataTable({ headers, rows, scroll, compact, className })',
+            shape: 'DataTable({ headers, rows, scroll, compact, stack, form, className })',
             fields: {
-                headers: 'the column names', rows: 'the records, one array each; a cell is a value, or { text, mono, title }',
+                headers: 'the column names', rows: 'the records, one array each; a cell is a value, a control, or { text, mono, title }',
                 scroll: 'the table in a box that scrolls after 600px',
                 compact: 'a table to choose from inside a dialog: ink words at .85rem in close cells, no ground under the pointer, a check box flush in its cell, a status word and a choice drawn small',
+                stack: 'on a phone (560px and narrower) each row is one block and each cell is labelled with its column head',
+                form: 'the cells hold controls: each control fills its cell, the cells sit on one middle line, no ground under the pointer',
                 className: 'a class of the caller\'s own, kept for older callers',
             },
         },
-        useFor: ['Records compared column by column (admin).', 'Rows a person ticks and chooses from inside a dialog (compact).'],
+        useFor: ['Records compared column by column (admin).', 'Rows a person ticks and chooses from inside a dialog (compact).', 'One row per item to edit field by field, on a phone too (form, stack).'],
         variants: [
             { name: 'compact', prop: 'compact', class: 'data-table--compact', when: 'a table to choose from inside a dialog, such as the app catalogue\'s backup restore' },
+            { name: 'stack', prop: 'stack', class: 'data-table--stack', when: 'a table that must stay readable on a phone without scrolling sideways, such as the data product wizard\'s columns' },
+            { name: 'form', prop: 'form', class: 'data-table--form', when: 'a table whose cells are fields a person edits, such as the data product wizard\'s columns' },
         ],
         example: { headers: ['Name', 'State'], rows: [['alpha', 'on'], ['beta', 'off']] },
-        note: 'compact came with appcat (2026-09-27): it draws the old app catalogue\'s backup import table (.backup-table).',
+        note: 'compact came with appcat (2026-09-27): it draws the old app catalogue\'s backup import table (.backup-table). stack and form came with the data product wizard (2026-11-01).',
     },
     {
         id: 'usage-chart', name: 'UsageChart', kind: 'component', status: 'active',

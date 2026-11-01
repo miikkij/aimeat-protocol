@@ -4,6 +4,7 @@
  * SPDX-License-Identifier: MIT
  * @description .env / .json / .ini config-file generators for the `aimeat init` wizard. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-11-01 — The Modes section names AIMEAT_DATA_INTERMEDIATION (plan doc-mvwxcas3dom3, D7.1).
  *   v1.5.0 — 2026-10-18 — The Modes section names the content starting levels, AIMEAT_DEFAULT_* (plan doc-mvcn6c7e4e5q, V5).
  *   v1.4.0 — 2026-10-16 — Every answer reaches the .env: operator identity, AI transparency, consent, the commerce fee mode and the global rate limit have sections, and a key no section names goes under "Other settings". The JSON writer nests schema dot-paths (it wrote camelCase names the loader skips) and the INI writer keeps dot-less paths at the top level; a setting with no schema row goes under its variable name (QA audit D8-03).
  *   v1.3.1 — 2026-10-11 — The app-origin comment says what DNS and TLS it needs instead of naming a
@@ -90,6 +91,7 @@ export function generateEnvContent(settings: Record<string, string>): string {
         { key: 'AIMEAT_DEV_MODE' },
         { key: 'AIMEAT_ANONYMOUS' },
         { key: 'AIMEAT_PUBLISH_GATE', comment: 'Who asks the owner before making something public: off | agents | agents-and-apps' },
+        { key: 'AIMEAT_DATA_INTERMEDIATION', comment: 'Whether this node runs a data intermediation service (EU 2022/868): report | none | node | owners' },
         { key: 'AIMEAT_DEFAULT_MEMORY_VISIBILITY', comment: 'An entry saved with no level: private | owner | members' },
         { key: 'AIMEAT_DEFAULT_FILE_VISIBILITY', comment: 'A file uploaded with no level: private | owner | members' },
         { key: 'AIMEAT_DEFAULT_APP_UPLOAD_VISIBILITY', comment: 'A file an app uploads with visibility "default" (the asset library): public | private | owner | members' },

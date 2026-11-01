@@ -16,6 +16,13 @@
  * @usage
  *   await setVersionAudience(deps, ownerGhii, name, contentHash, 'public', { catalogue: true });
  * @version-history
+ *   v1.6.2 — 2026-11-01 — writeLatest records the confirmation of a public package from personal data on
+ *     the audience record, and carries the recorded one forward, not the earlier pointer's (WP9e, D1.7).
+ *   v1.6.1 — 2026-11-01 — writeLatest copies the sale terms from the service's record
+ *     (./sale-terms-record.ts saleTermsOf), not from the earlier pointer (WP9e).
+ *   v1.6.0 — 2026-11-01 — writeLatest keeps the package's EXCHANGE sale terms (`exchange`) on the new
+ *     pointer, so a new version stays on sale, and runs the hooks onLatestWritten registered (plan
+ *     doc-mvwxcas3dom3, D5.1).
  *   v1.5.0 — 2026-11-01 — The catalogue manifest's tags carry the descriptor's keywords, so DCAT lists
  *     them as dcat:keyword (a data product's keywords; plan doc-mvwxcas3dom3, D9).
  *   v1.4.0 — 2026-11-01 — The catalogue manifest's x_aimeat_datapackage carries the name, title,
@@ -45,6 +52,7 @@ import {
 import { manifestRecordVisibility, entryRecordVisibility } from '../knowledge-audience.js';
 import { fileVisibilityOf, catalogueAudienceOf, catalogueEntryVisibilityOf, withAudienceTag } from './audience.js';
 import { recordPackageAudience, trustedAudienceOf } from './audience-record.js';
+import { saleTermsOf } from './sale-terms-record.js';
 import { invalidateDatasetFacts, catalogueKeyRoot } from './catalogue-facts.js';
 import { announcePublicDataset } from './announce.js';
 
@@ -86,22 +94,51 @@ export async function writeLatest(
     visibility: string, opts: { personalPublicConfirmed?: LatestPointer['personalPublicConfirmed'] } = {},
 ): Promise<void> {
     // The owner's confirmation of a public package from personal data stays with the package
-    // (./personal-guard.ts); every other field of the earlier pointer is the old version's.
-    const confirmed = opts.personalPublicConfirmed ?? (await readPointer(deps, ownerGhii, name))?.personalPublicConfirmed;
+    // (./personal-guard.ts): the one this publish carried, else the one the service recorded
+    // (./audience-record.ts), never the earlier pointer's word. Every other field of the earlier
+    // pointer is the old version's. The EXCHANGE sale terms stay with the package too
+    // (services/exchange-datapackage.ts, D5.1): the pointer carries a copy of the service's record of
+    // them (./sale-terms-record.ts), not the earlier pointer's word.
+    const before = await readPointer(deps, ownerGhii, name);
+    const confirmed = opts.personalPublicConfirmed
+        ?? (await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, before)).personalPublicConfirmed;
+    const sold = await saleTermsOf(deps.storage, deps.config.nodeId, ownerGhii, name, before);
     const pointer: LatestPointer = {
         packageId: packageId(localAccountName(ownerGhii), name),
         name, contentHash, descriptorUrl, updatedAt: at, visibility,
         ...(confirmed ? { personalPublicConfirmed: confirmed } : {}),
+        ...(sold ? { exchange: sold } : {}),
     };
     // The audience the reads decide on, written before the pointer moves, so the pointer never names
     // a version the record does not (./audience-record.ts).
-    await recordPackageAudience(deps.storage, ownerGhii, name, contentHash, visibility);
+    await recordPackageAudience(deps.storage, ownerGhii, name, contentHash, visibility, confirmed);
     await writeStorageFile(deps, ownerGhii, {
         key: latestKey(name),
         data: Buffer.from(JSON.stringify(pointer, null, 2) + '\n', 'utf8'),
         mimeType: 'application/json; charset=utf-8',
         visibility: fileVisibilityOf(visibility),
     });
+    await runLatestHooks(deps.storage, ownerGhii, name, pointer);
+}
+
+/** Run every onLatestWritten hook for a pointer written (or withdrawn, ./withdraw.ts). A hook's failure is logged. */
+export async function runLatestHooks(storage: StoreDeps['storage'], ownerGhii: string, name: string, pointer: LatestPointer): Promise<void> {
+    for (const hook of latestHooks) {
+        try { await hook(storage, ownerGhii, name, pointer); }
+        catch (err) { logger.warn('datapackage: a hook on a new pointer failed', { owner: ownerGhii, package: name, error: String(err) }); }
+    }
+}
+
+type LatestHook = (storage: StoreDeps['storage'], ownerGhii: string, name: string, pointer: LatestPointer) => Promise<void>;
+const latestHooks: LatestHook[] = [];
+
+/**
+ * Run `hook` after every new pointer writeLatest writes. The EXCHANGE projection registers here
+ * (services/exchange-projection.ts), so a package on sale has its listing follow each new version
+ * without this file importing the projection.
+ */
+export function onLatestWritten(hook: LatestHook): void {
+    latestHooks.push(hook);
 }
 
 /** catalogueKeyRoot lives beside the catalogue facts now (./catalogue-facts.ts) and is re-exported here. */

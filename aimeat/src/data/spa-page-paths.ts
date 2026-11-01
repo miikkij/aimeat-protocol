@@ -16,6 +16,7 @@
  * @structure SPA_PAGE_PATHS
  * @usage import { SPA_PAGE_PATHS } from '../data/spa-page-paths.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — /v1/shared-data, the page a share link opens (WP9b).
  *   v1.0.0 — 2026-10-30 — Initial: moved out of routes/portal.ts with its comments, and read by the
  *     content access gate too.
  */
@@ -72,4 +73,7 @@ export const SPA_PAGE_PATHS: readonly string[] = [
   '/v1/allow',       // The owner allows what their agent asked for with one press (SPA, ?agent=&need=)
   '/v1/secret-allow', // The owner allows an extension to send a secret to one address (SPA, ?secret=&extension=&host=)
   '/v1/eco-capability-allow', // The owner allows another account's capability to run one action of their outside app (SPA, ?app=&capability=)
+  '/v1/shared-data', // A person with no account opens a share link: the terms, the key once, the connection file (SPA, ?invite=; services/parties/invite.ts)
+  // The public dataset page /v1/dataset/{owner}/{name} is parameterized, so routes/portal.ts serves it
+  // with its own head and the content access gate names it with a pattern of its own.
 ];

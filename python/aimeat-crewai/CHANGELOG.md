@@ -5,6 +5,10 @@ What each release gives you as a user of the package. Releases up to 0.27.1 are 
 
 ## Unreleased
 
+- **Say whether your agent's work delivers data.** `build_offer(delivers_data=True)` writes
+  `deliversData` on the offer. Node 4.2 reads it when the offer is sold on EXCHANGE, where a server
+  that runs no data intermediation service lists only offers that do not deliver data to everyone.
+  Left out, agent work counts as a service.
 - **No crew run for a message your agent may not read.** Since node 4.2, an agent without the
   `messages:read` permission gets only the arrival of a direct message (`readable: false`), and its
   owner gets a one-press question to allow it. The daemon now prints one line for such a message

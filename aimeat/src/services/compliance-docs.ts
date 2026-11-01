@@ -34,6 +34,8 @@
  * @version-history
  *   v1.0.0 — 2026-10-23 — Initial (plan doc-mvlftkh9zmc9, C1.2, C4.3, C5, C6).
  *   v1.1.0 — 2026-10-24 — patchDocItem(): one entry changed in place, the rest untouched (C7.7).
+ *   v1.2.0 — 2026-11-01 — The document `intermediation`, at the node and organism scopes (plan
+ *     doc-mvwxcas3dom3, D7.2).
  */
 import type { Storage } from '../storage/interface.js';
 import { appSlug } from '../utils/gaii.js';
@@ -57,6 +59,8 @@ export const SCOPES_OF: Record<ComplianceDocKind, ReadonlyArray<ComplianceScope[
   dpias: ['node', 'organism', 'app'],
   frameworks: ['node', 'organism'],
   processors: ['node'],
+  // The node's provider (mode node), or an organism that runs its own marketplace (mode owners).
+  intermediation: ['node', 'organism'],
 };
 
 export function scopeAllows(kind: ComplianceDocKind, scope: ComplianceScope): boolean {

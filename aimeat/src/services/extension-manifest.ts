@@ -5,6 +5,7 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-11-01 — An action's commercial block keeps `deliversData` for its EXCHANGE listing (plan D5.5).
  *   2026-10-25 — EXT_ADDRESS_PATTERN: the name, or `<owner>/<name>` (owner namespaces wish, secaudit2026oct22).
  *   2026-10-25 — NODE_OWNED_CONFIG_KEYS is exported: the config route and the action-script route ask it too (secaudit2026oct22).
  *   v1.15.0 — 2026-10-21 — `uses_secrets: [{ name, hosts, why }]`, stored as `config.__usesSecrets`.
@@ -690,7 +691,7 @@ export function buildExtensionRecordFromManifest(
     actions: actions.map(a => {
       const commercial = a.commercial as {
         payMorsels?: unknown; payMoney?: unknown; plans?: unknown;
-        pricesMoney?: unknown; exchange?: unknown; usageTerms?: unknown;
+        pricesMoney?: unknown; exchange?: unknown; usageTerms?: unknown; deliversData?: unknown;
         provenance?: unknown; odps?: unknown;
       } | undefined;
       type ActionCommercial = NonNullable<ExtensionRecord['actions'][number]['commercial']>;
@@ -717,7 +718,7 @@ export function buildExtensionRecordFromManifest(
             ...(commercial.pricesMoney !== undefined
               ? { pricesMoney: commercial.pricesMoney as ActionCommercial['pricesMoney'] }
               : {}),
-            ...(commercial.exchange !== undefined ? { exchange: commercial.exchange === true } : {}),
+            ...(commercial.exchange !== undefined ? { exchange: commercial.exchange === true } : {}), ...(typeof commercial.deliversData === 'boolean' ? { deliversData: commercial.deliversData } : {}),
             ...(commercial.usageTerms !== undefined
               ? { usageTerms: commercial.usageTerms as ActionCommercial['usageTerms'] }
               : {}),

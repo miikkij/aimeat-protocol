@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-01: check:datapackage-pointer-reads, a data package's audience is read from the service's record, not from latest.json (secaudit2026oct31w2).
  *  - 2026-10-27: check:string-bounds (every Zod string bounded, zero allowed) and check:write-validation (writing routes read their body through a schema; seeded ratchet).
  *  - 2026-10-23: check:unbounded-lists also refuses a Postgres take-first read without LIMIT 1 (aimeat.io stalled on one that day).
  *  - 2026-10-20: check:unbounded-lists (QA audit P7-10) and check:storage-conformance (P4-09), two ratchets seeded from today's code.
@@ -105,6 +106,9 @@ export const FAST_CHECKS = [
     // From the September 2026 audit's check of the fixes: a visitor from another node is named
     // `alice@their-node`, and a cut at the '@' anywhere in src/ made it the local account `alice`.
     { script: 'check:identity-shortening', label: 'An identity is cut to an account name only by localAccountName or localAccountOf' },
+    // Secaudit2026oct31w2, after round 10: a data package read decided on the latest.json pointer an
+    // app can rewrite, twice; its audience comes from the service's record.
+    { script: 'check:datapackage-pointer-reads', label: 'A data package\'s audience is read from the service\'s record, never from latest.json, beyond the listed reads' },
     // Secaudit 2026-10, C1, C2 and C7: a security decision with a function of its own is made only
     // through it; the hand copies left are counted per file and may only fall.
     { script: 'check:single-entry', label: 'A password check, an account deletion and an operator check each go through their one function' },

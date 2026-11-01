@@ -12,6 +12,7 @@
  *   secConsumers
  * @usage import { renderPage } from './ai/page.js';
  * @version-history
+ *   v1.43.0 -- 2026-11-01 -- In the simple view the sections inside "02 Lisäasetukset" are numbered 02.1 to 02.8, so none of them reads 01 under 02 (Grok's first-timer review 1.11 c); the full page keeps 01 to 08.
  *   v1.42.0 -- 2026-11-01 -- No count of messages anywhere: messagesLeft and its 30-day history fallback are gone, and the head explains the credit in Jouni's words, that it is used according to the model and the amount of use (Jouni, 1.11 04.00: "lupaukset eivät koskaan pidä paikkaansa").
  *   v1.41.0 -- 2026-11-01 -- The simple view says what the credit still buys as a sentence in the head ("Saldosi riittää vielä noin N tavalliseen viestiin."), not in the strip's monospace line, and its crumb names the page Tekoälysaldo (commercial's check of 2c31d1d22).
  *   v1.40.0 -- 2026-11-01 -- The simple view (Jouni's review of v33): the title and menu say "Tekoälysaldo"; no 30-day figure in the strip and no monospace line on the meter; in Lisäasetukset the first and chosen radio is "Tekoälysaldo (oletus, ei avainta)", with "Ilman omaa avainta…" above the choice and the key field only after a service of one's own is picked (K60); "about N messages" by the store's price of one message when it set one (A3).
@@ -142,14 +143,14 @@ function renderSimple(ctx) {
         ${secToday(ctx)}
         <${FoldSection} id="ai-advanced" num="02" title=${x('simple.advanced')} sub=${x('simple.advancedSub')}
           lead=${x('simple.advancedLead')} open=${ctx.advancedOpen} onToggle=${() => ctx.setAdvancedOpen(!ctx.advancedOpen)}>
-          ${secConnection(ctx)}
-          ${secProviders(ctx, '02')}
-          ${secRouting(ctx, '03')}
-          ${secRoles(ctx, '04')}
-          ${secPolicy(ctx, '05')}
-          <${GenRulesSection} num="06" />
-          ${secBudget(ctx)}
-          ${secConsumers(ctx)}
+          ${secConnection(ctx, '02.1')}
+          ${secProviders(ctx, '02.2')}
+          ${secRouting(ctx, '02.3')}
+          ${secRoles(ctx, '02.4')}
+          ${secPolicy(ctx, '02.5')}
+          <${GenRulesSection} num="02.6" />
+          ${secBudget(ctx, '02.7')}
+          ${secConsumers(ctx, '02.8')}
           ${ctx.extras || null}
         <//>`}
     <//>`;
@@ -288,7 +289,7 @@ function strip(ctx) {
 
 /* ── 01 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secConnection(ctx) {
+function secConnection(ctx, num = '01') {
   const s = ctx.settings;
   // In the simple view this section sits in Lisäasetukset and is "Oma tekoälytili (valinnainen)",
   // with no "ei avainta" count: having no key is the ordinary case there (v31 K58).
@@ -313,7 +314,7 @@ function secConnection(ctx) {
       actions=${html`<${Action} small disabled=${ctx.busy === 'conn'} onClick=${() => ctx.saveConnection()}>${x('save')}<//>`} />
     ${msg(ctx.connMsg)}`;
   return html`
-    <${PageSection} id="ai-connection" num="01" title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple ? null : count} first=${true}>
+    <${PageSection} id="ai-connection" num=${num} title=${simple ? x('simple.connTitle') : x('secConnection')} count=${simple ? null : count} first=${true}>
       ${creditFirst ? html`<${Note} kind="lead">${x('simple.noKey')}<//>` : null}
       <${Facts} rows=${[
         { k: x('providerLabel'), v: providers, sub: creditFirst ? null : x('providerHint') },
@@ -325,10 +326,10 @@ function secConnection(ctx) {
 
 /* ── 06 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secBudget(ctx) {
+function secBudget(ctx, num = '07') {
   const u = ctx.usage;
   const r = ctx.roll;
-  if (!u) return html`<${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
+  if (!u) return html`<${PageSection} id="ai-budget" num=${num} title=${x('secBudget')} count=${null}><${Note} kind="loading">${x('loading')}<//><//>`;
   const budget = Number(u.daily_budget_usd) || 0;
   const spent = Number(u.spent_today_usd) || 0;
   const pct = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0;
@@ -351,7 +352,7 @@ function secBudget(ctx) {
     ? html`<${Loud} control disabled=${ctx.busy === 'caps'} onClick=${() => ctx.saveCaps()}>${x('saveCaps')}<//><${Action} small soft onClick=${() => ctx.setCapsEditing(false)}>${x('cancel')}<//>`
     : html`<${Action} small soft onClick=${() => ctx.setCapsEditing(true)}>${x('setCaps')}<//>`;
   return html`
-    <${PageSection} id="ai-budget" num="07" title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
+    <${PageSection} id="ai-budget" num=${num} title=${x('secBudget')} count=${x('secBudgetSub', { n: money(budget), today: money(spent) })}>
       <${Facts} rows=${[
         { key: 'budget', k: html`<${HelpLabel} term="ai.daily_budget" label=${x('dailyBudget')}>${x('dailyBudget')}<//>`, v: budgetValue },
         { k: x('monthLabel'), v: r && r.days ? x('monthBody', { cost: money(r.cost), calls: r.calls, tokens: compact(r.tokens), apps: r.apps.length, big: r.apps.filter((a) => a.cost >= 0.1).length }) : x('monthNone'), sub: x('monthSub') },
@@ -389,7 +390,7 @@ function chart(ctx, history, r) {
 
 /* ── 07 ───────────────────────────────────────────────────────────────────────────────────────── */
 
-function secConsumers(ctx) {
+function secConsumers(ctx, num = '08') {
   const top = (ctx.roll?.apps || []).filter((a) => !a.app.includes(':')).slice(0, 3).map((a) => a.app);
   const chat = ctx.chat;
   // What the own key never reaches here, as the server says it (own_key.not_covered, services/
@@ -405,7 +406,7 @@ function secConsumers(ctx) {
     v: !crewsMissed ? x('consumerCrewsNodeBody') : onNode.length ? x('consumerCrewsMixed', { agents: onNode.join(', ') }) : x('consumerCrewsBody'),
   };
   return html`
-    <${PageSection} id="ai-consumers" num="08" title=${x('secConsumers')} count=${null}>
+    <${PageSection} id="ai-consumers" num=${num} title=${x('secConsumers')} count=${null}>
       <${Note} kind="lead">${x('consumersIntro')}<//>
       <${Facts} rows=${[
         { k: x('consumer.apps'), v: `${x('consumerAppsBody')}${top.length ? ` ${x('consumerAppsTop', { apps: top.join(', ') })}` : ''}` },

@@ -5,6 +5,8 @@
  * @description Styles for the AI Help Prompt page — warm white aesthetic,
  *   DM Sans body text, JetBrains Mono for the prompt code block.
  * @version-history
+ *   v3.3.0 -- 2026-11-01 -- A centred reading column of at most 760px with a margin on both sides, and more
+ *       space under each headline, between paragraphs and around lists (Jouni, 1.11 11.40).
  *   v3.2.0 -- 2026-10-31 -- The title row with the language choice, the section links and the sections
  *       of the page read from public/help/help.<lang>.md (Jouni v27 P4).
  *   v3.1.0 -- 2026-09-13 -- Compose the existing ink top rule from poster.css.
@@ -24,10 +26,11 @@
  */
 
 /* ── Container ── */
+/* A reading column of at most 760px, centred, with a margin on both sides (Jouni, 1.11 11.40). */
 .hlp-container {
-  max-width: 840px;
+  max-width: 760px;
   margin: 0 auto;
-  padding: 44px 20px 64px;
+  padding: 44px 24px 64px;
   font-family: var(--font-showroom-body);
 }
 
@@ -138,7 +141,7 @@
 /* Section headlines in the display face; the steps numbered with coral numerals. */
 .hlp-human .section-title, .hlp-agent .section-title {
   font-family: var(--font-showroom); font-weight: 400; text-transform: uppercase; font-size: 1.65rem; line-height: 1.05; letter-spacing: .01em;
-  color: var(--text); margin: 2.75rem 0 .75rem;
+  color: var(--text); margin: 3.25rem 0 1.1rem;
 }
 .hlp-human > .section-title:first-child { margin-top: 0; }
 .hlp-steps { list-style: none; margin: 0; padding: 0; counter-reset: hlp-step; }
@@ -192,3 +195,8 @@
 .hlp-toc a:hover { color: var(--accent); }
 .hlp-section { scroll-margin-top: 5rem; }
 .hlp-section .md-body blockquote { margin: .75rem 0; }
+/* Reading rhythm (Jouni, 1.11 11.40): air under each headline, between the paragraphs and around a list. */
+.hlp-section .md-body { line-height: 1.7; }
+.hlp-section .md-body p { margin: 0 0 1.1rem; }
+.hlp-section .md-body ul, .hlp-section .md-body ol { margin: 0 0 1.25rem; }
+.hlp-section .md-body li + li { margin-top: .4rem; }

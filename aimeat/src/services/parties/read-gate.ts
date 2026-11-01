@@ -13,13 +13,19 @@
  *     3. the version: a share that pins one serves that one (a read without a version is pointed at
  *        it), and another version is 403 VERSION_NOT_SHARED;
  *     4. the key in the address only for a share that allows it: 403 URL_KEY_NOT_ALLOWED;
- *     5. the terms, when the share requires them: 403 TERMS_NOT_ACCEPTED with the address to accept.
+ *     5. the terms, when the share requires them: 403 TERMS_NOT_ACCEPTED with the address to accept;
+ *     6. for a share an EXCHANGE purchase made, the versions of the purchased interface: 403
+ *        VERSION_NOT_IN_CONTRACT for another; the route then meters each data read (plan D5.3).
  *   The answer is a package reader that admits this party to this package and nothing else
  *   (services/datapackage/audience.ts): it is never a node account, so the members and organism levels
  *   refuse it, and it carries no owner, so no owner rule reads it as the owner's principal.
  * @structure PartyReadTarget · PartyReadVerdict · partyReadVerdict
  * @usage const v = await partyReadVerdict(deps, ctx, { name, version, what: 'rows' }); if (!v.ok) refuse(v);
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A key a DSP transfer minted reads only the share it names (plan D8.4).
+ *   v1.2.0 — 2026-11-01 — A share a purchase made reads the purchased interface's versions only, and the
+ *     verdict names its `contract` for the metering (plan D5.3, D5.4).
+ *   v1.1.0 — 2026-11-01 — A served read names its version in the read log when it is known (plan D6.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2.5, D2.9, D3.2, D3.5, D3.7).
  */
 import type { Storage, ConsentRecord } from '../../storage/interface.js';
@@ -27,8 +33,9 @@ import type { AimeatConfig } from '../../config.js';
 import type { DatapackageReader } from '../datapackage/audience.js';
 import { bare } from '../datapackage/contract.js';
 import type { PartyContext } from './verify.js';
-import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf } from './shares.js';
+import { isLiveShare, packageOfPattern, partySharesOf, shareMetaOf, type ShareContract } from './shares.js';
 import { logPartyRead, takeReadSlot } from './activity.js';
+import { contractVersionHashes } from '../exchange-datapackage.js';
 
 export interface PartyReadTarget {
     /** The package name. */
@@ -46,6 +53,8 @@ export type PartyReadVerdict =
         version?: string;
         /** Write the served read to the log, with the row count when the endpoint knows it. */
         served: (rows?: number) => void;
+        /** The purchase the share delivers, when a purchase made it: its data reads are metered. */
+        contract?: ShareContract;
     }
     | { ok: false; status: 403 | 429; code: string; message: string; details?: Record<string, unknown> };
 
@@ -57,7 +66,7 @@ export async function partyReadVerdict(
 ): Promise<PartyReadVerdict> {
     const { storage, config } = deps;
     const what = `${target.name}/${target.what}`;
-    const log = (verdict: 'served' | 'refused', share: string | null, extra: { rows?: number; code?: string } = {}) =>
+    const log = (verdict: 'served' | 'refused', share: string | null, extra: { rows?: number; code?: string; version?: string } = {}) =>
         logPartyRead(storage, ctx.ownerGhii, { at: new Date().toISOString(), share, party: ctx.party.name, uid: ctx.party.uid, what, verdict, ...extra });
     const refuse = (status: 403 | 429, code: string, message: string, share: string | null, details?: Record<string, unknown>): PartyReadVerdict => {
         log('refused', share, { code });
@@ -68,8 +77,9 @@ export async function partyReadVerdict(
         return refuse(429, 'RATE_LIMITED', `This party may make ${config.partyReadsPerMinute ?? 60} reads a minute on this server. Wait a minute and read again.`, null);
     }
 
+    // A key a DSP transfer minted reads the one share its agreement made (plan D8.4).
     const shares = (await partySharesOf(storage, ctx.ownerGhii, ctx.party, config.nodeId))
-        .filter(c => packageOfPattern(c.dataPattern) === target.name);
+        .filter(c => packageOfPattern(c.dataPattern) === target.name && (!ctx.keyShare || c.id === ctx.keyShare));
     const live = shares.filter(c => isLiveShare(c));
     if (!live.length) {
         if (!shares.length) return refuse(403, 'NOT_SHARED', 'The owner has not shared this data package with you.', null);
@@ -99,10 +109,30 @@ export async function partyReadVerdict(
         return refuse(403, 'TERMS_NOT_ACCEPTED', `Accept the terms of this share first: what it is for (${share.purpose}) and the licence of the data. POST ${acceptUrl}.`, share.id, { accept_url: acceptUrl, purpose: share.purpose });
     }
 
+    // 6. A share a purchase made reads the versions of the purchased interface (plan D5.3, D5.4): a read
+    //    with no version reads the newest of them, another version is refused.
+    let versions: string[] | undefined;
+    if (meta.contract) {
+        versions = await contractVersionHashes(storage, ctx.ownerGhii, target.name, meta.contract.ifaceVersion);
+        if (!versions.length) return refuse(403, 'NO_VERSION_IN_CONTRACT', `No stored version of this package has the schemas of interface v${meta.contract.ifaceVersion}, which your purchase covers. Ask the provider.`, share.id);
+        if (version && !versions.some(v => sameVersion(v, version!))) {
+            return refuse(403, 'VERSION_NOT_IN_CONTRACT', `Your purchase covers the versions with the schemas of interface v${meta.contract.ifaceVersion}; ${version} is not one of them.`, share.id);
+        }
+        version = version ?? versions[0];
+    }
+
     const reader: DatapackageReader = {
         sub: ctx.partyRef,
-        party: { ownerGhii: ctx.ownerGhii, packageName: target.name, shareId: share.id, ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}) },
+        party: {
+            ownerGhii: ctx.ownerGhii, packageName: target.name, shareId: share.id,
+            ...(meta.pinnedVersion ? { pinnedVersion: meta.pinnedVersion } : {}), ...(versions ? { versions } : {}),
+        },
     };
     const shareId = share.id;
-    return { ok: true, reader, share, ...(version ? { version } : {}), served: (rows?: number) => log('served', shareId, rows === undefined ? {} : { rows }) };
+    const readVersion = version;
+    // The served entry names the version when the request or the share named one (D6.4).
+    return {
+        ok: true, reader, share, ...(version ? { version } : {}), ...(meta.contract ? { contract: meta.contract } : {}),
+        served: (rows?: number) => log('served', shareId, { ...(rows === undefined ? {} : { rows }), ...(readVersion ? { version: readVersion } : {}) }),
+    };
 }

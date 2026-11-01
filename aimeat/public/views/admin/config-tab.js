@@ -25,6 +25,7 @@
  *   components/SettingsIndex.js; this file gives it the schema as data.
  * @structure
  *   - DOMAINS / domainOf — the grouping behind the index
+ *   - PAGE_GROUPS / pageRank / groupOfPath — a group of the page that collects settings of several sections
  *   - choiceLabel / shownIn — a fixed value in words
  *   - rangeWords — a number's range as "recommended …" or "allowed …"
  *   - rangeMin / refusalWords — why the node did not save a value, in the page's language
@@ -32,6 +33,13 @@
  *   - configLabel / configGroupLabel — a setting's and a group's name, for the admin menu find too
  *   - ConfigTab (default)
  * @version-history
+ *   2026-11-01 -- The "Data out" group (design canvas "Data ulos", board Admin-Config; WP9b): PAGE_GROUPS
+ *     collects data intermediation, app registration without an account, the whole `dataspace` section
+ *     and the longest share into one group of its own domain, in the board's order, with the stored
+ *     dot-paths unchanged; its section action (config-data-out.js) shows the Dataspace Protocol status,
+ *     the outside parties' figures, the apps that ask to let people register, and the DCAT feed.
+ *   2026-11-01 -- The `dataspace` section (the Dataspace Protocol provider) sits under identity, after
+ *     consent (plan doc-mvwxcas3dom3, D8); the "Data ulos" group of WP9b may move it.
  *   2026-10-31 -- The `schedules` section (how many schedules one owner keeps, and the shortest time
  *     between two runs) sits under limits (secaudit2026oct31w2 round 10).
  *   v3.9.0 -- 2026-10-29 -- The `file_store` section (where stored files keep their bytes, and whether a
@@ -105,6 +113,7 @@ import { t } from '/js/i18n.js';
 import { Badge, Empty, ExpandableHelp, ErrorBox } from './shared.js';
 import { saveConfig, deleteConfig } from '/js/services/admin.js';
 import { DecideKeyTest } from './decide-key-test.js';
+import { DataOutStatus } from './config-data-out.js';
 import { SettingsIndex, SettingLine, ChangeList } from '/components/SettingsIndex.js';
 import { Section } from '/components/Section.js';
 import { Action, Loud } from '/components/Action.js';
@@ -141,6 +150,7 @@ const DOMAINS = [
   { id: 'ai', groups: ['ai', 'decide', 'content_class', 'agent','agents', 'tasks', 'mcp', 'cortex', 'proactive'] },
   { id: 'money', groups: ['morsel_policy', 'commerce', 'marketplace', 'work', 'portfolio'] },
   { id: 'identity', groups: ['auth', 'passkey', 'totp', 'eudiw', 'docsign', 'sso', 'registration', 'scopes', 'consent', 'classification', 'security', 'moderation', 'account_events', 'echat'] },
+  { id: 'data_out', groups: ['data_out'] },
   { id: 'node', groups: ['node', 'operator', 'storage', 'setup', 'consul', 'stats', 'metrics', 'usage', 'features', 'packages'] },
   { id: 'limits', groups: ['quota', 'file_store', 'rate_limits', 'boards', 'extensions', 'realtime', 'schedules'] },
   { id: 'federation', groups: ['federation', 'federation_sync', 'cross_federation', 'personal_nodes', 'connect_tunnel', 'msm'] },
@@ -148,11 +158,33 @@ const DOMAINS = [
 ];
 
 /**
+ * Groups of the page that collect settings from more than one section, in the order they are shown:
+ * an entry is one dot-path, or `<section>.*` for every setting of a section. The stored dot-paths
+ * stay as they are; only where the page shows them changes. "Data out" (design canvas "Data ulos",
+ * board Admin-Config) holds what decides how data leaves this node. `pnpm check:config-tab` reads
+ * this map, so a page group needs its dashboard.cfgGroup_<group> name like a section does.
+ */
+const PAGE_GROUPS = {
+  data_out: ['consent.data_intermediation', 'consent.party_self_registration', 'dataspace.*', 'consent.share_max_days'],
+};
+
+/** The place of `path` in a page group's list, or -1 when no entry names it. */
+function pageRank(list, path) {
+  return list.findIndex(e => (e.endsWith('.*') ? path.startsWith(e.slice(0, -1)) : e === path));
+}
+/** The group the page shows `path` in: a page group that names it, else its section. */
+function groupOfPath(path) {
+  for (const [g, list] of Object.entries(PAGE_GROUPS)) if (pageRank(list, path) >= 0) return g;
+  return path.split('.')[0];
+}
+
+/**
  * A section that needs an action of its own beside its fields, rendered under them. The decision
  * model's key is the first: a key an operator cannot test is a key they find out about from users.
  */
 const SECTION_ACTIONS = {
   decide: DecideKeyTest,
+  data_out: DataOutStatus,
 };
 
 function domainOf(group) {
@@ -353,9 +385,13 @@ export default function ConfigTab({ data, reload, configFind }) {
   const groups = {};
   for (const path in schema) {
     if (!matches(path, schema[path])) continue;
-    const group = path.split('.')[0];
+    const group = groupOfPath(path);
     if (!groups[group]) groups[group] = [];
     groups[group].push({ path, entry: schema[path] });
+  }
+  // A page group shows its settings in its own order, not in the schema's.
+  for (const [g, list] of Object.entries(PAGE_GROUPS)) {
+    if (groups[g]) groups[g].sort((a, b) => pageRank(list, a.path) - pageRank(list, b.path));
   }
   const groupEntries = Object.entries(groups);
   const byDomain = new Map();

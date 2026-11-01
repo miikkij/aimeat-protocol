@@ -14,6 +14,11 @@
  *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
+ *   2026-11-01 — /v1/dataset/:owner/:name, the public dataset page, with the package's schema.org
+ *     Dataset in the head (WP9b).
+ *   2026-11-01 — The operator's place on the privacy and terms pages comes from
+ *     services/operator-place.ts: a private person's pages give the email only and print no postal
+ *     address; the country is in the page's language; {{operatorAddress}} is gone (Jouni, 11.39).
  *   2026-11-01 — /v1/privacy, /v1/terms and /v1/connect with `?lang=<a language the node ships>` go to
  *     that language's own path (302); the English page was served (crew45 check).
  *   2026-10-31 — The privacy page's {{aiRegionNotice}}: where the node's OpenRouter key has a request
@@ -124,12 +129,15 @@ import { resolvePublishedPortfolio } from './portfolio.js';
 import { livePageMarkdown } from '../services/page-body-live.js';
 import { portfolioSeoIndexable, portfolioPage, type PortfolioSeoConfig } from '../services/portfolio-seo.js';
 import { pageAccessOf } from '../services/page-access.js';
+import { datasetPageOf } from '../services/datapackage/landing-page.js';
+import { logger } from '../utils/logger.js';
 export { serveSpa, resolvePublicFile } from './portal-spa.js';
 import { LOCALES, type Locale } from '../i18n.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { tagsInUseOnNode } from '../services/visibility/visibility-settings.js';
 import { ownerAnalyticsNotice } from '../services/visibility/privacy-notice.js';
 import { aiRegionNotice } from '../services/privacy-ai-region.js';
+import { operatorPlaceVars } from '../services/operator-place.js';
 import { renderPolicyNotSetPage } from './portal-policy-not-set.js';
 
 /**
@@ -180,8 +188,9 @@ function templateVars(config: AimeatConfig, locale: Locale): Record<string, stri
           fi: `, Y-tunnus ${config.operator.businessId}`,
           es: `, identificación fiscal ${config.operator.businessId}` }[locale]
       : '',
-    operatorAddress: config.operator.address,
-    operatorCountry: config.operator.country,
+    // The country in the page's language and the postal address, which a private person's pages
+    // leave out: the email is their contact, never their home address (services/operator-place.ts).
+    ...operatorPlaceVars(config.operator, locale),
     operatorEmail: config.operator.email,
     operatorSecurityEmail: config.operator.securityEmail || config.operator.email,
     hostingName: config.operator.hostingName,
@@ -561,6 +570,18 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       changefreq: 'weekly',
       priority: '0.4',
     });
+  });
+
+  // The public dataset page of one data package — /v1/dataset/:owner/:name (views/dataset.js; board
+  // Julkinen-sivu). A public package gives the head its title, description and schema.org Dataset
+  // (services/datapackage/landing-page.ts); any other is never indexed, and the page shows the 404.
+  router.get('/v1/dataset/:owner/:name', async (req, res) => {
+    const spaPath = resolvePublicFile('spa.html');
+    if (!spaPath) { res.redirect(302, '/spa.html'); return; }
+    const page = await datasetPageOf({ storage, config }, String(req.params.owner ?? ''), String(req.params.name ?? ''))
+      .catch((err: unknown) => { logger.warn('portal: the dataset page head could not be read', { error: String(err) }); return null; });
+    if (!page) res.setHeader('X-Robots-Tag', 'noindex, nofollow');
+    serveSpa(res, spaPath, config, undefined, page ?? undefined);
   });
 
   // ── SPA routes — serve spa.html for all portal pages ──

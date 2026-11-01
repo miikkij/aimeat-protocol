@@ -31,6 +31,9 @@
  * @usage
  *   if (!(await datapackageReadable(storage, ownerGhii, pointer?.visibility, req.auth))) return null;
  * @version-history
+ *   v1.4.0 — 2026-11-01 — A contract reader (`contract`, ./contract-read.ts) opens the one package its
+ *     EXCHANGE contract names, at the versions of the interface the contract pins, and nothing else; like
+ *     a party it carries no owner, so no other level admits it (plan doc-mvwxcas3dom3, D5.3).
  *   v1.3.0 — 2026-11-01 — An outside party's reader (`party`, services/parties/read-gate.ts) opens the one
  *     package its share names, every version or the pinned one, and nothing else: datapackageReadable
  *     takes the package name, and a caller that passes none admits no party. A party is never a node
@@ -81,6 +84,17 @@ export interface DatapackageReader extends AudienceAuth {
   scopes?: readonly string[];
   /** An outside party admitted by one share (services/parties/read-gate.ts): it reads this one package and nothing else. */
   party?: PartyReaderFacts;
+  /** An account admitted by its EXCHANGE contract (services/datapackage/contract-read.ts): this package, the versions of its interface. */
+  contract?: ContractReaderFacts;
+}
+
+/** What a contract reader says: whose package, which one, the entitlement, and the versions its interface covers. */
+export interface ContractReaderFacts {
+  ownerGhii: string;
+  packageName: string;
+  entitlementId: string;
+  /** The pinned version range (services/exchange-datapackage.ts contractVersionHashes), `sha256:<hex>`. */
+  versions: string[];
 }
 
 /** What a party's reader says: whose package, which one, the share, and the version the share pins. */
@@ -89,6 +103,8 @@ export interface PartyReaderFacts {
   packageName: string;
   shareId: string;
   pinnedVersion?: string;
+  /** A share bound to a purchase reads the versions of the purchased interface only (./contract-read.ts). */
+  versions?: string[];
 }
 
 /**
@@ -142,6 +158,7 @@ export async function datapackageReadable(
   name?: string,
 ): Promise<boolean> {
   if (reader?.party) return partyAdmits(ownerGhii, name, reader);
+  if (reader?.contract) return name !== undefined && reader.contract.ownerGhii === ownerGhii && reader.contract.packageName === name;
   if (readsAsPackageOwner(ownerGhii, reader)) return true;
   const audience = parseAudience(visibility ?? 'public');
   if (!audience || audience.level === 'private') return false;
@@ -189,7 +206,10 @@ export async function versionOpenTo(
   const bareHash = (h: string) => h.replace(/^sha256:/, '');
   // A party reads every version of the shared package, or the one version its share pins. The caller
   // has already admitted it to the package (datapackageReadable with the name).
+  if (reader?.party?.versions && !reader.party.versions.some(v => bareHash(v) === bareHash(contentHash))) return false;
   if (reader?.party) return !reader.party.pinnedVersion || bareHash(reader.party.pinnedVersion) === bareHash(contentHash);
+  // A contract reads the versions of the interface it was signed on, and no other (plan D5.1).
+  if (reader?.contract) return reader.contract.versions.some(v => bareHash(v) === bareHash(contentHash));
   if (readsAsPackageOwner(ownerGhii, reader)) return true;
   if (pointer?.contentHash && bareHash(pointer.contentHash) === bareHash(contentHash)) return true;
   const recorded = recordedAudienceOf(versionFile.tags);

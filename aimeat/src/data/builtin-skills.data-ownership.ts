@@ -27,6 +27,7 @@
  * @structure DATA_OWNERSHIP_SKILL_ENTRY
  * @usage import { DATA_OWNERSHIP_SKILL_ENTRY } from './builtin-skills.data-ownership.js';
  * @version-history
+ *   2026-11-01 — Section 5: a table's freshness and the versions still in use (plan doc-mvwxcas3dom3, D6).
  *   2026-11-01 — Section 1: a data product (aimeat_dataproduct) builds a table from the person's own
  *     material and refreshes it on a schedule (plan doc-mvwxcas3dom3, D9).
  *   2026-11-01 — Section 4: a data package is withdrawn with aimeat_datapackage_withdraw, and with purge
@@ -286,6 +287,14 @@ let knowledge age, and you should offer them, not wait to be asked:
 - **Row retention.** A workspace row space can keep only the newest rows or only the last days
   (\`retention: { maxRows, maxDays }\` in the workspace's manifest); older rows go as new ones arrive.
   Right for logs, readings and event streams.
+- **A table says whether it is up to date.** \`GET /v1/datapackages/{owner}/{name}\` and the
+  dataset entries of \`aimeat_discover\` carry \`freshness\`: fresh, late, stale (three promised
+  updates missed) or unscheduled (nothing promised, never called fresh), against the data product's
+  schedule or the producer's. When the person asks "is any of my data out of date?", answer per table
+  with the state and its reason; a stale one also rang their bell once. The versions list
+  (\`GET /v1/datapackages/{owner}/{name}/versions\`) tells the person which versions a named share
+  pins, which an outside party read in the last 30 days, and which the retention policy removes next;
+  a version a share pins is never removed. Offer to withdraw a table nobody reads and nobody updates.
 - **Cleaning up with the person.** When you list a person's records and see old drafts, keys nobody
   has read for months, or a place whose readme no longer says what is current, name them and ask.
   Delete with their yes, and tell them the restore date.

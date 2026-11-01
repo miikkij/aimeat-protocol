@@ -436,6 +436,9 @@
             "exchange": {
               "type": "boolean"
             },
+            "deliversData": {
+              "type": "boolean"
+            },
             "inputSchema": {
               "type": "object",
               "propertyNames": {

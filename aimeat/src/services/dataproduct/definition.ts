@@ -17,12 +17,23 @@
  *   THE AUDIENCE DEFAULTS TO PRIVATE. A data package published by hand defaults to public; a product
  *   built from somebody's records, memory and files does not, because the sources it reads are mostly
  *   private and the build refuses an audience wider than its narrowest source anyway.
+ *
+ *   WHEN IT RUNS. `schedule` is a clock ({ cron, timezone? }), "when a source changes" ({ on: 'change' },
+ *   the REST and MCP form; the string "on-change" is read as the same), or null (on demand only). The
+ *   node sees a change of a records space, an app's data, a memory key, a stored file and another data
+ *   package (./on-change.ts); it does not see when an extension action would answer differently, so a
+ *   product with an extension source is refused `on: 'change'` with NO_CHANGE_SIGNAL.
  * @structure DATAPRODUCT_SPEC · DataProductDefinition · SourceSpec · normaliseDefinition · dataProductKey
- *   · DataProductError · SOURCE_KINDS · COMBINE_MODES · FILTER_OPS
+ *   · DataProductError · SOURCE_KINDS · COMBINE_MODES · FILTER_OPS · sourceLabel · runsOnChange ·
+ *   scheduleLabelOf · ON_CHANGE · NO_CHANGE_SIGNAL_KINDS
  * @usage
  *   const out = normaliseDefinition(name, body);
  *   if (!out.ok) return refuse(out.code, out.message);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — `schedule: { on: 'change' }`: run when a source changes (WP9c); refused with
+ *     NO_CHANGE_SIGNAL for a product with an extension source. `runAs`, the maker a change run acts as.
+ *   v1.1.0 — 2026-11-01 — `retention` { keep, unit }: how many earlier versions a run keeps (the
+ *     package's retention policy); sourceLabel, a source in a few words for a list row (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { FieldType } from '../datapackage/contract.js';
@@ -42,6 +53,26 @@ export type FilterOp = typeof FILTER_OPS[number];
 
 /** The memory key of one product's definition. */
 export const dataProductKey = (name: string): string => `${DATAPRODUCT_KEY_PREFIX}${name}`;
+
+/** The schedule label a change run records as its producer schedule, and DCAT reads as irregular. */
+export const ON_CHANGE = 'on-change' as const;
+/** Source kinds whose change the node cannot see: a product with one cannot run on a change. */
+export const NO_CHANGE_SIGNAL_KINDS: readonly SourceKind[] = ['extension'];
+
+/** Does this definition run when a source changes? */
+export const runsOnChange = (def: Pick<DataProductDefinition, 'schedule'>): boolean => def.schedule?.on === 'change';
+
+/** What the producer schedule of a version says: the cron, `on-change`, or nothing. */
+export function scheduleLabelOf(def: Pick<DataProductDefinition, 'schedule'>): string | undefined {
+    if (runsOnChange(def)) return ON_CHANGE;
+    return def.schedule?.cron || undefined;
+}
+
+/**
+ * Whom a run on a source change acts as: the maker of the definition, in the terms a schedule record
+ * keeps them (services/schedule-actor.ts makerOf), so the run is asked again who that is at each fire.
+ */
+export interface RunAs { createdBy: string; createdByAgent: boolean; createdByApp?: string }
 
 /**
  * Which columns a source hands on, before the product's own column mapping: a list of names to keep,
@@ -117,7 +148,13 @@ export interface DataProductDefinition {
     combine: CombineSpec;
     columns?: ColumnMapping[];
     filter?: FilterSpec | null;
-    schedule?: { cron: string; timezone?: string } | null;
+    /** A clock ({ cron, timezone? }), a source change ({ on: 'change' }), or null for on demand only. */
+    schedule?: { cron?: string; timezone?: string; on?: 'change' } | null;
+    /** The maker a run on a source change acts as; set by define for `schedule: { on: 'change' }`. */
+    runAs?: RunAs;
+    /** How many earlier versions a run keeps (the package's retention policy, ../datapackage/retention.ts).
+     *  Absent: every version stays. A version a share pins or a contract reads is kept regardless. */
+    retention?: { keep: number; unit: 'versions' | 'months' } | null;
     visibility: string;
     /** The owner's confirmation that a public product may carry a column the data map marks personal. */
     confirmPersonalPublic?: boolean;
@@ -225,10 +262,32 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
     let schedule: DataProductDefinition['schedule'];
     if (raw.schedule !== undefined && raw.schedule !== null) {
         const s = raw.schedule as Record<string, unknown>;
-        const cron = typeof raw.schedule === 'string' ? raw.schedule : str(s.cron);
-        if (!cron) return bad('schedule is { cron, timezone? }, or null to build on demand only.');
-        schedule = { cron, ...(str(s.timezone) ? { timezone: str(s.timezone)! } : {}) };
+        if (raw.schedule === ON_CHANGE || s.on === 'change') {
+            const blind = sources.find(src => NO_CHANGE_SIGNAL_KINDS.includes(src.kind));
+            if (blind) {
+                return {
+                    ok: false, code: 'NO_CHANGE_SIGNAL',
+                    message: `Source ${blind.id} is an extension action. The node cannot see when an extension's answer changes, so this product cannot run when its source changes. Give it a schedule instead: { cron, timezone? }.`,
+                };
+            }
+            schedule = { on: 'change' };
+        } else {
+            const cron = typeof raw.schedule === 'string' ? raw.schedule : str(s.cron);
+            if (!cron) return bad('schedule is { cron, timezone? }, { on: "change" } to run when a source changes, or null to build on demand only.');
+            schedule = { cron, ...(str(s.timezone) ? { timezone: str(s.timezone)! } : {}) };
+        }
     } else if (raw.schedule === null) schedule = null;
+
+    let retention: DataProductDefinition['retention'];
+    if (raw.retention !== undefined && raw.retention !== null) {
+        const r = raw.retention as Record<string, unknown>;
+        const keep = Number(r.keep);
+        const unit = r.unit ?? 'versions';
+        if (!Number.isInteger(keep) || keep < 1 || keep > 1000 || (unit !== 'versions' && unit !== 'months')) {
+            return bad('retention is { keep, unit }: keep a whole number from 1 to 1000, unit "versions" (the default) or "months"; null keeps every version.');
+        }
+        retention = { keep, unit };
+    } else if (raw.retention === null) retention = null;
 
     const visibility = str(raw.visibility) ?? 'private';
     if (!parseAudience(visibility)) return bad('visibility is private (the default), members, organism:<id> or public.');
@@ -245,6 +304,7 @@ export function normaliseDefinition(name: string, raw: Record<string, unknown>):
             ...(columns ? { columns } : {}),
             ...(filter !== undefined ? { filter } : {}),
             ...(schedule !== undefined ? { schedule } : {}),
+            ...(retention !== undefined ? { retention } : {}),
             ...(raw.confirm_personal_public === true || raw.confirmPersonalPublic === true ? { confirmPersonalPublic: true } : {}),
         },
     };
@@ -259,6 +319,22 @@ function validSourceColumns(v: unknown): boolean {
 export function splitRef(ref: string): [string, string] {
     const dot = ref.indexOf('.');
     return dot > 0 ? [ref.slice(0, dot), ref.slice(dot + 1)] : ['', ref];
+}
+
+/**
+ * A source in a few words, for a list row: the extension and its action, the app and its prefix, the
+ * memory key, the file, the records space, the other package. The words are identifiers, so they are
+ * the same in every language.
+ */
+export function sourceLabel(s: SourceSpec): { label: string } {
+    switch (s.kind) {
+        case 'extension': return { label: `${s.ext} › ${s.action}` };
+        case 'app': return { label: `${s.app} › ${s.key_prefix}` };
+        case 'records': return { label: `${s.ws} › ${s.space}` };
+        case 'datapackage': return { label: `${s.owner ? `${s.owner}/` : ''}${s.name}${s.resource ? ` › ${s.resource}` : ''}` };
+        case 'file': return { label: String(s.key).split('/').pop() || String(s.key) };
+        default: return { label: `${s.key}${s.rows_at ? ` › ${s.rows_at}` : ''}` };
+    }
 }
 
 /** Read a stored record value as a definition, or null when it is not one. */

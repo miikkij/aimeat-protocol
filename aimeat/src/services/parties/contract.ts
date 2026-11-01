@@ -19,11 +19,21 @@
  *   a party deleted and created again under the same name inherits no share and no token (invariant 19).
  *   A key is 32 random bytes, shown once, and stored as its SHA-256 (./keys.ts).
  * @structure PARTIES_KEY · PARTY_READS_PREFIX · PARTY_MANAGE_SCOPE · PARTY_KINDS · PartyKind · PartyKey ·
- *   PartyRecord · PartiesValue · PARTY_NAME_RE · validatePartyName · partyRefOf · parsePartyRef ·
+ *   PartyRecord · PartyInvite · PartiesValue · PARTY_NAME_RE · validatePartyName · partyRefOf · parsePartyRef ·
  *   parsePartyUser · parsePartiesValue · partyView · PARTY_TOKEN_PREFIX · PARTY_TOKEN_TTL_SECONDS ·
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.4.0 — 2026-11-01 — A party holds the one-time links its owner sent (`shareLinks`, PartyInvite;
+ *     ./invite.ts), and the owner's view lists them without their hashes; "invites" is a reserved name
+ *     (WP9b).
+ *   v1.3.0 — 2026-11-01 — A data space participant (kind `dataspace`) carries its `did` and credential
+ *     type `did`; a key a DSP transfer minted names its `share` and `transfer` (plan D8.4, D8.5). The DSP
+ *     data address token is this party token, read on the OData and CSV routes already listed here.
+ *   v1.2.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes an app party's own endpoints (me, signout, party-data;
+ *     plan D4.2), and a name starting with "ap-" is kept for the parties of an app.
+ *   v1.1.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes POST /v1/exchange/offerings/{id}/buy: a party buying a
+ *     data package again presents its own credential (plan D5.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2; lead decisions L1 and L3).
  */
 
@@ -51,6 +61,12 @@ export interface PartyKey {
     createdAt: string;
     lastUsedAt: string | null;
     expiresAt?: string | null;
+    /**
+     * Set on the key a DSP transfer minted (services/dataspace/transfer-token.ts): the one share its
+     * token reads, and the transfer it belongs to. No secret of it ever leaves the node; its token does.
+     */
+    share?: string;
+    transfer?: string;
 }
 
 /** One party, as the `parties` record holds it. */
@@ -71,9 +87,37 @@ export interface PartyRecord {
     /** The principal that made it (the owner's GHII, or the agent's GAII). */
     createdBy: string;
     keys: PartyKey[];
+    /**
+     * A data space participant's id (kind `dataspace`, plan D8.5): its DID under DCP, or the id the
+     * operator gave it under the static method. Set with `credential: 'did'`; such a party holds no key
+     * the owner hands out, only the keys its DSP transfers mint.
+     */
+    did?: string;
+    credential?: 'key' | 'did';
     /** Wrong keys presented for this party, counted for the owner and the operator (D2.9). */
     failedAttempts: number;
     lastSeenAt: string | null;
+    /** The one-time links the owner sent for its shares (./invite.ts). The code itself is never stored. */
+    shareLinks?: PartyInvite[];
+}
+
+/**
+ * A one-time link to one share of the party (./invite.ts): the recipient opens it with no account,
+ * accepts the terms and takes a key made at that moment. Only the SHA-256 of the code is kept.
+ */
+export interface PartyInvite {
+    id: string;
+    hash: string;
+    /** The share (consent id) the link opens. */
+    share: string;
+    createdAt: string;
+    /** The earlier of the share's end and 14 days after the link was made. */
+    expiresAt: string;
+    /** The principal that sent it. */
+    createdBy: string;
+    /** When the recipient redeemed it, and the key made then. A link redeems once. */
+    usedAt?: string | null;
+    keyId?: string;
 }
 
 export interface PartiesValue {
@@ -108,6 +152,11 @@ export const PARTY_TOKEN_ROUTES: ReadonlyArray<{ methods: readonly string[]; pat
     { methods: ['GET', 'HEAD'], path: /^\/v1\/odata\/[^/]+\/[^/]+(?:\/[^/]+)?\/?$/ },
     { methods: ['GET', 'HEAD'], path: /^\/v1\/pub\/[^/]+\/datapkg\// },
     { methods: ['GET', 'POST'], path: /^\/v1\/parties\/me(?:\/.*)?$/ },
+    // A party buying a data package again tops up its contract (services/exchange-party-buy.ts, D5.4).
+    { methods: ['POST'], path: /^\/v1\/exchange\/offerings\/[^/]+\/buy\/?$/ },
+    // An app's registered party: its own standing, its sign-out and its data in the app (D4.2).
+    { methods: ['GET', 'POST'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/parties\/(?:me|signout)\/?$/ },
+    { methods: ['GET', 'PUT', 'DELETE'], path: /^\/v1\/apps\/[^/]+\/[^/]+\/party-data\/[^/]+\/?$/ },
 ];
 
 /** Does this endpoint take a party token? */
@@ -121,7 +170,7 @@ const OWNER_PART_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 const NODE_PART_RE = /^[a-z0-9][a-z0-9.-]{0,252}$/;
 
 /** Names the party endpoints use as path segments under /v1/parties, so no party is called one of them. */
-export const RESERVED_PARTY_NAMES: readonly string[] = ['me', 'token', 'share'];
+export const RESERVED_PARTY_NAMES: readonly string[] = ['me', 'token', 'share', 'invites'];
 
 /** Null when `name` is a party name, else the reason it is not. */
 export function validatePartyName(name: unknown): string | null {
@@ -129,6 +178,8 @@ export function validatePartyName(name: unknown): string | null {
         return 'A party name is 1 to 40 characters: lowercase letters, digits and dashes, starting with a letter or a digit.';
     }
     if (RESERVED_PARTY_NAMES.includes(name)) return `"${name}" is a word the party endpoints use. Choose another name.`;
+    // `ap-` names the parties people make by registering to an app (services/app-parties/contract.ts).
+    if (name.startsWith('ap-')) return 'A name starting with "ap-" is kept for the people who register to your apps. Choose another name.';
     return null;
 }
 
@@ -186,12 +237,14 @@ export function partyView(p: PartyRecord, ref: string): Record<string, unknown> 
     return {
         uid: p.uid, name: p.name, party_ref: ref, display_name: p.displayName, kind: p.kind,
         ...(p.contact ? { contact: p.contact } : {}),
+        ...(p.did ? { did: p.did, credential: p.credential ?? 'did' } : {}),
         status: p.status,
         ...(p.stoppedBy ? { stopped_by: p.stoppedBy, stopped_at: p.stoppedAt ?? null } : {}),
         ...(p.stopReason ? { stop_reason: p.stopReason } : {}),
         created_at: p.createdAt, created_by: p.createdBy,
-        keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null })),
+        keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null, ...(k.transfer ? { dsp_transfer: k.transfer } : {}) })),
         failed_attempts: p.failedAttempts ?? 0,
         last_seen_at: p.lastSeenAt ?? null,
+        ...(p.shareLinks?.length ? { share_links: p.shareLinks.map(i => ({ id: i.id, share: i.share, created_at: i.createdAt, expires_at: i.expiresAt, used_at: i.usedAt ?? null })) } : {}),
     };
 }

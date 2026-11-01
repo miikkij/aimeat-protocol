@@ -15,12 +15,14 @@
  * @structure packageSource · exchangeSource · agentSource
  * @usage import { packageSource } from './sources-market.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Each item carries `close` (and an offering or a need `title_parts`): the code
+ *     and identifiers a page says the instruction and the title with in its language (WP9c).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import { listAllOfferings, listNeeds } from '../exchange-market.js';
 import {
   type ExposureItem, type ExposureLevel, type ExposureSource, LEVELS,
-  levelOfVisibility, ownerIdentities,
+  levelOfVisibility, ownerIdentities, closeAs,
 } from './exposure-types.js';
 
 const enc = encodeURIComponent;
@@ -45,6 +47,7 @@ export const packageSource: ExposureSource = {
     return [...widest].map(([groupId, { name, ...lv }]): ExposureItem => ({
       kind: 'package', id: groupId, title: name, ...lv, url: `${ctx.base}/v1/packages/${enc(groupId)}`,
       how_to_close: `Make it private with PATCH /v1/packages/${enc(groupId)} and {"visibility":"private"}, or take a version back with aimeat_package_withdraw.`,
+      close: closeAs('package', { route: `PATCH /v1/packages/${enc(groupId)} {"visibility":"private"}`, tool: 'aimeat_package_withdraw' }),
     }));
   },
 };
@@ -61,10 +64,14 @@ export const exchangeSource: ExposureSource = {
       out.push({
         kind: 'exchange', id: o.offeringId,
         title: listed ? `Offering: ${o.title}` : `Offering: ${o.title} (off the market, the record is still readable)`,
+        title_parts: closeAs(listed ? 'offering' : 'offering-off', { name: o.title }),
         level: 'public', url: `${ctx.base}/v1/exchange/offerings/${enc(o.offeringId)}`,
         how_to_close: listed
           ? `Take it off the market with DELETE /v1/exchange/offerings/${enc(o.offeringId)}, then remove the record with aimeat_memory_delete (key exchange.offering.${o.offeringId}).`
           : `Remove the record with aimeat_memory_delete (key exchange.offering.${o.offeringId}; DELETE /v1/memory/exchange.offering.${enc(o.offeringId)}).`,
+        close: listed
+          ? closeAs('market-listed', { route: `DELETE /v1/exchange/offerings/${enc(o.offeringId)}`, tool: 'aimeat_memory_delete', key: `exchange.offering.${o.offeringId}` })
+          : closeAs('market-record', { tool: 'aimeat_memory_delete', key: `exchange.offering.${o.offeringId}`, route: `DELETE /v1/memory/exchange.offering.${enc(o.offeringId)}` }),
       });
     }
     for (const n of needs) {
@@ -73,10 +80,14 @@ export const exchangeSource: ExposureSource = {
       out.push({
         kind: 'exchange', id: n.needId,
         title: `Need: ${n.description.slice(0, 120)}${open ? '' : ' (closed, the record is still readable)'}`,
+        title_parts: closeAs(open ? 'need' : 'need-closed', { name: n.description.slice(0, 120) }),
         level: 'public', url: `${ctx.base}/v1/exchange/needs`,
         how_to_close: open
           ? `Close it with POST /v1/exchange/needs/${enc(n.needId)}/close, then remove the record with aimeat_memory_delete (key exchange.need.${n.needId}).`
           : `Remove the record with aimeat_memory_delete (key exchange.need.${n.needId}; DELETE /v1/memory/exchange.need.${enc(n.needId)}).`,
+        close: open
+          ? closeAs('need-open', { route: `POST /v1/exchange/needs/${enc(n.needId)}/close`, tool: 'aimeat_memory_delete', key: `exchange.need.${n.needId}` })
+          : closeAs('market-record', { tool: 'aimeat_memory_delete', key: `exchange.need.${n.needId}`, route: `DELETE /v1/memory/exchange.need.${enc(n.needId)}` }),
       });
     }
     return out;
@@ -93,6 +104,7 @@ export const agentSource: ExposureSource = {
         kind: 'agent', id: a.gaii, title: a.displayName || a.name, level: 'public',
         url: `${ctx.base}/v1/catalogue/agents`,
         how_to_close: `Take it out of the public agent list with aimeat_agent_tags_set, adding the tag "unlisted" to its tags (PATCH /v1/agents/${enc(a.name)}/tags).`,
+        close: closeAs('agent', { tool: 'aimeat_agent_tags_set', tag: 'unlisted', route: `PATCH /v1/agents/${enc(a.name)}/tags` }),
       }));
   },
 };

@@ -9,8 +9,9 @@
  *   (or an extension the app's map names) publishes a package to `public`, the publish is refused with
  *   PERSONAL_DATA_PUBLIC before anything is written, unless the request carries the confirmation
  *   (`confirm_personal_public: true` on POST /v1/datapackages, `confirmPersonalPublic: true` on
- *   ctx.datapackage.publish). A confirmed publish records the confirmation on the package pointer
- *   (`personalPublicConfirmed`), so the producer's later public versions are not asked again. A
+ *   ctx.datapackage.publish). A confirmed publish records the confirmation on the package's
+ *   service-owned audience record (./audience-record.ts, `personalPublicConfirmed`; the pointer keeps a
+ *   copy no decision reads), so the producer's later public versions are not asked again. A
  *   proposal, not a block: the owner decides, and a package below public is never asked.
  *
  *   WHICH ROWS COUNT. A map row that names the package's own storage family (`datapkg/...` with the
@@ -25,9 +26,11 @@
  *   the publish request, where the owner decides anyway.
  * @structure personalRowsFor · personalPublicGuard · PERSONAL_DATA_PUBLIC
  * @usage
- *   const guard = await personalPublicGuard(deps, ownerGhii, name, visibility, producedBy, input.confirmPersonalPublic, pointer);
+ *   const guard = await personalPublicGuard(deps, ownerGhii, name, visibility, producedBy, input.confirmPersonalPublic, trusted.personalPublicConfirmed);
  *   if (!guard.ok) return refusal;
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Decides on the confirmation the service recorded, not the pointer's
+ *     `personalPublicConfirmed`, which an app with storage:write rewrites (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.7).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -35,7 +38,7 @@ import type { Storage } from '../../storage/interface.js';
 import { appDataMapKey, DATA_MAP_SPEC, type DataMap, type DataMapRow } from '../data-map/data-map-types.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
-import type { LatestPointer } from './contract.js';
+import type { PublicConfirmation } from './audience-record.js';
 
 export const PERSONAL_DATA_PUBLIC = 'PERSONAL_DATA_PUBLIC' as const;
 
@@ -114,16 +117,17 @@ export type PersonalGuardResult =
   | { ok: false; code: typeof PERSONAL_DATA_PUBLIC; message: string; rows: Array<{ app: string; what: string; holds: string }> };
 
 /**
- * May this version go public? Ok when it is not going public, when the package carries a confirmation
- * already, when the producer's data map marks nothing personal, or when the request confirms (then
+ * May this version go public? Ok when it is not going public, when the package has a confirmation the
+ * service recorded (`recorded`, ./audience-record.ts trustedAudienceOf; never the pointer file's own
+ * word, which an app with storage:write rewrites), when the producer's data map marks nothing personal, or when the request confirms (then
  * `confirmedAt` is the stamp to record). Refused otherwise, before any write.
  */
 export async function personalPublicGuard(
   deps: { storage: Storage; config: AimeatConfig }, ownerGhii: string, name: string, visibility: string,
-  producer: GuardProducer, confirm: boolean | undefined, pointer: LatestPointer | null,
+  producer: GuardProducer, confirm: boolean | undefined, recorded: PublicConfirmation | undefined,
 ): Promise<PersonalGuardResult> {
   if (visibility !== 'public') return { ok: true };
-  if (pointer?.personalPublicConfirmed) return { ok: true };
+  if (recorded) return { ok: true };
   if (!producer.app && !producer.extension) return { ok: true };
   let rows: Array<{ app: string; row: DataMapRow }>;
   try {

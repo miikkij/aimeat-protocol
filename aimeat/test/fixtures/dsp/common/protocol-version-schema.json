@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2019-09/schema",
+  "title": "VersionSchema",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "#/definitions/VersionResponse"
+    }
+  ],
+  "$id": "https://w3id.org/dspace/2025/1/common/protocol-version-schema.json",
+  "definitions": {
+    "VersionResponse": {
+      "type": "object",
+      "properties": {
+        "protocolVersions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Version"
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "protocolVersions"
+      ]
+    },
+    "Version": {
+      "type": "object",
+      "properties": {
+        "version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "string",
+              "enum": [
+                "0.8",
+                "2024-1",
+                "2025-1"
+              ]
+            }
+          ]
+        },
+        "path": {
+          "type": "string"
+        },
+        "binding": {
+          "type": "string",
+          "enum": [
+            "HTTPS"
+          ]
+        },
+        "identifierType": {
+          "type": "string"
+        },
+        "serviceId": {
+          "type": "string"
+        },
+        "auth": {
+          "$ref": "#/definitions/Auth"
+        }
+      },
+      "required": [
+        "version",
+        "path",
+        "binding"
+      ]
+    },
+    "Auth": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        },
+        "profile": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "protocol",
+        "version"
+      ]
+    }
+  }
+}

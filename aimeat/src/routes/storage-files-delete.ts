@@ -8,6 +8,8 @@
  * @structure storageDeleteRouter(config, storage)
  * @usage router.use(storageDeleteRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Hands the shared delete its caller, so a company's page key asks what the
+ *     company page route asks (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   v1.0.0 — 2026-11-01 — Extracted from routes/storage-files.ts (max-file-lines; plan doc-mvwxcas3dom3, D3).
  */
 import { Router } from 'express';
@@ -19,6 +21,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { removeStorageFile } from '../services/storage-file-write.js';
 import { extractKey } from './storage-files-request.js';
+import { callerOf } from '../middleware/caller.js';
 
 export function storageDeleteRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -32,7 +35,8 @@ export function storageDeleteRouter(config: AimeatConfig, storage: Storage): Rou
         const gaii = resolve(req);
         const key = extractKey(req.params);
 
-        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
+        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key,
+            { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) });
         if (!removed.ok) {
             res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
             return;

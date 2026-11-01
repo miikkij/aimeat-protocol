@@ -17,6 +17,11 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.4.1 — 2026-11-01 — A review's id takes a colon: it is the finding's id, and a finding about one
+ *     organism or one owner names it after a colon, so those findings could not be reviewed (WP9b).
+ *   v1.4.0 — 2026-11-01 — The document `intermediation` (Data Governance Act 2022/868): the provider's
+ *     notification record and a person's review of each data intermediation finding (plan
+ *     doc-mvwxcas3dom3, D7.2, D7.3).
  *   v1.3.0 — 2026-10-28 — An answer's source may be `proposed`: the node read it from the data map's
  *     words and nobody has decided (a register's domain drafted from an app's map).
  *   v1.2.0 — 2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
@@ -28,7 +33,7 @@ import { z } from 'zod';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 
 /** The documents, in the order the surfaces list them. */
-export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks'] as const;
+export const COMPLIANCE_DOC_KINDS = ['registers', 'processors', 'requests', 'breaches', 'dpias', 'frameworks', 'intermediation'] as const;
 export type ComplianceDocKind = typeof COMPLIANCE_DOC_KINDS[number];
 
 export function isComplianceDocKind(v: unknown): v is ComplianceDocKind {
@@ -176,6 +181,44 @@ export const FrameworkAnswersSchema = z.object({
   ...stamp,
 });
 
+/**
+ * D7.2: the data intermediation notification (Data Governance Act 2022/868, art. 11): the legal person
+ * that provides the service, its business id, when it notified the authority and the authority's
+ * reference, the EU register entry, when the authority confirmed it, and what the service covers. The
+ * operator keeps the node's; in mode `owners` an organism that runs its own marketplace keeps its own.
+ */
+export const IntermediationNotificationSchema = z.object({
+  id, type: z.literal('notification'),
+  legalName: z.string().min(1).max(300),
+  businessId: z.string().min(1).max(60),
+  notifiedAt: iso.optional(),
+  authorityRef: z.string().max(200).optional(),
+  euRegisterUrl: z.string().max(500).optional(),
+  confirmedAt: iso.optional(),
+  /** What the service covers, in the provider's words (the marketplace, the data space). */
+  scope: text(2000),
+  answerSources: sources,
+  ...stamp,
+});
+
+/**
+ * D7.3: a person's decision on one data intermediation finding of the compliance report: the finding's
+ * id, accepted (it is intermediation and is handled) or dismissed (it is not, with the reason). A finding
+ * without a review reads source `proposed`: the node matched it by rule, and nobody has decided.
+ * The id is the finding's own, and a finding about one thing names it after a colon
+ * (`open_organism_with_data:<organism>`, `person_party_contact:<owner>`), so this id takes a colon too.
+ */
+const findingId = z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/, 'letters, digits, dot, colon, dash and underscore');
+export const IntermediationReviewSchema = z.object({
+  id: findingId, type: z.literal('review'),
+  decision: z.enum(['accepted', 'dismissed']),
+  note: text().optional(),
+  reviewedAt: iso.optional(),
+  ...stamp,
+});
+
+export const IntermediationItemSchema = z.discriminatedUnion('type', [IntermediationNotificationSchema, IntermediationReviewSchema]);
+
 /** A list document: { items: [...] }, ids unique. */
 function listDoc<T extends z.ZodTypeAny>(item: T, max: number) {
   return z.object({ items: z.array(item).max(max) }).superRefine((v, ctx) => {
@@ -194,6 +237,7 @@ export const DOC_SCHEMAS = {
   breaches: listDoc(BreachSchema, 500),
   dpias: listDoc(DpiaSchema, 500),
   frameworks: FrameworkAnswersSchema,
+  intermediation: listDoc(IntermediationItemSchema, 500),
 } as const;
 
 export type ComplianceRegister = z.infer<typeof RegisterSchema>;
@@ -202,6 +246,9 @@ export type ComplianceRequest = z.infer<typeof RequestSchema>;
 export type ComplianceBreach = z.infer<typeof BreachSchema>;
 export type ComplianceDpia = z.infer<typeof DpiaSchema>;
 export type ComplianceFrameworkAnswers = z.infer<typeof FrameworkAnswersSchema>;
+export type IntermediationNotification = z.infer<typeof IntermediationNotificationSchema>;
+export type IntermediationReview = z.infer<typeof IntermediationReviewSchema>;
+export type IntermediationItem = z.infer<typeof IntermediationItemSchema>;
 
 /** The document each kind stores. */
 export interface ComplianceDocs {
@@ -211,6 +258,7 @@ export interface ComplianceDocs {
   breaches: { items: ComplianceBreach[] };
   dpias: { items: ComplianceDpia[] };
   frameworks: ComplianceFrameworkAnswers;
+  intermediation: { items: IntermediationItem[] };
 }
 
 /** An empty document of a kind, which is what a scope with nothing stored reads as. */

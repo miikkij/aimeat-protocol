@@ -15,6 +15,9 @@
  * @structure
  *   - GET/POST   /v1/parties                         the owner's parties; make one (its key shown once)
  *   - POST       /v1/parties/share                   share a package with a party in one call
+ *   - POST       /v1/parties/:name/invite            send a share's one-time link to the party's e-mail
+ *   - POST       /v1/parties/invites/preview         the recipient page reads a link (no credential)
+ *   - POST       /v1/parties/invites/redeem          the recipient redeems it once: a new key, the connection file
  *   - POST       /v1/parties/token                   a party's key for a token (OAuth 2.0 client credentials)
  *   - GET        /v1/parties/me                      the party and what was shared with it
  *   - POST       /v1/parties/me/keys/rotate          a new key; the one used stops working
@@ -28,6 +31,8 @@
  *   - POST /v1/admin/parties/:owner/:name/stop, /resume   the operator, for abuse (D2.9)
  * @usage app.use(partiesRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The one-time share link: POST /v1/parties/:name/invite, the recipient's
+ *     preview and redeem, and `email` on POST /v1/parties/share (services/parties/invite.ts; WP9b).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3).
  */
 import { Router } from 'express';
@@ -41,8 +46,9 @@ import { callerOf } from '../middleware/caller.js';
 import { deny403 } from '../auth/deny.js';
 import {
     createParty, listParties, getParty, updateParty, stopParty, resumeParty, deleteParty, createKey, deleteKey,
-    readsOfParty, shareWithParty, type PartyAnswer, type PartyServiceCtx,
+    readsOfParty, type PartyAnswer, type PartyServiceCtx,
 } from '../services/parties/service.js';
+import { previewInvite, redeemInvite, sendShareLink, shareAndSend } from '../services/parties/invite.js';
 import { partyMe, partyConnection, acceptShareTerms, declineShare, rotatePartyKey, partyTokenFor } from '../services/parties/party-self.js';
 import { operatorSetStop } from '../services/parties/admin.js';
 import { partyCredentialOf, verifyParty, type PartyContext } from '../services/parties/verify.js';
@@ -51,6 +57,7 @@ import { takeReadSlot } from '../services/parties/activity.js';
 import { validateBody } from '../models/schemas.js';
 import {
     PartyCreateSchema, PartyUpdateSchema, PartyShareSchema, PartyTokenSchema, PartyStopSchema, EmptyPartyBodySchema,
+    PartyInviteSendSchema, PartyInviteCodeSchema,
 } from '../models/party-schemas.js';
 
 export function partiesRouter(config: AimeatConfig, storage: Storage): Router {
@@ -112,6 +119,20 @@ export function partiesRouter(config: AimeatConfig, storage: Storage): Router {
         res.json(await partyTokenFor(v.ctx));
     });
 
+    // ── The one-time share link (services/parties/invite.ts): no credential, the code is the body ──
+
+    /** The recipient page opens a link: who shared what, until when. Nothing changes. */
+    router.post('/v1/parties/invites/preview', validateBody(PartyInviteCodeSchema, config.nodeId), async (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        render(req, res, await previewInvite(deps, (req.body as { code?: unknown }).code));
+    });
+    /** The recipient redeems the link once: the terms, a new key, the connection file, a party token. */
+    router.post('/v1/parties/invites/redeem', validateBody(PartyInviteCodeSchema, config.nodeId), async (req, res) => {
+        res.setHeader('Cache-Control', 'no-store');
+        const body = (req.body ?? {}) as { code?: unknown; accept_terms?: unknown };
+        render(req, res, await redeemInvite(deps, body.code, body));
+    });
+
     router.get('/v1/parties/me', async (req, res) => {
         const ctx = await partyOf(req, res);
         if (ctx) render(req, res, await partyMe(deps, ctx));
@@ -140,7 +161,10 @@ export function partiesRouter(config: AimeatConfig, storage: Storage): Router {
         render(req, res, await createParty(ctxOf(req), (req.body ?? {}) as Record<string, unknown>), 201);
     });
     router.post('/v1/parties/share', ...owner, validateBody(PartyShareSchema, config.nodeId), async (req, res) => {
-        render(req, res, await shareWithParty(ctxOf(req), (req.body ?? {}) as Record<string, unknown>), 201);
+        render(req, res, await shareAndSend(ctxOf(req), (req.body ?? {}) as Record<string, unknown>), 201);
+    });
+    router.post('/v1/parties/:name/invite', ...owner, validateBody(PartyInviteSendSchema, config.nodeId), async (req, res) => {
+        render(req, res, await sendShareLink(ctxOf(req), name(req), (req.body ?? {}) as Record<string, unknown>), 201);
     });
     router.get('/v1/parties/:name', ...owner, async (req, res) => { render(req, res, await getParty(ctxOf(req), name(req))); });
     router.patch('/v1/parties/:name', ...owner, validateBody(PartyUpdateSchema, config.nodeId), async (req, res) => {

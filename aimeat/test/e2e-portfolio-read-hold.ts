@@ -16,6 +16,10 @@
  *   shared runner has no portfolio host.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=portfolio-read-hold
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Three tests added after the earlier ones, which are unchanged: a page an agent
+ *     without memory:read stores through POST /v1/storage for an owner with no hold record waits, the
+ *     owner's press lets it read, and a delete that uncovers another copy waits (secaudit2026oct31w2
+ *     round 11, portfolio-read-hold:absent-record-adopted-at-first-read).
  *   v1.0.0 — 2026-10-31 — Initial (audit H-9).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -193,6 +197,45 @@ try {
         assert((await json('/v1/portfolio/config', { method: 'PUT', headers: bearer(other.token), body: JSON.stringify({ enabled: true }) })).status === 200, 'switched on');
         const s = await silent(OTHER, other.rt);
         assert(s.ok === true && s.scope === 'memory:read', `silent: ${JSON.stringify(s)}`);
+    });
+
+    // secaudit2026oct31w2 round 11 (portfolio-read-hold:absent-record-adopted-at-first-read): an owner with
+    // no hold record yet. The node marked the pages that existed at the update at its start, so a page with
+    // no record is one written since, and its writer decides.
+    const THIRD = `${OWNER}c`;
+    const third = await register(THIRD);
+    const scribe = await agent(THIRD, third.token, 'side-scribe', ['storage:write', 'storage:read']);
+    let scribeRequest = '';
+
+    await test('attack: a page an agent without memory:read stores through POST /v1/storage, for an owner with no record yet, waits', async () => {
+        const w = await json('/v1/storage', { method: 'POST', headers: bearer(scribe),
+            body: JSON.stringify({ key: 'portfolio/index.html', data: Buffer.from(page('scribe page')).toString('base64'), mime_type: 'text/html', visibility: 'owner' }) });
+        assert(w.status === 201 || w.status === 200, `generic write: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        assert((await json('/v1/portfolio/config', { method: 'PUT', headers: bearer(third.token), body: JSON.stringify({ enabled: true }) })).status === 200, 'switched on');
+        const s = await silent(THIRD, third.rt);
+        assert(s.ok === false && s.error === 'consent_required' && s.reason === 'portfolio_read_waits' && !!s.request_id, `silent: ${JSON.stringify(s)}`);
+        scribeRequest = s.request_id!;
+        const list = await json('/v1/publish-requests', { headers: bearer(third.token) });
+        const asked = ((list.body.data.requests ?? list.body.data.items ?? []) as any[]).find(r => r.id === scribeRequest);
+        assert(asked?.kind === 'portfolio-memory-read' && String(asked?.requested_by?.principal ?? '').startsWith('side-scribe#'), `the question names the writer: ${JSON.stringify(asked?.requested_by)}`);
+    });
+
+    await test('designed use: the owner allows that page with one press, and it reads', async () => {
+        const r = await json(`/v1/publish-requests/${scribeRequest}/decision`, { method: 'POST', headers: bearer(third.token), body: JSON.stringify({ decision: 'approve' }) });
+        assert(r.status === 200 && r.body.data.request.state === 'approved', `decision: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data?.request?.state)}`);
+        const s = await silent(THIRD, third.rt);
+        assert(s.ok === true && s.scope === 'memory:read', `silent after the press: ${JSON.stringify(s)}`);
+    });
+
+    await test('a delete that uncovers another copy of the page: that page waits until the owner says, as before', async () => {
+        const own = await json('/v1/storage', { method: 'POST', headers: bearer(third.token),
+            body: JSON.stringify({ key: 'portfolio/index.html', data: Buffer.from(page('owner under')).toString('base64'), mime_type: 'text/html', visibility: 'owner' }) });
+        assert(own.status === 201 || own.status === 200, `owner write: ${own.status}`);
+        // The agent's copy is served first; the owner's own copy under it reads once the agent's is gone.
+        const d = await json('/v1/storage/portfolio/index.html', { method: 'DELETE', headers: bearer(scribe) });
+        assert(d.status === 200, `delete: ${d.status} ${JSON.stringify(d.body?.error)}`);
+        const s = await silent(THIRD, third.rt);
+        assert(s.ok === false && s.reason === 'portfolio_read_waits', `silent after the delete: ${JSON.stringify(s)}`);
     });
 } finally {
     server?.kill();

@@ -21,6 +21,9 @@
  * @structure memorySource · fileSource · knowledgeSource · skillSource · datapackageSource
  * @usage import { memorySource } from './sources-records.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — Each item carries `close` (a row another identity stored `title_parts`): the
+ *     code and identifiers a page says the instruction and the title with in its language (WP9c).
+ *   v1.2.0 — 2026-11-01 — A data package item carries its freshness (plan doc-mvwxcas3dom3, D6.1).
  *   v1.1.0 — 2026-11-01 — datapackageSource lists each package at its own audience (members as
  *     signed-in, organism:<id> as organism) and leaves out a private, a withdrawn and a never-published
  *     one; it listed every package as public. how_to_close names the withdrawal (DELETE
@@ -30,11 +33,12 @@
  */
 import type { MemoryMetaRow } from '../../storage/repositories/memory.repository.js';
 import { listPackages as listDataPackages } from '../datapackage/store.js';
+import { packageFreshness } from '../datapackage/freshness-read.js';
 import { MANIFEST_KEY_RE } from '../skill-refs.js';
 import { memoryTarget, fileTarget } from '../classification/labels.js';
 import {
-  type ExposureFound, type ExposureItem, type ExposureSource,
-  levelOfVisibility, ownerIdentities, ownerMemoryMeta,
+  type ExposureFound, type ExposureItem, type ExposureSource, type ExposureClose,
+  levelOfVisibility, ownerIdentities, ownerMemoryMeta, closeAs,
 } from './exposure-types.js';
 
 /** Memory keys another source counts, by the kind a person knows them as. */
@@ -58,6 +62,13 @@ function heldBy(ownerGhii: string, holder: string): string {
   return ` (stored by ${hash > 0 ? holder.slice(0, hash) : holder})`;
 }
 
+/** The title's parts when another identity holds the row: the key and who stored it. */
+function storedByParts(ownerGhii: string, holder: string, key: string): { title_parts?: ExposureClose } {
+  if (holder === ownerGhii) return {};
+  const hash = holder.indexOf('#');
+  return { title_parts: closeAs('stored-by', { name: key, holder: hash > 0 ? holder.slice(0, hash) : holder }) };
+}
+
 const isKnowledgeRow = (r: MemoryMetaRow): boolean => r.tags.some(t => KNOWLEDGE_TAGS.includes(t));
 
 export const memorySource: ExposureSource = {
@@ -72,10 +83,14 @@ export const memorySource: ExposureSource = {
       out.push({
         kind: 'memory', content: memoryTarget(r.ownerGaii, r.key),
         id: r.ownerGaii === ownerGhii ? r.key : `${r.ownerGaii}:${r.key}`,
-        title: `${r.key}${heldBy(ownerGhii, r.ownerGaii)}`,
+        title: `${r.key}${heldBy(ownerGhii, r.ownerGaii)}`, ...storedByParts(ownerGhii, r.ownerGaii, r.key),
         ...lv,
         ...(lv.level === 'public' ? { url: `${ctx.base}/v1/memory/${enc(r.ownerGaii)}/${enc(r.key)}` } : {}),
         how_to_close: `Make it private with aimeat_memory_write and visibility "private" (PATCH /v1/memory/${enc(r.key)} with {"patch":{},"visibility":"private"}), or remove it with aimeat_memory_delete (DELETE /v1/memory/${enc(r.key)}).`,
+        close: closeAs('memory', {
+          tool: 'aimeat_memory_write', route: `PATCH /v1/memory/${enc(r.key)} {"patch":{},"visibility":"private"}`,
+          remove: 'aimeat_memory_delete', removeRoute: `DELETE /v1/memory/${enc(r.key)}`,
+        }),
       });
     }
     return out;
@@ -96,10 +111,14 @@ export const fileSource: ExposureSource = {
         out.push({
           kind: 'file', content: fileTarget(holder, f.key, f.workspaceRef),
           id: holder === ownerGhii ? f.key : `${holder}:${f.key}`,
-          title: `${f.key}${heldBy(ownerGhii, holder)}`,
+          title: `${f.key}${heldBy(ownerGhii, holder)}`, ...storedByParts(ownerGhii, holder, f.key),
           ...lv,
           ...(lv.level === 'public' ? { url: `${ctx.base}/v1/pub/${enc(holder)}/${keyPath(f.key)}` } : {}),
           how_to_close: `Make it private with PATCH /v1/storage/${keyPath(f.key)}/visibility and {"visibility":"private"}, or remove it with aimeat_storage_delete (DELETE /v1/storage/${keyPath(f.key)}).`,
+          close: closeAs('file', {
+            route: `PATCH /v1/storage/${keyPath(f.key)}/visibility {"visibility":"private"}`,
+            remove: 'aimeat_storage_delete', removeRoute: `DELETE /v1/storage/${keyPath(f.key)}`,
+          }),
         });
       }
     }
@@ -141,6 +160,7 @@ export const knowledgeSource: ExposureSource = {
           ...lv,
           ...(lv.level === 'public' ? { url: `${ctx.base}/v1/knowledge/${enc(manifest[1])}` } : {}),
           how_to_close: `Take the package out of the catalogue with PATCH /v1/knowledge/${enc(manifest[1])}/sharing and {"catalog_listed":false}; aimeat_memory_delete on ${r.key} removes it.`,
+          close: closeAs('knowledge-package', { route: `PATCH /v1/knowledge/${enc(manifest[1])}/sharing {"catalog_listed":false}`, remove: 'aimeat_memory_delete', key: r.key }),
         });
         continue;
       }
@@ -149,6 +169,9 @@ export const knowledgeSource: ExposureSource = {
         how_to_close: entry
           ? `Make the entry private with PATCH /v1/knowledge/${enc(entry[1])}/entries/${enc(r.key)}/visibility and {"visibility":"private"}, or with aimeat_memory_write and visibility "private".`
           : 'Make the entry private with aimeat_memory_write and visibility "private", or remove it with aimeat_memory_delete.',
+        close: entry
+          ? closeAs('knowledge-entry', { route: `PATCH /v1/knowledge/${enc(entry[1])}/entries/${enc(r.key)}/visibility {"visibility":"private"}`, tool: 'aimeat_memory_write' })
+          : closeAs('knowledge-record', { tool: 'aimeat_memory_write', remove: 'aimeat_memory_delete' }),
       });
     }
     return out;
@@ -170,6 +193,7 @@ export const skillSource: ExposureSource = {
         kind: 'skill', content: memoryTarget(r.ownerGaii, r.key), id: m[1], title: m[1], ...lv,
         url: `${ctx.base}/v1/skills/${enc(m[1])}?scope=user&owner=${enc(ownerName)}`,
         how_to_close: `Make it yours alone with aimeat_skill_update and visibility "owner" (PATCH /v1/skills/${enc(m[1])} with {"visibility":"owner"}).`,
+        close: closeAs('skill', { tool: 'aimeat_skill_update', route: `PATCH /v1/skills/${enc(m[1])} {"visibility":"owner"}` }),
       });
     }
     return out;
@@ -189,10 +213,14 @@ export const datapackageSource: ExposureSource = {
       const lv = levelOfVisibility(p.visibility ?? 'public');
       if (!lv) continue;
       const path = `/v1/datapackages/${enc(ownerName)}/${enc(p.name)}`;
+      // Against its producer's promise (services/datapackage/freshness.ts, plan D6.1).
+      const fresh = await packageFreshness({ storage: ctx.storage, config: ctx.config }, ownerGhii, p.name, { pointer: p, now: new Date(ctx.nowMs) });
       out.push({
         kind: 'datapackage', id: p.packageId, title: p.name, ...lv,
         ...(lv.level === 'public' ? { url: p.descriptorUrl } : {}),
         how_to_close: `Withdraw it with aimeat_datapackage_withdraw and ref "${p.packageId}" (DELETE ${path}): every read answers 410 and it leaves the catalogue; add ?purge=true to delete its files too. To narrow who reads it instead, publish it again with visibility "private".`,
+        close: closeAs('datapackage', { tool: 'aimeat_datapackage_withdraw', ref: p.packageId, route: `DELETE ${path}` }),
+        ...(fresh ? { freshness: fresh.state } : {}),
       });
     }
     return out;

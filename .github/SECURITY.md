@@ -39,7 +39,7 @@ reported under this policy too.
 
 | Version | Supported |
 |---------|-----------|
-| 3.26.x (latest) | Yes |
-| < 3.26  | No        |
+| The newest release | Yes |
+| Any older release  | No  |
 
-The table is the node's version line. Security fixes go into the latest release line only. Update to the newest 3.26.x release before you report, if you can. The CrewAI package and the desktop app have their own version lines; for them, too, only the latest release receives fixes.
+The node's newest release is the `aimeat` package on npm (`npm view aimeat version`). Security fixes ship in a new release, and only the newest release receives them. Update to it before you report, if you can. The CrewAI package and the desktop app have their own version lines; for them, too, only the latest release receives fixes.

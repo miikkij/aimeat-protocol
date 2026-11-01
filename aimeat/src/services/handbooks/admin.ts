@@ -6,6 +6,9 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.31.0 -- 2026-11-01 -- aimeat_admin_app_party_registrations: the apps that ask to let people register, and the decision (WP9b).
+ *   v1.30.0 -- 2026-11-01 -- Data intermediation: the setting, section 12 of the report and the part
+ *     `intermediation` (plan doc-mvwxcas3dom3, D7).
  *   v1.29.0 -- 2026-10-31 -- A store test's browser_access and the CORS rule it gives.
  *   v1.28.0 -- 2026-10-30 -- Named node stores: aimeat_admin_file_store_set and _remove, the default, the
  *     stores everyone may choose, a move between node stores (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -189,6 +192,12 @@ owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimea
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
 
+When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let people register to it
+without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state
+requested, open or refused) and, with \`action: "decide"\`, approves or refuses one (\`owner\`, \`app\`,
+\`decision\`, \`reason\`). Decide only as the operator says; the Config page's group Data out shows the
+same list.
+
 **Where stored files keep their bytes (operator).** By default the node's database holds them. The
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any
 S3-compatible service) or one Azure Blob container: \`file_store.kind\` and the address settings with
@@ -228,6 +237,16 @@ register of its own only when someone other than its user sees its personal data
 regulated data: \`aimeat_compliance_report\` with \`scope: "node"\` lists every app's \`reach\` in
 \`processing.apps\`, and what a person keeps through an app only they see is in the node's record
 \`node-user-content\`.
+
+**Data intermediation (operator).** The setting AIMEAT_DATA_INTERMEDIATION (Config, consent) says
+whether this node runs a data intermediation service under the EU Data Governance Act: \`report\`
+(nothing refused), \`none\` (an offering that delivers data is not listed to everyone), \`node\` (the
+operator is the provider) or \`owners\` (an organism that declared itself a provider may list data to
+everyone). \`aimeat_compliance_report\` with \`scope: "node"\` carries it as \`data_intermediation\`:
+the findings, each a proposal with its reason and article, and the Article 12 rows with their
+evidence. Record the provider's notification and a person's decision on a finding with
+\`aimeat_compliance_register_write\` (\`part: "intermediation"\`, items of \`type\` notification or
+review). Say that it is a reading of the regulation, not a legal opinion.
 
 **Data processing agreements (operator).** When the operator processes a customer's personal data
 (hosting, care, remote access), GDPR article 28 asks for a written agreement, and the node makes it:

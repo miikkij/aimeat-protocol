@@ -7,6 +7,9 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.27.0 — 2026-11-01 — DataspaceConfig mixed in (config-dataspace.ts; plan doc-mvwxcas3dom3, D8).
+ *   v1.26.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION; plan doc-mvwxcas3dom3, D4.3).
+ *   v1.25.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION; plan doc-mvwxcas3dom3, D7.1).
  *   v1.24.0 — 2026-11-01 — shareMaxDays and partyReadsPerMinute: the named share's longest life and an
  *     outside party's read rate (plan doc-mvwxcas3dom3, D2.9, D3.1).
  *   v1.23.0 — 2026-10-29 — FileStoreConfig mixed in (config-file-store.ts): where stored files keep their bytes.
@@ -127,7 +130,7 @@ import type { AccountSecurityConfig } from './config-types-account-security.js';
 import type { CapabilitiesConfig } from './config-types-capabilities.js';
 import type { ThemesConfig } from './config-themes.js';
 import type { PackagesConfig } from './config-types-packages.js';
-import type { ClassificationConfig } from './config-data-access.js';
+import type { ClassificationConfig, DataIntermediationMode, PartySelfRegistration } from './config-data-access.js';
 import type { UpdateCheckConfig } from './config-update-check.js';
 import type { AppAuditConfig } from './config-app-audit.js';
 import type { AgentAccessConfig } from './config-types-agent-access.js';
@@ -140,8 +143,9 @@ import type { RuntimeConfig } from './config-runtime.js';
 import type { ExtensionLoadConfig } from './config-extension-load.js';
 import type { NodeLimitsConfig } from './config-node-limits.js';
 import type { FileStoreConfig } from './config-file-store.js';
+import type { DataspaceConfig } from './config-dataspace.js';
 
-export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig {
+export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, SealedConfig, SitePresenceConfig, SocialLoginConfig, ConnectionsConfig, McpProxyConfig, EnterpriseSsoConfig, AccountSecurityConfig, CapabilitiesConfig, ThemesConfig, PackagesConfig, ClassificationConfig, UpdateCheckConfig, AppAuditConfig, AgentAccessConfig, VisibilityConfig, TurnConfig, DocsignConfig, PagesConfig, ContentClassConfig, RuntimeConfig, ExtensionLoadConfig, NodeLimitsConfig, FileStoreConfig, DataspaceConfig {
   port: number;
   baseUrl: string;
   /**
@@ -476,6 +480,10 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   shareMaxDays: number;
   /** Reads one outside party may make a minute before 429 (services/parties/read-gate.ts). */
   partyReadsPerMinute: number;
+  /** Whether this node runs a data intermediation service and who provides it (services/data-intermediation/). */
+  dataIntermediation: DataIntermediationMode;
+  /** Whether an app's users may register as outside parties of its owner (services/app-parties/). */
+  partySelfRegistration: PartySelfRegistration;
   /**
    * How many events stay in an account's "what has happened" window before the oldest move to the
    * archive. A COUNT rather than a number of days: recency is relative to how much happens to

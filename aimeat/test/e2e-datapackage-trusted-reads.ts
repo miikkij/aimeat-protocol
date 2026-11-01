@@ -19,6 +19,8 @@
  *       `Vary: Authorization`.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-datapackage-trusted-reads
  * @version-history
+ *   v1.2.0 -- 2026-11-01 -- A6b: an app that rewrites latest.json to say public while its request waits
+ *     does not turn the owner's approval into a success that leaves the version closed.
  *   v1.1.0 -- 2026-11-01 -- A2 reads the package's CSV through GET /v1/pub after the forged pointer: the
  *     package-file read added on main (plan doc-mvwxcas3dom3, D0.4) decided on the pointer's word.
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10).
@@ -185,6 +187,22 @@ await test('A6. Usage: a public package and a members package keep their readers
     const list = await call('GET', '/v1/datapackages', A.token);
     const listed = (list.body.data.packages as Body[]).find(p => p.name === P3);
     assert(listed?.visibility === 'public', `the owner's list: ${JSON.stringify(listed)}`);
+});
+
+await test('A6b. Attack: the app rewrites latest.json to say public while its request waits; the owner\'s approval still opens the version', async () => {
+    const name = `dptwait${short}`;
+    const asked = await publish(app, name, [{ id: 1, label: 'WAITED-ROW' }]);
+    assert(asked.status === 202, `asked: ${show(asked)}`);
+    const hash = asked.body.data.publish_request.version ?? asked.body.data.content_hash;
+    assert(typeof hash === 'string' && hash.length > 0, `the asked version: ${show(asked)}`);
+    const pointer = { packageId: `pkg:${A.name}/${name}`, name, contentHash: hash, descriptorUrl: 'https://elsewhere.invalid/x', updatedAt: new Date().toISOString(), visibility: 'public' };
+    const w = await call('POST', '/v1/storage', app, { key: `datapkg/${name}/latest.json`, data: b64(JSON.stringify(pointer)), mime_type: 'application/json', visibility: 'private' });
+    assert(w.status === 201 || w.status === 200, `the generic write: ${show(w)}`);
+    const d = await call('POST', `/v1/publish-requests/${asked.body.data.publish_request.request_id}/decision`, A.token, { decision: 'approve' });
+    assert(d.status === 200, `approve: ${show(d)}`);
+    assert(!JSON.stringify(d.body).includes('elsewhere.invalid'), `the approval answered the pointer's address: ${show(d)}`);
+    const after = await call('GET', `/v1/datapackages/${A.name}/${name}/rows/items`);
+    assert(after.status === 200 && JSON.stringify(after.body.data.rows).includes('WAITED-ROW'), `anonymous after approval: ${show(after)}`);
 });
 
 await test('A7. Usage: the owner deletes the files of a package with the generic storage route, and the package is gone', async () => {
