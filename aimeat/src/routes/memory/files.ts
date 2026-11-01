@@ -5,6 +5,9 @@
  * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
  *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.14.0 -- 2026-11-01 -- The presigned mint and DELETE of a company's page key ask what the company
+ *     page route asks, as the inline write does through the shared write (services/storage-page-keys.ts;
+ *     secaudit2026oct31w2 round 11).
  *   v1.13.0 -- 2026-10-30 -- POST takes `store`, the store the writer names for the bytes (inline and
  *     presigned), and the upload answer and the list say each file's `store`
  *     (wish-useampi-tiedostos-il-yksi-oletus-ja-tallentaja-voi-valita-s-).
@@ -68,6 +71,7 @@ import { generateUploadToken, buildUploadMeta } from '../../services/upload-toke
 import {
   removeStorageFile, appOwnedKeyRefusal, writeStorageFile, storageProvenanceMintRefusal, changeStorageFileVisibility,
 } from '../../services/storage-file-write.js';
+import { pageKeyWriteRefusal, pageWriterOf } from '../../services/storage-page-keys.js';
 import { mintPublishCarry, closedFileLevel, fileCapRefusal } from '../../services/storage-file-publish.js';
 import { closedNodeWarnings } from '../../services/closed-node-level.js';
 import { callerOf } from '../../middleware/caller.js';
@@ -142,6 +146,9 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // The bytes then skip body parsing entirely (server.ts excludes /v1/upload/), so the only ceiling
     // left is the one the operator actually set: quota.storage_max_file_size_mb.
     if (mode === 'presigned') {
+      // A key a page origin serves asks what that page's own route asks, as the shared mint does.
+      const pageRefused = await pageKeyWriteRefusal({ storage, config }, gaii, String(key), pageWriterOf({ storage, config }, publishGate));
+      if (pageRefused) { res.status(pageRefused.status).json(error(config.nodeId, pageRefused.code, pageRefused.message)); return; }
       const refused = await storageProvenanceMintRefusal({ storage, config }, stated.provenance);
       if (refused) { res.status(refused.status).json(error(config.nodeId, refused.code, refused.message)); return; }
       // A closed node mints public at 'members' (plan V1.6), before the gate, as the shared mint does.
@@ -398,7 +405,8 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const gaii = resolve(req);
     const key = req.params.key as string;
 
-    const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
+    const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key,
+      { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) });
     if (!removed.ok) {
       res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
       return;

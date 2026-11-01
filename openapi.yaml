@@ -27163,8 +27163,11 @@ paths:
           description: >
             The key is under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and
             screenshot doors write, because they check that the bytes are a picture; an anonymous
-            principal wrote outside `anonymous/*`; or SCOPE_DENIED, a declaration without
-            `provenance:write`.
+            principal wrote outside `anonymous/*`; the key is `company/{id}/index.html`, the page a
+            company of the account serves, and the caller is not the owner in person, does not hold
+            `company:write` and was not allowed by the owner (FORBIDDEN, the message names the request
+            that asks the owner, kind `company-page-write`, and `PUT /v1/companies/{id}/portfolio`); or
+            SCOPE_DENIED, a declaration without `provenance:write`.
         '404':
           description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
         '413':
@@ -27301,6 +27304,10 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >
+            Anonymous agent outside the `anonymous/` key prefix, or a company's page key that the
+            caller may not change (as on `DELETE /v1/storage/{key}`).
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -28245,8 +28252,12 @@ paths:
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or any caller targeted a key
             under `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot
-            doors write, because they check that the bytes are a picture. Applies to both the inline
-            and the presigned form: the namespace fence is on the write, not on the representation.
+            doors write, because they check that the bytes are a picture. The key
+            `company/{id}/index.html`, the page a company of the account serves, needs the owner in
+            person, `company:write`, or the owner's one-press allowance for this caller (FORBIDDEN, the
+            message names the request that asks the owner, kind `company-page-write`, and
+            `PUT /v1/companies/{id}/portfolio`). Applies to both the inline and the presigned form: the
+            namespace fence is on the write, not on the representation.
             SCOPE_DENIED: an agent or app declared ai_provenance without `provenance:write`.
         '404':
           description: NOT_FOUND — `ai_provenance_id` names no provenance record of the caller's own.
@@ -28432,7 +28443,12 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '403':
-          description: Anonymous agent outside the `anonymous/` key prefix
+          description: >
+            Anonymous agent outside the `anonymous/` key prefix, or the key is
+            `company/{id}/index.html`, the page a company of the account serves, and the caller is not
+            the owner in person, does not hold `company:write` and was not allowed by the owner
+            (FORBIDDEN, the message names the request that asks the owner, kind `company-page-write`,
+            and `DELETE /v1/companies/{id}/portfolio`).
         '404':
           description: No such file in the caller's own namespace
 
@@ -33968,7 +33984,9 @@ paths:
           description: >
             An anonymous principal targeted a key outside `anonymous/*`, or the key is under
             `apps/icons/` or `apps/screenshots/`, which only an app's own icon and screenshot doors
-            write.
+            write, or the key is `company/{id}/index.html`, the page a company of the account serves,
+            and the caller is not the owner in person, does not hold `company:write` and was not
+            allowed by the owner (the message names the request that asks the owner).
         '413':
           description: QUOTA_EXCEEDED — the declared chunks make a file larger than one file on this node may be.
         '429':
