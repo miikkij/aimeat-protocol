@@ -5885,7 +5885,8 @@
       "secrets": "the keys you keep here",
       "ext": "the extensions installed on your account",
       "mcp": "the MCP servers you have attached",
-      "publish": "making things public"
+      "publish": "making things public",
+      "party": "people and programs outside this server you share data with"
     },
     "scopeText": {
       "push": {
@@ -7897,7 +7898,7 @@
   "aipage.provider.lmstudio": "LM Studio",
   "aipage.provider.custom": "own address",
   "aipage.desc": "The AI features here run on your own key: what apps ask, what agents do, voice messages turned into text and attached images read. The built-in chat is the exception: {host} pays for it on its own key.",
-  "aipage.descNoKey": "You have no key of your own, so the AI features run on {host}'s key for as long as the starter allowance lasts; {n} is left. With your own key everything runs on your own budget and the model you choose, with no allowance to run out. An ordinary answer costs a fraction of a cent. Put $10 on OpenRouter once and its free models rise to a thousand requests a day.",
+  "aipage.descNoKey": "You have no key of your own, so the AI features run on {host}'s key for as long as the starter allowance lasts; {n} is left. With your own key everything runs on your own budget and the model you choose, with no allowance to run out. Put $10 on OpenRouter once and its free models rise to a thousand requests a day.",
   "aipage.testConnection": "Test the connection",
   "aipage.testing": "Testing…",
   "aipage.getKey": "Get a key from OpenRouter",
@@ -7909,9 +7910,7 @@
   "aipage.stripAllowance": "starter allowance left: {n}",
   "aipage.stripAllowanceBought": "AI allowance left: {n}",
   "aipage.simple.titleSub": "your AI credit and how it is used",
-  "aipage.simple.desc": "AI credit is an amount in euros that pays for the AI's work here. The credit is used when the AI answers or does work. If you want to use an AI account of your own, open Advanced settings at the bottom of the page.",
-  "aipage.simple.lasts": "lasts about {n} ordinary messages",
-  "aipage.simple.lastsLine": "Your credit still lasts about {n} ordinary messages.",
+  "aipage.simple.desc": "AI credit is an amount in euros that pays for the AI's work here. It is used according to which model you use and how much – different models use it at different rates. You can buy more at any time. If you want to use an AI account of your own, open Advanced settings at the bottom of the page.",
   "aipage.simple.underCent": "under 1 cent",
   "aipage.simple.topupNote": "One-off payment. No new subscription.",
   "aipage.simple.connTitle": "Your own AI account (optional)",
@@ -8015,7 +8014,7 @@
   "aipage.sttResultMeta": "{seconds} s of audio · {cost} · {model}",
   "aipage.sttCostNotReported": "the provider reported no price",
   "aipage.sttFailed": "The transcription failed.",
-  "aipage.hintUnits": "Prices are per million tokens: a token is about half a word, and an ordinary answer is a few hundred tokens, a fraction of a cent. \"In\" is what you send the model, \"out\" is what it answers. Context is how much text the model keeps in mind at once; 1 000 k is about a novel.",
+  "aipage.hintUnits": "Prices are per million tokens: a token is about half a word, and an ordinary answer is a few hundred tokens. \"In\" is what you send the model, \"out\" is what it answers. Context is how much text the model keeps in mind at once; 1 000 k is about a novel.",
   "aipage.hintModels": "Change opens the search on the same row: the recommended first (the free router that picks a model for you, the cheapest that reads images, the cheapest with a large context), then the whole list with prices. A choice is stored on the row at once. A role without a model uses the default model; speech and image making are the exception, and without a model they are off.",
   "aipage.hintModelsNoKey": "Models are chosen once a key is stored: the list is fetched from the provider with your key.",
   "aipage.secBudget": "Budget and spending",
@@ -8023,7 +8022,7 @@
   "aipage.perDayShort": "{n}/day",
   "aipage.dailyBudget": "Daily budget",
   "aipage.dailyBudgetBody": "{n} a day, {today} spent today. Once the budget is spent, further requests are refused and the asker is told why.",
-  "aipage.dailyBudgetSub": "This server's default is {def}. An ordinary answer costs a fraction of a cent; your last 30 days cost {month}, about {perDay} a day.",
+  "aipage.dailyBudgetSub": "This server's default is {def}. Your last 30 days cost {month}, about {perDay} a day.",
   "aipage.changeBudget": "Change the budget",
   "aipage.monthLabel": "Last 30 days",
   "aipage.monthBody": "{cost} · requests {calls} · tokens {tokens} · apps {apps}, of which {big} spent at least 10 cents.",
@@ -8195,7 +8194,7 @@
   "aipage.pv.test": "Test",
   "aipage.pv.testCap": "What to test",
   "aipage.pv.testRun": "Run the test",
-  "aipage.pv.testHint": "The smallest real call. A text test costs a fraction of a cent. An image test costs more, and you are asked first.",
+  "aipage.pv.testHint": "The smallest real call. An image test costs more than a text test, and you are asked first.",
   "aipage.pv.testOk": "{cap} works: {model}, {ms} ms, {cost}.",
   "aipage.pv.testNow": "Test now",
   "aipage.pv.offLead": "Part of your AI is off. Each line says how to turn it on.",
@@ -10943,6 +10942,11 @@
   "notiftext.agent_permissions_added.title": "{by} gave {agent} new permissions",
   "notiftext.agent_permissions_added.body": "{by} added these permissions to {agent}: {words}. You can take them away on {agent}'s page. On {by}'s page you can also stop it from adding permissions.",
   "notiftext.agent_permissions_added.open": "Open {agent}'s page",
+  "notiftext.datapackage_stale_one.title": "Your data package \"{name}\" is out of date",
+  "notiftext.datapackage_stale_one.body": "It has missed three updates its schedule promised. Readers keep getting the last version. Check what produces it, or change or remove the schedule.",
+  "notiftext.datapackage_stale_many.title": "{count} of your data packages are out of date",
+  "notiftext.datapackage_stale_many.body": "They have missed three updates their schedule promised: {names}. Readers keep getting the last version. Check what produces them, or change or remove the schedule.",
+  "notiftext.datapackage_stale.open": "See your data packages",
   "notiftext.secret_use_ask.title": "Extension {extension} asks to use your secret {secret}",
   "notiftext.secret_use_ask.body": "{extension}, installed by {installer}, needs your secret {secret} for {host}. Your secret has not gone to this address before, so you are asked first, and nothing was sent. Open this to see why, or answer here.",
   "notiftext.secret_use_ask.allow": "Allow",
@@ -12794,7 +12798,6 @@
     "cfg_site_store_soon_code": "Opening discount code",
     "cfg_site_store_topup_url": "Store page for buying more AI allowance",
     "cfg_site_ai_credit_eur_per_usd": "Euros of AI credit per dollar of the AI key",
-    "cfg_site_ai_eur_per_message": "Price of an ordinary message in euros of AI credit",
     "cfg_site_default_locale": "This server's own language",
     "cfg_site_store_orders_url": "Store page for the owner's orders and invoices",
     "cfg_site_purchase_plan": "What the owner bought",
@@ -13728,6 +13731,13 @@
     "cfgOpt_classification_mode_off": "Off",
     "cfgOpt_classification_mode_owner": "Each owner decides",
     "cfgOpt_classification_mode_all": "On for everyone",
+    "cfgOpt_consent_data_intermediation_report": "Report only, refuse nothing",
+    "cfgOpt_consent_data_intermediation_none": "This server passes no data between others",
+    "cfgOpt_consent_data_intermediation_node": "The operator provides it",
+    "cfgOpt_consent_data_intermediation_owners": "Declared providers may provide it",
+    "cfgOpt_consent_party_self_registration_off": "Nobody registers to an app",
+    "cfgOpt_consent_party_self_registration_apps-ask": "An app's owner asks, the operator approves",
+    "cfgOpt_consent_party_self_registration_on": "An app's owner opens the signup",
     "cfgOpt_content_class_mode_on": "On, each owner decides",
     "cfgOpt_content_class_mode_off": "Off",
     "cfgOpt_commerce_fee_mode_operator": "To the operator",
@@ -13891,6 +13901,10 @@
     "cfg_email_smtp_pass_configured": "SMTP Password Configured",
     "cfg_consent_enabled": "Consent Enabled",
     "cfg_consent_audit_retention_days": "Audit Retention (days)",
+    "cfg_consent_share_max_days": "Longest share to an outside party (days)",
+    "cfg_consent_party_reads_per_minute": "Reads an outside party may make a minute",
+    "cfg_consent_data_intermediation": "Data intermediation service (EU 2022/868)",
+    "cfg_consent_party_self_registration": "People register to apps without an account",
     "cfg_totp_enabled": "TOTP Enabled",
     "cfg_totp_period": "Code Period (seconds)",
     "cfg_totp_window": "Validation Window",
@@ -15522,7 +15536,6 @@
     "credit": {
       "line": "AI credit {amount}",
       "left": "AI credit left {amount}",
-      "leftN": "AI credit left {amount} – about {n} more messages",
       "ready": "your own AI is in use",
       "low": "running low",
       "empty": "used up",
@@ -19877,6 +19890,9 @@
           "publish": {
             "public": "Make a record, a file, an app or a page public to anyone, without asking you first. Without this, the agent asks you, and you approve or decline. Not part of full access."
           },
+          "party": {
+            "manage": "Give a person or a program that has no account here a key, and share one of your data packages with it until a date. You see each one and can end it at any time. Not part of full access."
+          },
           "operator": {
             "organism-repair": "Put an owner back on an organism this account does not own. Only works for a node operator: on any other account this permission does nothing. It is the way back when an organism's owner account can no longer be reached, and it hands that organism to whoever the agent names.",
             "admin": "Administer this installation through this agent. It can, for example, close accounts, remove someone's two-step sign-in, and change organisation sign-in, the allowed origins, the hooks and the MCP servers every account is offered. Only works for whoever runs this installation; on any other account this permission does nothing. \"Full access\" does not include it."
@@ -19926,7 +19942,8 @@
         "domainSignals": "Reach",
         "domainSite": "The pages people arrive on",
         "domainMcp": "MCP servers you have attached",
-        "domainPublish": "Publishing to everyone"
+        "domainPublish": "Publishing to everyone",
+        "domainParty": "Sharing with people and programs outside this server"
       },
       "deviceAuth": {
         "title": "Device Authorization",
@@ -22684,7 +22701,7 @@
       "statusReady": "Key saved",
       "statusNoKey": "No key",
       "whyLead": "With your own key, the AI features here (apps, agents, voice messages, attached images) run on your budget and your choice of model, with no allowance to run out. The built-in chat stays on this server's own key.",
-      "whyCost": "Ordinary models cost a fraction of a cent per exchange. A one-time $10 credit on OpenRouter also lifts its free models to 1,000 requests a day, which for most people is effectively free forever.",
+      "whyCost": "The price depends on the model and on how much you use it. A one-time $10 credit on OpenRouter lifts its free models to 1,000 requests a day.",
       "whyModel": "A good first pick: DeepSeek v4 0813, with reasoning turned on.",
       "section": {
         "connection": "Connection",
@@ -27823,7 +27840,7 @@
         "range": "0 to 1,000 US dollars. The default is 1 dollar a day. 0 refuses every call.",
         "low": "A small budget: an app or an agent that goes wrong can spend only a little. Your own work can stop in the middle of the day.",
         "high": "A large budget: work does not stop, but a fault in an app can cost more before you see it.",
-        "ex1": "1: the default. Enough for many ordinary answers, because one usually costs a fraction of a cent.",
+        "ex1": "1: the default.",
         "ex2": "0: no AI call runs, for example while you are away and want no spending at all.",
         "ex3": "20, with a limit of 2 on one app: the app stops at 2 dollars, and the rest of the budget stays for other work.",
         "tip": "Look at what your last 30 days cost, under the budget, and set the budget a little above a normal day. Give a new or busy app a limit of its own, so that it cannot use the whole budget."

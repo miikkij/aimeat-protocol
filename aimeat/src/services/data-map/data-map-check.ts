@@ -12,9 +12,14 @@
  *
  *   PURE. No storage, no clock: the caller passes `at`, so the same map always yields the same
  *   summary and a unit test can assert it.
- * @structure summariseMap · checkMap · statesInvites · stampFor · FINDING_CODES
+ * @structure summariseMap · checkMap · statesInvites · statesRegisters · stampFor · FINDING_CODES
  * @usage import { summariseMap, checkMap } from './data-map-check.js';
  * @version-history
+ *   v1.8.0 — 2026-11-01 — DATAMAP_REGISTERS_UNSTATED: an app whose party signup is open (checkMap's
+ *     `registersParties`) and whose map has neither `registers-parties` nor a `registers` statement is a
+ *     finding, after the invites one, and never a refusal (plan doc-mvwxcas3dom3, D4.4).
+ *   v1.7.0 — 2026-11-01 — DATAMAP_ROW_BAD_PUBLISHABLE: a row's optional `publishable` that is not a
+ *     boolean is a finding, after the agent one, and never a refusal (plan doc-mvwxcas3dom3, D9.1).
  *   v1.6.0 — 2026-10-28 — DATAMAP_AI_ACT_UNANSWERED: the map says the app uses AI and its `aiAct`
  *     answers none of the EU AI Act questions. Last in the order and never a refusal.
  *   v1.5.0 — 2026-10-28 — DATAMAP_ROW_BAD_DOMAIN (a row names a data domain the node does not know)
@@ -55,7 +60,9 @@ export const FINDING_CODES = [
   'DATAMAP_ROW_NO_WHY',
   'DATAMAP_NO_ROWS',
   'DATAMAP_INVITES_UNSTATED',
+  'DATAMAP_REGISTERS_UNSTATED',
   'DATAMAP_ROW_BAD_AGENT',
+  'DATAMAP_ROW_BAD_PUBLISHABLE',
   'DATAMAP_ROW_BAD_CLASSIFICATION',
   'DATAMAP_ROW_BAD_DOMAIN',
   'DATAMAP_PERSONAL_NO_DOMAIN',
@@ -97,6 +104,9 @@ const badClassification = (r: DataMapRow): boolean =>
  */
 const badAgent = (r: DataMapRow): boolean => r.agent !== undefined && !isValidAgentName(r.agent);
 
+/** True when a row's optional `publishable` is present and is not true or false. */
+const badPublishable = (r: DataMapRow): boolean => r.publishable !== undefined && typeof r.publishable !== 'boolean';
+
 /** The scope that lets an app invite people into organisms, where an invitation can create an account. */
 export const INVITE_SCOPE = 'organism:invite';
 
@@ -110,6 +120,13 @@ export function statesInvites(map: DataMap): boolean {
   if (!inv || typeof inv !== 'object') return false;
   const does = Array.isArray(inv.does) ? inv.does.filter(d => typeof d === 'string' && d.trim()) : [];
   return does.length > 0 || (typeof inv.into === 'string' && inv.into.trim().length > 0);
+}
+
+/** True when the map says the app registers people: `registers-parties`, or a `registers` statement that names who. */
+export function statesRegisters(map: DataMap): boolean {
+  if (Array.isArray(map.machinery) && map.machinery.includes('registers-parties')) return true;
+  const r = map.registers;
+  return !!r && typeof r === 'object' && typeof r.who === 'string' && r.who.trim().length > 0;
 }
 
 /**
@@ -214,9 +231,19 @@ export interface MapCheck {
  * `declaredScopes` are the words of the app's `<meta name="aimeat-scopes">` (parseAppScopes). They
  * decide only whether the map has to say that the app invites people; omitted, nothing is asked.
  */
-export function checkMap(map: DataMap | null, at: string, declaredScopes: readonly string[] = []): MapCheck {
+export function checkMap(
+  map: DataMap | null, at: string, declaredScopes: readonly string[] = [],
+  /** The app's party signup is open (services/app-parties/): the map has to say whom it registers. */
+  opts: { registersParties?: boolean } = {},
+): MapCheck {
   const findings: { code: FindingCode; message: string }[] = [];
   const invites = invitesFinding(map, declaredScopes);
+  const registers = opts.registersParties && !(map && map.source !== 'none' && statesRegisters(map)) ? {
+    code: 'DATAMAP_REGISTERS_UNSTATED' as const,
+    message: 'People without an account register to this app, and the map does not say so. Add "registers-parties" to '
+      + '`machinery`, or a `registers` statement: { "who": "who registers", "keeps": ["e-mail address", "..."] }. '
+      + 'The owner holds their addresses, and the records of processing list them.',
+  } : null;
 
   if (!map || map.source === 'none') {
     findings.push({
@@ -225,9 +252,11 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
         + 'find out where its data goes, which is how data ends up wherever was easiest to reach.',
     });
     if (invites) findings.push(invites);
+    if (registers) findings.push(registers);
     return { findings, gap: { code: 'DATAMAP_MISSING', message: findings[0].message, at } };
   }
   if (invites) findings.push(invites);
+  if (registers) findings.push(registers);
 
   if (!map.what.trim() || !map.usedFor.trim()) {
     findings.push({
@@ -282,6 +311,15 @@ export function checkMap(map: DataMap | null, at: string, declaredScopes: readon
       message: `${badName.length} of ${map.held.length} rows name an agent with something that cannot `
         + 'be an agent\'s name: use the local name of one of your own agents, such as "morning-news", '
         + `or leave the field out. Rows: ${badName.map(r => r.what).join(', ')}.`,
+    });
+  }
+  const badMark = map.held.filter(badPublishable);
+  if (badMark.length > 0) {
+    findings.push({
+      code: 'DATAMAP_ROW_BAD_PUBLISHABLE',
+      message: `${badMark.length} of ${map.held.length} rows carry a "publishable" that is not true or false. `
+        + 'true offers the family to a data product as material; leave the field out otherwise. '
+        + `Rows: ${badMark.map(r => r.what).join(', ')}.`,
     });
   }
   const unknownDomain = map.held.filter(r => badDomains(r).length > 0);

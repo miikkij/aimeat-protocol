@@ -13,6 +13,9 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-01 -- definitions/datapackage-sell.ts: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
+ *   v1.x -- 2026-11-01 -- definitions/party.ts: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
+ *   v1.x -- 2026-11-01 -- definitions/dataproduct.ts: aimeat_dataproduct (plan doc-mvwxcas3dom3, D9).
  *   v1.x -- 2026-10-29 -- definitions/file-store.ts: where stored files keep their bytes (eight tools).
  *   v1.x -- 2026-10-29 -- definitions/operator-config.ts: the two operator propose-then-confirm tools, moved out of capabilities-groups-skills.ts, in the same place in the order.
  *   v1.x -- 2026-10-26 -- definitions/dm-reactions.ts: aimeat_dm_react (a mark on one message).
@@ -108,6 +111,9 @@ import { dmReactionTools } from './definitions/dm-reactions.js';
 import { publishRequestTools } from './definitions/publish-requests.js';
 import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
+import { dataProductTools } from './definitions/dataproduct.js';
+import { partyTools } from './definitions/party.js';
+import { datapackageSellTools } from './definitions/datapackage-sell.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -156,6 +162,9 @@ const CATALOG = [
     ...publishRequestTools,
     ...accountRightsTools,
     ...secretAddressTools,
+    ...dataProductTools,
+    ...partyTools,
+    ...datapackageSellTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

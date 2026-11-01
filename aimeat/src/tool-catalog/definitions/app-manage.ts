@@ -21,6 +21,8 @@
  *   const checked = checkAppManageInput(input);
  *   if (!checked.ok) return toolError('INVALID_INPUT', checked.message);
  * @version-history
+ *   2026-11-01 — member_set takes `party` (an outside party of the owner), and parties, party_remove and
+ *     party_registration_set manage the people who register to the app without an account (plan D4.1 to D4.3).
  *   2026-10-30 — structure_set: proposals, the layouts and navigations the AI drew for the app; it takes ai_provenance and leaves it unused.
  *   2026-10-29 — structure_set: layout and nav take "custom" with a note, and a note takes 600 characters.
  *   2026-10-29 — The app's structure and plan from the first moment of building: structure,
@@ -164,6 +166,10 @@ export const APP_MANAGE_FIELDS: Record<string, ToolInputField> = {
     year: { type: 'string', description: 'For audit: read that year\'s archived entries (four digits, e.g. "2026") instead of the active log. The audit answer lists the archived years.', zod: z.string().regex(/^\d{4}$/).max(INPUT_LIMITS.id) },
     keep: { type: 'string', description: 'For audit_keep: "all" keeps every entry of every app\'s audit log (nothing deleted), a whole number such as "1000" keeps that many newest entries per app and deletes the rest, "default" returns to the node default. Omit it to read the setting. A number deletes, so it takes the account:security permission: without it the number is refused, and the account holder sets it on the app page, signed in.', zod: z.string().max(20) },
     invite_id: { type: 'string', description: 'For member_invite_cancel: the invitation id, from the invites list of members.' },
+    // the app's users without an account (routes/app-parties.ts; plan doc-mvwxcas3dom3, D4)
+    party: { type: 'string', description: 'For member_set, instead of account or email: an outside party of the app\'s owner, party:<owner>/<name>@<node> (a person registered to the app, or a party of aimeat_party). The role carries no free access, because a party has no account.', zod: z.string().max(INPUT_LIMITS.id) },
+    party_name: { type: 'string', description: 'For party_remove: the name of a person registered to the app (ap-..., from parties).', zod: z.string().max(40) },
+    open: { type: 'boolean', description: 'For party_registration_set: true lets people without an account register to the app (when this server allows it), false closes the signup.' },
     // design spec (routes/apps/design-spec.ts)
     markdown: { type: 'string', description: 'For spec_set: the WHOLE design spec as one markdown document, at most 64 KB. It replaces what is there. Sending the text that is there marks the spec current for the app\'s version without a new revision.' },
     words: { type: 'array', description: 'For scope_allowance_remove: the permission words to take away from what the app kept when this server moved to 4.0, e.g. ["ext:invoke"]. Read them first with scope_allowance.', zod: z.array(z.string().max(INPUT_LIMITS.id)) },
@@ -200,7 +206,7 @@ const SETTINGS_FIELDS = ['name', 'description', 'descriptions', 'listing', 'park
 const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
     members: { fields: F(['filename'], ['owner', 'q', 'limit', 'offset']), scope: 'app:write',
         summary: 'the app\'s member roster: who holds which role, with display names, who asked to join and waits for your decision, who opened the app without a role, and the open email invitations. The owner, and members whose role the plan names as managing the roster read it all; when the plan shows the roster to members, a member reads names and roles only' },
-    member_set: { fields: F(['filename', 'role'], ['owner', 'account', 'email', 'locale', 'level', 'note', 'offerings', 'days', 'expires_at']), oneOf: ['account', 'email'], scope: 'exchange:grant',
+    member_set: { fields: F(['filename', 'role'], ['owner', 'account', 'email', 'party', 'locale', 'level', 'note', 'offerings', 'days', 'expires_at']), oneOf: ['account', 'email', 'party'], scope: 'exchange:grant',
         summary: 'approve a person into a role, or change their role or end date, by account or by email (an unknown address is invited). The person is notified of a new membership and of a role change, and the plan\'s free access for the role is given to them; the answer says what was given and taken back. The owner, and members whose role the plan names as managing the roster; only the owner gives a managing role' },
     member_remove: { fields: F(['filename', 'account'], ['owner']), scope: 'exchange:grant',
         summary: 'remove a member: they are notified and the free access the membership gave them is taken back. A right to build the app stays. The owner, and members whose role the plan names as managing the roster; only the owner removes a manager' },
@@ -222,6 +228,12 @@ const MEMBER_ACTION_SPECS: Record<string, AppManageAction> = {
         summary: 'your own standing in an app, yours or somebody else\'s: your role, whether you are the owner, and your request to join and its state' },
     member_request: { fields: F(['filename', 'owner'], ['note']), scope: 'social:write',
         summary: 'ask the owner of somebody else\'s app to let you in. The owner is notified with your note; asking again replaces the note. A member is told they already are one' },
+    parties: { fields: F(['filename'], []), scope: 'app:write',
+        summary: 'the people without an account who registered to the app (outside parties of yours), each with their e-mail address, state and role, and whether the signup is open. Owner only' },
+    party_remove: { fields: F(['filename', 'party_name'], []), scope: 'app:manage',
+        summary: 'remove one registered person: their sign-in ends at once, they leave the roster, and everything they kept in the app is deleted. Owner only' },
+    party_registration_set: { fields: F(['filename', 'open'], ['role']), scope: 'app:manage',
+        summary: 'open or close the app\'s signup for people without an account, and with role the roster role they get. When this server asks its operator first (apps-ask), opening files a request and the signup opens when the operator approves. Owner only' },
 };
 
 /**

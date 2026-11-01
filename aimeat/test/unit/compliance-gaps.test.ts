@@ -17,6 +17,9 @@
  *   already covered.
  * @usage cd aimeat && pnpm exec vitest run test/unit/compliance-gaps.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The storage answers the consents and organisms the data intermediation
+ *     section reads (none); the test setup no longer matched the report's reads, the source was right
+ *     (plan doc-mvwxcas3dom3, D7).
  *   v1.3.0 — 2026-10-23 — The storage answers the listing of the records of processing (none), which
  *     the node-wide report now reads (plan doc-mvlftkh9zmc9).
  *   v1.2.0 — 2026-10-16 — The storage answers the workspace share candidates the counts now read (none).
@@ -67,6 +70,9 @@ function storageWith(opts: {
     queryUsageDailyAllOwners: async () => usageRows,
     queryUsageDaily: async () => usageRows,
     consentFacets: async () => [],
+    // The data intermediation section's owner slice counts the account's consents (services/data-intermediation/findings.ts): none here.
+    listConsents: async () => [],
+    getOrganism: async () => null,
     aiProvenanceFacets: async () => [],
     listAiProvenance: async () => ({ items: [], total: 0 }),
     // The share candidates the counts add (services/share-provenance.ts sharePublicInScope): none here.

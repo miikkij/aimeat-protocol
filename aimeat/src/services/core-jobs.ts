@@ -11,6 +11,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   2026-11-01 — datapackage-freshness: the owners of data packages that turned stale are told once
+ *     (services/datapackage/freshness-sweep.ts; plan doc-mvwxcas3dom3, D6.2).
  *   2026-10-28 — compliance-ask-makers: the makers of apps that use AI and leave the EU AI Act
  *     questions open get a message (services/compliance-ask-makers.ts).
  *   2026-10-25 — held-label-release: the own addresses of removed apps are held, then released after
@@ -83,6 +85,7 @@ import { logger } from '../utils/logger.js';
 import { installWriteClassifier, runClassificationQueueJob } from './classification-queue-job.js';
 import { installContentIntake } from './content/intake.js';
 import { refreshTrustScore } from './trust.js';
+import { setIntermediationConfig } from './data-intermediation/gate.js';
 
 /**
  * Register all core job handlers on the scheduler.
@@ -181,6 +184,13 @@ export function registerCoreHandlers(
     await runComplianceMonthlyReport(config, storage);
   });
 
+  // Data packages whose producer missed three promised runs: each owner is told once per stale spell
+  // (services/datapackage/freshness-sweep.ts, plan doc-mvwxcas3dom3 D6.2).
+  scheduler.registerCoreHandler('datapackage-freshness', async () => {
+    const { sweepStalePackages } = await import('./datapackage/freshness-sweep.js');
+    await sweepStalePackages(storage, config);
+  });
+
   // The makers of apps that use AI and have left the EU AI Act questions open get a message with a
   // ready prompt, at most once per app per fortnight (compliance-ask-makers.ts).
   scheduler.registerCoreHandler('compliance-ask-makers', async () => {
@@ -207,6 +217,10 @@ export function registerCoreHandlers(
   // memory writes are inspected under each owner's settings. Installed here for the same import-cycle
   // reason as the write classifier above; does nothing while content classes are off.
   installContentIntake({ storage, config });
+
+  // The data intermediation listing gate reads the running config on code paths that carry none (the
+  // EXCHANGE projection from memory write hooks). Installed here at boot for the same reason as above.
+  setIntermediationConfig(config);
 
   // Decision records past their retention window (TARGET-080). One indexed delete across owners.
   scheduler.registerCoreHandler('ai-decision-prune', async () => {

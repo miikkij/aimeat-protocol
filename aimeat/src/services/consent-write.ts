@@ -21,13 +21,17 @@
  *
  *   One capability, one implementation, whatever the interface — CLAUDE.md, Backend.
  * @structure
- *   - VALID_RECIPIENT_PATTERNS — the seven shapes a recipient may take
+ *   - VALID_RECIPIENT_PATTERNS — the eight shapes a recipient may take
  *   - CONSENT_PUBLISH_KIND — the publish-request kind a consent to everyone is filed as
  *   - grantConsent() / revokeConsent() — the whole sequence, gate first
  * @usage
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-01 — A recipient may be an outside party, party:<owner>/<name>@<node> (the eighth shape): a
+ *     named share of one data package (services/parties/shares.ts normalizePartyShare checks the party,
+ *     the package, the version, the expiry and party:manage before any write, and files it under the
+ *     owner's GHII with the reach local and the metadata the node writes; plan doc-mvwxcas3dom3, D3.1).
  *   2026-10-20 — A consent whose recipient is `*` asks the publish gate (services/publish-gate.ts),
  *     the same question a raise to public asks: a scoped agent without publish:public files a
  *     request for the owner and nothing is opened. The only gate was consent:manage, which every
@@ -69,6 +73,7 @@ import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
 import { notifyDirectoryChange } from './directory.js';
 import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
+import { normalizePartyShare } from './parties/shares.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -85,6 +90,9 @@ export const VALID_RECIPIENT_PATTERNS = [
     /^node:\S+$/,                // one node
     /^[^*][^:]*#[^@]+@.+$/,      // one agent  (agent#owner@node)
     /^[^#@*:]+@[^@]+$/,          // one owner  (owner@node)
+    // One outside party of the owner (services/parties/contract.ts): party:<owner>/<name>@<node>. Matched
+    // only by that exact party (storage/consent-recipient.ts), never by a ghii:, owner or wildcard form.
+    /^party:[a-z0-9][a-z0-9_.-]{0,63}\/[a-z0-9][a-z0-9-]{0,39}@[a-z0-9][a-z0-9.-]{0,252}$/,
 ];
 
 /**
@@ -236,9 +244,11 @@ async function wildcardPublishRefusal(
 export async function grantConsent(
     deps: ConsentWriteDeps,
     caller: ConsentCaller,
-    input: ConsentGrantInput,
+    asked: ConsentGrantInput,
 ): Promise<ConsentResult<ConsentRecord>> {
     const { storage } = deps;
+    // What is granted: the request, or for a party recipient the request as normalizePartyShare completed it.
+    let input = asked;
 
     const denied = gate(caller);
     if (denied) return denied;
@@ -249,8 +259,20 @@ export async function grantConsent(
     if (!VALID_RECIPIENT_PATTERNS.some(p => p.test(input.recipient))) {
         return {
             ok: false, status: 400, code: 'INVALID_RECIPIENT',
-            message: 'recipient must be "*", a GAII, or prefixed with "organism.", "ghii:", "domain:", or "node:"',
+            message: input.recipient.startsWith('party:')
+                ? 'A party recipient is party:<owner>/<party name>@<node>: the party name is lowercase letters, digits and dashes.'
+                : 'recipient must be "*", a GAII, a party (party:<owner>/<name>@<node>), or prefixed with "organism.", "ghii:", "domain:", or "node:"',
         };
+    }
+    // A named share to an outside party (services/parties/shares.ts): the party, the package, the
+    // version, the expiry and party:manage are checked here, before anything is written, and the share is
+    // filed under the owner's GHII with the metadata the node writes and the reach `local`.
+    let fileUnder = caller.ownerGaii;
+    if (input.recipient.startsWith('party:')) {
+        const share = await normalizePartyShare({ storage, config: deps.config }, caller, input);
+        if (!share.ok) return share;
+        fileUnder = share.fileUnder;
+        input = { ...input, scope: share.scope, expires: share.expires, metadata: share.metadata };
     }
     // The reach (Core 2026-11 AUTHZ-18): one of three, the two older names stored as `local`, and the
     // default decided by the running version, so a consent made without a reach never makes a record
@@ -274,7 +296,7 @@ export async function grantConsent(
     const notOurs = await wildcardPublishRefusal(deps, caller, input, reach);
     if (notOurs) return notOurs;
 
-    const existing = await storage.listConsents(caller.ownerGaii);
+    const existing = await storage.listConsents(fileUnder);
     if (existing.length >= CONSENT_QUOTA) {
         return {
             ok: false, status: 413, code: 'QUOTA_EXCEEDED',
@@ -290,7 +312,7 @@ export async function grantConsent(
         : input.metadata;
     const consent = await storage.createConsent({
         id: randomUUID(),
-        ownerGaii: caller.ownerGaii,
+        ownerGaii: fileUnder,
         dataPattern: input.dataPattern,
         recipient: input.recipient,
         purpose: input.purpose,
@@ -304,7 +326,7 @@ export async function grantConsent(
 
     // The trail that answers "who was given access to what, and when". The MCP door wrote nothing
     // here, so a consent granted by an agent was invisible to it.
-    await auditDataAccess(storage, consent.id, caller.ownerGaii, consent.recipient, consent.dataPattern, 'grant', true);
+    await auditDataAccess(storage, consent.id, fileUnder, consent.recipient, consent.dataPattern, 'grant', true);
 
     // A federation consent decides who is in the member directory, so the index hears it from the
     // change itself. It depended on the caller passing onDirectoryChange, which only the REST route did.

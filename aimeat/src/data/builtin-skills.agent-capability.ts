@@ -33,6 +33,7 @@
  * @structure AGENT_CAPABILITY_SKILL_ENTRY
  * @usage import { AGENT_CAPABILITY_SKILL_ENTRY } from './builtin-skills.agent-capability.js';
  * @version-history
+ *   v1.7.3 — 2026-11-01 — A listed tool's `deliversData`, and the node's proposal from its output (plan D5.5).
  *   v1.7.2 — 2026-10-25 — The newsletter row: ctx.email takes one recipient per call within the hourly allowance (secaudit2026oct22, lead 325).
  *   v1.7.1 — 2026-10-18 — The ctx.ai row says the extension reads the answer back, privately.
  *   v1.7.0 — 2026-10-14 — "What an app tool is": the permission organism:direct lets one agent
@@ -132,7 +133,9 @@ running:
   agent's definition names a tool that has an action.
 
 A tool may carry a money price and a pacing amount, and it can be listed on the Exchange. A tool
-with an action and no price is the owner's own: their agents call it directly.
+with an action and no price is the owner's own: their agents call it directly. A listed tool says
+whether it delivers data (\`deliversData\`); left out, the node proposes it from the tool's output
+shape (rows or records count as data).
 
 **A tool's checks hold only if the agent cannot write past the tool.** The extension writes the
 workspace as the agent that called it, so the same agent can write the same record directly with

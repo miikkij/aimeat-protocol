@@ -237,8 +237,11 @@
     "src/services/email-recipients.ts": {
       "listOwners": 1
     },
+    "src/services/exchange-projection-migrate.ts": {
+      "listAgents": 1
+    },
     "src/services/exchange-projection.ts": {
-      "listAgents": 3
+      "listAgents": 2
     },
     "src/services/exposure/exposure-report.ts": {
       "listOwners": 1

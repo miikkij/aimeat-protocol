@@ -154,6 +154,9 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // while the node's publish gate covers apps; a community app whose visitors post public entries
   // declares it, and the owner sees it on the consent screen (plan doc-mvcn6c7e4e5q, V4.1).
   'publish:public': 'Make what it creates public to anyone, without asking you each time',
+  // Outside parties (services/parties/): a key handed to a person or a program with no account here
+  // reads the owner's shared data from outside, so an app asks for it by name (plan doc-mvwxcas3dom3, D2.7).
+  'party:manage': 'Give people and programs outside this server a key, and share your data packages with them',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   // NARROWER THAN push:manage ON PURPOSE. That word lists and removes every device the person has,
   // across every app and the node itself, and no app has any business there. This one registers and

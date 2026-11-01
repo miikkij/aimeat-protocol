@@ -33,13 +33,16 @@
  * @structure OpenRouterRegion · RegionFallback · REGION_HOSTS · regionBaseUrl · RegionMode ·
  *   regionModeOf · regionSettingsOf · freeModelOf · freeLastResortOf · EU_ONLY_TEXT_MODEL ·
  *   allowedRegions · RegionChoice · regionChoiceFor · RegionModels · regionModels · regionModelIds ·
- *   RegionNeeds · RegionDecision · decideRegion · euOnlyModelFor · regionsInUse · REGION_MODE_LIMITS ·
+ *   RegionNeeds · RegionDecision · decideRegion · euOnlyModelFor · nodeTextModel · nodePictureModel · regionsInUse · REGION_MODE_LIMITS ·
  *   REGION_COUNTRY · regionView · regionDeclaration · resetRegionModelsForTests
  * @usage
  *   const choice = regionChoiceFor(config, rules, candidate.keyScope);
  *   const d = await decideRegion(config, choice, model);
  *   if (!d.ok) reject(d.message); else target.baseUrl = d.baseUrl;
  * @version-history
+ *   v1.2.1 — 2026-11-01 — nodePictureModel: the statement names the model that reads pictures when it is not the text model.
+ *   v1.2.0 — 2026-11-01 — nodeTextModel: the statement names the node's default model for the chat and
+ *     the agents, and eu-only's stand-in (Jouni, 2026-11-01 02.54).
  *   v1.1.0 — 2026-11-01 — ai.region_mode (eu, eu-only, own) decides the region settings; a region's
  *     list records which models it offers without tool calling, and a call that sends tools does not
  *     go to such an endpoint; eu-only replaces a node-chosen model the EU does not offer and has no
@@ -53,6 +56,27 @@ import { logger } from '../../utils/logger.js';
 import { fixedBaseUrlOf, regionOverrideOf } from './providers.js';
 import type { RoutingRules } from './routing.js';
 import { nodeOpenRouterKey } from './node-openrouter-key.js';
+import { resolveModelFor } from '../ai-model-defaults.js';
+
+/**
+ * The model the node's chat and agents use when a call names none and the person chose none: the
+ * node's chat default, then its execution and reasoning defaults, the order services/ai/completion.ts
+ * reads them in. Undefined when the node names none. On eu-only a model the EU does not offer is
+ * replaced at the call (euOnlyModelFor); the statements name that model beside this one.
+ */
+export function nodeTextModel(config: AimeatConfig): string | undefined {
+  return resolveModelFor(config, undefined, 'chat') ?? resolveModelFor(config, undefined, 'execution')
+    ?? resolveModelFor(config, undefined, 'reasoning');
+}
+
+/**
+ * The model that reads a picture when the node sets one of its own (its vision default) and it is not
+ * the text model; undefined otherwise, when a picture goes to the text model (services/ai/completion.ts).
+ */
+export function nodePictureModel(config: AimeatConfig): string | undefined {
+  const vision = resolveModelFor(config, undefined, 'vision');
+  return vision && vision !== nodeTextModel(config) ? vision : undefined;
+}
 
 export type OpenRouterRegion = 'eu' | 'us' | 'any';
 export type RegionFallback = 'off' | 'us' | 'any';
@@ -353,11 +377,17 @@ export function regionDeclaration(config: AimeatConfig): Record<string, unknown>
   const mode = regionModeOf(config);
   const settings = regionSettingsOf(config);
   const nodeKey = !!nodeOpenRouterKey(config);
+  const model = nodeTextModel(config);
   return {
     mode: mode || null,
     ...(mode ? { mode_limits: REGION_MODE_LIMITS[mode] } : {}),
     node_key: nodeKey,
     ...(nodeKey ? {
+      // The model behind the chat and the agents when nobody chose one (Jouni, 2026-11-01 02.54: the
+      // customer-visible text and the records name the model and the region).
+      default_model: model ?? null,
+      ...(nodePictureModel(config) ? { picture_model: nodePictureModel(config) } : {}),
+      ...(mode === 'eu-only' ? { eu_only_model: EU_ONLY_TEXT_MODEL } : {}),
       region: settings.region, host: REGION_HOSTS[settings.region], fallback: settings.fallback,
       regions_in_use: regionsInUse(config).map(r => ({ region: r, host: REGION_HOSTS[r], country: REGION_COUNTRY[r] })),
     } : {}),

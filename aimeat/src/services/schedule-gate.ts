@@ -29,6 +29,8 @@
  *   const bad = checkScheduleGate({ kind, cron, timezone }, caller);
  *   if (bad) return renderRefusal(bad);   // each door renders its own way
  * @version-history
+ *   2026-11-01 — The `dataproduct` kind, which needs storage:write and memory:write, the words a data
+ *     package publish asks (plan doc-mvwxcas3dom3, D9.5).
  *   2026-10-20 — The `extension` kind asks `ext:invoke`, the word POST /v1/ext/:ext/:action asks, on
  *     create, edit and run; the fire asks the maker again (services/scheduler-extension-job.ts)
  *     (secaudit 2026-10, SCHEDULE_KIND_SCOPE:extension-kind-asks-no-ext-invoke).
@@ -46,7 +48,7 @@ import { logger } from '../utils/logger.js';
 import { scopeIsCovered } from '../utils/scope-coverage.js';
 
 /** Every schedule kind this node knows. */
-export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish' | 'refinery';
+export type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish' | 'refinery' | 'dataproduct';
 
 /**
  * The scope a caller needs for the capability the schedule DRIVES, or every scope when it drives
@@ -68,6 +70,8 @@ export const SCHEDULE_KIND_SCOPE: Partial<Record<ScheduleKind, string | readonly
     'connections-publish': 'connections:use',
     // A refinery batch reads a mailbox, asks the models, writes rows and moves its cursor.
     refinery: ['connections:read-through', 'ai:use', 'organism:rows', 'memory:write'],
+    // A data product build publishes a data package version: its bytes and its catalogue entry.
+    dataproduct: ['storage:write', 'memory:write'],
 };
 
 export interface ScheduleCaller {
@@ -88,7 +92,7 @@ export interface ScheduleRefusal {
     message: string;
 }
 
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish', 'refinery'];
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish', 'refinery', 'dataproduct'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. Moved here from
  *  routes/schedules.ts so both doors judge the same string the same way. */

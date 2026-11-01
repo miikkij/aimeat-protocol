@@ -24,6 +24,11 @@
  * @structure DataMap · DataMapRow · ElsewhereRow · InvitesStatement · DataMapStamp · publicDataMap()
  * @usage import type { DataMap } from './data-map-types.js';
  * @version-history
+ *   v2.8.0 — 2026-11-01 — The machinery word `registers-parties` and the optional app-level `registers`
+ *     statement: the app lets people without an account register to it (plan doc-mvwxcas3dom3, D4.4).
+ *     Additive, so the spec stays /2.
+ *   v2.7.0 — 2026-11-01 — A `held` row may carry `publishable`: the family may be read into a data
+ *     package by a data product (plan doc-mvwxcas3dom3, D9.1). Additive, so the spec stays /2.
  *   v2.6.0 — 2026-10-28 — The optional app-level `aiAct`: the maker's answers to the EU AI Act
  *     questions, with a reason each, which the register draft takes as the maker's for the
  *     administrator to approve (wish: the maker answers for their own app).
@@ -118,7 +123,20 @@ export type LossRisk =
  */
 export type Machinery =
   | 'iam-and-roles' | 'workflows' | 'extensions' | 'cortex' | 'ai-generation' | 'scheduling'
-  | 'connections-and-publish' | 'payments' | 'federation' | 'invites-people';
+  | 'connections-and-publish' | 'payments' | 'federation' | 'invites-people' | 'registers-parties';
+
+/**
+ * Who the app registers (plan doc-mvwxcas3dom3, D4.4): people with no account here who sign up to the
+ * app with an e-mail address and become outside parties of its owner (services/app-parties/). The
+ * owner is the controller of their addresses and of what they keep in the app, so the records of
+ * processing list it. Stating it is the map's answer to the finding DATAMAP_REGISTERS_UNSTATED.
+ */
+export interface RegistersStatement {
+  /** Who registers, in the app's own words: "buyers and sellers of the market". */
+  who: string;
+  /** What the app keeps of each: "e-mail address, display name, listings, messages". */
+  keeps: string[];
+}
 
 /** What an app does when it lets people in. Open like every other list: an unknown act is kept. */
 export type InviteAct =
@@ -220,6 +238,15 @@ export interface DataMapRow {
    * classification floor and the AI Act register read: written here once, it reaches all three.
    */
   domains?: string[];
+  /**
+   * True when the app's builder says this family may be published as a data package: a data product
+   * may read it as material (services/dataproduct/, an `app` source). Absent or false: not offered.
+   *
+   * OPTIONAL, AND A STATEMENT RATHER THAN A PERMISSION. It says which of the app's data is meant to go
+   * out; who may read the package is still the product's audience, and a row that also marks its data
+   * personal keeps every column out of a public package until the owner confirms.
+   */
+  publishable?: boolean;
 }
 
 /** The second table: what is unresolved, or is not ours. */
@@ -258,6 +285,8 @@ export interface DataMap {
   leaves: LeavesRow[];
   /** Optional: the app invites people into organisms, and how. See InvitesStatement. */
   invites?: InvitesStatement;
+  /** Optional: the app lets people without an account register to it. See RegistersStatement. */
+  registers?: RegistersStatement;
   /** Optional: the maker's answers to the EU AI Act questions, for an app that uses AI. */
   aiAct?: AiActStatement;
 

@@ -15,6 +15,13 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.5.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION: off, the default |
+ *     apps-ask | on; plan doc-mvwxcas3dom3, D4.3).
+ *   v1.4.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION: report, the code default |
+ *     none | node | owners; plan doc-mvwxcas3dom3, D7.1).
+ *   v1.3.0 — 2026-11-01 — shareMaxDays (AIMEAT_SHARE_MAX_DAYS, 365) and partyReadsPerMinute
+ *     (AIMEAT_PARTY_READS_PER_MINUTE, 60): the longest named share and an outside party's read rate
+ *     (plan doc-mvwxcas3dom3, D2.9, D3.1).
  *   v1.2.0 — 2026-10-18 — agentClearanceDefault (AIMEAT_AGENT_CLEARANCE_DEFAULT): the clearance a new
  *     agent gets, '' = no limit (plan doc-mvdipuyqraas, L2.1).
  *   v1.1.0 — 2026-10-11 — consentMaxPerUser (AIMEAT_CONSENT_MAX_PER_USER) removed: no code read it.
@@ -65,5 +72,48 @@ export function dataAccessDefaults() {
     executionLogRetentionDays: parseInt(process.env.AIMEAT_EXECUTION_LOG_RETENTION_DAYS ?? '30', 10),
     classificationMode: parseClassificationMode(process.env.AIMEAT_CLASSIFICATION),
     agentClearanceDefault: parseAgentClearanceDefault(process.env.AIMEAT_AGENT_CLEARANCE_DEFAULT),
+    // The longest a named share to an outside party may last, in days (services/parties/shares.ts).
+    shareMaxDays: positiveInt(process.env.AIMEAT_SHARE_MAX_DAYS, 365, 3650),
+    // How many reads one outside party may make a minute; past it 429 (services/parties/read-gate.ts).
+    partyReadsPerMinute: positiveInt(process.env.AIMEAT_PARTY_READS_PER_MINUTE, 60, 100_000),
+    // Whether this node runs a data intermediation service (EU 2022/868), and who provides it
+    // (services/data-intermediation/). report, the code default, refuses nothing.
+    dataIntermediation: parseDataIntermediationMode(process.env.AIMEAT_DATA_INTERMEDIATION),
+    // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
+    // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
+    partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
   };
+}
+
+/**
+ * Whether people register to an app as its outside parties (plan doc-mvwxcas3dom3, D4.3). off: no
+ * signup. apps-ask: an app's owner asks, and the operator approves each app. on: an app's owner
+ * opens its signup.
+ */
+export type PartySelfRegistration = 'off' | 'apps-ask' | 'on';
+export const PARTY_SELF_REGISTRATION_MODES: readonly PartySelfRegistration[] = ['off', 'apps-ask', 'on'];
+
+/** An unknown value is `off`, the one that lets nobody register. */
+export function parsePartySelfRegistration(v: unknown): PartySelfRegistration {
+  return PARTY_SELF_REGISTRATION_MODES.find(m => m === v) ?? 'off';
+}
+
+/**
+ * The data intermediation setting (plan doc-mvwxcas3dom3, D7.1). report: nothing is refused, the
+ * compliance report lists the findings. none: the node intermediates nothing, so an offering that
+ * delivers data is not listed to everyone. node: the operator is the provider. owners: an owner or an
+ * organism that declared itself a provider may run an open marketplace; everyone else is as none.
+ */
+export type DataIntermediationMode = 'report' | 'none' | 'node' | 'owners';
+export const DATA_INTERMEDIATION_MODES: readonly DataIntermediationMode[] = ['report', 'none', 'node', 'owners'];
+
+/** An unknown value is `report`, the one that refuses nothing. */
+export function parseDataIntermediationMode(v: unknown): DataIntermediationMode {
+  return DATA_INTERMEDIATION_MODES.find(m => m === v) ?? 'report';
+}
+
+/** A whole number from 1 to `max`; anything else is `fallback`. */
+function positiveInt(raw: string | undefined, fallback: number, max: number): number {
+  const n = Number.parseInt(raw ?? '', 10);
+  return Number.isInteger(n) && n >= 1 && n <= max ? n : fallback;
 }

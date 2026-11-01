@@ -27,6 +27,9 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-11-01 — Section 5: a package sold on EXCHANGE, the feed metered against the buyer's contract (plan D5; routes/odata.ts).
+ *   2026-11-01 — Section 5: a package shared by name with an outside reader through aimeat_party, who
+ *     signs in to the feed with HTTP Basic (plan doc-mvwxcas3dom3, D3; routes/odata.ts).
  *   2026-11-01 — Section 5: the ODPS sheet's address (odps_url) and aimeat_datapackage_withdraw, after
  *     which the feed answers 410 (plan doc-mvwxcas3dom3, D0.1 and D0.3; routes/odata.ts).
  *   2026-10-21 — Section 5: only a PRIVATE package needs storage:read for the person's agent or app,
@@ -164,6 +167,16 @@ programs read it:
   answers 403 naming that permission, and you ask the person for it. An earlier version named with
   \`?version=\` opens only at the level it was published at: a version published for members before
   the package went public stays for members.
+- **To give one outside reader the package** (an accountant's Power BI, a partner's program, someone
+  with no account here), share it by name: \`aimeat_party\` action \`share\` with the reader's name, the
+  package, the purpose and \`days\`. The reader gets a key and a connection file, and signs in to the
+  feed with HTTP Basic (user \`<owner>/<name>\`, password the key). Tell the person until when, that
+  ending the share stops the next read, and that copies already taken stay with the reader.
+- **To sell the package** (by the month, or by the read), \`aimeat_datapackage_sell\` with the money
+  price and the usage terms lists it on EXCHANGE. A buyer with an account reads the feed with their own
+  token and pays each read or month through their contract; a buyer with no account buys on the
+  provider's card page and gets a key for HTTP Basic, as an outside reader does. A reader the package's
+  own audience already admits reads free, so a package for sale is one that is not public.
 
 ## How it goes stale
 

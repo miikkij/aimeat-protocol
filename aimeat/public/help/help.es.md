@@ -31,7 +31,7 @@ Si ya usas ChatGPT, Claude o Grok, conéctalo aquí y se convierte en tu mano de
 <!--store-->
 Tu compra incluye saldo de IA. El saldo de IA es una cantidad en euros que paga el trabajo de la IA aquí. Ves cuánto queda arriba en tu Inicio, en el chat y en la [página de Saldo de IA](/v1/profile?tab=ai).
 
-El saldo se gasta cuando la IA responde o hace un trabajo. Para tener más IA, pulsa Comprar más IA junto al saldo en tu Inicio. Es un pago único y no hace falta una suscripción nueva. Puedes hacerlo cuando quieras.
+El saldo se gasta según el modelo que uses y cuánto lo uses: cada modelo gasta a un ritmo distinto. Puedes comprar más cuando quieras: pulsa Comprar más IA junto al saldo en tu Inicio. Es un pago único y no hace falta una suscripción nueva.
 
 Cuando el saldo se agota, recibes un aviso en tu Inicio y en el chat. Entonces puedes comprar más IA o empezar a usar una cuenta de IA propia.
 
