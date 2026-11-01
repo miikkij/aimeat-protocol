@@ -19,11 +19,14 @@
  *   a party deleted and created again under the same name inherits no share and no token (invariant 19).
  *   A key is 32 random bytes, shown once, and stored as its SHA-256 (./keys.ts).
  * @structure PARTIES_KEY · PARTY_READS_PREFIX · PARTY_MANAGE_SCOPE · PARTY_KINDS · PartyKind · PartyKey ·
- *   PartyRecord · PartiesValue · PARTY_NAME_RE · validatePartyName · partyRefOf · parsePartyRef ·
+ *   PartyRecord · PartyInvite · PartiesValue · PARTY_NAME_RE · validatePartyName · partyRefOf · parsePartyRef ·
  *   parsePartyUser · parsePartiesValue · partyView · PARTY_TOKEN_PREFIX · PARTY_TOKEN_TTL_SECONDS ·
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.4.0 — 2026-11-01 — A party holds the one-time links its owner sent (`invites`, PartyInvite;
+ *     ./invite.ts), and the owner's view lists them without their hashes; "invites" is a reserved name
+ *     (WP9b).
  *   v1.3.0 — 2026-11-01 — A data space participant (kind `dataspace`) carries its `did` and credential
  *     type `did`; a key a DSP transfer minted names its `share` and `transfer` (plan D8.4, D8.5). The DSP
  *     data address token is this party token, read on the OData and CSV routes already listed here.
@@ -94,6 +97,27 @@ export interface PartyRecord {
     /** Wrong keys presented for this party, counted for the owner and the operator (D2.9). */
     failedAttempts: number;
     lastSeenAt: string | null;
+    /** The one-time links the owner sent for its shares (./invite.ts). The code itself is never stored. */
+    invites?: PartyInvite[];
+}
+
+/**
+ * A one-time link to one share of the party (./invite.ts): the recipient opens it with no account,
+ * accepts the terms and takes a key made at that moment. Only the SHA-256 of the code is kept.
+ */
+export interface PartyInvite {
+    id: string;
+    hash: string;
+    /** The share (consent id) the link opens. */
+    share: string;
+    createdAt: string;
+    /** The earlier of the share's end and 14 days after the link was made. */
+    expiresAt: string;
+    /** The principal that sent it. */
+    createdBy: string;
+    /** When the recipient redeemed it, and the key made then. A link redeems once. */
+    usedAt?: string | null;
+    keyId?: string;
 }
 
 export interface PartiesValue {
@@ -146,7 +170,7 @@ const OWNER_PART_RE = /^[a-z0-9][a-z0-9_.-]{0,63}$/;
 const NODE_PART_RE = /^[a-z0-9][a-z0-9.-]{0,252}$/;
 
 /** Names the party endpoints use as path segments under /v1/parties, so no party is called one of them. */
-export const RESERVED_PARTY_NAMES: readonly string[] = ['me', 'token', 'share'];
+export const RESERVED_PARTY_NAMES: readonly string[] = ['me', 'token', 'share', 'invites'];
 
 /** Null when `name` is a party name, else the reason it is not. */
 export function validatePartyName(name: unknown): string | null {
@@ -221,5 +245,6 @@ export function partyView(p: PartyRecord, ref: string): Record<string, unknown> 
         keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null, ...(k.transfer ? { dsp_transfer: k.transfer } : {}) })),
         failed_attempts: p.failedAttempts ?? 0,
         last_seen_at: p.lastSeenAt ?? null,
+        ...(p.invites?.length ? { invites: p.invites.map(i => ({ id: i.id, share: i.share, created_at: i.createdAt, expires_at: i.expiresAt, used_at: i.usedAt ?? null })) } : {}),
     };
 }

@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-01 — aimeat_admin_app_party_registrations is probed on its decide branch (WP9b).
  *   2026-11-01 — aimeat_dataspace is probed on its decline branch; list and settings in dataspace-dispatch.test.ts (plan D8.3).
  *   2026-11-01 — aimeat_datapackage_sell is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D5.1).
  *   2026-11-01 — aimeat_datapackage_withdraw is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D0.3).
@@ -118,6 +119,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // action='settings' (the enum sentinel) carries only package and auto_agree; 'decline' carries the
     // negotiation and the reason. The list and settings branches are measured in dataspace-dispatch.test.ts.
     aimeat_dataspace: { always: { action: 'decline' } },
+    // action='list' (the default) reads nothing; 'decide' carries owner and app in the path and the
+    // decision and reason in the body, so the probe holds the decision's companions (WP9b).
+    aimeat_admin_app_party_registrations: { always: { action: 'decide', owner: 'zqxownerzqx', app: 'zqxappzqx', decision: 'approve' } },
     // `account` names whose request an operator reads or answers, so it rides on one request (request_id);
     // the list is always the caller's own account.
     aimeat_publish_requests: { always: { request_id: 'zqxrequest_idzqx' } },
