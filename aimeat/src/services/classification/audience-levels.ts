@@ -19,16 +19,22 @@
  *   if (!capAllows(label.maxAudience, storedLevel(config, 'public'))) → refuse
  *   const cap = narrowerCap(node.maxAudience, layer.maxAudience);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The exposure report's new level `named` (outside parties) is not an audience
+ *     level a cap names; the order and the words are unchanged (plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L3.1).
  */
 import { signedInOnly, type ContentAccess } from '../../config-visibility.js';
 import { LEVELS, type ExposureLevel } from '../exposure/exposure-types.js';
 
-/** Who may read content: one of the exposure levels, or private (nobody outside). */
-export type AudienceLevel = ExposureLevel | 'private';
+/**
+ * Who may read content: one of the exposure levels, or private (nobody outside). The report's `named`
+ * level (an outside party the owner chose by name, services/parties/) is not a cap: a share to a party
+ * is decided per share, not by a label's audience, and it sits on no line between private and public.
+ */
+export type AudienceLevel = Exclude<ExposureLevel, 'named'> | 'private';
 
 /** Every level, from the narrowest to the widest: private, organism, signed-in, link, public. */
-export const AUDIENCE_LEVELS: readonly AudienceLevel[] = ['private', ...[...LEVELS].reverse()];
+export const AUDIENCE_LEVELS: readonly AudienceLevel[] = ['private', ...[...LEVELS].filter((l): l is Exclude<ExposureLevel, 'named'> => l !== 'named').reverse()];
 
 /** How each level is named in a sentence (English; the locales carry the other languages). */
 export const AUDIENCE_LEVEL_WORDS: Record<AudienceLevel, string> = {

@@ -4861,7 +4861,8 @@
       "secrets": "las claves que guardas aquí",
       "ext": "las extensiones instaladas en tu cuenta",
       "mcp": "los servidores MCP que has conectado",
-      "publish": "hacer públicas las cosas"
+      "publish": "hacer públicas las cosas",
+      "party": "las personas y los programas de fuera de este servidor con los que compartes datos"
     },
     "scopeText": {
       "push": {
@@ -12463,6 +12464,8 @@
     "cfg_email_smtp_pass_configured": "Contraseña SMTP configurada",
     "cfg_consent_enabled": "Consentimiento activado",
     "cfg_consent_audit_retention_days": "Conservar la auditoría (días)",
+    "cfg_consent_share_max_days": "Duración máxima de un acceso compartido con una parte externa (días)",
+    "cfg_consent_party_reads_per_minute": "Lecturas por minuto de una parte externa",
     "cfg_totp_enabled": "TOTP activado",
     "cfg_totp_period": "Periodo del código (segundos)",
     "cfg_totp_window": "Ventana de validación",
@@ -18139,6 +18142,9 @@
           "publish": {
             "public": "Hacer público para cualquiera un registro, un archivo, una aplicación o una página, sin preguntarte antes. Sin este permiso, el agente te lo pregunta y tú lo apruebas o lo rechazas. No forma parte del acceso completo."
           },
+          "party": {
+            "manage": "Dar una clave a una persona o a un programa que no tiene cuenta en este servidor, y compartir con él uno de tus paquetes de datos hasta una fecha. Ves cada acceso y puedes terminarlo cuando quieras. No forma parte del acceso completo."
+          },
           "operator": {
             "organism-repair": "Devuelve un propietario a un organismo que esta cuenta no posee. Solo funciona para el operador del nodo: en cualquier otra cuenta este permiso no hace nada. Es la vuelta atrás cuando ya no se alcanza la cuenta propietaria de un organismo, y entrega ese organismo a quien el agente nombre.",
             "admin": "Administrar esta instalación a través de este agente. Puede, por ejemplo, desactivar cuentas, quitarle a alguien la verificación en dos pasos y cambiar el inicio de sesión de organización, los orígenes permitidos, los hooks y los servidores MCP que se ofrecen a todas las cuentas. Solo funciona para quien administra esta instalación; en cualquier otra cuenta este permiso no hace nada. \"Acceso total\" no lo incluye."
@@ -18188,7 +18194,8 @@
         "domainSignals": "Alcance",
         "domainSite": "Las páginas a las que se llega",
         "domainMcp": "Servidores MCP que has conectado",
-        "domainPublish": "Publicar para todos"
+        "domainPublish": "Publicar para todos",
+        "domainParty": "Compartir con partes externas"
       },
       "deviceAuth": {
         "title": "Autorización de dispositivo",

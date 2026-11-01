@@ -28,6 +28,8 @@
  *   const cls = await classifyExposure(ctx, ownerGhii, found);
  *   const c = cls.items.get(item);   // undefined: classification is off where the item lives
  * @version-history
+ *   v1.0.1 — 2026-11-01 — An item at the level `named` (an outside party) is held to no cap (plan
+ *     doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-18 — Initial (plan doc-mvdipuyqraas, L4.1).
  */
 import type { ContentLabelTarget } from '../../storage/interface.js';
@@ -132,7 +134,9 @@ export async function classifyExposure(ctx: ExposureContext, ownerGhii: string, 
         label: label.id, name: label.name, color: label.color, from: e?.from ?? 'own', max_audience: cap, conflict: false,
       };
       out.items.set(f, c);
-      if (!capAllows(cap, storedLevel(ctx.config, f.level))) over.push({ f, c });
+      // An item with content is a record, a file or an entry, never a named share (`named` carries no
+      // content address, ./sources-parties.ts), so its level is one a cap names.
+      if (f.level !== 'named' && !capAllows(cap, storedLevel(ctx.config, f.level))) over.push({ f, c });
     }
     if (!over.length) continue;
     const rankOf = (id: string) => labelById(policy, id)?.rank ?? -1;

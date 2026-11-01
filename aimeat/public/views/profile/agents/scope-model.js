@@ -18,6 +18,8 @@
  *   const checked = expandScopes(agent.default_scopes ?? ['*']);
  *   await save(collapseScopes(checked));
  * @version-history
+ *   2026-11-01 — party:manage, outside every wildcard: outside parties and the named shares to them
+ *     (plan doc-mvwxcas3dom3, D2.7).
  *   2026-10-29 — agent:permissions-add, outside every wildcard: adding permissions it holds to another
  *     of the owner's agents (wish-omistajan-ai-voi-lis-t-agenttien-oikeuksia-kun-omistaja-niin).
  *   2026-10-18 — publish:public, outside every wildcard: making something public without a request to
@@ -199,6 +201,11 @@ export const NOT_IN_WILDCARD = [
   // Adding permissions to another of the owner's agents, from the ones this agent holds itself
   // (src/services/agent-scope-add.ts). Only the owner gives it, here, because no agent may pass it on.
   'agent:permissions-add',
+  // ── Added 2026-11-01 ─────────────────────────────────────────────────────────────────────────
+  // Giving a person or a program with no account here a key, and sharing a data package with it
+  // (src/services/parties/). A key handed to a stranger reads from outside the node, so it costs its
+  // own tick (plan doc-mvwxcas3dom3, D2.7).
+  'party:manage',
 ];
 
 /**
@@ -323,6 +330,9 @@ export const SCOPE_DOMAINS = [
   // publish:public — make something public without a request to the owner (plan doc-mvcn6c7e4e5q,
   //   V4.1). Outside every wildcard (NOT_IN_WILDCARD above).
   { key: 'publish',  permissions: ['public'] },
+  // party:manage — make outside parties (people and programs with no account here), give them keys,
+  //   and share a data package with one (plan doc-mvwxcas3dom3, D2.7). Outside every wildcard.
+  { key: 'party',    permissions: ['manage'] },
 
   // ── Added 2026-08-10 (August 2026 audit, step 3a) ────────────────────────────────────────────
   // These name things an agent could already do with no permission at all, because the MCP surface

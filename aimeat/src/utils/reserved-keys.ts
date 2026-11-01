@@ -15,11 +15,14 @@
  *   (services/ecosystem-access.ts). See
  *   docs/coding-guidelines/security-development-dna.md invariant #2.
  * @structure RESERVED_OWNER_KEY_PREFIXES · isReservedServerKey(key) ·
- *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · SERVICE_OWNED_KEY_PREFIXES ·
+ *   SERVER_WRITTEN_KEYS · SERVER_WRITTEN_KEY_PREFIXES · SERVICE_OWNED_KEY_PREFIXES · SERVICE_OWNED_KEYS ·
  *   isServiceOwnedKey(key) · isServerWrittenKey(key) · serverWrittenKeyRefusal(key) ·
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-01 -- SERVICE_OWNED_KEYS, exact service-owned keys: `parties`, the owner's outside parties and
+ *     their key hashes, and the prefix `party-reads.`, their read log; only services/parties/ writes
+ *     either (plan doc-mvwxcas3dom3, D2, D3.5). Both are new, so nothing wrote them through the memory API.
  *   2026-11-01 -- `dataproducts.` is reserved and service-owned: a data product definition, which a
  *     schedule acts on; only services/dataproduct/ writes it (plan doc-mvwxcas3dom3, D9).
  *   2026-10-31 -- `datapkg-audience.` is service-owned: who reads a data package, written only by the data
@@ -430,7 +433,21 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.', 'party-reads.'];
+
+/**
+ * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
+ * writes, deletes or restores them, for any principal.
+ *
+ * `parties` (2026-11-01, plan doc-mvwxcas3dom3 D2) is the owner's outside parties and the SHA-256 of
+ * each party's keys (services/parties/). Every party read compares a presented key with it, so a
+ * principal that could write it could give itself a key to every share the owner made. The party
+ * service writes it, on its version; people read and change it through /v1/parties and aimeat_party.
+ * Its sibling `party-reads.<yyyy-mm>`, the read log, is a prefix above: a principal that could write it
+ * could erase the record of who read the owner's data. An exact key rather than a prefix because the
+ * collection is one record (lead decision L3), and `parties.x` is an ordinary key.
+ */
+export const SERVICE_OWNED_KEYS: readonly string[] = ['parties'];
 
 /** Where each service-owned record is read and changed instead of a memory route. */
 const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
@@ -449,6 +466,8 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['mcp.tasks.', 'an MCP task, and only the MCP server writes it. Read it with tasks/get over MCP 2026-07-28.'],
   ['commerce.platform-fee.', 'the operator\'s fee on a money sale, and only the checkout writes it. The operator reads the totals on GET /v1/admin/dashboard.'],
   ['dataproducts.', 'a data product definition, and only the data product service writes it. Read and change it with /v1/dataproducts/{name} or the aimeat_dataproduct MCP tool.'],
+  ['party-reads.', 'the read log of your outside parties, and only the party service writes it. Read it with GET /v1/parties/{name}/reads or the aimeat_party MCP tool (action reads).'],
+  ['parties', 'your outside parties and their keys, and only the party service writes it. Read and change them with /v1/parties or the aimeat_party MCP tool.'],
   ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
   ['datapkg-audience.', 'who reads a data package, and only the data package service writes it. Publish with POST /v1/datapackages or the aimeat_datapackage_publish MCP tool, which takes the visibility.'],
   ['living-spend-hold.', 'whether a living document may refresh itself with your AI, and only the node writes it. You allow it with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
@@ -469,7 +488,8 @@ export function isOwnerRemovableServiceKey(key: unknown): boolean {
 
 /** True iff `key` is owned by one service and no memory route writes, restores or deletes it. */
 export function isServiceOwnedKey(key: unknown): boolean {
-  return typeof key === 'string' && SERVICE_OWNED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
+  return typeof key === 'string'
+    && (SERVICE_OWNED_KEYS.includes(key) || SERVICE_OWNED_KEY_PREFIXES.some((prefix) => key.startsWith(prefix)));
 }
 
 /**

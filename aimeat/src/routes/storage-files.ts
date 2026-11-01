@@ -11,6 +11,10 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-01 -- GET /v1/pub takes an outside party on a data package's own files (routes/pub-party-read.ts):
+ *     HTTP Basic or a party token, admitted by its named share to that package only; anything else it
+ *     asks for is 404. DELETE /v1/storage/{*key} moved by pure extraction to routes/storage-files-delete.ts
+ *     (800-line limit) (plan doc-mvwxcas3dom3, D3.2).
  *   2026-11-01 -- GET /v1/pub answers 410 GONE for a withdrawn data package's own file to a reader its
  *     audience admits (services/datapackage/withdraw.ts; plan doc-mvwxcas3dom3, D0.3).
  *   2026-11-01 -- GET /v1/pub reads a data package's own file (the pointer, a descriptor, a resource
@@ -178,7 +182,7 @@ import { callerOf } from '../middleware/caller.js';
 import { denyScope403 } from '../auth/deny.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import {
-    writeStorageFile, mintStorageUploadUrl, removeStorageFile, changeStorageFileVisibility, type StorageProvenanceInput,
+    writeStorageFile, mintStorageUploadUrl, changeStorageFileVisibility, type StorageProvenanceInput,
 } from '../services/storage-file-write.js';
 import { storageProvenanceFromBody, uploadProvenanceBlock } from './storage-provenance-input.js';
 import { loadServedProvenance, setProvenanceHeaders, provenanceItemBlock, type ServedProvenance } from '../services/ai-provenance-marks.js';
@@ -197,6 +201,8 @@ import { sharedPageAdmitsFile } from './organisms/share-file-pass.js';
 import { uploadVisibilityOf, isAppGrantRoles } from '../services/content-defaults.js';
 import { ownExtensionFileKey } from '../services/component-address.js';
 import { storageFilesListRouter, storePlaceOf } from './storage-files-list.js';
+import { storageDeleteRouter } from './storage-files-delete.js';
+import { partyPubReader } from './pub-party-read.js';
 
 export function storageFilesRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -499,7 +505,12 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         // A data package's own file is read on the package's audience (services/datapackage/file-read.ts):
         // an organism or private package's files are stored at 'private', which the tier rules below
         // open to nobody but a consent holder, so a member following the descriptor read nothing.
-        const pkg = await packageFileVerdict(storage, gaii, key, req.auth);
+        // An outside party reads the files of a package shared with it, and nothing else (routes/pub-party-read.ts).
+        const party = await partyPubReader(req, res, { storage, config }, gaii, key);
+        if (party === null) return;
+        const pkg = await packageFileVerdict(storage, gaii, key, party === 'none' ? req.auth : party.reader);
+        if (party !== 'none' && pkg.kind !== 'open') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
+        if (party !== 'none') party.served();
         if (pkg.kind === 'withdrawn') { res.status(410).json(error(config.nodeId, 'GONE', withdrawnMessage(key.split('/')[1], pkg.withdrawnAt))); return; }
         if (pkg.kind === 'open' && file.visibility !== 'public') {
             if (await hiddenFromCaller()) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Public file not found')); return; }
@@ -773,24 +784,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
     });
 
-    // DELETE /v1/storage/{*key} — delete file (agent auth)
-    // The key fence, the existence and ownership checks and the change events are the shared delete
-    // (services/storage-file-write.ts), which aimeat_storage_delete calls too. This handler parses
-    // the request and renders the answer.
-    router.delete('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:write'), async (req, res) => {
-        const gaii = resolve(req);
-        const key = extractKey(req.params);
-
-        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
-        if (!removed.ok) {
-            res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
-            return;
-        }
-
-        res.json(success(config.nodeId, {
-            deleted: true, key: removed.key, size: removed.size, mime_type: removed.mimeType,
-        }));
-    });
+    // DELETE /v1/storage/{*key} — delete file (agent auth). → routes/storage-files-delete.ts
+    router.use(storageDeleteRouter(config, storage));
 
     return router;
 }

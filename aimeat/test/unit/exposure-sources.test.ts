@@ -10,6 +10,7 @@
  *   classification reader hides is counted and not listed.
  * @usage cd aimeat && pnpm exec vitest run test/unit/exposure-sources.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The kinds named_share and outside_party (plan doc-mvwxcas3dom3, D3).
  *   v1.0.0 — 2026-10-17 — Initial (plan doc-mvcn6c7e4e5q, V6.1).
  */
 import { describe, it, expect } from 'vitest';
@@ -23,7 +24,7 @@ import type { ContentReader } from '../../src/services/classification/reader.js'
 /** The kinds the report promises, written out here so a change to KINDS shows in this file's diff. */
 const EXPECTED_KINDS = [
   'memory', 'file', 'app', 'workspace_share', 'organism', 'board', 'knowledge', 'package',
-  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent',
+  'datapackage', 'skill', 'portfolio', 'company', 'exchange', 'agent', 'named_share', 'outside_party',
 ];
 
 describe('the exposure registry', () => {
@@ -68,6 +69,7 @@ function stubStorage(memory: number, broken: string[] = []): Storage {
     getOrganism: null, listBoards: [], getMemory: null, listPackages: { packages: [], total: 0 },
     listStorageFiles: [], getStorageFile: null, listCompanies: [], listAllMemory: { items: [], total: 0 },
     listSubdomainSites: [], listGHIIs: [], getAgentsByOwners: {}, listMemoryForOwners: [],
+    listConsents: [],
   };
   return new Proxy({}, {
     get: (_t, name: string) => async () => {
@@ -83,7 +85,7 @@ describe('buildExposureReport', () => {
     const report = await buildExposureReport(createExposureContext(stubStorage(EXPOSURE_ITEM_CAP + 20), config), 'alice', SEES_ALL);
     expect(report.failed).toEqual([]);
     expect(report.capped).toEqual(['memory']);
-    expect(report.counts.by_kind.memory).toEqual({ public: EXPOSURE_ITEM_CAP + 20, link: 0, 'signed-in': 0, organism: 1 });
+    expect(report.counts.by_kind.memory).toEqual({ public: EXPOSURE_ITEM_CAP + 20, link: 0, 'signed-in': 0, organism: 1, named: 0 });
     expect(report.items.filter(i => i.kind === 'memory')).toHaveLength(EXPOSURE_ITEM_CAP);
     expect(report.items.some(i => i.id === 'notes.secret')).toBe(false);
     expect(report.owner).toBe(`alice@${NODE}`);
@@ -108,7 +110,7 @@ describe('buildExposureReport', () => {
   it('lists public as signed-in on a node that shows its content to its own accounts only, and says why', async () => {
     const closedNode = { ...config, contentAccess: 'signed-in' } as unknown as AimeatConfig;
     const report = await buildExposureReport(createExposureContext(stubStorage(2), closedNode), 'alice', SEES_ALL);
-    expect(report.counts.by_level).toEqual({ public: 0, link: 0, 'signed-in': 2, organism: 1 });
+    expect(report.counts.by_level).toEqual({ public: 0, link: 0, 'signed-in': 2, organism: 1, named: 0 });
     expect(report.notes[0]).toBe(NODE_SIGNED_IN_NOTE);
   });
 

@@ -16,6 +16,12 @@
  *   - the refusal path itself (deny401/deny403 and the audit context) lives in ./deny.ts
  *
  * @version-history
+ *   2026-11-01 — optionalAuth recognises an outside party's token by its prefix (aimeat_party_,
+ *     services/parties/token.ts) and never turns it into req.auth: on an endpoint that takes a party
+ *     (PARTY_TOKEN_ROUTES) it is left to that endpoint's verifier with no anonymous identity, and on any
+ *     other endpoint it is answered 401 invalid_token (plan doc-mvwxcas3dom3, lead decision L2). The
+ *     narrowest of the three ways the brief named: a distinct scheme would leave anonymous mode filling
+ *     req.auth, and a verify in this middleware would put party facts on every request.
  *   2026-10-25 — maybeSetPatBrowserSession reads the refresh cookie by the node's config, so on https it
  *     sets `__Host-aimeat_rt` when only the old name is present (secaudit2026oct22,
  *     refresh-cookie-unprefixed-first-match).
@@ -146,6 +152,7 @@ import { credentialRevoked } from './credential-revoked.js';
 import { withCurrentScopes } from './effective-scopes.js';
 import { noteScopeUse } from '../services/scope-use.js';
 import { getAnonymousCredentials, isAnonymousMode, registerSessionAuth, sessionConfig, sessionStorage } from './node-auth.js';
+import { PARTY_TOKEN_PREFIX, takesPartyToken } from '../services/parties/contract.js';
 
 export { enableAnonymousAuth, isAnonymousMode, getAnonymousCredentials } from './node-auth.js';
 
@@ -306,6 +313,16 @@ export function optionalAuth(opts: OptionalAuthOptions = {}) {
   };
   return async (req: Request, res: Response, next: NextFunction) => {
     const token = extractToken(req);
+    // AN OUTSIDE PARTY'S TOKEN IS NEVER A SESSION (plan doc-mvwxcas3dom3, lead decision L2). It is a
+    // purpose token with its own prefix (services/parties/token.ts), so it is recognised here without a
+    // signature check. On an endpoint that takes a party (PARTY_TOKEN_ROUTES) it is left to that
+    // endpoint's own verifier: no req.auth, and no anonymous identity either, so a refused party is
+    // never read as the anonymous reader. Everywhere else it is a credential this node refuses, 401.
+    if (token && token.startsWith(PARTY_TOKEN_PREFIX)) {
+      if (takesPartyToken(req.method, req.path)) { next(); return; }
+      refuse(req, res, 'A party access token reads only the data shared with the party: the data package, OData and file reads and /v1/parties/me. It is not a sign-in to this server.');
+      return;
+    }
     if (token) {
       // A CREDENTIAL THAT WAS PRESENTED AND REFUSED IS ANSWERED 401 ON EVERY ROUTE (QA audit F1-01).
       // It used to leave req.auth unset and let the request go on, so a route without requireAuth()

@@ -28,6 +28,8 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — openPackage names the package to datapackageReadable, so an outside party's reader opens
+ *     the package its share names; its rows pass the classification reader as no account (plan D3.2).
  *   2026-11-01 — publishPackage takes `{ dryRun: true }`: every check runs and the version is built,
  *     nothing is stored and no provenance record is made; a data product preview reads it (plan
  *     doc-mvwxcas3dom3, D9.4). ProducedBy.kind may be 'dataproduct'.
@@ -577,7 +579,7 @@ export async function openPackage(
     const pointerFile = await deps.storage.getStorageFile(ownerGhii, latestKey(name));
     const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
     const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
-    if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader))) return null;
+    if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader, name))) return null;
     // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
     if (pointer?.status === 'withdrawn') return null;
 
@@ -661,7 +663,11 @@ async function loadResourceRows(
     // The classification reader GET /v1/pub runs on the same CSV (routes/storage-files.ts): a label
     // that hides the file from this reader, or ranks above an agent's clearance, hides its rows too,
     // and the read answers as a missing resource, as /v1/pub answers 404.
-    const [shown] = await readerFor(deps, reader?.sub ? reader as ReaderAuth : null).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
+    // An outside party reads as a principal of no account and no recognised role, which classification
+    // reads the stricter way (services/classification/reader-kind.ts): a label that keeps content inside
+    // the owner's account or an organism hides it from the party too.
+    const asReader = reader?.party ? { sub: reader.sub ?? '', owner: '', roles: ['party'] } : reader?.sub ? reader as ReaderAuth : null;
+    const [shown] = await readerFor(deps, asReader).show([file], () => fileTarget(parsed.ownerGhii, key, file.workspaceRef));
     if (!shown) return null;
     return { all: fromCsv(shown.data, res.schema), res };
 }
