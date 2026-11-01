@@ -33,13 +33,14 @@
  * @structure OpenRouterRegion · RegionFallback · REGION_HOSTS · regionBaseUrl · RegionMode ·
  *   regionModeOf · regionSettingsOf · freeModelOf · freeLastResortOf · EU_ONLY_TEXT_MODEL ·
  *   allowedRegions · RegionChoice · regionChoiceFor · RegionModels · regionModels · regionModelIds ·
- *   RegionNeeds · RegionDecision · decideRegion · euOnlyModelFor · nodeTextModel · regionsInUse · REGION_MODE_LIMITS ·
+ *   RegionNeeds · RegionDecision · decideRegion · euOnlyModelFor · nodeTextModel · nodePictureModel · regionsInUse · REGION_MODE_LIMITS ·
  *   REGION_COUNTRY · regionView · regionDeclaration · resetRegionModelsForTests
  * @usage
  *   const choice = regionChoiceFor(config, rules, candidate.keyScope);
  *   const d = await decideRegion(config, choice, model);
  *   if (!d.ok) reject(d.message); else target.baseUrl = d.baseUrl;
  * @version-history
+ *   v1.2.1 — 2026-11-01 — nodePictureModel: the statement names the model that reads pictures when it is not the text model.
  *   v1.2.0 — 2026-11-01 — nodeTextModel: the statement names the node's default model for the chat and
  *     the agents, and eu-only's stand-in (Jouni, 2026-11-01 02.54).
  *   v1.1.0 — 2026-11-01 — ai.region_mode (eu, eu-only, own) decides the region settings; a region's
@@ -66,6 +67,15 @@ import { resolveModelFor } from '../ai-model-defaults.js';
 export function nodeTextModel(config: AimeatConfig): string | undefined {
   return resolveModelFor(config, undefined, 'chat') ?? resolveModelFor(config, undefined, 'execution')
     ?? resolveModelFor(config, undefined, 'reasoning');
+}
+
+/**
+ * The model that reads a picture when the node sets one of its own (its vision default) and it is not
+ * the text model; undefined otherwise, when a picture goes to the text model (services/ai/completion.ts).
+ */
+export function nodePictureModel(config: AimeatConfig): string | undefined {
+  const vision = resolveModelFor(config, undefined, 'vision');
+  return vision && vision !== nodeTextModel(config) ? vision : undefined;
 }
 
 export type OpenRouterRegion = 'eu' | 'us' | 'any';
@@ -376,6 +386,7 @@ export function regionDeclaration(config: AimeatConfig): Record<string, unknown>
       // The model behind the chat and the agents when nobody chose one (Jouni, 2026-11-01 02.54: the
       // customer-visible text and the records name the model and the region).
       default_model: model ?? null,
+      ...(nodePictureModel(config) ? { picture_model: nodePictureModel(config) } : {}),
       ...(mode === 'eu-only' ? { eu_only_model: EU_ONLY_TEXT_MODEL } : {}),
       region: settings.region, host: REGION_HOSTS[settings.region], fallback: settings.fallback,
       regions_in_use: regionsInUse(config).map(r => ({ region: r, host: REGION_HOSTS[r], country: REGION_COUNTRY[r] })),
