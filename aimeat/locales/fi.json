@@ -5785,6 +5785,47 @@
       "parties": "Osapuolet",
       "partiesSub": "ei tiliä täällä"
     },
+    "close": {
+      "package": "Muuta se yksityiseksi: {route}, tai vedä versio pois työkalulla {tool}.",
+      "market-listed": "Poista se markkinoilta: {route}. Poista sitten tietue työkalulla {tool} (avain {key}).",
+      "market-record": "Poista tietue työkalulla {tool} (avain {key}; {route}).",
+      "need-open": "Sulje se: {route}. Poista sitten tietue työkalulla {tool} (avain {key}).",
+      "agent": "Poista se julkisesta agenttilistasta työkalulla {tool}: lisää sen tunnisteisiin \"{tag}\" ({route}).",
+      "named-share": "Päätä jako työkalulla {tool} (consent_id {id}; {route}). Seuraava luku estetään. Jo ladatut kopiot jäävät osapuolelle.",
+      "party": "Pysäytä osapuoli työkalulla {tool}, toiminto \"stop\" ({stop}), tai poista se toiminnolla \"delete\" ({remove}). Poisto päättää heti sen avaimet, tunnukset ja jaot.",
+      "app-public": "Poista sovellus kaikista listoista työkalulla {tool} (toiminto \"settings\", listing \"unlisted\") ja valitse siellä, kuka saa avata sen: open_to \"signed-in\" tai \"organism:<id>\", tai pääsykoodi access_code ({route}). {remove} poistaa sovelluksen.",
+      "app-narrow": "Valitse työkalulla {tool} (toiminto \"settings\"), kuka saa avata sovelluksen: open_to \"organism:<id>\" yhdelle yhteiselle paikalle, tai pääsykoodi access_code, jolloin vain koodin tietävät avaavat sen ({route}). {remove} poistaa sovelluksen.",
+      "app-internet": "Sovellus on avoinna kaikille internetissä {date} asti avauksella, jolla on oma syy ja historia. Sulje avaus työkalulla {tool} ({route}). Sen jälkeen sovellus näkyy taas vain kirjautuneille.",
+      "workspace-page": "Lopeta sivun jakaminen työkalulla {tool} ({args}) tai pyynnöllä {route}.",
+      "organism": "Muuta yhteinen paikka yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\" ({route}).",
+      "organism-members": "Näytä jäsenlista vain kirjautuneille: {route}.",
+      "board": "Sulje taulu: {route}, tai poista se työkalulla {remove}.",
+      "portfolio-public": "Valitse työkalulla {tool}, kuka saa avata sivun (access \"signed-in\" tai \"organism:<id>\"), tai sulje sivu: {route}.",
+      "portfolio-narrow": "Sulje sivu: {route}, tai rajaa työkalulla {tool}, kuka saa avata sen (access \"organism:<id>\").",
+      "company": "Valitse työkalulla {tool}, kuka saa avata sivun (access \"signed-in\" tai \"organism:<id>\"), tai lopeta yrityksen osoitteen palvelu valinnalla kind \"none\" ({route}).",
+      "memory": "Muuta tietue yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\" ({route}), tai poista se työkalulla {remove} ({removeRoute}).",
+      "file": "Muuta tiedosto yksityiseksi: {route}, tai poista se työkalulla {remove} ({removeRoute}).",
+      "knowledge-package": "Poista paketti luettelosta: {route}. {remove} avaimelle {key} poistaa sen.",
+      "knowledge-entry": "Muuta merkintä yksityiseksi: {route}, tai työkalulla {tool} ja näkyvyydellä \"private\".",
+      "knowledge-record": "Muuta merkintä yksityiseksi työkalulla {tool} ja näkyvyydellä \"private\", tai poista se työkalulla {remove}.",
+      "skill": "Muuta taito vain omaksesi työkalulla {tool} ja näkyvyydellä \"owner\" ({route}).",
+      "datapackage": "Vedä datapaketti pois työkalulla {tool} ja viitteellä \"{ref}\" ({route}): jokainen luku saa vastauksen 410, ja paketti poistuu luettelosta. Lisää ?purge=true, jos haluat poistaa myös sen tiedostot. Jos haluat vain rajata lukijoita, julkaise paketti uudelleen näkyvyydellä \"private\"."
+    },
+    "titles": {
+      "offering": "Tarjous: {name}", "offering-off": "Tarjous: {name} (pois markkinoilta, tietue on yhä luettavissa)",
+      "need": "Tarve: {name}", "need-closed": "Tarve: {name} (suljettu, tietue on yhä luettavissa)",
+      "members": "Paikan {name} jäsenet", "portfolio": "Tervetulosivusi", "stored-by": "{name} (tallentaja {holder})"
+    },
+    "notes": {
+      "signed-in-node": "Tämä palvelin näyttää sisältönsä vain omille kirjautuneille tileilleen (ylläpitäjän asetus). Siksi mikään tässä ei ole auki tuntemattomille eikä pelkän linkin haltijalle: se, mikä muuten olisi julkista, näkyy listassa kirjautuneille avoimena, ja mitä nyt muutat julkiseksi, tallentuu kirjautuneille. Ainoa poikkeus on internetiin avattu sovellus lomakkeineen: se näkyy julkisena, kunnes avaus päättyy.",
+      "presigned": "Listassa ei ole latausosoitetta, joka on tehty yhden tiedoston jakamista varten (esiallekirjoitettu linkki). Se vanhenee itsestään, ja annoit sen jollekulle tarkoituksella.",
+      "access-code": "Listassa ei ole sovellusta, jolla on pääsykoodi, ylläpitäjän piilottamaa sovellusta eikä salasanan takana olevaa työtilan jakoa: tuntematon tarvitsee myös koodin tai salasanan.",
+      "named-readers": "Listassa eivät ole jakoryhmät, työtilojen jäsenluettelot eivätkä työtilaan jaetut tietueet: jokainen niistä nimeää lukijansa.",
+      "workspace-page": "Jaettu työtilan sivu lasketaan sellaisena kuin nimetön kävijä sen saa. Se näkyy työtilan luojalle sekä yhteisen paikan luojalle, omistajille ja ylläpitäjille, koska jokainen heistä voi sulkea sen.",
+      "market-record": "Vaihdannan tarjous tai tarve jää julkiseksi tietueeksi, kun se poistuu markkinoilta. Se lasketaan, kunnes tietue poistetaan.",
+      "item-cap": "Jokaisesta lajista listataan enintään {n} kohdetta. Luvuissa on mukana kaikki löydetty.",
+      "store-limit": "Osa listoista luetaan tallennuksen rajaan asti: vaihdannan tarjoukset ja tarpeet (kumpiakin 5000 tällä palvelimella) ja yhden jaetun työtilan tilan tietueet (5000)."
+    },
     "named": {
       "sharesTitle": "Nimetyt jaot", "sharesSub": "datatuote yhdelle ihmiselle tai ohjelmalle tiettyyn päivään asti",
       "sharesEmpty": "Et ole jakanut mitään nimetylle.",

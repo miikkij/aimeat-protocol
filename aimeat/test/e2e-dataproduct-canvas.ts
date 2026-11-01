@@ -5,8 +5,9 @@
  * @description E2E for the data product capabilities the "Data ulos" canvas shows and WP9a could not
  *   (WP9c, plan doc-mvwxcas3dom3 D9).
  *   Run when a source changes (board Vaihe4, "Kun lähde muuttuu"): a product with `schedule: { on:
- *     'change' }` makes no schedule record and runs after a change of its memory key, its stored file
- *     and its source data package, at most once in five minutes (a second change waits); its freshness
+ *     'change' }` makes no schedule record and runs after a change of its memory key, its stored file,
+ *     its source data package and its workspace records space (another account cannot define one over
+ *     that space), at most once in five minutes (a second change waits); its freshness
  *     follows its newest run and its sources, not a clock; an extension source is refused with
  *     NO_CHANGE_SIGNAL; another account's write of the same key name runs nothing; a deleted product
  *     runs no more.
@@ -19,6 +20,7 @@
  *   Each assertion reads a field or a behaviour that did not exist before WP9c (`on` was not a schedule
  *   field, and nothing ran on a change).
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A published record of a workspace records space runs the product built from it (WP9c, lead's addition).
  *   v1.0.0 — 2026-11-01 — Initial (WP9c).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=dataproduct-canvas
@@ -189,6 +191,42 @@ async function main() {
     await test('on change: B cannot define a change product over A\'s private record', async () => {
         const d = await define(B.token, N('steal'), { sources: [{ kind: 'memory', key: 'dpc.towns', owner: A.name }], schedule: { on: 'change' } });
         assert(d.status === 403, `refused: ${show(d)}`);
+    });
+
+    await test('on change: a record published in a workspace records space runs the product built from it', async () => {
+        const org = await call('/v1/organisms', { token: A.token, body: { name: `Dpc Org ${stamp}`, type: 'project', join_policy: 'approval_required', visibility: 'private' } });
+        assert(org.status === 201, `organism: ${show(org)}`);
+        const orgId = org.body.data.organism.id as string;
+        const w = await call(`/v1/organisms/${orgId}/workspaces`, { token: A.token, body: { name: 'Signals', manifest: {
+            manifestVersion: '1', name: 'Signals', kind: 'project',
+            objectTypes: [{ name: 'signal', namespace: 'shared.signals', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:signal@1' }],
+        }, schemas: { 'shared.signals': { type: 'object', additionalProperties: true, properties: { id: { type: 'string' }, kunta: { type: 'string', description: 'The municipality' }, signaali: { type: 'integer' } } } } } });
+        assert(w.status === 201 || w.status === 200, `workspace: ${show(w)}`);
+        const ws = w.body.data.ws as string;
+        const publish = async (id: string, kunta: string, signaali: number) => {
+            const dr = await call(`/v1/organisms/${orgId}/workspace/drafts`, { token: A.token, body: { ws, space: 'signal', id, value: { kunta, signaali } } });
+            assert(dr.status === 200, `draft ${id}: ${show(dr)}`);
+            const p = await call(`/v1/organisms/${orgId}/publish`, { token: A.token, body: { ws, namespace: 'shared.signals', id } });
+            assert(p.status === 200, `publish ${id}: ${show(p)}`);
+        };
+        await publish('s1', 'Espoo', 3);
+        await publish('s2', 'Vantaa', 5);
+        const src = { kind: 'records', organism_id: orgId, ws, space: 'signal' };
+        // Another account, no member of the organism, cannot make a change product of the space.
+        const theirs = await define(B.token, N('recx'), { sources: [src], schedule: { on: 'change' } });
+        assert(theirs.status === 403 || theirs.status === 404, `B refused: ${show(theirs)}`);
+        const d = await define(A.token, N('rec'), { visibility: `organism:${orgId}`, sources: [src], schedule: { on: 'change' } });
+        assert(d.status === 201, `define: ${show(d)}`);
+        const r = await run(A.token, N('rec'));
+        assert(r.status === 201 && r.body.data.rows === 2, `first run: ${show(r)}`);
+        const first = r.body.data.content_hash as string;
+        await publish('s3', 'Oulu', 1);
+        const h = await newVersion(A.token, N('rec'), first);
+        assert(h, 'a new version of the records product within 45 s');
+        const rows = await call(`/v1/datapackages/${A.name}/${N('rec')}/rows/rows?limit=10`, { token: A.token });
+        assert((rows.body.data?.rows ?? []).length === 3 && (rows.body.data.rows as Body[]).some(x => x.kunta === 'Oulu'), `three rows: ${show(rows)}`);
+        const got = await call(`/v1/dataproducts/${N('rec')}`, { token: A.token });
+        assert(got.body.data.definition.lastRun?.ok === true && got.body.data.definition.lastRun.rows === 3, `one run followed: ${JSON.stringify(got.body.data.definition.lastRun)}`);
     });
 
     // ── Step 2: each column's description from the source's own schema ──
