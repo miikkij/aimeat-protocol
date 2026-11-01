@@ -40,6 +40,9 @@
  *   const out = await createScheduleRecord({ storage, config, scheduler }, caller, body);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-01 — The `dataproduct` kind: create and edit check that input.name names a data product
+ *     definition of the owner (services/dataproduct/schedule-input.ts); only the name is stored (plan
+ *     doc-mvwxcas3dom3, D9.5).
  *   2026-10-31 — Create asks schedules.min_interval_seconds and schedules.max_per_owner, and an edit
  *     that gives a new time asks the first (services/schedule-load-limits.ts; secaudit2026oct31w2
  *     round 10, f-2026aug-dos-ratelimit-2). A schedule that exists keeps its time.
@@ -109,6 +112,7 @@ import { instructionHoldNeeded, holdInstruction, clearInstructionHold } from './
 import { getActiveScheduler, type Scheduler, type JobOutcome } from './scheduler.js';
 import { withSchedulePrompt } from './schedule-prompt.js';
 import { checkRefineryScheduleInput, refineryRunAs } from './refinery/schedule-input.js';
+import { checkDataproductScheduleInput } from './dataproduct/schedule-input.js';
 
 /** Fields an edit may change without changing what the schedule does: no word is asked for these. */
 const QUIET_EDIT_FIELDS: ReadonlySet<string> = new Set(['enabled', 'display_name', 'description', 'purpose']);
@@ -401,6 +405,10 @@ export async function createScheduleRecord(
         const bad = await checkRefineryScheduleInput(storage, owner, runAs, body.input);
         if (bad) return { ok: false, ...bad };
     }
+    if (kind === 'dataproduct') {
+        const bad = await checkDataproductScheduleInput(storage, owner, body.input);
+        if (bad) return { ok: false, ...bad };
+    }
 
     const cron = typeof body.cron === 'string' ? body.cron : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
@@ -560,6 +568,9 @@ export async function createScheduleRecord(
     } else if (kind === 'refinery') {
         // Only the prefix: the definition lives in the owner's memory, where the app edits it.
         base.input = { prefix: String((body.input as { prefix?: unknown }).prefix).trim() };
+    } else if (kind === 'dataproduct') {
+        // Only the name: the definition is the owner's dataproducts.<name> (services/dataproduct/).
+        base.input = { name: String((body.input as { name?: unknown }).name).trim() };
     }
 
     const created = await storage.createScheduledJob(base);
@@ -636,6 +647,11 @@ export async function updateScheduleRecord(
             const bad = await checkRefineryScheduleInput(storage, job.ownerScope ?? ownerScope, refineryRunAs(job), patch.input);
             if (bad) return { ok: false, ...bad };
             patch = { ...patch, input: { prefix: String((patch.input as { prefix: string }).prefix).trim() } };
+        }
+        if (job.type === 'dataproduct') {
+            const bad = await checkDataproductScheduleInput(storage, job.ownerScope ?? ownerScope, patch.input);
+            if (bad) return { ok: false, ...bad };
+            patch = { ...patch, input: { name: String((patch.input as { name: string }).name).trim() } };
         }
         // Same rule as create for an `ai` job's input namespaces, and for the same reason: a gate that
         // only runs on create is walked around by editing the schedule afterwards.

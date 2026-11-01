@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-01 — The data package and OData mounts moved to routes-loader-data.ts, which mounts the data product routes beside them (plan doc-mvwxcas3dom3, D9).
  *   2026-10-29 — fileStoreRouter (routes/file-store.ts): where stored files keep their bytes, the node's and a person's own.
  *   2026-10-25 — internetOpeningRouter (routes/internet-opening.ts): one app opened to the internet on a closed node.
  *   2026-10-25 — goalsRouter: agent goals (session cc-jouni-goals).
@@ -158,8 +159,7 @@ import { mountOutboundRouters } from './routes-loader-outbound.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
-import { dataPackagesRouter } from '../routes/datapackages.js';
-import { odataRouter } from '../routes/odata.js';
+import { mountDataRouters } from './routes-loader-data.js';
 import { validateRouter } from '../routes/validate.js';
 import { unfurlRouter } from '../routes/unfurl.js';
 import { mcpRouter } from '../mcp/index.js';
@@ -587,14 +587,7 @@ export async function mountRoutes(
   app.use(flagsRouter(config, storage));
   app.use(appealsRouter(config, storage));
   app.use(storageFilesRouter(config, storage), fileStoreRouter(config, storage));
-  // Data packages: the publish/validate/read door onto services/datapackage/. The CANONICAL
-  // address of a package is the /v1/pub storage URL these routes hand back; this is where a
-  // producer writes one and where "the newest version" gets resolved.
-  app.use(dataPackagesRouter(config, storage));
-  // The OData v4 feed for a package. A core route because an extension cannot serve one: the
-  // extension surface is POST-only behind auth, the sandbox never sees the query string, and the
-  // answer is envelope-wrapped — OData needs GET, query options, XML metadata and a bare body.
-  app.use(odataRouter(config, storage));
+  mountDataRouters(app, config, storage);        // data packages, data products, OData (routes-loader-data.ts)
   app.use(validateRouter(config));
   app.use(unfurlRouter(config));                        // GET /v1/unfurl(/image) — link previews
   app.use(mcpRouter(config, storage, peers));
