@@ -20,6 +20,8 @@
  * @structure SharedData (default) · call · partyFetch · fileOf
  * @usage routed at /v1/shared-data?invite=<code> by spa.html
  * @version-history
+ *   v1.0.1 — 2026-11-01 — A share with no purpose shows terms of its own (recipient.termsNoPurpose), not a
+ *     purpose placeholder inside the purpose sentence (WP10d).
  *   v1.0.0 — 2026-11-01 — Initial (WP9b).
  */
 import { h } from 'preact';
@@ -192,7 +194,9 @@ export default function SharedData() {
             ? html`<${Note}>${r('termsAccepted', { date: fmtDate(view.terms_accepted) })}<//>`
             : termsNeeded
             ? html`<${Check} checked=${accepted || !!got} disabled=${!!got} onChange=${setAccepted}>
-                ${r('terms', { purpose: share.purpose || r('thePurpose'), licence: pkg.licence || r('noLicence'), owner: view.owner_name })}<//>`
+                ${share.purpose
+                    ? r('terms', { purpose: share.purpose, licence: pkg.licence || r('noLicence'), owner: view.owner_name })
+                    : r('termsNoPurpose', { licence: pkg.licence || r('noLicence'), owner: view.owner_name })}<//>`
             : html`<${Note}>${got ? r('termsNone') : r('termsNoneYet')}<//>`}
           ${got ? null : html`<${Actions}>
             <${Loud} control disabled=${busy || (termsNeeded && !accepted)} onClick=${redeem}>${termsNeeded ? r('acceptAndShow') : r('show')}<//>
