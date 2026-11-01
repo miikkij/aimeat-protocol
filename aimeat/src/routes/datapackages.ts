@@ -77,7 +77,7 @@ import { datapackagePublishGate, fileDatapackageAsk } from '../services/datapack
 import { closedNodeWarnings } from '../services/closed-node-level.js';
 import { callerOf } from '../middleware/caller.js';
 import { denyScope403, deny403 } from '../auth/deny.js';
-import { withdrawPackage, withdrawalOfRef, withdrawnMessage, DATAPACKAGE_WITHDRAW_SCOPE } from '../services/datapackage/withdraw.js';
+import { withdrawPackage, withdrawalOfRef, withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
 import { odpsSheetFor, odpsAddress, versionAudienceOf } from '../services/datapackage/odps-read.js';
 import { schemaOrgDataset } from '../services/datapackage/schema-org.js';
@@ -315,12 +315,15 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
      * before any write. The shared anonymous principal is refused with 401 as on the publish.
      */
     // requireScope answers a principal without storage:write before the service; the service asks the
-    // same word again for the MCP tool, which reaches it without this middleware.
-    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope(DATAPACKAGE_WITHDRAW_SCOPE), async (req, res) => {
+    // same word again for the MCP tool, which reaches it without this middleware. The word is a literal
+    // here (it equals DATAPACKAGE_WITHDRAW_SCOPE) because the REST scope scanner reads literals only.
+    router.delete('/v1/datapackages/:owner/:name', requireAuth(), refuseAnonymousPrincipal(), requireScope('storage:write'), async (req, res) => {
         const purge = req.query.purge === 'true' || req.query.purge === '1';
         const out = await withdrawPackage(store, callerOf(req, config.nodeId, storage), req.params.owner as string, req.params.name as string, { purge });
         if (!out.ok) {
-            if (out.code === 'SCOPE_DENIED') { denyScope403(req, res, [DATAPACKAGE_WITHDRAW_SCOPE], out.message); return; }
+            // requireScope above already refused a principal without storage:write, so this branch is the
+            // service's own answer for the MCP path and is not reached from this route in practice.
+            if (out.code === 'SCOPE_DENIED') { deny403(req, res, out.code, out.message); return; }
             if (out.code === 'FORBIDDEN') { deny403(req, res, out.code, out.message); return; }
             res.status(out.status).json(error(config.nodeId, out.code, out.message));
             return;
