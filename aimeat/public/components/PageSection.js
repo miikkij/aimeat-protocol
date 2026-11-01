@@ -5,10 +5,12 @@
  * @description A section of a Settings & Controls tab page: the section title (poster.css
  *   .poster-section-title) with a small mono count or number beside it, the doors on the right, and
  *   the body. Its look is css/components/page-section.css; the catalogue entry is `page-section`.
- * @structure PageSection({ id, num, title, count, doors, first, plain, band, group, ends, children })
+ * @structure PageSection({ id, num, title, count, doors, first, plain, band, group, ends, step, children })
  * @usage html`<${PageSection} id="sec-files" num="02" title="Files" count=${12} doors=${html`<button class="og-door">Upload</button>`}>…<//>`
  *        html`<${PageSection} plain first=${!canEdit}>…<//>` (a section with no headline: the rule on top and the body)
  * @version-history
+ *   2026-11-01 — `step`: one numbered step of a procedure on the page, the number in the ink square
+ *     before the bold title, the body under it (the share link page, board Vastaanottaja; WP9b); additive.
  *   2026-10-18 — A visually hidden ": " between the headline and its count, so a screen reader says
  *     "What is open: 10" instead of "What is open10"; nothing changes on the screen.
  *   2026-10-11 — `ends` (with the default, `band` and `group` cuts): the section shows where it
@@ -46,9 +48,18 @@ const saidApart = () => html`<span class="visually-hidden">: </span>`;
  * `count` wins over `num` beside the title; `first` drops the rule on top.
  * @param {{ id?: string, num?: any, title: any, count?: any, doors?: any, first?: boolean, plain?: boolean,
  *   band?: boolean, group?: boolean, ends?: boolean, chapter?: any, list?: boolean, onFold?: (e: Event) => void, folded?: boolean,
- *   foldLabel?: string, foot?: any, spaced?: boolean, part?: boolean, children?: any }} props
+ *   foldLabel?: string, foot?: any, spaced?: boolean, part?: boolean, step?: boolean, children?: any }} props
  */
-export function PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children }) {
+export function PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, step, children }) {
+  // step (added by WP9b, board Vastaanottaja): one numbered step of a procedure a person follows on
+  // the page, its number in the ink square before the bold title and the body under the title;
+  // `done` would be a later option, so a step says nothing of its state.
+  if (step) {
+    return html`<section class=${`og-sec og-sec--step${first ? ' og-sec--first' : ''}`} id=${id}>
+      <h3 class="og-step-h"><span class="og-step-n" aria-hidden="true">${num}</span><span>${title}</span></h3>
+      <div class="og-step-body">${children}</div>
+    </section>`;
+  }
   // part (added by appcat's dialogs, parity): a part of a dialog's body, the old app catalogue's
   // section.poster-section with its slab title, which the dialog's own sheet sizes and spaces
   // (dialog.css: the slab a size smaller, 1rem under it, 2rem between parts).

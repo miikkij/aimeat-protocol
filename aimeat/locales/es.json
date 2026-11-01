@@ -3238,6 +3238,83 @@
         "app-scan-listed-only": "El informe lee los mapas de datos de las aplicaciones que muestra el catálogo y de toda aplicación con un registro. Una aplicación apartada u oculta solo se lee cuando tiene un registro.",
         "federation-peers-not-processors": "Las instalaciones socias no están en la lista de encargados. Una copia que va a otra instalación la detiene su clasificación (no puede salir de su lugar compartido) y no se anota como transferencia."
       },
+      "di": {
+        "title": "Intermediación de datos",
+        "lead": "Esta sección indica si esta instalación intermedia datos por cuenta de otros (Reglamento de Gobernanza de Datos 2022/868), qué se ha detectado y qué condiciones del artículo 12 se cumplen. Cada hallazgo es una propuesta hasta que una persona lo acepta.",
+        "modeLine": "Modo: {mode}",
+        "mode": { "di-mode-report": "Solo informe", "di-mode-none": "Sin intermediación", "di-mode-node": "La instalación intermedia", "di-mode-owners": "Los propietarios intermedian" },
+        "modeText": {
+          "di-mode-report": "No se rechaza nada. Esta sección enumera lo que en esta instalación podría ser intermediación de datos, para que una persona decida.",
+          "di-mode-none": "Esta instalación no intermedia datos. Una oferta que entrega datos no se muestra a todos; los datos van solo a destinatarios con nombre.",
+          "di-mode-node": "El operador presta el servicio de intermediación de datos y mantiene el registro de la notificación que aparece abajo.",
+          "di-mode-owners": "La instalación es una herramienta. Un propietario u organismo que se ha declarado proveedor puede gestionar un mercado de datos abierto; para los demás vale lo mismo que en Sin intermediación."
+        },
+        "changeSetting": "Cambiar el ajuste",
+        "fig": {
+          "offerings": "Ofertas que entregan datos", "offeringsSub": "en EXCHANGE, para todos",
+          "buyers": "Compradores externos", "buyersSub": "contratos con otra cuenta o una parte externa",
+          "organisms": "Organismos abiertos", "organismsSub": "cualquiera puede unirse; {n} paquetes de datos compartidos",
+          "apps": "Registro abierto y ventas", "appsSub": "apps"
+        },
+        "proposalsTitle": "Propuestas",
+        "proposalsNone": "Ahora nada en esta instalación parece intermediación de datos.",
+        "finding": {
+          "di-data-offering-public": { "title": "Ofertas de EXCHANGE que entregan datos y se muestran a todos: {n}.", "why": "Un mercado donde cualquiera ofrece datos a cualquiera es el propio ejemplo de intermediación de datos del reglamento." },
+          "di-contract-outside-buyer": { "title": "Contratos que venden datos a otra cuenta o a una parte externa: {n}.", "why": "Esta instalación guarda el contrato, así que conoce la relación comercial que creó. Eso es más que una herramienta técnica." },
+          "di-open-organism-with-data": { "title": "Cualquiera puede unirse al organismo {name}, y se han compartido paquetes de datos con sus miembros: {n}.", "why": "Un grupo abierto a todos no es un grupo cerrado. Un grupo que pide aprobación puede serlo." },
+          "di-app-open-registration": { "title": "Apps que permiten registrarse a partes externas y les venden: {n}.", "why": "El propietario de la app puede ser el proveedor de un mercado." },
+          "di-priced-named-share": { "title": "Accesos con nombre para una parte externa que tienen precio: {n}.", "why": "Esta instalación conoce la venta. Un acceso gratuito para un destinatario con nombre es una herramienta técnica del titular de los datos." },
+          "di-person-party-contact": { "title": "Partes externas de {owner} que son personas, con su contacto: {n}.", "why": "El contacto es un dato personal que guarda la cuenta, y la cuenta es su responsable del tratamiento. Debe figurar en el registro de actividades de tratamiento de esa cuenta." },
+          "di-notification-missing": { "title": "No hay ninguna notificación registrada.", "whyNode": "Esta instalación está configurada para prestar un servicio de intermediación de datos. Un proveedor lo notifica a la autoridad antes de empezar.", "whyOwners": "Esta instalación permite que proveedores declarados gestionen mercados, y ningún propietario ni organismo se ha declarado proveedor." },
+          "di-node-ai-reads-exchanged": { "title": "Paquetes de datos vendidos en EXCHANGE mientras esta instalación clasifica archivos guardados: {n}.", "why": "Clasificar un archivo lee su contenido. Un proveedor usa los datos que intermedia solo para ponerlos a disposición de los usuarios." }
+        },
+        "proposal": {
+          "require_approval": "Propuesta: unirse al organismo requiere aprobación. Lo cambia su creador o un administrador; la instalación no lo cambia por sí misma.",
+          "record_processing": "Propuesta: añade las partes externas al registro de actividades de tratamiento del organismo o la app para el que se guardan: quiénes son, por qué se guarda su contacto y hasta cuándo. Elimina una parte cuando ya no compartas nada con ella.",
+          "record_notification": "Propuesta: registra la notificación: la persona jurídica, su número de identificación, cuándo lo notificó a la autoridad y la referencia que recibió."
+        },
+        "mark": { "proposal": "propuesta", "accepted": "aceptado", "dismissed": "no aplica" },
+        "accept": "Aceptar",
+        "dismiss": "No aplica",
+        "reviewAccepted": "Aceptado. El hallazgo es ahora tu decisión.",
+        "reviewDismissed": "Marcado como no aplica.",
+        "reviewFailed": "La decisión no se guardó.",
+        "art12Title": "Condiciones del artículo 12 y las pruebas de esta instalación",
+        "col": { "point": "Punto", "requirement": "Requisito", "evidence": "Prueba en esta instalación", "state": "Estado" },
+        "state": { "evidence": "✓ prueba", "check": "revisar", "missing": "falta" },
+        "art12": {
+          "a": { "title": "Limitación de la finalidad y una persona jurídica separada", "text": "Ninguna analítica ni IA de esta instalación lee datos entregados a través de EXCHANGE; un resultado medido va solo al comprador. Una persona confirma que una persona jurídica separada presta el servicio.", "textMissing": "Ninguna analítica ni IA de esta instalación lee datos entregados a través de EXCHANGE. No hay ningún proveedor registrado." },
+          "c": { "title": "Metadatos de uso solo para el servicio", "text": "Cada lectura de una parte externa queda registrada para el titular de los datos. El registro sirve solo para la vista del propio titular y los límites contra el abuso." },
+          "d": { "title": "Los datos en el formato en que se recibieron", "text": "Cada paquete de datos conserva su CSV y su Table Schema tal como se publicaron, en una dirección permanente, y registra sus fuentes y transformaciones ({n} paquetes)." },
+          "h": { "title": "Continuidad y traslado si el servicio termina", "text": "Un titular exporta cualquier paquete con sus instrucciones de conexión, y cada versión se queda en su dirección permanente según la política de conservación del titular." },
+          "i": {
+            "title": "Interoperabilidad con estándares abiertos",
+            "textOpen": "El feed DCAT-AP, las fichas ODPS, las descripciones Frictionless y los feeds OData describen y sirven cada paquete. El Dataspace Protocol está desactivado.",
+            "textOpenDsp": "El feed DCAT-AP, las fichas ODPS, las descripciones Frictionless y los feeds OData describen y sirven cada paquete. El Dataspace Protocol está activado.",
+            "textClosed": "Esta instalación no muestra nada a recolectores externos, así que el feed DCAT está vacío; ODPS, Frictionless y OData sirven cada paquete. El Dataspace Protocol está desactivado.",
+            "textClosedDsp": "Esta instalación no muestra nada a recolectores externos, así que el feed DCAT está vacío; ODPS, Frictionless y OData sirven cada paquete. El Dataspace Protocol está activado."
+          },
+          "k": { "title": "Acceso no autorizado comunicado a los titulares", "text": "Las violaciones de datos se registran en el documento de violaciones de datos ({n} registradas). Una persona confirma que se avisa a los titulares sin demora." },
+          "n": { "title": "Herramientas de consentimiento y permisos", "text": "Los titulares conceden, ven y revocan cada consentimiento y cada acceso con nombre, y uno revocado rechaza la siguiente lectura ({consents} consentimientos, {shares} accesos con nombre vigentes).", "textOff": "La capa de consentimiento está desactivada en esta instalación (AIMEAT_CONSENT_ENABLED)." },
+          "o": { "title": "Un registro de la actividad", "text": "El uso de los consentimientos se audita y se conserva {days} días, y cada lectura de una parte externa queda registrada." }
+        },
+        "notif": {
+          "title": "Notificación a la autoridad",
+          "provider": "Proveedor", "noProvider": "No hay persona jurídica registrada", "notified": "Notificado", "ref": "Referencia de la autoridad",
+          "euRegister": "Registro de la UE", "confirmed": "Confirmación", "scope": "Qué cubre el servicio",
+          "organismProvider": "Proveedor en un organismo", "notifiedOn": "notificado el {date}",
+          "record": "Registrar la notificación", "edit": "Cambiar la notificación",
+          "formTitle": "La notificación del servicio de intermediación de datos",
+          "formLead": "Anota la notificación que el proveedor hizo a la autoridad (en Finlandia, Traficom) antes de empezar el servicio.",
+          "legalName": "Persona jurídica", "businessId": "Número de identificación", "notifiedAt": "Fecha de notificación", "authorityRef": "Referencia de la autoridad",
+          "euRegisterUrl": "Inscripción en el registro de la UE (dirección)", "confirmedAt": "Fecha de confirmación",
+          "scopePlaceholder": "Por ejemplo: el mercado de datos EXCHANGE de esta instalación",
+          "save": "Guardar", "cancel": "Cancelar", "saved": "La notificación está registrada.", "failed": "La notificación no se guardó."
+        },
+        "notYet": "aún no",
+        "aside": "Esto es una lectura del reglamento, no un dictamen jurídico. La notificación se hace antes de que empiece la intermediación y no hace falta licencia. En Finlandia, Traficom confirma una notificación a petición en una semana. Esta sección también aparece en la versión impresa de Compliance.",
+        "print": { "mode": "Modo", "finding": "Hallazgo", "regulation": "Reglamento", "decision": "Decisión" }
+      },
       "gapFonts": "Fuentes sin datos de licencia",
       "toFonts": "A Fuentes",
       "records": {
@@ -4366,7 +4443,17 @@
       "openPrivate": "Estas direcciones piden iniciar sesión. Tú las lees con tu propia cuenta; la persona con quien compartes las lee con la clave de su acceso.",
       "openPublic": "Cualquiera puede leer estas direcciones sin iniciar sesión.",
       "toolLabel": "Programa",
-      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Tu propia IA" },
+      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Tu propia IA", "office": "Excel y Power BI", "python": "Python", "mcp": "Tu propia IA (MCP)" },
+      "user": "Tu nombre de usuario", "openYours": "Estas direcciones piden tu nombre y tu clave. Excel y Power BI te los piden; DuckDB y pandas usan un token que obtienes con ellos.",
+      "basicYours": "Elige Básica: el usuario es {user} y la contraseña es tu clave", "anonymous": "Elige Anónimo: no hace falta iniciar sesión",
+      "duckdbOpen": "Lee la dirección CSV directamente: no hace falta iniciar sesión", "pandasOpen": "pandas lee la dirección CSV directamente: no hace falta iniciar sesión",
+      "mcpAddress": "La dirección MCP de este servidor es {url}",
+      "afterPublic": {
+        "office": "Actualizar trae la versión más reciente. La actualización programada en el servicio de Power BI también funciona, porque la dirección es pública.",
+        "duckdb": "La dirección sigue la versión más reciente. La descripción (datapackage.json) da a cada versión una dirección permanente.",
+        "python": "La dirección sigue la versión más reciente. Si la tabla es grande, lee las filas página a página con offset y limit.",
+        "mcp": "Tu IA encuentra el conjunto de datos en el catálogo de este servidor y lee sus filas."
+      },
       "excel1": "Datos › Obtener datos › De otras fuentes › Desde una fuente OData", "excel2": "Pega la dirección de la fuente OData: {url}", "excel3": "Elige Básica: el usuario es el nombre del acceso (propietario/parte) y la contraseña es su clave", "excel4": "Elige la tabla {table} › Cargar",
       "powerbi1": "Obtener datos › Fuente OData", "powerbi2": "Pega la dirección de la fuente OData: {url}", "powerbi3": "Elige Básica: el usuario es el nombre del acceso (propietario/parte) y la contraseña es su clave", "powerbi4": "Elige la tabla {table} › Cargar",
       "duckdb1": "Pide un token con el nombre y la clave del acceso en {url}", "duckdb2": "Pon el token en el secreto de abajo y lee el CSV",
@@ -4377,6 +4464,61 @@
         "duckdb": "El token dura poco. Pide uno nuevo cuando venza.", "pandas": "El token dura poco. Pide uno nuevo cuando venza.",
         "ai": "Tu IA lee las filas con aimeat_datapackage_export."
       }
+    },
+    "recipient": {
+      "tag": "Datos compartidos", "label": "{owner} ha compartido contigo", "noAccount": "No necesitas cuenta",
+      "lead": "Puedes leer estos datos con tu propio programa hasta el {until}. La finalidad es: {purpose}.",
+      "leadNoPurpose": "Puedes leer estos datos con tu propio programa hasta el {until}.",
+      "untilEnd": "final del acceso",
+      "get": "Recibes", "getWord": "Lectura", "getSub": "no puedes cambiarlos ni pasarlos a otros",
+      "ends": "Termina", "endsSub": "o cuando {owner} termine el acceso",
+      "updates": "Se actualiza", "updatesSub": "actualízalo en tu programa", "updatesNone": "sin programación",
+      "every": { "daily": "a diario", "monthly": "cada mes", "change": "al cambiar la fuente", "weekly": { "0": "los domingos", "1": "los lunes", "2": "los martes", "3": "los miércoles", "4": "los jueves", "5": "los viernes", "6": "los sábados" } },
+      "step1": "Acepta las condiciones", "step2": "Guarda la clave", "step3": "Conecta tu programa",
+      "terms": "Uso los datos para la finalidad «{purpose}» y respeto la licencia {licence}. Entiendo que {owner} ve cuándo los leo.",
+      "thePurpose": "indicada arriba", "noLicence": "(sin indicar)",
+      "termsAccepted": "Aceptaste las condiciones el {date}.",
+      "termsNone": "Este acceso no tiene condiciones que aceptar.", "termsNoneYet": "Este acceso no tiene condiciones que aceptar. Pulsa el botón para crear tu clave.",
+      "acceptAndShow": "Aceptar y mostrar la clave", "show": "Mostrar la clave",
+      "keyOnce": "La clave se muestra solo ahora, y también está en el archivo de conexión. Guárdala antes de salir de esta página.",
+      "keyLater": "La clave aparece aquí cuando aceptas las condiciones.",
+      "keyLines": "acceso     {id}\nusuario    {user}\nclave      {key}",
+      "copyKey": "Copiar la clave", "rotated": "La clave es nueva. La anterior dejó de funcionar.",
+      "download": "Descargar el archivo de conexión", "instructions": "Instrucciones: Power BI, Excel, DuckDB",
+      "rotate": "Cambiar la clave", "decline": "Ya no lo necesito",
+      "rotateWhy": "Si la clave cae en malas manos, cámbiala aquí. La anterior deja de funcionar al momento.",
+      "rotateLater": "Cuando tengas la clave, puedes cambiarla aquí cuando quieras.",
+      "declineConfirm": "¿Terminar el acceso? Tu clave deja de funcionar al momento, y {owner} ve que lo terminaste. Las copias que ya descargaste se quedan contigo.",
+      "declineYes": "Terminar el acceso", "declineNo": "Mantenerlo",
+      "endedTitle": "El acceso ha terminado", "ended": "Terminaste el acceso a «{title}». {owner} ve que ya no lo necesitas.",
+      "refusedTitle": "Este enlace no funciona",
+      "refused": {
+        "INVITE_NOT_FOUND": "Este enlace no es válido. Pide a quien compartió los datos que lo envíe de nuevo.",
+        "INVITE_USED": "Este enlace ya se usó, y la clave se mostró a quien lo abrió. Pide a quien compartió los datos un enlace nuevo.",
+        "INVITE_EXPIRED": "Este enlace ha caducado. Pide a quien compartió los datos que lo envíe de nuevo.",
+        "SHARE_ENDED": "Este acceso ha terminado, así que el enlace ya no funciona.",
+        "PARTY_STOPPED": "Este acceso está detenido. Contacta con quien compartió los datos.",
+        "other": "No se pudo abrir el enlace. Inténtalo de nuevo en un momento."
+      }
+    },
+    "dataset": {
+      "catalogue": "Catálogo de datos", "noDescription": "Una tabla de datos que puedes abrir en Excel, Power BI o con tu propio código.",
+      "maker": "Autor", "freshness": "Actualidad", "noFresh": "Sin indicar", "updated": "actualizado por última vez el {date}",
+      "size": "Tamaño", "rows": "{n} filas", "rows_one": "{n} fila", "csvSize": "CSV, {size}", "licence": "Licencia", "noLicence": "Sin indicar", "licenceSub": "las condiciones de uso",
+      "producer": {
+        "extension": "recogidos por la extensión {ref}", "workflow": "hechos por el flujo de trabajo {ref}", "agent": "hechos por un agente",
+        "app": "hechos por la app {ref}", "dataproduct": "reunidos como producto de datos", "manual": "publicados a mano"
+      },
+      "use": "Usa estos datos", "columns": "Columnas", "versions": "Versiones", "openExcel": "Abrir en Excel",
+      "colName": "Nombre", "colType": "Tipo", "colDesc": "Descripción",
+      "howMade": "Cómo se hizo",
+      "howMadeText": "Estos datos fueron {producer}. Fuentes: {sources}. Cambios registrados: {changes}. Versiones: {versions}.",
+      "provenance": "Procedencia", "needMore": "¿Necesitas más?",
+      "needMoreText": "El autor puede darte un acceso más amplio o una suscripción.", "askAccess": "Pedir acceso", "askSubject": "Acceso a {title}",
+      "machine": "Legible por máquina",
+      "versionsText": "La más reciente es la versión {n}, publicada el {date}.", "versionLine": "Versión {n} · {date} · {changes}",
+      "missingTitle": "No hay un conjunto de datos público con ese nombre", "missing": "Estos datos no son públicos o no existen. Pide un acceso a su autor.",
+      "failed": "No se pudieron leer los datos. Inténtalo de nuevo en un momento."
     },
     "origin": {
       "sources": "Fuentes", "combine": "Combinación", "transformations": "Qué se cambió", "lineage": "Construido a partir de", "license": "Licencia", "noLicense": "Sin licencia indicada", "producedBy": "Hecho por", "hash": "Hash del contenido"
@@ -4409,7 +4551,11 @@
       "theRecipient": "Quien lo recibe",
       "cancel": "Cancelar", "submit": "Compartir", "submitSend": "Compartir y enviar el enlace", "close": "Listo",
       "done": "Compartido.", "failed": "No se compartió. Inténtalo de nuevo.",
-      "notSent": "El enlace no se envió a {email}: este servidor todavía no envía enlaces de acceso. Entrégale tú mismo el archivo de conexión.",
+      "linkSent": "El enlace se envió a {email}. Funciona una sola vez, hasta el {date}.",
+      "linkManual": "Este servidor no envía correo ahora, así que el enlace no se envió a {email}. Dale tú mismo este enlace. Funciona una sola vez.",
+      "linkFailed": "El enlace no se envió a {email}. Dale tú mismo el archivo de conexión.",
+      "copyLink": "Copiar el enlace",
+      "linkKey": "El enlace crea una clave propia para quien lo recibe. La clave de este archivo deja de funcionar cuando abre el enlace.",
       "copyFile": "Copiar el archivo de conexión", "downloadFile": "Descargar el archivo de conexión"
     },
     "sell": {
@@ -11690,6 +11836,7 @@
     "cfg_site_store_note_es": "Aviso de la tienda en español",
     "cfg_site_store_soon_code": "Código de descuento de apertura",
     "cfg_site_store_topup_url": "Página de la tienda para comprar más saldo de IA",
+    "cfg_site_build_queue_url": "Cola de encargos de «Lo construimos contigo»",
     "cfg_site_ai_credit_eur_per_usd": "Euros de saldo de IA por dólar de la clave de IA",
     "cfg_site_default_locale": "Idioma propio del servidor",
     "cfg_site_store_orders_url": "Página de la tienda para los pedidos y facturas del propietario",
@@ -13002,6 +13149,63 @@
     "cfgDomain_federation": "Federación",
     "cfgDomain_integrations": "Integraciones",
     "cfgDomain_other": "Otros",
+    "cfgDomain_data_out": "Salida de datos",
+    "cfgGroup_data_out": "Salida de datos",
+    "cfgDesc_consent_data_intermediation": "Si este servidor intermedia datos entre otros como servicio. El modo informe no cambia nada: muestra lo que encuentra en la página de Compliance.",
+    "cfgDesc_consent_party_self_registration": "Si una app puede dejar que la gente se registre sin una cuenta en este servidor. Siempre desactivado en un servidor que solo muestra su contenido a las cuentas con sesión iniciada.",
+    "cfgDesc_dataspace_enabled": "Abre este servidor a los conectores de los espacios de datos de la UE. Los emisores de confianza se configuran un espacio de datos cada vez.",
+    "cfgDesc_consent_share_max_days": "Cuánto tiempo puede un propietario compartir un producto de datos con una parte externa con nombre.",
+    "dataOut": {
+      "dspTitle": "Dataspace Protocol ahora",
+      "dspState": "Estado",
+      "on": "Activado",
+      "off": "Desactivado",
+      "dspOnSub": "Los conectores de un espacio de datos pueden leer el catálogo, cerrar un contrato y traer los datos.",
+      "dspOffSub": "Las direcciones /dsp/ y /.well-known/dspace-version responden 404.",
+      "dspParticipant": "Identificador de este servidor",
+      "dspBase": "Dirección del protocolo",
+      "dspVersion": "Dataspace Protocol {v}",
+      "dspVersionEndpoint": "Dirección de la versión",
+      "dspDid": "Documento DID",
+      "dspAuth": "Cómo demuestra un participante quién es",
+      "dspStatic": "Participantes con un token compartido",
+      "dspTck": "Kit de pruebas de conformidad",
+      "readFailed": "No se ha podido leer ahora.",
+      "securityTitle": "En la página de Seguridad",
+      "securitySub": "Partes externas en todo el servidor: personas y programas que leen un producto de datos compartido con ellos por su nombre, sin cuenta aquí.",
+      "figParties": "Partes externas",
+      "figPartiesSub": "en todo el servidor",
+      "figRefused": "Lecturas rechazadas, 7 días",
+      "figRefusedSub": "clave o destino equivocado",
+      "figStopped": "Detenidas",
+      "figStoppedSub": "por el operador",
+      "regsTitle": "Apps que piden dejar que la gente se registre",
+      "regsSub": {
+        "off": "El registro sin cuenta está desactivado en este servidor, así que ninguna app acepta gente nueva.",
+        "apps-ask": "El dueño de una app lo pide, y tú apruebas o rechazas cada app aquí.",
+        "on": "El dueño de una app abre el registro sin pedirlo."
+      },
+      "regsNone": "Ninguna app lo ha pedido.",
+      "regsParties": "Personas registradas: {n}",
+      "regState": {
+        "requested": "Espera tu decisión",
+        "open": "Abierto",
+        "refused": "Rechazado",
+        "closed": "Cerrado"
+      },
+      "approve": "Aprobar",
+      "refuse": "Rechazar",
+      "close": "Cerrar",
+      "approved": "{app} de {owner} acepta registros ahora.",
+      "refused": "{app} de {owner} no acepta registros.",
+      "decideFailed": "La decisión no se ha guardado.",
+      "regsOff": "Hay peticiones esperando, pero el registro está desactivado. Elige primero arriba «El dueño de la app lo pide y el operador lo aprueba». Hasta entonces el servidor rechaza la decisión.",
+      "dcatTitle": "Fuente DCAT",
+      "dcatFeed": "Dirección",
+      "dcatSub": "Los productos de datos públicos como una lista legible por máquina que pueden leer avoindata.fi y data.europa.eu. No tiene interruptor: un producto de datos aparece en ella mientras es público.",
+      "open": "Abrir",
+      "aside": "Un servidor que instala aimeat init empieza con «Este servidor no intermedia datos entre otros». Mantén un servidor público en «Solo informe» hasta que hayas comprobado su actividad y hecho la notificación a la autoridad."
+    },
     "cfgGroup_ai": "IA: claves, modelos y saldo",
     "cfgGroup_decide": "Modelo de decisión (TypeSafe)",
     "decideKeyTest": "Probar la clave del servidor",
@@ -24090,6 +24294,8 @@
     "structure.next.visibility": "Decide quién ve la aplicación antes de publicarla.",
     "structure.next.requirements": "Escribe las páginas legales y responde a las preguntas abiertas en la página de la aplicación en el catálogo.",
     "structure.next.none": "Nada te espera. Tu IA sigue con el trabajo.",
+    "structure.next.done": "Todos los pasos están hechos y la aplicación está publicada.",
+    "structure.door.app": "Abrir la aplicación",
     "structure.optional": "Esta página es una ayuda, no una obligación. Puedes decirle a tu IA \"construye la aplicación sin más\". Entonces decide por su cuenta, y esta página muestra lo que decidió.",
     "structure.parts": "De qué se compone la aplicación",
     "structure.part.view": "vista",
@@ -26809,6 +27015,48 @@
       }
     },
     "config": {
+      "consent": {
+        "data_intermediation": {
+          "title": "Servicio de intermediación de datos",
+          "short": "Si este servidor presta un servicio de intermediación de datos según el Reglamento de Gobernanza de Datos de la UE (2022/868), y quién lo presta. Solo informe no bloquea nada y muestra lo que encuentra en la página de Compliance.",
+          "what": "Un servicio de intermediación de datos pone en contacto comercial a quienes tienen datos y a quienes los usan, por ejemplo un mercado donde cualquiera ofrece datos y cualquiera los compra. En este servidor el ajuste decide una cosa: si una oferta de EXCHANGE que entrega datos puede publicarse para todos. Solo informe y Lo presta el operador no bloquean nada. Este servidor no intermedia datos entre otros rechaza esa publicación; entonces los datos llegan solo a destinatarios con nombre, con un acceso compartido a una parte externa. Pueden prestarlo los proveedores declarados funciona igual, salvo para un propietario que administra un organismo con su propia notificación registrada. La comprobación se hace al publicar: una oferta publicada antes de un cambio se queda, y la página de Compliance la muestra como un hallazgo para que una persona decida. La sección 12 de la página de Compliance muestra los hallazgos y las condiciones del artículo 12 en todos los modos.",
+          "range": "Uno de cuatro: Solo informe (el valor por defecto del código), Este servidor no intermedia datos entre otros, Lo presta el operador, Pueden prestarlo los proveedores declarados. Un servidor que instala aimeat init empieza con Este servidor no intermedia datos entre otros.",
+          "ex1": "Este servidor no intermedia datos entre otros: el servidor de una empresa o de una persona que comparte datos solo con socios con nombre.",
+          "ex2": "Lo presta el operador: un servidor cuyo operador ha hecho la notificación a la autoridad y mantiene un mercado de datos abierto.",
+          "tip": "Elige Lo presta el operador solo cuando la notificación esté hecha y registrada en la página de Compliance. Es una lectura del reglamento, no asesoramiento jurídico."
+        },
+        "party_self_registration": {
+          "title": "Registro en apps sin una cuenta",
+          "short": "Si una app puede dejar que sus usuarios se registren con una dirección de correo, sin una cuenta en este servidor. Desactivado por defecto.",
+          "what": "Quien se registra así en una app pasa a ser una parte externa del dueño de la app: entra con un enlace que recibe por correo y ve solo lo que esa app le da, nunca el resto del servidor. Nadie se registra en una app: ninguna app acepta registros. El dueño de la app lo pide y el operador lo aprueba: el dueño abre el registro, queda como petición, y tú apruebas o rechazas cada app en la lista bajo este grupo (una IA hace lo mismo con aimeat_admin_app_party_registrations). El dueño de la app abre el registro: el dueño lo abre sin pedirlo. Un servidor que solo muestra su contenido a las cuentas con sesión iniciada lo tiene siempre desactivado, diga lo que diga este ajuste.",
+          "range": "Nadie se registra en una app (por defecto), El dueño de la app lo pide y el operador lo aprueba, o El dueño de la app abre el registro.",
+          "ex1": "Nadie se registra en una app: un servidor donde todos los que usan una app tienen cuenta.",
+          "ex2": "El dueño de la app lo pide y el operador lo aprueba: un servidor público donde quieres saber qué apps recogen direcciones de correo de personas sin cuenta.",
+          "tip": "El dueño de la app tiene la dirección de correo de cada persona que se registra así. La página de Compliance muestra como hallazgo una app con el registro abierto que vende algo."
+        },
+        "share_max_days": {
+          "title": "Duración máxima de un acceso compartido con una parte externa",
+          "short": "Cuánto tiempo puede un propietario compartir un producto de datos con una parte externa con nombre, en días. Un acceso compartido sin fecha de fin dura esto. El valor por defecto es 365.",
+          "what": "Un acceso compartido con nombre da a una parte externa, una persona o un programa sin cuenta aquí, un producto de datos hasta una fecha. Al crearlo, se rechaza una fecha de fin más lejana que este número de días, y un acceso sin fecha de fin recibe exactamente este número de días. Un acceso creado antes de cambiar el ajuste conserva su fecha de fin. El formulario de compartir limita la fecha a este valor.",
+          "range": "Un número entero de 1 a 3650 días. El valor por defecto es 365.",
+          "low": "Menor: los accesos terminan antes, así que un acceso que nadie renueva se acaba solo, y los propietarios vuelven a compartir más a menudo.",
+          "high": "Mayor: un acceso puede durar años, y uno que nadie recuerda sigue abierto más tiempo.",
+          "ex1": "365 (por defecto): un informe anual compartido con un socio.",
+          "ex2": "30: un servidor donde cada acceso externo se revisa cada mes.",
+          "tip": "Bájalo cuando haya que revisar los accesos externos con regularidad. Un propietario siempre puede terminar un acceso antes."
+        }
+      },
+      "dataspace": {
+        "enabled": {
+          "title": "Ofrecer paquetes de datos a espacios de datos",
+          "short": "Si este servidor responde al Eclipse Dataspace Protocol (DSP 2025-1), para que los conectores de un espacio de datos de la UE encuentren y traigan paquetes de datos. Desactivado por defecto.",
+          "what": "Activado: un participante de un espacio de datos lee el catálogo de este servidor en /dsp/2025-1, cierra un contrato y trae los datos. Un participante ve un paquete de datos cuando es público y el ajuste de intermediación permite ofrecer datos abiertamente, cuando el propietario lo compartió con ese participante por su nombre, o cuando se vende en EXCHANGE. El propietario aprueba cada contrato, salvo que deje que un paquete acepte solo. Un participante demuestra quién es con un token firmado desde su identidad did:web, o con un token compartido en un laboratorio de pruebas, y los emisores de confianza se configuran para cada espacio de datos. El identificador de este servidor es el did:web de su dirección pública, salvo que pongas otro. Desactivado: /.well-known/dspace-version y todas las direcciones /dsp/ responden 404.",
+          "range": "Activado o desactivado. Por defecto, desactivado.",
+          "ex1": "Desactivado (por defecto): ningún espacio de datos se conecta a este servidor.",
+          "ex2": "Activado, con dcp como forma de demostrar quién es un participante y los emisores de confianza de tu espacio de datos: una organización que se une a un espacio de datos con sus propios datos.",
+          "tip": "Actívalo cuando este servidor forme parte de un espacio de datos. El estado bajo este grupo muestra las direcciones que necesita un conector."
+        }
+      },
       "extensions": {
         "fetch_inflight_mb": {
           "title": "Datos de descargas en curso por ejecución",

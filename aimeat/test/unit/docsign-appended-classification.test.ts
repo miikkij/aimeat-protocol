@@ -17,6 +17,11 @@
  *   second signatures with test/fixtures/docsign/pdf-sign.ts, the builders make-fixtures.ts uses.
  * @usage cd aimeat && pnpm exec vitest run test/unit/docsign-appended-classification.test.ts
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A real later signature does not cover a changed page: four attack cases
+ *     (a page pointed at new content and a grown indirect content list fail on the classifier of
+ *     929e228ce; a new page in the signed tree and a new page tree were already caught by the /Pages
+ *     type and stay as regression cases) and one usage case (a later signature's widget added to an
+ *     indirect annotation list). Finding w3-docsign-later-signature-adds-page.
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 11).
  */
 import { describe, it, expect, beforeAll } from 'vitest';
@@ -80,6 +85,22 @@ const PAGE = (contents: number, annots = '[5 0 R]') => `<< /Type /Page /Parent 2
 const CHANGED = stream('', 'BT /F1 14 Tf 72 760 Td (Kauppahinta 1 000 000 euroa) Tj ET');
 const DER = (seed: number) => Buffer.from(Array.from({ length: 600 }, (_, i) => (i * 31 + seed * 7) % 256));
 
+/** A second signer with its own test CA, for the later signatures. */
+const signer = () => {
+  const ca = newRsa();
+  const key = newRsa();
+  const caName = name('Second Test CA', 'AIMEAT Test');
+  const caCert = makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 41 });
+  const cert = makeCert({ subject: name('Toinen Allekirjoittaja', 'AIMEAT Test'), issuer: caName, publicKey: key.publicKey, signer: ca.privateKey, ca: false, serial: 42 });
+  return { cert, key: key.privateKey, chain: [caCert] };
+};
+
+/** `base` with `objects` written in one update and a real later signature over the whole file. */
+function withLaterSignature(base: Buffer, objects: Obj[]): Buffer {
+  const s = signer();
+  return appendSignature(withUpdate(base, objects), s.cert, s.key, s.chain);
+}
+
 /** The first signature's classification and validation report. */
 async function first(pdf: Buffer) {
   const [sig] = extractPdfSignatures(pdf);
@@ -140,6 +161,45 @@ describe('content changed after signing is never read as validation data or a la
   });
 });
 
+describe('a real later signature does not cover a page changed beside it', () => {
+  const expectChanged = async (pdf: Buffer) => {
+    const r = await first(pdf);
+    expect(r.appended.laterSignatures).toBe(1);
+    expect(r.appended.otherChanges).toBe(true);
+    expect(r.reasons).toContain('CONTENT_ADDED_AFTER_SIGNING');
+    expect(r.verdict).not.toBe('valid');
+  };
+
+  it('the signed page pointed at a new content stream', async () => {
+    await expectChanged(withLaterSignature(signed, [[3, PAGE(22)], [22, CHANGED]]));
+  });
+
+  it('a new page added to the signed page tree', async () => {
+    await expectChanged(withLaterSignature(signed, [
+      [2, '<< /Type /Pages /Kids [3 0 R 31 0 R] /Count 2 >>'],
+      [31, `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 32 0 R /Resources << /Font << /F1 6 0 R >> >> >>`],
+      [32, CHANGED],
+    ]));
+  });
+
+  it('the Catalog pointed at a new page tree', async () => {
+    await expectChanged(withLaterSignature(signed, [
+      [1, '<< /Type /Catalog /Pages 30 0 R /AcroForm << /Fields [5 0 R] /SigFlags 3 >> >>'],
+      [30, '<< /Type /Pages /Kids [31 0 R] /Count 1 >>'],
+      [31, `<< /Type /Page /Parent 30 0 R /MediaBox [0 0 595 842] /Contents 32 0 R /Resources << /Font << /F1 6 0 R >> >> >>`],
+      [32, CHANGED],
+    ]));
+  });
+
+  it('a content stream added to the signed page\'s indirect content list', async () => {
+    // The signed revision (the second signature's) keeps the page's content in list object 40.
+    const base = withLaterSignature(signed, [[3, PAGE(40)], [40, '[4 0 R]']]);
+    const pdf = withLaterSignature(base, [[40, '[4 0 R 41 0 R]'], [41, CHANGED]]);
+    const second = extractPdfSignatures(pdf)[1]!;
+    expect(second.appended).toMatchObject({ laterSignatures: 1, otherChanges: true });
+  });
+});
+
 /** Long-term-validation data as a PAdES-B-LT update writes it: the Catalog names a /DSS. */
 function ltv(base: Buffer): Buffer {
   return withUpdate(base, [
@@ -188,15 +248,6 @@ describe('validation data and later signatures still read as normal (usage)', ()
     expect(r.reasons).toEqual(['REVOCATION_UNKNOWN', 'NOT_WHOLE_FILE']);
   });
 
-  const signer = () => {
-    const ca = newRsa();
-    const key = newRsa();
-    const caName = name('Second Test CA', 'AIMEAT Test');
-    const caCert = makeCert({ subject: caName, issuer: caName, publicKey: ca.publicKey, signer: ca.privateKey, ca: true, serial: 41 });
-    const cert = makeCert({ subject: name('Toinen Allekirjoittaja', 'AIMEAT Test'), issuer: caName, publicKey: key.publicKey, signer: ca.privateKey, ca: false, serial: 42 });
-    return { cert, key: key.privateKey, chain: [caCert] };
-  };
-
   it('a second signature appended as a wallet does', async () => {
     const s = signer();
     const pdf = appendSignature(signed, s.cert, s.key, s.chain);
@@ -230,6 +281,18 @@ describe('validation data and later signatures still read as normal (usage)', ()
     const [one, two] = extractPdfSignatures(pdf);
     expect(one!.appended).toMatchObject({ laterSignatures: 1, otherChanges: false });
     expect(two!.appended).toMatchObject({ laterSignatures: 0, validationData: true, otherChanges: false });
+  });
+
+  it('a later signature that adds its widget to an indirect annotation list', async () => {
+    // The signed revision keeps the page's annotations in list object 42.
+    const base = withLaterSignature(signed, [[3, PAGE(4, '42 0 R')], [42, '[5 0 R]']]);
+    const pdf = withLaterSignature(base, [
+      [1, '<< /Type /Catalog /Pages 2 0 R /AcroForm << /Fields [5 0 R 91 0 R] /SigFlags 3 >> >>'],
+      [42, '[5 0 R 91 0 R]'],
+      [91, '<< /Type /Annot /Subtype /Widget /FT /Sig /T (Signature3) /Rect [400 40 560 90] /P 3 0 R /V 90 0 R >>'],
+    ]);
+    const second = extractPdfSignatures(pdf)[1]!;
+    expect(second.appended).toMatchObject({ laterSignatures: 1, otherChanges: false });
   });
 
   it('a signature field placed with an unchanged Catalog keeps reading as before', async () => {

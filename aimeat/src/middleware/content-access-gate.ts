@@ -43,6 +43,8 @@
  * @structure OPEN_ROUTES · isOpenRoute() · openedAppRead() · contentAccessGate(config)
  * @usage app.use(contentAccessGate(config));   // after optionalAuth, CORS and appOriginSignIn
  * @version-history
+ *   v1.4.4 — 2026-11-01 — The public dataset page /v1/dataset/{owner}/{name} and the share link page
+ *     /v1/shared-data open as SPA page addresses (WP9b).
  *   v1.4.3 — 2026-10-31 — isOpenRoute tests the open patterns case-insensitively, as Express routes
  *     paths: /v1/auth/Anonymous and /v1/portfolio/Members passed the gate as open and reached the
  *     handlers the patterns leave out (secaudit 2026-10-31 inv-07).
@@ -103,6 +105,7 @@ export const OPEN_ROUTES: ReadonlyArray<{ method: string | null; path: RegExp; w
   // A person's portfolio PAGE, never the portfolio API beside it (catalog, config, data, me, members).
   { method: 'GET', path: /^\/v1\/portfolio\/(?!(catalog|config|data|me|members|upload)$)[^/]+$/, why: 'SPA page address; the shell drops the person from the head in this mode' },
   { method: 'GET', path: /^\/v1\/use-with-ai\/[^/]+\/[^/]+$/, why: 'SPA page address; the shell drops the app from the head in this mode' },
+  { method: 'GET', path: /^\/v1\/dataset\/[^/]+\/[^/]+$/, why: 'SPA page address; the shell gives no dataset head in this mode (services/datapackage/landing-page.ts)' },
   { method: 'GET', path: /^\/v1\/(connect|privacy|terms)(\/[^/]+)?$/, why: 'operator-written pages' },
   { method: 'GET', path: /^\/v1\/admin\/(ui|setup)$/, why: 'admin shell and first-run setup page' },
   { method: 'GET', path: /^\/v1\/agents\/verify$/, why: 'device authorization consent page' },

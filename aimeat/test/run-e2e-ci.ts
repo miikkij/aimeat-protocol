@@ -12,10 +12,12 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
  *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
  *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-package-compose-holder.ts joins the list (not the guard tier): compose packages only a cortex the composer holds (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-dsp.ts joins the list (not the guard tier): the Dataspace Protocol provider (plan doc-mvwxcas3dom3, D8).
+ *   2026-11-01 -- e2e-party-invite.ts joins the list (not the guard tier): the one-time share link and the engine reads as a party (WP9b).
  *   2026-11-01 -- e2e-app-parties.ts joins the list (not the guard tier): an app's users as outside parties (plan doc-mvwxcas3dom3, D4).
  *   2026-11-01 -- e2e-exchange-datapackage.ts joins the list (not the guard tier): a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   2026-11-01 -- e2e-data-lifecycle.ts and e2e-data-intermediation.ts join the list (not the guard tier):
@@ -1124,6 +1126,9 @@ const ALL_SUITES = [
     // Agent goals: open work two agents race for, the chain and its limit, a reaction, a person's step,
     // asking a result again, pause, and the refusals (session cc-jouni-goals).
     'test/e2e-goals.ts',
+    // "Build it with you": the place's one build request, the operator's relay with the admin password,
+    // the queue's public status, the place's trail, and the once-per-code notice (Jouni, 1.11 16.22).
+    'test/e2e-build-with-you.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
@@ -1282,6 +1287,8 @@ const ALL_SUITES = [
     'test/e2e-exchange-datapackage.ts',
     // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.
     'test/e2e-app-parties.ts',
+    // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
+    'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
     'test/e2e-dsp.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
@@ -1298,6 +1305,9 @@ const ALL_SUITES = [
     // What a data package read trusts: the audience the service wrote, the classification reader, and
     // the OData cache header by the package's audience (secaudit2026oct31w2 round 10).
     'test/e2e-datapackage-trusted-reads.ts',
+    // The rest of the package reads decide on the service's record too: the withdrawal, a share, a data
+    // product source, the EXCHANGE sale terms and the Dataspace catalogue (WP9e).
+    'test/e2e-datapackage-pointer-forgery.ts',
     'test/e2e-publish-gate-shared.ts',
     // The same gate on apps (listing, open_to, access code, first publish, fork), the welcome page and a company's front page (V4).
     'test/e2e-publish-gate-apps.ts',

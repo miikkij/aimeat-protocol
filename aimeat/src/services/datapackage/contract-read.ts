@@ -25,12 +25,14 @@
  *   const c = await contractReaderFor(deps, req.auth, { owner, name, version });
  *   const outcome = await meterPackageRead(deps, { caller, owner, name, session });
  * @version-history
+ *   v1.0.1 — 2026-11-01 — The version and the withdrawal come from the service's record
+ *     (trustedPackageOf), not the pointer (WP9e).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D5.3).
  */
 import type { StoreDeps } from './store.js';
 import type { DatapackageReader } from './audience.js';
 import { datapackageReadable } from './audience.js';
-import { readPointer, readTrustedVisibility } from './version-audience.js';
+import { trustedPackageOf } from './audience-record.js';
 import { bare } from './contract.js';
 import { readEntitlementForCall, type MeteredEntitlement } from '../metered-entitlements.js';
 import { authoriseMeteredCall, type MeteredOutcome } from '../metered-access.js';
@@ -55,11 +57,11 @@ export async function contractReaderFor(
     if (auth.owner === target.owner) return null;
     const { storage, config } = deps;
     const ownerGhii = `${target.owner}@${config.nodeId}`;
-    const pointer = await readPointer(deps, ownerGhii, target.name);
-    if (!pointer?.contentHash || pointer.status === 'withdrawn') return null;
+    // The version, the withdrawal and the audience are the service's record (./audience-record.ts).
+    const pkg = await trustedPackageOf(storage, config.nodeId, ownerGhii, target.name);
+    if (!pkg?.trusted.current || pkg.trusted.withdrawnAt) return null;
     // A reader the audience admits reads as before, uncharged.
-    const visibility = await readTrustedVisibility(deps, ownerGhii, target.name);
-    if (await datapackageReadable(storage, ownerGhii, visibility, auth, target.name)) return null;
+    if (await datapackageReadable(storage, ownerGhii, pkg.trusted.visibility ?? 'public', auth, target.name)) return null;
     const coord = datapackageCoordinate(target.owner, target.name);
     const principal = resolveIdentity(auth, config.nodeId);
     const ent = await readEntitlementForCall(storage, principal, coord.ext, coord.action);

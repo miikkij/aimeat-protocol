@@ -28,6 +28,9 @@
  *   - GET  /v1/datapackages/:owner/:name/rows/:resource   a paginated row window, or ?format=csv the whole resource
  * @usage app.use(dataPackagesRouter(config, storage))
  * @version-history
+ *   v1.11.0 -- 2026-11-01 -- The schema.org Dataset of ?format=schemaorg is built by
+ *     services/datapackage/landing-page.ts schemaOrgOfOpened, which the public dataset page's head
+ *     reads too, and names the page /v1/dataset/{owner}/{name} (WP9b).
  *   v1.10.0 -- 2026-11-01 -- PUT /v1/datapackages/:owner/:name/exchange sells a package on EXCHANGE (or
  *     takes it off). The reads decide who reads in routes/package-reader.ts: an outside party's share, an
  *     account's EXCHANGE contract (the paid feed), or req.auth; a row window and the CSV are metered for
@@ -100,10 +103,8 @@ import { callerOf } from '../middleware/caller.js';
 import { denyScope403, deny403 } from '../auth/deny.js';
 import { withdrawPackage, withdrawalOfRef, withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { lacksPackageReadScope, ownerAuthOf, DATAPACKAGE_READ_SCOPE } from '../services/datapackage/audience.js';
-import { odpsSheetFor, odpsAddress, versionAudienceOf } from '../services/datapackage/odps-read.js';
-import { schemaOrgDataset } from '../services/datapackage/schema-org.js';
-import { readPointer, catalogueKeyRoot } from '../services/datapackage/version-audience.js';
-import { datasetLandingUrl } from '../services/datapackage/catalogue-facts.js';
+import { odpsSheetFor, odpsAddress } from '../services/datapackage/odps-read.js';
+import { schemaOrgOfOpened } from '../services/datapackage/landing-page.js';
 import { ODPS_VERSION } from '../services/exchange-odps.js';
 import { packageFreshness } from '../services/datapackage/freshness-read.js';
 import { versionsInUse } from '../services/datapackage/versions-in-use.js';
@@ -156,20 +157,8 @@ export function dataPackagesRouter(config: AimeatConfig, storage: Storage): Rout
         return { reader: who.reader, ref: who.ref, party: who.admitted, served: who.served, charge: who.charge };
     };
 
-    /** The schema.org Dataset JSON-LD of an opened version: the public page address for a public package only. */
-    const schemaOrgOf = async (opened: NonNullable<Awaited<ReturnType<typeof openPackage>>>) => {
-        const d = opened.descriptor;
-        const owner = /^pkg:([^/]+)\//.exec(d.aimeat.packageId)?.[1] ?? '';
-        const ownerGhii = `${owner}@${config.nodeId}`;
-        const audience = await versionAudienceOf(store, ownerGhii, d.name, d.aimeat.contentHash, opened.latest ?? await readPointer(store, ownerGhii, d.name));
-        const catalogueId = catalogueKeyRoot(d.aimeat.packageId).slice('packages/'.length);
-        return schemaOrgDataset({
-            baseUrl: config.baseUrl, siteName: config.seoSiteName || `AIMEAT node ${config.nodeId}`, ownerName: owner,
-            descriptor: d, descriptorUrl: opened.descriptorUrl, audience,
-            ...(audience === 'public' ? { landingUrl: datasetLandingUrl(config.baseUrl, catalogueId) } : {}),
-            ...(opened.latest?.updatedAt ? { modified: opened.latest.updatedAt } : {}),
-        });
-    };
+    /** The schema.org Dataset JSON-LD of an opened version (services/datapackage/landing-page.ts, which the page head reads too). */
+    const schemaOrgOf = (opened: NonNullable<Awaited<ReturnType<typeof openPackage>>>) => schemaOrgOfOpened(store, opened);
 
     /**
      * Publish one version.

@@ -8,21 +8,23 @@
  *   aimeat_datapackage_* call too, so the page decides nothing the node does not decide. Errors throw
  *   with the node's code and message (js/api.js).
  *
- *   sendShareLink is the one call site of the e-mailed share link (WP9b builds the invite and the
- *   mail). Until it exists it says so and sends nothing; the share dialog shows the connection file
- *   instead, so no link is ever claimed as sent.
+ *   sendShareLink is the one call site of the e-mailed share link: it asks the node to mail the share's
+ *   one-time link, and says when the node sends no mail, so no link is ever claimed as sent.
  * @structure listProducts · getProduct · defineProduct · previewDraft · describeDraft · runProduct · deleteProduct ·
  *   getPackage · listVersions · listPackages · withdrawPackage · sellPackage · listParties · getParty ·
  *   shareWithParty · revokeShare · createPartyKey · deletePartyKey · stopParty · resumeParty ·
  *   deleteParty · partyReads · createParty · sendShareLink · listSourceChoices
  * @usage import * as dp from '/js/services/dataproducts.js';
  * @version-history
+ *   v1.2.0 — 2026-11-01 — sendShareLink sends the one-time link (POST /v1/parties/{party}/invite) in the
+ *     page's language (WP9b).
  *   v1.1.0 — 2026-11-01 — describeDraft (the AI's description draft); shareWithParty takes `recipient`
  *     for a person on another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a: the owner's screens for data products, shares and parties).
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { getLocale } from '/js/i18n.js';
 
 const enc = encodeURIComponent;
 const data = (r) => r?.data ?? null;
@@ -74,14 +76,24 @@ export async function deleteParty(name) { return data(await apiDelete(`/v1/parti
 export async function partyReads(name, limit = 20) { return data(await apiGet(`/v1/parties/${enc(name)}/reads?limit=${limit}`)); }
 
 /**
- * Mail the share's one-time link to the recipient. WP9b builds the invite and the mail; until then this
- * sends nothing and answers `{ sent: false, reason: 'not-available' }`, so the dialog hands over the
- * connection file itself. This is the only place a share link is sent from.
- * @param {{ share: object, party: object }} _shared what POST /v1/parties/share answered
- * @param {string} _email the recipient's address
+ * Mail the share's one-time link to the recipient: POST /v1/parties/{party}/invite, the call aimeat_party
+ * "send_link" makes, in the page's language. Answers `{ sent, to, link, expires_at }`; `sent` is false
+ * when this server sends no mail, and the page then shows the link for the owner to pass on. A refusal
+ * answers `{ sent: false, error }`, never throws, because the share itself was made. This is the only
+ * place a share link is sent from.
+ * @param {{ share: object, party: object }} shared what POST /v1/parties/share answered
+ * @param {string} email the recipient's address
  */
-export async function sendShareLink(_shared, _email) {
-  return { sent: false, reason: 'not-available' };
+export async function sendShareLink(shared, email) {
+  const party = shared?.party?.name;
+  const share = shared?.share?.id;
+  if (!party || !share) return { sent: false, error: 'no party share' };
+  try {
+    return data(await apiPost(`/v1/parties/${enc(party)}/invite`, { share, email, locale: getLocale() })) || { sent: false };
+  } catch (err) {
+    swallowed('dataproducts: sendShareLink', err);
+    return { sent: false, error: err?.message || String(err), code: err?.code };
+  }
 }
 
 /* ── What a source can be picked from ──────────────────────────────────────────────────────── */

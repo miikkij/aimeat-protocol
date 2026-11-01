@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-01 -- definitions/build-with-you.ts: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.x -- 2026-11-01 -- definitions/dataspace.ts: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
  *   v1.x -- 2026-11-01 -- definitions/datapackage-sell.ts: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
  *   v1.x -- 2026-11-01 -- definitions/party.ts: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
@@ -114,6 +115,7 @@ import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
 import { dataProductTools } from './definitions/dataproduct.js';
 import { partyTools } from './definitions/party.js';
+import { buildWithYouTools } from './definitions/build-with-you.js';
 import { dataspaceTools } from './definitions/dataspace.js';
 import { datapackageSellTools } from './definitions/datapackage-sell.js';
 
@@ -166,6 +168,7 @@ const CATALOG = [
     ...secretAddressTools,
     ...dataProductTools,
     ...partyTools,
+    ...buildWithYouTools,
     ...datapackageSellTools,
     ...dataspaceTools,
 ];

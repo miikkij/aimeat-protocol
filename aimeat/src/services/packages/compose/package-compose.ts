@@ -13,9 +13,10 @@
  *
  *   THREE KINDS OF DEPENDENCY, AND ONLY ONE OF THEM TRAVELS.
  *     · A cortex the OWNER installed is packaged, once, however many of the chosen apps load it.
- *       The app's address is resolved as the lib route resolves it (findCortex), and the record's
- *       installer must be the composer: a cortex another account installed is named in `expects`,
- *       as an extension is, because packaging it copies that account's work under the composer's name.
+ *       The app's address is resolved as the lib route resolves it (findCortex). Another account's
+ *       cortex is packaged only while it is public and active, which every account already reads
+ *       and loads, and a note names its installer; a private or inactive one is named in `expects`,
+ *       as an extension is, because packaging it copies work its author has not shared.
  *     · A cortex the NODE ships is never packaged. Copying it would give the installed apps a
  *       private second copy of a shared library while the rest of the node keeps using the first.
  *     · A library pack is never packaged. The node serves those from public/lib and src/static, each
@@ -39,6 +40,9 @@
  *   import { composePackageFromApps } from './package-compose.js';
  *   const out = await composePackageFromApps({ storage, config }, caller, { name, apps });
  * @version-history
+ *   v1.8.0 — 2026-11-01 — Another account's public, active cortex travels in the package again, and a
+ *     note names its installer; a private or inactive one stays in expects.cortex (Jouni's ruling on
+ *     the v1.7.0 change).
  *   v1.7.0 — 2026-11-01 — A cortex dependency is resolved with findCortex for the composer and packaged
  *     only when the composer installed it; another account's cortex is named in expects.cortex and a
  *     note names it. The raw name lookup copied another account's private cortex, manifest and lib
@@ -141,6 +145,17 @@ async function cortexNamed(storage: Storage, name: string, owner: string): Promi
     }
 }
 
+/**
+ * Whether a cortex record travels in the composer's package: the composer installed it, or another
+ * account did and keeps it public and active (Jouni, 2026-11-01). A shipped cortex never travels, and
+ * another account's private or inactive one stays with its author.
+ */
+function cortexTravels(record: CortexExtensionRecord, composer: string, systemGaii: string): boolean {
+    if (record.installedBy === composer) return true;
+    if (record.installedBy === systemGaii) return false;
+    return record.visibility === 'public' && record.status === 'active';
+}
+
 /** A component id that survives registeredNameFor and reads as itself in a dependency list. */
 function cortexComponentId(name: string): string {
     return `cortex-${shortCortexName(name)}`;
@@ -240,6 +255,8 @@ export async function planComposeFromApps(
     const seenExpect = { cortex: new Set<string>(), extensions: new Set<string>(), packs: new Set<string>() };
     /** The expected cortex names another account installed, for the notes. */
     const heldByOthers = new Set<string>();
+    /** Another account's public, active cortex the package carries: name -> its installer, for the notes. */
+    const carriedFromOthers = new Map<string, string>();
 
     for (const filename of input.apps) {
         if (typeof filename !== 'string' || !filename) {
@@ -263,9 +280,10 @@ export async function planComposeFromApps(
             // use (component-address.ts), with the composer as the caller.
             const record = await cortexNamed(storage, c.name, caller.owner);
 
-            // Unknown to this node, shipped by it, or installed by another account: named, never
-            // copied. Only a cortex the composer holds travels in the composer's package.
-            if (!record || record.installedBy !== caller.owner) {
+            // Unknown to this node, shipped by it, or another account's cortex that is private or
+            // inactive: named, never copied. The composer's own cortex travels, and so does another
+            // account's public, active one, which every account on the node already reads and loads.
+            if (!record || !cortexTravels(record, caller.owner, systemGaii)) {
                 if (record && record.installedBy !== systemGaii) heldByOthers.add(c.name);
                 if (!seenExpect.cortex.has(c.name)) {
                     seenExpect.cortex.add(c.name);
@@ -282,6 +300,7 @@ export async function planComposeFromApps(
             }
 
             const id = cortexComponentId(c.name);
+            if (record.installedBy !== caller.owner) carriedFromOthers.set(c.name, record.installedBy);
             if (!cortexComponents.has(id)) {
                 const content = await cortexComponentContent(storage, record.name);
                 if (content === null) {
@@ -375,7 +394,10 @@ export async function planComposeFromApps(
         notes.push(`Expects cortexes this node ships: ${shipped.join(', ')}`);
     }
     if (heldByOthers.size > 0) {
-        notes.push(`Expects cortexes other accounts installed, which travel only with their own author's package: ${[...heldByOthers].join(', ')}`);
+        notes.push(`Expects cortexes other accounts keep private or inactive, which travel only with their own author's package: ${[...heldByOthers].join(', ')}`);
+    }
+    if (carriedFromOthers.size > 0) {
+        notes.push(`Carries public cortexes other accounts installed: ${[...carriedFromOthers].map(([n, by]) => `${n} (by ${by})`).join(', ')}`);
     }
     if (expects.packs.length > 0) {
         notes.push(`Expects library packs the node serves: ${expects.packs.join(', ')}`);

@@ -9,7 +9,10 @@
  * @structure
  *   - Phase 1: fixtures (the holder's private, inactive cortexes; the composer's own cortexes; one app)
  *   - Phase 2: compose (what travels and what is named) and the ZIP export
+ *   - Phase 3: another account's public cortex travels while active, and is named while inactive
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Phase 3: another account's public, active cortex travels with a note naming
+ *     its installer, and a public, inactive one stays in expects.cortex (Jouni's ruling).
  *   v1.0.0 — 2026-11-01 — Initial (secaudit2026oct31w2 round 11,
  *     package-compose.ts:planComposeFromApps:cortex-copied-without-holder-check).
  */
@@ -213,8 +216,69 @@ await test('The exported ZIP carries none of the holder\'s cortex text', async (
     assert(!all.includes(SECRET), 'the holder\'s manifest and lib text are not in the ZIP');
 });
 
+console.log('\nPhase 3 — Another account\'s public cortex');
+
+/** The holder's public, active cortexes (bare and `<holder>/<name>`) and a public one left inactive. */
+const PUB_BARE = `pub-bare-${stamp}`;
+const PUB_NS = `pub-ns-${stamp}`;
+const PUB_OFF = `pub-off-${stamp}`;
+const PUB_APP = 'public-probe.html';
+const PUB_PKG = `public-pack-${stamp}`;
+let pubGroupId = '';
+
+await test('The holder installs three cortexes, makes them public and leaves one inactive', async () => {
+    await installCortex(holderToken, holderName, PUB_BARE, PUB_BARE, 'pub-bare-lib');
+    await installCortex(holderToken, holderName, PUB_NS, `${holderName}/${PUB_NS}`, 'pub-ns-lib');
+    await installCortex(holderToken, holderName, PUB_OFF, PUB_OFF, 'pub-off-lib');
+    for (const address of [PUB_BARE, `${holderName}/${PUB_NS}`, PUB_OFF]) {
+        const r = await json(`/v1/cortex/${encodeURIComponent(address)}/visibility`, {
+            method: 'POST', headers: authed(holderToken), body: JSON.stringify({ visibility: 'public' }),
+        });
+        assert(r.status === 200, `make ${address} public: ${r.status} ${JSON.stringify(r.body)}`);
+    }
+    await cortexStep(holderToken, PUB_BARE, 'activate');
+    await cortexStep(holderToken, `${holderName}/${PUB_NS}`, 'activate');
+});
+
+await test('The composer publishes an app that names the three public cortexes', async () => {
+    const uses = [PUB_BARE, `${holderName}/${PUB_NS}`, PUB_OFF];
+    const html = '<!DOCTYPE html><html><head><title>Public probe</title></head><body><h1>Probe</h1></body></html>';
+    const { status, body } = await json('/v1/apps', {
+        method: 'POST', headers: authed(composerToken),
+        body: JSON.stringify({ filename: PUB_APP, content: b64(html), name: 'Public probe', description: 'Compose fixture', category: 'utility', uses_cortex: uses }),
+    });
+    assert(status === 201, `publish: ${status} ${JSON.stringify(body)}`);
+});
+
+await test('Compose carries the holder\'s public, active cortexes and names the inactive one', async () => {
+    const { status, body } = await json('/v1/packages/compose', {
+        method: 'POST', headers: authed(composerToken),
+        body: JSON.stringify({ name: PUB_PKG, apps: [PUB_APP], allow_expectations: true }),
+    });
+    assert(status === 201, `compose: ${status} ${JSON.stringify(body)}`);
+    pubGroupId = body.data.packageGroupId;
+
+    const pkg = await json(`/v1/packages/${encodeURIComponent(pubGroupId)}`, { headers: authed(composerToken) });
+    const comps = pkg.body.data?.components ?? [];
+    const cortexIds = comps.filter((c: any) => c.type === 'cortex').map((c: any) => c.id).sort();
+    assert(JSON.stringify(cortexIds) === JSON.stringify([`cortex-${PUB_BARE}`, `cortex-${PUB_NS}`].sort()),
+        `the public, active cortexes travel, got ${JSON.stringify(cortexIds)}`);
+    const libs = comps.filter((c: any) => c.type === 'cortex').map((c: any) => JSON.stringify(JSON.parse(c.content).libs)).join(' ');
+    assert(libs.includes('pub-bare-lib') && libs.includes('pub-ns-lib'), `they travel with their lib files, got ${libs}`);
+    assert(!libs.includes('pub-off-lib'), 'the inactive public cortex does not travel');
+
+    const manifest = JSON.parse(pkg.body.data.manifest);
+    assert(manifest.expects.cortex.includes(PUB_OFF), `the inactive one is named in expects.cortex, got ${JSON.stringify(manifest.expects.cortex)}`);
+    for (const n of [PUB_BARE, `${holderName}/${PUB_NS}`]) {
+        assert(!manifest.expects.cortex.includes(n), `${n} travels, so it is not an expectation`);
+    }
+    const notes = JSON.stringify(body.data.notes ?? []);
+    assert(notes.includes(`${PUB_BARE} (by ${holderName})`), `a note names the installer of the carried cortex, got ${notes}`);
+});
+
 console.log('\nCleanup');
 await json(`/v1/packages/${encodeURIComponent(groupId)}`, { method: 'DELETE', headers: authed(composerToken) });
+await json(`/v1/packages/${encodeURIComponent(pubGroupId)}`, { method: 'DELETE', headers: authed(composerToken) });
 
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exit(1);

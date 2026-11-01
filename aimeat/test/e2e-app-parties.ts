@@ -17,6 +17,8 @@
  *     whose signup is open and that sells.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=app-parties
  * @version-history
+ *   v1.1.0 — 2026-11-01 — D4.3 over MCP: aimeat_admin_app_party_registrations lists and decides for the
+ *     operator and refuses an owner's agent (WP9b; the tool did not exist, so the test fails on the old code).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D4).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -146,6 +148,26 @@ async function run(): Promise<void> {
         const ok = await call(`/v1/admin/app-party-registrations/${A.name}/${APP}`, { token: OP.token, body: { decision: 'approve' } });
         assert(ok.status === 200 && ok.body.data.registration.open === true, `approve: ${show(ok)}`);
         assert((await call(P('/parties/registration'))).body.data.open === true, 'open after approval');
+    });
+
+    await test('D4.3 over MCP: the operator lists the requests and decides one; an owner\'s agent is refused', async () => {
+        const ask = await call(P('/parties/registration', OTHER), { token: A.token, method: 'PUT', body: { open: true } });
+        assert(ask.status === 200 && ask.body.data.registration.state === 'requested', `ask: ${show(ask)}`);
+        const opAgent = await makeAgent(BASE, OP, ['operator:admin']);
+        const opSession = await openSession(BASE, opAgent.token, 'app-parties-operator');
+        const ownAgent = await makeAgent(BASE, A, ['app:manage', 'party:manage']);
+        const ownSession = await openSession(BASE, ownAgent.token, 'app-parties-owner');
+        const refusedList = await callTool(ownSession, 'aimeat_admin_app_party_registrations', {});
+        assert(refusedList.isError && /FORBIDDEN|SCOPE_DENIED/.test(refusedList.text), `an owner's agent lists: ${refusedList.text.slice(0, 300)}`);
+        const refusedDecide = await callTool(ownSession, 'aimeat_admin_app_party_registrations', { action: 'decide', owner: A.name, app: OTHER, decision: 'approve' });
+        assert(refusedDecide.isError && /FORBIDDEN|SCOPE_DENIED/.test(refusedDecide.text), `an owner's agent decides: ${refusedDecide.text.slice(0, 300)}`);
+        assert((await call(P('/parties/registration', OTHER))).body.data.open === false, 'the refused decision changed nothing');
+        const list = await callTool(opSession, 'aimeat_admin_app_party_registrations', { action: 'list' });
+        assert(!list.isError && (list.data.apps as Body[]).some(x => x.owner === A.name && x.filename === OTHER && x.state === 'requested'), `the operator's list: ${list.text.slice(0, 400)}`);
+        const refuse = await callTool(opSession, 'aimeat_admin_app_party_registrations', { action: 'decide', owner: A.name, app: OTHER, decision: 'refuse', reason: 'Not this one' });
+        assert(!refuse.isError && refuse.data.registration?.state === 'refused', `refuse: ${refuse.text.slice(0, 400)}`);
+        const again = await callTool(opSession, 'aimeat_admin_app_party_registrations', { action: 'decide', owner: A.name, app: OTHER, decision: 'approve' });
+        assert(again.isError && /NOT_REQUESTED/.test(again.text), `nothing waits now: ${again.text.slice(0, 300)}`);
     });
 
     console.log('\nD4.2 sign up, sign in, the session');

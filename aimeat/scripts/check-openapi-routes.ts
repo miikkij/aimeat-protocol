@@ -25,6 +25,7 @@
  * @structure norm · contractPairs · codePairs · NOT_API · DECLARED_ELSEWHERE · main
  * @usage pnpm check:openapi-routes   (add --list to print every pair the code declares)
  * @version-history
+ *   v1.0.8 — 2026-11-01 — GET /v1/dataset/{owner}/{name} is a page (the public dataset page, WP9b).
  *   v1.0.7 — 2026-11-01 — GET /sitemap-datasets.xml is answered as a static document, like the portfolio sitemap.
  *   v1.0.6 — 2026-10-27 — POST /v1/a2a/directory is declared in routes/a2a.ts with router.use.
  *   v1.0.5 — 2026-10-16 — The page host's three routes answered: the page frame (a page), its slash redirect, the holder script.
@@ -67,6 +68,7 @@ const NOT_API: Record<string, string> = {
     'GET /v1/portal': PAGE,
     'GET /v1/portfolio/{}': PAGE,
     'GET /v1/use-with-ai/{}/{}': PAGE,
+    'GET /v1/dataset/{}/{}': PAGE,
     'GET /v1/privacy': PAGE,
     'GET /v1/privacy/{}': PAGE,
     'GET /v1/terms': PAGE,

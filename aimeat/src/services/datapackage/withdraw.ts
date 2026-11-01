@@ -25,7 +25,16 @@
  *   withdrawnMessage · withdrawPackage
  * @usage
  *   const out = await withdrawPackage({ storage, config }, callerOf(req, nodeId, storage), owner, name, { purge });
+ *
+ *   WHAT IT DECIDES ON. The package's audience, the version it points at and its withdrawal are the
+ *   service's record (./audience-record.ts trustedAudienceOf), never the pointer, which the generic
+ *   storage routes write: a pointer rewritten to say public opens no withdrawal notice to a stranger,
+ *   and a pointer with the withdrawal mark cleared brings no package back. The withdrawal is recorded
+ *   on the record and on the pointer. A purge deletes the package's sale terms record too.
  * @version-history
+ *   v1.4.0 — 2026-11-01 — Decides on trustedAudienceOf, not the pointer's visibility, version or
+ *     withdrawal mark; records the withdrawal on the audience record; a purge deletes the sale terms
+ *     record (WP9e, incident-datapackage-withdraw-ts-decides-on-latest-json-s-visibility--mvxmm7ex).
  *   v1.3.0 — 2026-11-01 — A package on EXCHANGE is delisted when it is withdrawn (runLatestHooks; plan D5.1).
  *   v1.2.0 — 2026-11-01 — The party of each share a withdrawal ends is mailed when it has an address
  *     (./share-notices.ts), and the withdrawal emits the `datapackages` change to the owner's streams
@@ -39,8 +48,10 @@
  */
 import type { StoreDeps } from './store.js';
 import { parseRef } from './store.js';
-import { readPointer, catalogueKeyRoot, runLatestHooks } from './version-audience.js';
+import { catalogueKeyRoot, runLatestHooks } from './version-audience.js';
 import { datapackageReadable, fileVisibilityOf, type DatapackageReader } from './audience.js';
+import { trustedPackageOf, recordPackageWithdrawal } from './audience-record.js';
+import { saleTermsOf, deleteSaleTerms } from './sale-terms-record.js';
 import { latestKey, packageKeyRoot, validateName, type LatestPointer } from './contract.js';
 import { writeStorageFile } from '../storage-file-write.js';
 import { emitChange } from '../event-bus.js';
@@ -67,23 +78,23 @@ export type WithdrawResult =
 /** The permission word a principal of the owner withdraws with. */
 export const DATAPACKAGE_WITHDRAW_SCOPE = 'storage:write';
 
-/** The withdrawal recorded on a pointer, or null when the package is not withdrawn. */
-export function withdrawalOf(pointer: LatestPointer | null | undefined): { withdrawnAt: string } | null {
-    return pointer?.status === 'withdrawn' && pointer.withdrawnAt ? { withdrawnAt: pointer.withdrawnAt } : null;
+/** The withdrawal trustedAudienceOf answered, or null when the package is not withdrawn. */
+export function withdrawalOf(trusted: { withdrawnAt?: string | undefined } | null | undefined): { withdrawnAt: string } | null {
+    return trusted?.withdrawnAt ? { withdrawnAt: trusted.withdrawnAt } : null;
 }
 
 /**
  * The withdrawal of one package as `reader` may learn of it: present only when the package is
  * withdrawn AND its audience admits the reader. A reader the audience refuses gets null, and the
- * caller answers it as a missing package.
+ * caller answers it as a missing package. Both come from the service's record.
  */
 export async function withdrawalFor(
     deps: StoreDeps, ownerGhii: string, name: string, reader: DatapackageReader | null | undefined,
 ): Promise<{ withdrawnAt: string } | null> {
-    const pointer = await readPointer(deps, ownerGhii, name);
-    const withdrawn = withdrawalOf(pointer);
+    const pkg = await trustedPackageOf(deps.storage, deps.config.nodeId, ownerGhii, name);
+    const withdrawn = withdrawalOf(pkg?.trusted);
     if (!withdrawn) return null;
-    return (await datapackageReadable(deps.storage, ownerGhii, pointer!.visibility, reader, name)) ? withdrawn : null;
+    return (await datapackageReadable(deps.storage, ownerGhii, pkg!.trusted.visibility, reader, name)) ? withdrawn : null;
 }
 
 /** withdrawalFor for a `pkg:{owner}/{name}[@version]` reference. */
@@ -120,13 +131,16 @@ export async function withdrawPackage(
     }
     const nameError = validateName(name);
     if (nameError) return { ok: false, status: 400, code: 'INVALID_INPUT', message: nameError };
-    const pointer = await readPointer(deps, ownerGhii, name);
+    const pkg = await trustedPackageOf(storage, config.nodeId, ownerGhii, name);
     const packageId = `pkg:${localAccountName(ownerGhii)}/${name}`;
-    if (!pointer || (!pointer.contentHash && !withdrawalOf(pointer))) {
+    if (!pkg || (!pkg.trusted.current && !withdrawalOf(pkg.trusted))) {
         return { ok: false, status: 404, code: 'NOT_FOUND', message: `No such data package: ${packageId}` };
     }
+    const { pointer, trusted } = pkg;
 
-    const earlier = withdrawalOf(pointer);
+    const earlier = withdrawalOf(trusted);
+    // Read before a purge deletes them: a package on sale has its listing follow the withdrawal.
+    const sold = await saleTermsOf(storage, config.nodeId, ownerGhii, name, pointer);
     const withdrawnAt = earlier?.withdrawnAt ?? new Date().toISOString();
     const catalogueRemoved = await removeCatalogueEntry(deps, ownerGhii, pointer.packageId || packageId);
 
@@ -139,14 +153,20 @@ export async function withdrawPackage(
         const pointerKey = latestKey(name);
         for (const f of files.filter(x => x.key !== pointerKey)) if (await storage.deleteStorageFile(ownerGhii, f.key)) filesDeleted++;
         if (await storage.deleteStorageFile(ownerGhii, pointerKey)) filesDeleted++;
+        // The package is gone, so are its sale terms; a later publish of the name starts off the market.
+        await deleteSaleTerms(storage, ownerGhii, name);
         logger.info('datapackage: purged', { package: packageId, files: filesDeleted });
-    } else if (!earlier) {
+    }
+    // The record's mark is the one the reads decide on (a record with a mark keeps its own); the
+    // pointer's is for a reader of the file, and is written again when something cleared it.
+    await recordPackageWithdrawal(storage, ownerGhii, name, withdrawnAt);
+    if (!opts.purge && pointer.status !== 'withdrawn') {
         const next: LatestPointer = { ...pointer, status: 'withdrawn', withdrawnAt };
         const written = await writeStorageFile(deps, ownerGhii, {
             key: latestKey(name),
             data: Buffer.from(JSON.stringify(next, null, 2) + '\n', 'utf8'),
             mimeType: 'application/json; charset=utf-8',
-            visibility: fileVisibilityOf(pointer.visibility ?? 'public'),
+            visibility: fileVisibilityOf(trusted.visibility ?? 'public'),
         });
         if (!written.ok) throw new Error(`withdrawing ${packageId}: the pointer could not be written: ${written.message}`);
     }
@@ -161,7 +181,7 @@ export async function withdrawPackage(
             .catch(err => logger.warn('datapackage: the withdrawal notices failed', { package: packageId, error: String(err) }));
     }
     // A package on EXCHANGE leaves the market with it; its contracts stay as they are (plan D5.1).
-    if (pointer.exchange) await runLatestHooks(storage, ownerGhii, name, { ...pointer, status: 'withdrawn', withdrawnAt });
+    if (sold) await runLatestHooks(storage, ownerGhii, name, { ...pointer, exchange: sold, status: 'withdrawn', withdrawnAt });
     emitChange('files');
     emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
     if (catalogueRemoved) emitChange('memory');
