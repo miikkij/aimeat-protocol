@@ -9,6 +9,7 @@
  * @structure dataProductTools · DATAPRODUCT_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.2.0 — 2026-11-01 — `schedule: { on: "change" }`; action "describe" with `lang` (WP9c).
  *   v1.1.0 — 2026-11-01 — `retention`; "list" says what each row carries (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
@@ -20,7 +21,7 @@ import {
     DataProductScheduleSchema, DataProductRetentionSchema, DataProductVisibilitySchema,
 } from '../../models/dataproduct-schemas.js';
 
-export const DATAPRODUCT_ACTIONS = ['define', 'get', 'list', 'preview', 'run', 'delete'] as const;
+export const DATAPRODUCT_ACTIONS = ['define', 'get', 'list', 'preview', 'run', 'delete', 'describe'] as const;
 
 export const dataProductTools = [
     {
@@ -29,11 +30,11 @@ export const dataProductTools = [
             + 'When the person asks for one ("make a data product of the municipal budget signals, update it on Mondays"), find the material first (aimeat_discover, aimeat_workspace_read), then call action "define" with the sources and the schedule, then action "preview" and tell the person what the rows look like and who will read them. Run it when they agree. '
             + 'action "define" { name, sources, combine?, columns?, filter?, schedule?, visibility?, title?, description?, keywords?, license? } stores the definition (REPLACES one of the same name) after reading every source as you; '
             + '"preview" { name } builds it without publishing: the first 20 rows of each resource, the row counts, the Table Schema, the validation result and the ODPS sheet the version would get (pass the definition fields too to preview a draft without storing it); '
-            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get"; "list" (each product with its freshness: fresh, late, stale or unscheduled; its audience, live named shares and reads in the last seven days, which answers "what data do I offer", "is any of it stale" and "who reads my data"); "delete" (removes the definition and its schedule; the package stays). '
+            + '"run" { name } builds and publishes one version (the same rows give no new version: unchanged true); "get"; "list" (each product with its freshness: fresh, late, stale or unscheduled; its audience, live named shares and reads in the last seven days, which answers "what data do I offer", "is any of it stale" and "who reads my data"); "delete" (removes the definition and its schedule; the package stays); "describe" { name, lang?, and the definition fields for a draft } asks the person\'s own AI for a two- or three-sentence description from the name, the sources and the columns (no row is sent; needs ai:use): a draft for the person to change, AI-written, with its provenance record. '
             + 'SOURCES, each { id (A, B...), kind, ... }: records { organism_id, ws, space } (each published record of a workspace records space is a row); app { app, key_prefix, rows_at? } (an app\'s data, only the families its data map marks publishable); memory { key, rows_at?, owner? } (the array at rows_at of one record); extension { ext, action, input?, rows_at? } (an extension action the node runs); file { key, sheet? } (a stored CSV or XLSX); datapackage { name, owner?, resource? } (another data package; it goes into the lineage). '
             + 'A source may name `columns`: a list to keep, or { column: "dotted.path" } to flatten nested values. '
             + 'COMBINE: "tables" (each source its own resource; the default with one source), "union" (rows appended; the columns must match), "join" with key { left: "A.kunta", right: "B.kunta" } (a left join of the first source; unmatched rows kept with nulls; a right key on several rows is refused). '
-            + 'columns [{ source, from, name?, type?, description?, include? }] maps the output; filter { column, op eq|ne|gt|gte|lt|lte|contains|in, value } keeps rows; schedule { cron, timezone? } rebuilds on a clock ("0 6 * * 1" is Mondays at 06:00), null builds on demand only. '
+            + 'columns [{ source, from, name?, type?, description?, include? }] maps the output; filter { column, op eq|ne|gt|gte|lt|lte|contains|in, value } keeps rows; schedule { cron, timezone? } rebuilds on a clock ("0 6 * * 1" is Mondays at 06:00), { on: "change" } rebuilds when a source changes (a records space, an app\'s data, a memory key, a file or another package; at most once every five minutes; refused with NO_CHANGE_SIGNAL for a product with an extension source), null builds on demand only. '
             + 'WHO READS IT: visibility private (the default), members, organism:<id> or public; it may not be wider than its narrowest source (a private record or an organism workspace refuses public with AUDIENCE_WIDER_THAN_SOURCE). A column the data map marks personal is left out unless columns names it with include true, and then public is refused with PERSONAL_DATA_PUBLIC until the person confirms (confirm_personal_public true). '
             + 'Reading needs storage:read; define, run and delete need storage:write and memory:write; each source needs the permission its own read needs (organism:read, memory:read, ext:invoke, storage:read).',
         caller: 'agent',
@@ -54,9 +55,10 @@ export const dataProductTools = [
             combine: { type: 'object', description: 'For define: { mode: tables | union | join, key?: { left: "A.col", right: "B.col" or a list } }.', zod: DataProductCombineSchema },
             columns: { type: 'array', description: 'For define: the output columns [{ source, from, name?, type?, description?, include? }]. Omit to keep every column of every source.', zod: DataProductColumnsSchema },
             filter: { type: 'object', description: 'For define: { column, op, value } keeps the rows that pass; null removes the filter.', zod: DataProductFilterSchema },
-            schedule: { type: 'object', description: 'For define: { cron, timezone? } rebuilds the product on a clock; null builds on demand only.', zod: DataProductScheduleSchema },
+            schedule: { type: 'object', description: 'For define: { cron, timezone? } rebuilds the product on a clock; { on: "change" } rebuilds it when a source changes; null builds on demand only.', zod: DataProductScheduleSchema },
             retention: { type: 'object', description: 'For define: { keep, unit? } keeps that many earlier versions (unit "versions", the default) or that many months of them; null or absent keeps every version. A version a share pins stays regardless.', zod: DataProductRetentionSchema },
             visibility: { type: 'string', description: 'For define: private (the default), members, organism:<id> or public.', zod: DataProductVisibilitySchema },
+            lang: { type: 'string', enum: ['en', 'fi', 'es'], description: 'For describe: the language of the draft (default en).' },
             confirm_personal_public: { type: 'boolean', description: 'For define: the person agreed that a public product carries the columns the data map marks personal.' },
         },
     },

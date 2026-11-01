@@ -38,6 +38,9 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.14.0 — 2026-11-01 — The file hooks moved by extraction to ./storage-file-hooks.ts (line limit) and
+ *     are re-exported; it adds addStorageFileListener(), which the data products that run when a source
+ *     changes use (services/dataproduct/on-change.ts, WP9c).
  *   v1.13.0 — 2026-11-01 — The write and the delete of the welcome page key note its writer
  *     (storage-page-keys.ts notePageKeyChange), and the presigned mint carries the writer in the token
  *     (`page_writer`); the write takes it back as `pageWriter` (secaudit2026oct31w2 round 11,
@@ -131,6 +134,7 @@ import type { ClosedNodeWarning } from './closed-node-level.js';
 import { uploadVisibilityOf } from './content-defaults.js';
 import { resolveChoice } from './file-store/file-store-resolver.js';
 import { adoptStorageObject, directUploadTarget } from '../storage/blob/file-store-wrap.js';
+import { fileStored, fileRemoved } from './storage-file-hooks.js';
 
 /**
  * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
@@ -141,22 +145,9 @@ function levelOf(config: AimeatConfig, named: string | undefined, gate: StorageP
     return uploadVisibilityOf(config, named, !!gate && 'caller' in gate && gate.caller.kind === 'app') as StorageFileRecord['visibility'];
 }
 
-/** A function told about a stored or removed file after the fact. It returns at once and never throws. */
-export type StorageFileHook = (deps: { storage: Storage; config: AimeatConfig }, ownerGaii: string, key: string) => void;
-
-/**
- * The hooks the write and the delete call once the file has landed or gone. Set at boot
- * (setStorageFileHooks), as the write classifier is (classify-on-write.ts): the content class
- * pipeline that listens here stores its own text files through this module, so a static import
- * would close an import cycle.
- */
-const fileHooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook } = {};
-
-/** Set the hooks the write and the delete call. Called once at boot. */
-export function setStorageFileHooks(hooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook }): void {
-    fileHooks.afterStore = hooks.afterStore;
-    fileHooks.afterRemove = hooks.afterRemove;
-}
+// The hooks told about a stored or removed file live in ./storage-file-hooks.ts (moved at the line
+// limit); the names this module exported are exported from here still.
+export { setStorageFileHooks, addStorageFileListener, type StorageFileHook } from './storage-file-hooks.js';
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -442,7 +433,7 @@ export async function writeStorageFile(
     emitRecordChange('files', ownerGaii, level.visibility);
     emitRecordChange('memory', ownerGaii, level.visibility);
     // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
-    fileHooks.afterStore?.({ storage, config }, ownerGaii, input.key);
+    fileStored({ storage, config }, ownerGaii, input.key);
     // A welcome page notes its writer before the answer, so the next read meets the record (storage-page-keys.ts).
     await notePageKeyChange(deps, ownerGaii, input.key, writer, input.data);
 
@@ -524,7 +515,7 @@ export async function removeStorageFile(
     // bytes in the budget the memory view renders. The route emitted only 'files'.
     emitRecordChange('files', ownerGaii, existing.visibility);
     emitRecordChange('memory', ownerGaii, existing.visibility);
-    fileHooks.afterRemove?.({ storage, config: deps.config }, ownerGaii, key);
+    fileRemoved({ storage, config: deps.config }, ownerGaii, key);
     // A removed welcome page can uncover another copy, which the remover then put on show (storage-page-keys.ts).
     await notePageKeyChange(deps, ownerGaii, key, writer);
 

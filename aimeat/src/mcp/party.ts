@@ -12,6 +12,7 @@
  * @structure registerPartyTool(mcp, config, storage, caller)
  * @usage registerPartyTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "share" takes `recipient`: a person on another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
 import type { McpServer } from '@modelcontextprotocol/server';
@@ -30,7 +31,7 @@ import {
 import { operatorSetStop } from '../services/parties/admin.js';
 import { PARTY_MANAGE_SCOPE } from '../services/parties/contract.js';
 
-const SHARE_FIELDS = ['name', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key'] as const;
+const SHARE_FIELDS = ['name', 'recipient', 'package', 'purpose', 'days', 'expires', 'kind', 'display_name', 'contact', 'pinned_version', 'allow_url_key', 'terms_required', 'new_key'] as const;
 const PARTY_FIELDS = ['name', 'kind', 'display_name', 'contact'] as const;
 
 export function registerPartyTool(

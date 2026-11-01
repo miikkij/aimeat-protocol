@@ -14,6 +14,8 @@
  * @structure namedShareSource · outsidePartySource
  * @usage import { namedShareSource, outsidePartySource } from './sources-parties.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A share to a person on another AIMEAT node is a named share too, party kind
+ *     `visitor`, named by their home account (WP9c).
  *   v1.2.0 — 2026-11-01 — A named share carries `share` (the package, the party's name and kind, the
  *     purpose, the end, the last read and the reads of seven days) and a party `party` (its name, kind,
  *     live shares, keys and when a key was last used), for the owner's page (WP9a).
@@ -21,11 +23,12 @@
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3).
  */
 import type { ExposureItem, ExposureSource } from './exposure-types.js';
-import { isLiveShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
+import { isLiveShare, isNamedShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
 import { readParties } from '../parties/store.js';
 import { shareReadStats } from '../parties/read-stats.js';
 import { flushOwner } from '../parties/activity.js';
 import { parsePartyRef } from '../parties/contract.js';
+import { localAccountName } from '../../utils/gaii.js';
 import { packageFreshness } from '../datapackage/freshness-read.js';
 
 const enc = encodeURIComponent;
@@ -34,7 +37,7 @@ export const namedShareSource: ExposureSource = {
   kind: 'named_share',
   async list(ctx, _ownerName, ownerGhii) {
     const active = await ctx.storage.listConsents(ownerGhii, { status: 'active' });
-    const live = active.filter(c => c.recipient.startsWith('party:') && isLiveShare(c, ctx.nowMs));
+    const live = active.filter(c => isNamedShare(c) && isLiveShare(c, ctx.nowMs));
     if (!live.length) return [];
     // The shared package's freshness, once per package (plan D6.1).
     const states = new Map<string, string>();
@@ -52,13 +55,16 @@ export const namedShareSource: ExposureSource = {
         const party = ref?.name ?? c.recipient;
         const p = ref ? byName.get(ref.name) : undefined;
         const st = stats.get(c.id);
+        // A share to a person on another AIMEAT node names their home account, and they read as a visitor.
+        const visitor = shareMetaOf(c).visitor === true;
         return {
           kind: 'named_share', id: c.id, title: `${pkg} shared with ${party} until ${(c.expires ?? '').slice(0, 10)}`,
-          level: 'named', url: `${ctx.base}/v1/odata/${enc(ref?.owner ?? '')}/${enc(pkg)}`,
+          level: 'named', url: `${ctx.base}/v1/odata/${enc(ref?.owner ?? localAccountName(ownerGhii))}/${enc(pkg)}`,
           how_to_close: `End it with aimeat_consent_revoke (consent_id ${c.id}; DELETE /v1/consent/${enc(c.id)}). The next read is refused; copies already taken stay with the party.`,
           ...(states.get(pkg) ? { freshness: states.get(pkg) } : {}),
           share: {
-            package: pkg, party, party_name: p?.displayName ?? party, party_kind: p?.kind ?? 'program', purpose: c.purpose,
+            package: pkg, party, party_name: p?.displayName ?? (typeof c.metadata?.displayName === 'string' ? c.metadata.displayName : party),
+            party_kind: visitor ? 'visitor' : p?.kind ?? 'program', purpose: c.purpose,
             expires: c.expires ?? null, last_read_at: st?.last_read_at ?? null, reads_7d: st?.reads_7d ?? 0,
           },
         };

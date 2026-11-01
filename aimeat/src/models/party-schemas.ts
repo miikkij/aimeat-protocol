@@ -11,6 +11,8 @@
  *   PartyStopSchema · EmptyPartyBodySchema
  * @usage router.post('/v1/parties', ..., validateBody(PartyCreateSchema, config.nodeId), handler)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — PartyShareSchema takes `recipient` in place of `name`: a share to a person on
+ *     another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3).
  */
 import { z } from 'zod';
@@ -30,13 +32,18 @@ export const PartyUpdateSchema = z.object({
     kind: kind.optional(), display_name: displayName.optional(), contact: contact.nullable().optional(),
 });
 
+/**
+ * A share to a party (`name`), or to a person on another AIMEAT node (`recipient`, their home account
+ * name@their-node). One of the two, never both.
+ */
 export const PartyShareSchema = z.object({
-    name: partyName, package: z.string().max(64), purpose: z.string().max(512),
+    name: partyName.optional(), recipient: z.string().max(INPUT_LIMITS.id).optional(),
+    package: z.string().max(64), purpose: z.string().max(512),
     days: z.number().positive().max(3650).optional(), expires: z.string().max(64).optional(),
     kind: kind.optional(), display_name: displayName.optional(), contact: contact.optional(),
     pinned_version: z.string().max(80).optional(), allow_url_key: z.boolean().optional(),
     terms_required: z.boolean().optional(), new_key: z.boolean().optional(),
-});
+}).refine(b => (b.name === undefined) !== (b.recipient === undefined), { message: 'Name the party (name) or the person on another AIMEAT node (recipient), one of the two.', path: ['recipient'] });
 
 /** OAuth 2.0 client credentials, as a form or JSON; the pair may come as HTTP Basic instead. */
 export const PartyTokenSchema = z.object({
