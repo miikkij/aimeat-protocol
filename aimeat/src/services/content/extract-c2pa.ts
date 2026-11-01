@@ -13,48 +13,30 @@
  *   and no manifest". Chain of trust is not checked by the library, so `valid` says that the
  *   manifest's hashes and signature hold, not who is behind the certificate.
  *
- *   REFLECT METADATA. c2pa-ts loads @peculiar/x509, which loads tsyringe, and tsyringe throws at load
- *   time unless `Reflect.getMetadata` exists. The `reflect-metadata` package (Apache-2.0, the one
- *   tsyringe documents) is imported before the library, which is imported dynamically, so the node
- *   pays for neither until the first picture or video is read.
+ *   IN A WORKER. The library runs in a worker thread under the time and memory limits of
+ *   media-read-bounded.ts (content_class.media_read_seconds, content_class.media_read_memory_mb), which
+ *   also loads reflect-metadata before it, as tsyringe (loaded by @peculiar/x509) requires. The node's
+ *   own thread never loads c2pa-ts.
  *
- *   NEVER THROWS. Any error after a manifest was found gives `{ present: true, error }`; any error
- *   before that gives null.
- * @structure readC2pa · subjectName · loadC2pa
- * @usage const c2pa = await readC2pa(bytes); // null | { present: false } | { present: true, ... }
+ *   NEVER THROWS, WITH ONE EXCEPTION. Any error after a manifest was found gives `{ present: true,
+ *   error }` (a limit reached then included); any error before that gives null. A limit reached before
+ *   the manifest was found throws MediaReadLimitReached, so the caller records why the file was not read.
+ * @structure readC2pa · subjectName
+ * @usage const c2pa = await readC2pa(bytes, mediaReadLimits(config)); // null | { present: false } | { present: true, ... }
  * @version-history
+ *   v1.1.0 — 2026-11-01 — c2pa-ts runs in a worker under a time and a memory limit (media-read-bounded.ts);
+ *     nested JUMBF superboxes made it copy the manifest once per level in the node's own thread
+ *     (secaudit2026oct31w2 round 12, readC2pa:jumbf-superbox-nesting-quadratic-copy). The facts read
+ *     are the same.
  *   v1.0.1 — 2026-10-20 — The hand-written Reflect metadata functions are replaced by the
  *     reflect-metadata package.
  *   v1.0.0 — 2026-10-20 — Initial.
  */
 import { logger } from '../../utils/logger.js';
+import { DEFAULT_MEDIA_READ_LIMITS, MediaReadLimitReached, readC2paBounded, type MediaReadLimits } from './media-read-bounded.js';
 import type { AiMarks } from './types.js';
 
 type C2paFacts = NonNullable<AiMarks['c2pa']>;
-
-type C2paModules = {
-  asset: typeof import('@trustnxt/c2pa-ts/asset');
-  jumbf: typeof import('@trustnxt/c2pa-ts/jumbf');
-  manifest: typeof import('@trustnxt/c2pa-ts/manifest');
-};
-
-let loaded: Promise<C2paModules> | null = null;
-
-/** The three c2pa-ts entry points, imported once, after reflect-metadata. */
-function loadC2pa(): Promise<C2paModules> {
-  if (!loaded) {
-    loaded = import('reflect-metadata').then(() => Promise.all([
-      import('@trustnxt/c2pa-ts/asset'),
-      import('@trustnxt/c2pa-ts/jumbf'),
-      import('@trustnxt/c2pa-ts/manifest'),
-    ])).then(([asset, jumbf, manifest]) => ({ asset, jumbf, manifest }));
-    loaded.catch((err: unknown) => {
-      logger.warn(`[content] c2pa-ts did not load: ${errText(err)}`);
-      loaded = null;
-    });
-  }
-  return loaded;
-}
 
 /** "CN=Example Signer, O=Example Ltd, C=FI" gives "Example Signer (Example Ltd)". */
 function subjectName(subject: string | undefined): string | undefined {
@@ -72,59 +54,46 @@ const errText = (err: unknown): string => ((err as Error)?.message || String(err
 /**
  * The C2PA manifest summary of a file.
  * @param {Buffer} bytes - The file.
+ * @param {MediaReadLimits} [limits] - The time and memory limits of the read; the defaults when left out.
  * @returns {Promise<object|null>} null when c2pa-ts does not read the format; `{ present: false }`
  *   when it reads it and finds no manifest; otherwise the active manifest's summary.
+ * @throws {MediaReadLimitReached} when a limit is reached before a manifest was found.
  */
-export async function readC2pa(bytes: Buffer): Promise<C2paFacts | null> {
+export async function readC2pa(bytes: Buffer, limits: MediaReadLimits = DEFAULT_MEDIA_READ_LIMITS): Promise<C2paFacts | null> {
   let found = false;
+  let answer;
   try {
-    const { asset: assetMod, jumbf: jumbfMod, manifest: manifestMod } = await loadC2pa();
-    let asset: Awaited<ReturnType<typeof assetMod.createAsset>>;
-    try {
-      asset = await assetMod.createAsset(new Uint8Array(bytes));
-    } catch (err) {
-      // createAsset throws on any format it does not read; null is the documented answer for that.
-      logger.debug(`[content] c2pa-ts does not read this format: ${errText(err)}`);
-      return null;
-    }
-    const raw = await asset.getManifestJUMBF();
-    if (!raw) return { present: false };
-    found = true;
-
-    const store = manifestMod.ManifestStore.read(jumbfMod.SuperBox.fromBuffer(raw));
-    const active = store.getActiveManifest();
-    const out: C2paFacts = { present: true };
-    if (active?.claim) {
-      const claim = active.claim;
-      const gen = [claim.claimGeneratorName, claim.claimGeneratorVersion].filter(Boolean).join(' ');
-      if (gen) out.claimGenerator = gen;
-      else if (claim.claimGeneratorInfo) out.claimGenerator = claim.claimGeneratorInfo;
-      if (claim.title) out.title = claim.title;
-    }
-    const signer = subjectName(active?.signature?.signatureData?.certificate?.subject);
-    if (signer) out.signer = signer;
-
-    const actions: string[] = [];
-    const sourceTypes: string[] = [];
-    for (const assertion of active?.assertions?.getActionAssertions() ?? []) {
-      for (const a of assertion.actions ?? []) {
-        if (a.action && !actions.includes(String(a.action))) actions.push(String(a.action));
-        if (a.digitalSourceType && !sourceTypes.includes(String(a.digitalSourceType))) sourceTypes.push(String(a.digitalSourceType));
-      }
-    }
-    if (actions.length) out.actions = actions;
-    if (sourceTypes.length) out.digitalSourceTypes = sourceTypes;
-
-    try {
-      const result = await store.validate(asset);
-      out.valid = result.isValid;
-    } catch (err) {
-      out.valid = false;
-      out.error = errText(err);
-    }
-    return out;
+    answer = await readC2paBounded(bytes, limits, () => { found = true; });
   } catch (err) {
+    if (found) return { present: true, error: errText(err) };
+    if (err instanceof MediaReadLimitReached) throw err;
     logger.debug(`[content] C2PA read failed: ${errText(err)}`);
-    return found ? { present: true, error: errText(err) } : null;
+    return null;
   }
+  if ('load' in answer) {
+    logger.warn(`[content] c2pa-ts did not load: ${answer.load}`);
+    return null;
+  }
+  if ('unreadable' in answer) {
+    // createAsset throws on any format it does not read; null is the documented answer for that.
+    logger.debug(`[content] c2pa-ts does not read this format: ${answer.unreadable}`);
+    return null;
+  }
+  if ('failed' in answer) {
+    logger.debug(`[content] C2PA read failed: ${answer.failed}`);
+    return null;
+  }
+  const { facts, subject } = answer;
+  if (!facts.present) return { present: false };
+  const out: C2paFacts = { present: true };
+  if (facts.claimGenerator) out.claimGenerator = facts.claimGenerator as string;
+  if (facts.title) out.title = facts.title;
+  const signer = subjectName(subject);
+  if (signer) out.signer = signer;
+  if (facts.actions?.length) out.actions = facts.actions;
+  if (facts.digitalSourceTypes?.length) out.digitalSourceTypes = facts.digitalSourceTypes;
+  if (facts.valid !== undefined) out.valid = facts.valid;
+  if (facts.error) out.error = facts.error;
+  if (out.error && facts.valid === undefined) logger.debug(`[content] C2PA read failed: ${out.error}`);
+  return out;
 }

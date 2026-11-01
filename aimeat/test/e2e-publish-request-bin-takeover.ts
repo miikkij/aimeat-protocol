@@ -21,8 +21,14 @@
  *   anonymous read of the key stays refused. The positive control: an unchanged request still applies.
  *   Phase 5 does the same for a knowledge package request and the entry it names: the bin settles it
  *   (DELETE), the entry digest refuses it (bulk delete), and an unchanged one still applies.
+ *   Phase 6: the agent writes other content and asks again, which moves the waiting request to it
+ *   under the same id; the owner's old notice and list item close as outdated and new ones ask about
+ *   the new content, so the press publishes what the owner was last asked about. The same content
+ *   asked again changes nothing, and content written later without asking is refused (409 OUTDATED).
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-publish-request-bin-takeover
  * @version-history
+ *   2026-11-01 — Phase 6 (secaudit2026oct31w2 round 12,
+ *     publish-requests/store.ts:filePublishRequest:reask-moves-approval-to-new-content).
  *   2026-10-21 — Phase 4 asserts the agent gets 403 when it approves its own request.
  *   2026-10-20 — Phase 5: the knowledge-entry variant (settled on the bin, refused by the entry digest).
  *   2026-10-20 — Initial (secaudit 2026-10, apply-memory.ts:applyMemoryPublish:version-restarts-on-bin-takeover).
@@ -281,6 +287,77 @@ await test('SECURITY: an entry removed through bulk delete and written again: th
     assert(d.status === 409 && d.body.error?.code === 'OUTDATED', `the approval: ${d.status} ${short(d.body)}`);
     const anon = await anonRead(k.entryKey);
     assert(anon.status !== 200, `the swapped entry went public: ${anon.status} ${short(anon.body)}`);
+});
+
+console.log('\nPhase 6: an ask again that moves the request to other content asks the owner again');
+
+/** The owner's notices about one request, and the open items on the owner's list that name it. */
+async function questionOf(id: string): Promise<{ notices: any[]; items: any[] }> {
+    const n = await json('/v1/notifications?limit=200', { headers: bearer(ownerToken) });
+    assert(n.status === 200, `notifications ${n.status}: ${short(n.body)}`);
+    const o = await json('/v1/open-items', { headers: bearer(ownerToken) });
+    assert(o.status === 200, `open items ${o.status}: ${short(o.body)}`);
+    return {
+        notices: (n.body.data.notifications as any[]).filter(v => v.ref === `publish-request:${id}`),
+        items: (o.body.data.items as any[]).filter(i => i.object?.type === 'publish-request' && i.object.id === id),
+    };
+}
+const approvable = (v: any): boolean => !v.answered && (v.actions ?? []).some((a: any) => a.id === 'approve');
+
+/** The agent writes `key` public again: the same request answers, still waiting. */
+async function askAgain(key: string, value: unknown, id: string): Promise<void> {
+    const w = await json('/v1/memory', { method: 'POST', headers: bearer(agentToken), body: JSON.stringify({ key, value, visibility: 'public' }) });
+    assert(w.status === 202 && w.body.data?.publish_request?.request_id === id && w.body.data.publish_request.already_waiting === true,
+        `asking again answers the standing request: ${w.status} ${short(w.body.data?.publish_request ?? w.body.error)}`);
+}
+
+await test('SECURITY: the agent writes other content and asks again: the old notice and item close as outdated, a new notice and item ask about what is there now', async () => {
+    const key = 'pbt.reask';
+    const id = await askPublic(key, { t: 'A-first-content' });
+    const first = await questionOf(id);
+    assert(first.notices.length === 1 && approvable(first.notices[0]), `one notice with Approve at filing: ${short(first.notices)}`);
+    assert(first.items.length === 1, `one item at filing: ${short(first.items)}`);
+    await askAgain(key, { t: 'B-later-content' }, id);
+    const after = await questionOf(id);
+    const old = after.notices.find(v => v.id === first.notices[0].id);
+    assert(old && old.answered?.outcome === 'outdated' && (old.actions ?? []).length === 0,
+        `the notice the owner was shown before the move keeps its Approve: ${short(old)}`);
+    const fresh = after.notices.filter(approvable);
+    assert(fresh.length === 1 && fresh[0].id !== first.notices[0].id, `one new notice asks again: ${short(after.notices)}`);
+    assert(after.items.length === 1 && after.items[0].id !== first.items[0].id, `the old item closes and a new one opens: ${short(after.items)}`);
+    const d = await approve(id);
+    assert(d.status === 200 && d.body.data?.request?.state === 'approved', `approve ${d.status}: ${short(d.body)}`);
+    const anon = await anonRead(key);
+    assert(anon.status === 200 && anon.body.data?.value?.t === 'B-later-content', `anonymous read ${anon.status}: ${short(anon.body)}`);
+    const settled = await questionOf(id);
+    assert(settled.notices.every(v => !approvable(v)) && settled.items.length === 0, `the press closes every notice and item: ${short(settled)}`);
+});
+
+await test('KEPT: the agent writes the same content again and asks again: the owner is not asked again, and one press publishes it', async () => {
+    const key = 'pbt.same';
+    const id = await askPublic(key, { t: 'same-content' });
+    const first = await questionOf(id);
+    await askAgain(key, { t: 'same-content' }, id);
+    const after = await questionOf(id);
+    assert(after.notices.length === 1 && after.notices[0].id === first.notices[0].id && approvable(after.notices[0]),
+        `the same notice still asks: ${short(after.notices)}`);
+    assert(after.items.length === 1 && after.items[0].id === first.items[0].id, `the same item stays: ${short(after.items)}`);
+    const d = await approve(id);
+    assert(d.status === 200 && d.body.data?.request?.state === 'approved', `approve ${d.status}: ${short(d.body)}`);
+    const anon = await anonRead(key);
+    assert(anon.status === 200 && anon.body.data?.value?.t === 'same-content', `anonymous read ${anon.status}: ${short(anon.body)}`);
+});
+
+await test('SECURITY: content written after the newest notice without asking again is not published by the press (409 OUTDATED)', async () => {
+    const key = 'pbt.reask.late';
+    const id = await askPublic(key, { t: 'A-first-content' });
+    await askAgain(key, { t: 'B-asked-content' }, id);
+    const late = await json('/v1/memory', { method: 'POST', headers: bearer(agentToken), body: JSON.stringify({ key, value: { t: 'C-unasked-content' }, visibility: 'private' }) });
+    assert(late.status === 200 && !late.body.data?.publish_request, `a private rewrite asks nothing: ${late.status} ${short(late.body.data)}`);
+    const d = await approve(id);
+    assert(d.status === 409 && d.body.error?.code === 'OUTDATED', `the approval: ${d.status} ${short(d.body)}`);
+    const anon = await anonRead(key);
+    assert(anon.status !== 200, `the unasked content went public: ${anon.status} ${short(anon.body)}`);
 });
 
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);

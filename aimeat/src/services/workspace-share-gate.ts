@@ -13,12 +13,18 @@
  *   level it had, or the newly opened targets stay as they were. The request carries the held-back
  *   part as `change.to`, and the applier (apply-workspace-share.ts) hands exactly that body to
  *   setWorkspaceShareOp as the owner.
- * @structure ShareTarget · openTargets · newlyOpened · withholdOpening · fileShareAsk · shareCapRefusal ·
- *   publishedPageIds · spacePagesRefusal · sharedPagesRefusal
+ * @structure ShareTarget · shareEndPassed · liveAt · openTargets · newlyOpened · withholdOpening ·
+ *   fileShareAsk · shareCapRefusal · publishedPageIds · spacePagesRefusal · sharedPagesRefusal
  * @usage
- *   const opened = newlyOpened(prev, next);
+ *   const opened = newlyOpened(prev, next, Date.now());
  *   if (opened.length && ask) { const held = withholdOpening(prev, next, opened, untilIn); ... }
  * @version-history
+ *   2026-11-01 — A target whose end date has passed is not open (openTargets, newlyOpened) and was not
+ *     handed out (shareCapRefusal), as the viewer reads it (isDocPublicAt): giving it a new end or
+ *     removing its end opens it again, so an agent without publish:public files a publish request and
+ *     the label cap is asked for it. withholdOpening carries a removed end to the approval. The end
+ *     check moved here from workspace-share.ts as shareEndPassed (secaudit2026oct31w2 round 12,
+ *     openTargets ended-until).
  *   2026-11-01 — publishedPageIds reads a page's id from the end of its key (spaceRowAt), so a page
  *     whose id holds a dot is held to its own label when its space is shared whole; it was skipped
  *     (secaudit2026oct31w2 round 10b, dotted record ids).
@@ -48,20 +54,38 @@ import { spacePrefixesOf, spaceRowAt } from './workspace-record-key.js';
 /** A target as `until` names it: `*` (the workspace), `space:<name>`, or `<space>/<id>` (a page). */
 type ShareTarget = string;
 
-/** The targets anyone with the link reads under this share: none unless its access is `open`. */
-export function openTargets(share: Pick<ResolvedShare, 'access' | 'public' | 'spaces' | 'docs'>): Set<ShareTarget> {
+/** Has this end date passed? A target past its end reads as not shared (isDocPublicAt). */
+export function shareEndPassed(iso: string | undefined, nowMs: number): boolean {
+  if (!iso) return false;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) && t <= nowMs;
+}
+
+/** Is target `t` shared in this share now: its flag is true and its end, if any, has not passed. */
+function liveAt(share: Pick<ResolvedShare, 'until'>, t: ShareTarget, flag: boolean | undefined, nowMs: number): boolean {
+  return flag === true && !shareEndPassed(share.until[t], nowMs);
+}
+
+/**
+ * The targets anyone with the link reads under this share: none unless its access is `open`. With a
+ * time, a target whose end date has passed by then is left out, as the viewer leaves it out
+ * (isDocPublicAt), so giving it a new end or removing its end counts as opening it
+ * (secaudit2026oct31w2 round 12). With null, end dates are not read (the public feed's flag test).
+ */
+export function openTargets(share: Pick<ResolvedShare, 'access' | 'public' | 'spaces' | 'docs' | 'until'>, nowMs: number | null): Set<ShareTarget> {
   const out = new Set<ShareTarget>();
   if (share.access !== 'open') return out;
-  if (share.public) out.add('*');
-  for (const [k, v] of Object.entries(share.spaces)) if (v) out.add(`space:${k}`);
-  for (const [k, v] of Object.entries(share.docs)) if (v) out.add(k);
+  const open = (t: ShareTarget, flag: boolean | undefined): boolean => (nowMs === null ? !!flag : liveAt(share, t, flag, nowMs));
+  if (open('*', share.public)) out.add('*');
+  for (const [k, v] of Object.entries(share.spaces)) if (open(`space:${k}`, v)) out.add(`space:${k}`);
+  for (const [k, v] of Object.entries(share.docs)) if (open(k, v)) out.add(k);
   return out;
 }
 
 /** The targets this change opens to anyone with the link that were not open to them before. */
-export function newlyOpened(prev: ResolvedShare, next: ResolvedShare): ShareTarget[] {
-  const before = openTargets(prev);
-  return [...openTargets(next)].filter(t => !before.has(t));
+export function newlyOpened(prev: ResolvedShare, next: ResolvedShare, nowMs: number | null): ShareTarget[] {
+  const before = openTargets(prev, nowMs);
+  return [...openTargets(next, nowMs)].filter(t => !before.has(t));
 }
 
 /**
@@ -69,7 +93,8 @@ export function newlyOpened(prev: ResolvedShare, next: ResolvedShare): ShareTarg
  * later. Access raised to `open`: the access keeps its level, and every target the call shared stays
  * shared under it. Access already `open`: each newly opened target keeps the value it had, and its end
  * date goes unless the share had one before. `untilIn` is what the call named for an end date; the
- * body carries those, and the HTML page default is decided again when it is applied.
+ * body carries those, a removal (null) included, so a target whose end had passed and whose end the
+ * call removed opens with no end on approval. The HTML page default is decided again when it is applied.
  */
 export function withholdOpening(
   prev: ResolvedShare, next: ResolvedShare, opened: ShareTarget[], untilIn: Record<string, string | null>,
@@ -78,7 +103,7 @@ export function withholdOpening(
     next.access = prev.access;
     return { access: 'open' };
   }
-  const body: { public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>; until?: Record<string, string> } = {};
+  const body: { public?: boolean; spaces?: Record<string, boolean>; docs?: Record<string, boolean>; until?: Record<string, string | null> } = {};
   for (const t of opened) {
     if (t === '*') { next.public = prev.public; body.public = true; }
     else if (t.startsWith('space:')) {
@@ -91,6 +116,8 @@ export function withholdOpening(
     }
     if (prev.until[t]) next.until[t] = prev.until[t]; else delete next.until[t];
     if (typeof untilIn[t] === 'string') (body.until ??= {})[t] = untilIn[t] as string;
+    // Only a held-back end of its own needs removing: a target with none before has none now.
+    else if (untilIn[t] === null && prev.until[t]) (body.until ??= {})[t] = null;
   }
   return body;
 }
@@ -113,9 +140,11 @@ export function fileShareAsk(
   }, 'it was');
 }
 
-/** Does this share hand anything out: the workspace, a space or a page? */
-function sharesAny(share: Pick<ResolvedShare, 'public' | 'spaces' | 'docs'>): boolean {
-  return share.public || Object.values(share.spaces).some(Boolean) || Object.values(share.docs).some(Boolean);
+/** Does this share hand anything out now: the workspace, a space or a page whose end has not passed? */
+function sharesAny(share: Pick<ResolvedShare, 'public' | 'spaces' | 'docs' | 'until'>, nowMs: number): boolean {
+  return liveAt(share, '*', share.public, nowMs)
+    || Object.entries(share.spaces).some(([k, v]) => liveAt(share, `space:${k}`, v, nowMs))
+    || Object.entries(share.docs).some(([k, v]) => liveAt(share, k, v, nowMs));
 }
 
 /**
@@ -126,32 +155,35 @@ function sharesAny(share: Pick<ResolvedShare, 'public' | 'spaces' | 'docs'>): bo
  * this call shows whole wider than before (every space, when the whole workspace is shared), held to
  * its own effective label, so one Confidential page refuses the space it is in. Asked before the
  * publish gate and before the share is stored, so a refusal stores nothing. `wasStored` is false for
- * a workspace never shared, which counts as private before.
+ * a workspace never shared, which counts as private before. A target whose end date had passed counts
+ * as not handed out before, and one whose end has passed in `next` as not handed out by it, as the
+ * viewer reads them (isDocPublicAt; secaudit2026oct31w2 round 12).
  */
 export async function shareCapRefusal(
   ctx: { storage: Storage; config: AimeatConfig }, orgId: string, ws: string,
-  prev: ResolvedShare, next: ResolvedShare, wasStored: boolean, by: CapOptions['by'],
+  prev: ResolvedShare, next: ResolvedShare, wasStored: boolean, by: CapOptions['by'], nowMs: number = Date.now(),
 ): Promise<{ ok: false; status: 409; code: string; message: string } | null> {
   const to = audienceOfShareAccess(next.access);
-  if (!sharesAny(next) || to === 'private') return null;
-  const before = wasStored && sharesAny(prev) ? audienceOfShareAccess(prev.access) : null;
+  if (!sharesAny(next, nowMs) || to === 'private') return null;
+  const before = wasStored && sharesAny(prev, nowMs) ? audienceOfShareAccess(prev.access) : null;
   const whole = capRefusalOf(await audienceCapOf(ctx, workspaceTarget(orgId, ws), to, { from: before, by, where: 'workspace share' }));
   if (whole) return whole;
   const manifest = (await readWorkspaceMetaRecord(ctx.storage, orgId, ws, 'meta.manifest', ctx.config.nodeId))?.value as
     { objectTypes?: Array<{ name?: unknown; namespace?: unknown }> } | undefined;
-  const pageRefusal = await sharedPagesRefusal(ctx, orgId, ws, prev, next, wasStored, manifest, to, by);
+  const pageRefusal = await sharedPagesRefusal(ctx, orgId, ws, prev, next, wasStored, manifest, to, by, nowMs);
   if (pageRefusal) return pageRefusal;
   // Each published page of a space this call shows whole, wider than before (plan doc-mvdipuyqraas,
   // L3 gap closed in L5).
   const shownAt = (shared: boolean): AudienceLevel | null => (wasStored && shared ? audienceOfShareAccess(prev.access) : null);
+  const wholeOf = (s: ResolvedShare, space: string): boolean => liveAt(s, '*', s.public, nowMs) || liveAt(s, `space:${space}`, s.spaces[space], nowMs);
   const spaces = (manifest?.objectTypes ?? [])
     .filter((o): o is { name: string; namespace: string } => !!o && typeof o.name === 'string' && !!o.name && typeof o.namespace === 'string' && !!o.namespace)
-    .filter(o => next.public || next.spaces[o.name] === true)
-    .map(o => ({ name: o.name, namespace: o.namespace, from: shownAt(prev.public || prev.spaces[o.name] === true) }))
+    .filter(o => wholeOf(next, o.name))
+    .map(o => ({ name: o.name, namespace: o.namespace, from: shownAt(wholeOf(prev, o.name)) }))
     .filter(o => o.from === null || isWiderAudience(to, o.from));
   if (!spaces.length) return null;
   const prefixes = spacePrefixesOf(`organism.${orgId}.w.${ws}`, manifest?.objectTypes);
-  return spacePagesRefusal(ctx, orgId, ws, spaces, prefixes, page => shownAt(prev.docs[page] === true), to, by);
+  return spacePagesRefusal(ctx, orgId, ws, spaces, prefixes, page => shownAt(liveAt(prev, page, prev.docs[page], nowMs)), to, by);
 }
 
 /**
@@ -205,20 +237,27 @@ async function spacePagesRefusal(
   return null;
 }
 
-/** Each page this call shares on its own that was not handed out before, held to its own effective label. */
+/**
+ * Each page this call shares on its own that was not handed out before, held to its own effective
+ * label. A page whose own end had passed was not handed out, and one whose end has passed in `next` is
+ * not handed out by it.
+ */
 async function sharedPagesRefusal(
   ctx: { storage: Storage; config: AimeatConfig }, orgId: string, ws: string,
   prev: ResolvedShare, next: ResolvedShare, wasStored: boolean,
   manifest: { objectTypes?: Array<{ name?: unknown; namespace?: unknown }> } | undefined,
-  to: AudienceLevel, by: CapOptions['by'],
+  to: AudienceLevel, by: CapOptions['by'], nowMs: number,
 ): Promise<{ ok: false; status: 409; code: string; message: string } | null> {
-  const pages = Object.entries(next.docs).filter(([k, v]) => v && prev.docs[k] !== true).map(([k]) => k);
+  const pages = Object.entries(next.docs).filter(([k, v]) => liveAt(next, k, v, nowMs) && !liveAt(prev, k, prev.docs[k], nowMs)).map(([k]) => k);
   for (const page of pages) {
     const [space, id] = page.split('/');
     const ns = (manifest?.objectTypes ?? []).find(o => o && o.name === space)?.namespace;
     if (typeof ns !== 'string' || !space || !id) continue;
-    // A page already handed out with its whole space or the workspace was at the old level.
-    const from = wasStored && (prev.public || prev.spaces[space] === true) ? audienceOfShareAccess(prev.access) : null;
+    // A page already handed out with its whole space or the workspace was at the old level, unless
+    // its own entry had ended, which closed it whatever its space was (isDocPublicAt).
+    const ownEnded = prev.docs[page] === true && shareEndPassed(prev.until[page], nowMs);
+    const from = wasStored && !ownEnded && (liveAt(prev, '*', prev.public, nowMs) || liveAt(prev, `space:${space}`, prev.spaces[space], nowMs))
+      ? audienceOfShareAccess(prev.access) : null;
     const target = memoryTarget(`organism:${orgId}`, `organism.${orgId}.w.${ws}.${ns}.${id}`);
     const refused = capRefusalOf(await audienceCapOf(ctx, target, to, { from, by, where: 'workspace share' }));
     if (refused) return refused;
