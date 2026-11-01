@@ -4568,6 +4568,47 @@
       "parties": "Partes externas",
       "partiesSub": "sin cuenta aquí"
     },
+    "close": {
+      "package": "Hazlo privado con {route}, o retira una versión con {tool}.",
+      "market-listed": "Quítalo del mercado con {route} y después elimina el registro con {tool} (clave {key}).",
+      "market-record": "Elimina el registro con {tool} (clave {key}; {route}).",
+      "need-open": "Ciérrala con {route} y después elimina el registro con {tool} (clave {key}).",
+      "agent": "Sácalo de la lista pública de agentes con {tool}, añadiendo la etiqueta \"{tag}\" a sus etiquetas ({route}).",
+      "named-share": "Termínalo con {tool} (consent_id {id}; {route}). La siguiente lectura se rechaza; las copias ya descargadas se quedan con la parte externa.",
+      "party": "Detenla con {tool}, acción \"stop\" ({stop}), o elimínala con la acción \"delete\" ({remove}), que termina de inmediato sus claves, tokens y accesos.",
+      "app-public": "Quítala de todas las listas con {tool} (acción \"settings\", listing \"unlisted\") y elige allí quién puede abrirla: open_to \"signed-in\" u \"organism:<id>\", o un código de acceso access_code ({route}); {remove} la elimina.",
+      "app-narrow": "Elige quién puede abrirla con {tool} (acción \"settings\"): open_to \"organism:<id>\" para un lugar compartido, o un código de acceso access_code para que solo la abra quien tenga el código ({route}); {remove} la elimina.",
+      "app-internet": "Está abierta a todo el mundo en internet hasta el {date}, por una apertura con su propio motivo e historial. Ciérrala con {tool} ({route}); después vuelve a verse solo con sesión iniciada.",
+      "workspace-page": "Deja de compartirla con {tool} ({args}) o con {route}.",
+      "organism": "Hazlo privado con {tool} y la visibilidad \"private\" ({route}).",
+      "organism-members": "Muestra la lista de miembros solo a quien tiene sesión iniciada con {route}.",
+      "board": "Ciérralo con {route}, o elimínalo con {remove}.",
+      "portfolio-public": "Elige quién puede abrirla con {tool} (access \"signed-in\" u \"organism:<id>\"), o apaga la página con {route}.",
+      "portfolio-narrow": "Apaga la página con {route}, o limita quién puede abrirla con {tool} (access \"organism:<id>\").",
+      "company": "Elige quién puede abrirla con {tool} (access \"signed-in\" u \"organism:<id>\"), o deja de servir la dirección de la empresa con kind \"none\" ({route}).",
+      "memory": "Hazlo privado con {tool} y la visibilidad \"private\" ({route}), o elimínalo con {remove} ({removeRoute}).",
+      "file": "Hazlo privado con {route}, o elimínalo con {remove} ({removeRoute}).",
+      "knowledge-package": "Saca el paquete del catálogo con {route}; {remove} sobre {key} lo elimina.",
+      "knowledge-entry": "Haz privada la entrada con {route}, o con {tool} y la visibilidad \"private\".",
+      "knowledge-record": "Haz privada la entrada con {tool} y la visibilidad \"private\", o elimínala con {remove}.",
+      "skill": "Hazla solo tuya con {tool} y la visibilidad \"owner\" ({route}).",
+      "datapackage": "Retíralo con {tool} y la referencia \"{ref}\" ({route}): cada lectura responde 410 y sale del catálogo; añade ?purge=true para borrar también sus archivos. Para limitar solo quién lo lee, publícalo de nuevo con la visibilidad \"private\"."
+    },
+    "titles": {
+      "offering": "Oferta: {name}", "offering-off": "Oferta: {name} (fuera del mercado, el registro todavía se puede leer)",
+      "need": "Necesidad: {name}", "need-closed": "Necesidad: {name} (cerrada, el registro todavía se puede leer)",
+      "members": "Quiénes forman parte de {name}", "portfolio": "Tu página de bienvenida", "stored-by": "{name} (guardado por {holder})"
+    },
+    "notes": {
+      "signed-in-node": "Este servidor muestra su contenido solo a sus propias cuentas con sesión iniciada (un ajuste de quien lo administra), así que nada de aquí está abierto a desconocidos ni a quien solo tiene un enlace: lo que de otro modo sería público aparece como visible con sesión iniciada, y lo que hagas público ahora se guarda para las cuentas con sesión iniciada. La única excepción es una aplicación abierta a internet, con los formularios que usa: aparece como pública hasta que termina su apertura.",
+      "presigned": "No se cuenta una dirección de descarga hecha para entregar un archivo (un enlace prefirmado): caduca sola y la diste a alguien a propósito.",
+      "access-code": "No se cuentan una aplicación con código de acceso, una aplicación que ocultó quien administra el servidor ni un espacio de trabajo compartido con contraseña: alguien desconocido necesita además el código o la contraseña.",
+      "named-readers": "No se cuentan los grupos para compartir, las listas de miembros de los espacios de trabajo ni los registros compartidos en un espacio de trabajo: cada uno nombra a quienes leen.",
+      "workspace-page": "Una página compartida de un espacio de trabajo se cuenta tal como la recibiría un visitante anónimo. Aparece para quien creó el espacio de trabajo y para quien creó el lugar compartido, sus propietarios y administradores, porque cada uno puede cerrarla.",
+      "market-record": "Una oferta o necesidad del intercambio sigue siendo un registro público cuando sale del mercado; se cuenta hasta que se elimina el registro.",
+      "item-cap": "De cada tipo se listan como máximo {n} elementos. Los recuentos incluyen todo lo encontrado.",
+      "store-limit": "Algunas listas se leen hasta un límite del almacenamiento: las ofertas y necesidades del intercambio (5000 de cada una en este servidor) y los registros de un espacio compartido de un espacio de trabajo (5000)."
+    },
     "named": {
       "sharesTitle": "Accesos compartidos con nombre", "sharesSub": "un producto de datos para una persona o un programa, hasta una fecha",
       "sharesEmpty": "No compartiste nada con nombre.",

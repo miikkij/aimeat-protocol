@@ -15,14 +15,15 @@
  * @usage import { namedShareSource, outsidePartySource } from './sources-parties.js';
  * @version-history
  *   v1.3.0 — 2026-11-01 — A share to a person on another AIMEAT node is a named share too, party kind
- *     `visitor`, named by their home account (WP9c).
+ *     `visitor`, named by their home account (WP9c). Each item carries `close`, the code and identifiers
+ *     a page says the instruction with in its language.
  *   v1.2.0 — 2026-11-01 — A named share carries `share` (the package, the party's name and kind, the
  *     purpose, the end, the last read and the reads of seven days) and a party `party` (its name, kind,
  *     live shares, keys and when a key was last used), for the owner's page (WP9a).
  *   v1.1.0 — 2026-11-01 — A named share carries the freshness of the package it shares (plan D6.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3).
  */
-import type { ExposureItem, ExposureSource } from './exposure-types.js';
+import { closeAs, type ExposureItem, type ExposureSource } from './exposure-types.js';
 import { isLiveShare, isNamedShare, packageOfPattern, shareMetaOf } from '../parties/shares.js';
 import { readParties } from '../parties/store.js';
 import { shareReadStats } from '../parties/read-stats.js';
@@ -61,6 +62,7 @@ export const namedShareSource: ExposureSource = {
           kind: 'named_share', id: c.id, title: `${pkg} shared with ${party} until ${(c.expires ?? '').slice(0, 10)}`,
           level: 'named', url: `${ctx.base}/v1/odata/${enc(ref?.owner ?? localAccountName(ownerGhii))}/${enc(pkg)}`,
           how_to_close: `End it with aimeat_consent_revoke (consent_id ${c.id}; DELETE /v1/consent/${enc(c.id)}). The next read is refused; copies already taken stay with the party.`,
+          close: closeAs('named-share', { tool: 'aimeat_consent_revoke', id: c.id, route: `DELETE /v1/consent/${enc(c.id)}` }),
           ...(states.get(pkg) ? { freshness: states.get(pkg) } : {}),
           share: {
             package: pkg, party, party_name: p?.displayName ?? (typeof c.metadata?.displayName === 'string' ? c.metadata.displayName : party),
@@ -87,6 +89,7 @@ export const outsidePartySource: ExposureSource = {
         kind: 'outside_party', id: p.uid, title: `${p.displayName} (${p.kind}, ${p.keys.length} key${p.keys.length === 1 ? '' : 's'})`,
         level: 'named',
         how_to_close: `Stop it with aimeat_party action "stop" (POST /v1/parties/${enc(p.name)}/stop), or delete it with action "delete" (DELETE /v1/parties/${enc(p.name)}), which ends its keys, tokens and shares at once.`,
+        close: closeAs('party', { tool: 'aimeat_party', stop: `POST /v1/parties/${enc(p.name)}/stop`, remove: `DELETE /v1/parties/${enc(p.name)}` }),
         party: {
           name: p.name, display_name: p.displayName, party_kind: p.kind, shares: sharesOf(p.uid), keys: p.keys.length,
           key_last_used_at: p.keys.map(k => k.lastUsedAt).filter((x): x is string => !!x).sort().pop() ?? null,

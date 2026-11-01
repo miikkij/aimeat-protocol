@@ -81619,7 +81619,19 @@ paths:
                                 level: { type: string, enum: [public, link, signed-in, organism, named], description: 'named is one outside party the owner chose by name (a named share, a party holding a key).' }
                                 organism_id: { type: string, description: Present when level is organism. }
                                 url: { type: string, description: The address it is read at, when a stranger can open one. }
-                                how_to_close: { type: string }
+                                how_to_close: { type: string, description: 'The English sentence, for an AI. A page says the same from `close`.' }
+                                close:
+                                  type: object
+                                  description: 'How to close it as a stable `code` (package, market-listed, market-record, need-open, agent, named-share, party, app-public, app-narrow, app-internet, workspace-page, organism, organism-members, board, portfolio-public, portfolio-narrow, company, memory, file, knowledge-package, knowledge-entry, knowledge-record, skill, datapackage) and the identifiers the instruction names (`values`: tools, routes, ids, a date), so a page says it in its own language.'
+                                  properties:
+                                    code: { type: string }
+                                    values: { type: object, additionalProperties: { type: string } }
+                                title_parts:
+                                  type: object
+                                  description: 'For a title the node words itself (offering, offering-off, need, need-closed, members, portfolio, stored-by): its `code` and the names in it (`values`).'
+                                  properties:
+                                    code: { type: string }
+                                    values: { type: object, additionalProperties: { type: string } }
                                 freshness: { type: string, enum: [fresh, late, stale, unscheduled], description: A data package's or a named share's package freshness against its producer's schedule. }
                                 share:
                                   type: object
@@ -81657,6 +81669,14 @@ paths:
                           notes:
                             type: array
                             items: { type: string }
+                            description: The English sentences, for an AI.
+                          note_codes:
+                            type: array
+                            items: { type: string, enum: [signed-in-node, presigned, access-code, named-readers, workspace-page, market-record, item-cap, store-limit] }
+                            description: The code of each note, in the same order, so a page says them in its own language.
+                          item_cap:
+                            type: integer
+                            description: How many items a kind lists at most (the note item-cap names it).
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '503':

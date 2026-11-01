@@ -5591,6 +5591,47 @@
       "parties": "Outside parties",
       "partiesSub": "no account here"
     },
+    "close": {
+      "package": "Make it private with {route}, or take a version back with {tool}.",
+      "market-listed": "Take it off the market with {route}, then remove the record with {tool} (key {key}).",
+      "market-record": "Remove the record with {tool} (key {key}; {route}).",
+      "need-open": "Close it with {route}, then remove the record with {tool} (key {key}).",
+      "agent": "Take it out of the public agent list with {tool}, adding the tag \"{tag}\" to its tags ({route}).",
+      "named-share": "End it with {tool} (consent_id {id}; {route}). The next read is refused; copies already taken stay with the party.",
+      "party": "Stop it with {tool} action \"stop\" ({stop}), or delete it with action \"delete\" ({remove}), which ends its keys, tokens and shares at once.",
+      "app-public": "Take it off every list with {tool} (action \"settings\", listing \"unlisted\"), and choose who may open it there: open_to \"signed-in\" or \"organism:<id>\", or an access_code ({route}); {remove} removes it.",
+      "app-narrow": "Choose who may open it with {tool} (action \"settings\"): open_to \"organism:<id>\" for one organisation, or an access_code so only people with the code open it ({route}); {remove} removes it.",
+      "app-internet": "It is open to everyone on the internet until {date}, by an opening with its own reason and history. Close it with {tool} ({route}); it then reads as signed-in again.",
+      "workspace-page": "Stop sharing it with {tool} ({args}), or {route}.",
+      "organism": "Make it private with {tool} and visibility \"private\" ({route}).",
+      "organism-members": "Show the member list to signed-in people only with {route}.",
+      "board": "Close it with {route}, or remove it with {remove}.",
+      "portfolio-public": "Choose who may open it with {tool} (access \"signed-in\" or \"organism:<id>\"), or switch the page off with {route}.",
+      "portfolio-narrow": "Switch the page off with {route}, or narrow who may open it with {tool} (access \"organism:<id>\").",
+      "company": "Choose who may open it with {tool} (access \"signed-in\" or \"organism:<id>\"), or stop serving the company's address with kind \"none\" ({route}).",
+      "memory": "Make it private with {tool} and visibility \"private\" ({route}), or remove it with {remove} ({removeRoute}).",
+      "file": "Make it private with {route}, or remove it with {remove} ({removeRoute}).",
+      "knowledge-package": "Take the package out of the catalogue with {route}; {remove} on {key} removes it.",
+      "knowledge-entry": "Make the entry private with {route}, or with {tool} and visibility \"private\".",
+      "knowledge-record": "Make the entry private with {tool} and visibility \"private\", or remove it with {remove}.",
+      "skill": "Make it yours alone with {tool} and visibility \"owner\" ({route}).",
+      "datapackage": "Withdraw it with {tool} and ref \"{ref}\" ({route}): every read answers 410 and it leaves the catalogue; add ?purge=true to delete its files too. To narrow who reads it instead, publish it again with visibility \"private\"."
+    },
+    "titles": {
+      "offering": "Offering: {name}", "offering-off": "Offering: {name} (off the market, the record is still readable)",
+      "need": "Need: {name}", "need-closed": "Need: {name} (closed, the record is still readable)",
+      "members": "Who belongs to {name}", "portfolio": "Your welcome page", "stored-by": "{name} (stored by {holder})"
+    },
+    "notes": {
+      "signed-in-node": "This server shows its content to its own signed-in accounts only (the administrator's setting), so nothing here is open to strangers or to someone who only holds a link: what would otherwise be public is listed as signed-in, and what is made public now is saved for signed-in accounts. The one exception is an app opened to the internet, with the forms it uses: it is listed as public until its opening ends.",
+      "presigned": "A download address made to hand out one file (a presigned link) is not counted: it ends by itself, and you gave it to someone on purpose.",
+      "access-code": "An app with an access code, an app an administrator hid, and a workspace share behind a password are not counted: a stranger needs the code or the password as well.",
+      "named-readers": "Sharing groups, workspace rosters and records shared into a workspace are not counted: each names the people who read.",
+      "workspace-page": "A shared workspace page is counted as an anonymous visitor would be given it. It is listed for the workspace's creator and for the organism's creator, owners and admins, because each of them can close it.",
+      "market-record": "An exchange offering or need stays a public record after it leaves the market; it is counted until the record is deleted.",
+      "item-cap": "Each kind lists at most {n} items. The counts include everything found.",
+      "store-limit": "Some lists are read up to a limit of the store: exchange offerings and needs (5000 each on this server) and the records of one shared workspace space (5000)."
+    },
     "named": {
       "sharesTitle": "Named shares", "sharesSub": "a data product for one person or program, until a date",
       "sharesEmpty": "You have not shared anything by name.",
