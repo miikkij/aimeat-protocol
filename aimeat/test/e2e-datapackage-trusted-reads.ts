@@ -19,6 +19,8 @@
  *       `Vary: Authorization`.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-datapackage-trusted-reads
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- A2 reads the package's CSV through GET /v1/pub after the forged pointer: the
+ *     package-file read added on main (plan doc-mvwxcas3dom3, D0.4) decided on the pointer's word.
  *   v1.0.0 -- 2026-10-31 -- Initial (secaudit2026oct31w2 round 10).
  */
 import { registerOwner, type RegisteredOwner } from './helpers/owner-login.js';
@@ -80,10 +82,12 @@ console.log('\nW2-14: the audience is what the service wrote');
 
 const P1 = `dptpriv${short}`;
 let h1 = '';
+let p1csv = '';
 await test('A1. Usage: the owner publishes a private package; anonymous gets 404, the owner reads its rows', async () => {
     const r = await publish(A.token, P1, [{ id: 1, label: 'SECRET-ROW' }], 'private');
     assert(r.status === 201, `publish: ${show(r)}`);
     h1 = r.body.data.content_hash;
+    p1csv = new URL(r.body.data.resources[0].url).pathname;
     assert((await call('GET', `/v1/datapackages/${A.name}/${P1}/rows/items`)).status === 404, 'anonymous reads the private package');
     const own = await call('GET', `/v1/datapackages/${A.name}/${P1}/rows/items`, A.token);
     assert(own.status === 200 && JSON.stringify(own.body.data.rows).includes('SECRET-ROW'), `owner: ${show(own)}`);
@@ -97,6 +101,12 @@ await test('A2. Attack: the app rewrites latest.json to say public through POST 
         const r = await call('GET', path);
         assert(r.status === 404, `anonymous ${path}: ${show(r)}`);
         assert(!JSON.stringify(r.body).includes('SECRET-ROW'), `anonymous ${path}: a private row leaked`);
+    }
+    // The package's own file through GET /v1/pub asks the package's audience too (file-read.ts).
+    const pubPath = p1csv;
+    for (const [who, token] of [['anonymous', undefined], ['owner B', B.token]] as const) {
+        const r = await call('GET', pubPath, token);        assert(r.status === 403 || r.status === 404, `${who} GET /v1/pub: ${show(r)}`);
+        assert(!JSON.stringify(r.body).includes('SECRET-ROW'), `${who} GET /v1/pub: a private row leaked`);
     }
     const own = await call('GET', `/v1/datapackages/${A.name}/${P1}/rows/items`, A.token);
     assert(own.status === 200 && JSON.stringify(own.body.data.rows).includes('SECRET-ROW'), `owner still reads it: ${show(own)}`);
