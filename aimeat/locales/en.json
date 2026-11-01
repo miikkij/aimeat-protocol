@@ -16148,6 +16148,11 @@
       "continue": "From here you can carry on alone with your own AI. Claude Code, Codex and a Grok bot can all connect to your place and keep developing what was built.",
       "continueLink": "How to connect them"
     },
+    "away": {
+      "title": "While you were away",
+      "nothing": "Nothing new happened while you were away.",
+      "more": "See everything that has happened"
+    },
     "trail": {
       "title": "Activity log",
       "sub": "Everything done in your place: what, on what, who did it and when. Newest first.",

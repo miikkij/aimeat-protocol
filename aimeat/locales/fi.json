@@ -16342,6 +16342,11 @@
       "continue": "Tästä eteenpäin voit jatkaa itse omalla tekoälylläsi. Claude Code, Codex ja Grok-botti voivat kaikki yhdistyä paikkaasi ja kehittää tehtyä työtä eteenpäin.",
       "continueLink": "Näin yhdistät ne"
     },
+    "away": {
+      "title": "Sillä aikaa kun olit poissa",
+      "nothing": "Poissa ollessasi ei tapahtunut mitään uutta.",
+      "more": "Katso kaikki, mitä on tapahtunut"
+    },
     "trail": {
       "title": "Toimintaloki",
       "sub": "Kaikki, mitä paikassasi on tehty: mitä, mihin, kuka ja milloin. Uusin ensin.",

@@ -14489,6 +14489,11 @@
       "continue": "A partir de aquí puedes seguir por tu cuenta con tu propia IA. Claude Code, Codex y un bot de Grok pueden conectarse a tu sitio y seguir desarrollando lo que se ha construido.",
       "continueLink": "Cómo conectarlos"
     },
+    "away": {
+      "title": "Mientras no estabas",
+      "nothing": "No ha pasado nada nuevo mientras no estabas.",
+      "more": "Ver todo lo que ha pasado"
+    },
     "trail": {
       "title": "Registro de actividad",
       "sub": "Todo lo que se ha hecho en tu sitio: qué, sobre qué, quién y cuándo. Lo más reciente primero.",
