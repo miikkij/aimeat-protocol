@@ -512,6 +512,7 @@
     "unrouted:src/routes/personal.ts#5": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/personal.ts:51 body.public_key.",
     "unrouted:src/routes/personal.ts#6": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/personal.ts:51 body.visibility.",
     "unrouted:src/routes/portal.ts#1": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/routes/portal.ts:568 query.format.",
+    "unrouted:src/routes/portal.ts#2": "ANSWERED 2026-11-01 (crew45 check). The ?lang of the browser pages /v1/privacy, /v1/terms and /v1/connect, read in their shared redirect (routes/portal.ts toLanguagePath): a language the node ships answers 302 to /v1/<page>/<lang>. It is no record field and sets nothing; an agent reads each language's page at its own address.",
     "unrouted:src/services/perf-trace.ts#1": "NOT YET REVIEWED. Seeded 2026-09-14: a read of a request no route registration names, so its door is unknown: src/services/perf-trace.ts:131 query.trace."
   }
 }
