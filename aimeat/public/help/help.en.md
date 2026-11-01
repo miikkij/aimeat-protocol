@@ -31,7 +31,7 @@ If you already use ChatGPT, Claude or Grok, connect it here, and it becomes your
 <!--store-->
 Your purchase includes AI credit. AI credit is an amount in euros that pays for the AI's work here. You see how much is left at the top of your Home, in the chat and on the [AI credit page](/v1/profile?tab=ai).
 
-The credit is used when the AI answers or does work. To get more AI, press Buy more AI next to the credit on your Home. It is a one-off payment, and no new subscription is needed. You can do it at any time.
+The credit is used according to which model you use and how much – different models use it at different rates. You can buy more at any time: press Buy more AI next to the credit on your Home. It is a one-off payment, and no new subscription is needed.
 
 When the credit is used up, you get a notice on your Home and in the chat. You can then buy more AI or start using an AI account of your own.
 
