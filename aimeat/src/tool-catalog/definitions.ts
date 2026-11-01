@@ -13,6 +13,7 @@
  * @usage
  *   import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
  * @version-history
+ *   v1.x -- 2026-11-01 -- definitions/build-with-you.ts: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.x -- 2026-11-01 -- definitions/party.ts: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
  *   v1.x -- 2026-11-01 -- definitions/dataproduct.ts: aimeat_dataproduct (plan doc-mvwxcas3dom3, D9).
  *   v1.x -- 2026-10-29 -- definitions/file-store.ts: where stored files keep their bytes (eight tools).
@@ -112,6 +113,7 @@ import { accountRightsTools } from './definitions/account-rights.js';
 import { secretAddressTools } from './definitions/secret-addresses.js';
 import { dataProductTools } from './definitions/dataproduct.js';
 import { partyTools } from './definitions/party.js';
+import { buildWithYouTools } from './definitions/build-with-you.js';
 
 const CATALOG = [
     ...agentMessagingTools,
@@ -162,6 +164,7 @@ const CATALOG = [
     ...secretAddressTools,
     ...dataProductTools,
     ...partyTools,
+    ...buildWithYouTools,
 ];
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = CATALOG;

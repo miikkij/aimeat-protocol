@@ -12984,6 +12984,7 @@
     "cfg_site_store_note_es": "Kaupan ilmoitus espanjaksi",
     "cfg_site_store_soon_code": "Avajaisten alennuskoodi",
     "cfg_site_store_topup_url": "Kaupan sivu, jolta ostetaan lisää tekoälysaldoa",
+    "cfg_site_build_queue_url": "Rakennuspyyntöjen jono (Rakennamme kanssasi)",
     "cfg_site_ai_credit_eur_per_usd": "Tekoälysaldon euroa tekoälyavaimen dollaria kohden",
     "cfg_site_default_locale": "Palvelimen oma kieli",
     "cfg_site_store_orders_url": "Kaupan sivu omistajan tilauksille ja laskuille",

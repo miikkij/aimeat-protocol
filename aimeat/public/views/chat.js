@@ -16,6 +16,8 @@
  *   - ChatView — the page: status, conversations, one live turn
  * @usage import ChatView from '/views/chat.js'
  * @version-history
+ *   2026-11-01: The page opens the live stream, and a conversation whose turn still runs elsewhere shows
+ *     the work and reads itself again when the turn ends; the text helpers moved to ./chat-text.js (crew51).
  *   2026-11-01: New opens an empty screen and the conversation is created with its first message;
  *     the list shows only conversations with a message (Grok's first-timer review, K32).
  *   2026-11-01: The empty chat says "Voit myös pyytää sovellusta: saat linkin valmiiseen sovellukseen."
@@ -101,9 +103,11 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { swallowed } from '/js/swallowed.js';
 import { useConfirm } from '/components/Modal.js';
 import { BUYER_STARTERS, startersFor } from './chat-starters.js';
+import { withoutToolMarkers, conversationAsText, sessionTokenCap, sessionTokensOf, spokenThreads } from './chat-text.js';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
-import { hasSession } from '/js/services/auth.js';
+import { hasSession, getSession } from '/js/services/auth.js';
+import { relayLiveUpdates } from '/lib/live-updates.js';
 import { apiPut } from '/js/api.js';
 import { Spinner } from '/components/Spinner.js';
 import * as chat from '/js/services/chat.js';
@@ -130,69 +134,6 @@ import { trackVisualViewport } from '/js/visual-viewport.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
-
-/**
- * The words without the "[Calling: <tool>]" lines a model writes as text when it means a tool call.
- * The work log shows the calls that ran; such a line is a duplicate or a call that never happened.
- * The node strips the same patterns from what it keeps (services/chat-session.ts withoutToolMarkers),
- * the pieces of a tool call the model wrote in its own syntax included (v31 K36).
- */
-function withoutToolMarkers(text) {
-    return text
-        .replace(/^[ \t]*\[Calling: [^\]\n]*\][ \t]*(\r?\n)?/gm, '')
-        .replace(/<\/?｜?DSML｜[^>\n]*>?/g, '')
-        .replace(/(?:[^\s"]*="[^"\n]*"|[^\s"]+")\s+string="[^\n]*/g, '')
-        .replace(/\n{3,}/g, '\n\n');
-}
-
-/**
- * The conversation as plain text, in the order it happened.
- *
- * Who said what, and nothing else: no tool log, no timestamps to the second, no markdown fences
- * around the whole thing. This is the shape that pastes into a document or another chat and still
- * reads as a conversation.
- */
-function conversationAsText(title, turns) {
-    const head = title ? `# ${title}\n\n` : '';
-    const body = (turns ?? []).map((turn) => {
-        const who = turn.role === 'user' ? tr('chat.youLabel', 'You') : tr('chat.agentLabel', 'Agent');
-        return `## ${who}\n\n${(turn.text || '').trim()}`;
-    }).join('\n\n');
-    return `${head}${body}\n`;
-}
-
-/**
- * The free ride has a ceiling. A chat turn runs on the node's own key (status.pays === 'node'),
- * and an uncapped session on somebody else's money is an invoice with no top. The ceiling is
- * enforced HERE, at request level: past it the composer stands down and the person is offered
- * the two honest ways forward — their own key, or their own place. Never a silent cutoff.
- *
- * TODO(server): the authoritative cap belongs next to the payer — a config setting (e.g.
- * AIMEAT_CHAT_SESSION_TOKEN_CAP, with a CONFIG_FIELDS row) read by POST /v1/chat/threads/:id/turn
- * in src/routes/chat.ts — and the cheapest-capable-model choice with it: the session model is
- * AIMEAT_GOOSE_MODEL, operator-set, and this file cannot pick it. Until that lands, this
- * request-level guard is the cap.
- *
- * Four characters per token is the coarse rule of thumb; the job is a ceiling with a managed
- * landing, not billing-grade accounting. The sessionStorage override exists so the landing can
- * be VERIFIED in a browser without first spending 50k tokens of somebody's money.
- */
-const SESSION_TOKEN_CAP = 50_000;
-function sessionTokenCap() {
-    try {
-        const t = parseInt(sessionStorage.getItem('aimeat.chat.cap') ?? '', 10);
-        if (Number.isFinite(t) && t > 0) return t;
-    } catch (err) { console.warn('[chat] cap override not readable:', err.message); }
-    return SESSION_TOKEN_CAP;
-}
-const sessionTokensOf = (turns) =>
-    Math.ceil((turns ?? []).reduce((n, turn) => n + (turn.text || '').length, 0) / 4);
-
-/**
- * The conversations worth a row: the ones with a message. An empty one says nothing a person can
- * go back to, and the ones stored before New stopped creating them stay on the node, out of the list.
- */
-const spokenThreads = (threads) => (threads ?? []).filter((th) => (th.turns ?? 0) > 0);
 
 /** Close enough to the bottom to count as "following the conversation". */
 const BOTTOM_SLACK_PX = 48;
@@ -346,6 +287,25 @@ export default function ChatView() {
         window.addEventListener('aimeat-live-update', handler);
         return () => window.removeEventListener('aimeat-live-update', handler);
     }, []);
+
+    // The chat is a route of its own, so it opens the live stream itself (/lib/live-updates.js); without
+    // it neither handler above nor the one below ever heard a change.
+    useEffect(() => (hasSession() ? relayLiveUpdates(() => getSession()?.jwt) : undefined), []);
+
+    // A conversation opened while its turn still runs elsewhere (the person sent it, went to another
+    // page and came back) shows the work going on, and reads the conversation again when the node says
+    // the turn ended (the `chat` domain). Before this the answer never appeared (crew51, 2026-11-01).
+    const openId = thread?.id;
+    const runningElsewhere = !busy && !!thread?.running;
+    useEffect(() => {
+        if (!openId || !runningElsewhere) return undefined;
+        const handler = (e) => {
+            if (e.detail?.domains && !e.detail.domains.has('chat')) return;
+            void openThread(openId).then(loadThreads).catch((err) => console.warn('[chat] the conversation could not be re-read:', err.message));
+        };
+        window.addEventListener('aimeat-live-update', handler);
+        return () => window.removeEventListener('aimeat-live-update', handler);
+    }, [openId, runningElsewhere, openThread, loadThreads]);
 
     // New opens an empty screen and stores nothing: the conversation is created on the node when
     // the first message is sent (send below), so pressing New three times leaves no three empty
@@ -656,7 +616,7 @@ export default function ChatView() {
     // Offered by the LAST agent turn only, and only while nothing is running: a fork the agent
     // named three answers ago has been overtaken by everything said since.
     const lastAgentTurn = [...turns].reverse().find((t) => t.role !== 'user');
-    const openChoices = busy ? [] : choicesIn(lastAgentTurn?.text);
+    const openChoices = busy || runningElsewhere ? [] : choicesIn(lastAgentTurn?.text);
     const disabled = status ? !status.enabled : false;
 
     return html`
@@ -739,8 +699,8 @@ export default function ChatView() {
                         <//>` : ''}
 
                     ${turns.map((turn, i) => html`<${Turn} key=${i} id=${`${thread?.id}-${i}`} turn=${turn} />`)}
-                    <${LiveTurn} text=${live.text} thought=${live.thought} progress=${live.progress} tools=${live.tools} cards=${live.cards} busy=${busy} />
-                    ${!busy && html`<${Choices} options=${openChoices} disabled=${disabled}
+                    <${LiveTurn} text=${live.text} thought=${live.thought} progress=${live.progress} tools=${live.tools} cards=${live.cards} busy=${busy || runningElsewhere} />
+                    ${!busy && !runningElsewhere && html`<${Choices} options=${openChoices} disabled=${disabled}
                         onPick=${(opt) => send(opt)} />`}
                     <${TurnError} message=${failure} fixHref=${fixHref} choices=${fixChoices}
                         onFreeModel=${lastAskRef.current && !busy ? () => switchToFreeModel(lastAskRef.current) : null}
