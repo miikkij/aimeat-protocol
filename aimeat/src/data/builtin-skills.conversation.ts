@@ -33,6 +33,7 @@
  * @usage
  *   import { CONVERSATION_SKILL_ENTRIES } from './builtin-skills.conversation.js';
  * @version-history
+ *   2026-11-01 -- aimeat-paying-for-the-ai: no free model on a node set up for the EU only (ai.region_mode eu-only).
  *   2026-10-27 -- aimeat-paying-for-the-ai: a node-key call is priced by everything it sends, a model
  *     with no catalogue price runs one call at a time on what is left, and empty attempts are counted (secaudit2026oct26).
  *   2026-10-25 — aimeat-paying-for-the-ai: the free model is the last resort, on or off by the
@@ -517,7 +518,9 @@ not you:
    \`free_model\` on \`GET /v1/ai/routing\` says what applies now). Off, the call is refused
    (\`QUOTA_EXHAUSTED\`) with its price and where to turn it on. Unless the owner's
    model policy leaves the free model out: then the call is refused (\`QUOTA_EXHAUSTED\`, saying so),
-   because the owner ruled weaker models out. A call that names its own model is refused
+   because the owner ruled weaker models out. On a node set up to keep its AI in the EU only
+   (\`openrouter_region.mode\` is eu-only) there is no free model at all, because the free router
+   does not run in the EU, and a spent allowance is refused. A call that names its own model is refused
    (\`QUOTA_EXHAUSTED\`) once the allowance is spent: the node never swaps the model a caller named,
    and its key pays nothing more. The operator may choose otherwise: with daily limits on, the
    node's key keeps paying past the allowance up to a cap per account and a cap for all accounts,

@@ -26,6 +26,7 @@
  *   const sessionId = await acp.newSession({ mcpServers: [aimeatMcpServer(base, token)] });
  *   for await (const u of acp.prompt(sessionId, 'build me a pong game')) { … }
  * @version-history
+ *   v2.11.1 — 2026-11-01 — The shared key's region is decided for a call with tools, so an endpoint without tool calling is passed over.
  *   v2.11.0 — 2026-10-31 — On the shared key the child's OpenRouter host is the node's region for the
  *     chat model (services/ai/openrouter-region.ts); before, it was always openrouter.ai.
  *   v2.10.0 — 2026-10-31 — newSession() takes `required`: a named MCP server that failed to load
@@ -83,7 +84,8 @@ import { DEFAULT_RULES } from './ai/routing.js';
 async function sharedKeyOpenRouterHost(config: AimeatConfig): Promise<string | undefined> {
     if (!chatUsesSharedKey(config)) return undefined;
     const choice = regionChoiceFor(config, DEFAULT_RULES, 'node');
-    const decided = config.gooseModel ? await decideRegion(config, choice, config.gooseModel) : null;
+    // The chat always sends tools, so the region must offer the model with tool calling.
+    const decided = config.gooseModel ? await decideRegion(config, choice, config.gooseModel, { tools: true }) : null;
     if (decided && !decided.ok) logger.warn(`[goose] ${decided.message}`);
     const base = decided?.ok ? decided.baseUrl : regionBaseUrl(config, choice.region);
     return base.endsWith('/api/v1') ? base.slice(0, -'/api/v1'.length) : undefined;

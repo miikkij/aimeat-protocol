@@ -28,6 +28,8 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-11-01 — `ai_processing_region`: where the node's AI key has prompts processed, the
+ *     buyer's choice (ai.region_mode) and what it switches off (Jouni, 2026-11-01).
  *   v1.5.2 — 2026-10-16 — The operator report and the owner's view count what an open workspace share serves to anyone as public.
  *   v1.5.1 — 2026-10-08 — The report and the unlabelled lists are decided under the node's label posture (config.aiLabelPublic).
  *   v1.5.0 — 2026-10-05 — The operator routes ask requireOperator (askOperator with operator:admin), so the operator's agent holding operator:admin passes as on MCP (secaudit 2026-10, C2).
@@ -58,6 +60,7 @@ import { success } from '../middleware/envelope.js';
 import { sendMarkdown, prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { LOCALES } from '../i18n.js';
+import { regionDeclaration } from '../services/ai/openrouter-region.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
@@ -132,6 +135,9 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       member_state: op.country || null,
       note: 'The AI Act market-surveillance authority is determined by where the operator is established and is not the data-protection authority named here.',
     },
+    // Where the node's own AI key has prompts processed, from the same helpers the calls use
+    // (services/ai/openrouter-region.ts): the buyer's choice when one was made, and its limits.
+    ai_processing_region: regionDeclaration(config),
     marking: {
       spec: AI_PROVENANCE_SPEC_V1,
       schema: `${b}${AI_PROVENANCE_SCHEMA_PATH}`,

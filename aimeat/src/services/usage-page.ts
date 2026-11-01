@@ -32,6 +32,7 @@
  *   import { buildUsagePage } from '../services/usage-page.js';
  *   const data = await buildUsagePage(config, storage, { from, to, includeKeySpend: false });
  * @version-history
+ *   v1.2.1 — 2026-11-01 — The house key is nodeOpenRouterKey: not configured on the own-key choice (ai.region_mode own).
  *   v1.2.0 — 2026-10-09 — The shared chat key is sent to OpenRouter to read its spend only when it is
  *     an OpenRouter key (AIMEAT_GOOSE_PROVIDER=openrouter, or none named and an `sk-or-` key); any
  *     other provider's key stays on the node (secrets audit 2026-10-09, finding 1.6).
@@ -45,6 +46,7 @@ import type { Storage } from '../storage/interface.js';
 import { chatUsesSharedKey } from './goose-env.js';
 import { getAdminLedger } from './ledger-admin.js';
 import { readKeySpend, type KeySpend } from './openrouter-key.js';
+import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 
 /** How many models get a row of their own before the rest fold into one. */
 const TOP_MODELS = 8;
@@ -166,7 +168,7 @@ export async function buildUsagePage(
 
   const keys: Record<string, unknown> = {
     house: {
-      configured: !!config.openrouterInstanceKey,
+      configured: !!nodeOpenRouterKey(config),
       // The house key is metered per call, so the node's own number is meaningful — and still only
       // covers the calls that reached the metering.
       metered_here: true,
@@ -195,7 +197,7 @@ export async function buildUsagePage(
     const chatKey = (config.gooseProviderApiKey || '').trim();
     const chatIsOpenRouter = chatProvider === 'openrouter' || (!chatProvider && chatKey.startsWith('sk-or-'));
     const [house, chat] = await Promise.all([
-      readKeySpend(config, config.openrouterInstanceKey, 'house'),
+      readKeySpend(config, nodeOpenRouterKey(config), 'house'),
       chatKey && !chatIsOpenRouter
         ? Promise.resolve<KeySpend>({
           ok: false,

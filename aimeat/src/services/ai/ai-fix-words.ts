@@ -18,6 +18,7 @@
  * @structure CapabilityReason · reasonOf · agentFixFor · aiSettingsUrl · personLocale · personFixFor ·
  *   withPersonFix · BalanceChoice · balanceChoices
  * @version-history
+ *   v1.1.1 — 2026-11-01 — No free-model way on in eu-only (ai.region_mode), where the free router does not run.
  *   v1.1.0 — 2026-10-29 — BALANCE_SPENT (AI_BALANCE_SPENT: the allowance the owner bought is used up)
  *     carries `choices`, the three ways on that Jouni named: buy more, their own key, the free model
  *     (UX review 2026-10-29, A1).
@@ -29,6 +30,7 @@ import type { Storage } from '../../storage/interface.js';
 import { createT, LOCALES, type Locale } from '../../i18n.js';
 import { displayPrefsFor } from '../display-prefs.js';
 import { AiCompletionError } from './errors.js';
+import { freeModelOf } from './openrouter-region.js';
 import type { AiCapability } from './types.js';
 
 export type CapabilityReason =
@@ -169,6 +171,6 @@ export function balanceChoices(config: AimeatConfig, locale: Locale, settingsUrl
     out.push({ kind: 'buy', url: url.toString() });
   }
   out.push({ kind: 'own_key', url: settingsUrl });
-  if (cap === 'text' && (config.modelFreeFallback ?? '').trim()) out.push({ kind: 'free_model' });
+  if (cap === 'text' && freeModelOf(config).trim()) out.push({ kind: 'free_model' });
   return out;
 }
