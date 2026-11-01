@@ -16150,11 +16150,10 @@
       "more": "Show older",
       "operator": "The operator",
       "someone": "Someone",
-      "used": "used {code}",
       "line": "{who} {what}",
       "lineTarget": "{who} {what}: {target}",
       "failed": "(did not succeed)",
-      "showReads": "Show reads too",
+      "showReads": "Show reads and routine entries too",
       "did": {
         "sentRequest": "sent the build request",
         "checkedRequest": "checked the build request",
@@ -16164,7 +16163,19 @@
         "askedChat": "asked in the chat",
         "savedNote": "saved a note",
         "wroteDoc": "wrote a workspace document",
-        "uploadedFile": "uploaded a file"
+        "uploadedFile": "uploaded a file",
+        "deletedNote": "deleted a note",
+        "gaveTask": "gave a task",
+        "startedTask": "started a task",
+        "reportedTask": "reported on a task",
+        "finishedTask": "finished a task",
+        "failedTask": "could not finish a task",
+        "declinedTask": "declined a task",
+        "changedTask": "changed a task",
+        "sentMessage": "sent a message",
+        "readData": "read data",
+        "openedPage": "opened a page",
+        "madeChange": "made a change"
       }
     },
     "welcomeSub": "Before the place can do anything for you, there are a couple of things to do.",
