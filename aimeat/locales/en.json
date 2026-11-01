@@ -15901,7 +15901,7 @@
       "position": "You are number {n} of {total} requests in the queue.",
       "stateLabel": "Status",
       "state": {
-        "received": "Sent. Waiting for the queue to confirm it.",
+        "received": "Sent to the operator, who passes it to the queue.",
         "queued": "In the queue",
         "building": "Being built",
         "invited": "Invitation sent",

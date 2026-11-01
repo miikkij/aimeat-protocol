@@ -16094,7 +16094,7 @@
       "position": "Olet jonossa sijalla {n} / {total} pyyntöä.",
       "stateLabel": "Tila",
       "state": {
-        "received": "Lähetetty. Odottaa, että jono vahvistaa sen.",
+        "received": "Lähetetty palvelun ylläpitäjälle, joka vie sen jonoon.",
         "queued": "Jonossa",
         "building": "Työn alla",
         "invited": "Kutsu lähetetty",
