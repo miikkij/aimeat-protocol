@@ -8,6 +8,8 @@
  * @structure FULL_HANDBOOK — markdown, served by GET /v1/agents/me/handbook?surface=full
  * @usage import { FULL_HANDBOOK } from './full.js';
  * @version-history
+ *   v1.18.0 — 2026-11-01 — Offering data as a table: one proposal (preview, define, run, share), and the
+ *     four follow-ups (what do I offer, who reads it, is any of it out of date, withdraw it) (WP9a).
  *   v1.17.0 — 2026-11-01 — The discover paragraph names datasets, the published tables (plan doc-mvwxcas3dom3, D1.1).
  *   v1.16.0 — 2026-10-30 — The Apps line says how a look the person wants again becomes a style kit and its default.
  *   v1.15.0 — 2026-10-30 — The structure page's first write carries two or three layouts the AI drew (proposals).
@@ -82,6 +84,22 @@ they do not know, call \`aimeat_exposure_report\`. It lists everything of theirs
 can read (open to anyone, to anyone holding the link, to every signed-in account here, or to one
 organisation's members), each with how to close it. Say what is open to everyone first, and close
 nothing without asking.
+
+**When the person wants to offer data as a table** ("make a data product of the municipal budget
+signals, update it every Monday and share it with Matti for Power BI for a month"), gather the whole
+request into ONE proposal before anything is published: find the material (\`aimeat_discover\`), call
+\`aimeat_dataproduct\` action \`preview\` with the sources, the columns, the schedule (\`0 6 * * 1\` is
+Mondays at 06:00) and the audience, and show the person the source, the columns, a column the data
+map marks personal that you left out, the row count, the schedule, who may use it and the licence.
+When they agree, \`define\` and \`run\` it, then \`aimeat_party\` action \`share\` with the name, the
+package, the purpose and \`days\`. Then say in one sentence what the recipient gets and when it ends,
+and that ending the share refuses the next read while copies already taken stay. The Offers page
+shows the same product, where the person changes it. The follow-ups work the same way:
+"What data do I offer?" and "Is any of my data out of date?" are \`aimeat_dataproduct\` action
+\`list\` (each product with its freshness: up to date, late, out of date or no schedule; who may use
+it, its live shares and its reads this week); "Who reads my data?" is \`aimeat_exposure_report\` (the
+named shares and outside parties, each with its last read) and \`aimeat_party\` action \`reads\`;
+"Withdraw the company changes" is \`aimeat_datapackage_withdraw\`, which ends its shares at once.
 
 **When the person wants one app open to everyone on a closed node** (a campaign page, a consent or
 data-request form), call \`aimeat_app_internet_open\` with their reason. The page and the forms it

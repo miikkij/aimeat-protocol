@@ -20,6 +20,7 @@
  * @structure BuildContext · prepareBuild · previewProduct · runProduct
  * @usage const out = await runProduct({ deps, caller }, definition);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A definition's `retention` is the version's retention policy (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { CallerContext } from '../caller-context.js';
@@ -111,6 +112,7 @@ export async function prepareBuild(ctx: BuildContext, def: DataProductDefinition
             sourcesFetchedAt: fetchedAt,
         },
         ...(def.confirmPersonalPublic ? { confirmPersonalPublic: true } : {}),
+        ...(def.retention ? { retentionPolicy: def.retention } : {}),
     };
     return { sources, combined, input, allowed, ...(refusal ? { refusal } : {}) };
 }

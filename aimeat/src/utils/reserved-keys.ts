@@ -23,6 +23,9 @@
  *   2026-11-01 -- `company-page-writers.` is service-owned: which writers without company:write the owner
  *     allowed to change a company's page through the file routes (services/company/company-page-key.ts;
  *     secaudit2026oct31w2 round 11). A new prefix, so nothing wrote it through the memory API before.
+ *   2026-11-01 -- `dsp.` is service-owned: the Dataspace Protocol negotiations, transfers, archive and
+ *     package settings of an owner (services/dataspace/; plan doc-mvwxcas3dom3, D8). An agreement there
+ *     names the share it made, so a principal that could write it could forge an agreement. A new prefix.
  *   2026-11-01 -- `app-parties.` and `app-party-data.` are service-owned: the people who registered to an
  *     app, and what each keeps in it (services/app-parties/; plan doc-mvwxcas3dom3, D4).
  *   2026-11-01 -- `party-purchases.` is service-owned: the EXCHANGE purchases of outside parties, one
@@ -442,7 +445,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
 
 /**
  * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
@@ -481,6 +484,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['dataproducts.', 'a data product definition, and only the data product service writes it. Read and change it with /v1/dataproducts/{name} or the aimeat_dataproduct MCP tool.'],
   ['app-parties.', 'the people who registered to one of your apps and its signup setting, and only the app party service writes it. Read them with GET /v1/apps/{owner}/{app}/parties.'],
   ['app-party-data.', 'what a person registered to one of your apps keeps in it, and only the app party service writes it. The app reads and writes it with /v1/apps/{owner}/{app}/party-data/{key}.'],
+  ['dsp.', 'a Dataspace Protocol negotiation, transfer or setting of your data packages, and only the dataspace service writes it. Read them with GET /v1/dataspace/negotiations or the aimeat_dataspace MCP tool.'],
   ['party-purchases.','the EXCHANGE purchases outside parties made of your data packages, and only the purchase service writes it. Read them with GET /v1/exchange/offerings/{id}/consumers.'],
   ['party-reads.', 'the read log of your outside parties, and only the party service writes it. Read it with GET /v1/parties/{name}/reads or the aimeat_party MCP tool (action reads).'],
   ['parties', 'your outside parties and their keys, and only the party service writes it. Read and change them with /v1/parties or the aimeat_party MCP tool.'],

@@ -23,6 +23,7 @@
  *   that answers an anonymous caller differently rather than refusing, has no refusal to test.
  * @structure authenticatedOperations · routeMatchers · testBlocks · refusalIn · namedRoutes · helperRoutes · refusedRoutes
  * @version-history
+ *   v1.0.2 -- 2026-11-01 -- A path under /dsp (the Dataspace Protocol endpoints, plan doc-mvwxcas3dom3 D8) is read as a route too.
  *   v1.0.1 -- 2026-10-19 -- A helper's name is regex-escaped in full, backslash included, before it is built into a pattern (CodeQL 1746).
  *   v1.0.0 — 2026-10-16 — Initial (QA audit P3-08, W29).
  */
@@ -142,7 +143,7 @@ const METHOD_WORD =/(?:method\s*:\s*['"`]|['"`]|\.)(GET|POST|PUT|PATCH|DELETE|ge
 /** The routes a block names: `METHOD /path` with the path's `${...}` holes kept as one segment. */
 export function namedRoutes(block: string, matchers: Matcher[]): Set<RouteKey> {
     const out = new Set<RouteKey>();
-    const literal = /(['"`])(?:\$\{[^}]*\})?(\/(?:v1|v2|mcp|local|a2a|\.well-known|api|oauth|federation)[^'"`\s?#]*)/g;
+    const literal = /(['"`])(?:\$\{[^}]*\})?(\/(?:v1|v2|mcp|local|a2a|\.well-known|api|oauth|federation|dsp)[^'"`\s?#]*)/g;
     for (const m of block.matchAll(literal)) {
         const path = m[2]!.replace(/\$\{[^}]*\}/g, 'X').replace(/\/+$/, '');
         const at = m.index;

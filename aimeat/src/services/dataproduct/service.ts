@@ -33,6 +33,9 @@
  *   const out = await defineProduct(ctx, name, body);
  *   if (!out.ok) return render(out.status, out.code, out.message);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The list carries each product's package, freshness, live shares, reads in the
+ *     last seven days, next run and a short label of each source (./list-facts.ts; WP9a, the Offers page),
+ *     and the node's data intermediation mode, which a sale on EXCHANGE is subject to (plan D7.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
 import type { ScheduledJobRecord } from '../../storage/interface.js';
@@ -45,9 +48,11 @@ import { recordFailure } from '../datapackage/store.js';
 import { readPointer } from '../datapackage/version-audience.js';
 import { logger } from '../../utils/logger.js';
 import {
-    DataProductError, normaliseDefinition, dataProductKey, asDefinition, DATAPRODUCT_KEY_PREFIX,
+    DataProductError, normaliseDefinition, dataProductKey, asDefinition, sourceLabel, DATAPRODUCT_KEY_PREFIX,
     type DataProductDefinition, type LastRun,
 } from './definition.js';
+import { productListFacts } from './list-facts.js';
+import { intermediationMode } from '../data-intermediation/gate.js';
 import { prepareBuild, previewProduct, runProduct, type BuildContext, type RunOutcome } from './build.js';
 import { DATAPRODUCT_SCHEDULE_KIND } from './schedule-input.js';
 import type { SourceDeps } from './source-common.js';
@@ -182,7 +187,16 @@ export async function listProducts(ctx: DataProductCtx): Promise<DataProductAnsw
     const items = await ctx.deps.storage.listMemory(ctx.caller.ownerGhii, { prefix: DATAPRODUCT_KEY_PREFIX });
     const defs = items.map(r => asDefinition(r.value)).filter((d): d is DataProductDefinition => !!d)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-    return { ok: true, data: { products: defs.map(d => ({ name: d.name, title: d.title ?? null, visibility: d.visibility, sources: d.sources.map(s => ({ id: s.id, kind: s.kind })), combine: d.combine.mode, schedule: d.schedule ?? null, last_run: d.lastRun ?? null, updated_at: d.updatedAt })), total: defs.length } };
+    // Each row's package, freshness, live shares and reads, so the list answers "what do I offer,
+    // is any of it stale, who reads it" without a second call per product.
+    const facts = await productListFacts(ctx.deps, ctx.caller.ownerGhii, defs.map(d => d.name));
+    const jobs = await ctx.deps.storage.listScheduledJobs({ ownerScope: ctx.caller.ownerGhii, type: DATAPRODUCT_SCHEDULE_KIND });
+    const nextRunOf = (name: string) => jobs.find(j => (j.input as { name?: unknown } | undefined)?.name === name)?.nextRunAt ?? null;
+    return { ok: true, data: { products: defs.map(d => ({
+        name: d.name, title: d.title ?? null, visibility: d.visibility, sources: d.sources.map(s => ({ id: s.id, kind: s.kind, ...sourceLabel(s) })),
+        combine: d.combine.mode, schedule: d.schedule ?? null, next_run_at: nextRunOf(d.name), last_run: d.lastRun ?? null, updated_at: d.updatedAt,
+        ...(facts.get(d.name) ?? { package: null, freshness: null, shares: 0, reads_7d: 0 }),
+    })), total: defs.length, data_intermediation: intermediationMode(ctx.deps.config) } };
 }
 
 /** Delete a definition and every schedule that builds it. The package and its versions stay. */

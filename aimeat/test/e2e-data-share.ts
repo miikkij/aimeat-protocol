@@ -18,6 +18,8 @@
  *   The party's own endpoints: me, decline, key rotation.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-share
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The exposure items carry a named share's and a party's facts as fields (WP9a;
+ *     they did not exist before, so the assertion fails on the previous code).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3).
  */
 import { registerOwner } from './helpers/owner-login.js';
@@ -300,6 +302,15 @@ await test('Exposure: the report lists the named shares and the parties at the l
     assert(share && share.level === 'named' && /aimeat_consent_revoke/.test(share.how_to_close), `share item: ${JSON.stringify(share)}`);
     assert(party && party.level === 'named' && /aimeat_party/.test(party.how_to_close), `party item: ${JSON.stringify(party)}`);
     assert(r.body.data.counts.by_level.named >= 2, `counts: ${JSON.stringify(r.body.data.counts?.by_level)}`);
+    // The facts a page draws each row from, as fields (WP9a): the share's package, party, end and reads;
+    // the party's name, kind, live shares and keys.
+    const s = share.share as Body | undefined;
+    assert(s && typeof s.package === 'string' && typeof s.party === 'string' && typeof s.party_name === 'string'
+        && ['program', 'person', 'dataspace'].includes(s.party_kind) && 'expires' in s && 'last_read_at' in s && typeof s.reads_7d === 'number', `share facts: ${JSON.stringify(s)}`);
+    const p = party.party as Body | undefined;
+    assert(p && typeof p.name === 'string' && typeof p.display_name === 'string' && p.keys >= 1 && typeof p.shares === 'number' && 'key_last_used_at' in p, `party facts: ${JSON.stringify(p)}`);
+    const anyRead = items.filter(i => i.kind === 'outside_party').some(i => i.party?.key_last_used_at);
+    assert(anyRead, 'a party that read with its key says when the key was last used');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
