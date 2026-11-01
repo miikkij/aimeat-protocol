@@ -28,6 +28,8 @@
  *   const a = parseAudience(app.access);          // { level: 'organism', organismId } | ...
  *   if (!(await audienceAllows(storage, a, req.auth))) → refuse
  * @version-history
+ *   v1.1.0 — 2026-11-01 — isNodeAccount refuses an outside party's reader (`party` set): members and
+ *     organism:<id> never admit a party (plan doc-mvwxcas3dom3, D2.8).
  *   v1.0.3 — 2026-10-24 — Header only: the memory 'members' check did admit a visitor; corrected
  *     (secaudit2026oct22, members-tier-admits-federated-visitor).
  *   v1.0.2 — 2026-10-21 — isNodeAccount asks isAnonymousPrincipal, so the minted anonymous token is no
@@ -55,6 +57,12 @@ export interface AudienceAuth {
   owner?: string;
   anonymous?: boolean;
   federated?: boolean;
+  /**
+   * Present on an outside party's reader (services/parties/read-gate.ts). A party is never an account
+   * of this node, so isNodeAccount refuses it and the members and organism levels never admit it
+   * (plan doc-mvwxcas3dom3, D2.8).
+   */
+  party?: unknown;
 }
 
 /** Read a stored or requested audience. Null for anything that is not one of the four forms. */
@@ -74,7 +82,8 @@ export function formatAudience(a: Audience): string {
 
 /** Signed in on THIS node: not the shared anonymous identity, not a session from another node. */
 export function isNodeAccount(auth: AudienceAuth | null | undefined): boolean {
-  return !!auth && !isAnonymousPrincipal(auth) && auth.federated !== true && typeof auth.owner === 'string' && auth.owner.length > 0;
+  return !!auth && !isAnonymousPrincipal(auth) && auth.federated !== true && auth.party === undefined
+    && typeof auth.owner === 'string' && auth.owner.length > 0;
 }
 
 /**

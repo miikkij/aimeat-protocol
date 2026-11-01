@@ -11,6 +11,9 @@
  *   import { registerConsentTools } from './consent.js';
  *   registerConsentTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-01 — aimeat_consent_grant takes a party recipient (a named share of a data package) with
+ *     pinned_version, allow_url_key and terms_required, sent to grantConsent as the share's metadata,
+ *     and answers the share (plan doc-mvwxcas3dom3, D3.4).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-20 — consentCaller() files and checks a consent under the session's principal, as POST
@@ -44,6 +47,7 @@ import { consentCollectionMethod } from '../services/mydata-receipt.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
+import { shareView } from '../services/parties/shares.js';
 
 export function registerConsentTools(
     mcp: McpServer,
@@ -148,7 +152,13 @@ export function registerConsentTools(
             inputSchema: zodShapeFor('aimeat_consent_grant'),
             annotations: annotationsFor('aimeat_consent_grant'),
         },
-        async ({ target_gaii, scope, data_pattern, purpose, ttl_hours }) => {
+        async ({ target_gaii, scope, data_pattern, purpose, ttl_hours, pinned_version, allow_url_key, terms_required }) => {
+            // A party recipient's share terms (services/parties/shares.ts reads them from the metadata).
+            const shareTerms = {
+                ...(pinned_version !== undefined ? { pinned_version } : {}),
+                ...(allow_url_key !== undefined ? { allow_url_key } : {}),
+                ...(terms_required !== undefined ? { terms_required } : {}),
+            };
             // ONE implementation (services/consent-write.ts). This tool used to build the record
             // itself, which is why it accepted a recipient no access check will ever match, wrote no
             // audit entry, and never refreshed the federation directory — three things the REST door
@@ -159,6 +169,7 @@ export function registerConsentTools(
                 purpose,
                 scope,
                 expires: ttl_hours != null ? new Date(Date.now() + ttl_hours * 3_600_000).toISOString() : null,
+                ...(Object.keys(shareTerms).length ? { metadata: shareTerms } : {}),
             });
             if (!granted.ok) {
                 // Nothing was granted, and the owner was asked: the answer carries the request so the
@@ -178,6 +189,9 @@ export function registerConsentTools(
                         target_gaii: consent.recipient,
                         scope: consent.scope,
                         expires_at: consent.expires,
+                        // A named share: the party reads it with its key; its connection file is at
+                        // /v1/parties/me/shares/{id}/connection, and aimeat_party "get" lists it.
+                        ...(consent.recipient.startsWith('party:') ? { share: shareView(consent) } : {}),
                     }, null, 2),
                 }],
             };

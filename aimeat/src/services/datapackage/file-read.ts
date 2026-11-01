@@ -25,6 +25,8 @@
  *   const verdict = await packageFileVerdict(storage, gaii, key, req.auth);
  *   if (verdict.kind === 'open' && file.visibility !== 'public') { ...serve... }
  * @version-history
+ *   v1.3.0 — 2026-11-01 — The package name goes to datapackageReadable, so an outside party's reader opens
+ *     the files of the package its share names (plan doc-mvwxcas3dom3, D3.2).
  *   v1.2.0 — 2026-11-01 — The package's and the version's audience come from the service's own record
  *     (./audience-record.ts trustedAudienceOf), as openPackage reads them, not from the pointer or the
  *     descriptor's tags (secaudit2026oct31w2 round 10, W2-14, met again at the merge with D0.4).
@@ -89,7 +91,7 @@ export async function packageFileVerdict(
     // The audience is the one the service recorded (./audience-record.ts), as openPackage reads it: the
     // pointer and the descriptor's tags are files the generic storage routes write.
     const trusted = await trustedAudienceOf(storage, nodeId ?? '', ownerGhii, name, pointer);
-    if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return { kind: 'closed' };
+    if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader, name))) return { kind: 'closed' };
     // A withdrawn package's files are served to nobody (./withdraw.ts); a reader the audience admits
     // learns it was withdrawn, anyone else gets the ordinary refusal.
     const withdrawn = withdrawalOf(pointer);

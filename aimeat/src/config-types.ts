@@ -7,6 +7,8 @@
  *   Extracted from config.ts to satisfy max-file-lines; config.ts re-exports
  *   every symbol so no consumer import changes.
  * @version-history
+ *   v1.24.0 — 2026-11-01 — shareMaxDays and partyReadsPerMinute: the named share's longest life and an
+ *     outside party's read rate (plan doc-mvwxcas3dom3, D2.9, D3.1).
  *   v1.23.0 — 2026-10-29 — FileStoreConfig mixed in (config-file-store.ts): where stored files keep their bytes.
  *   v1.22.1 — 2026-10-25 — personalNodeMaxPerOwner (secaudit2026oct22, personal-anchor-no-per-owner-slot-limit).
  *   v1.22.0 — 2026-10-25 — NodeLimitsConfig mixed in (config-node-limits.ts; secaudit2026oct22).
@@ -470,6 +472,10 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   // Consent Layer (Phase 0.3)
   consentEnabled: boolean;
   consentAuditRetentionDays: number;
+  /** The longest a named share to an outside party may last, in days (services/parties/shares.ts). */
+  shareMaxDays: number;
+  /** Reads one outside party may make a minute before 429 (services/parties/read-gate.ts). */
+  partyReadsPerMinute: number;
   /**
    * How many events stay in an account's "what has happened" window before the oldest move to the
    * archive. A COUNT rather than a number of days: recency is relative to how much happens to

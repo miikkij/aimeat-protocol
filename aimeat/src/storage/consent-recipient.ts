@@ -5,6 +5,9 @@
  * @description Pure consent-recipient matching and summary shared by storage and services.
  * @structure matchesRecipient; countConsentRecipients
  * @version-history
+ *   1.1.0 2026-11-01 A 'party:' recipient matches only that exact party accessor, and a party accessor
+ *     matches no other form, '*' included; countConsentRecipients counts parties apart (plan
+ *     doc-mvwxcas3dom3, D3.1, lead decision L1).
  *   1.0.2 2026-10-27 A 'node:' or 'domain:' recipient never matches the shared anonymous agent of the
  *     reserved account 'anonymous' (secaudit2026oct26, node-domain-recipient-matches-shared-anonymous-principal).
  *   1.0.1 2026-10-24 A 'domain:' recipient matches only an accessor that names a node, so it never
@@ -37,6 +40,14 @@ export function matchesRecipient(
   accessorOwner: string,
   accessorNode: string,
 ): boolean {
+  // An outside party (services/parties/contract.ts, party:<owner>/<name>@<node>) is matched by its own
+  // recipient string and nothing else, in both directions: a party recipient admits only that exact
+  // party, and a party accessor is admitted by no wildcard, ghii:, domain:, node: or owner form, so a
+  // grant written for the owner's own principals or for everyone never reaches it (plan doc-mvwxcas3dom3, L1).
+  if (recipient.startsWith('party:') || accessorGaii.startsWith('party:')) {
+    return accessorGaii.startsWith('party:') && recipient === accessorGaii;
+  }
+
   // Wildcard — everyone
   if (recipient === '*') return true;
 
@@ -83,9 +94,10 @@ export function matchesRecipient(
 }
 
 export function countConsentRecipients(consents: readonly { recipient: string }[]) {
-  const byType = { wildcard: 0, gaii: 0, ghii: 0, organism: 0, domain: 0, node: 0 };
+  const byType = { wildcard: 0, gaii: 0, ghii: 0, organism: 0, domain: 0, node: 0, party: 0 };
   for (const c of consents) {
     if (c.recipient === '*') byType.wildcard++;
+    else if (c.recipient.startsWith('party:')) byType.party++;
     else if (c.recipient.startsWith('ghii:')) byType.ghii++;
     else if (c.recipient.startsWith('organism.')) byType.organism++;
     else if (c.recipient.startsWith('domain:')) byType.domain++;
