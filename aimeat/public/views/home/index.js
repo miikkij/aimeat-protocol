@@ -16,6 +16,8 @@
  * @structure default HomeView; shared HomeJourney and HomeSettingsDialog
  * @usage routed at /v1/home by spa.html (and portal.ts spaRoutes, or F5 is a 404)
  * @version-history
+ *   2026-11-02: Under the change-log band, on a customer's node, "Sillä aikaa kun olit poissa"
+ *     (away.js): what happened while the buyer was away (Jouni, 2.11 00.52, three visits).
  *   2026-11-01: Under the welcome, on a customer's node, "Rakennamme kanssasi" (build-with-you.js):
  *     the offer once the node opens it, then the request's place in the queue (Jouni, 1.11 16.22).
  *   2026-10-31: The welcome takes no navigate: its sentence field went with v31 K26. It leaves once the
@@ -83,6 +85,7 @@ import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 import { SurfaceRenderer, useSurfaceLayout } from '/views/surface/renderer.js';
 import { useHomeState } from '/views/surface/home-state.js';
 import { CustomerWelcome } from './customer-welcome.js';
+import { AwayCard } from './away.js';
 import { BuildWithYou } from './build-with-you.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -170,6 +173,9 @@ export default function HomeView({ navigate }) {
             link always points at something here. Outside the layout, because it goes away by being
             read rather than by being arranged. */''}
       <${NewsBand} session=${session} navigate=${navigate} />
+      ${/* A buyer back after a while away: what their agents did and what the node said meanwhile
+            (away.js); nothing on a first visit or anywhere else. */''}
+      <${AwayCard} />
       ${/* A buyer's first page on the node the store made for them says what they bought and what to
             do first (customer-welcome.js); it draws nothing anywhere else. */''}
       <${CustomerWelcome} session=${session} initialized=${connected} />
