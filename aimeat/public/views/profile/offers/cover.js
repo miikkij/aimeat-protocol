@@ -12,6 +12,9 @@
  * @structure renderOffersView · renderCover · secBack · secAuto · secAsk · catalogue · aiResults · sellPage
  * @usage import { renderOffersView } from './offers/cover.js';
  * @version-history
+ *   v2.2.0 -- 2026-11-01 -- Section 06 is the data products (data-list.js); a product opens as its own
+ *     page (data-product.js), "New data product" as the six-step wizard (wizard.js), and the page of
+ *     every product is a page from the rail (WP9a, design canvas "Data ulos", board Tarjoama).
  *   v2.1.1 -- 2026-10-11 -- The selling register's price-and-pacing cell wraps instead of ending in an ellipsis, and on a phone the rows stack with each cell's column name before it (List labels instead of keepCols), so the pacing amount shows at every width. Its column head is colPricePacing ("Price and pacing"); colPrice stays the selling editor's money field label.
  *   v2.1.0 -- 2026-10-11 -- The selling register's price column says the money price (or Free) and the pacing amount (tollMorsels, 3.x price.morsels as fallback); a morsel amount is no longer a price.
  *   v2.0.0 -- 2026-09-26 -- Every part is a component call that gets data (page group G6): the frame
@@ -69,6 +72,9 @@ import { c, word, agentMark, getWord, costTime, statusWord, deliveryRows, rel, c
 import { renderOffer } from './offer-page.js';
 import { renderInbox, renderDeliverable } from './inbox.js';
 import { MapPage } from './map-page.js';
+import { secData, dataPage } from './data-list.js';
+import { ProductPage } from './data-product.js';
+import { DataWizard } from './wizard.js';
 
 const BACK_ROWS = 6;
 const needLabel = (k) => t('profile.offers.need.' + k) || k;
@@ -82,7 +88,10 @@ export function renderOffersView(ctx) {
     if (v.id === 'inbox') return renderInbox(ctx);
     if (v.id === 'map') return html`<${MapPage} ctx=${ctx} />`;
     if (v.id === 'sell') return sellPage(ctx);
+    if (v.id === 'data') return dataPage(ctx);
   }
+  if (v.kind === 'product') return html`<${ProductPage} key=${v.name} ctx=${ctx} name=${v.name} tab=${v.tab} share=${!!v.share} />`;
+  if (v.kind === 'wizard') return html`<${DataWizard} ctx=${ctx} />`;
   return renderCover(ctx);
 }
 
@@ -116,6 +125,7 @@ function renderCover(ctx) {
         { id: 'op-ask', num: '03', label: c('secAsk'), count: m.askable.length },
         { id: 'op-offline', num: '04', label: c('secOffline'), count: m.offlineAgents.size },
         { id: 'op-selling', num: '05', label: c('secSelling'), count: m.selling.length },
+        { id: 'op-data', num: '06', label: t('dataout.list.title'), count: (ctx.data.products || []).length },
       ]}
       pagesLabel=${c('pages')} pages=${pageLinks(ctx, null)}>
       ${secBack(ctx)}
@@ -123,6 +133,7 @@ function renderCover(ctx) {
       ${secAsk(ctx)}
       ${secOffline(ctx)}
       ${secSelling(ctx)}
+      ${secData(ctx)}
     <//>`;
 }
 

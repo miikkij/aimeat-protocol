@@ -5323,6 +5323,212 @@
       "product": "Product", "language": "Language", "create": "Make the draft", "created": "The draft was made."
     }
   },
+  "dataout": {
+    "fresh": {
+      "fresh": "Up to date", "late": "Late", "stale": "Out of date", "unscheduled": "No schedule", "unpublished": "Not published yet",
+      "why": {
+        "late": "The last update came later than its schedule promised. Readers still get the previous version. Run it now, or look at why the last run failed.",
+        "stale": "Three updates in a row are missing. The catalogue marks the product out of date, and you were notified. Run it now, or change its schedule."
+      }
+    },
+    "audience": { "private": "Only me", "members": "Signed-in accounts", "public": "Everyone", "organismOf": "Members of {name}" },
+    "schedule": {
+      "none": "updated only when you run it", "cron": "on the schedule {cron}", "daily": "updated every day at {at}", "monthly": "updated on day {day} of each month at {at}",
+      "weekly": { "0": "updated on Sundays at {at}", "1": "updated on Mondays at {at}", "2": "updated on Tuesdays at {at}", "3": "updated on Wednesdays at {at}", "4": "updated on Thursdays at {at}", "5": "updated on Fridays at {at}", "6": "updated on Saturdays at {at}" }
+    },
+    "day": { "0": "Sunday", "1": "Monday", "2": "Tuesday", "3": "Wednesday", "4": "Thursday", "5": "Friday", "6": "Saturday" },
+    "kind": { "records": "Workspace records", "app": "App data", "memory": "Agent or workflow result", "extension": "Extension action", "file": "File", "datapackage": "Another data product" },
+    "combine": {
+      "title": "How {ids} are combined",
+      "tables": "As their own tables", "tablesHint": "The package holds one table per source. Power BI sees each one, and you can join them there.",
+      "union": "As one table", "unionHint": "The rows follow one another, when the sources have the same columns.",
+      "join": "Enrich by a key", "joinHint": "The columns of the other sources are added to the rows of the first one where the key matches.",
+      "keyLeft": "Key in {id}", "keyRight": "Key in {id}", "tryFirst": "Try the sources first", "tryNow": "Try the sources"
+    },
+    "list": {
+      "title": "Data products", "sub": "{n} products", "sub_one": "{n} product",
+      "desc": "Tables built from your own material, each with a schedule and a list of who may read it. A row says whether the data is up to date and who reads it.",
+      "new": "New data product", "allN": "All {n}", "oldN": "Out of date: {n}",
+      "filterLabel": "Show", "filterAll": "Data products", "filterOld": "Out of date",
+      "chipProducts": "{n} products", "chipProducts_one": "{n} product", "chipOld": "{n} out of date", "chipOld_one": "{n} out of date",
+      "colName": "Name", "colFresh": "Freshness", "colWho": "Who may use it", "colReads": "Readers",
+      "rows": "{n} rows", "rows_one": "{n} row", "sharesN": "{n} shares", "sharesN_one": "{n} share", "readsWeek": "{n} reads / week", "readsWeek_one": "{n} read / week",
+      "open": "Open", "withdrawn": "Withdrawn",
+      "empty": "You have no data products yet. Make one from your records, an app's data, a file or an extension's results.",
+      "noneOld": "Every data product is up to date or has no schedule.",
+      "hint": "A data product is a table at a permanent address. Power BI, Excel and other programs read it, and you decide who may.",
+      "askAi": "Your AI reads the same list. Ask it \"what data do I offer?\" or \"is any of my data out of date?\"."
+    },
+    "product": {
+      "label": "Data product", "loadFailed": "The data product could not be read. Try again in a moment.",
+      "versionN": "Version {n}", "current": "in use", "notPublished": "Not published yet", "nextRun": "next run {when}",
+      "share": "Share", "sell": "Sell on EXCHANGE", "sellEdit": "Change the sale", "withdraw": "Withdraw", "runNow": "Update now", "publishAgain": "Publish again", "onSale": "On EXCHANGE",
+      "figRows": "Rows", "figVersions": "Versions", "figShares": "Shares", "figReads": "Reads in 7 days", "lastRun": "updated {when}",
+      "tabsLabel": "About the data product",
+      "tab": { "shares": "Shares and readers", "versions": "Versions", "columns": "Columns", "connect": "Connection", "origin": "Origin" },
+      "colWho": "Who", "colUntil": "Until", "until": "until {date}", "lastRead": "last read {when}", "notRead": "not read yet",
+      "revoke": "End share", "revokeConfirm": "End {who}'s share? The next read is refused at once. Copies already taken cannot be called back.",
+      "revoked": "{who}'s share has ended.", "revokeFailed": "The share was not ended. Try again.",
+      "youAndAgents": "You and your agents", "owner": "owner",
+      "noShares": "Nobody outside reads this product. Share it with a person or a program by name.",
+      "colVersion": "Version", "colChanges": "What changed", "colRows": "Rows", "colWhen": "When", "descriptor": "Descriptor",
+      "pinnedN": "{n} shares pinned to it", "pinnedN_one": "{n} share pinned to it", "reads30": "{n} reads in 30 days", "reads30_one": "{n} read in 30 days", "removedNext": "removed at the next update",
+      "noVersions": "No version is published yet.", "retentionAll": "Every version is kept.",
+      "retention": { "versions": "The newest {n} versions are kept. A version someone still reads stays until you see it.", "months": "Versions of the last {n} months are kept. A version someone still reads stays until you see it." },
+      "noColumns": "The columns show once a version is published.", "notPublishedYet": "The addresses work once a version is published. Update it now.",
+      "ran": "A new version is published.", "unchanged": "The rows did not change, so no new version was made.", "runFailed": "The update failed. The previous version stays.",
+      "lastRunFailed": "The last update failed {when}: {error}. Readers still get the previous version.",
+      "withdrawConfirm": "Withdraw \"{title}\"? Every read is refused from now on, it leaves the catalogue, and its {n} shares end. Copies already taken cannot be called back.",
+      "withdrawConfirm_one": "Withdraw \"{title}\"? Every read is refused from now on, it leaves the catalogue, and its share ends. Copies already taken cannot be called back.",
+      "withdrawn": "\"{title}\" is withdrawn.", "withdrawFailed": "It was not withdrawn. Try again."
+    },
+    "connect": {
+      "copy": "Copy", "odata": "OData feed", "csv": "CSV: {table}", "descriptor": "Description", "descriptorSub": "datapackage.json, Frictionless; this version's permanent address", "odps": "ODPS", "odpsSub": "odps.yaml, computed when it is read",
+      "openPrivate": "These addresses need a sign-in. You read them with your own account; a person you share with reads them with the key of their share.",
+      "openPublic": "Anyone can read these addresses without signing in.",
+      "toolLabel": "Program",
+      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Your own AI" },
+      "excel1": "Data › Get Data › From Other Sources › From OData Feed", "excel2": "Paste the OData feed address: {url}", "excel3": "Choose Basic: the user is the share's name (owner/party), the password is its key", "excel4": "Choose the table {table} › Load",
+      "powerbi1": "Get data › OData feed", "powerbi2": "Paste the OData feed address: {url}", "powerbi3": "Choose Basic: the user is the share's name (owner/party), the password is its key", "powerbi4": "Choose the table {table} › Load",
+      "duckdb1": "Get a token with the share's name and key: {url}", "duckdb2": "Put the token in the secret below and read the CSV",
+      "pandas1": "The token comes from {url} with the share's name and key", "pandas2": "pandas reads the CSV with the token in its header",
+      "ai1": "Connect your AI to AIMEAT over MCP", "ai2": "Say: \"Read the data product {name}\"",
+      "after": {
+        "excel": "Refresh fetches the newest version.", "powerbi": "Refresh fetches the newest version. A scheduled refresh in the Power BI service needs a public address.",
+        "duckdb": "The token lasts a short while. Ask for a new one when it ends.", "pandas": "The token lasts a short while. Ask for a new one when it ends.",
+        "ai": "Your AI reads the rows with aimeat_datapackage_export."
+      }
+    },
+    "origin": {
+      "sources": "Sources", "combine": "Combined", "transformations": "What was changed", "lineage": "Built from", "license": "Licence", "noLicense": "No licence given", "producedBy": "Made by", "hash": "Content hash"
+    },
+    "share": {
+      "title": "Share by name", "doneTitle": "Shared", "who": "Who", "whoPlaceholder": "Matti", "whoHint": "Their name in your list: {name}",
+      "how": "How they read it",
+      "howProgram": "With a program", "howProgramHint": "Power BI, Excel, DuckDB. Gets a key in a connection file.",
+      "howBrowser": "In a browser", "howBrowserHint": "Opens a link in their e-mail and sees the rows.",
+      "howDataspace": "From a dataspace", "howDataspaceHint": "An organisation's connector over the Dataspace Protocol.",
+      "email": "E-mail for the link", "emailPlaceholder": "name@example.com", "emailHint": "Optional. The link goes to this address.", "emailNeeded": "A person who reads in a browser gets the link at this address.",
+      "purpose": "Purpose", "purposePlaceholder": "reporting", "until": "Ends", "untilHint": "At most {n} days on this server, so no later than {date}.",
+      "version": "Which version", "versionLatest": "Always the newest", "versionOnly": "Only version {n} ({hash})",
+      "sentences": "{who} needs no AIMEAT account. You can end the share at any time, and it ends at once. Copies already taken cannot be called back. You see every read.",
+      "theRecipient": "The recipient",
+      "cancel": "Cancel", "submit": "Share", "submitSend": "Share and send the link", "close": "Done",
+      "done": "Shared.", "failed": "The share was not made. Try again.",
+      "notSent": "The link was not sent to {email}: this server does not send share links yet. Give them the connection file yourself.",
+      "copyFile": "Copy the connection file", "downloadFile": "Download the connection file"
+    },
+    "sell": {
+      "title": "Sell on EXCHANGE", "lead": "Buyers find the product on EXCHANGE and read it with their own key. You set the price and how the data may be used.",
+      "model": "Price", "perMonth": "By the month", "perRead": "By the read",
+      "priceMonth": "Price in euros per month", "priceRead": "Price in euros per read", "priceHint": "Leave it empty for free.",
+      "pacing": "Pacing in morsels per read", "pacingHint": "How fast a buyer with an account may read. A morsel is not money.",
+      "terms": "A buyer may", "attribution": "use it when they name you as the source", "derivatives": "make new data from it", "resale": "sell it on",
+      "note": "Other terms", "notePlaceholder": "for example: not for marketing",
+      "mode": {
+        "report": "On this server data intermediation is in the mode report. The sale shows to the administrator on the Compliance page as a finding.",
+        "none": "This server does not act as a data intermediation service. A sale of data may be refused; the reason comes with the answer.",
+        "node": "This server's administrator runs the data intermediation service and has notified the authority. Your sale goes through it.",
+        "owners": "On this server each owner who sells data runs their own intermediation service and notifies the authority. Without a notification a sale is refused."
+      },
+      "submit": "List on EXCHANGE", "update": "Save the sale", "off": "Take off EXCHANGE",
+      "done": "The product is listed on EXCHANGE.", "offDone": "The product is no longer on EXCHANGE.", "failed": "The sale was not saved."
+    },
+    "party": {
+      "title": "Outside parties", "count": "{n} parties", "count_one": "{n} party",
+      "intro": "People and programs with no account on this server that you have given access to. Each one reads only what you shared with it.",
+      "colName": "Party", "colShares": "Shares", "colKey": "Key used",
+      "none": "You have no outside parties. One is made when you share a data product by name.",
+      "kind": { "program": "program", "person": "person", "dataspace": "dataspace" },
+      "keyOf": { "program": "program key", "person": "browser link", "dataspace": "dataspace connector" },
+      "status": { "active": "active", "stopped": "stopped" },
+      "dataProduct": "data product",
+      "sharesN": "{n} shares", "sharesN_one": "{n} share", "keyUsed": "key used {when}", "keyNotUsed": "key not used yet",
+      "open": "Open", "close": "Close", "add": "Add a party",
+      "display": "Name", "name": "Name in the address", "nameHint": "Lowercase letters, digits and dashes", "kindLabel": "Kind", "contact": "Contact", "contactHint": "An e-mail address or a phone number. A person's contact is personal data you hold.",
+      "created": "The party was made. Its key is shown once below.",
+      "label": "Outside party", "newKey": "New key", "keyOnce": "This key is shown once. Give it to the party now; this server keeps only a fingerprint of it.",
+      "keys": "Keys", "noKeys": "No key. Make a new one when the party needs to read.", "keyId": "key …{id}", "keyMade": "made {date}",
+      "replace": "Replace", "replaceConfirm": "Replace the key of {who}? A new key is made and the old one stops working at once.", "replaced": "The key was replaced.",
+      "deleteKey": "Delete", "deleteKeyConfirm": "Delete this key of {who}? It stops working at once.", "keyDeleted": "The key was deleted.",
+      "gets": "What they get", "read": "read", "noShares": "Nothing is shared with this party now.",
+      "reads": "Last reads", "noReads": "No reads yet.", "served": "allowed", "refused": "refused",
+      "refusedMeans": "A refused read means the key was used for something you did not share.",
+      "stop": "Stop", "resume": "Resume", "stopped": "{who} is stopped. Their keys and shares no longer work.", "resumed": "{who} can read again.",
+      "delete": "Delete party", "deleteConfirm": "Delete {who}? Their keys stop working and their {n} shares end at once. Copies already taken cannot be called back.",
+      "deleteConfirm_one": "Delete {who}? Their keys stop working and their share ends at once. Copies already taken cannot be called back.", "deleted": "{who} was deleted.",
+      "operatorStopped": "The administrator of this server stopped this party. Ask the administrator to resume it.",
+      "failed": "That did not work. Try again."
+    },
+    "wizard": {
+      "label": "New data product", "stepsLabel": "Steps", "back": "Back", "cancel": "Cancel", "working": "Working…", "failed": "That did not work. Read the message and try again.",
+      "needName": "Give the product an address name in step 3.", "publish": "Publish",
+      "next": { "columns": "Next: columns", "preview": "Next: preview", "schedule": "Next: updates", "who": "Next: who may use it" },
+      "colOut": "Name out", "colType": "Type", "colDesc": "Description",
+      "sources": { "tab": "Sources", "title": "Where does the data come from?", "lead": "A data product can have several sources. Each one can be its own table in the package, or the sources combine into one table. You see only the sources you, your agents and your apps can read." },
+      "columns": { "tab": "Columns", "title": "Which columns go out?", "lead": "Choose the columns and give them names another system understands. The description goes into the schema, and Power BI and Excel show it." },
+      "preview": { "tab": "Preview", "title": "This is how another system sees it", "lead": "Check the rows, the name and the description. Write the description for someone who decides whether to use the data." },
+      "schedule": { "tab": "Updates", "title": "How often does it update?", "lead": "This is a promise to the reader. The server runs the sources on the schedule and makes a new version only when the rows changed. If a run fails, the previous version stays and you are notified." },
+      "who": { "tab": "Who may use it", "title": "Who may use it?", "lead": "Three ways, and you can use them together: the audience, named shares and a sale on EXCHANGE. The server checks access on every read, so a change works at once." },
+      "done": { "tab": "Done", "title": "Done. The first version is out.", "lead": "The data product is published and its schedule is on. Below are the addresses and the steps a program reads it with." }
+    },
+    "src": {
+      "title": "Sources", "count": "{n} sources", "count_one": "{n} source", "none": "Add the first source below.", "add": "Add a source", "kindLabel": "Kind of source", "remove": "Remove", "pick": "Choose…",
+      "notTried": "Not tried yet. Next reads it.", "tried": "The last try read {rows} rows and {cols} columns.",
+      "organism": "Organism", "ws": "Workspace", "space": "Records space", "spaceHint": "The name of the records space",
+      "app": "App", "keyPrefix": "Key prefix", "keyPrefixHint": "Only the records its data map marks publishable",
+      "key": "Memory key", "keyHint": "The record an agent or a workflow writes its result to", "rowsAt": "Rows at", "rowsAtHint": "The field that holds the list of rows, for example rows",
+      "ext": "Extension", "action": "Action", "input": "Input", "inputHint": "JSON, or plain words for the action's query",
+      "file": "File", "fileHint": "A CSV or Excel file in your storage", "sheet": "Sheet", "sheetHint": "In an Excel file; the first one when empty",
+      "package": "Data product", "resource": "Table", "resourceHint": "The first table when empty",
+      "provenance": "The origin, the freshness and the personal data of each source are checked one by one and written into the package's description. A data product is as fresh as its oldest source."
+    },
+    "cols": {
+      "title": "Columns", "count": "{n} of {of} go out", "include": "Goes out", "personal": "personal data · data map", "descPlaceholder": "What the column holds",
+      "personalLeftOut": "Left out: {cols}. The data map marks them personal data. If you take them in, the product cannot be public. A named share and a contract are possible, and they show on the Compliance page.",
+      "personalIncluded": "Personal data goes out: {cols}. The product cannot be public.",
+      "filterTitle": "Row filter", "optional": "optional", "filterColumn": "Column", "noFilter": "No filter", "filterOp": "Condition", "filterValue": "Value",
+      "op": { "eq": "is", "ne": "is not", "gt": "greater than", "gte": "at least", "lt": "less than", "lte": "at most", "contains": "contains" },
+      "filterNote": "The filter is written into the package's transformations, so a reader sees what was left out."
+    },
+    "preview": {
+      "rowsTitle": "First rows of the trial build", "counts": "{rows} rows · {cols} columns", "sizeLine": "{rows} rows · {cols} columns · about {size}",
+      "validOk": "The Frictionless check passed.", "validBad": "The Frictionless check found {n} problems. Change the column types in step 2.", "validBad_one": "The Frictionless check found one problem. Change the column's type in step 2.",
+      "describedOk": "Every column has a type and a description.", "describedBad": "A column has no description. Add one in step 2.",
+      "personalNone": "No personal data goes out.", "personalIn": "Personal data goes out.",
+      "aboutTitle": "Name and description", "name": "Name", "slug": "Address name", "slugHint": "Lowercase letters, digits and dashes. It becomes part of every address.",
+      "desc": "Description", "keywords": "Keywords", "keywordsHint": "Separated by commas", "rebuild": "Build the preview again",
+      "odpsTitle": "The description machines read (ODPS 4.1, excerpt)", "noOdps": "The sheet shows once the preview passes its checks."
+    },
+    "sched": {
+      "title": "Pace", "pace": "Pace", "once": "Once", "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly",
+      "weekday": "Day", "monthday": "Day of the month", "time": "Time", "keep": "Keep old versions", "keep12": "The newest 12", "keepAll": "All", "keep6m": "6 months",
+      "onceNote": "The product is built when you publish it and when you press Update now. Readers see it as having no schedule.",
+      "freshTitle": "How a reader sees its freshness",
+      "freshFresh": "updated within the promised time",
+      "freshLate": { "day": "more than a day since the last update", "week": "more than a week since the last update", "month": "more than a month since the last update" },
+      "freshStale": { "day": "more than three days; the catalogue marks it and you are notified", "week": "more than three weeks; the catalogue marks it and you are notified", "month": "more than three months; the catalogue marks it and you are notified" },
+      "freshNone": "No schedule is promised, so the reader sees when it was last published.",
+      "nodeNote": "The run is the server's own schedule: the same one you see on the Schedules page, and an agent can start it. A version someone still reads is not removed without you seeing it first."
+    },
+    "who": {
+      "audience": "Audience",
+      "privateHint": "You, your agents and your apps. Others only by a named share or a contract.",
+      "organism": "One organism's members", "organismHint": "The active members of one shared place.", "organismPick": "Organism",
+      "membersHint": "Every account of this server. No outside parties and no visitors from another server.",
+      "publicHint": "Anyone, also search engines and the EU's data portals. Copies already downloaded cannot be called back.",
+      "publicNote": "A public product cannot be made private for the copies already downloaded.",
+      "licence": "Licence", "licencePick": "Choose a licence",
+      "sharesTitle": "Named shares", "newShare": "Add a share", "addShare": "Add", "noShares": "No named shares yet.",
+      "noAccount": "The recipient needs no AIMEAT account. Each share is made when you publish, and its key is shown once on the next page.",
+      "sellTitle": "EXCHANGE", "sell": "Sell on EXCHANGE"
+    },
+    "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Only on the terms of a contract" },
+    "done": {
+      "addresses": "Addresses", "noPackage": "The package could not be read just now. Open the data product to see its addresses.",
+      "shares": "Shares made", "showInOffers": "Open the data product", "tryTool": "Try with an outside tool", "shareMore": "Share with someone else"
+    }
+  },
   "exposure": {
     "title": "What others can see of yours",
     "intro": "Everything of yours that someone outside can read: anyone at all, anyone with a link, every account signed in here, or the members of one shared place. Close what should not be open.",
@@ -5336,7 +5542,32 @@
       "signedIn": "Signed-in accounts",
       "signedInSub": "any account here",
       "organism": "Members only",
-      "organismSub": "of one shared place"
+      "organismSub": "of one shared place",
+      "named": "Named by you",
+      "namedShares": "Named shares",
+      "namedSharesSub": "one person or program each",
+      "parties": "Outside parties",
+      "partiesSub": "no account here"
+    },
+    "named": {
+      "sharesTitle": "Named shares", "sharesSub": "a data product for one person or program, until a date",
+      "sharesEmpty": "You have not shared anything by name.",
+      "colWho": "Who · data product", "colUntil": "Until", "colLastRead": "Last read",
+      "revoke": "End share", "revokeConfirm": "End {who}'s share of {what}? The next read is refused at once. Copies already taken cannot be called back.",
+      "revoked": "{who}'s share has ended.",
+      "partiesTitle": "Outside parties", "partiesSub": "people and programs with a key and no account here",
+      "partiesEmpty": "No outside party holds a key.",
+      "colParty": "Party", "colGets": "Shares and keys", "colKeyUsed": "Key used",
+      "noAccount": "no AIMEAT account", "sharesKeys": "shares: {shares} · keys: {keys}",
+      "keyUsed": "key used {when}", "keyNotUsed": "key not used yet", "manage": "Manage",
+      "productsTitle": "Data products", "productsEmpty": "You have no published data packages.",
+      "colLevel": "Level", "change": "Change",
+      "level": { "public": "public", "members": "signed-in", "organism": "members", "private": "only me" },
+      "plusShares": "+ {n} shares", "plusShares_one": "+ {n} share",
+      "who": { "public": "anyone, also search engines", "members": "every account here", "organism": "the members of one shared place" },
+      "privateAlone": "not open to anyone outside",
+      "privateShared": "not open to anyone outside without a share",
+      "productsNote": "Each data product shows at its own level. A private one reaches only the people you shared it with by name."
     },
     "levelSubPartial": "some places could not be read",
     "failed": "These could not be read just now, so their numbers are missing, not zero: {kinds}. Try again in a moment.",
@@ -5356,7 +5587,9 @@
       "portfolio": "Welcome page",
       "company": "Company page",
       "exchange": "Exchange listing",
-      "agent": "Agent in the public list"
+      "agent": "Agent in the public list",
+      "named_share": "Named share",
+      "outside_party": "Outside party"
     },
     "noAddress": "no address for outsiders",
     "closeIt": "Close it",
