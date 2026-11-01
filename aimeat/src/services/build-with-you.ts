@@ -28,6 +28,9 @@
  *   startBuildWithYou · stopBuildWithYou
  * @usage res.json(success(nodeId, await submitOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.1.1 — 2026-11-01 — The queue's `inviteAccount` is kept and shown beside `inviteEmail`, so the
+ *     card can say the invitation waits in the aimeat.io account rather than in an inbox
+ *     (commercial's crew56 chain test).
  *   v1.1.0 — 2026-11-01 — The store's build code (site.build_code). Jouni rejected the queue submit
  *     agent (1.11 18.18), so the request goes with the person's OWN aimeat.io account: a place with a
  *     code answers buildCode and `send` (the queue's app tool submitRequest, called through aimeat.io's
@@ -83,6 +86,8 @@ interface StoredRequest {
   organismInviteSent: boolean;
   organism: { id: string; name: string; url?: string } | null;
   inviteEmail: string | null;
+  /** The aimeat.io account the organism invitation went to, when it went to an account and not an address. */
+  inviteAccount?: string | null;
   note: string;
   checkedAt?: string;
   lastError?: string;
@@ -168,7 +173,7 @@ function view(config: AimeatConfig, rec: BuildWithYouRecord) {
         id: r.organism.id, name: r.organism.name,
         url: r.organism.url ?? (queueOrigin ? `${queueOrigin}/v1/profile?tab=organisms&org=${encodeURIComponent(r.organism.id)}` : null),
       } : null,
-      inviteEmail: r.inviteEmail, note: r.note, spec: r.spec, submittedAt: r.submittedAt, checkedAt: r.checkedAt ?? null,
+      inviteEmail: r.inviteEmail, inviteAccount: r.inviteAccount ?? null, note: r.note, spec: r.spec, submittedAt: r.submittedAt, checkedAt: r.checkedAt ?? null,
     } : null,
   };
 }
@@ -308,6 +313,7 @@ function fold(r: StoredRequest, d: Record<string, unknown>, at: string): StoredR
     organismInviteSent: typeof d.organismInviteSent === 'boolean' ? d.organismInviteSent : r.organismInviteSent,
     organism: org && str(org.id) ? { id: str(org.id), name: str(org.name), ...(str(org.url) ? { url: str(org.url) } : {}) } : r.organism,
     inviteEmail: str(d.inviteEmail) || r.inviteEmail,
+    inviteAccount: str(d.inviteAccount) || r.inviteAccount || null,
     note: 'note' in d ? str(d.note) : r.note,
     checkedAt: at,
     lastError: undefined,
