@@ -38,6 +38,10 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.13.0 — 2026-11-01 — The write and the delete of the welcome page key note its writer
+ *     (storage-page-keys.ts notePageKeyChange), and the presigned mint carries the writer in the token
+ *     (`page_writer`); the write takes it back as `pageWriter` (secaudit2026oct31w2 round 11,
+ *     portfolio-read-hold:absent-record-adopted-at-first-read).
  *   v1.12.0 — 2026-11-01 — The write, the presigned mint and the delete of a company's page key
  *     (`company/<id>/index.html`) ask what the company page route asks: the owner in person, a writer
  *     holding company:write, or one the owner allowed with one press (storage-page-keys.ts,
@@ -111,7 +115,7 @@ import {
     provenanceForStoredBytes, storageProvenanceMintRefusal,
     type StorageProvenanceInput, type ProvenanceRefusalCode,
 } from './storage-file-provenance.js';
-import { pageKeyWriteRefusal, pageWriterOf } from './storage-page-keys.js';
+import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, type PageWriter } from './storage-page-keys.js';
 // Moved to storage-file-provenance.ts (800-line limit); re-exported so the importers are unchanged.
 export { storageProvenanceMintRefusal };
 export type { StorageProvenanceInput, ProvenanceRefusalCode };
@@ -231,6 +235,8 @@ export interface StorageFileInput {
     publishGate?: StoragePublishGate;
     /** The store the writer named for the bytes. Absent: the owner's default store, else the node's. */
     store?: StoreChoice;
+    /** The writer of a page key when `publishGate` names no caller: a presigned upload's signed `page_writer` (storage-page-keys.ts). */
+    pageWriter?: PageWriter;
 }
 
 /** A refusal when the named store cannot take a file of `ownerGaii`; null when it can, or none was named. */
@@ -329,8 +335,9 @@ export async function writeStorageFile(
     const { storage, config } = deps;
 
     // A key a page origin serves asks what that page's own route asks (storage-page-keys.ts).
+    const writer = input.pageWriter ?? pageWriterOf(deps, input.publishGate);
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key)
-        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, pageWriterOf(deps, input.publishGate));
+        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
 
     // No visibility named: the node's starting level (plan V5.2), before the publish gate below. A
@@ -436,6 +443,8 @@ export async function writeStorageFile(
     emitRecordChange('memory', ownerGaii, level.visibility);
     // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
     fileHooks.afterStore?.({ storage, config }, ownerGaii, input.key);
+    // A welcome page notes its writer before the answer, so the next read meets the record (storage-page-keys.ts).
+    await notePageKeyChange(deps, ownerGaii, input.key, writer, input.data);
 
     // The request the publish gate asked for, now that the file it names exists.
     const filed = raise.kind === 'ask' ? await fileFilePublishRequest({ storage, config }, raise.requester, file) : null;
@@ -476,7 +485,8 @@ export async function removeStorageFile(
 ): Promise<StorageFileDeleteResult> {
     const { storage } = deps;
 
-    const fenced = checkKey(ownerGaii, asked) ?? await pageKeyWriteRefusal(deps, ownerGaii, asked, pageWriterOf(deps, gate));
+    const writer = pageWriterOf(deps, gate);
+    const fenced = checkKey(ownerGaii, asked) ?? await pageKeyWriteRefusal(deps, ownerGaii, asked, writer);
     if (fenced) return fenced;
 
     // The account's own extension's file named by its short key is stored under the stored name
@@ -515,6 +525,8 @@ export async function removeStorageFile(
     emitRecordChange('files', ownerGaii, existing.visibility);
     emitRecordChange('memory', ownerGaii, existing.visibility);
     fileHooks.afterRemove?.({ storage, config: deps.config }, ownerGaii, key);
+    // A removed welcome page can uncover another copy, which the remover then put on show (storage-page-keys.ts).
+    await notePageKeyChange(deps, ownerGaii, key, writer);
 
     return {
         ok: true, key, size: existing.size, mimeType: existing.mimeType, visibility: existing.visibility,
@@ -588,8 +600,9 @@ export async function mintStorageUploadUrl(
         : { visibility: named, warning: null };
     const input = { ...given, visibility: closed.visibility };
 
+    const writer = pageWriterOf(deps, input.publishGate);
     const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key)
-        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, pageWriterOf(deps, input.publishGate));
+        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
     // Refused at the mint as at the write, so no URL is handed out for a file that cannot land.
     const audience = await organismVisibilityRefusal(deps.storage, input.visibility, { identity: ownerGaii });
@@ -632,6 +645,7 @@ export async function mintStorageUploadUrl(
             publish_ask: carry.requester,
             store: input.store?.id || undefined,
             object: target?.blobRef,
+            page_writer: pageWriterMeta(input.key, writer),
         }),
         maxBytes,
         contentType,

@@ -10,6 +10,8 @@
  *   import { handleStorageUpload, declaredFromMeta } from './upload-storage.js';
  *   await handleStorageUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
  * @version-history
+ *   v1.5.0 — 2026-11-01 — The write takes the welcome page's writer from the signed token (`page_writer`)
+ *     when no live caller is asked (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   v1.4.0 — 2026-10-31 — completeDirectStorageUpload (POST /v1/upload/{token}/complete): the file a client
  *     PUT straight in the object store is recorded from the size the store reports; a refused one's
  *     object is removed (wish-suuret-tiedostot-virtaavat-aimeat-io-n-l-pi-ilman-koko-tiedo).
@@ -31,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, StorageFileRecord } from '../storage/interface.js';
 import { writeStorageFile } from '../services/storage-file-write.js';
 import { requesterFromMeta } from '../services/storage-file-publish.js';
+import { pageWriterFromMeta } from '../services/storage-page-keys.js';
 import { uploadPublishGate } from '../services/publish-requests/upload-gate.js';
 import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
@@ -166,6 +169,9 @@ export async function handleStorageUpload(
             // as an operator would ask it: who may choose it was settled at the mint, and the store's
             // state now (gone, closed to own storage) is what the write asks.
             ...(typeof meta.store === 'string' && meta.store ? { store: { id: meta.store, operator: true } } : {}),
+            // The welcome page's writer as the mint knew it, from the SIGNED token, when no live caller
+            // is asked here (services/storage-page-keys.ts).
+            ...(!liveGate && pageWriterFromMeta(meta.page_writer) ? { pageWriter: pageWriterFromMeta(meta.page_writer) } : {}),
         },
     );
     if (!written.ok) {
