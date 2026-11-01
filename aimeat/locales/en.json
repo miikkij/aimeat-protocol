@@ -9451,6 +9451,7 @@
   "accesspage.rail.elsewhere": "Elsewhere",
   "accesspage.rail.groups": "Sharing groups",
   "accesspage.rail.mcp": "MCP servers",
+  "accesspage.rail.mcpPlace": "Other services",
   "accesspage.rail.addresses": "Addresses",
   "accesspage.rail.ai": "Your AI and access",
   "accesspage.chipApps": "{n} apps act in your name",
@@ -9751,6 +9752,8 @@
   "accesspage.secAccounts": "Your accounts at other services",
   "accesspage.secAccountsSub": "{n} connected · {providers} services on offer",
   "accesspage.secMcp": "MCP servers you have attached",
+  "accesspage.secMcpPlace": "Connections to other services",
+  "accesspage.mcpIntroPlace": "Here you connect your AIMEAT to other services, such as aimeat.io. Once it is connected, this place's chat and your agents can use the service in your name. You sign in to the service once, and the sign-in details stay only in your own AIMEAT.",
   "accesspage.secMcpSub": "{n} attached",
   "accesspage.secAccountsOff": "not enabled on this server",
   "accesspage.accountsIntro": "An account you connect here stays here: an app or an agent is only told which account it may use, never the credentials. Reading and sending are separate connections, because they are separate trust.",
@@ -16085,6 +16088,7 @@
       "stepsLabel": "Two steps",
       "step2": "Say in one sentence what you want done. AIMEAT makes an agent for it and shows it to you before it starts.",
       "step2Waits": "This opens when your AI is connected.",
+      "step2Open": "Open the chat",
       "settings": "Settings"
     },
     "buildWithYou": {
@@ -22571,6 +22575,7 @@
       "mcpTitle": "MCP servers",
       "mcpIntro": "Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.",
       "mcpEmpty": "No MCP servers attached yet.",
+      "mcpEmptyPlace": "No other services connected yet.",
       "mcpToolCount": "{n} tools",
       "mcpOff": "switched off",
       "mcpNeedsReauth": "needs connecting again",
@@ -24107,6 +24112,7 @@
   },
   "setup": {
     "pickTool": "Which AI tool are you connecting? The steps differ enough that the general version is not usable.",
+    "moreTools": "Other AI tools ({n})",
     "recommendedBadge": "recommended to start",
     "paramsTitle": "What to put in each field",
     "copyCmd": "Copy the command",

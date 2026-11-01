@@ -21,7 +21,9 @@
  * @structure McpServersSection — GET /v1/mcp-servers, attach, switch off, remove, and the tool list
  *   on demand.
  * @version-history
- *   v1.11.1 — 2026-11-01 — A finished sign-in returns to this tab (/v1/profile?tab=access), not to the start page.
+ *   v1.11.1 — 2026-11-01 — The sign-in round returns to /v1/profile?tab=access&section=ac-mcp; the
+ *     old '/spa.html#access' showed the place's start page. On a node the store sold the empty list
+ *     says "no connections to other services yet" (mcpEmptyPlace), without the word MCP.
  *   v1.11.0 — 2026-11-01 — "Connect to <host>": on a node whose site.build_queue_url names the
  *     builders' node, a ready choice fills the attach form with that node's MCP address and sign-in, so
  *     the owner connects it with their own account ("Rakennamme kanssasi"). Shown until a server of
@@ -70,7 +72,7 @@ import { TextField } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { api, apiGet, apiPatch, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
-import { siteLink } from '/js/site.js';
+import { siteLink, customerNode } from '/js/site.js';
 
 const EMPTY_DRAFT = { name: '', url: '', title: '', token: '', header: '', auth: 'token' };
 
@@ -140,8 +142,9 @@ export function McpServersSection({ showToast, inRow }) {
       // Not retried: starting a sign-in stores a fresh one-time state on the node, and a retry after a
       // 5xx would start a second round the person never sees.
       const res = await api('/v1/mcp-servers/' + encodeURIComponent(s.id || s.slug) + '/authorize', {
-        // Back to this tab: '/spa.html#access' landed on the start page, which has no route by that name.
-        method: 'POST', body: JSON.stringify({ return_url: '/v1/profile?tab=access' }), retries: 0,
+        // Back to this section by the SPA's own route: '/spa.html#access' opened the start page, since
+        // the SPA routes by path, and the person lost the thread (commercial's crew52 walk).
+        method: 'POST', body: JSON.stringify({ return_url: '/v1/profile?tab=access&section=ac-mcp' }), retries: 0,
       });
       const url = res?.data?.authorize_url;
       if (!url) {
@@ -278,7 +281,7 @@ export function McpServersSection({ showToast, inRow }) {
       <${Note}>${t('profile.access.mcpIntro')
         || 'Other MCP servers you have attached. Your AI, your agents and your apps can use them, and the credential stays here in your own AIMEAT — nothing acting for you ever sees it.'}<//>`}
 
-    <${List} cols="name-doors" empty=${t('profile.access.mcpEmpty') || 'No MCP servers attached yet.'}>
+    <${List} cols="name-doors" empty=${t(customerNode() ? 'profile.access.mcpEmptyPlace' : 'profile.access.mcpEmpty') || 'No MCP servers attached yet.'}>
       ${servers.map(s => html`
         <${Row} key=${s.id} hover below=${toolsFor === s.id ? html`
           <${Note} kind="meta">

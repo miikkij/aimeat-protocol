@@ -8399,6 +8399,7 @@
   "accesspage.rail.elsewhere": "En otros servicios",
   "accesspage.rail.groups": "Grupos para compartir",
   "accesspage.rail.mcp": "Servidores MCP",
+  "accesspage.rail.mcpPlace": "Otros servicios",
   "accesspage.rail.addresses": "Direcciones",
   "accesspage.rail.ai": "Tu IA y el acceso",
   "accesspage.chipApps": "{n} aplicaciones actúan en tu nombre",
@@ -8699,6 +8700,8 @@
   "accesspage.secAccounts": "Tus cuentas en otros servicios",
   "accesspage.secAccountsSub": "{n} conectadas · {providers} servicios disponibles",
   "accesspage.secMcp": "Servidores MCP que conectaste",
+  "accesspage.secMcpPlace": "Conexiones con otros servicios",
+  "accesspage.mcpIntroPlace": "Aquí conectas tu AIMEAT con otros servicios, como aimeat.io. Una vez conectado, el chat de este sitio y tus agentes pueden usar el servicio en tu nombre. Inicias sesión en el servicio una vez, y tus datos de acceso se quedan solo en tu propio AIMEAT.",
   "accesspage.secMcpSub": "{n} conectados",
   "accesspage.secAccountsOff": "no está habilitado en este servidor",
   "accesspage.accountsIntro": "Una cuenta que conectas aquí se queda aquí: a una aplicación o a un agente solo se le dice qué cuenta puede usar, nunca las credenciales. Leer y enviar son conexiones separadas, porque son confianzas separadas.",
@@ -14426,6 +14429,7 @@
       "stepsLabel": "Dos pasos",
       "step2": "Di en una frase lo que quieres conseguir. AIMEAT crea un agente para ello y te lo muestra antes de que empiece.",
       "step2Waits": "Esto se abre cuando tu IA esté conectada.",
+      "step2Open": "Abrir el chat",
       "settings": "Ajustes"
     },
     "buildWithYou": {
@@ -20659,6 +20663,7 @@
       "mcpTitle": "Servidores MCP",
       "mcpIntro": "Otros servidores MCP que has conectado. Tu IA, tus agentes y tus aplicaciones pueden usarlos, y las credenciales se quedan en este AIMEAT: nada de lo que actúa por ti llega a verlas.",
       "mcpEmpty": "Todavía no has conectado ningún servidor MCP.",
+      "mcpEmptyPlace": "Todavía no has conectado otros servicios.",
       "mcpToolCount": "{n} herramientas",
       "mcpOff": "desactivado",
       "mcpNeedsReauth": "hay que conectarlo otra vez",
@@ -22194,6 +22199,7 @@
   },
   "setup": {
     "pickTool": "¿Qué herramienta de IA vas a conectar? Los pasos cambian lo bastante como para que la versión general no sirva.",
+    "moreTools": "Otras herramientas de IA ({n})",
     "recommendedBadge": "recomendada para empezar",
     "paramsTitle": "Qué poner en cada campo",
     "copyCmd": "Copiar el comando",
