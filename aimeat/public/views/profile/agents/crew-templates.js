@@ -8,6 +8,8 @@
  *   structure. Prompt text stays English: it is read by a model, not by the person.
  * @structure CREW_TEMPLATES · buildTemplate(id, agentName) · emptyMember() · emptyTask()
  * @version-history
+ *   v1.1.0 -- 2026-11-02 -- morningDigest: the agent the home offers on the first visit (Jouni, 2.11
+ *     00.52, "three visits" a). Built by buildTemplate, not listed in the Crew tab.
  *   v1.0.0 -- 2026-08-28 -- Initial (JSON-agent Crew tab).
  */
 
@@ -102,6 +104,30 @@ export function buildTemplate(id, agentName) {
             description: 'Check this topic: {{ctx.prompt}}\n\nToday is {{ctx.today}}. Read your previous note from memory if there is one, search for what is new, and update the note.',
             expected_output: 'A short update of what changed since the last check, and the updated running note saved to memory.',
             agent: 'watcher', context: [], async: false,
+          },
+        ],
+      };
+    // The first agent the home offers (views/home/morning-digest.js), not listed in CREW_TEMPLATES:
+    // the request ({{ctx.prompt}}) is written in the person's language from their profile answers, and
+    // the digest goes back in that language by the notify tool.
+    case 'morningDigest':
+      return {
+        ...base,
+        tags: ['digest'],
+        agents: [
+          {
+            name: 'editor', role: 'Morning digest editor',
+            goal: 'Give the person, each morning, the few pieces of news and information that matter for their own work.',
+            backstory: 'You read widely and choose little. You pick what touches the person\'s work, say in one sentence why each item matters to them, and link the source.',
+            tools: ['news', 'web', 'article_fetch', 'notify'], allow_delegation: false,
+          },
+        ],
+        tasks: [
+          {
+            id: 'digest',
+            description: 'Make this morning digest: {{ctx.prompt}}\n\nToday is {{ctx.today}}. Find at most five items from the last day that touch the work described above: the news tool first, then the web. Open each one you keep. Write the digest in the language the request above is written in: a heading with the date, then for each item one sentence of what happened and one of why it matters for this work, with its link. Send it to the person with the notify tool, subject "Morning digest" in that language.',
+            expected_output: 'The digest, sent with notify: at most five items, each with what happened, why it matters for the person\'s work, and the source link.',
+            agent: 'editor', context: [], async: false,
           },
         ],
       };

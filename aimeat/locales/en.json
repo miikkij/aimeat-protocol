@@ -16095,6 +16095,30 @@
       "step2Open": "Open the chat",
       "settings": "Settings"
     },
+    "digest": {
+      "title": "A morning digest for tomorrow",
+      "lead": "Your first agent can put together a short digest for you every morning at 7: at most five news items or facts that touch your work. It comes to your email.",
+      "workLine": "The work it follows: {work}",
+      "purpose": "Every morning at 7, at most five news items or facts from the last day that touch your work ({work}). In short, to your email.",
+      "purposeGeneral": "Every morning at 7, the five most important news items of the day. In short, to your email.",
+      "agentName": "Morning digest",
+      "start": "Start the morning digest",
+      "starting": "Starting…",
+      "notNow": "Not now",
+      "done": "Done. Your first digest comes tomorrow morning at 7. The agent is called Morning digest, and you can change or stop it on the Agents page.",
+      "scheduleProblem": "The agent was made, but its time was not set: {reason} Set the time on the Agents page.",
+      "agentsLink": "Agents page",
+      "failed": "The morning digest could not be started: {reason}"
+    },
+    "madeForYou": {
+      "title": "I made this for you",
+      "lead": "I read what you told me about your work and made one thing ready for you. Keep it if it helps.",
+      "keep": "Keep it",
+      "decline": "No thanks",
+      "kept": "Kept. It is in your memory, and your AI can carry on from it when you ask.",
+      "memoryLink": "Memory page",
+      "failed": "Your answer was not saved. Try again in a moment."
+    },
     "buildWithYou": {
       "title": "We build it with you",
       "promise": "We build your first complete piece of work with you.",
