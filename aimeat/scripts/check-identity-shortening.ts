@@ -43,6 +43,7 @@
  * @version-history
  *   v1.0.0 — 2026-09-26 — Initial (secaudit 2026-09, F-1 as a class).
  *   v1.0.1 — 2026-10-25 — ALLOWED: component-address.ts takes a version pin off an extension name (secaudit2026oct22).
+ *   v1.0.2 — 2026-11-01 — ALLOWED: parties/contract.ts parses a party identity (plan doc-mvwxcas3dom3, D2).
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -288,6 +289,9 @@ export function compareWithAllowed(found: Map<string, Finding[]>, allowed: Recor
  * Each sentence says what the shortened value is and why no visitor's name can reach it.
  */
 export const ALLOWED: Record<string, Record<string, string>> = {
+  'src/services/parties/contract.ts': {
+    "rest.slice(0, at) ← rest.lastIndexOf('@')": 'Parses an outside party\'s identity `party:<owner>/<name>@<node>` into its three parts, each checked against its own pattern; the owner part decides nothing until the caller compares it with its own account and this node, and no principal of this node carries the `party:` form.',
+  },
   'src/services/component-address.ts': {
     "raw.slice(0, at) ← raw.lastIndexOf('@')": 'Takes the version pin off an extension name (`weather@1.0.0` is `weather`), the form splitPinnedName in component-versions.ts reads; an extension name holds no identity.',
   },

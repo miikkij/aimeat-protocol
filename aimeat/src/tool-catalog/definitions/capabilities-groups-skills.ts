@@ -5,6 +5,8 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages and skills registry tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-11-01 — aimeat_consent_grant takes a party recipient with pinned_version, allow_url_key and
+ *     terms_required: a named share of a data package (plan doc-mvwxcas3dom3, D3.4).
  *   2026-10-29 — The two operator propose-then-confirm tools moved unchanged to ./operator-config.ts (max-file-lines).
  *   2026-10-27 — Every string field has a length limit from models/input-limits.ts (wish wish-sy-tteiden-validointi-pituusrajat-ja-roskan-torjunta-palveli).
  *   2026-10-26 — aimeat_capabilities_get says who is shown a private or not yet published capability (secaudit2026oct22).
@@ -201,7 +203,7 @@ export const capabilitiesGroupsSkillsTools = [
     },
     {
         name: 'aimeat_consent_grant',
-        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, with a reach and optional expiry. The reach is local (read on this node), federation (as local, and matching public records may be replicated to peers) or auth (another node may sign the person in); private and dmz are older names for local and are stored as local. Without a reach the node picks federation before 4.0.0 and local from 4.0.0. Creates an auditable consent record filed under YOU, the caller, so it covers your own records; your owner sees it in their list and can revoke it, and you can revoke only what you granted. Recipient "*" means everyone, the anonymous reader included: on a node that asks before anything is made public, it needs publish:public, or the answer is PUBLISH_REQUESTED and your owner approves it at the address in the answer. Max 100 records. Manage existing grants with aimeat_consent_list / aimeat_consent_revoke.',
+        description: 'Grant data-sharing consent: authorize a recipient (a GAII, "*", or a prefixed scope like organism:/domain:/node:) to access memory matching a glob data pattern, with a reach and optional expiry. The reach is local (read on this node), federation (as local, and matching public records may be replicated to peers) or auth (another node may sign the person in); private and dmz are older names for local and are stored as local. Without a reach the node picks federation before 4.0.0 and local from 4.0.0. Creates an auditable consent record filed under YOU, the caller, so it covers your own records; your owner sees it in their list and can revoke it, and you can revoke only what you granted. Recipient "*" means everyone, the anonymous reader included: on a node that asks before anything is made public, it needs publish:public, or the answer is PUBLISH_REQUESTED and your owner approves it at the address in the answer. Max 100 records. Manage existing grants with aimeat_consent_list / aimeat_consent_revoke. A recipient party:<owner>/<name>@<node> is one of your outside parties (aimeat_party): data_pattern "datapkg:<package>" shares that data package with it (a named share, filed under your owner, needs party:manage; pinned_version, allow_url_key and terms_required apply only to it). aimeat_party action "share" does the same in one call and makes the party when it is missing.',
         caller: 'agent',
         visibility: agentEverywhere,
         annotations: { title: 'Grant Consent', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
@@ -209,11 +211,14 @@ export const capabilitiesGroupsSkillsTools = [
         scope: 'consent:manage',
         surfaces: ['admin'],
         input: {
-            target_gaii: { type: 'string', required: true, description: 'Recipient GAII, "*", or prefixed identifier (organism.x, ghii:, domain:, node:).' },
+            target_gaii: { type: 'string', required: true, description: 'Recipient GAII, "*", a party (party:<owner>/<name>@<node>), or prefixed identifier (organism.x, ghii:, domain:, node:).' },
             scope: { type: 'string', description: 'The reach: local, federation or auth (private and dmz are older names for local). Omit for the node default.', zod: z.enum(CONSENT_REACH_INPUTS) },
             data_pattern: { type: 'string', required: true, description: 'Glob pattern for data keys (e.g. "profile.*").' },
             purpose: { type: 'string', required: true, description: 'Human-readable purpose for this consent.' },
-            ttl_hours: { type: 'number', description: 'Expiry in hours from now (omit for indefinite).' },
+            ttl_hours: { type: 'number', description: 'Expiry in hours from now (omit for indefinite; a share to a party gets the node\'s longest share).' },
+            pinned_version: { type: 'string', description: 'For a party recipient: share one version of the package (sha256:<hex>) instead of the newest.', zod: z.string().max(80) },
+            allow_url_key: { type: 'boolean', description: 'For a party recipient: the CSV address may carry the party key (Google Sheets). Off by default.' },
+            terms_required: { type: 'boolean', description: 'For a party recipient: the party accepts the terms before the first read. Default true for a person, false for a program.' },
         },
     },
     {

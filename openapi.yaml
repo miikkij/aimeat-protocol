@@ -248,6 +248,8 @@ tags:
     description: Scheduled jobs and recurring automation triggers
   - name: Data Packages
     description: Frictionless Data Packages with AIMEAT provenance — publish, validate, read
+  - name: Parties
+    description: Outside parties (people and programs with no account here) and the named shares of data packages to them
   - name: Workflows
     description: Multi-step agent workflows — save, run, answer human-input steps, and inspect pending inputs
   - name: Public
@@ -303,6 +305,24 @@ components:
         task:read, task:write (create/start tasks for your own agents — grantable to an H-2 app
         so a control-plane app can drive your own fleet on your behalf; an app may only reach its
         own owner's agents), workflow:read, workflow:write (see/create/run your automations),
+    PartyBasicAuth:
+      type: http
+      scheme: basic
+      description: >
+        An outside party (a person or a program with no account on this node) reading a data package
+        shared with it: user `<owner>/<party name>`, password the party key. What Excel, Power BI and
+        Tableau send to an OData feed. Accepted only on the data package reads, the OData feed, the
+        package files under /v1/pub and /v1/parties/me; a wrong key on the OData feed answers 401 with
+        `WWW-Authenticate: Basic realm="aimeat"`. Never a sign-in to this node.
+    PartyTokenAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: aimeat_party_<jwt>
+      description: >
+        An outside party's access token from `POST /v1/parties/token` (OAuth 2.0 client credentials),
+        about 15 minutes. Accepted on the same endpoints as PartyBasicAuth; on every other endpoint it
+        answers 401. Every request re-checks the party, its key and its share, so a deleted party,
+        a deleted key or an ended share refuses the next read with an earlier token.
     SignatureAuth:
       type: apiKey
       in: header
@@ -318,6 +338,7 @@ components:
         link: { type: integer }
         signed-in: { type: integer }
         organism: { type: integer }
+        named: { type: integer, description: 'Named shares and outside parties: one person or program the owner chose by name, with no account here.' }
     InternetOpeningForm:
       type: object
       description: One public intake form an opened app submits to (/v1/intake/{org}/{ws}/{form_id}).
@@ -27883,7 +27904,7 @@ paths:
         published or last set at: an earlier private version of a package made public later answers
         404 to anyone who does not read as the owner.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27931,7 +27952,7 @@ paths:
         - { name: purge, in: query, required: false, schema: { type: boolean, default: false }, description: 'true also deletes every stored file of the package and its pointer.' }
       responses:
         '200':
-          description: '`{ package_id, name, status: "withdrawn", withdrawn_at, purged, already_withdrawn, files_deleted, catalogue_removed }`'
+          description: '`{ package_id, name, status: "withdrawn", withdrawn_at, purged, already_withdrawn, files_deleted, catalogue_removed, shares_ended }`. Its named shares to outside parties end with it (status revoked, ended_reason package-withdrawn).'
         '400':
           description: INVALID_INPUT. The name is not a package name
         '401':
@@ -27958,7 +27979,7 @@ paths:
         version published before 2026-11-01 also has an `odps.yaml` stored beside its descriptor; its
         /v1/pub address redirects here.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -27995,7 +28016,7 @@ paths:
         descriptor does. The list is the caller's: an earlier version whose own audience does not
         admit the caller (an earlier private version of a package made public later) is not listed.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string }, description: 'Owner name or GHII.' }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28022,7 +28043,7 @@ paths:
         `GET /v1/pub` runs on the same CSV: a resource whose label hides it from the caller (an agent's
         clearance, a label that hides content from AI) answers 404, as `/v1/pub` does.
       tags: [Data Packages]
-      security: [{}, { BearerAuth: [] }]
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28031,11 +28052,25 @@ paths:
         - { name: offset, in: query, required: false, schema: { type: integer, default: 0 } }
         - { name: limit, in: query, required: false, schema: { type: integer, default: 500, maximum: 5000 } }
         - { name: select, in: query, required: false, schema: { type: string }, description: 'Comma-separated field names.' }
+        - name: format
+          in: query
+          required: false
+          schema: { type: string, enum: [csv] }
+          description: 'csv answers the whole resource as text/csv: a stable address that follows the newest version (or the version a share pins), for a spreadsheet.'
+        - name: key
+          in: query
+          required: false
+          schema: { type: string }
+          description: 'With format=csv only: an outside party''s key in the address, for a client that cannot send headers (Google Sheets). Accepted only when the share allows it (allow_url_key); otherwise 403 URL_KEY_NOT_ALLOWED.'
       responses:
         '200':
-          description: rows, total, and the Table Schema of what was returned
+          description: rows, total, and the Table Schema of what was returned; with format=csv the whole resource as text/csv
+        '401':
+          description: INVALID_PARTY_CREDENTIAL. A party credential that names no live party and key
         '403':
-          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private
+          description: SCOPE_DENIED. The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private. For an outside party (PartyBasicAuth, PartyTokenAuth, or the key in the address) PARTY_STOPPED, NOT_SHARED, SHARE_ENDED, SHARE_EXPIRED, VERSION_NOT_SHARED, URL_KEY_NOT_ALLOWED or TERMS_NOT_ACCEPTED (with details.accept_url)
+        '429':
+          description: RATE_LIMITED. The party made more reads this minute than AIMEAT_PARTY_READS_PER_MINUTE allows
         '404':
           description: No such package, version or resource
         '410':
@@ -28252,8 +28287,15 @@ paths:
         Paste this URL into Excel's "From OData Feed" or Power BI's OData connector and the rest is
         automatic — and the workbook refreshes itself afterwards, which is the whole reason this
         exists next to the CSV address.
+
+        AN OUTSIDE PARTY. A package shared by name with a party (services/parties/) is read here with
+        HTTP Basic, user `<owner>/<party name>` and the party key as the password, which is what the
+        connectors ask for, or with a party token. A wrong key answers 401 with
+        `WWW-Authenticate: Basic realm="aimeat"` so the client asks for it again; a stopped party, an
+        ended or expired share, unaccepted terms or another version than the share pins answer 403 with
+        a code. The same applies to `$metadata` and the entity sets.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28265,8 +28307,12 @@ paths:
       responses:
         '200':
           description: '{ "@odata.context": …, "value": [ { name, kind, url } ] }'
+        '401':
+          description: 'INVALID_PARTY_CREDENTIAL. An outside party''s key or token is wrong; the answer carries `WWW-Authenticate: Basic realm="aimeat"` (OData error shape)'
         '403':
-          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape)
+          description: The caller is an agent, app grant or ecosystem app of the owner without storage:read, and the package (or the pinned version) is private (OData error shape). An outside party gets PARTY_STOPPED, NOT_SHARED, SHARE_ENDED, SHARE_EXPIRED, VERSION_NOT_SHARED or TERMS_NOT_ACCEPTED
+        '429':
+          description: RATE_LIMITED. The party made more reads this minute than AIMEAT_PARTY_READS_PER_MINUTE allows
         '404':
           description: No such package (OData error shape, not the node envelope)
         '410':
@@ -28289,7 +28335,7 @@ paths:
         precisely because the version is immutable. Every other property is nullable: a Table Schema's
         `primaryKey` is the only statement anybody made about required-ness.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28340,7 +28386,7 @@ paths:
         `$metadata` answer the same way. The rows pass the classification reader `GET /v1/pub` runs
         on the same CSV: a resource whose label hides it from the caller answers 404.
       tags: [Data Packages]
-      security: []
+      security: [{}, { BearerAuth: [] }, { PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: name, in: path, required: true, schema: { type: string } }
@@ -28365,6 +28411,329 @@ paths:
           description: The owner withdrew the package (OData error shape, code Gone)
         '501':
           description: A query construct this feed does not implement — refused rather than ignored
+
+  # ── Outside parties and named shares ───────────────────────
+  # A person or a program with no account here, reading the data packages its owner shared with it by
+  # name (plan doc-mvwxcas3dom3, D2, D3; services/parties/). MCP: aimeat_party, aimeat_consent_grant.
+  /v1/parties:
+    get:
+      operationId: listParties
+      summary: The caller's outside parties
+      description: |
+        Every party of the caller's account with its keys (ids and dates, never the key), its
+        status, the wrong keys presented, and each of its shares with `last_read_at` and `reads_7d`.
+        The owner in person, or a principal of the owner holding `party:manage` (no wildcard carries it).
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ parties: [ { uid, name, party_ref, display_name, kind, status, keys, failed_attempts, last_seen_at, shares } ], total }`' }
+        '403': { description: SCOPE_DENIED (party:manage) or FORBIDDEN (a visitor) }
+    post:
+      operationId: createParty
+      summary: Make an outside party
+      description: |
+        `{ name, kind?: program | person | dataspace, display_name?, contact?, with_key?: true }`. The
+        party's identity is `party:<owner>/<name>@<node>`, the recipient a share names. Its first key
+        is in this answer only (`key`, `key_id`); the node keeps its SHA-256. A person's contact is
+        personal data the owner holds. Names are 1 to 40 of a-z, 0-9 and dashes, unique per owner;
+        `me`, `token` and `share` are taken by the endpoints.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, pattern: '^[a-z0-9][a-z0-9-]{0,39}$' }
+                kind: { type: string, enum: [program, person, dataspace] }
+                display_name: { type: string, maxLength: 120 }
+                contact: { type: string, maxLength: 320 }
+                with_key: { type: boolean }
+      responses:
+        '201': { description: '`{ party, key, key_id, key_note }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '409': { description: PARTY_EXISTS }
+        '413': { description: QUOTA_EXCEEDED. At most 100 parties per account }
+  /v1/parties/share:
+    post:
+      operationId: shareWithParty
+      summary: Share one data package with a party, in one call
+      description: |
+        `{ name, package, purpose, days? | expires?, kind?, display_name?, contact?, pinned_version?,
+        allow_url_key?, terms_required?, new_key? }`. Makes the party when it does not exist (with a
+        key), makes a key when it has none or `new_key` is true, and grants the share through
+        POST /v1/consent's code path (its checks, audit entry and account event). Answers the
+        party, the share, the connection file (a Delta Sharing style profile:
+        `shareCredentialsVersion`, `endpoint` (the OData service), `partyId`, `key` when one was made,
+        `expirationTime`, `package`, `resources: [{ name, csvUrl, odataEntitySet }]`) and `say`, the
+        one sentence to tell the owner: what the party gets, until when, that ending the share stops
+        the next read and that copies already taken cannot be called back. A party made for a share
+        that is then refused is removed again.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, package, purpose]
+              properties:
+                name: { type: string }
+                package: { type: string }
+                purpose: { type: string }
+                days: { type: number }
+                expires: { type: string, format: date-time }
+                kind: { type: string, enum: [program, person, dataspace] }
+                display_name: { type: string }
+                contact: { type: string }
+                pinned_version: { type: string }
+                allow_url_key: { type: boolean }
+                terms_required: { type: boolean }
+                new_key: { type: boolean }
+      responses:
+        '201': { description: '`{ party, party_created, share, connection, key_note, say }`' }
+        '400': { description: INVALID_INPUT or SHARE_TOO_LONG }
+        '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
+        '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
+        '409': { description: PARTY_STOPPED or PACKAGE_WITHDRAWN }
+  /v1/parties/token:
+    post:
+      operationId: partyToken
+      summary: A party's key for an access token (OAuth 2.0 client credentials)
+      description: |
+        `grant_type=client_credentials`, `client_id=<owner>/<party name>`, `client_secret=<key>`, as a
+        form, JSON, or HTTP Basic with the same pair. Answers `{ access_token, token_type: Bearer,
+        expires_in, party_ref }`: a purpose token (`aimeat_party_…`, about 15 minutes) that is never a
+        node session. It reads the data package endpoints, OData, the package files and /v1/parties/me;
+        any other endpoint answers 401 for it. Errors are the OAuth shape `{ error, error_description }`.
+      tags: [Parties]
+      security: [{}, { PartyBasicAuth: [] }]
+      requestBody:
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string }
+          application/json:
+            schema:
+              type: object
+              properties:
+                grant_type: { type: string, enum: [client_credentials] }
+                client_id: { type: string }
+                client_secret: { type: string }
+      responses:
+        '200': { description: '`{ access_token, token_type, expires_in, party_ref }`' }
+        '400': { description: 'unsupported_grant_type, or unauthorized_client for a stopped party' }
+        '401': { description: 'invalid_client, with WWW-Authenticate: Basic realm="aimeat"' }
+        '429': { description: slow_down. Too many requests for this party this minute }
+  /v1/parties/me:
+    get:
+      operationId: partyMe
+      summary: The party and what was shared with it
+      description: |
+        For the party itself, with HTTP Basic or a party token: its name and kind, and every share it
+        holds, live ones first, with the package's title, the purpose, the end, whether the terms are
+        accepted, and the address of the share's connection file.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      responses:
+        '200': { description: '`{ party, shares, total, note }`' }
+        '401': { description: AUTH_REQUIRED or INVALID_PARTY_CREDENTIAL }
+        '403': { description: PARTY_STOPPED }
+  /v1/parties/me/keys/rotate:
+    post:
+      operationId: partyRotateKey
+      summary: A new key for the party
+      description: The new key is in this answer only. The key the request was made with stops working at once, and so do the tokens made with it.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      responses:
+        '200': { description: '`{ key, key_id, retired_key_id, key_note }`' }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+        '403': { description: PARTY_STOPPED }
+  /v1/parties/me/shares/{id}/connection:
+    get:
+      operationId: partyShareConnection
+      summary: A share's connection file
+      description: The connection file of one live share of this party, without the key.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ connection }`' }
+        '403': { description: SHARE_ENDED or PARTY_STOPPED }
+        '404': { description: NOT_FOUND. No share with this id belongs to this party }
+  /v1/parties/me/shares/{id}/accept:
+    post:
+      operationId: partyAcceptShareTerms
+      summary: Accept a share's terms
+      description: |
+        The purpose and the licence of the shared data. Until a share that requires them is
+        accepted, its reads answer 403 TERMS_NOT_ACCEPTED with this address. The time is written on
+        the share.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ share, accepted }` or `{ share, already_accepted }`' }
+        '403': { description: SHARE_ENDED or PARTY_STOPPED }
+        '404': { description: NOT_FOUND }
+  /v1/parties/me/shares/{id}/decline:
+    post:
+      operationId: partyDeclineShare
+      summary: End a share the party no longer needs
+      description: The share ends at once (status revoked, ended_reason declined), and the owner's list says the party declined it.
+      tags: [Parties]
+      security: [{ PartyBasicAuth: [] }, { PartyTokenAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ share, declined }` or `{ share, already_ended }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    get:
+      operationId: getParty
+      summary: One party, its keys and its shares
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ party }` with `shares` (each with last_read_at and reads_7d)' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+    patch:
+      operationId: updateParty
+      summary: Change a party's display name, contact or kind
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                display_name: { type: string }
+                contact: { type: [string, 'null'] }
+                kind: { type: string, enum: [program, person, dataspace] }
+      responses:
+        '200': { description: '`{ party }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+    delete:
+      operationId: deleteParty
+      summary: Delete a party
+      description: Its keys and tokens end at once (the next request is 401), then every share it held (status revoked, ended_reason party-deleted). A party made later under the same name has a new uid and none of it.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ deleted, name, uid, shares_ended }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/keys:
+    post:
+      operationId: createPartyKey
+      summary: A new key for the party
+      description: Shown in this answer only. A party holds at most 5 keys.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { description: '`{ name, key, key_id, key_note }`' }
+        '404': { description: NOT_FOUND }
+        '409': { description: TOO_MANY_KEYS }
+  /v1/parties/{name}/keys/{keyId}:
+    delete:
+      operationId: deletePartyKey
+      summary: Delete one key
+      description: Every token made with it ends on its next request.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: keyId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ name, key_id, deleted }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/stop:
+    post:
+      operationId: stopParty
+      summary: Stop a party
+      description: A stopped party reads nothing (403 PARTY_STOPPED) until it is resumed. Its keys and shares stay.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party }`' }
+        '404': { description: NOT_FOUND }
+  /v1/parties/{name}/resume:
+    post:
+      operationId: resumeParty
+      summary: Resume a stopped party
+      description: A party the operator stopped stays stopped (409 STOPPED_BY_OPERATOR) until the operator resumes it.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party }`' }
+        '404': { description: NOT_FOUND }
+        '409': { description: STOPPED_BY_OPERATOR }
+  /v1/parties/{name}/reads:
+    get:
+      operationId: partyReads
+      summary: What the party read, and what was refused
+      description: |
+        The party's entries of the owner's read log (`party-reads.<yyyy-mm>`, this month and last),
+        newest first: `{ at, share, party, uid, what, rows?, verdict: served | refused, code? }`. A
+        month keeps at most 4000 entries; past that they are counted in `not_kept_this_period`.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: limit, in: query, required: false, schema: { type: integer, maximum: 2000 } }
+      responses:
+        '200': { description: '`{ name, uid, reads, total, not_kept_this_period }`' }
+        '404': { description: NOT_FOUND }
+  /v1/admin/parties/{owner}/{name}/stop:
+    post:
+      operationId: adminStopParty
+      summary: Stop any account's party (operator)
+      description: For abuse (regulation (EU) 2022/868 art. 12 (g)). The owner cannot resume it; the operator does. `{ reason? }` is kept on the party. The Security overview counts the parties, the stopped ones and the refused reads.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ owner, party }`' }
+        '403': { description: Not the operator (operator:admin) }
+        '404': { description: NOT_FOUND }
+  /v1/admin/parties/{owner}/{name}/resume:
+    post:
+      operationId: adminResumeParty
+      summary: Resume a party (operator)
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ owner, party }`' }
+        '403': { description: Not the operator (operator:admin) }
+        '404': { description: NOT_FOUND }
 
   # ── Binary Storage ─────────────────────────────────────────
   /v1/storage:
@@ -41564,6 +41933,23 @@ paths:
         the answer is 403 `PUBLISH_REQUESTED` and the request waits on the
         owner's list at /v1/publish-requests, where approving it grants the
         consent.
+
+        A NAMED SHARE. Recipient `party:<owner>/<name>@<node>` is one of the
+        caller's outside parties (/v1/parties), and `data_pattern`
+        `datapkg:<package>` names one data package: the party reads that package
+        and nothing else, over the data package reads, OData and the package files.
+        It needs `party:manage` (no wildcard carries it) besides `consent:manage`,
+        is filed under the owner's GHII with the reach `local`, and must end within
+        AIMEAT_SHARE_MAX_DAYS (absent `expires`: that many days; later: 400
+        SHARE_TOO_LONG). `metadata` may carry `pinned_version` (sha256:<hex>),
+        `allow_url_key` and `terms_required` (default true for a person party, false
+        for a program); the node writes `partyUid`, `pinnedVersion`, `allowUrlKey`,
+        `termsRequired` and later `termsAcceptedAt` itself and drops a request's own
+        values for them. Refusals: 400 INVALID_RECIPIENT, 403 FORBIDDEN (another
+        account's party), 403 SCOPE_DENIED (party:manage), 404 PARTY_NOT_FOUND,
+        404 NOT_FOUND (the package), 404 VERSION_NOT_FOUND, 409 PARTY_STOPPED,
+        409 PACKAGE_WITHDRAWN. Revoking the consent ends the share: the party's next
+        read is refused, with a token minted before the revoke too.
       tags: [Consent]
       security:
         - BearerAuth: []
@@ -71852,7 +72238,9 @@ paths:
         (an incident may carry `params`, the values the page's own sentence for its type names,
         beside the English `detail`), who holds the operator role and which accounts are deactivated or use two-step sign-in,
         how apps are kept apart (`apps`, with a warning and the settings to change on a node several
-        people share with no app origin), and the door settings. The same data the
+        people share with no app origin), the outside parties (`parties`: total, stopped,
+        stopped_by_operator, failed_key_attempts, refused_reads_7d, served_reads_7d; stop one with
+        POST /v1/admin/parties/{owner}/{name}/stop), and the door settings. The same data the
         `aimeat_admin_security_overview` tool returns.
         Requires the `operator` role.
       security:

@@ -3041,6 +3041,30 @@
         "getOwnerScopeMemory": 1
       },
       "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D9.1): the app source and the memory source read the records a data product names, and pass the classification reader on them: show() (a record the caller may not see answers as absent) and, for an audience other than private, leave() as an export. getMemory reads the app's data map (configuration) and another account's record, which passes authorizeRead and then show()."
+    },
+    "src/services/parties/admin.ts": {
+      "reads": {
+        "getMemoryByKeysAnyOwner": 2
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2.9), the node's own read: every owner's `parties` record and party read log (service-owned keys), counted for the operator's Security overview. Only numbers leave it; no content is shown."
+    },
+    "src/services/parties/read-stats.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3.5), the node's own read: the owner's own party read log (`party-reads.<yyyy-mm>`, service-owned), which the node wrote, shown to that owner or the owner's principal holding party:manage. No content of a record."
+    },
+    "src/services/parties/shares.ts": {
+      "reads": {
+        "getStorageFile": 4
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D3), the node's own read: a data package's pointer and descriptor (metadata the package service wrote) to check a share names a package and version that exist, and to build the connection file's table list for the owner or the party the owner shared it with. The rows themselves are read through openPackage and readRows, which pass the classification reader."
+    },
+    "src/services/parties/store.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01 (plan doc-mvwxcas3dom3, D2), the node's own read: the owner's `parties` record (service-owned), read to verify a party's key or token and to answer the owner about its own parties. No content."
     }
   }
 }
