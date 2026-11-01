@@ -12,6 +12,8 @@
  * @usage
  *   import { RUNBOOK_SKILL_ENTRIES } from './builtin-skills.runbooks.js';
  * @version-history
+ *   2026-11-01 -- aimeat-node-operations: "Before the node goes online", the go-live walk an operator's
+ *     AI makes with the admin tools (wish-it-adoption-package-and-go-live-checklist-for-an-aimeat-node).
  *   2026-10-31 — manage-my-agents: approval_url is the proposal's own page, and a proposal may carry
  *     its clock (`schedule`), which the approval starts it on (v31 K47, K51).
  *   2026-10-31 — manage-my-agents: each computer's `programs` in aimeat_connector_list, and
@@ -125,6 +127,40 @@ show the owner what you found before acting.
    only with the owner's confirmation: turning it
    on, or from owner to all, applies at once; turning it off, or from all to owner, is refused from
    an AI, because the operator does that on the admin Config page.
+
+## Before the node goes online
+When the operator asks whether the node is ready for its users, or what is still missing, walk these
+in order. Read each one first, show the operator what you found, and change a setting only on their word.
+1. **The address.** \`aimeat_admin_config\` with \`q: "passkey"\`: a passkey is bound to the node's
+   domain for good (\`passkey.rp_id\`, which cannot be changed while the node runs). If the address is
+   still going to change, say so before anyone registers a passkey: after a change every passkey
+   stops working.
+2. **The security picture.** \`aimeat_admin_security_overview\`: open incidents, whether apps run on
+   their own origin and what to set when they do not, test-only settings still in force, who holds
+   the operator role, how many accounts have two-step sign-in, the registration mode and the
+   sign-in limits.
+3. **Email.** \`aimeat_admin_config\` with \`q: "smtp"\`. Without an SMTP server the node sends no
+   sign-in links, invitations or address confirmations. Tell the operator that the sender's domain
+   needs SPF, DKIM and DMARC records at their mail provider or the messages land in spam, and that
+   the test send is on the admin Email page (\`/v1/admin?tab=email\`).
+4. **Sign-in.** \`aimeat_admin_sso_list\` for SAML and SCIM connections, and \`aimeat_admin_config\`
+   with \`q: "entra"\` and \`q: "google"\` for the Microsoft and Google sign-in. Each needs an app
+   registration at the identity provider whose redirect address is the node's own.
+5. **AI.** \`aimeat_ai_providers\` and \`aimeat_ai_provider_test\`: which model sources the node has and
+   whether each answers. Ask where the organisation's data may be processed before you suggest a
+   provider or a region.
+6. **Search engines.** \`aimeat_seo_status\`. A node for one organisation's own staff is usually kept
+   out of search results (\`seo.indexing\` off); a public node names itself and verifies the site with
+   Google and Bing. Ask which one this node is.
+7. **What leaves the node.** \`aimeat_admin_federation\` (connections to other nodes, best off when
+   nobody needs them) and \`aimeat_admin_internet_openings\` (apps open to anyone on the internet).
+8. **Privacy and AI Act records.** \`aimeat_admin_config\` with \`q: "operator"\`: who the data
+   controller is and which supervisory authority oversees it, which the privacy page and the AI
+   statement show to everyone, and the DPO contact, which the generated processing agreements carry. \`aimeat_compliance_report\` shows what the records hold.
+9. **The first backup.** The node cannot take or test a backup by itself: ask the operator whether a
+   backup exists and whether a restore has been tried on another machine.
+Report the result as a short list: ready, missing (with what fills it and who provides it), and
+the operator's decisions still open.
 
 ## After an update
 Every step an update brings runs by itself when the node starts: there is no script to run by hand,

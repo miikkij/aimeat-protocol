@@ -2,6 +2,7 @@
  * @file check-registry.mjs
  * @description Canonical read-only checks for check:fast, audit reports and SARIF.
  * @version-history
+ *  - 2026-11-01: check:it-adoption, every page of the IT adoption package was read against the code it describes, and the settings and tools it names exist.
  *  - 2026-11-01: check:datapackage-pointer-reads, a data package's audience is read from the service's record, not from latest.json (secaudit2026oct31w2).
  *  - 2026-10-27: check:string-bounds (every Zod string bounded, zero allowed) and check:write-validation (writing routes read their body through a schema; seeded ratchet).
  *  - 2026-10-23: check:unbounded-lists also refuses a Postgres take-first read without LIMIT 1 (aimeat.io stalled on one that day).
@@ -50,6 +51,7 @@ export const FAST_CHECKS = [
     { script: 'check:openapi-routes', label: 'The contract and the code name the same routes' },
     { script: 'check:skill-reviews', label: 'Every skill was read against the code it describes, and that code has not changed since' },
     { script: 'check:skill-evals', label: 'A skill with an eval suite that changed has the developer\'s decision: eval run or skipped' },
+    { script: 'check:it-adoption', label: 'Every page of the IT adoption package was read against the code it describes, that code has not changed since, and the settings and tools it names exist' },
     { script: 'check:app-catalog', label: 'app-catalog.html ↔ sources in sync' },
     { script: 'check:everything', label: 'everything.json ↔ docs/AIMEAT-Feature-List.md in sync' },
     { script: 'check:changelog', label: 'Landing change log parses + newest first' },
