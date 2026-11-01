@@ -13069,6 +13069,11 @@ paths:
                     approval records an account event, and the owner may sign the agent's other
                     sessions out. Nothing is refused either way. `aimeat connect add` sends it from
                     the key it keeps beside the token.
+                    A client keeps the node id (the device-token answer's
+                    `next_steps.keep_your_key.node_id`) and this node's address with the key, and
+                    signs a proof only when it connects to that same address: a server at another
+                    address can report this node's id. `aimeat connect add`, the OpenHands bundle
+                    and the Dify bridge do so.
                   properties:
                     signed_at: { type: string, format: date-time }
                     signature: { type: string }
