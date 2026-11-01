@@ -14436,6 +14436,30 @@
       "step2Open": "Abrir el chat",
       "settings": "Ajustes"
     },
+    "digest": {
+      "title": "Un resumen matinal para mañana",
+      "lead": "Tu primer agente puede prepararte cada mañana a las 7 un resumen breve: como mucho cinco noticias o datos que tocan tu trabajo. Te llega al correo.",
+      "workLine": "El trabajo que sigue: {work}",
+      "purpose": "Cada mañana a las 7, como mucho cinco noticias o datos del último día que tocan tu trabajo ({work}). Breve, a tu correo.",
+      "purposeGeneral": "Cada mañana a las 7, las cinco noticias más importantes del día. Breve, a tu correo.",
+      "agentName": "Resumen matinal",
+      "start": "Empezar el resumen matinal",
+      "starting": "Empezando…",
+      "notNow": "Ahora no",
+      "done": "Listo. Tu primer resumen llega mañana a las 7. El agente se llama Resumen matinal, y puedes cambiarlo o pararlo en la página Agentes.",
+      "scheduleProblem": "El agente está hecho, pero su hora no quedó fijada: {reason} Fíjala en la página Agentes.",
+      "agentsLink": "Página Agentes",
+      "failed": "No se pudo empezar el resumen matinal: {reason}"
+    },
+    "madeForYou": {
+      "title": "Hice esto para ti",
+      "lead": "Leí lo que me contaste de tu trabajo y te dejé una cosa lista. Guárdala si te sirve.",
+      "keep": "Guardarlo",
+      "decline": "No, gracias",
+      "kept": "Guardado. Está en tu memoria, y tu IA puede seguir desde ahí cuando se lo pidas.",
+      "memoryLink": "Página Memoria",
+      "failed": "Tu respuesta no se guardó. Inténtalo de nuevo en un momento."
+    },
     "buildWithYou": {
       "title": "Lo construimos contigo",
       "promise": "Tu primer trabajo completo lo construimos contigo.",

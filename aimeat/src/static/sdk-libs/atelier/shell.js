@@ -21,26 +21,16 @@
  *   control: it catches its click on the way down and lets the new theme open from the button
  *   as an iris. Motion is the shell's own switch, beside it. Both write on the root element, so
  *   both reach every component without one of them being told.
- * @structure app(spec) → { el, main, set, status, t, i18n, destroy } · section(spec) ·
- *   tabs(spec) · bottomNav(spec)
+ * @structure app(spec) → { el, main, set, status, t, i18n, destroy }; section, tabs and bottomNav
+ *   live in shell-parts.js and are exported from here too
  * @usage  const a = AIMEAT.atelier.app({ title: 'Errands', onReady(session) { render(a); } });
  *         a.main.appendChild(view);   // the main element is yours to fill
- * @parts section root · head · words · title · hint · actions · before · body · after
- * @slots section actions() · before() · after()
- * @variants section dense · plain · quiet
- * @tokens section --ak-section-pad · --ak-section-gap
- * @fork section It IS the escape hatch: put your own markup in its body and keep the frame.
- * @parts tabs root · tab
- * @slots tabs tab(item)
- * @variants tabs dense · pill
- * @tokens tabs --ak-tabs-gap
- * @fork tabs A row of buttons; copy .ak-tabs* out of shell.css and you give up the view transition.
- * @parts bottomNav root · item
- * @slots bottomNav item(entry)
- * @variants bottomNav dense
- * @tokens bottomNav --ak-chrome-bottom
- * @fork bottomNav Copy .ak-bottomnav* out of shell.css; the chrome reserve is the shell's.
  * @version-history
+ *   v0.68.1 — 2026-11-02 — A phone reaches every page of a side-navigation app (Jouni, Kehitysputki
+ *     on a phone: no menu at all, because every entry had a group and the bar was empty). The bar
+ *     ends in a Menu entry that opens every page in a sheet, grouped as the column groups them,
+ *     whenever the bar leaves an entry out; a bar the app gave nothing gets the first three
+ *     entries. An app that carries its own `more` entry in the bar keeps it, and gets no second.
  *   v0.68.0 — 2026-10-03 — `help` takes a handbook (handbook.js): its button stands in the bar.
  *   v0.67.0 — 2026-10-01 — The tab row scrolls ITSELF so the chosen tab is fully in view: at the
  *     first draw, on a pick and on set({ value }), smoothly on a change unless motion is reduced
@@ -87,19 +77,19 @@
  *     a default hint pointing at the account pill.
  *   v0.1.0 — 2026-08-27 — Initial (TARGET-074 phase 1, slice 1).
  */
-import { el, append, clear, resolve, uid, injectStyle, enter, setMotion, setMotionDefaults } from './dom.js';
-import { viewSwap } from './arrive.js';
+import { el, clear, resolve, uid, injectStyle, enter, setMotion, setMotionDefaults } from './dom.js';
 import { t, i18n } from './i18n.js';
 import { emptyState } from './state.js';
 import { screenTransition, curtain } from './transitions.js';
 import { ambient } from './ambient.js';
 import { weather } from './ambient-parts.js';
-import { partEl, slotInto, applyVariant, hasPart, partValue } from './parts-model.js';
 import { sideNav } from './workbench.js';
-import { ink } from './ink.js';
+import { sheet } from './dialog.js';
+import { section, tabs, bottomNav } from './shell-parts.js';
+
+export { section, tabs, bottomNav };
 import { margins } from './margins.js';
 import { motionLabel, motionIcon, motionIsLess } from './shell-motion.js';
-import { keepInView } from './scroll-edge.js';
 
 /** The longest inline logo drawn: a 64px WebP is 1 to 3 kB of base64, a photograph is not a logo. */
 const LOGO_INLINE_MAX = 8192;
@@ -131,14 +121,24 @@ function logoEl(src) {
  * @param {any[]} items
  */
 function bottomEntries(items) {
-  return items.filter(function (it) { return it.bottom === true || (it.bottom !== false && !it.group); });
+  const chosen = items.filter(function (it) { return it.bottom === true || (it.bottom !== false && !it.group); });
+  // Every entry grouped and none marked for the bar would leave a phone with no navigation.
+  return chosen.length ? chosen : items.slice(0, 3);
 }
 
-/** A navigation entry's own words, or whatever the app declared for that part — a string, a
- *  node, or an array of both. The kit's label is the default, never the ceiling. */
-function tabLabel(spec, name, item) {
-  const given = partValue(spec, name, item);
-  return given === undefined ? item.label : given;
+/** The id of the kit's own Menu entry at the end of the phone's bar. */
+const MENU_ID = 'ak-menu';
+
+/**
+ * The phone's bar for a side-navigation app: its entries, then the kit's Menu entry when the bar
+ * leaves any page out, so no page is out of reach on a phone. An app that already carries its own
+ * `more` entry in the bar has answered this itself and keeps its answer.
+ * @param {any[]} items @param {() => void} openMenu
+ */
+function phoneBar(items, openMenu) {
+  const bar = bottomEntries(items);
+  if (bar.length === items.length || bar.some(function (it) { return it.id === 'more'; })) return bar;
+  return bar.concat([{ id: MENU_ID, label: t('menu'), action: true, onPick: openMenu }]);
 }
 
 /** How often the boot poll looks for a session the silent login produced without an event. */
@@ -208,7 +208,8 @@ function ambientSpec(want) {
  *   characters, the one form a package carries to a customer node), drawn at 32 px
  *   before the title. `nav: 'side'` puts `navItems` in a left column beside a capped content
  *   column (the workbench layout); an entry may carry a `count`, a `tone` dot and a `group`
- *   heading, and on a phone the column becomes the bottom bar with the ungrouped entries.
+ *   heading, and on a phone the column becomes the bottom bar with the ungrouped entries (or
+ *   those marked `bottom: true`), ending in a Menu that opens every entry in a sheet.
  *   `motion: false` is the WHOLE opt-out from the kit's default motion for this app: no
  *   entrances, no enter/exit/move on a change, no count-up, no transition between views.
  *   Everything still renders and still works; nothing travels. It is one option because the
@@ -287,7 +288,7 @@ export function app(spec) {
   // THE SIDE NAVIGATION MODE (`nav: 'side'`): the pages stand in a column left of a capped
   // content column, and the two scroll together inside one frame, so the column stays in place
   // while the page moves. On a phone the column gives way to the bottom bar (the stylesheet
-  // decides by width), carrying the top-level pages only.
+  // decides by width), carrying the top-level pages and a Menu with all of them.
   const sideMode = spec.nav === 'side' && !!(spec.navItems && spec.navItems.length);
   const main = el('main', { class: 'ak-app__main' + (sideMode ? '' : ' ak-scroll') });
   const sideHost = sideMode ? el('aside', { class: 'ak-app__side' }) : null;
@@ -309,25 +310,58 @@ export function app(spec) {
 
   let nav = null;
   let side = null;
+  // In side mode the bar carries a subset, so the shell remembers the whole list and the open
+  // page: the Menu sheet lists all of it, and the bar marks Menu while the page is not in the bar.
+  let allItems = [];
+  let barItems = [];
+  let current = '';
+  let menuSheet = null;
   /** The entries as the app gave them, each pick also moving the other navigation's mark. */
   function linked(items) {
     return items.map(function (it) {
       return Object.assign({}, it, {
         onPick: function (picked) {
+          current = picked.id;
           if (side) side.set({ value: picked.id });
-          if (nav) nav.set({ value: picked.id });
+          if (nav) nav.set({ value: barValue(picked.id) });
           if (it.onPick) it.onPick(it);
         },
       });
     });
   }
+  function barValue(id) {
+    if (!sideMode || barItems.some(function (it) { return it.id === id; })) return id;
+    return barItems.some(function (it) { return it.id === MENU_ID; }) ? MENU_ID : id;
+  }
+  /** Every page in a sheet from the bottom edge, grouped as the column groups them. */
+  function openMenu() {
+    if (menuSheet) return;
+    menuSheet = sheet({
+      title: spec.navLabel || state.title || t('menu'),
+      body: function (host) {
+        sideNav({
+          target: host,
+          value: current,
+          label: spec.navLabel,
+          // The sheet closes before the page changes, so the change is seen, not covered.
+          items: allItems.map(function (it) {
+            return Object.assign({}, it, { onPick: function () { if (menuSheet) menuSheet.close('pick'); it.onPick(it); } });
+          }),
+        });
+      },
+      onClose: function () { menuSheet = null; },
+    });
+  }
   if (spec.navItems && spec.navItems.length) {
     const items = linked(spec.navItems);
     const first = spec.navValue || items[0].id;
+    allItems = items;
+    current = first;
     if (sideMode && sideHost) {
       side = sideNav({ target: sideHost, items: items, value: first, label: spec.navLabel });
     }
-    nav = bottomNav({ items: sideMode ? bottomEntries(items) : items, value: sideMode ? first : spec.navValue });
+    barItems = sideMode ? phoneBar(items, openMenu) : items;
+    nav = bottomNav({ items: barItems, value: sideMode ? barValue(first) : spec.navValue });
     root.appendChild(nav.el);
     root.classList.add('ak-app--bottomnav');
   }
@@ -557,8 +591,10 @@ export function app(spec) {
         set(patch) {
           if (!patch) return;
           const next = patch.items ? linked(patch.items) : null;
+          if (next) { allItems = next; barItems = sideMode ? phoneBar(next, openMenu) : next; }
+          if (patch.value != null) current = patch.value;
           if (side) side.set({ value: patch.value, items: next || undefined });
-          if (nav) nav.set({ value: patch.value, items: next ? (sideMode ? bottomEntries(next) : next) : undefined });
+          if (nav) nav.set({ value: patch.value != null ? barValue(patch.value) : undefined, items: next ? barItems : undefined });
         },
       };
     },
@@ -580,185 +616,5 @@ export function app(spec) {
       if (fullFrame) document.body.classList.remove('ak-body');
       if (root.parentNode) root.parentNode.removeChild(root);
     },
-  };
-}
-
-/**
- * A titled surface — and the ESCAPE HATCH: whatever the catalogue cannot express goes inside a
- * section as the app's own markup, so custom work stays inside a frame that still carries the
- * card surface, the measure cap and the entrance.
- * @param {{ target?: string|Element, title?: string, hint?: string, body?: any, flush?: boolean }} spec
- * @returns {{ el: HTMLElement, body: HTMLElement, set: (patch: any) => void, destroy: () => void }}
- */
-export function section(spec) {
-  const s = spec || {};
-  const heading = s.title != null ? el('h2', { class: 'ak-section__title', 'data-ak-part': 'title', text: s.title }) : null;
-  const hint = s.hint != null ? el('p', { class: 'ak-section__hint', 'data-ak-part': 'hint', text: s.hint }) : null;
-  const body = el('div', { class: 'ak-section__body', 'data-ak-part': 'body' });
-  if (s.body != null) append(body, s.body);
-  const root = el('section', {
-    class: 'ak-root ak-section' + (s.flush ? ' ak-section--flush' : ''),
-    'data-ak-part': 'root',
-  });
-  applyVariant(root, s, ['dense', 'plain', 'quiet']);
-  // THE HEAD IS A ROW ONLY WHEN THE APP GAVE IT A RIGHT-HAND SIDE. A section nobody customised
-  // keeps exactly the markup and the 8px column it had; declare `parts.actions` and the words
-  // move into a head that puts them beside the count, the filter or the one control that
-  // belongs to this block rather than to the page.
-  if (hasPart(s, 'actions')) {
-    const head = partEl('div', 'ak-section__head', 'head');
-    const words = el('div', { class: 'ak-section__words', 'data-ak-part': 'words' });
-    if (heading) words.appendChild(heading);
-    if (hint) words.appendChild(hint);
-    head.appendChild(words);
-    slotInto(head, s, 'actions', null, { cls: 'ak-section__actions', tag: 'div' });
-    root.appendChild(head);
-  } else {
-    if (heading) root.appendChild(heading);
-    if (hint) root.appendChild(hint);
-  }
-  slotInto(root, s, 'before', null, { cls: 'ak-section__before', tag: 'div' });
-  root.appendChild(body);
-  slotInto(root, s, 'after', null, { cls: 'ak-section__after', tag: 'div' });
-  if (s.target) resolve(s.target).appendChild(root);
-  enter(body);
-  return {
-    el: root,
-    body: body,
-    /** @param {{ title?: string, hint?: string, body?: any }} patch */
-    set(patch) {
-      if (!patch) return;
-      if (patch.title != null && heading) heading.textContent = patch.title;
-      if (patch.hint != null && hint) hint.textContent = patch.hint;
-      if (patch.body !== undefined) { clear(body); append(body, patch.body); }
-    },
-    destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
-  };
-}
-
-/**
- * A tab row. Reports the pick; the host swaps the view — inside the kit's screen transition, so
- * the swap is SEEN as a change without the host asking for it. `transition` names another move
- * (slide, wipe, zoom, iris, curtain); the app's `motion: false` and reduced motion collapse it.
- * A row wider than its box scrolls sideways by itself so the chosen tab is fully in view.
- * @param {{
- *   target?: string|Element, items: Array<{ id: string, label: string }>,
- *   value?: string, onChange?: (id: string) => void,
- *   transition?: 'fade'|'wipe'|'curtain'|'zoom'|'iris'|'slide',
- * }} spec
- * @returns {{ el: HTMLElement, set: (patch: { value?: string, items?: any[] }) => void, destroy: () => void }}
- */
-export function tabs(spec) {
-  const state = { items: spec.items || [], value: spec.value || (spec.items && spec.items[0] ? spec.items[0].id : '') };
-  const root = el('div', { class: 'ak-root ak-tabs', role: 'tablist', 'data-ak-part': 'root' });
-  applyVariant(root, spec, ['dense', 'pill']);
-  if (spec.target) resolve(spec.target).appendChild(root);
-  // The chosen tab's fill is the ink, one marker that travels to the next pick (ink.js).
-  const mark = ink(root, { active: '.ak-tab--active' });
-  // The strip scrolls itself (never the page) so the chosen tab is fully in view.
-  const follow = keepInView(root, '.ak-tab--active');
-
-  /** @param {boolean} [moved]  a change of choice, which may scroll smoothly; the first draw never does */
-  function render(moved) {
-    clear(root);
-    for (const item of state.items) {
-      const active = item.id === state.value;
-      root.appendChild(el('button', {
-        type: 'button',
-        class: 'ak-tab' + (active ? ' ak-tab--active' : ''),
-        role: 'tab',
-        'data-ak-part': 'tab',
-        'data-ak-id': item.id,
-        'aria-selected': active ? 'true' : 'false',
-        'data-ak-noguard': true,
-        on: {
-          click: function () {
-            if (item.id === state.value) return;
-            // A TAB CHANGE IS A SCREEN CHANGE, and the kit makes it look like one without being
-            // asked. The host's onChange is what swaps the view, so it runs INSIDE the
-            // transition: the browser crosses the old screen into the new one where it has View
-            // Transitions, the kit's curtain does it where it does not, and under reduced motion
-            // or an opt-out it is the plain swap it always was.
-            const release = mark.pin();
-            viewSwap(function () {
-              state.value = item.id;
-              render(true);
-              if (spec.onChange) spec.onChange(item.id);
-            }, { kind: spec.transition, node: root }).then(release, release);
-          },
-        },
-      }, tabLabel(spec, 'tab', item)));
-    }
-    mark.sync();
-    follow.request(moved);
-  }
-  render();
-
-  return {
-    el: root,
-    /** @param {{ value?: string, items?: Array<{ id: string, label: string }> }} patch */
-    set(patch) {
-      if (!patch) return;
-      if (patch.items) state.items = patch.items;
-      if (patch.value != null) state.value = patch.value;
-      render(true);
-    },
-    destroy() { follow.destroy(); mark.destroy(); if (root.parentNode) root.parentNode.removeChild(root); },
-  };
-}
-
-/**
- * The bottom navigation bar — fixed above the node's chrome strip (the stylesheet reserves
- * var(--aimeat-chrome-bottom), so it never sits under the injected controls). A pick runs inside
- * the kit's screen transition, the same as a tab.
- * @param {{
- *   target?: string|Element, items: Array<{ id: string, label: string, onPick?: (item: any) => void }>,
- *   value?: string, transition?: 'fade'|'wipe'|'curtain'|'zoom'|'iris'|'slide',
- * }} spec
- * @returns {{ el: HTMLElement, set: (patch: { value?: string, items?: any[] }) => void, destroy: () => void }}
- */
-export function bottomNav(spec) {
-  const state = { items: spec.items || [], value: spec.value || '' };
-  const root = el('nav', { class: 'ak-root ak-bottomnav', 'data-ak-part': 'root' });
-  applyVariant(root, spec, ['dense']);
-  if (spec.target) resolve(spec.target).appendChild(root);
-
-  function render() {
-    clear(root);
-    for (const item of state.items) {
-      const active = item.id === state.value;
-      root.appendChild(el('button', {
-        type: 'button',
-        class: 'ak-bottomnav__item' + (active ? ' ak-bottomnav__item--active' : ''),
-        'aria-current': active ? 'page' : null,
-        'data-ak-part': 'item',
-        'data-ak-id': item.id,
-        'data-ak-noguard': true,
-        on: {
-          click: function () {
-            if (item.id === state.value) { if (item.onPick) item.onPick(item); return; }
-            // The bottom bar changes the screen exactly as the tabs do, and gets the same move.
-            viewSwap(function () {
-              state.value = item.id;
-              render();
-              if (item.onPick) item.onPick(item);
-            }, { kind: spec.transition, node: root });
-          },
-        },
-      }, tabLabel(spec, 'item', item)));
-    }
-  }
-  render();
-
-  return {
-    el: root,
-    /** @param {{ value?: string, items?: any[] }} patch */
-    set(patch) {
-      if (!patch) return;
-      if (patch.items) state.items = patch.items;
-      if (patch.value != null) state.value = patch.value;
-      render();
-    },
-    destroy() { if (root.parentNode) root.parentNode.removeChild(root); },
   };
 }

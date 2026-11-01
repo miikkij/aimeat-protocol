@@ -16289,6 +16289,30 @@
       "step2Open": "Avaa chat",
       "settings": "Asetukset"
     },
+    "digest": {
+      "title": "Aamukatsaus huomisaamuksi",
+      "lead": "Ensimmäinen agenttisi voi koota sinulle joka aamu kello 7 lyhyen katsauksen: enintään viisi uutista tai tietoa, jotka koskevat työtäsi. Katsaus tulee sähköpostiisi.",
+      "workLine": "Työ, jota se seuraa: {work}",
+      "purpose": "Joka aamu kello 7 enintään viisi edellisen vuorokauden uutista tai tietoa, jotka koskevat työtäsi ({work}). Lyhyesti, sähköpostiisi.",
+      "purposeGeneral": "Joka aamu kello 7 päivän viisi tärkeintä uutista. Lyhyesti, sähköpostiisi.",
+      "agentName": "Aamukatsaus",
+      "start": "Aloita aamukatsaus",
+      "starting": "Aloitan…",
+      "notNow": "Ei nyt",
+      "done": "Valmista. Ensimmäinen katsaus tulee huomenna kello 7. Agentin nimi on Aamukatsaus, ja voit muuttaa tai pysäyttää sen Agentit-sivulla.",
+      "scheduleProblem": "Agentti on tehty, mutta sen aikaa ei asetettu: {reason} Aseta aika Agentit-sivulla.",
+      "agentsLink": "Agentit-sivu",
+      "failed": "Aamukatsausta ei voitu aloittaa: {reason}"
+    },
+    "madeForYou": {
+      "title": "Tein tämän sinulle",
+      "lead": "Luin, mitä kerroit työstäsi, ja tein sinulle yhden asian valmiiksi. Pidä se, jos siitä on apua.",
+      "keep": "Pidä tämä",
+      "decline": "Ei kiitos",
+      "kept": "Tallessa. Se on muistissasi, ja tekoälysi voi jatkaa siitä, kun pyydät.",
+      "memoryLink": "Muisti-sivu",
+      "failed": "Vastaustasi ei tallennettu. Yritä hetken päästä uudelleen."
+    },
     "buildWithYou": {
       "title": "Rakennamme kanssasi",
       "promise": "Ensimmäisen kokonaisuuden rakennamme kanssasi.",

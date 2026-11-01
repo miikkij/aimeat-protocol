@@ -103,7 +103,7 @@
  */
 import { el, clear, resolve, enter, setMotionDefaults } from './dom.js';
 import { t } from './i18n.js';
-import { section, tabs } from './shell.js';
+import { section, tabs } from './shell-parts.js';
 import { hero, statRow, figure, rating } from './hero.js';
 import { emptyState, skeleton } from './state.js';
 import { list } from './list.js';

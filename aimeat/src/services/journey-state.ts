@@ -34,6 +34,8 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.5.1 — 2026-11-02 — isOutsideMcpAgent asks node-resident-agent.ts isNodeResidentAgent, the rule the
+ *     first-MCP-call marker uses, instead of a second copy of its two conditions (agreed with bb).
  *   v1.5.0 — 2026-11-01 — "Connect your AI" is ticked by an agent of the person's own that used MCP
  *     (isOutsideMcpAgent), never by the place's own chat agent or a basic agent, which also call over MCP; the
  *     first-MCP-call marker counts only when it predates the agents' own MCP mark.
@@ -57,6 +59,7 @@ import { getOwnerScopeMemory } from './owner-memory.js';
 import { readHomeState, type HomeState } from './home-state.js';
 import { FIRST_MCP_CALL_KEY } from './onboarding-funnel.js';
 import { CHAT_AGENT_NAME } from './chat-agent.js';
+import { isNodeResidentAgent } from './node-resident-agent.js';
 import { getOwnerUsageSummary } from './usage-summary.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { writeMemoryRecord } from './memory-write.js';
@@ -228,14 +231,13 @@ export function isOwnWorker(a: { mode?: string; runMode?: string | null; tags?: 
  * (`chat#<owner>@<node>`) calls over MCP too, on every chat turn, and so do the basic agents made
  * with the account (tag `crew.basic`), so the first-MCP-call marker alone ticked "connect your AI"
  * for a buyer who had only used the place's chat (commercial's check of crew52, 2026-11-01). The
- * agent row's mcpLastSeen names the agent, so those agents are left out by name and tag: the same
- * two conditions as aimeat-protocol-4e's node-resident-agent rule on the write side.
+ * agent row's mcpLastSeen names the agent, so those agents are left out by the one rule the write
+ * side uses too (node-resident-agent.ts), and by the chat's GAII for a row read without its name.
  */
 export function isOutsideMcpAgent(a: { gaii?: string; name?: string; mcpLastSeen?: string | null; tags?: readonly string[] | null }): boolean {
     if (!a.mcpLastSeen) return false;
-    const chat = a.name === CHAT_AGENT_NAME || String(a.gaii ?? '').startsWith(`${CHAT_AGENT_NAME}#`);
-    const basic = Array.isArray(a.tags) && a.tags.includes('crew.basic');
-    return !chat && !basic;
+    if (String(a.gaii ?? '').startsWith(`${CHAT_AGENT_NAME}#`)) return false;
+    return !isNodeResidentAgent({ name: a.name ?? '', tags: a.tags });
 }
 
 /** The day agent-mcp-touch.ts began writing mcpLastSeen; before it the marker was the only record. */

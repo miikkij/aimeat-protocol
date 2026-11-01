@@ -288,7 +288,9 @@ moved under you says so.
    from the catalogue in the spec (hero, list, listDetail, cardGrid, mediaCard, form, table,
    statRow, figure, searchBar, timeline, tabs, and the designed \`emptyState\` and \`skeleton\`
    rather than a bare string or a grey box, and for a tool someone works in every day the
-   workbench pieces: sideNav through \`app({ nav: 'side' })\`, statusBand, checkGrid,
+   workbench pieces: sideNav through \`app({ nav: 'side' })\` (on a phone the column becomes a
+   bottom bar of the ungrouped or \`bottom: true\` entries, ending in a Menu sheet with every page,
+   so build no More page of your own), statusBand, checkGrid,
    choiceCards, settingsGroup, progressFigure, callout, promptPanel for the person's own AI (copy
    the prompt, paste the answer) and queueRow as a queue list's row part, and for anything a hand presses the
    controls that answer it: toggle, segmented, slider, menu, contextMenu, popover, tooltip,

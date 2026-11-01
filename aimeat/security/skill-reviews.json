@@ -74,7 +74,7 @@
         "aimeat/public/views/home/journey-roads.js",
         "aimeat/public/views/home/journey-prompts.js"
       ],
-      "digest": "sha256:dcfc94b6661308293e3d8b27",
+      "digest": "sha256:b2e9269a4790d4086cbc21ae",
       "note": "The stages, the roads and the record journey.state are defined in journey-state.ts; the home's road question and the first note's key are in the two home files."
     },
     "node:aimeat-organisms": {
@@ -142,14 +142,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:c2a75d8f5610a022a2b2a7cf"
+      "digest": "sha256:f3f96746bf65f4c81f91d161"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -569,7 +569,7 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "512d403da4e7befa",
       "aimeat/src/services/build-atelier-layers.ts": "cf45add323b4731c",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "baca79b3b245ef12",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "9edb0b27b92958d5",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
@@ -738,7 +738,7 @@
       "aimeat/src/data/refinery-classes.ts": "ab723c0852c19267"
     },
     "node:aimeat-guided-journey": {
-      "aimeat/src/services/journey-state.ts": "87e18a051c8d4d91",
+      "aimeat/src/services/journey-state.ts": "f7e77e3ec980d153",
       "aimeat/public/views/home/journey-roads.js": "c3c8e5805c7a3c51",
       "aimeat/public/views/home/journey-prompts.js": "429f406334ba193e"
     },

@@ -211,6 +211,14 @@ try {
         assert(entries.every((e) => e.actor.endsWith(`@${NODE_ID}`) && e.actor.includes(customerName)), 'only the customer\'s account');
     });
 
+    await test('a memory write names its key as the target, so the home can tell its bookkeeping from what the person saved', async () => {
+        const write = await json('/v1/memory', bearer(customerToken, { method: 'POST', body: JSON.stringify({ key: 'home.visits', value: { count: 1 }, visibility: 'private' }) }));
+        assert(write.status === 200 || write.status === 201, `write ${write.status} ${write.text}`);
+        const trail = await json('/v1/build-with-you/trail?limit=20', bearer(customerToken));
+        const entry = (trail.body.data.entries as any[]).find((e) => e.code === 'POST /v1/memory');
+        assert(entry?.target === 'home.visits', `entry ${JSON.stringify(entry)}`);
+    });
+
     await test('the operator\'s activity is the whole node\'s, newest first', async () => {
         const all = await json('/v1/operator/activity?limit=100', admin());
         assert(all.status === 200, `activity ${all.status} ${all.text}`);
