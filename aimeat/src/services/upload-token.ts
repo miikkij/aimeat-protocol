@@ -12,6 +12,8 @@
  * @usage
  *   import { generateUploadToken, verifyUploadToken } from '../services/upload-token.js';
  * @version-history
+ *   v1.13.0 — 2026-11-01 — PRESIGNED_META_KEYS.storage carries `page_writer`, the writer of the welcome
+ *     page key as the mint knew it (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   v1.12.0 — 2026-10-20 — The token carries its issue time to the millisecond (`iat_ms`) and, when the
  *     principal asking for it named an agent record at the mint, `actor_agent`. verifyUploadToken
  *     returns both, so the PUT asks whether that agent and its account still stand
@@ -199,7 +201,9 @@ export const PRESIGNED_META_KEYS = {
     // set by the node, never by a client; the upload files the request when the bytes land.
     // `object`: the store reference a direct upload's bytes go to, set by the node at the mint, never by
     // a client; POST /v1/upload/{token}/complete records the file that names it.
-    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store', 'object'],
+    // `page_writer`: who asked for the URL of the welcome page key and whether it may read memory, set
+    // by the node at the mint, never by a client (services/storage-page-keys.ts).
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs', 'ai_provenance', 'ai_provenance_id', 'publish_ask', 'store', 'object', 'page_writer'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],

@@ -9834,6 +9834,8 @@
   "notiftext.approval_goal_model_spend.body": "{agent} agregó la tarea «{work}» a tu objetivo «{goal}» para la IA de AIMEAT. {agent} no puede usar tu IA por sí mismo, así que el costo de la tarea espera tu respuesta. Si lo permites, la IA hace esta tarea y las tareas de IA que {agent} agregue a este objetivo más adelante. Si no lo permites, esta tarea no se hace.",
   "notiftext.approval_living_ai_spend.title": "{who} creó un documento vivo que usaría tu IA",
   "notiftext.approval_living_ai_spend.body": "{writer} creó el documento vivo «{document}». Se actualiza con tu IA, y tú lo pagas con tu propia clave o con tu saldo de IA. {writer} no puede usar tu IA por sí mismo, así que la actualización espera tu respuesta. Si lo permites, el documento se actualiza según su horario. Si no lo permites, la IA no lo actualiza y no se gasta nada.",
+  "notiftext.approval_company_page_write.title": "{who} pide permiso para cambiar la página web de tu empresa {company}",
+  "notiftext.approval_company_page_write.body": "{writer} intentó guardar una nueva página web para tu empresa {company}. Todos ven esta página en la dirección de la empresa. {writer} puede guardar tus archivos, pero no puede cambiar las páginas web de tus empresas. Si lo permites, {writer} puede cambiar y quitar la página web de esta empresa a partir de ahora. Si no lo permites, la página se queda como está.",
   "notiftext.approval_refinery_definition.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
   "notiftext.approval_refinery_definition.body": "El procesador de correo toma tu correo y guarda los mensajes en un espacio de trabajo. Después del cambio, lee el buzón {mailbox} y guarda cada mensaje en el espacio de trabajo {workspace}. {who} no puede hacer este cambio por su cuenta, así que el cambio espera tu aprobación. Si no lo permites, nada cambia.",
   "notiftext.approval_refinery_definition_text.title": "{who} pide cambiar de dónde toma tu correo el procesador de correo {refinery} y dónde lo guarda",
@@ -25201,6 +25203,17 @@
         "high": "La IA no actualiza el documento. No se gasta nada.",
         "tipLabel": "Cuándo permitirlo",
         "tip": "Permítelo si quieres que este documento esté al día. Si el agente o la aplicación siempre puede usar tu IA, dale ese permiso, y así ya no pregunta."
+      },
+      "approval_company_page_write": {
+        "title": "Una aplicación pide cambiar la página web de tu empresa",
+        "short": "Una aplicación o un agente que puede guardar tus archivos intentó cambiar la página web que tu empresa muestra en su dirección.",
+        "what": "La página web de tu empresa es lo que todos ven en la dirección de la empresa. La aplicación o el agente puede guardar tus archivos, pero no tiene permiso para cambiar las páginas web de tus empresas, así que no puede cambiar esta página por su cuenta. Por eso se te pregunta.",
+        "lowLabel": "Si lo permites",
+        "low": "Esta aplicación o este agente puede cambiar y quitar la página web de esta empresa a partir de ahora.",
+        "highLabel": "Si no lo permites",
+        "high": "La página se queda como está, y no se vuelve a preguntar por esta aplicación o este agente.",
+        "tipLabel": "Cuándo permitirlo",
+        "tip": "Permítelo si usas esta aplicación para hacer la página web de tu empresa. Si no sabes por qué la aplicación quiere cambiar la página, no lo permitas."
       },
       "approval_schedule_instruction": {
         "title": "Alguien cambió una programación",
