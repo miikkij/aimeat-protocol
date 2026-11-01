@@ -4,6 +4,9 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-11-01 -- keep_your_key adds that a client keeps node_id and this node's address with the key
+ *     and sends a proof only to that address, because a server at another address can report any node
+ *     id (secaudit2026oct31w2 round 11, device-return-proof.ts:return-proof-binds-only-public-node-id).
  *   2026-10-31 — device-authorize verifies a return proof and writes its mark before the pending request,
  *     not after it: in between, the pending list and the consent card read a proven return as a takeover,
  *     and an approval there recorded one (nightly sweep, e2e-device-return-clients on PostgreSQL).
@@ -544,6 +547,8 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
                 + '"signature": <base64 Ed25519 signature, made with privateKey, of the UTF-8 text '
                 + '"aimeat-device-return:v2\\n<node_id>\\n<owner>\\n<agent_name>\\n<signed_at>"> }. '
                 + 'node_id is node_id from GET /.well-known/aimeat; owner and agent_name are the values you send. '
+                + 'Keep node_id (given here) and the address of this node with the key, and send a proof only to that '
+                + 'same address, signed over the kept node_id: a server at another address can report any node id. '
                 + 'The owner then sees your return and keeps your access with one press; without the proof they are '
                 + 'told a new device is taking this agent over.',
               node_id: config.nodeId,

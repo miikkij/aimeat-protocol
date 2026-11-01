@@ -9,8 +9,15 @@
 # @env    AIMEAT_BASE_URL (default https://aimeat.io), AIMEAT_OWNER (required),
 #         AIMEAT_AGENT_NAME (default openhands), AIMEAT_SCOPES (default "*"),
 #         AIMEAT_SECRETS_FILE (default ./secrets/aimeat.env),
-#         AIMEAT_KEY_FILE (default <secrets dir>/<agent>@<owner>.key)
+#         AIMEAT_KEY_FILE (default <secrets dir>/<agent>@<owner>.key; the node that gave the key is
+#         recorded beside it in the same name with .node)
 # @version-history
+#   2026-11-01 -- The key is kept with the origin and the id of the node that gave it (<key>.node),
+#     and signs a return proof only toward that origin, over the stored id. Run against another
+#     address, the device request goes without a proof and the script says which node holds the key;
+#     the node id came from the contacted server, so any server could get a proof another node
+#     accepts. A key kept before the record existed is bound to the AIMEAT_BASE_URL of the env file
+#     written with it (secaudit2026oct31w2 round 11).
 #   2026-10-27 — The reconnect proof is the v2 text, which names the node's id from
 #     /.well-known/aimeat (secaudit2026oct26, return-proof-unbound-to-node-and-request).
 #   2026-10-27 -- The device-authorize and device-token bodies (the return proof, the device_code) go
@@ -82,13 +89,40 @@ scopes_json() {
 # without it, or without a key, the request goes without proof and the owner sees the takeover
 # screen, as before. No stored token is ever sent with the device request: the node refuses a dead one.
 KEY_FILE="${AIMEAT_KEY_FILE:-$(dirname "$SECRETS_FILE")/${AGENT_NAME}@${OWNER}.key}"
+# The node that gave the key: its origin and its id, recorded beside the key at the approval. The key
+# signs a return proof only toward that origin, over that id: an id read from the server a run
+# contacts is whatever that server reports (secaudit2026oct31w2 round 11).
+NODE_FILE="${KEY_FILE%.key}.node"
+
+origin_of() { # origin_of <url>: scheme://host[:port] in lower case, without a default port
+  local u="$1" scheme rest
+  case "$u" in *://*) ;; *) return 0 ;; esac
+  scheme="$(printf '%s' "${u%%://*}" | tr 'A-Z' 'a-z')"
+  rest="${u#*://}"; rest="${rest%%/*}"; rest="${rest%%\?*}"; rest="${rest%%#*}"; rest="${rest##*@}"
+  rest="$(printf '%s' "$rest" | tr 'A-Z' 'a-z')"
+  case "$scheme:$rest" in http:*:80) rest="${rest%:80}" ;; https:*:443) rest="${rest%:443}" ;; esac
+  printf '%s://%s' "$scheme" "$rest"
+}
 
 return_proof_json() { # prints ,"proof":{...} or nothing
   [ -s "$KEY_FILE" ] || return 0
   command -v openssl >/dev/null 2>&1 || return 0
-  local dir signed_at sig node_id
+  local dir signed_at sig node_id="" held=""
+  if [ -f "$NODE_FILE" ]; then
+    held="$(sed -n 's/^origin=//p' "$NODE_FILE" | head -n 1 | tr -d '\r')"
+    held="${held:-another node}"
+    node_id="$(sed -n 's/^node_id=//p' "$NODE_FILE" | head -n 1 | tr -d '\r')"
+  elif [ -f "$SECRETS_FILE" ]; then
+    # A key kept before the record existed: the env file written with it names its node.
+    held="$(origin_of "$(sed -n 's/^AIMEAT_BASE_URL=//p' "$SECRETS_FILE" | head -n 1 | tr -d '\r')")"
+  fi
+  if [ -n "$held" ] && [ "$held" != "$(origin_of "$BASE_URL")" ]; then
+    echo "WARNING: $KEY_FILE holds the agent \"$AGENT_NAME\" of $OWNER for $held. Its key signs a return proof only toward that node, so this request to $BASE_URL goes without one. Approving it replaces the key kept for $held. To keep both, set AIMEAT_KEY_FILE and AIMEAT_SECRETS_FILE to another folder, or use another AIMEAT_AGENT_NAME." >&2
+    return 0
+  fi
   # The proof names the node it goes to (v2), so it verifies on no other node (secaudit2026oct26).
-  node_id="$(curl -s -H 'Accept: application/json' "$BASE_URL/.well-known/aimeat" | json node_id)"
+  # A key kept before the record existed reads the id from the node it is run against, as before.
+  [ -n "$node_id" ] || node_id="$(curl -s -H 'Accept: application/json' "$BASE_URL/.well-known/aimeat" | json node_id)"
   if [ -z "$node_id" ]; then
     echo "WARNING: the node did not say its id; connecting without proof that this is the same agent." >&2
     return 0
@@ -182,6 +216,10 @@ if [ -n "$PRIVATE_KEY" ]; then
   mkdir -p "$(dirname "$KEY_FILE")"
   printf '%s\n' "$PRIVATE_KEY" > "$KEY_FILE"
   chmod 600 "$KEY_FILE"
+  # The node that gave this key: the origin of this run's address and the id that node reports.
+  GIVEN_NODE_ID="$(curl -s -H 'Accept: application/json' "$BASE_URL/.well-known/aimeat" | json node_id)"
+  printf 'origin=%s\nnode_id=%s\n' "$(origin_of "$BASE_URL")" "$GIVEN_NODE_ID" > "$NODE_FILE"
+  chmod 600 "$NODE_FILE"
 fi
 
 echo
