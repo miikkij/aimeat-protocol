@@ -13,6 +13,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-anonymous-member-reads
  * @version-history
+ *   2026-11-01 — aimeat_board_read refuses the minted anonymous token a private board, as the REST read
+ *     routes do (secaudit2026oct31w2 round 11).
  *   2026-11-01 — Skills at 'members' and the board roster: aimeat_skill_list, aimeat_skill_get and
  *     aimeat_board_list answer the minted anonymous token what GET /v1/skills, GET /v1/skills/:name
  *     and GET /v1/boards answer it (secaudit2026oct31w2 round 11).
@@ -316,6 +318,13 @@ await test('MCP board posts resource of the private board: the minted anonymous 
     const body = await mcpRpc(anonMcp!, 'resources/read', { uri: `aimeat://boards/${encodeURIComponent(anonAllowedBoard)}` });
     const text = String(body?.result?.contents?.[0]?.text ?? JSON.stringify(body?.error ?? body));
     assert(/ACCESS_DENIED|not shared with you/i.test(text) || body?.error !== undefined, `minted token MCP resource: ${text.slice(0, 200)}`);
+});
+
+await test('MCP aimeat_board_read of the private board: the minted anonymous token is refused, as on REST', async () => {
+    const r = await callTool(anonMcp!, 'aimeat_board_read', { board_id: anonAllowedBoard });
+    assert(r.isError && /AUTH_REQUIRED/.test(r.text), `minted token MCP board read: ${r.text.slice(0, 200)}`);
+    const pub = await callTool(anonMcp!, 'aimeat_board_read', { board_id: rosterPublicBoard });
+    assert(!pub.isError, `usage: the minted token still reads the public board with aimeat_board_read: ${pub.text.slice(0, 200)}`);
 });
 
 await test('usage: the minted anonymous token still reads the public board\'s posts over MCP', async () => {
