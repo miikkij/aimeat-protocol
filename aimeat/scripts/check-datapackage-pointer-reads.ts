@@ -214,6 +214,16 @@ export const ALLOWED: Record<string, Record<string, string>> = {
     'readPointer(ctx.deps, ctx.caller.ownerGhii, name)': 'Tells whether a data product\'s package exists (delete answer, failure note) and shows its pointer to the product\'s own caller; it opens nothing.',
     'pointer.visibility': 'Shown to the data product\'s own caller beside its definition; display only, no read decides on it.',
   },
+  'src/services/dataproduct/list-facts.ts': {
+    'readPointer(deps, ownerGhii, name)': 'The owner\'s own list facts per data product (version, update time, freshness); display to the owner, it opens nothing.',
+    'pointer.visibility': 'Shown in the owner\'s own list facts; display only, no read decides on it.',
+  },
+  'src/services/dataspace/owner.ts': {
+    'readPointer(ctx.deps, ctx.caller.ownerGhii, pkg)': 'Tells whether the owner has the package before the owner\'s own auto-agree setting for it is stored; it opens nothing.',
+  },
+  'src/services/dataspace/catalog.ts': {
+    'readPointer(deps, ownerGhii, name)': 'DEBT: a Dataspace participant\'s catalogue takes the package\'s existence, withdrawn mark and usage terms off the pointer; incident incident-data-products-party-shares-and-exchange-sale-read-latest-jso-mvxozs2r.',
+  },
   'src/services/dataproduct/scheduled-job.ts': {
     '`datapkg/${name}/latest.json`': 'Names the key a scheduled data product run writes, for the scheduler\'s reads and writes list; it decides nothing.',
   },
