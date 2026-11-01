@@ -9,6 +9,9 @@
  *   without a new case.
  * @usage pnpm exec vitest run test/unit/config-start-check.test.ts
  * @version-history
+ *   v2.2.0 -- 2026-11-01 -- aimeat validate accepts the data key alone for two-step sign-in, and names
+ *     both keys when neither is set (the source was broken: it demanded the TOTP key and said secrets
+ *     were stored unencrypted, both false since 2026-10-09).
  *   v2.1.0 — 2026-10-25 — START_ONLY_CHOICES is gone; its three settings are schema rows, so the
  *     table-driven case over every fixed-set row covers them.
  *   v2.0.0 — 2026-10-16 — The node starts on the default of a setting it does not accept instead of
@@ -199,6 +202,26 @@ describe('aimeat validate names every value the start sets aside', () => {
         process.env.AIMEAT_METRICS_ACCESS = 'Operator';
         const results = validateEnv().filter(r => r.variable === 'AIMEAT_METRICS_ACCESS');
         expect(results.map(r => r.level)).toEqual(['warning']);
+    });
+});
+
+describe('aimeat validate and the two-step sign-in key', () => {
+    const KEY = 'a'.repeat(64);
+    it('the data key alone is enough: no error, because it encrypts the two-step secrets', () => {
+        process.env.AIMEAT_ENCRYPTION_KEY = KEY;
+        delete process.env.AIMEAT_TOTP_ENCRYPTION_KEY;
+        delete process.env.AIMEAT_TOTP_ENABLED;
+        const totp = validateEnv().filter(r => r.variable === 'AIMEAT_TOTP_ENCRYPTION_KEY');
+        expect(totp.filter(r => r.level === 'error')).toEqual([]);
+    });
+
+    it('with neither key, an error that says two-step sign-in cannot be set up', () => {
+        delete process.env.AIMEAT_ENCRYPTION_KEY;
+        delete process.env.AIMEAT_TOTP_ENCRYPTION_KEY;
+        delete process.env.AIMEAT_TOTP_ENABLED;
+        const error = validateEnv().find(r => r.variable === 'AIMEAT_TOTP_ENCRYPTION_KEY' && r.level === 'error');
+        expect(error?.message).toContain('AIMEAT_ENCRYPTION_KEY');
+        expect(error?.message).not.toContain('unencrypted');
     });
 });
 

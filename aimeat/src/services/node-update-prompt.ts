@@ -19,6 +19,8 @@
  * @structure InstallMethod · UpdatePromptInput · buildNodeUpdatePrompt()
  * @usage const prompt = buildNodeUpdatePrompt({ current, latest, releasedAt, baseUrl, install, storage });
  * @version-history
+ *   v1.1.1 -- 2026-11-01 -- The PostgreSQL backup step names DATABASE_URL, the variable config.ts reads;
+ *     it named AIMEAT_DATABASE_URL, which no node reads, so an AI following it found nothing to dump.
  *   v1.1.0 — 2026-10-10 — The backup step names the node key file and the keys set outside `.env`:
  *     the identity key's database copy is encrypted since the 2026-10-09 secrets audit.
  *   v1.0.0 — 2026-09-30 — Initial.
@@ -60,7 +62,7 @@ function backupStep(input: UpdatePromptInput): string {
     return `Make a backup first: copy the SQLite database file (\`${input.sqlitePath}\`, relative to the working directory) and the \`.env\` file to a safe place, and tell me where they are.${KEYS_TOO}`;
   }
   if (input.storage === 'postgres-kysely') {
-    return `Make a backup first: take a \`pg_dump\` of the PostgreSQL database that AIMEAT_DATABASE_URL in the \`.env\` names, copy the \`.env\` file to a safe place, and tell me where they are.${KEYS_TOO}`;
+    return `Make a backup first: take a \`pg_dump\` of the PostgreSQL database that DATABASE_URL in the \`.env\` names, copy the \`.env\` file to a safe place, and tell me where they are.${KEYS_TOO}`;
   }
   return `Make a backup first: copy the \`.env\` file to a safe place and tell me where it is. This node keeps its data in memory, so a restart starts it empty.${KEYS_TOO}`;
 }

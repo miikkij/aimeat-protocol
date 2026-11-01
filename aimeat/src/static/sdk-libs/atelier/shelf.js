@@ -25,7 +25,7 @@
  */
 import { el, clear, resolve } from './dom.js';
 import { applyVariant } from './parts-model.js';
-import { tabs } from './shell.js';
+import { tabs } from './shell-parts.js';
 import { searchBar } from './table.js';
 import { emptyState } from './state.js';
 import { tb } from './board-i18n.js';

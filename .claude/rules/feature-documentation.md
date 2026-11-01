@@ -29,6 +29,7 @@ of these and no single page said so.
 | 12 | A Platform Development Notes document (what shipped, what it cost, what is open) | the next session | none |
 | 13 | The TARGET record or the wish: closed in the session that shipped it | Jouni, the wish bucket | none |
 | 14 | A decision record for any ruling made while building | every project under the goal | none |
+| 15 | `docs/it-adoption/`: the page that states what the feature changes for an operator (a setting, a default, a sign-in method, an outbound connection, a security control, a limit), and its entry in `aimeat/security/it-adoption-reviews.json` when the page now makes claims about a new file | an organisation's IT and security deciding whether to run AIMEAT | `check:it-adoption` (only when a watched file changes, or a named setting or tool is gone) |
 
 Rows 10, 12, 13 and 14 have no gate, so they are the ones that get skipped. Row 5 is never skipped: every new feature gets its feature list row. Row 6 is a question, never a silence: the report that says a feature is done ends with the proposed changelog entry (title and summary in en and fi) and the question whether it goes in. Read "ask first" as a duty to ask, not only as a limit on writing: read as a limit, it let 17 features from 2026-10-22 to 25 reach main with no entry and no question (Jouni, 2026-10-25). The `note-writer` agent
 does 12 to 14 from a commit hash and a list of what was decided.
