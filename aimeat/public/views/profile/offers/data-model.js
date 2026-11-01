@@ -8,9 +8,12 @@
  *   products that need a look. Pure functions over what GET /v1/dataproducts and the package reads
  *   answer, so the list, the product page and the wizard say the same thing the same way.
  * @structure d · FRESH_TONE · freshWord · freshTone · needsLook · audienceWord · scheduleWords ·
- *   cronFor · scheduleOf · versionNumber · productTitle · shortHash · bytesWord
+ *   cronFor · scheduleOf · versionNumber · productTitle · shortHash · bytesWord · errText ·
+ *   shareSentence · keyNote
  * @usage import { d, freshWord, scheduleWords } from './data-model.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "When the source changes" in words; errText, shareSentence and keyNote say a
+ *     refusal and a share's sentences in the page's language from the answer's code and facts (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a: the data products of the Offers page).
  */
 import { t, tn } from '/js/i18n.js';
@@ -59,6 +62,7 @@ export function scheduleOf(cron) {
 
 /** A schedule in words: "on Mondays at 06:00", "every day at 06:00", "on day 1 of each month". */
 export function scheduleWords(schedule) {
+  if (schedule?.on === 'change') return d('schedule.onChange');
   if (!schedule?.cron) return d('schedule.none');
   const s = scheduleOf(schedule.cron);
   if (!s) return d('schedule.cron', { cron: schedule.cron });
@@ -69,9 +73,9 @@ export function scheduleWords(schedule) {
   return d('schedule.monthly', { day: s.day, at });
 }
 
-/** The wizard's choice as a cron: null for "once". */
+/** The wizard's choice as a cron: null for "once" and for "when the source changes". */
 export function cronFor({ freq, day, time }) {
-  if (!freq || freq === 'once') return null;
+  if (!freq || freq === 'once' || freq === 'change') return null;
   const [h, m] = String(time || '06:00').split(/[:.]/).map((x) => Math.min(59, Math.max(0, parseInt(x, 10) || 0)));
   const hour = Math.min(23, h);
   if (freq === 'daily') return `${m} ${hour} * * *`;
@@ -87,6 +91,38 @@ export function versionNumber(versions, hash) {
   const list = versions || [];
   const i = list.findIndex((v) => v.contentHash === hash);
   return i < 0 ? list.length : list.length - i;
+}
+
+/**
+ * A refusal in the page's language: the words of `dataout.err.<CODE>` when this page has them (with
+ * the refusal's details, e.g. the source), else the node's own sentence, else `fallbackKey`. The node
+ * answers in English for an AI; a person reads the same refusal in their language.
+ */
+export function errText(err, fallbackKey) {
+  const code = err?.code || err?.response?.error?.code;
+  const key = code ? `dataout.err.${code}` : '';
+  const words = key ? t(key, { source: err?.response?.error?.details?.source || '', ...(err?.response?.error?.details || {}) }) : '';
+  if (words && words !== key) return words;
+  return err?.message || d(fallbackKey);
+}
+
+/**
+ * The sentence a share's answer is told with, in the page's language: who reads what until when, made
+ * from the answer's facts (POST /v1/parties/share keeps an English `say` for an AI).
+ */
+export function shareSentence(out, fallbackWho) {
+  const until = out?.share?.expires ? d('share.untilDate', { date: fmtDate(out.share.expires) }) : d('share.untilYouEnd');
+  const title = out?.package_title || out?.share?.package || '';
+  if (out?.recipient_kind === 'visitor') {
+    return d('share.sayVisitor', { who: out.display_name || out.recipient, title, until, account: out.recipient });
+  }
+  return d('share.say', { who: out?.party?.display_name || fallbackWho || '', title, until });
+}
+
+/** What to do with the key, in the page's language. */
+export function keyNote(out, fallbackWho) {
+  const who = out?.party?.display_name || fallbackWho || '';
+  return out?.key_shown ? d('share.keyShown', { who }) : d('share.keyKept', { who });
 }
 
 export const productTitle = (p) => p?.title || p?.definition?.title || p?.name || '';

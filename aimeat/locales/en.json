@@ -5333,6 +5333,7 @@
     },
     "audience": { "private": "Only me", "members": "Signed-in accounts", "public": "Everyone", "organismOf": "Members of {name}" },
     "schedule": {
+      "onChange": "updated when its source changes",
       "none": "updated only when you run it", "cron": "on the schedule {cron}", "daily": "updated every day at {at}", "monthly": "updated on day {day} of each month at {at}",
       "weekly": { "0": "updated on Sundays at {at}", "1": "updated on Mondays at {at}", "2": "updated on Tuesdays at {at}", "3": "updated on Wednesdays at {at}", "4": "updated on Thursdays at {at}", "5": "updated on Fridays at {at}", "6": "updated on Saturdays at {at}" }
     },
@@ -5361,6 +5362,7 @@
     },
     "product": {
       "label": "Data product", "loadFailed": "The data product could not be read. Try again in a moment.",
+      "nextChangeRun": "next run {when}, after its source changed",
       "versionN": "Version {n}", "current": "in use", "notPublished": "Not published yet", "nextRun": "next run {when}",
       "share": "Share", "sell": "Sell on EXCHANGE", "sellEdit": "Change the sale", "withdraw": "Withdraw", "runNow": "Update now", "publishAgain": "Publish again", "onSale": "On EXCHANGE",
       "figRows": "Rows", "figVersions": "Versions", "figShares": "Shares", "figReads": "Reads in 7 days", "lastRun": "updated {when}",
@@ -5408,6 +5410,21 @@
       "howProgram": "With a program", "howProgramHint": "Power BI, Excel, DuckDB. Gets a key in a connection file.",
       "howBrowser": "In a browser", "howBrowserHint": "Opens a link in their e-mail and sees the rows.",
       "howDataspace": "From a dataspace", "howDataspaceHint": "An organisation's connector over the Dataspace Protocol.",
+      "howAimeat": "From another AIMEAT", "howAimeatHint": "Reads with their own account, signed in here as a visitor.",
+      "account": "Their AIMEAT account", "accountPlaceholder": "matti@their-server.example", "accountHint": "Their account and their own server, as name@server. They sign in here with it.",
+      "sentencesAimeat": "{who} reads with their own AIMEAT account and needs no key. You can end the share at any time, and it ends at once. Copies already taken cannot be called back. You see every read.",
+      "say": "{who} can now read \"{title}\" {until}. You can end the share at any time and the next read is refused, but copies already taken cannot be called back.",
+      "sayVisitor": "{who} can now read \"{title}\" {until}, signed in here with their own account {account}. You can end the share at any time and the next read is refused, but copies already taken cannot be called back.",
+      "untilDate": "until {date}", "untilYouEnd": "until you end it",
+      "keyShown": "The key is in the connection file and is shown once. Give the file to {who} now.",
+      "keyKept": "{who} already has a key. The connection file says how to use it.",
+      "signInAt": "Signs in at",
+      "signIn": {
+        "ready": "This server takes sign-ins from {node}, so {who} can read it now.",
+        "not-a-peer": "This server is not connected to {node} yet, so {who} cannot sign in here. Ask this server's administrator to connect the two.",
+        "sign-ins-off": "This server takes no sign-ins from other servers, so {who} cannot sign in here. Ask the administrator to allow them.",
+        "not-allowed": "This server does not take sign-ins from {node}, so {who} cannot sign in here. Ask the administrator to allow them."
+      },
       "email": "E-mail for the link", "emailPlaceholder": "name@example.com", "emailHint": "Optional. The link goes to this address.", "emailNeeded": "A person who reads in a browser gets the link at this address.",
       "purpose": "Purpose", "purposePlaceholder": "reporting", "until": "Ends", "untilHint": "At most {n} days on this server, so no later than {date}.",
       "version": "Which version", "versionLatest": "Always the newest", "versionOnly": "Only version {n} ({hash})",
@@ -5439,8 +5456,8 @@
       "intro": "People and programs with no account on this server that you have given access to. Each one reads only what you shared with it.",
       "colName": "Party", "colShares": "Shares", "colKey": "Key used",
       "none": "You have no outside parties. One is made when you share a data product by name.",
-      "kind": { "program": "program", "person": "person", "dataspace": "dataspace" },
-      "keyOf": { "program": "program key", "person": "browser link", "dataspace": "dataspace connector" },
+      "kind": { "program": "program", "person": "person", "dataspace": "dataspace", "aimeat": "another AIMEAT", "visitor": "another AIMEAT" },
+      "keyOf": { "program": "program key", "person": "browser link", "dataspace": "dataspace connector", "visitor": "own account on another AIMEAT" },
       "status": { "active": "active", "stopped": "stopped" },
       "dataProduct": "data product",
       "sharesN": "{n} shares", "sharesN_one": "{n} share", "keyUsed": "key used {when}", "keyNotUsed": "key not used yet",
@@ -5484,6 +5501,7 @@
       "provenance": "The origin, the freshness and the personal data of each source are checked one by one and written into the package's description. A data product is as fresh as its oldest source."
     },
     "cols": {
+      "sourceField": "Source field", "note": "Note", "includeOne": "{col} goes out",
       "title": "Columns", "count": "{n} of {of} go out", "include": "Goes out", "personal": "personal data · data map", "descPlaceholder": "What the column holds",
       "personalLeftOut": "Left out: {cols}. The data map marks them personal data. If you take them in, the product cannot be public. A named share and a contract are possible, and they show on the Compliance page.",
       "personalIncluded": "Personal data goes out: {cols}. The product cannot be public.",
@@ -5492,6 +5510,10 @@
       "filterNote": "The filter is written into the package's transformations, so a reader sees what was left out."
     },
     "preview": {
+      "aiWorking": "Your AI is writing a draft of the description…", "aiAsk": "Ask your AI for a draft",
+      "aiNoKey": "A draft of the description needs your own AI. Set it up on the AI page, or write the description yourself.", "aiSettings": "Open the AI page",
+      "aiWrote": "Your AI wrote a draft of the description from the columns and the source. Make it your own.",
+      "aiFailed": "Your AI could not write a draft. Write the description yourself.",
       "rowsTitle": "First rows of the trial build", "counts": "{rows} rows · {cols} columns", "sizeLine": "{rows} rows · {cols} columns · about {size}",
       "validOk": "The Frictionless check passed.", "validBad": "The Frictionless check found {n} problems. Change the column types in step 2.", "validBad_one": "The Frictionless check found one problem. Change the column's type in step 2.",
       "describedOk": "Every column has a type and a description.", "describedBad": "A column has no description. Add one in step 2.",
@@ -5501,6 +5523,11 @@
       "odpsTitle": "The description machines read (ODPS 4.1, excerpt)", "noOdps": "The sheet shows once the preview passes its checks."
     },
     "sched": {
+      "change": "When the source changes",
+      "changeNote": "The server runs the product after its source changes: ten seconds after the change at the earliest, and at most once every five minutes. A new version is made only when the rows changed.",
+      "changeBlocked": "When the source changes cannot be chosen: an extension's result has no change the server can see. Give this product a schedule.",
+      "changeNodeNote": "The server sees a change of a workspace's records, an app's data, a memory record, a file and another data product. A version someone still reads is not removed without you seeing it first.",
+      "freshChange": { "fresh": "the newest run after a change succeeded", "late": "the source changed and the run after it failed", "stale": "a data product it is built from is out of date" },
       "title": "Pace", "pace": "Pace", "once": "Once", "daily": "Daily", "weekly": "Weekly", "monthly": "Monthly",
       "weekday": "Day", "monthday": "Day of the month", "time": "Time", "keep": "Keep old versions", "keep12": "The newest 12", "keepAll": "All", "keep6m": "6 months",
       "onceNote": "The product is built when you publish it and when you press Update now. Readers see it as having no schedule.",
@@ -5522,6 +5549,21 @@
       "sharesTitle": "Named shares", "newShare": "Add a share", "addShare": "Add", "noShares": "No named shares yet.",
       "noAccount": "The recipient needs no AIMEAT account. Each share is made when you publish, and its key is shown once on the next page.",
       "sellTitle": "EXCHANGE", "sell": "Sell on EXCHANGE"
+    },
+    "err": {
+      "SHARE_TOO_LONG": "The end is later than this server allows. Choose an earlier date.",
+      "INVALID_RECIPIENT": "Write their account as name@their-server. An account on this server reads through who may use it.",
+      "PACKAGE_WITHDRAWN": "This data product is withdrawn. Publish it again before you share it.",
+      "PARTY_STOPPED": "This party is stopped. Resume it in the Data Wallet first.",
+      "VERSION_NOT_FOUND": "That version is no longer kept. Choose another one.",
+      "NO_CHANGE_SIGNAL": "An extension source has no change the server can see. Choose a schedule in step 4.",
+      "AUDIENCE_WIDER_THAN_SOURCE": "Who may use it is wider than a source allows. Choose a narrower audience in step 5.",
+      "PERSONAL_DATA_PUBLIC": "A public data product cannot carry personal data. Leave the personal columns out in step 2, or choose another audience.",
+      "SOURCE_FAILED": "Source {source} could not be read. Try the sources again.",
+      "SCOPE_DENIED": "You do not have the permission this needs.",
+      "UNKNOWN_COLUMN": "A source no longer has a column you chose. Try the sources again in step 1.",
+      "UNION_COLUMNS_MISMATCH": "The sources do not have the same columns, so they cannot be one table. Choose their own tables or a key.",
+      "JOIN_DUPLICATE_KEY": "The key is not unique in a source. Choose another key column."
     },
     "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Only on the terms of a contract" },
     "done": {
