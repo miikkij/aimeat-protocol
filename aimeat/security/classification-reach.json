@@ -2084,6 +2084,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V1): the reads that hand content to a caller pass the classification reader; the other reads here serve a write or the node's own bookkeeping."
     },
+    "src/services/company/company-page-key.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Written 2026-11-01 (secaudit2026oct31w2 round 11), the node's own read: the service-owned record company-page-writers.<company id> that holds which writers the owner allowed to change a company's page through the file routes. Nothing of it is shown to anyone or sent to a model."
+    },
     "src/services/living-pulse-spend.ts": {
       "reads": {
         "getMemory": 2
@@ -2439,10 +2445,10 @@
     },
     "src/services/portfolio-read-hold.ts": {
       "reads": {
-        "getMemory": 1,
+        "getMemory": 4,
         "getStorageFile": 1
       },
-      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. Nothing of the page is shown to anyone or sent to a model."
+      "why": "Written 2026-10-31 (audit H-9), the node's own read: the owner's published welcome page file, read only to compute the sha256 of its bytes, and the service-owned record portfolio-read-hold.page that holds such digests. 2026-11-01 (secaudit2026oct31w2 round 11): the same record read again by the generic write's note and the once-only step, and the finished record of that step under system@<node>. Nothing of the page or the records is shown to anyone or sent to a model."
     },
     "src/services/portfolio-members.ts": {
       "reads": {

@@ -11,6 +11,8 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-01 -- DELETE hands the shared delete its caller, so a company's page key asks what the company
+ *     page route asks (services/storage-page-keys.ts; secaudit2026oct31w2 round 11).
  *   2026-11-01 -- GET /v1/pub answers 410 GONE for a withdrawn data package's own file to a reader its
  *     audience admits (services/datapackage/withdraw.ts; plan doc-mvwxcas3dom3, D0.3).
  *   2026-11-01 -- GET /v1/pub reads a data package's own file (the pointer, a descriptor, a resource
@@ -781,7 +783,8 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         const gaii = resolve(req);
         const key = extractKey(req.params);
 
-        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key);
+        const removed = await removeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, gaii, key,
+            { caller: callerOf(req, config.nodeId, storage), ...(req.auth!.app ? { app: req.auth!.app } : {}) });
         if (!removed.ok) {
             res.status(removed.status).json(error(config.nodeId, removed.code, removed.message));
             return;

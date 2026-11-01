@@ -32,6 +32,9 @@
  *   const filed = await filePublishRequest({ storage, config }, ownerGhii, draft);
  *   await settlePublishRequest({ storage, config }, ownerGhii, request, 'declined', { by: decider });
  * @version-history
+ *   2026-11-01 — The kind `company-page-write`: a writer without company:write may change a company's page
+ *     through the file routes once the owner allows it (services/company/company-page-key.ts;
+ *     secaudit2026oct31w2 round 11).
  *   2026-10-31 — The kind `living-ai-spend`: a living document whose config a writer without ai:use set
  *     up refreshes itself with the owner's AI once the owner allows it (services/living-pulse-spend.ts;
  *     secaudit2026oct31w2 round 10).
@@ -156,7 +159,9 @@ export type PublishKind =
   // A program a computer holds for an agent, allowed by the owner (services/connector-programs.ts).
   | 'connector-program'
   // A living document refreshing itself with the owner's AI, set up by a writer without ai:use (services/living-pulse-spend.ts).
-  | 'living-ai-spend';
+  | 'living-ai-spend'
+  // A writer without company:write changing a company's page through the file routes (services/company/company-page-key.ts).
+  | 'company-page-write';
 
 /** The stored state. A request whose `approval` names the operators reads `awaiting_operator` while it waits. */
 export type PublishRequestState = 'awaiting_owner' | 'approved' | 'declined' | 'expired' | 'outdated';
