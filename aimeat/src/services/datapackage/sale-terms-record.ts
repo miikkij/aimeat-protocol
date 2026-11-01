@@ -16,10 +16,11 @@
  *   every new version, as writeLatest kept them on the pointer (plan doc-mvwxcas3dom3, D5.1). The pointer
  *   still gets a copy of the terms, so a reader of the file sees what it saw; no decision reads it.
  *
- *   EXISTING TERMS AND WITHDRAWALS. recordPointerStateOnce runs once per node before it serves, after
- *   the audience step (server-bootstrap/once-only-keep-steps.ts). For every package pointer it copies
- *   the sale terms onto a new record, and a withdrawal mark onto the package's audience record
- *   (./audience-record.ts recordPackageWithdrawal). It acts only on what a pointer positively says,
+ *   EXISTING TERMS, WITHDRAWALS AND CONFIRMATIONS. recordPointerStateOnce runs once per node before it
+ *   serves, after the audience step (server-bootstrap/once-only-keep-steps.ts). For every package
+ *   pointer it copies the sale terms onto a new record, and a withdrawal mark and the owner's
+ *   confirmation of a public package from personal data onto the package's audience record
+ *   (./audience-record.ts recordPackageWithdrawal, recordPublicConfirmation). It acts only on what a pointer positively says,
  *   leaves a record that exists as it is, skips a pointer that is not JSON, and waits for a later start
  *   while the audience records are not in place. Until it has run, saleTermsOf answers the pointer's
  *   terms, as the reads did before.
@@ -28,6 +29,8 @@
  * @usage
  *   const terms = await saleTermsOf(storage, nodeId, ownerGhii, name, pointer);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The boot step copies the pointers' public confirmations too; the step key and
+ *     its in-force flag moved to ./audience-record.ts, which reads them for the confirmation (WP9e, D1.7).
  *   v1.0.0 — 2026-11-01 — Initial (WP9e, cc-jouni-dataulos).
  */
 import type { Storage } from '../../storage/interface.js';
@@ -37,14 +40,17 @@ import { updateRecord, UNCHANGED } from '../record-cas.js';
 import { claimOnceOnlyStep } from '../once-only-step.js';
 import { writeStorageFile, type StorageWriteDeps } from '../storage-file-write.js';
 import { fileVisibilityOf } from './audience.js';
-import { audienceRecordsInPlace, packageNamespaces, recordPackageWithdrawal } from './audience-record.js';
+import {
+    audienceRecordsInPlace, packageNamespaces, recordPackageWithdrawal, recordPublicConfirmation, publicConfirmationOf,
+    pointerStateInForce, markPointerStateInForce, DATAPACKAGE_POINTER_STATE_STEP_KEY,
+} from './audience-record.js';
 import { latestKey, type DatapackageExchangeTerms, type LatestPointer } from './contract.js';
 
 /** The service-owned memory prefix the record lives under, in the package owner's namespace. */
 export const SALE_TERMS_PREFIX = 'datapkg-exchange.';
 
-/** The record under `system@<nodeId>` that says the existing pointers' terms and withdrawals are recorded. */
-export const DATAPACKAGE_POINTER_STATE_STEP_KEY = 'migrations.datapackage-pointer-state';
+/** The step record's key lives beside the audience record, which reads it too; re-exported here. */
+export { DATAPACKAGE_POINTER_STATE_STEP_KEY };
 
 export function saleTermsKey(name: string): string {
     return `${SALE_TERMS_PREFIX}${name}`;
@@ -59,17 +65,6 @@ function parseRecord(v: unknown): SaleTermsRecord | null {
     return t && typeof t === 'object' && typeof t.exchange === 'boolean' ? { name: String(r.name ?? ''), terms: t } : null;
 }
 
-/** True once the boot step has copied the existing terms; read once per process after it is true. */
-let ruleInForce = false;
-
-async function termsRuleInForce(storage: Storage, nodeId: string): Promise<boolean> {
-    if (ruleInForce) return true;
-    const rec = await storage.getMemory(`system@${nodeId}`, DATAPACKAGE_POINTER_STATE_STEP_KEY);
-    const value = rec?.value as { state?: unknown } | undefined;
-    if (rec && value?.state !== 'running') ruleInForce = true;
-    return ruleInForce;
-}
-
 /**
  * The terms `ownerGhii`'s package `name` is sold under: the record's, or null when it has none. Before
  * the boot step has run, the stored pointer's terms (`pointer`), as every read took them then.
@@ -79,7 +74,7 @@ export async function saleTermsOf(
 ): Promise<DatapackageExchangeTerms | null> {
     const own = parseRecord((await storage.getMemory(ownerGhii, saleTermsKey(name)))?.value)?.terms;
     if (own) return own;
-    if (await termsRuleInForce(storage, nodeId)) return null;
+    if (await pointerStateInForce(storage, nodeId)) return null;
     return pointer?.exchange && typeof pointer.exchange.exchange === 'boolean' ? pointer.exchange : null;
 }
 
@@ -123,21 +118,21 @@ const NAMESPACE_BATCH = 200;
 
 /**
  * Once per node, before it serves and after the audience step: copy each pointer's sale terms onto a
- * terms record the package does not have yet, and each pointer's withdrawal mark onto the package's
- * audience record. Waits (answers ran: false, claims nothing) while the audience records are not in
+ * terms record the package does not have yet, and each pointer's withdrawal mark and public
+ * confirmation (./personal-guard.ts) onto the package's audience record. Waits (answers ran: false, claims nothing) while the audience records are not in
  * place. Throws when a read or a write fails, and then leaves no step record, so the next start tries
  * again.
  */
 export async function recordPointerStateOnce(
     storage: Storage, config: Pick<AimeatConfig, 'nodeId'>,
-): Promise<{ ran: boolean; terms?: number; withdrawals?: number }> {
+): Promise<{ ran: boolean; terms?: number; withdrawals?: number; confirmations?: number }> {
     if (!(await audienceRecordsInPlace(storage, config.nodeId))) return { ran: false };
     const claim = await claimOnceOnlyStep(storage, `system@${config.nodeId}`, DATAPACKAGE_POINTER_STATE_STEP_KEY);
     if (!claim) return { ran: false };
     try {
         const at = new Date().toISOString();
         const namespaces = await packageNamespaces(storage, config.nodeId);
-        let terms = 0, withdrawals = 0;
+        let terms = 0, withdrawals = 0, confirmations = 0;
         for (let i = 0; i < namespaces.length; i += NAMESPACE_BATCH) {
             const byOwner = await storage.listStorageFilesForOwners(namespaces.slice(i, i + NAMESPACE_BATCH));
             for (const [owner, files] of Object.entries(byOwner)) {
@@ -160,13 +155,17 @@ export async function recordPointerStateOnce(
                     if (pointer.status === 'withdrawn' && typeof pointer.withdrawnAt === 'string' && pointer.withdrawnAt) {
                         if (await recordPackageWithdrawal(storage, owner, name, pointer.withdrawnAt)) withdrawals++;
                     }
+                    const confirmed = publicConfirmationOf(pointer.personalPublicConfirmed);
+                    if (confirmed && await recordPublicConfirmation(storage, owner, name, confirmed)) confirmations++;
                 }
             }
         }
-        await claim.finish({ at, terms, withdrawals });
-        ruleInForce = true;
-        if (terms || withdrawals) logger.info('Data packages: the sale terms and withdrawals of the existing pointers recorded', { terms, withdrawals });
-        return { ran: true, terms, withdrawals };
+        await claim.finish({ at, terms, withdrawals, confirmations });
+        markPointerStateInForce();
+        if (terms || withdrawals || confirmations) {
+            logger.info('Data packages: the sale terms, withdrawals and public confirmations of the existing pointers recorded', { terms, withdrawals, confirmations });
+        }
+        return { ran: true, terms, withdrawals, confirmations };
     } catch (err) {
         await claim.release();
         throw err;

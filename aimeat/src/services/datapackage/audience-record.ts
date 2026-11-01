@@ -34,16 +34,28 @@
  *   The pointer's mark still counts for a package withdrawn before the record carried the mark;
  *   recordPointerStateOnce (./sale-terms-record.ts) copies those marks onto the records.
  *
+ *   THE CONFIRMATION OF A PUBLIC PACKAGE FROM PERSONAL DATA (plan D1.7, ./personal-guard.ts). A publish
+ *   that carried the owner's confirmation records it here, and every later version keeps it. The guard
+ *   decides on the record's: a pointer an app rewrote with a confirmation skips no question. The
+ *   pointer keeps a copy no decision reads; until recordPointerStateOnce has copied the existing
+ *   pointers' confirmations, a recorded package without one takes its pointer's, as before.
+ *
  *   OUTSIDE THE SERVICE. trustedPackageOf reads the pointer and answers it with the trusted facts, so
  *   a share, a sale, a data product source or the Dataspace catalogue decides on the record without
  *   reading the pointer itself; the pointer it hands back is for display fields only.
  * @structure AUDIENCE_RECORD_PREFIX · DATAPACKAGE_AUDIENCE_STEP_KEY · audienceRecordKey ·
- *   recordPackageAudience · recordPackageWithdrawal · TrustedAudience · trustedAudienceOf ·
- *   trustedPackageOf · packageNamespaces · recordDatapackageAudiencesOnce
+ *   recordPackageAudience · recordPackageWithdrawal · recordPublicConfirmation · PublicConfirmation ·
+ *   publicConfirmationOf · DATAPACKAGE_POINTER_STATE_STEP_KEY · pointerStateInForce · TrustedAudience ·
+ *   trustedAudienceOf · trustedPackageOf · packageNamespaces · recordDatapackageAudiencesOnce
  * @usage
  *   const trusted = await trustedAudienceOf(storage, nodeId, ownerGhii, name, pointer);
  *   if (!(await datapackageReadable(storage, ownerGhii, trusted.visibility, reader))) return null;
  * @version-history
+ *   v1.2.0 -- 2026-11-01 -- The record carries the owner's confirmation of a public package from personal
+ *     data (`personalPublicConfirmed`, ./personal-guard.ts): recordPackageAudience writes it from the
+ *     publish that carried it and keeps it on every later version; TrustedAudience answers it, and the
+ *     pointer's copy counts only until the boot step copied the existing ones (pointerStateInForce)
+ *     (WP9e, plan D1.7).
  *   v1.1.0 -- 2026-11-01 -- The record carries the withdrawal (recordPackageWithdrawal); TrustedAudience
  *     answers the current version (`current`) and the withdrawal (`withdrawnAt`); trustedPackageOf for
  *     the readers outside the service (WP9e, Lifecycle Central incidents ...-mvxmm7ex and ...-mvxozs2r).
@@ -74,10 +86,23 @@ interface AudienceRecord {
     versions: Record<string, string>;
     /** When the owner withdrew the package; absent once a version is published again. */
     withdrawnAt?: string;
+    /** The confirmation that the package goes public although its producer's data map marks its data
+     *  personal (./personal-guard.ts): written by a publish that carried it, kept on every later version. */
+    personalPublicConfirmed?: PublicConfirmation;
 }
+
+/** A confirmation of a public package from personal data: when, and the principal whose request carried it. */
+export type PublicConfirmation = { at: string; by: string };
 
 export function audienceRecordKey(name: string): string {
     return `${AUDIENCE_RECORD_PREFIX}${name}`;
+}
+
+/** A confirmation as stored, or undefined when the value is not one. */
+export function publicConfirmationOf(v: unknown): PublicConfirmation | undefined {
+    const c = v as Partial<PublicConfirmation> | null | undefined;
+    return c && typeof c === 'object' && typeof c.at === 'string' && c.at && typeof c.by === 'string' && c.by
+        ? { at: c.at, by: c.by } : undefined;
 }
 
 function parseRecord(v: unknown): AudienceRecord | null {
@@ -85,9 +110,11 @@ function parseRecord(v: unknown): AudienceRecord | null {
     const r = v as Partial<AudienceRecord>;
     if (typeof r.visibility !== 'string' || typeof r.current !== 'string') return null;
     const versions = r.versions && typeof r.versions === 'object' ? r.versions : {};
+    const confirmed = publicConfirmationOf(r.personalPublicConfirmed);
     return {
         name: String(r.name ?? ''), visibility: r.visibility, current: r.current, versions: { ...versions },
         ...(typeof r.withdrawnAt === 'string' && r.withdrawnAt ? { withdrawnAt: r.withdrawnAt } : {}),
+        ...(confirmed ? { personalPublicConfirmed: confirmed } : {}),
     };
 }
 
@@ -95,17 +122,38 @@ function parseRecord(v: unknown): AudienceRecord | null {
  * Record that `name` points at `contentHash` with `visibility`, and that this version's audience is
  * `visibility`. Called by writeLatest before it moves the pointer, so a pointer never names a version
  * the record does not. A publish restores a withdrawn package, so the record it writes has no
- * `withdrawnAt`.
+ * `withdrawnAt`. `confirmed` is the confirmation this publish carried (./personal-guard.ts); without
+ * one, the record keeps the confirmation it has, as the pointer kept it on every later version.
  */
 export async function recordPackageAudience(
     storage: Storage, ownerGhii: string, name: string, contentHash: string, visibility: string,
+    confirmed?: PublicConfirmation,
 ): Promise<void> {
-    await updateRecord(storage, ownerGhii, audienceRecordKey(name), parseRecord, cur => ({
-        name,
-        visibility,
-        current: contentHash,
-        versions: { ...(cur?.versions ?? {}), [bare(contentHash)]: visibility },
-    }), { tag: 'datapackage-audience', ttlHours: null });
+    await updateRecord(storage, ownerGhii, audienceRecordKey(name), parseRecord, cur => {
+        const keep = confirmed ?? cur?.personalPublicConfirmed;
+        return {
+            name,
+            visibility,
+            current: contentHash,
+            versions: { ...(cur?.versions ?? {}), [bare(contentHash)]: visibility },
+            ...(keep ? { personalPublicConfirmed: keep } : {}),
+        };
+    }, { tag: 'datapackage-audience', ttlHours: null });
+}
+
+/**
+ * Record a confirmation an existing pointer carries onto the package's record (the boot step,
+ * ./sale-terms-record.ts recordPointerStateOnce). A package with no record keeps none, and a record that
+ * has a confirmation keeps its own. Answers whether this call wrote it.
+ */
+export async function recordPublicConfirmation(storage: Storage, ownerGhii: string, name: string, confirmed: PublicConfirmation): Promise<boolean> {
+    let wrote = false;
+    await updateRecord(storage, ownerGhii, audienceRecordKey(name), parseRecord, cur => {
+        if (!cur || cur.personalPublicConfirmed) return UNCHANGED;
+        wrote = true;
+        return { ...cur, personalPublicConfirmed: confirmed };
+    }, { tag: 'datapackage-audience', ttlHours: null });
+    return wrote;
 }
 
 /**
@@ -124,7 +172,7 @@ export async function recordPackageWithdrawal(storage: Storage, ownerGhii: strin
 }
 
 /** The pointer fields a trusted read looks at: the version and audience it names and its withdrawal mark. */
-export type PointerFacts = Pick<LatestPointer, 'contentHash' | 'visibility'> & Partial<Pick<LatestPointer, 'status' | 'withdrawnAt'>>;
+export type PointerFacts = Pick<LatestPointer, 'contentHash' | 'visibility'> & Partial<Pick<LatestPointer, 'status' | 'withdrawnAt' | 'personalPublicConfirmed'>>;
 
 /** The withdrawal a pointer names, or undefined. */
 function pointerWithdrawal(pointer: PointerFacts | undefined | null): string | undefined {
@@ -146,6 +194,8 @@ export interface TrustedAudience {
     current: string | undefined;
     /** When the package was withdrawn: the record's mark, else the pointer's. Undefined when it is not withdrawn. */
     withdrawnAt: string | undefined;
+    /** The owner's confirmation of a public package from personal data, as the service recorded it (./personal-guard.ts). */
+    personalPublicConfirmed: PublicConfirmation | undefined;
 }
 
 /** True once the boot step has recorded the existing packages; read once per process after it is true. */
@@ -164,6 +214,26 @@ export function audienceRecordsInPlace(storage: Storage, nodeId: string): Promis
     return audienceRuleInForce(storage, nodeId);
 }
 
+/** The record under `system@<nodeId>` that says the existing pointers' terms, withdrawals and confirmations are recorded. */
+export const DATAPACKAGE_POINTER_STATE_STEP_KEY = 'migrations.datapackage-pointer-state';
+
+/** True once ./sale-terms-record.ts recordPointerStateOnce has run; read once per process after it is true. */
+let pointerStateRecorded = false;
+
+/** Has the boot step copied the existing pointers' state onto the records? Until then a read takes the pointer's, as before. */
+export async function pointerStateInForce(storage: Storage, nodeId: string): Promise<boolean> {
+    if (pointerStateRecorded) return true;
+    const rec = await storage.getMemory(`system@${nodeId}`, DATAPACKAGE_POINTER_STATE_STEP_KEY);
+    const value = rec?.value as { state?: unknown } | undefined;
+    if (rec && value?.state !== 'running') pointerStateRecorded = true;
+    return pointerStateRecorded;
+}
+
+/** Called by the boot step once it has finished in this process. */
+export function markPointerStateInForce(): void {
+    pointerStateRecorded = true;
+}
+
 /**
  * What a read of `ownerGhii`'s package `name` decides the audience on. `pointer` is the stored
  * `latest.json` as read (or undefined when there is none).
@@ -173,16 +243,21 @@ export async function trustedAudienceOf(
 ): Promise<TrustedAudience> {
     const ownCurrent = pointer?.contentHash || undefined;
     const ownWithdrawal = pointerWithdrawal(pointer);
+    const ownConfirmation = publicConfirmationOf(pointer?.personalPublicConfirmed);
     if (!(await audienceRuleInForce(storage, nodeId))) {
         // Before the existing packages are recorded: the pointer and the tags, as before.
-        return { visibility: pointer?.visibility, pointer: pointer ?? undefined, versionFile: (_h, f) => f, current: ownCurrent, withdrawnAt: ownWithdrawal };
+        return {
+            visibility: pointer?.visibility, pointer: pointer ?? undefined, versionFile: (_h, f) => f, current: ownCurrent, withdrawnAt: ownWithdrawal,
+            personalPublicConfirmed: ownConfirmation,
+        };
     }
     const rec = parseRecord((await storage.getMemory(ownerGhii, audienceRecordKey(name)))?.value);
     if (!rec) {
-        // Not written by the service: the owner and the owner's principals with storage:read only.
+        // Not written by the service: the owner and the owner's principals with storage:read only, and
+        // no confirmation the service did not record.
         return {
             visibility: 'private', pointer: { visibility: 'private' }, versionFile: (_h, f) => ({ visibility: f.visibility, tags: [] }),
-            current: ownCurrent, withdrawnAt: ownWithdrawal,
+            current: ownCurrent, withdrawnAt: ownWithdrawal, personalPublicConfirmed: undefined,
         };
     }
     return {
@@ -192,6 +267,9 @@ export async function trustedAudienceOf(
         versionFile: (hash, f) => ({ visibility: f.visibility, tags: withAudienceTag([], rec.versions[bare(hash)] ?? 'private') }),
         current: rec.current || undefined,
         withdrawnAt: rec.withdrawnAt ?? ownWithdrawal,
+        // The record's confirmation; the pointer's only until the boot step has copied the existing ones.
+        personalPublicConfirmed: rec.personalPublicConfirmed
+            ?? (await pointerStateInForce(storage, nodeId) ? undefined : ownConfirmation),
     };
 }
 
@@ -290,11 +368,15 @@ export async function recordDatapackageAudiencesOnce(
                     }
                     versions[bare(pointer.contentHash)] = visibility;
                     const withdrawnAt = pointerWithdrawal(pointer);
+                    const confirmed = publicConfirmationOf(pointer.personalPublicConfirmed);
                     let wrote = false;
                     await updateRecord(storage, owner, audienceRecordKey(name), parseRecord, cur => {
                         if (cur) return UNCHANGED;
                         wrote = true;
-                        return { name, visibility, current: pointer!.contentHash, versions, ...(withdrawnAt ? { withdrawnAt } : {}) };
+                        return {
+                            name, visibility, current: pointer!.contentHash, versions,
+                            ...(withdrawnAt ? { withdrawnAt } : {}), ...(confirmed ? { personalPublicConfirmed: confirmed } : {}),
+                        };
                     }, { tag: 'datapackage-audience', ttlHours: null });
                     if (wrote) recorded++;
                 }
