@@ -142,14 +142,14 @@
       "note": "The skill points at the build specification rather than repeating it, so it watches the doors to the specification and not the specification's text."
     },
     "node:aimeat-app-builder-atelier": {
-      "reviewedOn": "2026-10-30",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/build-atelier-prompt.ts",
         "aimeat/src/services/build-atelier-layers.ts",
         "aimeat/src/static/sdk-libs/atelier/describe-data.js",
         "aimeat/src/services/design-book/component.ts"
       ],
-      "digest": "sha256:c2a75d8f5610a022a2b2a7cf"
+      "digest": "sha256:f3f96746bf65f4c81f91d161"
     },
     "node:aimeat-phaser": {
       "reviewedOn": "2026-09-19",
@@ -253,7 +253,7 @@
       "digest": "sha256:83e26e7b02b3f6154df97a19"
     },
     "node:aimeat-node-operations": {
-      "reviewedOn": "2026-10-25",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/mcp/core-admin.ts"
       ],
@@ -347,7 +347,7 @@
       "digest": "sha256:787135ae122594df923ae77c"
     },
     "node:aimeat-html-page": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/services/html-page.ts",
         "aimeat/src/services/page-frame.ts",
@@ -355,7 +355,7 @@
         "aimeat/src/services/workspace-opened.ts",
         "aimeat/src/routes/page-host.ts"
       ],
-      "digest": "sha256:a50345d10c168fae5e1a4e6a",
+      "digest": "sha256:1c5f0595b550de77a41401e6",
       "note": "The page rules it states (size, files, libraries, no network) are enforced in html-page.ts and the page host's headers; the share default and the stale marker in workspace-share.ts and workspace-opened.ts."
     },
     "node:aimeat-agent-capability": {
@@ -569,7 +569,7 @@
     "node:aimeat-app-builder-atelier": {
       "aimeat/src/services/build-atelier-prompt.ts": "512d403da4e7befa",
       "aimeat/src/services/build-atelier-layers.ts": "cf45add323b4731c",
-      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "baca79b3b245ef12",
+      "aimeat/src/static/sdk-libs/atelier/describe-data.js": "9edb0b27b92958d5",
       "aimeat/src/services/design-book/component.ts": "71091551c9319c7e"
     },
     "node:aimeat-phaser": {
@@ -805,7 +805,7 @@
     "node:aimeat-html-page": {
       "aimeat/src/services/html-page.ts": "4017c2f005e63477",
       "aimeat/src/services/page-frame.ts": "96108b74f3403752",
-      "aimeat/src/services/workspace-share.ts": "c1c220512506f738",
+      "aimeat/src/services/workspace-share.ts": "2190682b2cb6d2ee",
       "aimeat/src/services/workspace-opened.ts": "5a9837a77b3b4530",
       "aimeat/src/routes/page-host.ts": "11cf872797b054ef"
     },

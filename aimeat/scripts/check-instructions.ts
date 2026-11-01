@@ -31,6 +31,7 @@
  *   v1.1.1 — 2026-09-27 — Ceiling 39,500 → 40,500 for the docs/internal plans rule.
  *   v1.1.2 — 2026-10-04 — Ceiling 40,500 → 40,800 for the rule that a mentioned place comes with its URL.
  *   v1.1.3 — 2026-10-18 — Ceiling 40,800 → 41,000 for the rule that live data is an event, never a poll.
+ *   v1.1.4 -- 2026-11-01 -- Ceiling 41,200 -> 41,700 for the rule that the IT adoption package stays true to the code.
  */
 import { execFileSync } from 'node:child_process';
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -58,8 +59,11 @@ const SKILLS_DIR = join(REPO, '.claude', 'skills');
  * over the existing SSE stream and never by polling, which holds in every session.
  * Raised to 41,200 on 2026-10-25 for Jouni's ruling that a session's sandbox gets his OpenRouter test
  * key and model without asking ("I gave the key exactly for this"), which holds in every session.
+ * Raised to 41,700 on 2026-11-01, at Jouni's request, for the rule that the IT adoption package
+ * stays true to the code ("tämä on tärkeä"), which holds in every session: any change to a setting,
+ * a default or a security control can make one of its pages false.
  */
-const CEILING_BYTES = 41_200;
+const CEILING_BYTES = 41_700;
 
 function trackedFiles(): string[] {
     return execFileSync('git', ['-C', REPO, 'ls-files'], { encoding: 'utf-8', maxBuffer: 64 * 1024 * 1024 })

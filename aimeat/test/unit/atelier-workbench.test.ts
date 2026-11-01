@@ -110,7 +110,8 @@ describe('the workbench frame', () => {
     expect(side.querySelector('[data-ak-id="clear"] .ak-sidenav__count').textContent).toBe('4');
     expect(side.querySelector('[data-ak-id="setup"]').getAttribute('aria-current')).toBe('page');
     const bottom = [...a.el.querySelectorAll('.ak-bottomnav__item')].map((b: any) => b.getAttribute('data-ak-id'));
-    expect(bottom).toEqual(['setup', 'run', 'unclear']);
+    // Clear is left out of the bar, so the bar ends in the Menu that reaches it.
+    expect(bottom).toEqual(['setup', 'run', 'unclear', 'ak-menu']);
 
     side.querySelector('[data-ak-id="clear"]').click();
     expect(picked).toEqual(['clear']);
@@ -119,6 +120,34 @@ describe('the workbench frame', () => {
     a.nav.set({ value: 'run', items: [{ id: 'setup', label: 'Setup' }, { id: 'run', label: 'Processing' }, { id: 'clear', label: 'Clear', count: 9, group: 'Waiting' }] });
     expect(a.el.querySelector('.ak-sidenav [data-ak-id="clear"] .ak-sidenav__count').textContent).toBe('9');
     expect(a.el.querySelector('.ak-bottomnav__item[data-ak-id="run"]').getAttribute('aria-current')).toBe('page');
+  });
+
+  it('reaches every page on a phone: a Menu sheet when the bar leaves one out, the first three when the app gave the bar none', () => {
+    const picked: string[] = [];
+    const grouped = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id, label: id.toUpperCase(), group: 'G', onPick: () => picked.push(id) }));
+    const a = mountApp({ nav: 'side', navItems: grouped });
+    const bar = () => [...a.el.querySelectorAll('.ak-bottomnav__item')].map((b: any) => b.getAttribute('data-ak-id'));
+    expect(bar()).toEqual(['a', 'b', 'c', 'ak-menu']);
+
+    a.el.querySelector('.ak-bottomnav__item[data-ak-id="ak-menu"]').click();
+    const sheet: any = document.querySelector('dialog.ak-dialog');
+    expect([...sheet.querySelectorAll('.ak-sidenav__item')].map((b: any) => b.getAttribute('data-ak-id'))).toEqual(['a', 'b', 'c', 'd', 'e']);
+    sheet.querySelector('[data-ak-id="e"]').click();
+    expect(picked).toEqual(['e']);
+    // The page is not in the bar, so the bar marks the Menu, and the column marks the page.
+    expect(a.el.querySelector('.ak-bottomnav__item[data-ak-id="ak-menu"]').getAttribute('aria-current')).toBe('page');
+    expect(a.el.querySelector('.ak-app__side [data-ak-id="e"]').getAttribute('aria-current')).toBe('page');
+
+    a.nav.set({ value: 'b' });
+    expect(a.el.querySelector('.ak-bottomnav__item[data-ak-id="b"]').getAttribute('aria-current')).toBe('page');
+
+    // An app that carries its own More entry has answered this itself.
+    const own = mountApp({ nav: 'side', navItems: [
+      { id: 'home', label: 'Home' },
+      { id: 'notes', label: 'Notes', bottom: false },
+      { id: 'more', label: 'More', bottom: true },
+    ] });
+    expect([...own.el.querySelectorAll('.ak-bottomnav__item')].map((b: any) => b.getAttribute('data-ak-id'))).toEqual(['home', 'more']);
   });
 });
 

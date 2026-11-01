@@ -6,7 +6,7 @@
 - [ ] Set `AIMEAT_STORAGE=postgres-kysely` or `AIMEAT_STORAGE=sqlite` (never use `memory` in production)
 - [ ] Set a strong `AIMEAT_ADMIN_PASSWORD`, or leave it unset and the node generates a random one at start. The node itself checks no strength rule: `aimeat init` asks for at least 8 characters, and anything longer and random is better
 - [ ] Set `AIMEAT_BASE_URL` to your HTTPS URL
-- [ ] Set `AIMEAT_ENCRYPTION_KEY` for stored secrets and the separate `AIMEAT_TOTP_ENCRYPTION_KEY` where required; follow `.env.example` for their formats
+- [ ] Set `AIMEAT_ENCRYPTION_KEY` before the first start: it encrypts every stored secret, two-step sign-in secrets included. `AIMEAT_TOTP_ENCRYPTION_KEY` is the data key when it is not set, which is the case on a node installed with `aimeat init`. **Do not add `AIMEAT_ENCRYPTION_KEY` to a node that already runs on the TOTP key**: AI provider keys, MCP server credentials, connected accounts and payment keys stored before then stop opening, because the node does not re-encrypt them ([IT adoption, backup and recovery](../it-adoption/11-backup-recovery.md)). Follow `.env.example` for the format
 - [ ] Set `AIMEAT_SECURITY_PROFILE=public` for a public deployment (otherwise the node infers `local` or `public` from the base URL host and node type), and read the startup self-check's warnings
 - [ ] Confirm app-origin isolation, wildcard DNS and TLS for hosted apps
 - [ ] Set `AIMEAT_KEY_PASSPHRASE` to encrypt node keys at rest
@@ -29,10 +29,10 @@
 
 ## Authentication
 
-- [ ] First registered owner automatically gets `operator` role
+- [ ] The first operator is created once, with the admin password at `/v1/admin/setup` or with the one-time setup code the start log prints on a node whose address is not localhost. Keep the admin password as secret as the encryption key until the operator exists
 - [ ] Owners sign in with a password (`POST /v1/ghii/login`), a passkey or a configured identity provider. Registration at `POST /v1/owners` still returns an Ed25519 private key once; signing in with that key (`POST /v1/auth/token` with `owner`) is the legacy owner-key login, removed in 4.0.0 (on a 3.x node `AIMEAT_OWNER_KEY_LOGIN=false` switches it off)
 - [ ] Enable TOTP for operator accounts
-- [ ] Set `AIMEAT_JWT_TTL` to appropriate value (default: 3600s)
+- [ ] Review the token lifetimes: `AIMEAT_ACCESS_TTL` for a person's access token (default 900 s, renewed by a refresh cookie that ends after `AIMEAT_REFRESH_IDLE_DAYS` idle and `AIMEAT_REFRESH_ABSOLUTE_DAYS` at most), `AIMEAT_AGENT_JWT_TTL` and `AIMEAT_ECO_JWT_TTL` for agents and ecosystem apps (default 90 days). `AIMEAT_JWT_TTL` covers only the legacy and admin tokens
 - [ ] Token revocation persists across restarts (requires sqlite/postgres-kysely)
 
 ## Federation

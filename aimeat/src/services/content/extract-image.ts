@@ -15,9 +15,19 @@
  *
  *   A failure in exifr is recorded in `errors.exif` and the picture still gets its format and its
  *   size from the IHDR chunk or from sniffImage (services/openrouter.ts).
- * @structure readImageFacts · opensAsSvg · readSvgFacts · svgRootAttributes · svgTitle · svgMetadata · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
+ *
+ *   exifr RUNS IN A WORKER under the time and memory limits of media-read-bounded.ts
+ *   (content_class.media_read_seconds, content_class.media_read_memory_mb). Past a limit the picture
+ *   keeps its format and size, and `errors.exif` names the limit and the setting. A PNG colour profile
+ *   that unpacks past half the memory limit is not read (`errors.icc`); the rest of the PNG is.
+ * @structure EXIF_READ · iccRefusedText · readImageFacts · opensAsSvg · readSvgFacts · svgRootAttributes · svgTitle · svgMetadata · svgLength · webpMetadataAsJpeg · app1 · pngHeader · isoOf · textOf
  * @usage const { facts, digitalSourceType, software, errors } = await readImageFacts(bytes, 'image/png');
  * @version-history
+ *   2026-11-01 — exifr runs in a worker under a time and a memory limit, and only the values in EXIF_READ
+ *     come back; a PNG colour profile that unpacks past half the memory limit is passed by
+ *     (secaudit2026oct31w2 round 12: readImageFacts:exifr-heif-zero-length-box-unbounded-loop,
+ *     exifr-icc-mluc-unbounded-entry-loop, exifr-png-iccp-inflate-unbounded-output,
+ *     exifr-tiff-value-count-aliasing-amplification). The facts of a picture within the limits are the same.
  *   2026-10-27 — readSvgFacts finds the <svg>, <title> and <metadata> tags in one pass with indexOf, and
  *     reads the AI mark and the creator tool with bounded runs that cannot overlap, from the first 1 MB
  *     of the metadata block; the old patterns rescanned the file per unclosed tag and tried every split
@@ -32,12 +42,42 @@
  *     neither gets no error. 349 of 1157 pictures on aimeat.io were WebP and all got "Unknown file format".
  *   v1.0.0 — 2026-10-20 — Initial.
  */
-import exifr from 'exifr';
 import { sniffImage } from '../openrouter.js';
 import { xmpIsBounded } from './xmp-shape.js';
+import { DEFAULT_MEDIA_READ_LIMITS, readExifrBounded, type MediaReadLimits } from './media-read-bounded.js';
 import type { ImageFacts } from './types.js';
 
 type Seg = Record<string, unknown>;
+
+/**
+ * Every exifr segment and key readImageFacts reads. Only these cross back from the worker, so a
+ * file whose tags repeat the same bytes many times costs the node's thread no more than the values
+ * read here. A new fact that reads another key adds it here.
+ */
+const EXIF_READ = {
+  ifd0: ['ImageWidth', 'ImageHeight', 'BitsPerSample', 'Orientation', 'Make', 'Model', 'Software', 'ModifyDate', 'Artist', 'Copyright', 'ImageDescription'],
+  exif: ['ExifImageWidth', 'ExifImageHeight', 'ColorSpace', 'LensModel', 'BodySerialNumber', 'ISO', 'FNumber', 'ExposureTime', 'FocalLength', 'Flash',
+    'DateTimeOriginal', 'OffsetTimeOriginal', 'CreateDate', 'OffsetTimeDigitized', 'OffsetTime'],
+  gps: ['latitude', 'longitude', 'GPSAltitude', 'GPSAltitudeRef'],
+  iptc: ['Byline', 'CopyrightNotice', 'Credit', 'ObjectName', 'Headline', 'Caption', 'DigitalSourceType'],
+  icc: ['ColorSpaceData', 'ProfileDescription'],
+  ihdr: ['ImageWidth', 'ImageHeight', 'BitDepth', 'Description'],
+  dc: ['creator', 'rights', 'title', 'description'],
+  // The raw XMP packet of the first read is a string and comes back whole.
+  xmp: ['CreatorTool', 'CreateDate', 'ModifyDate'],
+  photoshop: ['DateCreated', 'Credit', 'Headline'],
+  Iptc4xmpCore: ['AltTextAccessibility', 'DigitalSourceType'],
+  Iptc4xmpExt: ['DigitalSourceType'],
+  aux: ['Lens', 'SerialNumber'],
+  tiff: ['BitsPerSample', 'Orientation', 'Make', 'Model'],
+  exifEX: ['LensModel'],
+  xmpRights: ['UsageTerms'],
+} as const;
+
+/** errors.icc when a PNG's colour profile inflates past half the memory limit. */
+function iccRefusedText(limits: MediaReadLimits): string {
+  return `The colour profile unpacks to more than ${limits.memoryMb / 2} MB, half the memory limit, so it was not read. The operator can raise content_class.media_read_memory_mb.`;
+}
 
 const PNG_SIG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
@@ -248,9 +288,10 @@ function opensAsSvg(head: string): boolean {
  * The facts a picture carries about itself.
  * @param {Buffer} bytes - The file.
  * @param {string} mimeType - Its MIME type; the format is the subtype ("png", "jpeg").
+ * @param {MediaReadLimits} [limits] - The time and memory limits of the exifr read; the defaults when left out.
  * @returns {Promise<{facts: ImageFacts, digitalSourceType?: string, software?: string, errors: Record<string, string>}>}
  */
-export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
+export async function readImageFacts(bytes: Buffer, mimeType: string, limits: MediaReadLimits = DEFAULT_MEDIA_READ_LIMITS): Promise<{
   facts: ImageFacts; digitalSourceType?: string; software?: string; errors: Record<string, string>;
 }> {
   const errors: Record<string, string> = {};
@@ -272,14 +313,20 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
       tiff: true, ifd0: true, exif: true, gps: true, iptc: true, xmp: true, icc: true, ihdr: true,
       mergeOutput: false, reviveValues: false, translateValues: false, translateKeys: true,
     };
+    // exifr runs in a worker under the time and memory limits (media-read-bounded.ts), and only the
+    // values read below (EXIF_READ) come back.
     // The XMP packet comes out raw first, and exifr parses it only when its shape keeps exifr's
     // element search linear (xmp-shape.ts; secaudit2026oct26). A well-formed packet is then read
     // with the same options as before, so its facts are the same.
-    let parsed: unknown = await exifr.parse(source, { ...options, xmp: { parse: false } } as never);
+    let got = await readExifrBounded(source, { ...options, xmp: { parse: false } }, EXIF_READ, limits);
+    if (got.iccRefused) errors.icc = iccRefusedText(limits);
+    let parsed: unknown = got.parsed;
     const raw = parsed && typeof parsed === 'object' ? (parsed as { xmp?: unknown }).xmp : undefined;
     if (typeof raw === 'string' && raw) {
-      if (xmpIsBounded(raw)) parsed = await exifr.parse(source, options as never);
-      else {
+      if (xmpIsBounded(raw)) {
+        got = await readExifrBounded(source, options, EXIF_READ, limits);
+        parsed = got.parsed;
+      } else {
         delete (parsed as { xmp?: unknown }).xmp;
         errors.xmp = 'The XMP metadata is not well-formed XML, so it was not read.';
       }
@@ -289,7 +336,7 @@ export async function readImageFacts(bytes: Buffer, mimeType: string): Promise<{
     errors.exif = (err as Error).message || String(err);
   }
 
-  const seg = (name: string): Seg => (out[name] && typeof out[name] === 'object' ? out[name] : {});
+  const seg = (name: keyof typeof EXIF_READ): Seg => (out[name] && typeof out[name] === 'object' ? out[name] : {});
   const ifd0 = seg('ifd0');
   const exif = seg('exif');
   const gps = seg('gps');

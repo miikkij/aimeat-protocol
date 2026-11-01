@@ -39,8 +39,11 @@ audience of roles, groups or people) and detection rules:
 | `erittain-luottamuksellinen` (Highly confidential) | with a warning | yes | no | yes |
 
 A level's AI visibility can also be `hidden`; none of the shipped levels uses it. A level can also
-refuse an outside model (`externalAi: refused`): an AI still reads its content, but only a model on this
-machine. An agent whose model runs elsewhere finds such content absent, an AI call with a model that is
+refuse an outside model (`externalAi: refused`): an AI still reads its content, but only a `local`
+model. A `local` provider is one on this machine (a loopback address), or one the operator configures
+at an origin listed in `AIMEAT_AI_PROVIDER_EGRESS`, such as the organisation's own GPU server on its
+internal network; an owner's own provider counts as local only on loopback
+(`aimeat/src/services/ai/providers.ts`). An agent whose model runs elsewhere finds such content absent, an AI call with a model that is
 not `local:` is refused (`CLASSIFIED`), and no exception opens it. Only an agent whose runtime report
 says `llm: "local"` (`aimeat_agent_runtime_report`) reads it; the node records that claim and cannot
 check it. New content gets the policy's default label (Internal).
@@ -55,7 +58,7 @@ The operator switches two packs on from the admin Security page, or with `PUT /v
 | `tl` (Finnish security classes, laki 906/2019, VNA 1101/2019) | TL IV Käyttö rajoitettu, TL III Luottamuksellinen, TL II Salainen, TL I Erittäin salainen | 40, 50, 60, 70 |
 | `nato` | NATO RESTRICTED, NATO CONFIDENTIAL, NATO SECRET, COSMIC TOP SECRET | 45, 55, 65, 75 |
 
-Every class: an AI sees it with a warning and only a model on this machine reads it, every use is
+Every class: an AI sees it with a warning and only a `local` model (above) reads it, every use is
 audited, it never leaves its organism, lowering needs a reason, and it is shown to at most the
 organism's members. The need to know is the label's reader list (a group of cleared people). A pack's
 rules recognise its markings in upper case ("TL III", "ST II", "KÄYTTÖ RAJOITETTU", "NATO SECRET",

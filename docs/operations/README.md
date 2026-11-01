@@ -7,6 +7,7 @@ from the admin page and by an operator's AI with the `aimeat_admin_*` tools; the
 
 | You want to | Read |
 |---|---|
+| Hand an organisation's IT and security what they need to approve, install and run a node, with a go-live checklist | [IT adoption package](../it-adoption/README.md) |
 | Install and start a node | [Build and operate a node](../coding-guidelines/getting-started.md#build-and-operate-a-node) |
 | Put it on a public address: reverse proxy, TLS, wildcard names for apps, health checks | [Production deployment](production-deployment.md) |
 | Back it up and prove the backup restores | [Backup and restore](backup-and-restore.md) |

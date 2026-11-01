@@ -25,6 +25,10 @@
  *   const share = await readShareMetaOf(storage, config, orgId, ws);
  *   if (!isDocPublicAt(share, 'docs', docId)) …
  * @version-history
+ *   2026-11-01 — The publish gate and the label cap read end dates as the viewer does: a target whose
+ *     end has passed is not open, so giving it a new end or removing its end is asked about as an
+ *     opening (newlyOpened and shareCapRefusal take the call's time). The end check is shareEndPassed
+ *     in workspace-share-gate.ts (secaudit2026oct31w2 round 12, openTargets ended-until).
  *   v1.8.0 — 2026-10-20 — The public activity feed is told only when the stored share opens a target
  *     to anyone who has the link (newlyOpened on the share as stored, after the closed-node level and
  *     after a held-back opening). A flag edge under access 'organism', 'password' or 'account' used
@@ -67,7 +71,7 @@ import { isHtmlPageValue, HTML_PAGE_SHARE_DAYS } from './html-page.js';
 import { logger } from '../utils/logger.js';
 import { publishAskOf, type PublishAsk } from './publish-requests/ask.js';
 import type { PublishGateInput } from './publish-requests/door.js';
-import { newlyOpened, withholdOpening, fileShareAsk, shareCapRefusal } from './workspace-share-gate.js';
+import { newlyOpened, withholdOpening, fileShareAsk, shareCapRefusal, shareEndPassed } from './workspace-share-gate.js';
 import { capByOf } from './classification/audience-cap.js';
 import { closedNodeLevel, closedNodeWarnings } from './closed-node-level.js';
 
@@ -98,11 +102,7 @@ export function redactShareOf(share: ResolvedShare): Record<string, unknown> {
     };
 }
 
-const ended = (iso: string | undefined, nowMs: number): boolean => {
-    if (!iso) return false;
-    const t = Date.parse(iso);
-    return Number.isFinite(t) && t <= nowMs;
-};
+const ended = shareEndPassed;
 
 /**
  * Does the share open this page now? The most specific setting decides (the page's own, then its
@@ -277,14 +277,15 @@ export async function setWorkspaceShareOp(
     // The labels' audience cap (plan doc-mvdipuyqraas, L3.5): the workspace's label and each newly
     // shared page's cap the level, before the publish gate and before anything is stored.
     if (publishGate) {
-        const capped = await shareCapRefusal(deps, orgId, ws, prev, next, !!stored, capByOf(publishGate.caller));
+        const capped = await shareCapRefusal(deps, orgId, ws, prev, next, !!stored, capByOf(publishGate.caller), nowMs);
         if (capped) return refuse(capped.status, capped.code, capped.message);
     }
 
     // The publish gate (plan doc-mvcn6c7e4e5q, V4), before anything is stored: a change that lets
     // anyone with the link read what they could not, by a caller the node asks the owner about, is
-    // stored with that part held back (services/workspace-share-gate.ts).
-    const opened = publishGate ? newlyOpened(prev, next) : [];
+    // stored with that part held back (services/workspace-share-gate.ts). A target whose end date has
+    // passed is not open, so a new end or a removed end opens it (secaudit2026oct31w2 round 12).
+    const opened = publishGate ? newlyOpened(prev, next, nowMs) : [];
     let ask: Extract<PublishAsk, { kind: 'ask' }> | null = null;
     let held: Record<string, unknown> | null = null;
     if (opened.length && publishGate) {
@@ -316,8 +317,9 @@ export async function setWorkspaceShareOp(
     // share at one of those levels hands nothing to an anonymous reader, and announcing it on the
     // public feed named the organism, the workspace and both ids to readers who cannot open either
     // (secaudit 2026-10). services/public-activity.ts: a caller emits only when the underlying thing
-    // is genuinely public, with already-public fields.
-    if (newlyOpened(prev, next).length > 0) {
+    // is genuinely public, with already-public fields. End dates are not read here (null), as before:
+    // a target opened again after its end is not announced a second time.
+    if (newlyOpened(prev, next, null).length > 0) {
         const name = reg.entry.name ?? ws;
         void recordPublicActivity(storage, config, {
             category: 'organisms', actor: who.owner ?? '',
