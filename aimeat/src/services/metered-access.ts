@@ -31,6 +31,9 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.4.0 — 2026-11-01 — An outside party's call (caller `party:<owner>/<name>@<node>`) is settled
+ *     inside what it paid in advance, with no pacing; one that would charge again answers
+ *     `prepaid_ended` (plan doc-mvwxcas3dom3, D5.4).
  *   v1.3.2 — 2026-11-01 — The header states that a metered result goes to the buyer only (plan D7.5).
  *   v1.3.1 — 2026-10-31 — The contract's state, rate window, a grant's carried ceiling and the budget
  *     are asked before the pacing is charged, so a call they refuse moves no morsels; a settlement that
@@ -70,6 +73,7 @@ import {
 } from './metered-settlement.js';
 import { commerceFeePercent } from './marketplace-fee.js';
 import { recordUsageCall } from './usage/usage-buffer.js';
+import { isPartyRef } from './parties/contract.js';
 import type { UsageActorKind, UsageOutcome, UsageSurface } from '../storage/interface.js';
 
 /** The permission a hosted app needs before it may draw on its owner's contracts. */
@@ -113,6 +117,8 @@ export type MeteredOutcome =
   | { kind: 'refused_product'; entitlement: MeteredEntitlement; refusal: ProductRefusal }
   /** The payer could not cover the pacing toll or the price. */
   | { kind: 'insufficient'; entitlement: MeteredEntitlement | null; needed: number; carried: boolean }
+  /** An outside party's prepaid contract (a month, or a block of reads) is used up; it buys again. */
+  | { kind: 'prepaid_ended'; entitlement: MeteredEntitlement }
   /** Payment could not be moved; the caller was NOT charged. */
   | { kind: 'settlement_failed'; entitlement: MeteredEntitlement; reason: string }
   /**
@@ -387,6 +393,18 @@ async function decideMeteredCall(args: MeteredCallArgs): Promise<MeteredOutcome>
   }
 
   if (!budgetAllows(ent, decision.chargeUnits)) return { kind: 'refused_budget', entitlement: ent };
+
+  // 3b. An outside party (services/parties/) has no account to charge and no morsel balance: it paid
+  //     its contract in advance at the purchase (services/exchange-party-buy.ts). A call inside what it
+  //     paid is settled at 0 with no pacing (the party's own rate limit paces it); a call that would
+  //     charge again (a new month, a new block) is refused and the party buys again (plan D5.4).
+  if (isPartyRef(caller)) {
+    if (decision.chargeUnits > 0) return { kind: 'prepaid_ended', entitlement: ent };
+    const settled = await settleMeteredCharge({ config, storage, ent, caller, product, charge: 0, newPricing: decision.pricing });
+    if (settled.kind === 'insufficient') return { kind: 'prepaid_ended', entitlement: ent };
+    if (settled.kind === 'failed') return { kind: 'settlement_failed', entitlement: ent, reason: settled.reason };
+    return { kind: 'settled', entitlement: ent, charged: 0, refund: settled.refund, accrue: settled.accrue };
+  }
 
   // 4. Pacing, on every call the limits allow. The one brake that bounds RATE rather than total
   //    spend, which is the property a money budget does not have.

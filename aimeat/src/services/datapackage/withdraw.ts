@@ -26,6 +26,7 @@
  * @usage
  *   const out = await withdrawPackage({ storage, config }, callerOf(req, nodeId, storage), owner, name, { purge });
  * @version-history
+ *   v1.3.0 — 2026-11-01 — A package on EXCHANGE is delisted when it is withdrawn (runLatestHooks; plan D5.1).
  *   v1.2.0 — 2026-11-01 — The party of each share a withdrawal ends is mailed when it has an address
  *     (./share-notices.ts), and the withdrawal emits the `datapackages` change to the owner's streams
  *     (plan doc-mvwxcas3dom3, D6.2).
@@ -38,7 +39,7 @@
  */
 import type { StoreDeps } from './store.js';
 import { parseRef } from './store.js';
-import { readPointer, catalogueKeyRoot } from './version-audience.js';
+import { readPointer, catalogueKeyRoot, runLatestHooks } from './version-audience.js';
 import { datapackageReadable, fileVisibilityOf, type DatapackageReader } from './audience.js';
 import { latestKey, packageKeyRoot, validateName, type LatestPointer } from './contract.js';
 import { writeStorageFile } from '../storage-file-write.js';
@@ -159,6 +160,8 @@ export async function withdrawPackage(
         void noticeWithdrawn(deps, ownerGhii, name, ended)
             .catch(err => logger.warn('datapackage: the withdrawal notices failed', { package: packageId, error: String(err) }));
     }
+    // A package on EXCHANGE leaves the market with it; its contracts stay as they are (plan D5.1).
+    if (pointer.exchange) await runLatestHooks(storage, ownerGhii, name, { ...pointer, status: 'withdrawn', withdrawnAt });
     emitChange('files');
     emitChange(DATAPACKAGES_DOMAIN, ownerGhii);
     if (catalogueRemoved) emitChange('memory');

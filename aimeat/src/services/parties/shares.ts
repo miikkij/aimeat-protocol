@@ -33,6 +33,8 @@
  *   shareView
  * @usage const n = await normalizePartyShare(deps, caller, input); if (!n.ok) return n;
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A share may be bound to an EXCHANGE purchase (`contract`, node-written only):
+ *     its reads are metered against the purchase and cover the versions of its interface (plan D5.3, D5.4).
  *   v1.1.0 — 2026-11-01 — endSharesListed answers the shares it ended, so a withdrawal mails their
  *     parties (services/datapackage/share-notices.ts; plan D6.2).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D3; lead decision L3).
@@ -69,10 +71,15 @@ export interface ShareMeta {
     termsAcceptedAt?: string;
     declinedAt?: string;
     endedReason?: string;
+    /** The EXCHANGE purchase this share delivers (services/exchange-party-buy.ts): its reads are metered. */
+    contract?: ShareContract;
 }
 
+/** What binds a share to a contract: the offering bought and the interface version its reads cover. */
+export interface ShareContract { offeringId: string; entitlementId: string; ifaceVersion: number }
+
 /** The metadata keys the node writes on a share; a request's own values under them are dropped. */
-const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason'] as const;
+const NODE_KEYS = ['partyUid', 'pinnedVersion', 'allowUrlKey', 'termsRequired', 'termsAcceptedAt', 'declinedAt', 'endedReason', 'contract'] as const;
 
 export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
     const m = (c.metadata ?? {}) as Record<string, unknown>;
@@ -84,7 +91,14 @@ export function shareMetaOf(c: Pick<ConsentRecord, 'metadata'>): ShareMeta {
         ...(typeof m.termsAcceptedAt === 'string' ? { termsAcceptedAt: m.termsAcceptedAt } : {}),
         ...(typeof m.declinedAt === 'string' ? { declinedAt: m.declinedAt } : {}),
         ...(typeof m.endedReason === 'string' ? { endedReason: m.endedReason } : {}),
+        ...(contractOf(m.contract) ? { contract: contractOf(m.contract)! } : {}),
     };
+}
+
+function contractOf(v: unknown): ShareContract | null {
+    const c = v as Partial<ShareContract> | null | undefined;
+    return c && typeof c.offeringId === 'string' && typeof c.entitlementId === 'string' && typeof c.ifaceVersion === 'number'
+        ? { offeringId: c.offeringId, entitlementId: c.entitlementId, ifaceVersion: c.ifaceVersion } : null;
 }
 
 /** Active and not past its expiry. */
@@ -283,6 +297,7 @@ export function shareView(c: ConsentRecord, extra: Record<string, unknown> = {})
         terms_required: m.termsRequired, terms_accepted_at: m.termsAcceptedAt ?? null,
         ...(m.declinedAt ? { declined_at: m.declinedAt } : {}),
         ...(m.endedReason ? { ended_reason: m.endedReason } : {}),
+        ...(m.contract ? { contract: { offering_id: m.contract.offeringId, entitlement_id: m.contract.entitlementId, interface_version: m.contract.ifaceVersion } } : {}),
         ...extra,
     };
 }

@@ -24,6 +24,8 @@
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
+ *   v1.1.0 — 2026-11-01 — PARTY_TOKEN_ROUTES takes POST /v1/exchange/offerings/{id}/buy: a party buying a
+ *     data package again presents its own credential (plan D5.4).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2; lead decisions L1 and L3).
  */
 
@@ -108,6 +110,8 @@ export const PARTY_TOKEN_ROUTES: ReadonlyArray<{ methods: readonly string[]; pat
     { methods: ['GET', 'HEAD'], path: /^\/v1\/odata\/[^/]+\/[^/]+(?:\/[^/]+)?\/?$/ },
     { methods: ['GET', 'HEAD'], path: /^\/v1\/pub\/[^/]+\/datapkg\// },
     { methods: ['GET', 'POST'], path: /^\/v1\/parties\/me(?:\/.*)?$/ },
+    // A party buying a data package again tops up its contract (services/exchange-party-buy.ts, D5.4).
+    { methods: ['POST'], path: /^\/v1\/exchange\/offerings\/[^/]+\/buy\/?$/ },
 ];
 
 /** Does this endpoint take a party token? */

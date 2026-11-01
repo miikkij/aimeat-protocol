@@ -18,6 +18,8 @@
  *   Slices: B's own report holds none of A's findings; A's holds A's own; B cannot read the node report.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=data-intermediation
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The test actions return records: since D5.5 an offering's deliversData is
+ *     proposed from its output schema, and the gate this suite proves acts on data offerings.
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7).
  */
 import { registerOwner, setupOperator } from './helpers/owner-login.js';
@@ -55,7 +57,8 @@ console.log('\n=== AIMEAT data intermediation E2E ===\n');
 let OP = { name: '', token: '' }, A = { name: '', token: '' }, B = { name: '', token: '' }, C = { name: '', token: '' };
 const EXT = `dix${stamp}`;
 const SCRIPTS = { echo: 'export default async function(ctx, input){ return { echo: input }; }' };
-const action = (id: string) => ({ id, method: 'POST', path: `/${id}`, script: 'echo', input: { type: 'object', properties: { q: { type: 'string' } } }, output: { type: 'object', properties: { echo: {} } }, tollMorsels: 2 });
+// The output returns records, so the node proposes that each listing delivers data (plan D5.5).
+const action = (id: string) => ({ id, method: 'POST', path: `/${id}`, script: 'echo', input: { type: 'object', properties: { q: { type: 'string' } } }, output: { type: 'object', properties: { records: { type: 'array', items: { type: 'object' } } } }, tollMorsels: 2 });
 const MANIFEST = JSON.stringify({
     metadata: { name: EXT, version: '1.0.0', description: 'data intermediation e2e provider', author: 'e2e' },
     actions: [action('first'), action('second'), action('third')],

@@ -34,6 +34,7 @@
  * @structure descriptorToOdps · odpsVisibilityOf
  * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.3.1 -- 2026-11-01 -- The pricingPlans comment says the sheet's reader fills it from a listing (plan D5.1).
  *   v1.3.0 -- 2026-11-01 -- The SLA cadence is the freshness promise (a data product's schedule wins over
  *     the producer's), and x-aimeat.freshness states the package's state now (plan doc-mvwxcas3dom3, D6.1).
  *   v1.2.0 -- 2026-11-01 -- `dataHolder` from the owner's stated company (./data-holder.ts) and a
@@ -87,8 +88,8 @@ export interface OdpsProjectionInput {
     /** The legal entity behind the package, when the owner stated one (./data-holder.ts). Absent: no block. */
     dataHolder?: Record<string, string> | null;
     /**
-     * ODPS `pricingPlans`, when an offering sells this package. Nothing fills it yet: the package's own
-     * read has no price, and a sheet without plans says nothing is charged rather than inventing a plan.
+     * ODPS `pricingPlans`, when an EXCHANGE offering sells this package (./odps-read.ts fills it from the
+     * listing). A sheet without plans says nothing is charged rather than inventing a plan.
      */
     pricingPlans?: Record<string, unknown> | null;
     /**

@@ -13,6 +13,7 @@
  *            the shipped default agent scopes, the admin setup route closed after the first operator
  *            and the production rate limits, except the groups a listed suite keeps (QA audit P1-01,
  *            P1-08, P7-03, P7-05, F03a-02, S1-08, F7d). AIMEAT_E2E_SERVER_READY_MS sets the start budget.
+ *   v1.9.4 -- 2026-11-01 -- e2e-exchange-datapackage joins ANONYMOUS_OFF_SUITES (plan doc-mvwxcas3dom3, D5.4).
  *   v1.9.3 -- 2026-11-01 -- e2e-party and e2e-data-share join ANONYMOUS_OFF_SUITES (outside parties; plan
  *            doc-mvwxcas3dom3, D2, D3).
  *   v1.9.2 -- 2026-10-16 -- e2e-session-forgery joins ANONYMOUS_OFF_SUITES (three green runs alone on
@@ -226,6 +227,8 @@ export const ANONYMOUS_OFF_SUITES: readonly string[] = [
     // with it off (plan doc-mvwxcas3dom3, lead decision L2). Not yet measured three times green alone.
     'e2e-party',
     'e2e-data-share',
+    // A party credential refused on the buy endpoint, as above (plan D5.4). Not yet measured three times.
+    'e2e-exchange-datapackage',
 ];
 
 /** AIMEAT_ANONYMOUS for the node a suite runs against: 'false' for a listed suite, else the default. */

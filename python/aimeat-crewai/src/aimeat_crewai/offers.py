@@ -97,6 +97,7 @@ def build_offer(
     price: dict[str, Any] | None = None,
     visibility: str | None = None,
     callable: dict[str, Any] | None = None,
+    delivers_data: bool | None = None,
     **extra: Any,
 ) -> dict[str, Any]:
     """Assemble one offer dict, dropping keys left as None so the result stays
@@ -114,6 +115,9 @@ def build_offer(
     reads it as pacing until 4.0.0 and refuses it after; here it is turned into
     ``tollMorsels`` (added to ``toll_morsels``) with a DeprecationWarning, so the
     document never carries it.
+
+    ``delivers_data`` says whether the work, sold on EXCHANGE, delivers data
+    (``deliversData``); left out, the node reads agent work as a service.
 
     ``deliverable`` is required (0.36.0), as the node's OfferSchema requires it:
     ``{"format": <one of DELIVERABLE_FORMATS>, "location": {...}?, "sample": ...?}``.
@@ -145,6 +149,7 @@ def build_offer(
         "tollMorsels": toll_morsels,
         "visibility": visibility,
         "callable": callable,
+        "deliversData": delivers_data,
     }
     for k, v in optional.items():
         if v is not None:

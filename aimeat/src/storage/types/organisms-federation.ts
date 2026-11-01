@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.16.0 — 2026-11-01 — An extension action's `commercial` takes `deliversData`, the provider's
+ *     statement that its EXCHANGE listing delivers data (plan doc-mvwxcas3dom3, D5.5).
  *   v1.15.0 — 2026-11-01 — ScheduledJobRecord and ExecutionLogEntry take the type 'dataproduct': one data
  *     product build per fire, input { name } (services/dataproduct/; plan doc-mvwxcas3dom3, D9.5).
  *   v1.14.1 — 2026-10-23 — PeeringRequestRecord.status takes `revoked` (services/peer-origin.ts
@@ -445,6 +447,8 @@ export interface ExtensionRecord {
        * this action; flag off → the projected listing is delisted. CONTRACTS are never affected.
        */
       exchange?: boolean;
+      /** The provider's statement that the listing delivers data (plan D5.5); absent, the node proposes it. */
+      deliversData?: boolean;
       /** Usage licence surfaced on the projected offering (required to list — the legibility gate). */
       usageTerms?: { derivatives?: boolean; resale?: boolean; attribution?: boolean; note?: string };
       /** Provenance attestation carried onto the projected offering + its ODPS v4.0 document. */

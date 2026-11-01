@@ -13,6 +13,10 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.9.0 — 2026-11-01 — A datapackage offering's detail and ODPS document name its pinned Table Schemas,
+ *     its reads and the purchase address for an outside party; a hand listing of an ext-action carries
+ *     `deliversData` (the request's, the action's, else the node's proposal from the output schema), and
+ *     the data intermediation gate reads it (plan doc-mvwxcas3dom3, D5.1, D5.4, D5.5).
  *   v1.8.0 — 2026-11-01 — POST /v1/exchange/offerings of an ext-action (which delivers data) answers 403
  *     DATA_INTERMEDIATION_NOT_OFFERED before any write when AIMEAT_DATA_INTERMEDIATION is none, or owners
  *     and the provider declared no notification (services/data-intermediation/gate.ts; plan D7.1).
@@ -68,7 +72,9 @@ import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } 
 import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
 import { AppToolsDocSchema, appToolsKey, toolMoneyPrices } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
-import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
+import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled } from '../services/exchange-projection.js';
+import { migrateLegacyOfferings } from '../services/exchange-projection-migrate.js';
+import { proposeDeliversData, packageIfaceApp, DATAPACKAGE_ACTION } from '../services/exchange-datapackage.js';
 import { logger } from '../utils/logger.js';
 import { findExtension, addressSegment } from '../services/component-address.js';
 import { dataListingRefusal } from '../services/data-intermediation/gate.js';
@@ -345,16 +351,19 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const dupExt = await refuseDuplicate(`ext:${ext}:${action}`, 'ext-action');
     if (dupExt) return dupExt;
-    // An extension action delivers data, and a listing reaches everyone: on a node that runs no data
-    // intermediation service it is refused before anything is written (plan D7.1).
-    const notIntermediated = await dataListingRefusal({ storage, config }, { providerOwner: owner, kind: 'ext-action' });
+    // Whether it delivers data: the request's, else the action's own statement, else the node's proposal
+    // from its output schema (plan D5.5). A listing of data reaches everyone, so on a node that runs no
+    // data intermediation service it is refused before anything is written (plan D7.1).
+    const deliversData = typeof b.delivers_data === 'boolean' ? b.delivers_data
+      : (act.commercial as { deliversData?: boolean } | undefined)?.deliversData ?? proposeDeliversData('ext-action', act.outputSchema);
+    const notIntermediated = await dataListingRefusal({ storage, config }, { providerOwner: owner, kind: 'ext-action', deliversData });
     if (notIntermediated) return res.status(notIntermediated.status).json(error(config.nodeId, notIntermediated.code, notIntermediated.message, undefined, { setting: 'AIMEAT_DATA_INTERMEDIATION' }));
     const now = new Date().toISOString();
     const offering: Offering = {
       offeringId: newOfferingId(),
       providerGhii: resolveIdentity(req.auth!, config.nodeId),
       providerOwner: owner,
-      kind: 'ext-action', surface: null,
+      kind: 'ext-action', surface: null, deliversData,
       ext, action,
       capabilityBinding: `ext:${ext}:${action}`,
       title: str(b.title) || `${ext}/${action}`,
@@ -424,6 +433,27 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           body: `{ "offering_id": "${o.offeringId}", "input": { … } }`,
           auth: 'Your own AIMEAT token — the accepted contract authorises starting work; no separate API key.',
           note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + rake against your budget).`,
+        },
+        stats, tollMorsels,
+      };
+    }
+
+    // datapackage: the interface is the pinned Table Schemas; the reads are the OData feed, the rows and the
+    // CSV, admitted by the contract (an account) or by the named share a purchase made (an outside party).
+    if (o.kind === 'datapackage' && o.surface?.kind === 'datapackage') {
+      const s = o.surface;
+      const iface = await getInterfaceVersion(storage, o.providerGhii, packageIfaceApp(s.packageName), DATAPACKAGE_ACTION, s.ifaceVersion);
+      const path = `${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.packageName)}`;
+      return {
+        capability: { kind: 'datapackage', package: `pkg:${s.ownerName}/${s.packageName}`, iface_version: s.ifaceVersion, model: s.model,
+          ...(iface ? { schemas: iface.outputSchema } : {}), odps_url: `/v1/datapackages/${path}/odps` },
+        iface: iface ? { inputSchema: {}, outputSchema: iface.outputSchema } : null,
+        callRecipe: {
+          method: 'GET', url: `/v1/odata/${path}`,
+          rows: `/v1/datapackages/${path}/rows/{resource}`, csv: `/v1/datapackages/${path}/rows/{resource}?format=csv`,
+          auth: 'An account reads with its own AIMEAT token and its contract; an outside party with the key of the connection file its purchase gave (HTTP Basic or POST /v1/parties/token).',
+          note: `One metered read is one OData entity set, row window or CSV request. The descriptor, the versions and the metadata are not charged. The contract reads the versions with the schemas of interface v${s.ifaceVersion}.`,
+          buy: `POST /v1/exchange/offerings/${o.offeringId}/buy`,
         },
         stats, tollMorsels,
       };

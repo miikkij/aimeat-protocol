@@ -10,13 +10,16 @@
  *   by the plan's reading of art. 2(11) and recital 28, and cites them; a person decides (the finding's
  *   source is `proposed` until a review in the compliance document `intermediation` says otherwise).
  *
- *   WHICH OFFERING DELIVERS DATA. An offering states it with `deliversData` (plan D5.5). Until an
- *   offering carries the field, an `ext-action` offering and a `datapackage` offering are read as data,
- *   and an app tool and agent work as a service.
+ *   WHICH OFFERING DELIVERS DATA. Every offering carries `deliversData` (plan D5.5): the provider's
+ *   statement on its source, else the node's proposal (services/exchange-datapackage.ts
+ *   proposeDeliversData: a data package, and an action or tool whose output schema returns rows or
+ *   records). A listing made before the field existed is read by its kind until its next projection
+ *   writes the field: an `ext-action` and a `datapackage` as data, an app tool and agent work as a service.
  * @structure DGA_REFS · DgaRef · FindingKind · IntermediationFinding · Art12Status · Art12Row ·
  *   offeringDeliversData · INTERMEDIATION_FINDING_KINDS
  * @usage if (offeringDeliversData(o)) refuse();
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The offering's `deliversData` decides; the kind only for a listing written before it (plan D5.5).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7.1, D7.3, D7.4).
  */
 
