@@ -16344,11 +16344,10 @@
       "more": "Näytä vanhemmat",
       "operator": "Palvelun ylläpitäjä",
       "someone": "Joku",
-      "used": "käytti toimintoa {code}",
       "line": "{who} {what}",
       "lineTarget": "{who} {what}: {target}",
       "failed": "(ei onnistunut)",
-      "showReads": "Näytä myös tietojen lukemiset",
+      "showReads": "Näytä myös tietojen lukemiset ja rutiinikirjaukset",
       "did": {
         "sentRequest": "lähetti Rakennamme kanssasi -pyynnön",
         "checkedRequest": "tarkisti Rakennamme kanssasi -pyynnön tilan",
@@ -16358,7 +16357,19 @@
         "askedChat": "kysyi chatissa",
         "savedNote": "tallensi muistiinpanon",
         "wroteDoc": "kirjoitti dokumentin työtilaan",
-        "uploadedFile": "latasi tiedoston"
+        "uploadedFile": "latasi tiedoston",
+        "deletedNote": "poisti muistiinpanon",
+        "gaveTask": "antoi tehtävän",
+        "startedTask": "aloitti tehtävän",
+        "reportedTask": "kertoi tehtävän etenemisestä",
+        "finishedTask": "sai tehtävän valmiiksi",
+        "failedTask": "ei saanut tehtävää valmiiksi",
+        "declinedTask": "kieltäytyi tehtävästä",
+        "changedTask": "muutti tehtävää",
+        "sentMessage": "lähetti viestin",
+        "readData": "luki tietoja",
+        "openedPage": "avasi sivun",
+        "madeChange": "teki muutoksen"
       }
     },
     "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",

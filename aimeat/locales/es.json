@@ -14491,11 +14491,10 @@
       "more": "Mostrar anteriores",
       "operator": "Quien gestiona el servicio",
       "someone": "Alguien",
-      "used": "usó {code}",
       "line": "{who} {what}",
       "lineTarget": "{who} {what}: {target}",
       "failed": "(no se completó)",
-      "showReads": "Mostrar también las consultas",
+      "showReads": "Mostrar también las consultas y los registros rutinarios",
       "did": {
         "sentRequest": "envió la solicitud de «Lo construimos contigo»",
         "checkedRequest": "consultó el estado de la solicitud de «Lo construimos contigo»",
@@ -14505,7 +14504,19 @@
         "askedChat": "preguntó en el chat",
         "savedNote": "guardó una nota",
         "wroteDoc": "escribió un documento en el espacio de trabajo",
-        "uploadedFile": "subió un archivo"
+        "uploadedFile": "subió un archivo",
+        "deletedNote": "borró una nota",
+        "gaveTask": "encargó una tarea",
+        "startedTask": "empezó una tarea",
+        "reportedTask": "informó del avance de una tarea",
+        "finishedTask": "terminó una tarea",
+        "failedTask": "no pudo terminar una tarea",
+        "declinedTask": "rechazó una tarea",
+        "changedTask": "cambió una tarea",
+        "sentMessage": "envió un mensaje",
+        "readData": "consultó datos",
+        "openedPage": "abrió una página",
+        "madeChange": "hizo un cambio"
       }
     },
     "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
