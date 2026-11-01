@@ -1205,6 +1205,9 @@
       // The owner allows another account's capability to have their outside app run one action
       // (services/eco-capability-approvals.ts). A spaRoute in routes/portal.ts too, or F5 is a 404.
       '/v1/eco-capability-allow': () => import('/views/eco-capability-allow.js' + B),
+      // A share link a person with no account opens (services/parties/invite.ts, WP9b). In
+      // data/spa-page-paths.ts too, or F5 is a 404.
+      '/v1/shared-data': () => import('/views/shared-data.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
       '/v1/classic':     () => import('/views/portal-classic.js' + B),
       '/v1/portfolio':   () => import('/views/portfolio.js' + B),
@@ -1296,6 +1299,10 @@
       // Portfolio public view: /v1/portfolio/<username>
       if (pathname.startsWith('/v1/portfolio/') && pathname !== '/v1/portfolio/') {
         return () => import('/views/portfolio.js' + B);
+      }
+      // The public dataset page of one data package: /v1/dataset/<owner>/<name> (routes/portal.ts, WP9b)
+      if (/^\/v1\/dataset\/[^/]+\/[^/]+\/?$/.test(pathname)) {
+        return () => import('/views/dataset.js' + B);
       }
       // One app's "Use with your AI" guide: /v1/use-with-ai/<owner>/<file>
       if (/^\/v1\/use-with-ai\/[^/]+\/[^/]+\/?$/.test(pathname)) {

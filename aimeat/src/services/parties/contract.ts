@@ -24,7 +24,7 @@
  *   MAX_PARTIES · MAX_KEYS_PER_PARTY · isPartyRef · PARTY_TOKEN_ROUTES · takesPartyToken
  * @usage const ref = partyRefOf('alice', 'matti', config.nodeId);   // party:alice/matti@node
  * @version-history
- *   v1.4.0 — 2026-11-01 — A party holds the one-time links its owner sent (`invites`, PartyInvite;
+ *   v1.4.0 — 2026-11-01 — A party holds the one-time links its owner sent (`shareLinks`, PartyInvite;
  *     ./invite.ts), and the owner's view lists them without their hashes; "invites" is a reserved name
  *     (WP9b).
  *   v1.3.0 — 2026-11-01 — A data space participant (kind `dataspace`) carries its `did` and credential
@@ -98,7 +98,7 @@ export interface PartyRecord {
     failedAttempts: number;
     lastSeenAt: string | null;
     /** The one-time links the owner sent for its shares (./invite.ts). The code itself is never stored. */
-    invites?: PartyInvite[];
+    shareLinks?: PartyInvite[];
 }
 
 /**
@@ -245,6 +245,6 @@ export function partyView(p: PartyRecord, ref: string): Record<string, unknown> 
         keys: p.keys.map(k => ({ id: k.id, created_at: k.createdAt, last_used_at: k.lastUsedAt, expires_at: k.expiresAt ?? null, ...(k.transfer ? { dsp_transfer: k.transfer } : {}) })),
         failed_attempts: p.failedAttempts ?? 0,
         last_seen_at: p.lastSeenAt ?? null,
-        ...(p.invites?.length ? { invites: p.invites.map(i => ({ id: i.id, share: i.share, created_at: i.createdAt, expires_at: i.expiresAt, used_at: i.usedAt ?? null })) } : {}),
+        ...(p.shareLinks?.length ? { share_links: p.shareLinks.map(i => ({ id: i.id, share: i.share, created_at: i.createdAt, expires_at: i.expiresAt, used_at: i.usedAt ?? null })) } : {}),
     };
 }

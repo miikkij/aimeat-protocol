@@ -6,6 +6,7 @@
  *   list mirrors MCP_SURFACES.admin. Operator/owner governance — the operator tools are offered only
  *   to an operator's agent holding the operator:admin permission, and ask again at call time.
  * @version-history
+ *   v1.31.0 -- 2026-11-01 -- aimeat_admin_app_party_registrations: the apps that ask to let people register, and the decision (WP9b).
  *   v1.30.0 -- 2026-11-01 -- Data intermediation: the setting, section 12 of the report and the part
  *     `intermediation` (plan doc-mvwxcas3dom3, D7).
  *   v1.29.0 -- 2026-10-31 -- A store test's browser_access and the CORS rule it gives.
@@ -190,6 +191,12 @@ version at opening and now), what waits for a decision, and the owners who open 
 owner); \`aimeat_app_internet_close\` with \`owner\` closes any opening; \`aimeat_admin_internet_opener_set\`
 lets an owner open on their own or takes that back. Decide only as the operator says. How apps are
 opened is the setting \`visibility.app_internet_opening\` (operator, self, off).
+
+When \`consent.party_self_registration\` is apps-ask, an app's owner asks to let people register to it
+without an account here. \`aimeat_admin_app_party_registrations\` lists the apps that asked (state
+requested, open or refused) and, with \`action: "decide"\`, approves or refuses one (\`owner\`, \`app\`,
+\`decision\`, \`reason\`). Decide only as the operator says; the Config page's group Data out shows the
+same list.
 
 **Where stored files keep their bytes (operator).** By default the node's database holds them. The
 operator can send new files to one S3 bucket (Amazon S3, Cloudflare R2, Hetzner, Backblaze B2 or any

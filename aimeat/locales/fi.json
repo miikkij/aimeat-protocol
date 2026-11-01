@@ -4293,6 +4293,83 @@
         "app-scan-listed-only": "Raportti lukee niiden sovellusten datakartat, jotka luettelo näyttää, sekä jokaisen sovelluksen, jolla on rekisteri. Syrjään siirretty tai piilotettu sovellus luetaan vain, jos sillä on rekisteri.",
         "federation-peers-not-processors": "Kumppaniasennukset eivät ole käsittelijöiden luettelossa. Toiseen asennukseen lähtevän kopion pysäyttää sen luokitus (se ei saa lähteä yhteisestä paikastaan). Sitä ei kirjata siirroksi."
       },
+      "di": {
+        "title": "Datanvälitys",
+        "lead": "Tämä osio kertoo, välittääkö tämä asennus dataa muiden puolesta (datahallintosäädös 2022/868), mitä siitä on havaittu ja mitkä 12 artiklan ehdot täyttyvät. Havainto on ehdotus, kunnes ihminen hyväksyy sen.",
+        "modeLine": "Tila: {mode}",
+        "mode": { "di-mode-report": "Seuranta", "di-mode-none": "Ei välitystä", "di-mode-node": "Asennus välittää", "di-mode-owners": "Omistajat välittävät" },
+        "modeText": {
+          "di-mode-report": "Mitään ei hylätä. Osio luettelee, mikä tässä asennuksessa voisi olla datanvälitystä, ja ihminen päättää.",
+          "di-mode-none": "Tämä asennus ei välitä dataa. Dataa toimittavaa tarjousta ei näytetä kaikille, ja data menee vain nimetyille vastaanottajille.",
+          "di-mode-node": "Ylläpitäjä tarjoaa datanvälityspalvelun ja pitää alla olevaa ilmoituksen tietoa.",
+          "di-mode-owners": "Asennus on työkalu. Omistaja tai organismi, joka on ilmoittautunut palvelun tarjoajaksi, voi pitää avointa datamarkkinapaikkaa. Muille pätee sama kuin tilassa Ei välitystä."
+        },
+        "changeSetting": "Muuta asetusta",
+        "fig": {
+          "offerings": "Dataa toimittavat tarjoukset", "offeringsSub": "EXCHANGEssa kaikille",
+          "buyers": "Ulkopuoliset ostajat", "buyersSub": "sopimuksia toisen tilin tai ulkopuolisen kanssa",
+          "organisms": "Avoimet organismit", "organismsSub": "kuka tahansa voi liittyä; jaettuja datapaketteja {n}",
+          "apps": "Avoin rekisteröinti ja kauppa", "appsSub": "sovelluksia"
+        },
+        "proposalsTitle": "Ehdotukset",
+        "proposalsNone": "Tässä asennuksessa ei nyt näy mitään, mikä olisi datanvälitystä.",
+        "finding": {
+          "di-data-offering-public": { "title": "EXCHANGEssa näkyy kaikille dataa toimittavia tarjouksia: {n}.", "why": "Markkinapaikka, jolla kuka tahansa tarjoaa dataa kenelle tahansa, on säädöksen oma esimerkki datanvälityksestä." },
+          "di-contract-outside-buyer": { "title": "Sopimuksia, jotka myyvät dataa toiselle tilille tai ulkopuoliselle: {n}.", "why": "Asennus säilyttää sopimuksen, joten se tietää kaupallisesta suhteesta, jonka se loi. Se on enemmän kuin tekninen työkalu." },
+          "di-open-organism-with-data": { "title": "Organismiin {name} voi liittyä kuka tahansa, ja sen jäsenille on jaettu datapaketteja: {n}.", "why": "Kaikille avoin ryhmä ei ole suljettu ryhmä. Ryhmä, johon liitytään hyväksynnällä, voi olla." },
+          "di-app-open-registration": { "title": "Sovelluksia, joihin ulkopuoliset voivat rekisteröityä ja jotka myyvät heille: {n}.", "why": "Sovelluksen omistaja voi olla markkinapaikan tarjoaja." },
+          "di-priced-named-share": { "title": "Hinnoiteltuja nimettyjä jakoja ulkopuoliselle: {n}.", "why": "Asennus tietää kaupasta. Maksuton jako nimetylle vastaanottajalle on datan haltijan tekninen työkalu." },
+          "di-person-party-contact": { "title": "Tilin {owner} ulkopuolisia osapuolia, jotka ovat henkilöitä ja joilla on yhteystieto: {n}.", "why": "Yhteystieto on henkilötieto, jota tili pitää, ja tili on sen rekisterinpitäjä. Se kuuluu tilin selosteeseen käsittelytoimista." },
+          "di-notification-missing": { "title": "Ilmoitusta ei ole kirjattu.", "whyNode": "Asennus on asetettu tarjoamaan datanvälityspalvelua. Palvelun tarjoaja ilmoittaa viranomaiselle ennen kuin aloittaa.", "whyOwners": "Asennus antaa ilmoittautuneiden tarjoajien pitää markkinapaikkoja, mutta yksikään omistaja tai organismi ei ole ilmoittautunut." },
+          "di-node-ai-reads-exchanged": { "title": "EXCHANGEssa myydään datapaketteja, ja asennus luokittelee samalla tallennettuja tiedostoja: {n}.", "why": "Luokittelu lukee tiedoston sisällön. Palvelun tarjoaja käyttää välittämäänsä dataa vain siihen, että se on käyttäjien saatavilla." }
+        },
+        "proposal": {
+          "require_approval": "Ehdotus: organismiin liitytään hyväksynnällä. Organismin perustaja tai ylläpitäjä muuttaa asetuksen. Asennus ei muuta sitä itse.",
+          "record_processing": "Ehdotus: lisää ulkopuoliset osapuolet sen organismin tai sovelluksen selosteeseen käsittelytoimista, jota varten heitä pidetään: keitä he ovat, miksi yhteystieto säilytetään ja kuinka kauan. Poista osapuoli, kun sille ei enää jaeta mitään.",
+          "record_notification": "Ehdotus: kirjaa ilmoitus: oikeushenkilö, sen Y-tunnus, milloin se ilmoitti viranomaiselle ja minkä viitteen se sai."
+        },
+        "mark": { "proposal": "ehdotus", "accepted": "hyväksytty", "dismissed": "ei koske" },
+        "accept": "Hyväksy",
+        "dismiss": "Ei koske",
+        "reviewAccepted": "Hyväksytty. Havainto on nyt sinun päätöksesi.",
+        "reviewDismissed": "Merkitty: ei koske.",
+        "reviewFailed": "Päätöstä ei tallennettu.",
+        "art12Title": "12 artiklan ehdot ja tämän asennuksen todisteet",
+        "col": { "point": "Kohta", "requirement": "Vaatimus", "evidence": "Todiste tässä asennuksessa", "state": "Tila" },
+        "state": { "evidence": "✓ todiste", "check": "tarkista", "missing": "puuttuu" },
+        "art12": {
+          "a": { "title": "Välitettyä dataa ei käytetä muuhun; erillinen oikeushenkilö", "text": "Asennuksen analytiikka tai tekoäly ei lue EXCHANGEn kautta toimitettua dataa. Mitattu tulos menee vain ostajalle. Ihminen vahvistaa, että palvelua tarjoaa erillinen oikeushenkilö.", "textMissing": "Asennuksen analytiikka tai tekoäly ei lue EXCHANGEn kautta toimitettua dataa. Tarjoajaa ei ole kirjattu." },
+          "c": { "title": "Käytön metatieto vain palvelun tarpeisiin", "text": "Jokainen ulkopuolisen osapuolen luku kirjataan datan haltijalle. Lokia käytetään vain haltijan omaan näkymään ja väärinkäytön rajoihin." },
+          "d": { "title": "Data siinä muodossa, jossa se saatiin", "text": "Jokainen datapaketti pitää CSV:nsä ja Table Schema -kuvauksensa julkaistussa muodossa pysyvässä osoitteessa ja kirjaa lähteensä ja muunnoksensa (paketteja {n})." },
+          "h": { "title": "Jatkuvuus ja datan siirto, jos palvelu päättyy", "text": "Haltija vie minkä tahansa paketin yhteysohjeineen, ja jokainen versio pysyy pysyvässä osoitteessaan haltijan säilytyssääntöjen mukaan." },
+          "i": {
+            "title": "Yhteentoimivuus avoimilla standardeilla",
+            "textOpen": "DCAT-AP-syöte, ODPS-kuvaukset, Frictionless-kuvaukset ja OData-syötteet kuvaavat ja jakavat jokaisen paketin. Dataspace Protocol ei ole päällä.",
+            "textOpenDsp": "DCAT-AP-syöte, ODPS-kuvaukset, Frictionless-kuvaukset ja OData-syötteet kuvaavat ja jakavat jokaisen paketin. Dataspace Protocol on päällä.",
+            "textClosed": "Asennus ei näytä mitään ulkopuolisille kerääjille, joten DCAT-syöte on tyhjä. ODPS, Frictionless ja OData jakavat jokaisen paketin. Dataspace Protocol ei ole päällä.",
+            "textClosedDsp": "Asennus ei näytä mitään ulkopuolisille kerääjille, joten DCAT-syöte on tyhjä. ODPS, Frictionless ja OData jakavat jokaisen paketin. Dataspace Protocol on päällä."
+          },
+          "k": { "title": "Luvaton pääsy ilmoitetaan datan haltijalle", "text": "Tietoturvaloukkaukset kirjataan tietoturvaloukkausten asiakirjaan (kirjattu {n}). Ihminen vahvistaa, että haltijoille kerrotaan viipymättä." },
+          "n": { "title": "Suostumuksen työkalut", "text": "Haltijat antavat, näkevät ja perovat jokaisen suostumuksen ja nimetyn jaon, ja peruttu jako hylkää seuraavan luvun (suostumuksia {consents}, voimassa olevia nimettyjä jakoja {shares}).", "textOff": "Suostumukset eivät ole käytössä tässä asennuksessa (AIMEAT_CONSENT_ENABLED)." },
+          "o": { "title": "Toiminnan loki", "text": "Suostumusten käyttö kirjataan ja säilytetään {days} päivää, ja jokainen ulkopuolisen osapuolen luku kirjataan." }
+        },
+        "notif": {
+          "title": "Ilmoitus Traficomille",
+          "provider": "Tarjoaja", "noProvider": "Oikeushenkilöä ei ole kirjattu", "notified": "Ilmoitettu", "ref": "Traficomin viite",
+          "euRegister": "EU-rekisteri", "confirmed": "Vahvistus", "scope": "Mitä palvelu kattaa",
+          "organismProvider": "Tarjoaja organismissa", "notifiedOn": "ilmoitettu {date}",
+          "record": "Kirjaa ilmoitus", "edit": "Muuta ilmoitusta",
+          "formTitle": "Datanvälityspalvelun ilmoitus",
+          "formLead": "Kirjaa ilmoitus, jonka palvelun tarjoaja teki Traficomille ennen kuin palvelu alkoi.",
+          "legalName": "Oikeushenkilö", "businessId": "Y-tunnus", "notifiedAt": "Ilmoituspäivä", "authorityRef": "Traficomin viite",
+          "euRegisterUrl": "Merkintä EU-rekisterissä (osoite)", "confirmedAt": "Vahvistuspäivä",
+          "scopePlaceholder": "Esimerkiksi: tämän asennuksen EXCHANGE-datamarkkinapaikka",
+          "save": "Tallenna", "cancel": "Peruuta", "saved": "Ilmoitus on kirjattu.", "failed": "Ilmoitusta ei tallennettu."
+        },
+        "notYet": "ei vielä",
+        "aside": "Tämä on tulkinta, ei oikeudellinen lausunto. Ilmoitus tehdään ennen kuin välitys alkaa, eikä lupaa tarvita. Traficom vahvistaa ilmoituksen pyynnöstä viikossa. Osio on myös Compliance-tulosteessa.",
+        "print": { "mode": "Tila", "finding": "Havainto", "regulation": "Säädös", "decision": "Päätös" }
+      },
       "gapFonts": "Fontit ilman lisenssitietoa",
       "toFonts": "Fontteihin",
       "records": {
@@ -5584,7 +5661,17 @@
       "openPrivate": "Osoitteet vaativat kirjautumisen. Sinä luet ne omalla tunnuksellasi. Se, jolle jaat, lukee ne oman jakonsa avaimella.",
       "openPublic": "Kuka tahansa voi lukea osoitteet kirjautumatta.",
       "toolLabel": "Ohjelma",
-      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Oma tekoäly" },
+      "tool": { "excel": "Excel", "powerbi": "Power BI", "duckdb": "DuckDB", "pandas": "pandas", "ai": "Oma tekoäly", "office": "Excel ja Power BI", "python": "Python", "mcp": "Oma tekoäly (MCP)" },
+      "user": "Käyttäjänimesi", "openYours": "Osoitteet vaativat nimesi ja avaimesi. Excel ja Power BI kysyvät ne. DuckDB ja pandas käyttävät tokenia, jonka saat niillä.",
+      "basicYours": "Valitse Perus: käyttäjä on {user}, salasana on avaimesi", "anonymous": "Valitse Anonyymi: kirjautumista ei tarvita",
+      "duckdbOpen": "Lue CSV-osoite suoraan. Kirjautumista ei tarvita.", "pandasOpen": "pandas lukee CSV-osoitteen suoraan. Kirjautumista ei tarvita.",
+      "mcpAddress": "Tämän palvelimen MCP-osoite on {url}",
+      "afterPublic": {
+        "office": "Päivitä-painike hakee uusimman version. Myös Power BI -palvelun ajastettu päivitys toimii, koska osoite on julkinen.",
+        "duckdb": "Osoite seuraa uusinta versiota. Kuvaus (datapackage.json) antaa jokaiselle versiolle pysyvän osoitteen.",
+        "python": "Osoite seuraa uusinta versiota. Lue iso taulu sivu kerrallaan parametreilla offset ja limit.",
+        "mcp": "Tekoälysi löytää aineiston tämän palvelimen katalogista ja lukee sen rivit."
+      },
       "excel1": "Tiedot › Nouda tiedot › Muista lähteistä › OData-syötteestä", "excel2": "Liitä OData-syötteen osoite: {url}", "excel3": "Valitse Perus: käyttäjä on jaon nimi (omistaja/osapuoli), salasana on avain", "excel4": "Valitse taulu {table} › Lataa",
       "powerbi1": "Nouda tiedot › OData-syöte", "powerbi2": "Liitä OData-syötteen osoite: {url}", "powerbi3": "Valitse Perus: käyttäjä on jaon nimi (omistaja/osapuoli), salasana on avain", "powerbi4": "Valitse taulu {table} › Lataa",
       "duckdb1": "Hae token jaon nimellä ja avaimella osoitteesta {url}", "duckdb2": "Laita token alla olevaan salaisuuteen ja lue CSV",
@@ -5595,6 +5682,61 @@
         "duckdb": "Token on voimassa vähän aikaa. Hae uusi, kun se päättyy.", "pandas": "Token on voimassa vähän aikaa. Hae uusi, kun se päättyy.",
         "ai": "Tekoälysi lukee rivit työkalulla aimeat_datapackage_export."
       }
+    },
+    "recipient": {
+      "tag": "Jaettu data", "label": "{owner} jakoi sinulle", "noAccount": "Et tarvitse tiliä",
+      "lead": "Saat lukea tätä aineistoa omalla ohjelmallasi {until} asti. Käyttötarkoitus on {purpose}.",
+      "leadNoPurpose": "Saat lukea tätä aineistoa omalla ohjelmallasi {until} asti.",
+      "untilEnd": "jaon loppuun",
+      "get": "Saat", "getWord": "Lukea", "getSub": "et muuttaa etkä jakaa eteenpäin",
+      "ends": "Päättyy", "endsSub": "tai kun {owner} peruu jaon",
+      "updates": "Päivittyy", "updatesSub": "päivitä ohjelmassa", "updatesNone": "ei ajastusta",
+      "every": { "daily": "joka päivä", "monthly": "kuukausittain", "change": "kun lähde muuttuu", "weekly": { "0": "sunnuntaisin", "1": "maanantaisin", "2": "tiistaisin", "3": "keskiviikkoisin", "4": "torstaisin", "5": "perjantaisin", "6": "lauantaisin" } },
+      "step1": "Hyväksy ehdot", "step2": "Ota avain talteen", "step3": "Liitä ohjelmaasi",
+      "terms": "Käytän dataa tarkoitukseen ”{purpose}” ja noudatan lisenssiä {licence}. Ymmärrän, että {owner} näkee, milloin luen.",
+      "thePurpose": "yllä kerrottu", "noLicence": "(ei annettu)",
+      "termsAccepted": "Hyväksyit ehdot {date}.",
+      "termsNone": "Tähän jakoon ei liity hyväksyttäviä ehtoja.", "termsNoneYet": "Tähän jakoon ei liity hyväksyttäviä ehtoja. Paina painiketta, niin saat avaimen.",
+      "acceptAndShow": "Hyväksy ja näytä avain", "show": "Näytä avain",
+      "keyOnce": "Avain näytetään vain nyt. Se on myös yhteystiedostossa. Ota se talteen ennen kuin suljet sivun.",
+      "keyLater": "Avain näkyy tässä, kun hyväksyt ehdot.",
+      "keyLines": "jaon tunniste  {id}\nkäyttäjä       {user}\navain          {key}",
+      "copyKey": "Kopioi avain", "rotated": "Avain on uusi. Vanha avain lakkasi toimimasta.",
+      "download": "Lataa yhteystiedosto", "instructions": "Ohjeet: Power BI, Excel, DuckDB",
+      "rotate": "Vaihda avain", "decline": "En tarvitse tätä enää",
+      "rotateWhy": "Jos avain pääsee vääriin käsiin, vaihda se tästä. Vanha avain lakkaa toimimasta heti.",
+      "rotateLater": "Kun sinulla on avain, voit vaihtaa sen tästä milloin tahansa.",
+      "declineConfirm": "Lopetetaanko jako? Avaimesi lakkaa toimimasta heti, ja {owner} näkee, että lopetit sen. Jo lataamasi kopiot jäävät sinulle.",
+      "declineYes": "Lopeta jako", "declineNo": "Pidä jako",
+      "endedTitle": "Jako on päättynyt", "ended": "Lopetit jaon ”{title}”. {owner} näkee, ettet tarvitse sitä enää.",
+      "refusedTitle": "Linkki ei toimi",
+      "refused": {
+        "INVITE_NOT_FOUND": "Linkki ei kelpaa. Pyydä dataa jakanutta lähettämään se uudelleen.",
+        "INVITE_USED": "Linkki on jo käytetty, ja avain näytettiin sille, joka sen avasi. Pyydä dataa jakanutta lähettämään uusi linkki.",
+        "INVITE_EXPIRED": "Linkki on vanhentunut. Pyydä dataa jakanutta lähettämään se uudelleen.",
+        "SHARE_ENDED": "Jako on päättynyt, joten linkki ei enää toimi.",
+        "PARTY_STOPPED": "Jako on pysäytetty. Ota yhteyttä dataa jakaneeseen.",
+        "other": "Linkkiä ei voitu avata. Yritä hetken päästä uudelleen."
+      }
+    },
+    "dataset": {
+      "catalogue": "Datakatalogi", "noDescription": "Taulukko, jonka voit avata Excelissä, Power BI:ssä tai omalla koodillasi.",
+      "maker": "Tekijä", "freshness": "Tuoreus", "noFresh": "Ei kerrottu", "updated": "päivitetty viimeksi {date}",
+      "size": "Koko", "rows": "{n} riviä", "rows_one": "{n} rivi", "csvSize": "CSV, {size}", "licence": "Lisenssi", "noLicence": "Ei annettu", "licenceSub": "käyttöehdot",
+      "producer": {
+        "extension": "kerätty laajennuksella {ref}", "workflow": "tehty työnkululla {ref}", "agent": "agentin tekemä",
+        "app": "tehty sovelluksella {ref}", "dataproduct": "koottu datatuotteena", "manual": "julkaistu käsin"
+      },
+      "use": "Käytä tätä dataa", "columns": "Sarakkeet", "versions": "Versiot", "openExcel": "Avaa Excelissä",
+      "colName": "Nimi", "colType": "Tyyppi", "colDesc": "Kuvaus",
+      "howMade": "Miten tämä tehtiin",
+      "howMadeText": "Tämä data on {producer}. Lähteitä: {sources}. Kirjattuja muutoksia: {changes}. Versioita: {versions}.",
+      "provenance": "Alkuperätieto", "needMore": "Tarvitsetko enemmän?",
+      "needMoreText": "Tekijä voi antaa sinulle laajemman pääsyn tai tilauksen.", "askAccess": "Pyydä pääsyä", "askSubject": "Pääsy aineistoon {title}",
+      "machine": "Koneluettava",
+      "versionsText": "Uusin on versio {n}, julkaistu {date}.", "versionLine": "Versio {n} · {date} · {changes}",
+      "missingTitle": "Julkista aineistoa ei löydy", "missing": "Tämä data ei ole julkista, tai sitä ei ole. Pyydä tekijältä jakoa.",
+      "failed": "Aineistoa ei voitu lukea. Yritä hetken päästä uudelleen."
     },
     "origin": {
       "sources": "Lähteet", "combine": "Yhdistetty", "transformations": "Mitä muutettiin", "lineage": "Rakennettu näistä", "license": "Lisenssi", "noLicense": "Lisenssiä ei ole annettu", "producedBy": "Tekijä", "hash": "Sisällön tiiviste"
@@ -5627,7 +5769,11 @@
       "theRecipient": "Vastaanottaja",
       "cancel": "Peruuta", "submit": "Jaa", "submitSend": "Jaa ja lähetä linkki", "close": "Valmis",
       "done": "Jaettu.", "failed": "Jakoa ei tehty. Yritä uudelleen.",
-      "notSent": "Linkkiä ei lähetetty osoitteeseen {email}, koska tämä palvelin ei vielä lähetä jakolinkkejä. Anna yhteystiedosto hänelle itse.",
+      "linkSent": "Linkki lähti osoitteeseen {email}. Se toimii kerran {date} asti.",
+      "linkManual": "Tämä palvelin ei nyt lähetä sähköpostia, joten linkki ei lähtenyt osoitteeseen {email}. Anna linkki hänelle itse. Se toimii kerran.",
+      "linkFailed": "Linkkiä ei lähetetty osoitteeseen {email}. Anna yhteystiedosto hänelle itse.",
+      "copyLink": "Kopioi linkki",
+      "linkKey": "Linkki tekee vastaanottajalle oman avaimen. Tämän tiedoston avain lakkaa toimimasta, kun hän avaa linkin.",
       "copyFile": "Kopioi yhteystiedosto", "downloadFile": "Lataa yhteystiedosto"
     },
     "sell": {
@@ -14618,6 +14764,63 @@
     "cfgDomain_federation": "Federaatio",
     "cfgDomain_integrations": "Integraatiot",
     "cfgDomain_other": "Muut",
+    "cfgDomain_data_out": "Data ulos",
+    "cfgGroup_data_out": "Data ulos",
+    "cfgDesc_consent_data_intermediation": "Välittääkö tämä palvelin dataa muiden puolesta. Raportti ei muuta mitään, vaan näyttää havainnot Compliance-sivulla.",
+    "cfgDesc_consent_party_self_registration": "Saako sovellus päästää käyttäjiä rekisteröitymään ilman tiliä tällä palvelimella. Aina pois, jos palvelin näyttää sisältönsä vain kirjautuneille.",
+    "cfgDesc_dataspace_enabled": "Avaa palvelimen EU:n data-avaruuksien liittimille. Luotetut myöntäjät asetetaan data-avaruus kerrallaan.",
+    "cfgDesc_consent_share_max_days": "Kuinka pitkäksi aikaa omistaja voi jakaa datatuotteen nimetylle ulkopuoliselle osapuolelle.",
+    "dataOut": {
+      "dspTitle": "Dataspace Protocol nyt",
+      "dspState": "Tila",
+      "on": "Päällä",
+      "off": "Pois",
+      "dspOnSub": "Data-avaruuden liittimet voivat lukea luettelon, tehdä sopimuksen ja hakea datan.",
+      "dspOffSub": "Osoitteet /dsp/ ja /.well-known/dspace-version vastaavat 404.",
+      "dspParticipant": "Palvelimen tunniste",
+      "dspBase": "Protokollan osoite",
+      "dspVersion": "Dataspace Protocol {v}",
+      "dspVersionEndpoint": "Versio-osoite",
+      "dspDid": "DID-dokumentti",
+      "dspAuth": "Miten osallistuja todistaa, kuka se on",
+      "dspStatic": "Osallistujat, joilla on yhteinen avain",
+      "dspTck": "Yhteensopivuustestit",
+      "readFailed": "Tätä ei voitu lukea nyt.",
+      "securityTitle": "Tietoturva-sivulla",
+      "securitySub": "Ulkopuoliset osapuolet koko palvelimella: ihmiset ja ohjelmat, jotka lukevat niille nimeltä jaettua datatuotetta ilman tiliä tällä palvelimella.",
+      "figParties": "Osapuolia",
+      "figPartiesSub": "koko palvelimella",
+      "figRefused": "Hylättyjä lukuja 7 pv",
+      "figRefusedSub": "väärä avain tai kohde",
+      "figStopped": "Pysäytettyjä",
+      "figStoppedSub": "ylläpitäjä pysäytti",
+      "regsTitle": "Sovellukset, jotka haluavat päästää käyttäjiä rekisteröitymään",
+      "regsSub": {
+        "off": "Rekisteröityminen ilman tiliä on pois päältä tällä palvelimella, joten mikään sovellus ei ota uusia käyttäjiä.",
+        "apps-ask": "Sovelluksen omistaja pyytää, ja sinä hyväksyt tai hylkäät jokaisen sovelluksen tässä.",
+        "on": "Sovelluksen omistaja avaa rekisteröitymisen kysymättä."
+      },
+      "regsNone": "Yksikään sovellus ei ole pyytänyt.",
+      "regsParties": "Rekisteröityneitä: {n}",
+      "regState": {
+        "requested": "Odottaa päätöstäsi",
+        "open": "Auki",
+        "refused": "Hylätty",
+        "closed": "Suljettu"
+      },
+      "approve": "Hyväksy",
+      "refuse": "Hylkää",
+      "close": "Sulje",
+      "approved": "Sovellus {app} ({owner}) ottaa nyt rekisteröitymisiä vastaan.",
+      "refused": "Sovellus {app} ({owner}) ei ota rekisteröitymisiä vastaan.",
+      "decideFailed": "Päätöstä ei tallennettu.",
+      "regsOff": "Pyynnöt odottavat, mutta rekisteröityminen on pois päältä. Valitse ensin yllä ”Sovelluksen omistaja pyytää, ylläpitäjä hyväksyy”. Siihen asti palvelin hylkää päätöksen.",
+      "dcatTitle": "DCAT-syöte",
+      "dcatFeed": "Osoite",
+      "dcatSub": "Julkiset datatuotteet koneluettavana luettelona, jonka avoindata.fi ja data.europa.eu voivat lukea. Syötteellä ei ole kytkintä: datatuote on siinä niin kauan kuin se on julkinen.",
+      "open": "Avaa",
+      "aside": "Kun aimeat init asentaa palvelimen, datanvälitys on aluksi ”Palvelin ei välitä dataa muiden välillä”. Pidä julkinen palvelin tilassa ”Vain raportti”, kunnes olet tarkistanut sen toiminnan ja tehnyt ilmoituksen viranomaiselle."
+    },
     "cfgGroup_ai": "Tekoäly: avaimet, mallit ja saldo",
     "cfgGroup_decide": "Päätösmalli (TypeSafe)",
     "decideKeyTest": "Testaa palvelimen avain",
@@ -29157,6 +29360,48 @@
       }
     },
     "config": {
+      "consent": {
+        "data_intermediation": {
+          "title": "Datanvälityspalvelu",
+          "short": "Tarjoaako tämä palvelin datanvälityspalvelua EU:n datahallintosäädöksen (2022/868) mukaan, ja kuka sen tarjoaa. Vain raportti ei estä mitään, vaan näyttää havainnot Compliance-sivulla.",
+          "what": "Datanvälityspalvelu yhdistää datan haltijoita ja datan käyttäjiä kaupallisesti. Esimerkki on markkinapaikka, jolla kuka tahansa tarjoaa dataa ja kuka tahansa ostaa sitä. Tällä palvelimella asetus päättää yhden asian: saako EXCHANGEn tarjouksen, joka toimittaa dataa, listata kaikille. Vain raportti ja Ylläpitäjä tarjoaa palvelun eivät estä mitään. Palvelin ei välitä dataa muiden välillä estää tällaisen listauksen. Silloin data menee vain nimetyille vastaanottajille nimetyllä jaolla ulkopuoliselle osapuolelle. Ilmoittautuneet tarjoajat saavat tarjota palvelun toimii samoin, mutta sallii listauksen omistajalle, joka hallitsee organismia, jolla on oma ilmoitus kirjattuna. Palvelin tarkistaa asian, kun listaus tehdään. Ennen muutosta tehty listaus pysyy, ja Compliance-sivu näyttää sen havaintona, josta ihminen päättää. Compliance-sivun osio 12 näyttää havainnot ja 12 artiklan ehdot kaikissa tiloissa.",
+          "range": "Yksi neljästä: Vain raportti (koodin oletus), Palvelin ei välitä dataa muiden välillä, Ylläpitäjä tarjoaa palvelun tai Ilmoittautuneet tarjoajat saavat tarjota palvelun. Kun aimeat init asentaa palvelimen, asetus on aluksi Palvelin ei välitä dataa muiden välillä.",
+          "ex1": "Palvelin ei välitä dataa muiden välillä: yrityksen tai henkilön palvelin, joka jakaa dataa vain nimetyille kumppaneille.",
+          "ex2": "Ylläpitäjä tarjoaa palvelun: palvelin, jonka ylläpitäjä on tehnyt ilmoituksen viranomaiselle ja pitää avointa datan markkinapaikkaa.",
+          "tip": "Valitse Ylläpitäjä tarjoaa palvelun vasta, kun ilmoitus on tehty ja kirjattu Compliance-sivulle. Tämä on tulkinta säädöksestä, ei oikeudellinen neuvo."
+        },
+        "party_self_registration": {
+          "title": "Sovelluksiin rekisteröidytään ilman tiliä",
+          "short": "Saako sovellus päästää omat käyttäjänsä rekisteröitymään sähköpostiosoitteella ilman tiliä tällä palvelimella. Oletuksena pois.",
+          "what": "Kun ihminen rekisteröityy sovellukseen näin, hänestä tulee sovelluksen omistajan ulkopuolinen osapuoli. Hän kirjautuu sähköpostiin tulevalla linkillä ja näkee vain sen, mitä sovellus hänelle antaa, ei muuta palvelimelta. Kukaan ei rekisteröidy sovellukseen: mikään sovellus ei ota rekisteröitymisiä. Sovelluksen omistaja pyytää, ylläpitäjä hyväksyy: omistaja avaa rekisteröitymisen, se odottaa pyyntönä, ja sinä hyväksyt tai hylkäät jokaisen sovelluksen tämän ryhmän alla olevassa listassa. Tekoäly tekee saman työkalulla aimeat_admin_app_party_registrations. Sovelluksen omistaja avaa rekisteröitymisen: omistaja avaa sen kysymättä. Jos palvelin näyttää sisältönsä vain kirjautuneille, rekisteröityminen on aina pois, asetuksesta riippumatta.",
+          "range": "Kukaan ei rekisteröidy sovellukseen (oletus), Sovelluksen omistaja pyytää ja ylläpitäjä hyväksyy tai Sovelluksen omistaja avaa rekisteröitymisen.",
+          "ex1": "Kukaan ei rekisteröidy sovellukseen: palvelin, jolla jokaisella sovelluksen käyttäjällä on tili.",
+          "ex2": "Sovelluksen omistaja pyytää, ylläpitäjä hyväksyy: julkinen palvelin, jolla haluat tietää, mitkä sovellukset keräävät sähköpostiosoitteita ihmisiltä, joilla ei ole tiliä.",
+          "tip": "Sovelluksen omistajalla on jokaisen näin rekisteröityneen sähköpostiosoite. Compliance-sivu näyttää havaintona sovelluksen, jonka rekisteröityminen on auki ja joka myy jotain."
+        },
+        "share_max_days": {
+          "title": "Ulkopuolisen osapuolen jaon pisin kesto",
+          "short": "Kuinka pitkäksi aikaa omistaja voi jakaa datatuotteen nimetylle ulkopuoliselle osapuolelle, päivinä. Jako, jolle ei anneta päättymispäivää, kestää näin kauan. Oletus on 365.",
+          "what": "Nimetty jako antaa yhdelle ulkopuoliselle osapuolelle, ihmiselle tai ohjelmalle, jolla ei ole tiliä täällä, yhden datatuotteen tiettyyn päivään asti. Kun jako tehdään, palvelin hylkää päättymispäivän, joka on tätä useamman päivän päässä. Jako, jolle ei anneta päättymispäivää, saa juuri näin monta päivää. Ennen muutosta tehty jako pitää päättymispäivänsä. Jakolomake rajaa päivämäärän tähän arvoon.",
+          "range": "Kokonaisluku 1–3650 päivää. Oletus on 365.",
+          "low": "Pienempi: jaot päättyvät aiemmin, joten pääsy, jota kukaan ei uusi, loppuu itsestään. Omistajat jakavat uudelleen useammin.",
+          "high": "Suurempi: jako voi kestää vuosia, ja pääsy, jonka kaikki ovat unohtaneet, pysyy auki pidempään.",
+          "ex1": "365 (oletus): vuosiraportti, joka on jaettu kumppanille.",
+          "ex2": "30: palvelin, jolla jokainen ulkopuolinen pääsy tarkistetaan kuukausittain.",
+          "tip": "Pienennä arvoa, kun ulkopuoliset pääsyt pitää tarkistaa säännöllisesti. Omistaja voi aina lopettaa jaon aiemmin."
+        }
+      },
+      "dataspace": {
+        "enabled": {
+          "title": "Datapaketit tarjolla data-avaruuksiin",
+          "short": "Vastaako tämä palvelin Eclipse Dataspace Protocoliin (DSP 2025-1), jotta EU:n data-avaruuden liittimet voivat löytää ja hakea datapaketteja. Oletuksena pois.",
+          "what": "Päällä: data-avaruuden osallistuja lukee palvelimen luettelon osoitteesta /dsp/2025-1, tekee sopimuksen ja hakee datan. Osallistuja näkee datapaketin, jos paketti on julkinen ja datanvälityksen asetus sallii datan tarjoamisen avoimesti, jos omistaja on jakanut paketin osallistujalle nimeltä tai jos pakettia myydään EXCHANGEssa. Omistaja hyväksyy jokaisen sopimuksen, ellei hän anna paketin hyväksyä sopimuksia itse. Osallistuja todistaa, kuka se on, did:web-identiteettinsä allekirjoittamalla tokenilla tai testiympäristössä yhteisellä avaimella. Luotetut myöntäjät asetetaan data-avaruus kerrallaan. Palvelimen tunniste on sen julkisen osoitteen did:web, ellet aseta muuta. Pois: /.well-known/dspace-version ja jokainen /dsp/-osoite vastaavat 404.",
+          "range": "Päällä tai pois. Oletus on pois.",
+          "ex1": "Pois (oletus): mikään data-avaruus ei liity tähän palvelimeen.",
+          "ex2": "Päällä, kun osallistuja todistaa itsensä tavalla dcp ja data-avaruutesi luotetut myöntäjät on asetettu: organisaatio, joka liittyy data-avaruuteen omalla datallaan.",
+          "tip": "Kytke päälle, kun palvelin osallistuu data-avaruuteen. Tämän ryhmän alla oleva tila näyttää osoitteet, joita liitin tarvitsee."
+        }
+      },
       "extensions": {
         "fetch_inflight_mb": {
           "title": "Hakujen data kerralla ajoa kohden",

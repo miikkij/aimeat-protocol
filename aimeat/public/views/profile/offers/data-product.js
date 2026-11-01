@@ -12,6 +12,7 @@
  * @structure ProductPage · SharesTab · VersionsTab · ColumnsTab · OriginTab
  * @usage html`<${ProductPage} ctx=${ctx} name=${name} />`
  * @version-history
+ *   v1.1.1 — 2026-11-01 — ColumnsTab is exported for the public dataset page (WP9b).
  *   v1.1.0 — 2026-11-01 — A product that runs when its source changes says so, with the run after a seen
  *     change; the shares to people on other AIMEAT nodes are readers too; refusals in the page's
  *     language (WP9c).
@@ -82,10 +83,14 @@ function VersionsTab({ versions, retention }) {
     <${Note}>${retention ? d('product.retention.' + (retention.unit || 'versions'), { n: retention.keep }) : d('product.retentionAll')}<//>`;
 }
 
-function ColumnsTab({ descriptor }) {
+/**
+ * The columns of every table, from the Table Schema: also the public dataset page's (views/dataset.js),
+ * which names its first column `head` itself (the reader sees a name, not the wizard's "name out").
+ */
+export function ColumnsTab({ descriptor, head }) {
   const resources = descriptor?.resources || [];
   if (!resources.length) return html`<${Note} kind="quiet">${d('product.noColumns')}<//>`;
-  return html`<${List} cols="name-kind-words" head=${[d('wizard.colOut'), d('wizard.colType'), d('wizard.colDesc')]}>
+  return html`<${List} cols="name-kind-words" head=${head || [d('wizard.colOut'), d('wizard.colType'), d('wizard.colDesc')]}>
     ${resources.map((r) => html`
       <${Group} key=${r.name} title=${r.name} count=${d('list.rows', { n: num(r.rowCount || 0) })}>
         ${(r.schema?.fields || []).map((f) => html`<${Row} key=${r.name + f.name}>
