@@ -8,12 +8,17 @@
  *   (history.js): the same day groups and timeline rows.
  *
  *   THE NODE WRITES THE ACTION IN ENGLISH AND KEEPS THE TOOL OR ROUTE NAME IN `code`. The phrase in
- *   the page's language comes from CODE_PHRASE and the `home.trail.did.<phrase>` keys; a code without
- *   one says which tool or route was used, so no row is dropped and no row is in a language the page
- *   is not in.
- * @structure default HomeTrailView; trailLine(entry) · internal: CODE_PHRASE, EVENT_PHRASE, Day, byDay
+ *   the page's language comes from CODE_PHRASE, then FAMILY_PHRASE, and the `home.trail.did.<phrase>`
+ *   keys; a code without one says "made a change" or "read data", so no row is dropped, no row is in
+ *   a language the page is not in, and no row shows a route or an id.
+ * @structure default HomeTrailView; trailLine(entry) · isRoutine(entry) · plainTarget(raw) · internal:
+ *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.2.0 — 2026-11-01 — Families of codes an agent's run writes (notes, tasks, documents, messages)
+ *     have phrases; housekeeping (a live stream ticket, a task plan's steps, reports) waits with the
+ *     reads; an unknown row says "made a change", and the target is a plain name or nothing, never a
+ *     route or an id (commercial's crew55 chain test).
  *   v1.1.0 — 2026-11-01 — The phrase table for the codes 4e named; reads (readOnly) hidden behind a
  *     tick; a failed action says so; older pages read with `before`, as the route pages.
  *   v1.0.0 — 2026-11-01 — Initial (the trail route is aimeat-protocol-4e's).
@@ -74,8 +79,69 @@ const CODE_PHRASE = {
   aimeat_workspace_write: 'wroteDoc',
   aimeat_storage_upload: 'uploadedFile',
 };
+/**
+ * Codes in families, for what an agent's run writes (commercial's crew55 chain test: most rows were
+ * raw routes). Matched in order after CODE_PHRASE; the first pattern that fits names the phrase.
+ * @type {Array<[RegExp, string]>}
+ */
+const FAMILY_PHRASE = [
+  [/^(POST|PUT|PATCH) \/v1\/memory(\/:key)?$|^POST \/v1\/memory\/(bulk|files|import|copy|bundle)$|^PATCH \/v1\/memory\/files\/:key$/, 'savedNote'],
+  [/^DELETE \/v1\/memory\/|^POST \/v1\/memory\/bulk-delete$|^aimeat_memory_delete$/, 'deletedNote'],
+  [/^POST \/v1\/agents\/:name\/tasks$|^aimeat_task_create$|^aimeat_v2_task_create$/, 'gaveTask'],
+  [/^POST \/v1\/agents\/:name\/tasks\/:id\/start$|^aimeat_task_start$/, 'startedTask'],
+  [/^POST \/v1\/agents\/:name\/tasks\/:id\/event$|^aimeat_task_event$/, 'reportedTask'],
+  [/^POST \/v1\/agents\/:name\/tasks\/:id\/complete$|^aimeat_task_complete$|^aimeat_work_deliver$/, 'finishedTask'],
+  [/^POST \/v1\/agents\/:name\/tasks\/:id\/fail$|^aimeat_task_fail$/, 'failedTask'],
+  [/^POST \/v1\/agents\/:name\/tasks\/:id\/decline$|^aimeat_task_decline$/, 'declinedTask'],
+  [/^(PATCH|DELETE) \/v1\/agents\/:name\/tasks\/:id(\/todos\/:todoId|\/triage)?$|^POST \/v1\/agents\/:name\/tasks\/:id\/(pause|queue|rate|request-changes|propose-todos)$|^aimeat_task_(todo|propose_todos)$/, 'changedTask'],
+  [/^POST \/v1\/events\//, 'openedPage'],
+  [/^aimeat_workspace_|^(POST|PUT|PATCH) \/v1\/workspaces\//, 'wroteDoc'],
+  [/^aimeat_dm_send|^aimeat_message_send$|^POST \/v1\/(dm|messages)\b/, 'sentMessage'],
+];
+
+/**
+ * Housekeeping: rows an agent's run or a page writes for itself, not an action on the place (a live
+ * stream ticket, the steps of a task's plan, a heartbeat or a report of the runtime). Hidden with the
+ * reads until asked for.
+ */
+const ROUTINE = [
+  /^POST \/v1\/events\//,
+  /\/todos(\/|$)|\/propose-todos$|\/triage$|^aimeat_task_todo$|^aimeat_task_propose_todos$/,
+  /heartbeat|telemetry|runtime|capabilities_report|_report$/,
+];
+
+/** True for a row that is housekeeping rather than an action on the place. */
+export function isRoutine(entry) {
+  const code = String(entry.code || '');
+  return ROUTINE.some((re) => re.test(code));
+}
+
 /** An entry's `event`, for a code the table does not name. */
 const EVENT_PHRASE = { 'app.published': 'publishedApp', 'agent.approved': 'approvedAgent' };
+
+/** The phrase id for a code: its own entry, then its family, then the event the node named. */
+function phraseOf(entry) {
+  const code = String(entry.code || '');
+  return CODE_PHRASE[code] || FAMILY_PHRASE.find(([re]) => re.test(code))?.[1] || EVENT_PHRASE[entry.event] || '';
+}
+
+/**
+ * A segment that is a machine id: hex or a uuid, a prefixed id with a digit in it ("t_48be5aae",
+ * never "news-digest"), anything with a long digit run, or a shortened one ending in "…".
+ */
+const ID_LIKE = /^[0-9a-f-]{8,}$|^[a-z]{1,8}[_-](?=[0-9a-z]*\d)[0-9a-z]{6,}$|\d{4,}|…$/i;
+
+/**
+ * What the row acted on, in words a person reads: the first part of the target that is not a machine
+ * id, with an app's ".html" left off. A record key ("journey.state") or a route is no name, so the
+ * row then goes without one.
+ */
+export function plainTarget(raw) {
+  const parts = String(raw || '').trim().split('/').filter((p) => p && !ID_LIKE.test(p));
+  const name = (parts[0] || '').replace(/\.html$/i, '');
+  if (!name || /[.:#@?=]/.test(name) || name.length > 48) return '';
+  return name;
+}
 
 /**
  * Who did it. Always a third person, never "you": the verb phrase is one form per language, and a
@@ -89,19 +155,22 @@ function who(entry) {
 }
 
 /**
- * The row's sentence: who, what, and on what. The verb phrase comes from the code's phrase key; without
- * one, English pages keep the node's phrase and other pages name the tool or route that was used. A
- * failed action says so after the sentence.
+ * The row's sentence: who, what, and on what. The verb phrase comes from the code's phrase key or its
+ * family's; without one, an English page keeps the node's phrase for an MCP tool (its title), and
+ * every other row says "made a change" or "read data". A route or an id is never shown (commercial's
+ * crew55 chain test). A failed action says so after the sentence.
  */
 export function trailLine(entry) {
   const code = String(entry.code || '');
-  const phraseId = CODE_PHRASE[code] || EVENT_PHRASE[entry.event];
+  const phraseId = phraseOf(entry);
   const keyed = phraseId ? tr(`home.trail.did.${phraseId}`, '') : '';
-  const phrase = keyed
-    || (getLocale() === 'en' && entry.action
-      ? String(entry.action)
-      : fill(tr('home.trail.used', 'used {code}'), { code: code || String(entry.action || '') }));
-  const target = String(entry.target || '').trim();
+  const toolTitle = getLocale() === 'en' && code.startsWith('aimeat_') && entry.action ? String(entry.action) : '';
+  const phrase = keyed || toolTitle || (entry.readOnly
+    ? tr('home.trail.did.readData', 'read data')
+    : tr('home.trail.did.madeChange', 'made a change'));
+  // An agent acting on its own task names itself as the target; saying it twice reads as a fault.
+  const named = plainTarget(entry.target);
+  const target = named && named !== who(entry) ? named : '';
   const line = target
     ? fill(tr('home.trail.lineTarget', '{who} {what}: {target}'), { who: who(entry), what: phrase, target })
     : fill(tr('home.trail.line', '{who} {what}'), { who: who(entry), what: phrase });
@@ -197,8 +266,10 @@ export default function HomeTrailView({ navigate }) {
 
   if (!entries) return html`<${PageFrame} loading=${true}><${Spinner} /><//>`;
 
-  const shown = showReads ? entries : entries.filter((entry) => !entry.readOnly);
-  const hasReads = entries.some((entry) => entry.readOnly);
+  // Reads and housekeeping wait behind one tick: what was done to the place stays in view.
+  const quiet = (entry) => entry.readOnly || isRoutine(entry);
+  const shown = showReads ? entries : entries.filter((entry) => !quiet(entry));
+  const hasReads = entries.some(quiet);
 
   return html`
     <${PageFrame} width="narrow">
