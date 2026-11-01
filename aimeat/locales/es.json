@@ -4310,6 +4310,7 @@
     },
     "audience": { "private": "Solo yo", "members": "Cuentas con sesión", "public": "Público", "organismOf": "Miembros de {name}" },
     "schedule": {
+      "onChange": "se actualiza cuando cambia su origen",
       "none": "se actualiza solo cuando lo ejecutas", "cron": "con la programación {cron}", "daily": "se actualiza todos los días a las {at}", "monthly": "se actualiza el día {day} de cada mes a las {at}",
       "weekly": { "0": "se actualiza los domingos a las {at}", "1": "se actualiza los lunes a las {at}", "2": "se actualiza los martes a las {at}", "3": "se actualiza los miércoles a las {at}", "4": "se actualiza los jueves a las {at}", "5": "se actualiza los viernes a las {at}", "6": "se actualiza los sábados a las {at}" }
     },
@@ -4338,6 +4339,7 @@
     },
     "product": {
       "label": "Producto de datos", "loadFailed": "No se pudo leer el producto de datos. Inténtalo de nuevo en un momento.",
+      "nextChangeRun": "próxima ejecución {when}, porque cambió su origen",
       "versionN": "Versión {n}", "current": "en uso", "notPublished": "Aún sin publicar", "nextRun": "próxima ejecución {when}",
       "share": "Compartir", "sell": "Vender en EXCHANGE", "sellEdit": "Cambiar la venta", "withdraw": "Retirar", "runNow": "Actualizar ahora", "publishAgain": "Publicar de nuevo", "onSale": "En EXCHANGE",
       "figRows": "Filas", "figVersions": "Versiones", "figShares": "Accesos", "figReads": "Lecturas en 7 días", "lastRun": "actualizado {when}",
@@ -4385,6 +4387,21 @@
       "howProgram": "Con un programa", "howProgramHint": "Power BI, Excel, DuckDB. Recibe una clave en un archivo de conexión.",
       "howBrowser": "En el navegador", "howBrowserHint": "Abre un enlace que le llega por correo y ve las filas.",
       "howDataspace": "Desde un espacio de datos", "howDataspaceHint": "El conector de una organización con el Dataspace Protocol.",
+      "howAimeat": "Desde otro AIMEAT", "howAimeatHint": "Lee con su propia cuenta, como visitante.",
+      "account": "Su cuenta de AIMEAT", "accountPlaceholder": "matias@su-servidor.example", "accountHint": "Su cuenta y su propio servidor, como nombre@servidor. Inicia sesión aquí con ella.",
+      "sentencesAimeat": "{who} lee con su propia cuenta de AIMEAT y no necesita clave. Puedes terminar el acceso cuando quieras y termina de inmediato. Las copias ya descargadas no se pueden recuperar. Ves cada lectura.",
+      "say": "{who} ya puede leer «{title}» {until}. Puedes terminar el acceso cuando quieras y la siguiente lectura se rechaza, pero las copias ya descargadas no se pueden recuperar.",
+      "sayVisitor": "{who} ya puede leer «{title}» {until}, con su propia cuenta {account} e iniciando sesión en este servidor. Puedes terminar el acceso cuando quieras y la siguiente lectura se rechaza, pero las copias ya descargadas no se pueden recuperar.",
+      "untilDate": "hasta el {date}", "untilYouEnd": "hasta que termines el acceso",
+      "keyShown": "La clave está en el archivo de conexión y se muestra una sola vez. Dale el archivo a {who} ahora.",
+      "keyKept": "{who} ya tiene una clave. El archivo de conexión dice cómo usarla.",
+      "signInAt": "Inicia sesión en",
+      "signIn": {
+        "ready": "Este servidor acepta inicios de sesión desde {node}, así que {who} ya puede leerlo.",
+        "not-a-peer": "Este servidor todavía no está conectado con {node}, así que {who} no puede iniciar sesión aquí. Pide a quien administra este servidor que conecte los dos.",
+        "sign-ins-off": "Este servidor no acepta inicios de sesión desde otros servidores, así que {who} no puede iniciar sesión aquí. Pide a quien lo administra que los permita.",
+        "not-allowed": "Este servidor no acepta inicios de sesión desde {node}, así que {who} no puede iniciar sesión aquí. Pide a quien lo administra que los permita."
+      },
       "email": "Correo para el enlace", "emailPlaceholder": "nombre@ejemplo.com", "emailHint": "Opcional. El enlace se envía a esta dirección.", "emailNeeded": "Quien lee en el navegador recibe el enlace en esta dirección.",
       "purpose": "Para qué lo usa", "purposePlaceholder": "informes", "until": "Termina", "untilHint": "En este servidor dura como máximo {n} días, o sea, hasta el {date}.",
       "version": "Qué versión", "versionLatest": "Siempre la más reciente", "versionOnly": "Solo la versión {n} ({hash})",
@@ -4416,8 +4433,8 @@
       "intro": "Personas y programas sin cuenta en este servidor a quienes les diste acceso. Cada uno lee solo lo que compartiste con él.",
       "colName": "Parte", "colShares": "Accesos", "colKey": "Clave usada",
       "none": "No tienes partes externas. Se crea una cuando compartes un producto de datos con nombre.",
-      "kind": { "program": "programa", "person": "persona", "dataspace": "espacio de datos" },
-      "keyOf": { "program": "clave de programa", "person": "enlace de navegador", "dataspace": "conector del espacio de datos" },
+      "kind": { "program": "programa", "person": "persona", "dataspace": "espacio de datos", "aimeat": "otro AIMEAT", "visitor": "otro AIMEAT" },
+      "keyOf": { "program": "clave de programa", "person": "enlace de navegador", "dataspace": "conector del espacio de datos", "visitor": "su propia cuenta en otro AIMEAT" },
       "status": { "active": "activa", "stopped": "detenida" },
       "dataProduct": "producto de datos",
       "sharesN": "{n} accesos", "sharesN_one": "{n} acceso", "keyUsed": "clave usada {when}", "keyNotUsed": "clave aún sin usar",
@@ -4461,6 +4478,7 @@
       "provenance": "El origen, la actualidad y los datos personales de cada fuente se revisan uno por uno y quedan escritos en la descripción del paquete. Un producto de datos está tan al día como su fuente más antigua."
     },
     "cols": {
+      "sourceField": "Campo de origen", "note": "Nota", "includeOne": "{col} sale",
       "title": "Columnas", "count": "salen {n} de {of}", "include": "Sale", "personal": "dato personal · mapa de datos", "descPlaceholder": "Qué tiene la columna",
       "personalLeftOut": "Dejé fuera {cols}: el mapa de datos las marca como datos personales. Si las incluyes, el producto no puede ser público. Un acceso con nombre y un contrato son posibles, y aparecen en la página de Compliance.",
       "personalIncluded": "Salen datos personales: {cols}. El producto no puede ser público.",
@@ -4469,6 +4487,10 @@
       "filterNote": "El filtro queda escrito en las transformaciones del paquete, así que quien lo lee ve qué se dejó fuera."
     },
     "preview": {
+      "aiWorking": "Tu IA está escribiendo un borrador de la descripción…", "aiAsk": "Pedir un borrador a tu IA",
+      "aiNoKey": "Un borrador de la descripción necesita tu propia IA. Configúrala en los ajustes de IA o escribe tú la descripción.", "aiSettings": "Abrir los ajustes de IA",
+      "aiWrote": "Tu IA escribió un borrador de la descripción a partir de las columnas y del origen. Hazlo tuyo.",
+      "aiFailed": "Tu IA no pudo escribir un borrador. Escribe tú la descripción.",
       "rowsTitle": "Primeras filas de la prueba", "counts": "{rows} filas · {cols} columnas", "sizeLine": "{rows} filas · {cols} columnas · unos {size}",
       "validOk": "La revisión Frictionless pasó.", "validBad": "La revisión Frictionless encontró {n} problemas. Cambia los tipos de las columnas en el paso 2.", "validBad_one": "La revisión Frictionless encontró un problema. Cambia el tipo de la columna en el paso 2.",
       "describedOk": "Cada columna tiene un tipo y una descripción.", "describedBad": "A una columna le falta la descripción. Agrégala en el paso 2.",
@@ -4478,6 +4500,11 @@
       "odpsTitle": "La descripción que leen las máquinas (ODPS 4.1, extracto)", "noOdps": "Aparece cuando la vista previa pasa sus revisiones."
     },
     "sched": {
+      "change": "Cuando cambia el origen",
+      "changeNote": "El servidor ejecuta el producto cuando cambia su origen: como pronto diez segundos después del cambio y como mucho una vez cada cinco minutos. Solo hace una versión nueva cuando cambiaron las filas.",
+      "changeBlocked": "No se puede elegir Cuando cambia el origen: el servidor no ve cambiar el resultado de una extensión. Dale a este producto una programación.",
+      "changeNodeNote": "El servidor ve cuando cambian los registros de un espacio de trabajo, los datos de una aplicación, un registro de memoria, un archivo u otro producto de datos. Una versión que alguien todavía lee no se elimina sin que la veas primero.",
+      "freshChange": { "fresh": "la última ejecución tras un cambio salió bien", "late": "el origen cambió y la ejecución posterior falló", "stale": "un producto de datos del que se construye está desactualizado" },
       "title": "Ritmo", "pace": "Ritmo", "once": "Una vez", "daily": "Cada día", "weekly": "Cada semana", "monthly": "Cada mes",
       "weekday": "Día", "monthday": "Día del mes", "time": "Hora", "keep": "Conservar versiones anteriores", "keep12": "Las 12 más recientes", "keepAll": "Todas", "keep6m": "6 meses",
       "onceNote": "El producto se construye cuando lo publicas y cuando presionas Actualizar ahora. Quien lo lee lo ve sin programación.",
@@ -4499,6 +4526,21 @@
       "sharesTitle": "Accesos compartidos con nombre", "newShare": "Agregar un acceso", "addShare": "Agregar", "noShares": "Todavía no hay accesos con nombre.",
       "noAccount": "Quien lo recibe no necesita una cuenta de AIMEAT. Cada acceso se crea al publicar, y su clave se muestra una sola vez en la página siguiente.",
       "sellTitle": "EXCHANGE", "sell": "Vender en EXCHANGE"
+    },
+    "err": {
+      "SHARE_TOO_LONG": "La fecha de fin es posterior a lo que permite este servidor. Elige una fecha anterior.",
+      "INVALID_RECIPIENT": "Escribe su cuenta como nombre@servidor. Una cuenta de este servidor lee según quién puede usarlo.",
+      "PACKAGE_WITHDRAWN": "Este producto de datos está retirado. Publícalo de nuevo antes de compartirlo.",
+      "PARTY_STOPPED": "Esta parte externa está detenida. Reanúdala primero en la Cartera de datos.",
+      "VERSION_NOT_FOUND": "Esa versión ya no se conserva. Elige otra.",
+      "NO_CHANGE_SIGNAL": "El servidor no ve cambiar un origen de extensión. Elige una programación en el paso 4.",
+      "AUDIENCE_WIDER_THAN_SOURCE": "Quién puede usarlo es más amplio de lo que permite un origen. Elige una audiencia más reducida en el paso 5.",
+      "PERSONAL_DATA_PUBLIC": "Un producto de datos público no puede llevar datos personales. Deja fuera las columnas personales en el paso 2 o elige otra audiencia.",
+      "SOURCE_FAILED": "No se pudo leer el origen {source}. Prueba los orígenes de nuevo.",
+      "SCOPE_DENIED": "No tienes el permiso que esto necesita.",
+      "UNKNOWN_COLUMN": "Un origen ya no tiene una columna que elegiste. Prueba los orígenes de nuevo en el paso 1.",
+      "UNION_COLUMNS_MISMATCH": "Los orígenes no tienen las mismas columnas, así que no pueden ser una sola tabla. Elige tablas propias o una clave.",
+      "JOIN_DUPLICATE_KEY": "La clave no es única en un origen. Elige otra columna como clave."
     },
     "licence": { "ccBy": "CC BY 4.0", "cc0": "CC0", "contract": "Solo según un contrato" },
     "done": {

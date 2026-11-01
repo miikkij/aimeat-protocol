@@ -13,23 +13,28 @@
  * @structure columnsFromProbe · stepColumns · stepPreview
  * @usage const cols = columnsFromProbe(probe, sources, previous);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Step 2 is a table as on the canvas (DataTable form stack: goes out, source
+ *     field, name out, type, description, the personal mark; one block per column on a phone), its
+ *     descriptions and types filled from the source's schema by the node. Step 3 says that the owner's AI
+ *     wrote the description draft, with the AI label when one is owed, or where to set up an AI (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D9.2, D9.3, D9.4).
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { num } from '/js/format.js';
-import { Box, BoxList } from '/components/Box.js';
+import { Box } from '/components/Box.js';
 import { Fields } from '/components/Field.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Select } from '/components/Select.js';
 import { Check } from '/components/Check.js';
-import { Mark, Marks, Code } from '/components/Mark.js';
+import { Mark, Code } from '/components/Mark.js';
+import { AiLabel } from '/components/ai-label.js';
 import { Note } from '/components/Note.js';
 import { Section } from '/components/Section.js';
 import { DataTable } from '/components/DataTable.js';
 import { Action, Actions } from '/components/Action.js';
-import { d, bytesWord } from './data-model.js';
+import { d, bytesWord, errText } from './data-model.js';
 
 const TYPES = ['string', 'integer', 'number', 'boolean', 'date', 'datetime', 'any'];
 const OPS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'contains'];
@@ -68,18 +73,19 @@ export function stepColumns(s) {
   const f = draft.filter;
   return html`
     <${Section} id="wz-columns" title=${d('cols.title')} count=${d('cols.count', { n: outNames.length, of: draft.columns.length })} first=${true}>
-      <${BoxList}>
-        ${draft.columns.map((c, i) => html`<${Box} key=${`${c.source}.${c.from}`} tone=${c.include ? 'row' : 'off'}
-          name=${`${c.source}.${c.from}`}
-          marks=${html`<${Marks}><${Mark}>${c.type}<//>${c.personal ? html`<${Mark} tone="coral">${d('cols.personal')}<//>` : null}<//>`}
-          end=${html`<${Check} checked=${c.include} onChange=${(v) => setCol(i, { include: v })}>${d('cols.include')}<//>`}>
-          ${c.include ? html`<${Fields} cols=${3}>
-            <${TextField} label=${d('wizard.colOut')} code value=${c.name} onInput=${(v) => setCol(i, { name: v })} />
-            <${Select} label=${d('wizard.colType')} value=${c.type} options=${TYPES} onChange=${(v) => setCol(i, { type: v })} />
-            <${TextField} label=${d('wizard.colDesc')} value=${c.description} placeholder=${d('cols.descPlaceholder')} onInput=${(v) => setCol(i, { description: v })} />
-          <//>` : null}
-        <//>`)}
-      <//>
+      <${DataTable} form stack
+        headers=${[d('cols.include'), d('cols.sourceField'), d('wizard.colOut'), d('wizard.colType'), d('wizard.colDesc'), d('cols.note')]}
+        rows=${draft.columns.map((c, i) => {
+          const field = `${c.source}.${c.from}`;
+          return [
+            html`<${Check} checked=${c.include} ariaLabel=${d('cols.includeOne', { col: field })} onChange=${(v) => setCol(i, { include: v })} />`,
+            { text: field, mono: true },
+            html`<${TextField} code ariaLabel=${`${d('wizard.colOut')}: ${field}`} value=${c.name} disabled=${!c.include} onInput=${(v) => setCol(i, { name: v })} />`,
+            html`<${Select} ariaLabel=${`${d('wizard.colType')}: ${field}`} value=${c.type} options=${TYPES} disabled=${!c.include} onChange=${(v) => setCol(i, { type: v })} />`,
+            html`<${TextField} ariaLabel=${`${d('wizard.colDesc')}: ${field}`} value=${c.description} placeholder=${d('cols.descPlaceholder')} disabled=${!c.include} onInput=${(v) => setCol(i, { description: v })} />`,
+            c.personal ? html`<${Mark} tone="coral">${d('cols.personal')}<//>` : null,
+          ];
+        })} />
       ${personalOut.length ? html`<${Note} kind="aside" size="small">${d('cols.personalLeftOut', { cols: personalOut.map((c) => c.from).join(', ') })}<//>` : null}
       ${personalIn.length ? html`<${Note} kind="aside" size="small" tone="irreversible">${d('cols.personalIncluded', { cols: personalIn.map((c) => c.from).join(', ') })}<//>` : null}
     <//>
@@ -105,8 +111,27 @@ function checks(preview, draft) {
     [preview?.validation?.ok !== false, preview?.validation?.ok !== false ? d('preview.validOk') : d('preview.validBad', { n: preview?.validation?.issues?.length || 0 })],
     [described, described ? d('preview.describedOk') : d('preview.describedBad')],
     [!personal, personal ? d('preview.personalIn') : d('preview.personalNone')],
-    preview?.publish_check && !preview.publish_check.ok ? [false, preview.publish_check.message] : null,
+    preview?.publish_check && !preview.publish_check.ok ? [false, errText({ code: preview.publish_check.code, message: preview.publish_check.message }, 'wizard.failed')] : null,
   ].filter(Boolean);
+}
+
+/**
+ * What the page says about the description's AI draft: that the owner's AI wrote it and it is theirs to
+ * change, with the AI label when one is owed (components/ai-label.js decides from the record); or that
+ * a draft needs an AI, and where to set one up.
+ */
+function aiNote(s) {
+  const { ai, draft } = s;
+  if (!ai || ai.state === 'idle') return null;
+  if (ai.state === 'working') return html`<${Note} kind="loading">${d('preview.aiWorking')}<//>`;
+  if (ai.state === 'noai') {
+    return html`<${Note} kind="aside" size="small">${d('preview.aiNoKey')}<//>
+      ${ai.settingsUrl ? html`<${Actions}><${Action} small soft href=${ai.settingsUrl}>${d('preview.aiSettings')}<//><//>` : null}`;
+  }
+  if (ai.state === 'failed') return html`<${Note} kind="aside" size="small">${ai.error}<//>`;
+  if (draft.description !== ai.text) return null;
+  return html`<${Note} kind="aside" size="small">${d('preview.aiWrote')}<//>
+    ${ai.provenance ? html`<${AiLabel} variant="inline" record=${ai.provenance.record} recordUrl=${ai.provenance.record_url} />` : null}`;
 }
 
 export function stepPreview(s) {
@@ -135,7 +160,11 @@ export function stepPreview(s) {
         <${TextArea} label=${d('preview.desc')} wide rows=${5} value=${draft.description} onInput=${(v) => setDraft({ description: v })} />
         <${TextField} label=${d('preview.keywords')} wide hint=${d('preview.keywordsHint')} value=${draft.keywords} onInput=${(v) => setDraft({ keywords: v })} />
       <//>
-      <${Actions}><${Action} small disabled=${busy} onClick=${() => s.tryPreview()}>${d('preview.rebuild')}<//><//>
+      ${aiNote(s)}
+      <${Actions}>
+        <${Action} small disabled=${busy} onClick=${() => s.tryPreview()}>${d('preview.rebuild')}<//>
+        <${Action} small soft disabled=${s.ai?.state === 'working'} onClick=${s.askDraft}>${s.ai?.state === 'working' ? d('preview.aiWorking') : d('preview.aiAsk')}<//>
+      <//>
     <//>
     <${Section} id="wz-odps" title=${d('preview.odpsTitle')} count=${busy ? d('wizard.working') : ''}>
       ${yaml ? html`<${Code} block scroll>${yaml}<//>` : html`<${Note} kind="quiet">${d('preview.noOdps')}<//>`}

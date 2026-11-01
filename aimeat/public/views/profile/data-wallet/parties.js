@@ -13,6 +13,7 @@
  * @structure useParties · secParties · partyCount
  * @usage const parties = useParties({ confirm, toast }); … ${secParties(ctx, '02')}
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A refusal in the page's language (data-model.js errText; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a).
  */
 import { h } from 'preact';
@@ -20,7 +21,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { ago, date as fmtDate, num } from '/js/format.js';
-import { d as p } from '../offers/data-model.js';
+import { d as p, errText } from '../offers/data-model.js';
 import { swallowed } from '/js/swallowed.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import * as dp from '/js/services/dataproducts.js';
@@ -69,7 +70,7 @@ export function useParties({ confirm, toast, federated }) {
   const act = async (fn, said) => {
     setBusy(true);
     try { const out = await fn(); if (said) toast(said); await load(); return out; }
-    catch (err) { toast(err?.message || p('party.failed'), true); return null; }
+    catch (err) { toast(errText(err, 'party.failed'), true); return null; }
     finally { setBusy(false); }
   };
   const toggle = (name) => { setFresh(null); setOpenName((cur) => (cur === name ? null : name)); };
