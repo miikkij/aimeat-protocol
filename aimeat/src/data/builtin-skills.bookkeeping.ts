@@ -27,6 +27,8 @@
  * @structure BOOKKEEPING_SKILL_ENTRY
  * @usage import { BOOKKEEPING_SKILL_ENTRY } from './builtin-skills.bookkeeping.js';
  * @version-history
+ *   2026-11-01 — Section 5: a package offered to a data space over the Dataspace Protocol, the requests
+ *     and agreements through aimeat_dataspace (plan D8; routes/odata.ts reads the transfer token).
  *   2026-11-01 — Section 5: a package sold on EXCHANGE, the feed metered against the buyer's contract (plan D5; routes/odata.ts).
  *   2026-11-01 — Section 5: a package shared by name with an outside reader through aimeat_party, who
  *     signs in to the feed with HTTP Basic (plan doc-mvwxcas3dom3, D3; routes/odata.ts).
@@ -177,6 +179,17 @@ programs read it:
   token and pays each read or month through their contract; a buyer with no account buys on the
   provider's card page and gets a key for HTTP Basic, as an outside reader does. A reader the package's
   own audience already admits reads free, so a package for sale is one that is not public.
+- **To offer the package to a data space** (a partner's Catena-X or Gaia-X connector, any Eclipse
+  Dataspace Protocol 2025-1 participant): the operator turns the Dataspace Protocol on for the
+  server, and the person gives the partner the server's address. The partner's connector reads the
+  catalogue (public packages, packages shared with that participant, packages for sale), asks for one,
+  and the request waits for the person: \`aimeat_dataspace\` action \`list\` with \`waiting\` true shows
+  who asks for what, \`approve\` agrees, \`decline\` refuses or ends an agreement in force. To let one
+  package agree on its own to offers within its published terms, \`settings\` with the package and
+  \`auto_agree\` true; a package for sale always waits, because its price is invoiced outside the
+  server. After the agreement the partner pulls the rows over the feed with a token that reads that one
+  package and stops when the agreement ends. Tell the person that copies already taken stay with the
+  partner.
 
 ## How it goes stale
 

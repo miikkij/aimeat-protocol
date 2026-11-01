@@ -250,6 +250,8 @@ tags:
     description: Frictionless Data Packages with AIMEAT provenance — publish, validate, read
   - name: Parties
     description: Outside parties (people and programs with no account here) and the named shares of data packages to them
+  - name: Dataspace
+    description: The Eclipse Dataspace Protocol 2025-1 provider (catalog, contract negotiation, pull transfer) and the owner's and operator's reads of it
   - name: Workflows
     description: Multi-step agent workflows — save, run, answer human-input steps, and inspect pending inputs
   - name: Public
@@ -323,6 +325,15 @@ components:
         about 15 minutes. Accepted on the same endpoints as PartyBasicAuth; on every other endpoint it
         answers 401. Every request re-checks the party, its key and its share, so a deleted party,
         a deleted key or an ended share refuses the next read with an earlier token.
+    DataspaceAuth:
+      type: http
+      scheme: bearer
+      description: >
+        A Dataspace Protocol participant's credential, on the /dsp/2025-1 endpoints only (plan D8.5).
+        Under the `dcp` method: a Decentralized Claims Protocol 1.0 self-issued ID token signed by the
+        participant's did:web key (iss = sub = its DID, aud = this node's participant id, a fresh jti,
+        exp). Under the `static` method (a test lab, the TCK): the token the operator gave the
+        participant, as `Bearer <token>` or the bare header value. Never a node session.
     SignatureAuth:
       type: apiKey
       in: header
@@ -28722,6 +28733,359 @@ paths:
         '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
         '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
         '409': { description: PARTY_STOPPED or PACKAGE_WITHDRAWN }
+  /.well-known/dspace-version:
+    get:
+      operationId: dspVersion
+      summary: The Dataspace Protocol versions this node speaks
+      description: |
+        DSP 2025-1 version metadata, unauthenticated and unversioned: `{ protocolVersions: [{ version:
+        "2025-1", path: "/dsp/2025-1", binding: "HTTPS", serviceId, identifierType: "did:web", auth:
+        { protocol: "DCP", version: "1.0", profile } }] }`. Plain JSON without `@context`. 404 while
+        AIMEAT_DATASPACE_ENABLED is off.
+      tags: [Dataspace]
+      security: [{}]
+      responses:
+        '200': { description: '`{ protocolVersions }`' }
+        '404': { description: The dataspace is off on this node }
+  /dsp/2025-1/catalog/request:
+    post:
+      operationId: dspCatalogRequest
+      summary: The DSP catalog for the requesting participant
+      description: |
+        A CatalogRequestMessage (`filter` empty or absent; a filter is 400). Answers a Catalog
+        (compacted JSON-LD, `@context` the DSP context): this node's `participantId`, one DataService
+        whose `endpointURL` is the DSP base, and a Dataset for each data package the participant may
+        see: a public package (when the data intermediation setting lets data be offered openly), a
+        package shared by name with the participant's party, and a package listed on EXCHANGE with a
+        money price. Each Dataset has its ODRL Offers in `hasPolicy` (permission `use`, the share's
+        purpose and end as constraints, prohibitions `odrl:distribute` and `odrl:derive` from the usage
+        terms, the obligations `odrl:attribute` and, for a priced listing, `odrl:compensate` with
+        `odrl:payAmount`, `odrl:unit` and `odrl:elapsedTime` or `odrl:count`) and one Distribution
+        `HttpData-PULL`. Paged by 100 with `Link: <…?continuationToken=n>; rel="next"`.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters:
+        - { name: continuationToken, in: query, required: false, schema: { type: integer, minimum: 0 } }
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        '200': { description: A Catalog }
+        '400': { description: CatalogError (INVALID_MESSAGE, UNSUPPORTED_FILTER) }
+        '401': { description: CatalogError UNAUTHORIZED }
+        '404': { description: The dataspace is off on this node }
+  /dsp/2025-1/catalog/datasets/{id}:
+    get:
+      operationId: dspDataset
+      summary: One DSP dataset
+      description: The Dataset (with its own `@context`) when the participant may see it; otherwise 404 with a CatalogError.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: A Dataset }
+        '401': { description: CatalogError UNAUTHORIZED }
+        '404': { description: CatalogError NOT_FOUND }
+  /dsp/2025-1/negotiations/request:
+    post:
+      operationId: dspNegotiationRequest
+      summary: Start a contract negotiation (ContractRequestMessage)
+      description: |
+        The consumer's first ContractRequestMessage: `consumerPid`, `callbackAddress` (https, or an
+        origin in AIMEAT_DATASPACE_CALLBACK_ORIGINS) and an `offer` whose `@id` is one this node
+        published for the dataset `offer.target` to this participant. Answers 201 with a
+        ContractNegotiation in REQUESTED. Then, after the answer: when the owner set the package to
+        agree on its own and the offer is free, the agreement is made and sent to
+        `<callbackAddress>/negotiations/<consumerPid>/agreement`; otherwise the request waits for the
+        owner's approval (GET /v1/dataspace/negotiations). A priced offer always waits. The agreement is
+        a named share of the package to the participant's party (kind dataspace), or for a priced offer
+        an EXCHANGE contract booked on the invoice rail with the share bound to it.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object } } }
+      responses:
+        '201': { description: A ContractNegotiation (state REQUESTED) }
+        '400': { description: 'ContractNegotiationError: INVALID_MESSAGE, INVALID_CALLBACK, UNKNOWN_DATASET, UNKNOWN_OFFER, PROVIDER_BUSY' }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+  /dsp/2025-1/negotiations/{pid}:
+    get:
+      operationId: dspNegotiation
+      summary: A contract negotiation's state
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: A ContractNegotiation }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+        '404': { description: 'ContractNegotiationError NOT_FOUND: no such negotiation for this participant' }
+  /dsp/2025-1/negotiations/{pid}/request:
+    post:
+      operationId: dspNegotiationCounterOffer
+      summary: A counter-offer (ContractRequestMessage with providerPid)
+      description: Allowed in OFFERED only (it moves the negotiation to REQUESTED); any other state is 400 INVALID_STATE.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A ContractNegotiation }
+        '400': { description: ContractNegotiationError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+        '404': { description: ContractNegotiationError NOT_FOUND }
+  /dsp/2025-1/negotiations/{pid}/events:
+    post:
+      operationId: dspNegotiationEvent
+      summary: The consumer's ACCEPTED event
+      description: Moves OFFERED to ACCEPTED when the offer on the table is the provider's. FINALIZED from a consumer, and any other state, is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A ContractNegotiation }
+        '400': { description: ContractNegotiationError INVALID_MESSAGE, INVALID_EVENT or INVALID_STATE }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+        '404': { description: ContractNegotiationError NOT_FOUND }
+  /dsp/2025-1/negotiations/{pid}/agreement/verification:
+    post:
+      operationId: dspNegotiationVerification
+      summary: The consumer verifies the agreement
+      description: Moves AGREED to VERIFIED; the provider then sends the FINALIZED event. Any other state is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A ContractNegotiation }
+        '400': { description: ContractNegotiationError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+        '404': { description: ContractNegotiationError NOT_FOUND }
+  /dsp/2025-1/negotiations/{pid}/termination:
+    post:
+      operationId: dspNegotiationTermination
+      summary: The consumer terminates the negotiation
+      description: Moves any live state to TERMINATED and ends what an agreement made (its share, its contract, its transfers). In FINALIZED or TERMINATED it is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A ContractNegotiation }
+        '400': { description: ContractNegotiationError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: ContractNegotiationError UNAUTHORIZED }
+        '404': { description: ContractNegotiationError NOT_FOUND }
+  /dsp/2025-1/transfers/request:
+    post:
+      operationId: dspTransferRequest
+      summary: Start a pull transfer (TransferRequestMessage)
+      description: |
+        `consumerPid`, `agreementId` (an agreement this node made with the same participant, not
+        ended), `format` HttpData-PULL and `callbackAddress`. Answers 201 with a TransferProcess in
+        REQUESTED (the open transfer of the same consumerPid answers again). The provider then sends a
+        TransferStartMessage whose `dataAddress` is `{ endpointType: https://w3id.org/idsa/v4.1/HTTP,
+        endpoint: <base>/v1/odata/<owner>/<package>, endpointProperties: authorization = an outside
+        party token (aimeat_party_…) bound to the agreement's share, authType = bearer }`.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '201': { description: A TransferProcess (state REQUESTED) }
+        '400': { description: 'TransferError: INVALID_MESSAGE, UNSUPPORTED_FORMAT, INVALID_CALLBACK, UNKNOWN_AGREEMENT, PROVIDER_BUSY' }
+        '401': { description: TransferError UNAUTHORIZED }
+  /dsp/2025-1/transfers/{pid}:
+    get:
+      operationId: dspTransfer
+      summary: A transfer's state
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: A TransferProcess }
+        '401': { description: TransferError UNAUTHORIZED }
+        '404': { description: TransferError NOT_FOUND }
+  /dsp/2025-1/transfers/{pid}/start:
+    post:
+      operationId: dspTransferStart
+      summary: The consumer resumes a suspended transfer
+      description: SUSPENDED to STARTED; the token handed out at the start reads again until it expires. Any other state is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A TransferProcess }
+        '400': { description: TransferError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: TransferError UNAUTHORIZED }
+        '404': { description: TransferError NOT_FOUND }
+  /dsp/2025-1/transfers/{pid}/completion:
+    post:
+      operationId: dspTransferCompletion
+      summary: The consumer completes a transfer
+      description: STARTED to COMPLETED; the transfer's token stops reading. Any other state is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A TransferProcess }
+        '400': { description: TransferError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: TransferError UNAUTHORIZED }
+        '404': { description: TransferError NOT_FOUND }
+  /dsp/2025-1/transfers/{pid}/suspension:
+    post:
+      operationId: dspTransferSuspension
+      summary: The consumer suspends a transfer
+      description: STARTED to SUSPENDED; the token is refused until the transfer is resumed. Any other state is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A TransferProcess }
+        '400': { description: TransferError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: TransferError UNAUTHORIZED }
+        '404': { description: TransferError NOT_FOUND }
+  /dsp/2025-1/transfers/{pid}/termination:
+    post:
+      operationId: dspTransferTermination
+      summary: The consumer terminates a transfer
+      description: Any live state to TERMINATED; the token stops reading for good. COMPLETED or TERMINATED is 400.
+      tags: [Dataspace]
+      security: [{ DataspaceAuth: [] }]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: A TransferProcess }
+        '400': { description: TransferError INVALID_MESSAGE or INVALID_STATE }
+        '401': { description: TransferError UNAUTHORIZED }
+        '404': { description: TransferError NOT_FOUND }
+  /v1/dataspace/negotiations:
+    get:
+      operationId: dataspaceNegotiations
+      summary: The Dataspace Protocol negotiations of your data packages
+      description: |
+        The owner in person, or a principal holding party:manage. Newest first, each with its state,
+        whether it waits for you, the participant, the package, the offer and its price (paid by
+        invoice outside this server), and what an agreement made (the party and the share).
+        `?waiting=true` lists only the requests that wait; `?state=` one state.
+      tags: [Dataspace]
+      parameters:
+        - { name: state, in: query, required: false, schema: { type: string, enum: [REQUESTED, OFFERED, ACCEPTED, AGREED, VERIFIED, FINALIZED, TERMINATED] } }
+        - { name: waiting, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200': { description: '`{ negotiations, total, waiting_for_you }`' }
+        '403': { description: SCOPE_DENIED (party:manage) or FORBIDDEN }
+  /v1/dataspace/negotiations/{pid}:
+    get:
+      operationId: dataspaceNegotiation
+      summary: One negotiation of your data packages, with its transfers
+      tags: [Dataspace]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: '`{ negotiation }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+  /v1/dataspace/negotiations/{pid}/approve:
+    post:
+      operationId: dataspaceApprove
+      summary: Agree to a request that waits for you
+      description: The agreement materialises (a named share, or for a priced offer an EXCHANGE contract on the invoice rail) and is sent to the participant. Answers the negotiation and the sentence to tell the person.
+      tags: [Dataspace]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody: { required: false, content: { application/json: { schema: { type: object } } } }
+      responses:
+        '200': { description: '`{ negotiation, say }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+        '409': { description: NOT_WAITING or AGREEMENT_REFUSED }
+        '502': { description: CALLBACK_FAILED. The participant did not take the agreement; the request still waits }
+  /v1/dataspace/negotiations/{pid}/decline:
+    post:
+      operationId: dataspaceDecline
+      summary: Decline a request, or end an agreement
+      description: A request or an agreement not yet finalised is terminated with a message to the participant. A finalised agreement is ended; its share and contract end, its transfers are terminated, and the next read is refused.
+      tags: [Dataspace]
+      parameters: [{ name: pid, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: { reason: { type: string, maxLength: 2048 } } } } }
+      responses:
+        '200': { description: '`{ negotiation }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND }
+        '409': { description: ALREADY_ENDED }
+  /v1/dataspace/settings:
+    get:
+      operationId: dataspaceSettingsGet
+      summary: Which of your data packages agree on their own
+      tags: [Dataspace]
+      responses:
+        '200': { description: '`{ packages: [{ package, auto_agree, updated_at, updated_by }], default, enabled }`' }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+    put:
+      operationId: dataspaceSettingsSet
+      summary: Let one package agree on its own, or wait for you
+      description: '`auto_agree` true agrees at once on a free offer within the published policy; false waits for you; null goes back to the default (wait). A priced offer always waits.'
+      tags: [Dataspace]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [package, auto_agree]
+              properties:
+                package: { type: string, maxLength: 64 }
+                auto_agree: { type: boolean, nullable: true }
+      responses:
+        '200': { description: '`{ packages, default, enabled }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: SCOPE_DENIED or FORBIDDEN }
+        '404': { description: NOT_FOUND (the package) }
+  /v1/admin/dataspace:
+    get:
+      operationId: adminDataspaceStatus
+      summary: The Dataspace Protocol provider's status (operator)
+      description: |
+        Whether it is on, the protocol base and the version endpoint, the node's participant id and
+        DID document address, the verifiers in force, the trusted issuers of each data space, the
+        participant ids of the static tokens (never the tokens), the callback origins, the TCK mode
+        (set, in force, or refused and why), and the last TCK run recorded.
+      tags: [Dataspace]
+      responses:
+        '200': { description: '`{ enabled, protocol, participant_id, did_document, auth, trusted_issuers, static_participants, callback_origins, tck_mode, last_tck_result }`' }
+        '403': { description: Not an operator }
+  /v1/admin/dataspace/tck-result:
+    put:
+      operationId: adminDataspaceTckResult
+      summary: Record a run of the Dataspace Protocol TCK (operator)
+      tags: [Dataspace]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tests]
+              properties:
+                tck: { type: string }
+                note: { type: string }
+                tests:
+                  type: array
+                  maxItems: 500
+                  items:
+                    type: object
+                    required: [id, result]
+                    properties:
+                      id: { type: string, maxLength: 40 }
+                      result: { type: string, enum: [pass, fail, skip] }
+                      reason: { type: string }
+      responses:
+        '200': { description: '`{ recorded }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: Not an operator }
   /v1/parties/token:
     post:
       operationId: partyToken
@@ -82165,7 +82529,12 @@ paths:
         The W3C DID document for the node's verifiable-credential issuer: the issuer DID and the
         public key that signs credentials, as a JsonWebKey verification method used for both
         authentication and assertion. Registered only once the node key has loaded, so a node with
-        no key answers 404. Public.
+        no key answers 404. Public. While the Dataspace Protocol provider is on
+        (AIMEAT_DATASPACE_ENABLED), it is the node's did:web document as a data space participant:
+        `id` is the participant id (did:web of the public address unless configured), the same key as
+        JsonWebKey2020 with authentication, assertionMethod and capabilityInvocation, services
+        DataService (the dspace-version endpoint) and CatalogService, and the credential issuer DID in
+        `alsoKnownAs` when it differs.
       tags: [Verification]
       responses:
         '200':

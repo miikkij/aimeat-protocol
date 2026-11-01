@@ -21,7 +21,7 @@ The v4.0 Platform document went stale in at least ten places in three months, be
 
 The platform is a node built on Core that adds the product a person uses. A person's own AI does their work through the node, over MCP or with a prompt the person runs in their own chat. The web shows what happened and holds the controls that need a screen. The person owns the data, and every agent and application acts under their consent.
 
-On top of Core the reference node adds six clusters:
+On top of Core the reference node adds seven clusters:
 
 | Cluster | What it adds | Core it rests on |
 |---|---|---|
@@ -31,6 +31,11 @@ On top of Core the reference node adds six clusters:
 | Skills and capabilities | The skill registry, the capability registry with invoke and vouch | §6 records, §5.1 scopes |
 | Commerce | The marketplace (offerings, needs, bids, contracts), checkout, seller payouts, invoices, the pacing pack | §8.2 offers, §8.6 payment interface |
 | Public presence and outside accounts | Portfolio, company addresses, site layout, mail and social accounts, attached MCP servers as a gateway | §6.3 visibility, §11.4 MCP |
+| Data out | Data packages read by outside parties that have no account, shared by name, sold on the marketplace, and offered to data spaces over the Eclipse Dataspace Protocol 2025-1 | §5 authorization, §6 records, §8.2 offers |
+
+### Data out, and data spaces
+
+Every road out of the node ends in one of two grants that already exist: a named share (a consent whose recipient is an outside party) or a marketplace contract. The Dataspace Protocol adds no third kind. A data space participant becomes an outside party of the package owner, identified by its DID; an agreement it negotiates is a named share to that party, or for a priced offer a contract the owner approves, because the protocol moves no money. The data plane is the node's own OData and CSV reads, and the token a transfer hands out is the party's purpose token, bound to that one share, so ending the agreement, the share or the transfer ends the next read. The protocol endpoints take a participant's credential and never a node session; the owner's side of a negotiation is an agent tool like every other decision.
 
 ## 2. The shared living surface
 

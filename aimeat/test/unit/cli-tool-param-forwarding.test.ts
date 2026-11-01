@@ -26,6 +26,7 @@
  *   on the fleet door with this suite green.
  * @usage pnpm test -- cli-tool-param-forwarding
  * @version-history
+ *   2026-11-01 — aimeat_dataspace is probed on its decline branch; list and settings in dataspace-dispatch.test.ts (plan D8.3).
  *   2026-11-01 — aimeat_datapackage_sell is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D5.1).
  *   2026-11-01 — aimeat_datapackage_withdraw is probed with a pkg:owner/name ref (plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-25 — aimeat_publish_requests is probed with a request_id, which `account` rides on (secaudit2026oct22).
@@ -114,6 +115,9 @@ const PROBE_SETUP: Record<string, { shaped?: Record<string, unknown>; always?: J
     // ref is matched against the same pattern; owner and name go into the DELETE path.
     aimeat_datapackage_withdraw: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' } },
     aimeat_datapackage_sell: { shaped: { ref: 'pkg:zqxrefzqx/zqxrefzqx' } },
+    // action='settings' (the enum sentinel) carries only package and auto_agree; 'decline' carries the
+    // negotiation and the reason. The list and settings branches are measured in dataspace-dispatch.test.ts.
+    aimeat_dataspace: { always: { action: 'decline' } },
     // `account` names whose request an operator reads or answers, so it rides on one request (request_id);
     // the list is always the caller's own account.
     aimeat_publish_requests: { always: { request_id: 'zqxrequest_idzqx' } },
@@ -242,6 +246,12 @@ const UNREACHABLE: Record<string, Record<string, string>> = {
         state: 'Same condition and the same test.',
         request_id: "Conditional, not dropped: it rides only on action='decide'; measured in test/unit/package-sale-dispatch.test.ts.",
         decision: 'Same condition and the same test.',
+    },
+    aimeat_dataspace: {
+        state: "Conditional, not dropped: it rides only on action='list', and the probe holds `action` at 'decline'. "
+            + 'The list branch is measured in test/unit/dataspace-dispatch.test.ts.',
+        waiting: 'Same condition and the same test.',
+        auto_agree: "Conditional, not dropped: it rides only on action='settings' with a package; measured in test/unit/dataspace-dispatch.test.ts.",
     },
     aimeat_knowledge_contribute: {
         package_id: 'This tool is deliberately unreachable from the connector — see knowledgeContributeUnreachable().',

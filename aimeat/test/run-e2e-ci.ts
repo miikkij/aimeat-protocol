@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-dsp.ts joins the list (not the guard tier): the Dataspace Protocol provider (plan doc-mvwxcas3dom3, D8).
  *   2026-11-01 -- e2e-app-parties.ts joins the list (not the guard tier): an app's users as outside parties (plan doc-mvwxcas3dom3, D4).
  *   2026-11-01 -- e2e-exchange-datapackage.ts joins the list (not the guard tier): a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   2026-11-01 -- e2e-data-lifecycle.ts and e2e-data-intermediation.ts join the list (not the guard tier):
@@ -1271,6 +1272,8 @@ const ALL_SUITES = [
     'test/e2e-exchange-datapackage.ts',
     // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.
     'test/e2e-app-parties.ts',
+    // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
+    'test/e2e-dsp.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).
     'test/e2e-exposure-report.ts',
     // The conflicts in that report: each item's effective classification and cap, conflicts first,

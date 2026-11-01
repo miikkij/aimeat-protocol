@@ -95,6 +95,9 @@ export type AccountEventKind =
   | 'payment_sent'
   | 'contract_started'
   | 'contract_ended'
+  /** A data space participant asks for a data package and the agreement waits for the owner's approval
+   *  (services/dataspace/negotiation.ts). `data.name` the package, `data.who` the participant id. */
+  | 'dataspace_request'
   // Workflows
   | 'workflow_created'
   | 'workflow_updated'
