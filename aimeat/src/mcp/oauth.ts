@@ -12,6 +12,8 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   2026-11-01 — The browser path passes OAuth's ui_locales to the consent page as `lang`, so a
+ *     Finnish buyer's sign-in from their place opens in Finnish.
  *   2026-10-27 — An authorization code carries its issue time, and the exchange refuses a code from
  *     before the agent's credential cut, for an agent gone or made later, or for a deactivated account.
  *     The refresh grant goes on only when its delete removed the row, refuses a missing agent or a
@@ -81,6 +83,7 @@ import { registerOAuthMetadataRoutes } from './oauth-metadata.js';
 import { resolveClientIdMetadata, isClientIdUrl } from '../services/oauth-client-metadata.js';
 import { redirectUriRegistered } from './oauth-redirect.js';
 import { registerOAuthConsentInfo } from './oauth-consent-info.js';
+import { LOCALES } from '../i18n.js';
 import {
     hasUnknownResource, mcpOAuthLaxLive, mcpResourceOf, noteLaxUse, pkceRefusal, resourceRefusal, resourceValues,
 } from './oauth-binding.js';
@@ -346,6 +349,11 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
         if (codeChallengeMethod) consentUrl.searchParams.set('code_challenge_method', codeChallengeMethod);
         // The consent page posts these back to /v1/mcp/authorize-consent, which issues the code.
         for (const r of resources) consentUrl.searchParams.append('resource', r);
+        // OAuth's ui_locales (a space-separated preference list): the first language this node ships
+        // becomes the page's `lang`, which the page's locale detection reads before anything else.
+        const uiLocale = (q('ui_locales') ?? '').slice(0, 200).split(/\s+/)
+            .map(tag => tag.split('-')[0].toLowerCase()).find(tag => (LOCALES as readonly string[]).includes(tag));
+        if (uiLocale) consentUrl.searchParams.set('lang', uiLocale);
         res.redirect(302, consentUrl.toString());
     });
 
