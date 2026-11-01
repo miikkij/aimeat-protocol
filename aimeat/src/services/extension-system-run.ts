@@ -52,6 +52,8 @@
  *     logLabel: 'scheduler',
  *   });
  * @version-history
+ *   v1.10.2 -- 2026-11-01 -- ctx.datapackage's producer names the extension, for the personal-data check
+ *     of a public publish (services/datapackage/personal-guard.ts; plan doc-mvwxcas3dom3, D1.7).
  *   v1.10.1 -- 2026-10-25 -- The extension is found through services/component-address.ts, the owner's
  *     own first, so a run named with the bare name of an install made since names carry the owner
  *     reaches it (owner namespaces wish, secaudit2026oct22). A name another account now keeps under its
@@ -361,6 +363,9 @@ export async function runExtensionActionAsSystem(deps: SystemRunDeps, args: Syst
                 gaii: callerGaii,
                 kind: args.producerKind,
                 ref: args.producerRef ?? `${ext.name}/${actionId}`,
+                // The data maps of the apps naming this extension decide the personal-data check
+                // (services/datapackage/personal-guard.ts); not stored.
+                extension: ext.name,
                 ...(args.producerSchedule ? { schedule: args.producerSchedule } : {}),
             },
             publishers,

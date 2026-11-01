@@ -34,6 +34,8 @@
  * @structure descriptorToOdps · odpsVisibilityOf
  * @usage const doc = descriptorToOdps({ descriptor, ownerGhii, baseUrl, resourceUrls, audience });
  * @version-history
+ *   v1.2.0 -- 2026-11-01 -- `dataHolder` from the owner's stated company (./data-holder.ts) and a
+ *     `pricingPlans` slot an offering fills; absent stays absent (plan doc-mvwxcas3dom3, D1.2).
  *   v1.1.0 -- 2026-11-01 -- The sheet states the version's real audience (`audience`): visibility,
  *     authenticationMethod and the access descriptions follow it, and x-aimeat.audience names it. It
  *     said public and "No authentication" for every package (plan doc-mvwxcas3dom3, D0.1). odpsYamlKey
@@ -79,6 +81,13 @@ export interface OdpsProjectionInput {
     lang?: string;
     /** Who reads this version (./audience.ts): public, members, organism:<id> or private. Default public. */
     audience?: string;
+    /** The legal entity behind the package, when the owner stated one (./data-holder.ts). Absent: no block. */
+    dataHolder?: Record<string, string> | null;
+    /**
+     * ODPS `pricingPlans`, when an offering sells this package. Nothing fills it yet: the package's own
+     * read has no price, and a sheet without plans says nothing is charged rather than inventing a plan.
+     */
+    pricingPlans?: Record<string, unknown> | null;
 }
 
 /** ODPS v4.1 `details.visibility` for an AIMEAT audience. */
@@ -196,7 +205,9 @@ export function descriptorToOdps(input: OdpsProjectionInput): Record<string, unk
         product: {
             details: { [lang]: details },
             dataAccess,
+            ...(input.pricingPlans ? { pricingPlans: input.pricingPlans } : {}),
             ...(a.license ? { license: { scope: { definition: a.license } } } : {}),
+            ...(input.dataHolder ? { dataHolder: input.dataHolder } : {}),
             ...(sla ? { SLA: sla } : {}),
             // Everything the closed enums cannot hold, stated rather than bent into a near-fit.
             'x-aimeat': {

@@ -9,6 +9,12 @@
  * @structure catalogueRouter(config, storage, directoryService?) — GET /v1/catalogue,
  *   /v1/catalogue/{actions,agents,boards,hash,directory,directory/stats,knowledge,:actionId}, POST /v1/catalogue.
  * @version-history
+ *   2026-11-01 — GET /v1/catalogue/dcat, the DCAT-AP feed of the public data packages, is mounted here
+ *     (routes/catalogue-dcat.ts) before GET /v1/catalogue/:actionId (plan doc-mvwxcas3dom3, D1.3).
+ *   2026-11-01 — GET /v1/catalogue/knowledge: a data package's item carries `datapackage`, its descriptor,
+ *     OData, ODPS, schema.org and public page addresses and per resource the CSV address; the listing
+ *     dropped x_aimeat_datapackage, so a reader found a dataset and no way to its rows (plan
+ *     doc-mvwxcas3dom3, D1.1).
  *   2026-10-20 — SECURITY: GET /v1/catalogue/directory refuses the shared anonymous principal by
  *     identity (refuseAnonymousPrincipal), so the token POST /v1/auth/anonymous mints no longer lists
  *     the signed-in-only people directory (secaudit 2026-10, jwt.ts:issueJWT:anonymous-claim-not-signed).
@@ -50,6 +56,8 @@ import { readAvatarsOrEmpty } from '../services/agent-avatar.js';
 import { readerFor } from '../services/classification/reader.js';
 import { presentMemories, classificationWarningOf } from '../services/classification/present-memory.js';
 import { logger } from '../utils/logger.js';
+import { datasetFactsOf, datapackageListing } from '../services/datapackage/catalogue-facts.js';
+import { mountCatalogueDcat } from './catalogue-dcat.js';
 
 /** Shape of a stored knowledge-package manifest value (memory record `value`). */
 interface KnowledgePackageManifest {
@@ -374,6 +382,8 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
       const packageId = m.key.replace('packages/', '').replace('/manifest', '');
       // A warning-classified manifest carries what the reader put on it, as GET /v1/knowledge/:id does.
       const warning = classificationWarningOf(m);
+      // A data package's entry says where its rows are: the facts of its manifest (no file read).
+      const dataset = v.content_type === 'dataset' ? datasetFactsOf(m) : null;
       return {
         package_id: packageId,
         ...(warning ? { classificationWarning: warning } : {}),
@@ -391,6 +401,7 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
         sharing: v.sharing,
         created: v.created || m.createdAt,
         updated: v.updated || m.updatedAt,
+        ...(dataset ? { datapackage: datapackageListing(config.baseUrl, dataset) } : {}),
       };
     });
 
@@ -479,6 +490,9 @@ export function catalogueRouter(config: AimeatConfig, storage: Storage, director
   });
 
   // GET /v1/catalogue/:actionId — action detail (Tier 0, no auth)
+  // The DCAT-AP feed of the public data packages (routes/catalogue-dcat.ts), before :actionId takes the path.
+  mountCatalogueDcat(router, config, storage);
+
   router.get('/v1/catalogue/:actionId', async (req, res) => {
     const actions = await cachedActions();
     const action = actions.find(a => a.id === req.params.actionId);

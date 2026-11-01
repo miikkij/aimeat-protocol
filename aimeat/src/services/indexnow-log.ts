@@ -22,6 +22,8 @@
  * @usage
  *   const last = await readIndexNowLastRun(storage);
  * @version-history
+ *   v1.2.0 — 2026-11-01 — A run's scope may be `dataset`: one public data package's page, announced when
+ *     a public version is published (services/datapackage/announce.ts; plan doc-mvwxcas3dom3, D1.4).
  *   v1.1.0 — 2026-09-11 — The record keeps the newest five runs rather than the last one alone, and
  *     a run says how many hosts it reached, which hosts refused, what it covered (one app, the
  *     pages, everything) and who sent it. A record written by v1.0.0 (one flat run) still reads.
@@ -37,7 +39,7 @@ const KEY = 'site/indexnow-last-run';
 export const INDEXNOW_RUNS_KEPT = 5;
 
 /** What one notice covered. */
-export type IndexNowScope = 'app' | 'pages' | 'all';
+export type IndexNowScope = 'app' | 'pages' | 'all' | 'dataset';
 
 export interface IndexNowRun {
   /** ISO timestamp of the submission. */
@@ -104,7 +106,7 @@ function asRun(raw: unknown): IndexNowRun | null {
     ok: !!r.ok,
     status: typeof r.status === 'number' ? r.status : null,
     failed: Array.isArray(r.failed) ? r.failed.filter((h): h is string => typeof h === 'string') : [],
-    ...(r.scope === 'app' || r.scope === 'pages' || r.scope === 'all' ? { scope: r.scope } : {}),
+    ...(r.scope === 'app' || r.scope === 'pages' || r.scope === 'all' || r.scope === 'dataset' ? { scope: r.scope } : {}),
     ...(typeof r.by === 'string' ? { by: r.by } : {}),
   };
 }

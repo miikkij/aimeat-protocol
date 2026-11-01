@@ -9,6 +9,8 @@
  * @structure buildDiscoveryRegistry(storage, config) → DiscoveryRegistry (memory + capabilities + apps + agent-tasks)
  * @usage const registry = buildDiscoveryRegistry(storage, config);
  * @version-history
+ *   v0.7.0 — 2026-11-01 — Register the `datasets` source: data packages as `dataset` entries with their
+ *     audience, freshness and addresses (plan doc-mvwxcas3dom3, D1.1).
  *   v0.6.0 — 2026-10-02 — Register the `package-offers` source: the packages this node sells, as
  *     `offering` entries with segment `package` (package sale design, phase 5).
  *   v0.5.0 — 2026-09-01 — Register the `node-capabilities` source: what THIS NODE can do, so an
@@ -34,6 +36,7 @@ import { createAppToolsSource } from './sources/app-tools-source.js';
 import { createNodeCapabilitiesSource } from './sources/node-capabilities-source.js';
 import { createRemoteMcpSource } from './sources/remote-mcp-source.js';
 import { createPackageOffersSource } from './sources/package-offers-source.js';
+import { createDatasetSource } from './sources/dataset-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -47,5 +50,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createNodeCapabilitiesSource());              // the node's OWN capabilities — what `invoke` can run
   registry.register(createRemoteMcpSource(storage, config));      // tools on servers this caller has attached
   registry.register(createPackageOffersSource(storage, config));  // packages this node sells (package-sales catalogue)
+  registry.register(createDatasetSource(storage, config));        // data packages, one `dataset` entry per package
   return registry;
 }

@@ -26,6 +26,8 @@
  * @usage
  *   const out = await withdrawPackage({ storage, config }, callerOf(req, nodeId, storage), owner, name, { purge });
  * @version-history
+ *   v1.0.1 — 2026-11-01 — Removing the catalogue entry drops the cached package listing
+ *     (./catalogue-facts.ts), so discovery and the DCAT feed stop naming it at once (plan D1.1).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D0.3).
  */
 import type { StoreDeps } from './store.js';
@@ -37,6 +39,7 @@ import { writeStorageFile } from '../storage-file-write.js';
 import { emitChange } from '../event-bus.js';
 import { localAccountName } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
+import { invalidateDatasetFacts } from './catalogue-facts.js';
 
 /** The caller facts a withdrawal is decided on (services/caller-context.ts CallerContext). */
 export interface WithdrawCaller {
@@ -151,5 +154,7 @@ async function removeCatalogueEntry(deps: StoreDeps, ownerGhii: string, packageI
         .map(e => e.key).filter((k): k is string => typeof k === 'string' && k.startsWith(`${root}/`));
     for (const key of entries) await deps.storage.deleteMemory(ownerGhii, key, ownerGhii);
     await deps.storage.deleteMemory(ownerGhii, `${root}/manifest`, ownerGhii);
+    // The node-wide package listing (./catalogue-facts.ts) is cached; this package leaves it now.
+    invalidateDatasetFacts();
     return true;
 }
