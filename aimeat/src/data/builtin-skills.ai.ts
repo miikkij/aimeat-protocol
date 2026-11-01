@@ -9,6 +9,7 @@
  * @structure AI_TRANSPARENCY_SKILL_ENTRY · CONFIGURE_ROUTING_SKILL_ENTRY · AI_MODEL_POLICY_SKILL_ENTRY · AI_GEN_RULES_SKILL_ENTRY
  * @usage import { AI_TRANSPARENCY_SKILL_ENTRY, CONFIGURE_ROUTING_SKILL_ENTRY } from './builtin-skills.ai.js';
  * @version-history
+ *   2026-11-01 — configure-routing: the node's AI region choice (`openrouter_region.mode`).
  *   2026-10-31 — aimeat-gen-rules: the generation rules for AI pictures and videos; ai-transparency
  *     names `rules_followed`.
  *   2026-10-31 — configure-routing: the OpenRouter region rules (openrouterRegion,
@@ -208,8 +209,11 @@ Three separate "routing" layers — identify which one the owner means:
    the region's models, us sends it to the US, any tries the US and then any country). Null keeps
    the node's choice. \`openrouter_region\` on the read says what the node allows, whether the owner
    may choose, and what applies now on the node's key and on the owner's own OpenRouter key (whose
-   default is any, because an own key may not be on the plan the regional addresses need). When an
-   owner asks where their data goes, read it and say it in their words.
+   default is any, because an own key may not be on the plan the regional addresses need). Its
+   \`mode\`, when set, is the choice made when the node was bought, and the node's region follows it:
+   eu (the EU first, the rest elsewhere), eu-only (the EU alone, with speech, image generation,
+   embeddings and the free models off; \`mode.limits\` says so) or own (no shared key: the owner adds
+   their own OpenRouter key). When an owner asks where their data goes, read it and say it in their words.
    Every answer carries \`route\`: who chose, who answered, each attempt; an OpenRouter answer's
    \`answeredBy.region\` says where it was processed, and \`regionWanted\` the region it was meant for
    when it fell back. Spend history is
