@@ -23054,7 +23054,10 @@ paths:
         detection, labelling, code_of_practice, posture }`.
 
         `ai_processing_region` is where the node's own AI key has prompts processed: `{ mode,
-        mode_limits?, node_key, region?, host?, fallback?, regions_in_use?, note }`. `mode` is the AI
+        mode_limits?, node_key, default_model?, eu_only_model?, region?, host?, fallback?,
+        regions_in_use?, note }`. `default_model` is the model the chat and the agents use when
+        nobody chose one (the node's chat, then execution, then reasoning default);
+        `eu_only_model` is the model eu-only uses in its place when the EU does not offer it. `mode` is the AI
         region choice made when the node was bought (`ai.region_mode`: `eu`, `eu-only`, `own`, or null
         when none was made) and `mode_limits` what it switches off; the region fields appear when the
         node holds its own key.
