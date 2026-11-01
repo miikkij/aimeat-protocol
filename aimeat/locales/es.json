@@ -13860,7 +13860,7 @@
     "title": "Esto es {host}: tu propio AIMEAT",
     "intro": "AIMEAT es tu propio sitio, donde la IA trabaja para ti. Recuerda lo que le cuentas, te hace agentes y aplicaciones, y todo lo que hay en él es tuyo.",
     "signInNote": "Entra con un enlace por correo. Escribe la dirección con la que compraste tu AIMEAT y te enviaremos un enlace que te deja entrar sin contraseña.",
-    "next": "Cuando hayas entrado, llegas a tu Inicio. Allí escribes en una frase lo que quieres conseguir. AIMEAT crea con ella un agente, y ves el agente antes de que empiece.",
+    "next": "Cuando hayas entrado, llegas a la vista Inicio. Allí escribes en una frase lo que quieres conseguir. AIMEAT crea con ella un agente, y ves el agente antes de que empiece.",
     "signInLabel": "Entrar",
     "emailField": "Tu dirección de correo",
     "sendLink": "Enviar el enlace de acceso",
