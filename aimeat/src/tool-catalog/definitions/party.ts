@@ -9,6 +9,7 @@
  * @structure partyTools · PARTY_ACTIONS
  * @usage imported by catalog/definitions.ts into CLI_FALLBACK_TOOL_DEFINITIONS
  * @version-history
+ *   v1.1.0 — 2026-11-01 — "share" takes `recipient`, a person on another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D2, D3.4).
  */
 import { z } from 'zod';
@@ -23,7 +24,8 @@ export const partyTools = [
         name: 'aimeat_party',
         description: 'Share a data package with a person or a program that has no account here (an outside party), and manage those parties. '
             + 'When the person says something like "share the budget signals with Matti\'s Power BI for a month", call action "share" { name: "matti", package, purpose, days: 30 } once: it makes the party when it does not exist, gives it a key, grants the share and answers the connection file. Then tell the person the sentence in `say` (what the party gets, until when, that ending the share stops the next read, and that copies already taken cannot be called back), and hand them the connection file or its key for the party. Never put the key anywhere else. '
-            + 'Actions: "share" { name, package, purpose, days? or expires?, kind?, display_name?, contact?, pinned_version?, allow_url_key?, terms_required?, new_key? }; "create" { name, kind?, display_name?, contact? } (answers the key, shown once); "list"; "get" { name } (its keys, shares and their reads); "update" { name, display_name?, contact?, kind? }; "stop" and "resume" { name } (a stopped party reads nothing; the operator may pass `owner` to stop any account\'s party for abuse); "delete" { name } (its keys, tokens and shares end at once); "key_create" { name } (a new key, shown once); "key_delete" { name, key_id }; "reads" { name } (what it read and what was refused). '
+            + 'When the person to share with has an AIMEAT account on another node ("share it with bob@their-node"), call "share" { recipient: "bob@their-node", package, purpose, days? } instead of name: no party and no key; they sign in here with their own account and read it, and `sign_in` says whether this node takes sign-ins from their node now. '
+            + 'Actions: "share" { name or recipient, package, purpose, days? or expires?, kind?, display_name?, contact?, pinned_version?, allow_url_key?, terms_required?, new_key? }; "create" { name, kind?, display_name?, contact? } (answers the key, shown once); "list"; "get" { name } (its keys, shares and their reads); "update" { name, display_name?, contact?, kind? }; "stop" and "resume" { name } (a stopped party reads nothing; the operator may pass `owner` to stop any account\'s party for abuse); "delete" { name } (its keys, tokens and shares end at once); "key_create" { name } (a new key, shown once); "key_delete" { name, key_id }; "reads" { name } (what it read and what was refused). '
             + 'A party reads only the package shared with it: over OData (Excel, Power BI, Tableau: HTTP Basic with user <owner>/<name> and the key as the password), the CSV and row addresses, or a token from POST /v1/parties/token. A person party accepts the terms before the first read unless terms_required is false. End one share with aimeat_consent_revoke (its id is the share id). '
             + 'Needs party:manage, which only the owner gives, on the agent\'s page.',
         caller: 'agent',
@@ -34,6 +36,7 @@ export const partyTools = [
         input: {
             action: { type: 'string', required: true, enum: [...PARTY_ACTIONS], description: 'What to do. To share data with someone outside, "share".' },
             name: { type: 'string', description: 'The party: lowercase letters, digits and dashes, unique per owner (e.g. "matti" or "budget-powerbi"). Every action but list.', zod: NAME },
+            recipient: { type: 'string', description: 'For share, in place of name: a person\'s account on another AIMEAT node, name@their-node. They read signed in as a visitor; an account of this node is refused.', zod: z.string().max(200) },
             package: { type: 'string', description: 'For share: the data package to share, by name.', zod: z.string().max(64) },
             purpose: { type: 'string', description: 'For share: what the party uses the data for, in one sentence. The party sees it with the terms.', zod: z.string().max(512) },
             days: { type: 'number', description: 'For share: how many days the share lasts (at most the node\'s limit, 365 by default).', zod: z.number().positive().max(3650) },

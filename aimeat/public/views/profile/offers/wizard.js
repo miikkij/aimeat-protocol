@@ -15,6 +15,9 @@
  * @structure DataWizard · definitionOf · slugOf · STEPS
  * @usage html`<${DataWizard} ctx=${ctx} />`
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Step 4 "When the source changes" (`schedule: { on: 'change' }`); step 3 asks the
+ *     owner's own AI for a description draft (POST .../describe) when the field is empty; a share to a
+ *     person on another AIMEAT node by their account; refusals in the page's language (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a).
  */
 import { h } from 'preact';
@@ -27,7 +30,11 @@ import { Tabs } from '/components/Tabs.js';
 import { Note } from '/components/Note.js';
 import { Actions, Action, Loud } from '/components/Action.js';
 import { renderPage } from './frame.js';
-import { d, cronFor } from './data-model.js';
+import { d, cronFor, errText } from './data-model.js';
+import { getLocale } from '/js/i18n.js';
+
+/** The page's language for the AI's draft: fi, es, or en for any other. */
+const pageLang = () => { const l = String(getLocale() || 'en').slice(0, 2); return ['fi', 'es'].includes(l) ? l : 'en'; };
 import { stepSources, sourcesReady, sourceSpec } from './wizard-sources.js';
 import { stepColumns, stepPreview, columnsFromProbe } from './wizard-columns.js';
 import { stepSchedule, stepWho, stepDone } from './wizard-publish.js';
@@ -60,7 +67,7 @@ export function definitionOf(draft) {
   return {
     sources, combine, ...(columns ? { columns } : {}),
     filter: f && f.column && f.value !== '' ? { column: f.column, op: f.op, value } : null,
-    schedule: cron ? { cron, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null,
+    schedule: draft.schedule.freq === 'change' ? { on: 'change' } : cron ? { cron, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone } : null,
     retention: KEEP[draft.keep] ?? null,
     visibility,
     ...(draft.title.trim() ? { title: draft.title.trim() } : {}),
@@ -87,6 +94,7 @@ export function DataWizard({ ctx }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [result, setResult] = useState(null);    // what Publish made
+  const [ai, setAi] = useState({ state: 'idle' }); // the description draft by the owner's own AI
 
   useEffect(() => { dp.listSourceChoices(ctx.data.owner).then(setChoices).catch((err) => { swallowed('wizard: choices', err); setChoices({}); }); }, [ctx.data.owner]);
   const setDraft = (patch) => setDraftState((cur) => {
@@ -103,7 +111,7 @@ export function DataWizard({ ctx }) {
 
   const tryRun = async (fn) => {
     setBusy(true); setError('');
-    try { await fn(); } catch (err) { setError(err?.message || d('wizard.failed')); }
+    try { await fn(); } catch (err) { setError(errText(err, 'wizard.failed')); }
     setBusy(false);
   };
 
@@ -115,11 +123,29 @@ export function DataWizard({ ctx }) {
     setDraft((cur) => ({ columns: columnsFromProbe(out, cur.sources, cur.columns) }));
     if (advance) go(1);
   });
+  /**
+   * Step 3: the owner's own AI writes a draft of the description from the name, the sources and the
+   * columns (POST /v1/dataproducts/{name}/describe). It fills an empty field only; the owner changes it.
+   * With no AI to ask, the field stays empty and the page says where the AI is set up.
+   */
+  const askDraft = async (cur = draft) => {
+    setAi({ state: 'working' });
+    try {
+      const out = await dp.describeDraft(name, { ...definitionOf(cur), lang: pageLang() });
+      setAi({ state: 'done', text: out.description, provenance: out.provenance || null });
+      // An owner who wrote meanwhile keeps their words; the draft fills an empty field only.
+      setDraft((now) => (now.description.trim() ? {} : { description: out.description }));
+    } catch (err) {
+      const details = err?.response?.error?.details || {};
+      setAi(details.reason ? { state: 'noai', reason: details.reason, settingsUrl: details.settings_url } : { state: 'failed', error: errText(err, 'preview.aiFailed') });
+    }
+  };
   /** Step 2 → 3, and again when step 3 changes: the whole draft built, nothing stored. */
   const tryPreview = (then) => tryRun(async () => {
     const out = await dp.previewDraft(name, definitionOf(draft));
     setPreview(out);
     if (then !== undefined) go(then);
+    if (then === 2 && !draft.description.trim() && ai.state === 'idle') void askDraft();
   });
   /** Step 5: define, run, share, sell. A step that fails says so; what was made before it stays. */
   const publish = () => tryRun(async () => {
@@ -130,16 +156,20 @@ export function DataWizard({ ctx }) {
     const shares = [];
     for (const s of draft.shares) {
       try {
-        const out = await dp.shareWithParty({ name: s.party, display_name: s.who, kind: s.how, package: draft.name, purpose: s.purpose,
-          expires: new Date(`${s.until}T23:59:59`).toISOString(), ...(s.email ? { contact: s.email } : {}) });
+        const expires = new Date(`${s.until}T23:59:59`).toISOString();
+        // A person on another AIMEAT node is shared with by their own account, with no party and no key.
+        const out = s.how === 'aimeat'
+          ? await dp.shareWithParty({ recipient: s.account, display_name: s.who, package: draft.name, purpose: s.purpose, expires })
+          : await dp.shareWithParty({ name: s.party, display_name: s.who, kind: s.how, package: draft.name, purpose: s.purpose,
+            expires, ...(s.email ? { contact: s.email } : {}) });
         const link = s.email ? await dp.sendShareLink(out, s.email) : null;
         shares.push({ ...s, out, link });
-      } catch (err) { shares.push({ ...s, error: err?.message || d('share.failed') }); }
+      } catch (err) { shares.push({ ...s, error: errText(err, 'share.failed') }); }
     }
     let sale = null;
     if (draft.sell.on) {
       try { await dp.sellPackage(ctx.data.owner, draft.name, termsBody(draft.sell)); sale = { ok: true }; }
-      catch (err) { sale = { error: err?.message || d('sell.failed') }; }
+      catch (err) { sale = { error: errText(err, 'sell.failed') }; }
     }
     const pkg = await dp.getPackage(ctx.data.owner, draft.name).catch((err) => { swallowed('wizard: package', err); return null; });
     setResult({ ran, shares, sale, pkg, visibility: def.visibility });
@@ -147,7 +177,7 @@ export function DataWizard({ ctx }) {
     go(5);
   });
 
-  const s = { ctx, draft, setDraft, choices, probe, preview, busy, result, tryPreview, name, tryProbeOnly: () => tryProbe(false) };
+  const s = { ctx, draft, setDraft, choices, probe, preview, busy, result, tryPreview, name, tryProbeOnly: () => tryProbe(false), ai, askDraft: () => askDraft() };
   const id = STEPS[step];
   const body = [stepSources, stepColumns, stepPreview, stepSchedule, stepWho, stepDone][step](s);
   const next = [

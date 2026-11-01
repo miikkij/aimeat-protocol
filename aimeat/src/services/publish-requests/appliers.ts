@@ -13,6 +13,8 @@
  * @structure PUBLISH_APPLIERS
  * @usage const applied = await PUBLISH_APPLIERS[request.kind]?.(ctx, ownerGhii, request);
  * @version-history
+ *   v1.21.0 — 2026-11-01 — A writer without company:write changing a company's page through the file
+ *     routes, allowed by the owner (apply-company-page-write.ts; secaudit2026oct31w2 round 11).
  *   v1.20.0 — 2026-10-31 — A living document refreshing itself with the owner's AI, set up by a writer
  *     without ai:use, allowed by the owner (apply-living-ai-spend.ts; secaudit2026oct31w2 round 10).
  *   v1.19.0 — 2026-10-31 — A program a computer holds for an agent, allowed or not allowed by the owner
@@ -88,6 +90,7 @@ import { applyExtensionCode } from './apply-extension-code.js';
 import { applyCortexHolder } from './apply-cortex-holder.js';
 import { applyConnectorProgram, declineConnectorProgram } from './apply-connector-program.js';
 import { applyLivingAiSpend } from './apply-living-ai-spend.js';
+import { applyCompanyPageWrite } from './apply-company-page-write.js';
 
 /** One applier per kind of content a request can make public. */
 export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
@@ -122,6 +125,7 @@ export const PUBLISH_APPLIERS: Partial<Record<PublishKind, PublishApplier>> = {
   'portfolio-memory-read': applyPortfolioMemoryRead,
   'connector-program': applyConnectorProgram,
   'living-ai-spend': applyLivingAiSpend,
+  'company-page-write': applyCompanyPageWrite,
 };
 
 /**

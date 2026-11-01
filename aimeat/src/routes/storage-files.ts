@@ -11,6 +11,9 @@
  *   import { storageFilesRouter } from '../routes/storage-files.js';
  *   app.use(storageFilesRouter(config, storage));
  * @version-history
+ *   2026-11-01 -- DELETE hands the shared delete its caller, so a company's page key asks what the company
+ *     page route asks (services/storage-page-keys.ts; secaudit2026oct31w2 round 11); the handler is now
+ *     routes/storage-files-delete.ts.
  *   2026-11-01 -- A party's resource CSV read through a purchased share is metered before it is served (plan D5.3).
  *   2026-11-01 -- GET /v1/pub takes an outside party on a data package's own files (routes/pub-party-read.ts):
  *     HTTP Basic or a party token, admitted by its named share to that package only; anything else it

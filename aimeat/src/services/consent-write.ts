@@ -28,6 +28,9 @@
  *   const out = await grantConsent({ storage, config }, caller, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   2026-11-01 — A grant of `datapkg:<name>` to a GHII is a named share to a person on another AIMEAT
+ *     node (services/parties/shares.ts normalizeVisitorShare): an account of this node is refused, and
+ *     party:manage, the package, the pin and the end are checked as for a party share (WP9c).
  *   2026-11-01 — A recipient may be an outside party, party:<owner>/<name>@<node> (the eighth shape): a
  *     named share of one data package (services/parties/shares.ts normalizePartyShare checks the party,
  *     the package, the version, the expiry and party:manage before any write, and files it under the
@@ -73,7 +76,7 @@ import { COLLECTION_METHOD_KEY } from './mydata-receipt.js';
 import { notifyDirectoryChange } from './directory.js';
 import { callerFromAuth } from './caller-context.js';
 import { fileAsk, publishAskOf, publishRequestedBody } from './publish-requests/ask.js';
-import { normalizePartyShare } from './parties/shares.js';
+import { normalizePartyShare, normalizeVisitorShare, packageOfPattern } from './parties/shares.js';
 
 /** Max consent records per owner. Shared so the two doors cannot disagree about the ceiling. */
 export const CONSENT_QUOTA = 100;
@@ -270,6 +273,13 @@ export async function grantConsent(
     let fileUnder = caller.ownerGaii;
     if (input.recipient.startsWith('party:')) {
         const share = await normalizePartyShare({ storage, config: deps.config }, caller, input);
+        if (!share.ok) return share;
+        fileUnder = share.fileUnder;
+        input = { ...input, scope: share.scope, expires: share.expires, metadata: share.metadata };
+    } else if (packageOfPattern(input.dataPattern)) {
+        // A named share of a data package to a person on another AIMEAT node, by their home GHII: the
+        // same checks as a party share, and the visitor whose home GHII is exactly this one reads it.
+        const share = await normalizeVisitorShare({ storage, config: deps.config }, caller, input);
         if (!share.ok) return share;
         fileUnder = share.fileUnder;
         input = { ...input, scope: share.scope, expires: share.expires, metadata: share.metadata };

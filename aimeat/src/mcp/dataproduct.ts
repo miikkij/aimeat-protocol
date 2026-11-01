@@ -13,6 +13,7 @@
  * @structure registerDataProductTool(mcp, config, storage, caller)
  * @usage registerDataProductTool(mcp, config, storage, caller);   // from registerCoreDataPackageTools
  * @version-history
+ *   v1.2.0 — 2026-11-01 — action "describe": a description draft by the owner's own AI (WP9c).
  *   v1.1.0 — 2026-11-01 — define and a draft preview take `retention` (WP9a).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D9).
  */
@@ -29,6 +30,7 @@ import {
     defineProduct, getProduct, listProducts, deleteProduct, previewProductAnswer, runStored,
     type DataProductAnswer, type DataProductCtx,
 } from '../services/dataproduct/service.js';
+import { describeProduct } from '../services/dataproduct/describe.js';
 
 const DEFINITION_FIELDS = ['title', 'description', 'keywords', 'license', 'sources', 'combine', 'columns', 'filter', 'schedule', 'retention', 'visibility', 'confirm_personal_public'] as const;
 
@@ -63,7 +65,8 @@ export function registerDataProductTool(
             case 'preview': return answer(await previewProductAnswer(ctx, name, Array.isArray(body.sources) ? body : undefined));
             case 'run': return answer(await runStored(ctx, name));
             case 'delete': return answer(await deleteProduct(ctx, name));
-            default: return toolError('INVALID_INPUT', 'action is one of define, get, list, preview, run, delete.');
+            case 'describe': return answer(await describeProduct(ctx, name, { ...body, ...(typeof a.lang === 'string' ? { lang: a.lang } : {}) }));
+            default: return toolError('INVALID_INPUT', 'action is one of define, get, list, preview, run, delete, describe.');
         }
     });
 }

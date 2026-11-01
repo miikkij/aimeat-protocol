@@ -12,6 +12,8 @@
  * @structure registerCoreBoardTools(mcp, deps, caller)
  * @usage registerCoreBoardTools(mcp, { storage, config, agentGaii }, caller);
  * @version-history
+ *   2026-11-01 — aimeat_board_read asks boardReadRefusal with no reader for the shared anonymous
+ *     principal, as the REST read routes do, so a private board naming it is refused (secaudit2026oct31w2 round 11).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — aimeat_board_read passes the posts through the session's classification reader with
@@ -37,6 +39,7 @@ import { readerFor } from '../services/classification/reader.js';
 import { withoutHiddenPosts } from '../services/board-moderation.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 export function registerCoreBoardTools(
   mcp: McpServer,
@@ -59,7 +62,10 @@ mcp.registerTool(
         // same board filtered on visibility, so the two doors to one board disagreed.
         const board = await storage.getBoard(board_id);
         if (!board) return { content: [{ type: 'text' as const, text: `Board not found: ${board_id}` }], isError: true };
-        const refusal = await boardReadRefusal({ storage, config }, agentGaii, board, caller().auth);
+        // The shared anonymous principal is not a principal here, as on the REST read routes
+        // (routes/boards.ts): a private board answers it AUTH_REQUIRED, whatever its allowed list says.
+        const reader = isAnonymousPrincipal({ sub: agentGaii }) ? undefined : agentGaii;
+        const refusal = await boardReadRefusal({ storage, config }, reader, board, caller().auth);
         if (refusal) return { content: [{ type: 'text' as const, text: `${refusal.code}: ${refusal.message}` }], isError: true };
 
         // The same hiding rule GET /v1/boards/:id/posts applies: a post flags have hidden is

@@ -20,6 +20,9 @@
  *   appMayWriteKey(roles, key, delegatedOwnerWrite?, reservedAllowed?)
  * @usage import { appMayWriteKey } from '../utils/reserved-keys.js';
  * @version-history
+ *   2026-11-01 -- `company-page-writers.` is service-owned: which writers without company:write the owner
+ *     allowed to change a company's page through the file routes (services/company/company-page-key.ts;
+ *     secaudit2026oct31w2 round 11). A new prefix, so nothing wrote it through the memory API before.
  *   2026-11-01 -- `dsp.` is service-owned: the Dataspace Protocol negotiations, transfers, archive and
  *     package settings of an owner (services/dataspace/; plan doc-mvwxcas3dom3, D8). An agreement there
  *     names the share it made, so a principal that could write it could forge an agreement. A new prefix.
@@ -442,7 +445,7 @@ export const SERVER_WRITTEN_KEY_PREFIXES: readonly string[] = ['notif.'];
  * service's writeLatest is its one writer, straight to storage. A new prefix: nothing wrote it through
  * the memory API before this.
  */
-export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
+export const SERVICE_OWNED_KEY_PREFIXES: readonly string[] = ['classification.policy.', 'scope-use.', 'agent-workplace.', 'agent-goals.', 'commerce.session.', 'identity.adult.', 'commerce.subscription.', 'commerce.hold.', 'commerce.hold-in.', 'commerce.benefit.', 'identity.verified-name.', 'agent-device-return.', 'mcp.tasks.', 'commerce.platform-fee.', 'portfolio-read-hold.', 'datapkg-audience.', 'living-spend-hold.', 'company-page-writers.', 'dataproducts.', 'party-reads.', 'party-purchases.', 'app-parties.', 'app-party-data.', 'dsp.'];
 
 /**
  * Exact keys one named service owns, under the same rule as SERVICE_OWNED_KEY_PREFIXES: no memory route
@@ -489,6 +492,7 @@ const SERVICE_OWNED_WAY: ReadonlyArray<readonly [string, string]> = [
   ['portfolio-read-hold.', 'whether your welcome page may read your memory, and only the node writes it. You allow a page with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
   ['datapkg-audience.', 'who reads a data package, and only the data package service writes it. Publish with POST /v1/datapackages or the aimeat_datapackage_publish MCP tool, which takes the visibility.'],
   ['living-spend-hold.', 'whether a living document may refresh itself with your AI, and only the node writes it. You allow it with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
+  ['company-page-writers.', 'which apps and agents may change your company\'s page through the file routes, and only the node writes it. You allow one with the request it files, on GET /v1/publish-requests or the aimeat_publish_requests MCP tool.'],
 ];
 
 /**

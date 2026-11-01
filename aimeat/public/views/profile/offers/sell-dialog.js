@@ -11,6 +11,7 @@
  * @structure SellDialog · SellFields · termsBody
  * @usage html`<${SellDialog} open=${o} onClose=${close} owner=${owner} name=${name} current=${pkg.latest.exchange} mode=${mode} />`
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A refusal in the page's language (data-model.js errText; WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D5, D7.1).
  */
 import { h } from 'preact';
@@ -25,7 +26,7 @@ import { Check } from '/components/Check.js';
 import { Note } from '/components/Note.js';
 import { Action, Loud } from '/components/Action.js';
 import * as dp from '/js/services/dataproducts.js';
-import { d } from './data-model.js';
+import { d, errText } from './data-model.js';
 
 const MICRO = 1_000_000;
 
@@ -85,7 +86,7 @@ export function SellDialog({ open, onClose, owner, name, title, current, mode, s
   const save = async (terms, said) => {
     setBusy(true); setError('');
     try { await dp.sellPackage(owner, name, terms); showToast?.(said); onSaved?.(); onClose(); }
-    catch (err) { setError(err?.message || d('sell.failed')); }
+    catch (err) { setError(errText(err, 'sell.failed')); }
     setBusy(false);
   };
   const footer = html`

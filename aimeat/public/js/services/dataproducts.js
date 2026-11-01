@@ -11,12 +11,14 @@
  *   sendShareLink is the one call site of the e-mailed share link (WP9b builds the invite and the
  *   mail). Until it exists it says so and sends nothing; the share dialog shows the connection file
  *   instead, so no link is ever claimed as sent.
- * @structure listProducts · getProduct · defineProduct · previewDraft · runProduct · deleteProduct ·
+ * @structure listProducts · getProduct · defineProduct · previewDraft · describeDraft · runProduct · deleteProduct ·
  *   getPackage · listVersions · listPackages · withdrawPackage · sellPackage · listParties · getParty ·
  *   shareWithParty · revokeShare · createPartyKey · deletePartyKey · stopParty · resumeParty ·
  *   deleteParty · partyReads · createParty · sendShareLink · listSourceChoices
  * @usage import * as dp from '/js/services/dataproducts.js';
  * @version-history
+ *   v1.1.0 — 2026-11-01 — describeDraft (the AI's description draft); shareWithParty takes `recipient`
+ *     for a person on another AIMEAT node (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a: the owner's screens for data products, shares and parties).
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
@@ -35,6 +37,8 @@ export async function getProduct(name) { return data(await apiGet(`/v1/dataprodu
 export async function defineProduct(name, body) { return data(await apiPut(`/v1/dataproducts/${enc(name)}`, body)); }
 /** Build a draft that is not stored: rows, schema, validation and the ODPS sheet. */
 export async function previewDraft(name, body) { return data(await apiPost(`/v1/dataproducts/${enc(name)}/preview`, body)); }
+/** A description draft by the owner's own AI: `{ description, lang, provenance }`; a refusal names `details.reason`. */
+export async function describeDraft(name, body) { return data(await apiPost(`/v1/dataproducts/${enc(name)}/describe`, body)); }
 /** Build and publish one version of a stored definition. */
 export async function runProduct(name) { return data(await apiPost(`/v1/dataproducts/${enc(name)}/run`, {})); }
 export async function deleteProduct(name) { return data(await apiDelete(`/v1/dataproducts/${enc(name)}`)); }

@@ -10,6 +10,7 @@
  *   v1.58.0 -- 2026-11-01 -- Discover names aimeat_dataspace: the data space requests that wait for the person (plan doc-mvwxcas3dom3, D8).
  *   v1.57.0 -- 2026-11-01 -- Discover: a data product and its share are one proposal, and the follow-ups name their tools (WP9a).
  *   v1.56.0 -- 2026-11-01 -- Discover names aimeat_datapackage_sell: a package sold on EXCHANGE (plan doc-mvwxcas3dom3, D5).
+ *   v1.56.0 -- 2026-11-01 -- Discover names a run on a source change, aimeat_dataproduct "describe" and a share by `recipient` (WP9c).
  *   v1.55.0 -- 2026-11-01 -- Discover names aimeat_party "share": a package shared by name with an outside party (plan doc-mvwxcas3dom3, D3.4).
  *   v1.54.0 -- 2026-11-01 -- Discover names aimeat_dataproduct: a table built from material, previewed, then run (plan doc-mvwxcas3dom3, D9).
  *   v1.53.0 -- 2026-11-01 -- Discover lists datasets: a data package with its rows, freshness and read addresses (plan doc-mvwxcas3dom3, D1.1).
@@ -343,7 +344,10 @@ its entry carries the row count, when it was last published and the addresses to
 (descriptor, OData, ODPS sheet), and \`aimeat_datapackage_export\` reads its rows. To build a table
 that refreshes itself from the person's own material (workspace records, an app's publishable data, a
 record, an extension action, a CSV or Excel file, another package), use \`aimeat_dataproduct\`:
-\`define\` with sources and a schedule, \`preview\`, then \`run\`. To give one package to someone with no
+\`define\` with sources and a schedule (a cron, or \`{ on: "change" }\` to run when a source changes),
+\`preview\`, then \`run\`; \`describe\` drafts its description with the owner's AI. To give one package to
+a person with an AIMEAT account on another server, \`aimeat_party\` \`share\` takes \`recipient:
+"name@their-server"\` in place of a name and makes no key. To give one package to someone with no
 account here (a Power BI, a partner's program, a person), use \`aimeat_party\` action \`share\` with a
 name, the package, the purpose and \`days\`: it answers a key, a connection file and the one sentence to
 tell the person (until when, ending it stops the next read, copies already taken stay). It needs

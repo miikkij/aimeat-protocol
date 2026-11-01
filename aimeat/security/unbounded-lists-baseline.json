@@ -1,5 +1,5 @@
 {
-  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. The counts of services/account-event-task-keep.ts, services/app-tool-invoke-keep.ts, services/knowledge-link-owner-keep.ts and services/datapackage/audience-record.ts are once-only start steps (server-bootstrap/once-only-keep-steps.ts): each reads those tables whole once per node, before the node serves, and never in a request. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
+  "note": "Storage list methods with nothing to bound what they return, and the calls outside src/storage that read a whole table through one (scripts/check-unbounded-lists.ts). Seeded 2026-10-20 from the QA audit of 2026-10-16 (P7-10). An entry under methods is DEBT, a known unbounded read nobody has judged yet, or the reason the list cannot grow. Answering one means giving the method a limit and a cursor, or replacing DEBT with that reason. wholeTableCalls counts calls with no arguments per file; a count may only fall, and the gate fails until a fallen count is lowered here. The counts of services/account-event-task-keep.ts, services/app-tool-invoke-keep.ts, services/knowledge-link-owner-keep.ts, services/datapackage/audience-record.ts and services/portfolio-read-hold-keep.ts are once-only start steps (server-bootstrap/once-only-keep-steps.ts): each reads those tables whole once per node, before the node serves, and never in a request. Re-seeding forgives every entry, so it is a decision to ask about, never maintenance.",
   "methods": {
     "getAllConfigValues": "DEBT: ConfigRepository.getAllConfigValues() reads the whole table, with no limit or cursor",
     "listActionsByProvider": "DEBT: ActionRepository.listActionsByProvider(gaii) returns every match for its scope, with no limit or cursor",
@@ -281,6 +281,9 @@
     },
     "src/services/knowledge-overview.ts": {
       "listAgents": 1
+    },
+    "src/services/portfolio-read-hold-keep.ts": {
+      "listOwners": 1
     },
     "src/services/datapackage/audience-record.ts": {
       "listOwners": 1,

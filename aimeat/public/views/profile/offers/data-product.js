@@ -12,6 +12,9 @@
  * @structure ProductPage · SharesTab · VersionsTab · ColumnsTab · OriginTab
  * @usage html`<${ProductPage} ctx=${ctx} name=${name} />`
  * @version-history
+ *   v1.1.0 — 2026-11-01 — A product that runs when its source changes says so, with the run after a seen
+ *     change; the shares to people on other AIMEAT nodes are readers too; refusals in the page's
+ *     language (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D3, D5, D6, D9).
  */
 import { h } from 'preact';
@@ -32,14 +35,18 @@ import { renderPage } from './frame.js';
 import { ConnectSteps } from './data-connect.js';
 import { ShareDialog } from './share-dialog.js';
 import { SellDialog } from './sell-dialog.js';
-import { d, freshWord, scheduleWords, nextRunWords, versionNumber, productTitle, shortHash, audienceWord } from './data-model.js';
+import { d, freshWord, scheduleWords, nextRunWords, versionNumber, productTitle, shortHash, audienceWord, errText } from './data-model.js';
 
 const TABS = ['shares', 'versions', 'columns', 'connect', 'origin'];
 
-/** The live shares of this package across the owner's parties, each with its party. */
-function sharesOf(parties, name) {
+/**
+ * The live shares of this package: across the owner's parties, each with its party, and the shares to
+ * people on other AIMEAT nodes (GET /v1/dataproducts/{name} `visitor_shares`), each as its own reader.
+ */
+function sharesOf(parties, name, visitorShares = []) {
   const out = [];
   for (const p of parties || []) for (const s of p.shares || []) if (s.package === name && s.status === 'active') out.push({ ...s, party: p });
+  for (const s of visitorShares) out.push({ ...s, party: { kind: 'visitor', display_name: s.display_name || s.recipient } });
   return out;
 }
 
@@ -49,7 +56,7 @@ function SharesTab({ shares, onRevoke, busy }) {
     rows=${[...shares, { owner: true }]} render=${(s) => (s.owner
       ? html`<${Row} key="owner"><${Name} meta=${d('product.owner')}>${d('product.youAndAgents')}<//><${Who} /><${Doors} /><//>`
       : html`<${Row} key=${s.id}>
-        <${Name} meta=${[d('party.kind.' + s.party.kind), s.purpose].filter(Boolean).join(' · ')}>${s.party.display_name}<//>
+        <${Name} meta=${[d('party.kind.' + s.party.kind), s.party.kind === 'visitor' ? s.recipient : '', s.purpose].filter(Boolean).join(' · ')}>${s.party.display_name}<//>
         <${Who} sub=${s.last_read_at ? d('product.lastRead', { when: ago(s.last_read_at) }) : d('product.notRead')}>${d('product.until', { date: fmtDate(s.expires) })}<//>
         <${Doors}><${Action} small row tone="danger" disabled=${busy} onClick=${() => onRevoke(s)}>${d('product.revoke')}<//><//>
       <//>`)} />
@@ -119,8 +126,8 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
         published ? dp.listVersions(owner, name).catch((err) => { swallowed('data-product: versions', err); return null; }) : null,
         dp.listParties().catch((err) => { swallowed('data-product: parties', err); return null; }),
       ]);
-      setState({ def: got.definition, schedule: got.schedule, pkg, versions: ver?.versions || [], retention: ver?.retention_policy || null, shares: sharesOf(parties?.parties, name) });
-    } catch (err) { swallowed('data-product: load', err); setState({ failed: err?.message || d('product.loadFailed') }); }
+      setState({ def: got.definition, schedule: got.schedule, nextChange: got.next_change_run_at || null, pkg, versions: ver?.versions || [], retention: ver?.retention_policy || null, shares: sharesOf(parties?.parties, name, got.visitor_shares) });
+    } catch (err) { swallowed('data-product: load', err); setState({ failed: errText(err, 'product.loadFailed') }); }
   }, [name, owner]);
   useEffect(() => { load(); }, [load]);
   useEffect(() => {
@@ -133,7 +140,7 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
   if (!state) return renderPage(ctx, { id: 'data', crumbs: [...crumbs, name], title: name, children: html`<${Note} kind="loading" />` });
   if (state.failed) return renderPage(ctx, { id: 'data', crumbs: [...crumbs, name], title: name, children: html`<${Note} kind="message" error>${state.failed}<//>` });
 
-  const { def, schedule, pkg, versions, shares } = state;
+  const { def, schedule, pkg, versions, shares, nextChange } = state;
   const latest = pkg?.latest;
   const withdrawn = latest?.status === 'withdrawn';
   const fresh = pkg?.freshness;
@@ -145,26 +152,27 @@ export function ProductPage({ ctx, name, tab: initialTab, share: openShare }) {
   const run = async () => {
     setBusy(true);
     try { const out = await dp.runProduct(name); ctx.showToast(out?.unchanged ? d('product.unchanged') : d('product.ran')); await load(); ctx.data.reload(); }
-    catch (err) { ctx.showToast(err?.message || d('product.runFailed')); }
+    catch (err) { ctx.showToast(errText(err, 'product.runFailed')); }
     setBusy(false);
   };
   const withdraw = () => ctx.confirm(d('product.withdrawConfirm', { title, n: shares.length }), async () => {
     setBusy(true);
     try { await dp.withdrawPackage(owner, name); ctx.showToast(d('product.withdrawn', { title })); await load(); ctx.data.reload(); }
-    catch (err) { ctx.showToast(err?.message || d('product.withdrawFailed')); }
+    catch (err) { ctx.showToast(errText(err, 'product.withdrawFailed')); }
     setBusy(false);
   }, { danger: true, title: d('product.withdraw'), confirmLabel: d('product.withdraw') });
   const revoke = (s) => ctx.confirm(d('product.revokeConfirm', { who: s.party.display_name }), async () => {
     setBusy(true);
     try { await dp.revokeShare(s.id); ctx.showToast(d('product.revoked', { who: s.party.display_name })); await load(); ctx.data.reload(); }
-    catch (err) { ctx.showToast(err?.message || d('product.revokeFailed')); }
+    catch (err) { ctx.showToast(errText(err, 'product.revokeFailed')); }
     setBusy(false);
   }, { danger: true, title: d('product.revoke'), confirmLabel: d('product.revoke') });
 
   const line = [
     current ? d('product.versionN', { n: versionNumber(versions, current.contentHash) }) : d('product.notPublished'),
     scheduleWords(schedule || def.schedule),
-    schedule?.next_run_at ? d('product.nextRun', { when: nextRunWords(schedule.next_run_at) }) : null,
+    schedule?.next_run_at ? d('product.nextRun', { when: nextRunWords(schedule.next_run_at) })
+      : nextChange ? d('product.nextChangeRun', { when: nextRunWords(nextChange) }) : null,
   ].filter(Boolean).join(' · ');
   const marks = [
     withdrawn ? { label: d('list.withdrawn'), tone: 'dim' } : fresh ? { label: freshWord(fresh.state), tone: ['late', 'stale'].includes(fresh.state) ? 'coral' : undefined } : null,

@@ -33,6 +33,8 @@
  * @structure appSource · workspaceShareSource · organismSource · boardSource · portfolioSource · companySource
  * @usage import { appSource } from './sources-places.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — Each item carries `close` (a member list and the welcome page `title_parts`):
+ *     the code and identifiers a page says the instruction and the title with in its language (WP9c).
  *   v1.2.0 — 2026-10-18 — An app, a board, an organism and a workspace share carry their container's
  *     classification address, so the report decides them on the effective label (plan
  *     doc-mvdipuyqraas, L1.3).
@@ -56,7 +58,7 @@ import { pageAccessLevel } from '../page-access.js';
 import { appTarget, boardTarget, organismTarget, workspaceTarget } from '../classification/containers.js';
 import {
   type ExposureContext, type ExposureFound, type ExposureItem, type ExposureLevel, type ExposureSource,
-  levelOfVisibility, ownerIdentities,
+  levelOfVisibility, ownerIdentities, closeAs,
 } from './exposure-types.js';
 
 const enc = encodeURIComponent;
@@ -97,6 +99,7 @@ export const appSource: ExposureSource = {
         how_to_close: lv.level === 'public'
           ? `Take it off every list with aimeat_app_manage (action "settings", listing "unlisted"), and choose who may open it there: open_to "signed-in" or "organism:<id>", or an access_code (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`
           : `Choose who may open it with aimeat_app_manage (action "settings"): open_to "organism:<id>" for one organisation, or an access_code so only people with the code open it (PATCH /v1/apps/${enc(filename)}); aimeat_app_delete removes it.`,
+        close: closeAs(lv.level === 'public' ? 'app-public' : 'app-narrow', { tool: 'aimeat_app_manage', route: `PATCH /v1/apps/${enc(filename)}`, remove: 'aimeat_app_delete' }),
       };
     });
   },
@@ -163,6 +166,10 @@ export const workspaceShareSource: ExposureSource = {
             title: `${org.name} / ${wsName}: ${p.title}`, level: served.level,
             url: `${ctx.base}${publicViewerPath(org.id, ws, p.type, p.id)}`, content: workspaceTarget(org.id, ws),
             how_to_close: `Stop sharing it with aimeat_workspace_share (organism_id "${org.id}", ws "${ws}", space "${p.type}", id "${p.id}", shared false), or PUT /v1/organisms/${enc(org.id)}/workspace/share?ws=${enc(ws)} with {"docs":{"${p.type}/${p.id}":false}}.`,
+            close: closeAs('workspace-page', {
+              tool: 'aimeat_workspace_share', args: `organism_id "${org.id}", ws "${ws}", space "${p.type}", id "${p.id}", shared false`,
+              route: `PUT /v1/organisms/${enc(org.id)}/workspace/share?ws=${enc(ws)} {"docs":{"${p.type}/${p.id}":false}}`,
+            }),
           });
         }
       }
@@ -182,13 +189,16 @@ export const organismSource: ExposureSource = {
           kind: 'organism', id: org.id, title: org.name, level: 'public', url: `${ctx.base}/v1/organisms/${enc(org.id)}`,
           content: organismTarget(org.id),
           how_to_close: `Make it private with aimeat_organism_update and visibility "private" (PUT /v1/organisms/${enc(org.id)} with {"visibility":"private"}).`,
+          close: closeAs('organism', { tool: 'aimeat_organism_update', route: `PUT /v1/organisms/${enc(org.id)} {"visibility":"private"}` }),
         });
       }
       if (org.memberVisibility === 'public') {
         out.push({
           kind: 'organism', id: `${org.id}#members`, title: `Who belongs to ${org.name}`, level: 'public',
+          title_parts: closeAs('members', { name: org.name }),
           url: `${ctx.base}/v1/organisms/${enc(org.id)}/members`, content: organismTarget(org.id),
           how_to_close: `Show the member list to signed-in people only with PUT /v1/organisms/${enc(org.id)} and {"member_visibility":"authenticated"}.`,
+          close: closeAs('organism-members', { route: `PUT /v1/organisms/${enc(org.id)} {"member_visibility":"authenticated"}` }),
         });
       }
     }
@@ -209,6 +219,7 @@ export const boardSource: ExposureSource = {
       out.push({
         kind: 'board', id: b.id, title: b.name, ...lv, url: `${ctx.base}/v1/boards/${enc(b.id)}/posts`, content: boardTarget(b),
         how_to_close: `Close it with PATCH /v1/boards/${enc(b.id)}/visibility and {"visibility":"private"}, or remove it with aimeat_board_delete.`,
+        close: closeAs('board', { route: `PATCH /v1/boards/${enc(b.id)}/visibility {"visibility":"private"}`, remove: 'aimeat_board_delete' }),
       });
     }
     return out;
@@ -225,11 +236,12 @@ export const portfolioSource: ExposureSource = {
     // Who may open it: the page's own `access` (services/page-access.ts), as the portfolio origin reads it.
     const lv = pageAccessLevel((await portfolioSwitchState(ctx.storage, ownerName, ctx.config.nodeId)).access);
     return [{
-      kind: 'portfolio', id: ownerName, title: 'Your welcome page', ...lv,
+      kind: 'portfolio', id: ownerName, title: 'Your welcome page', title_parts: closeAs('portfolio'), ...lv,
       url: `${ctx.base}/v1/portfolio/${enc(ownerName)}`,
       how_to_close: lv.level === 'public'
         ? 'Choose who may open it with aimeat_portfolio_publish (access "signed-in" or "organism:<id>"), or switch the page off with PUT /v1/portfolio/config and {"enabled":false}.'
         : 'Switch the page off with PUT /v1/portfolio/config and {"enabled":false}, or narrow who may open it with aimeat_portfolio_publish (access "organism:<id>").',
+      close: closeAs(lv.level === 'public' ? 'portfolio-public' : 'portfolio-narrow', { tool: 'aimeat_portfolio_publish', route: 'PUT /v1/portfolio/config {"enabled":false}' }),
     }];
   },
 };
@@ -245,6 +257,7 @@ export const companySource: ExposureSource = {
       out.push({
         kind: 'company', id: c.id, title: c.name, ...pageAccessLevel(c.frontPageAccess), ...(url ? { url } : {}),
         how_to_close: `Choose who may open it with aimeat_company_front_page (access "signed-in" or "organism:<id>"), or stop serving the company's address with kind "none" (PUT /v1/companies/${enc(c.id)}/front-page with {"kind":"none"}).`,
+        close: closeAs('company', { tool: 'aimeat_company_front_page', route: `PUT /v1/companies/${enc(c.id)}/front-page {"kind":"none"}` }),
       });
     }
     return out;

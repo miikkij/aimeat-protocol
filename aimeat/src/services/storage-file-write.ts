@@ -38,6 +38,18 @@
  *   const out = await writeStorageFile({ storage, config, emitResourceUpdated }, gaii, input);
  *   if (!out.ok) return renderRefusal(out);   // each door renders its own way
  * @version-history
+ *   v1.14.0 — 2026-11-01 — The file hooks moved by extraction to ./storage-file-hooks.ts (line limit) and
+ *     are re-exported; it adds addStorageFileListener(), which the data products that run when a source
+ *     changes use (services/dataproduct/on-change.ts, WP9c).
+ *   v1.13.0 — 2026-11-01 — The write and the delete of the welcome page key note its writer
+ *     (storage-page-keys.ts notePageKeyChange), and the presigned mint carries the writer in the token
+ *     (`page_writer`); the write takes it back as `pageWriter` (secaudit2026oct31w2 round 11,
+ *     portfolio-read-hold:absent-record-adopted-at-first-read).
+ *   v1.12.0 — 2026-11-01 — The write, the presigned mint and the delete of a company's page key
+ *     (`company/<id>/index.html`) ask what the company page route asks: the owner in person, a writer
+ *     holding company:write, or one the owner allowed with one press (storage-page-keys.ts,
+ *     company/company-page-key.ts). removeStorageFile takes the door's caller. The provenance decision
+ *     moved by pure extraction to storage-file-provenance.ts (800-line limit) (secaudit2026oct31w2 round 11).
  *   v1.11.0 — 2026-10-31 — Direct upload: the mint with `direct` answers a signed address in the object
  *     store and a complete address, and the write takes `object` (the reference from the signed token and
  *     the size the store reports) instead of bytes, with the large-file ceiling, and records the file
@@ -100,11 +112,16 @@ import { checkStorageQuota, chargeOverage } from './quota.js';
 import { generateUploadToken, buildUploadMeta } from './upload-token.js';
 import { emitRecordChange } from './event-bus.js';
 import { isAnonymousGaii } from '../routes/memory/shared.js';
+import { storeHeldProvenance } from './ai-provenance.js';
+import { localAccountName } from '../utils/gaii.js';
 import {
-    provenanceForWrite, provenanceDeclarationRefusal, storeHeldProvenance, contentHashOf,
-    ProvenanceScopeError, type DeclaredProvenance,
-} from './ai-provenance.js';
-import { ownerGhiiOf, localAccountName } from '../utils/gaii.js';
+    provenanceForStoredBytes, storageProvenanceMintRefusal,
+    type StorageProvenanceInput, type ProvenanceRefusalCode,
+} from './storage-file-provenance.js';
+import { pageKeyWriteRefusal, pageWriterOf, pageWriterMeta, notePageKeyChange, type PageWriter } from './storage-page-keys.js';
+// Moved to storage-file-provenance.ts (800-line limit); re-exported so the importers are unchanged.
+export { storageProvenanceMintRefusal };
+export type { StorageProvenanceInput, ProvenanceRefusalCode };
 import { ownExtensionFileKey } from './component-address.js';
 import { organismVisibilityRefusal } from './organism-visibility.js';
 import { emitChange } from './event-bus.js';
@@ -117,6 +134,7 @@ import type { ClosedNodeWarning } from './closed-node-level.js';
 import { uploadVisibilityOf } from './content-defaults.js';
 import { resolveChoice } from './file-store/file-store-resolver.js';
 import { adoptStorageObject, directUploadTarget } from '../storage/blob/file-store-wrap.js';
+import { fileStored, fileRemoved } from './storage-file-hooks.js';
 
 /**
  * The level of a file (plan V5.2): none named is the file default for every caller; 'default' (the
@@ -127,22 +145,9 @@ function levelOf(config: AimeatConfig, named: string | undefined, gate: StorageP
     return uploadVisibilityOf(config, named, !!gate && 'caller' in gate && gate.caller.kind === 'app') as StorageFileRecord['visibility'];
 }
 
-/** A function told about a stored or removed file after the fact. It returns at once and never throws. */
-export type StorageFileHook = (deps: { storage: Storage; config: AimeatConfig }, ownerGaii: string, key: string) => void;
-
-/**
- * The hooks the write and the delete call once the file has landed or gone. Set at boot
- * (setStorageFileHooks), as the write classifier is (classify-on-write.ts): the content class
- * pipeline that listens here stores its own text files through this module, so a static import
- * would close an import cycle.
- */
-const fileHooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook } = {};
-
-/** Set the hooks the write and the delete call. Called once at boot. */
-export function setStorageFileHooks(hooks: { afterStore?: StorageFileHook; afterRemove?: StorageFileHook }): void {
-    fileHooks.afterStore = hooks.afterStore;
-    fileHooks.afterRemove = hooks.afterRemove;
-}
+// The hooks told about a stored or removed file live in ./storage-file-hooks.ts (moved at the line
+// limit); the names this module exported are exported from here still.
+export { setStorageFileHooks, addStorageFileListener, type StorageFileHook } from './storage-file-hooks.js';
 
 /** How long a presigned storage upload URL is good for. The number the caller is told and the number
  *  the token is signed with are the same value, so they cannot drift apart. */
@@ -221,6 +226,8 @@ export interface StorageFileInput {
     publishGate?: StoragePublishGate;
     /** The store the writer named for the bytes. Absent: the owner's default store, else the node's. */
     store?: StoreChoice;
+    /** The writer of a page key when `publishGate` names no caller: a presigned upload's signed `page_writer` (storage-page-keys.ts). */
+    pageWriter?: PageWriter;
 }
 
 /** A refusal when the named store cannot take a file of `ownerGaii`; null when it can, or none was named. */
@@ -229,23 +236,6 @@ async function storeChoiceRefusal(deps: StorageWriteDeps, ownerGaii: string, sto
     const r = await resolveChoice({ storage: deps.storage, config: deps.config }, ownerGaii, store.id, { operator: store.operator });
     return r.ok ? null : { ok: false, status: r.status, code: r.code as StorageWriteRefusal['code'], message: r.message };
 }
-
-/** The writer and its statement, for {@link StorageFileInput.provenance}. */
-export interface StorageProvenanceInput {
-    /** The resolved identity that wrote the bytes: GHII, GAII or GEAI. Never a client-sent value. */
-    actor: string;
-    /** The session's own words, when the door has them: a declaration needs the word there too. */
-    scopes?: readonly string[];
-    /** An existing record to attach. */
-    declaredId?: string;
-    /** A statement about how the bytes were made. */
-    declared?: DeclaredProvenance;
-    /** The route or tool that wrote, for the record's generator.pipeline. */
-    pipeline?: string;
-}
-
-/** The refusals the provenance step of a write can produce, each before any byte is stored. */
-export type ProvenanceRefusalCode = 'SCOPE_DENIED' | 'NOT_FOUND' | 'PROVENANCE_HASH_MISMATCH';
 
 /** What the publish gate adds to a stored file: the request the owner answers, or why none was filed. */
 export type StoragePublishOutcome = {
@@ -327,97 +317,6 @@ function checkKey(ownerGaii: string, key: string): KeyRefusal | null {
     return null;
 }
 
-type ProvenanceRefusal = { ok: false; status: number; code: ProvenanceRefusalCode; message: string };
-
-/**
- * The record an attached id names, when it may be attached by this writer: one answer for "no such
- * record" and "somebody else's record", so the refusal tells nobody which ids exist on this node.
- * Attaching is what makes a record public when the file is public, so the ownership test is the
- * whole gate (resolveAttachableProvenanceId says the same for memory).
- */
-async function attachableRecord(
-    storage: Storage, actor: string, id: string,
-): Promise<AiProvenanceRecordRow | ProvenanceRefusal> {
-    const row = await storage.getAiProvenance(id);
-    if (row && row.ownerGhii === ownerGhiiOf(actor)) return row;
-    return {
-        ok: false, status: 404, code: 'NOT_FOUND',
-        message: `No AI-provenance record of yours has the id "${id}". Attach the id the node returned `
-            + 'when it made this content for you, or describe how it was made in ai_provenance instead.',
-    };
-}
-
-/**
- * The provenance decision for one stored file (provenanceForWrite, with the two checks that only a
- * door holding the bytes can make). Returns the id to store on the file, or the refusal.
- *
- * THE HASH CHECK (B12). A record that names a content hash is a statement about exact bytes, and a
- * file that carries it says "this record is about me". When the two differ the attach is refused:
- * the by-hash lookup would never find the file, and the public label would describe other bytes.
- */
-async function provenanceForStoredBytes(
-    deps: StorageWriteDeps, p: StorageProvenanceInput, data: Buffer | undefined,
-    visibility: StorageFileRecord['visibility'], held: AiProvenanceRecordRow[],
-): Promise<{ ok: true; id: string | undefined } | ProvenanceRefusal> {
-    const { storage, config } = deps;
-    if (config.aiProvenance === false) return { ok: true, id: undefined };
-    if (p.declaredId) {
-        const row = await attachableRecord(storage, p.actor, p.declaredId);
-        if ('ok' in row) return row;
-        // A file that went straight to its store never passed through the node, so a record about exact
-        // bytes cannot be checked against it, and is not attached unchecked.
-        if (!data) {
-            if (!row.contentHash) return { ok: true, id: row.id };
-            return {
-                ok: false, status: 400, code: 'PROVENANCE_HASH_MISMATCH',
-                message: `Record ${row.id} is about exact bytes, and this file went straight to its store, so the node `
-                    + 'cannot compare them. Describe the file in ai_provenance instead, or upload it through the node.',
-            };
-        }
-        const bytesHash = contentHashOf(data);
-        if (row.contentHash && row.contentHash !== bytesHash) {
-            return {
-                ok: false, status: 400, code: 'PROVENANCE_HASH_MISMATCH',
-                message: `Record ${row.id} is about other bytes: it names ${row.contentHash}, and this file `
-                    + `is ${bytesHash}. Upload the exact bytes the record was made for, or describe this `
-                    + 'file in ai_provenance instead.',
-            };
-        }
-        return { ok: true, id: row.id };
-    }
-    try {
-        const id = await provenanceForWrite(storage, {
-            principal: p.actor, ...(p.scopes ? { scopes: p.scopes } : {}),
-            content: data, declared: p.declared, pipeline: p.pipeline ?? 'storage.upload',
-            surface: { visibility, humanAudience: true },
-            labelPolicy: config.aiLabelPublic, nodeId: config.nodeId, baseUrl: config.baseUrl,
-            enabled: config.aiProvenance, held,
-        });
-        return { ok: true, id };
-    } catch (err) {
-        if (err instanceof ProvenanceScopeError) return { ok: false, status: 403, code: 'SCOPE_DENIED', message: err.message };
-        throw err;
-    }
-}
-
-/**
- * The refusal a presigned mint can give before any byte arrives: an attached id that is not the
- * caller's own, or a declaration without provenance:write. The hash is checked when the bytes land.
- */
-export async function storageProvenanceMintRefusal(
-    deps: StorageWriteDeps, p: StorageProvenanceInput,
-): Promise<ProvenanceRefusal | null> {
-    if (deps.config.aiProvenance === false) return null;
-    if (p.declaredId) {
-        const row = await attachableRecord(deps.storage, p.actor, p.declaredId);
-        return 'ok' in row ? row : null;
-    }
-    const refused = await provenanceDeclarationRefusal(deps.storage, {
-        principal: p.actor, declared: p.declared, ...(p.scopes ? { scopes: p.scopes } : {}),
-    });
-    return refused ? { ok: false, status: 403, code: 'SCOPE_DENIED', message: refused.message } : null;
-}
-
 /** Store one file under `ownerGaii`, with every gate and side effect the capability carries. */
 export async function writeStorageFile(
     deps: StorageWriteDeps,
@@ -426,7 +325,10 @@ export async function writeStorageFile(
 ): Promise<StorageFileWriteResult> {
     const { storage, config } = deps;
 
-    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
+    // A key a page origin serves asks what that page's own route asks (storage-page-keys.ts).
+    const writer = input.pageWriter ?? pageWriterOf(deps, input.publishGate);
+    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key)
+        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
 
     // No visibility named: the node's starting level (plan V5.2), before the publish gate below. A
@@ -531,7 +433,9 @@ export async function writeStorageFile(
     emitRecordChange('files', ownerGaii, level.visibility);
     emitRecordChange('memory', ownerGaii, level.visibility);
     // The content class pipeline on arrival (services/content/intake.ts): scheduled, never awaited.
-    fileHooks.afterStore?.({ storage, config }, ownerGaii, input.key);
+    fileStored({ storage, config }, ownerGaii, input.key);
+    // A welcome page notes its writer before the answer, so the next read meets the record (storage-page-keys.ts).
+    await notePageKeyChange(deps, ownerGaii, input.key, writer, input.data);
 
     // The request the publish gate asked for, now that the file it names exists.
     const filed = raise.kind === 'ask' ? await fileFilePublishRequest({ storage, config }, raise.requester, file) : null;
@@ -567,10 +471,13 @@ export async function removeStorageFile(
     deps: StorageWriteDeps,
     ownerGaii: string,
     asked: string,
+    /** The door's caller, for the keys a page origin serves (storage-page-keys.ts). Absent: the node's own delete. */
+    gate?: { caller: CallerContext; app?: string },
 ): Promise<StorageFileDeleteResult> {
     const { storage } = deps;
 
-    const fenced = checkKey(ownerGaii, asked);
+    const writer = pageWriterOf(deps, gate);
+    const fenced = checkKey(ownerGaii, asked) ?? await pageKeyWriteRefusal(deps, ownerGaii, asked, writer);
     if (fenced) return fenced;
 
     // The account's own extension's file named by its short key is stored under the stored name
@@ -608,7 +515,9 @@ export async function removeStorageFile(
     // bytes in the budget the memory view renders. The route emitted only 'files'.
     emitRecordChange('files', ownerGaii, existing.visibility);
     emitRecordChange('memory', ownerGaii, existing.visibility);
-    fileHooks.afterRemove?.({ storage, config: deps.config }, ownerGaii, key);
+    fileRemoved({ storage, config: deps.config }, ownerGaii, key);
+    // A removed welcome page can uncover another copy, which the remover then put on show (storage-page-keys.ts).
+    await notePageKeyChange(deps, ownerGaii, key, writer);
 
     return {
         ok: true, key, size: existing.size, mimeType: existing.mimeType, visibility: existing.visibility,
@@ -682,7 +591,9 @@ export async function mintStorageUploadUrl(
         : { visibility: named, warning: null };
     const input = { ...given, visibility: closed.visibility };
 
-    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key);
+    const writer = pageWriterOf(deps, input.publishGate);
+    const fenced = checkKey(ownerGaii, input.key) ?? appOwnedKeyRefusal(input.key)
+        ?? await pageKeyWriteRefusal(deps, ownerGaii, input.key, writer);
     if (fenced) return fenced;
     // Refused at the mint as at the write, so no URL is handed out for a file that cannot land.
     const audience = await organismVisibilityRefusal(deps.storage, input.visibility, { identity: ownerGaii });
@@ -725,6 +636,7 @@ export async function mintStorageUploadUrl(
             publish_ask: carry.requester,
             store: input.store?.id || undefined,
             object: target?.blobRef,
+            page_writer: pageWriterMeta(input.key, writer),
         }),
         maxBytes,
         contentType,

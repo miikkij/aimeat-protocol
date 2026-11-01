@@ -11,6 +11,9 @@
  *   import { registerBoardsTools } from './boards.js';
  *   registerBoardsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged, scopes, caller);
  * @version-history
+ *   2026-11-01 — aimeat_board_list and the board-posts resource treat the shared anonymous principal as
+ *     GET /v1/boards and the board read routes do: public and system boards only, and no owner_gaii or
+ *     allowed_gaiis in the list (secaudit2026oct31w2 round 11).
  *   2026-10-20 — Imports the MCP SDK v2 packages (@modelcontextprotocol/server, /node, /client) in place of @modelcontextprotocol/sdk, through the official codemod (SDK v2 migration step 4b).
  *   2026-10-20 — Tools register with mcp.registerTool(name, { description, inputSchema, annotations }, handler), the form the MCP SDK v2 keeps (plan doc-mvguy322f9se, step 3). No behaviour change.
  *   2026-10-18 — The aimeat://boards/{id} resource passes the posts through the session's
@@ -77,6 +80,7 @@ import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { zodShapeFor } from '../tool-catalog/zod-shape.js';
 import type { CallerContext } from '../services/caller-context.js';
 import { resourceRefusal } from './resource-refusal.js';
+import { isAnonymousPrincipal } from '../auth/anonymous-principal.js';
 
 /**
  * How long a post lives when neither the post nor the board names a lifetime.
@@ -139,8 +143,13 @@ export function registerBoardsTools(
         return (await resolveOperatorAgentName(storage, agentGaii, scopes)) !== null;
     }
 
+    // The shared anonymous principal is not a member: GET /v1/boards and the board read routes treat it
+    // as signed out (routes/boards.ts), so it sees public and system boards only, without the roster.
+    const anonymous = isAnonymousPrincipal({ sub: agentGaii });
+
     /** Check if the agent can see a board (visibility rules; an organism board by membership). */
     function canSeeBoard(board: Pick<BoardRecord, 'visibility' | 'ownerGaii' | 'allowedGaiis'>): Promise<boolean> {
+        if (anonymous) return Promise.resolve(board.visibility === 'public' || board.visibility === 'system');
         return boardVisibleToCaller(storage, board, { gaii: agentGaii, auth: caller().auth });
     }
     /** The boards of `boards` this agent can see, in order. */
@@ -224,8 +233,7 @@ export function registerBoardsTools(
                         name: b.name,
                         description: b.description,
                         visibility: b.visibility,
-                        owner_gaii: b.ownerGaii,
-                        allowed_gaiis: b.allowedGaiis,
+                        ...(anonymous ? {} : { owner_gaii: b.ownerGaii, allowed_gaiis: b.allowedGaiis }),
                         created_at: b.createdAt,
                     })), null, 2),
                 }],

@@ -15,8 +15,16 @@
  *   <cwd>/.aimeat-dify) as <agent>@<owner>.token and .key at 0600. A later run signs its device
  *   request with that key (`proof`), so the owner sees the agent coming back and not a new device
  *   taking it over (src/services/device-return-proof.ts). No stored token is sent with the device
- *   request: the node refuses a dead one.
+ *   request: the node refuses a dead one. Beside them, <agent>@<owner>.node records the origin of the
+ *   node that gave the key and that node's id; the key signs only toward that origin.
  * @version-history
+ *   v1.1.2 - 2026-11-01 - The key is kept with the origin and the id of the node that gave it, and
+ *     signs a return proof only toward that origin, over the stored id. Run against another address
+ *     with the same folder and names, the device request goes without a proof and the run says which
+ *     node holds those names; the node id came from the contacted server, so any server could get a
+ *     proof another node accepts (secaudit2026oct31w2 round 11,
+ *     returnProof-signs-held-key-for-contacted-server-node-id). A key kept before this change has no
+ *     record and signs toward the address it is run with, as before, until its next approval.
  *   v1.1.1 - 2026-10-27 - The reconnect proof is the v2 text, which names the node's id from GET
  *     /.well-known/aimeat (secaudit2026oct26, return-proof-unbound-to-node-and-request).
  *   v1.1.0 - 2026-10-26 - Keep the token and the agent's key, and sign a reconnect with the key
@@ -37,6 +45,22 @@ const POLL_TIMEOUT_SEC = parseInt(env('POLL_TIMEOUT_SEC', '600'), 10);
 const HOME = env('AIMEAT_DIFY_HOME', join(process.cwd(), '.aimeat-dify'));
 const keyFile = () => join(HOME, `${AGENT}@${OWNER}.key`);
 const tokenFile = () => join(HOME, `${AGENT}@${OWNER}.token`);
+const nodeFile = () => join(HOME, `${AGENT}@${OWNER}.node`);
+
+/** The origin (scheme, host, port) of a node address, or '' when it does not parse. */
+const originOf = (url: string): string => (URL.canParse(url) ? new URL(url).origin : '');
+
+/** The node the kept key belongs to, as recorded at its approval; null for a key kept before the record existed. */
+function heldNode(): { origin: string; node_id: string } | null {
+  if (!existsSync(nodeFile())) return null;
+  try {
+    const rec = JSON.parse(readFileSync(nodeFile(), 'utf-8')) as { origin?: unknown; node_id?: unknown };
+    return { origin: typeof rec.origin === 'string' ? rec.origin : '', node_id: typeof rec.node_id === 'string' ? rec.node_id : '' };
+  } catch {
+    // An unreadable record still says the key belongs to some node: sign toward none.
+    return { origin: '', node_id: '' };
+  }
+}
 
 /** A file only its owner reads (0600), in a folder only its owner opens (0700). */
 function writePrivate(path: string, text: string): void {
@@ -50,14 +74,26 @@ async function returnProof(): Promise<{ signed_at: string; signature: string } |
   if (!existsSync(keyFile())) return undefined;
   const key = readFileSync(keyFile(), 'utf-8').trim();
   if (!key) return undefined;
-  // The v2 text names the node, so the proof verifies on this node only (secaudit2026oct26).
-  let nodeId = '';
-  try {
-    const res = await fetch(`${BASE}/.well-known/aimeat`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
-    nodeId = String(((await res.json()) as { data?: { node_id?: unknown } }).data?.node_id ?? '');
-  } catch (e) {
-    console.warn(`  The node did not say its id (${(e as Error).message}); connecting without proof that this is the same agent.`);
+  // The key signs only toward the node that gave it, over that node's stored id: an id read from
+  // the server this run contacts is whatever that server reports (secaudit2026oct31w2 round 11).
+  const held = heldNode();
+  if (held && (!held.origin || held.origin !== originOf(BASE))) {
+    console.warn(`  This folder holds the agent "${AGENT}" of ${OWNER} for ${held.origin || 'another node'}. Its key signs a return proof `
+      + `only toward that node, so this request to ${BASE} goes without one. Approving it replaces what this folder holds for `
+      + `${held.origin || 'that node'}. To keep both, set AIMEAT_DIFY_HOME to another folder or use another AGENT_NAME.`);
     return undefined;
+  }
+  // The v2 text names the node, so the proof verifies on this node only (secaudit2026oct26). A key
+  // kept before the record existed reads the id from the node it is run against, as before.
+  let nodeId = held?.node_id ?? '';
+  if (!nodeId) {
+    try {
+      const res = await fetch(`${BASE}/.well-known/aimeat`, { headers: { Accept: 'application/json' }, signal: AbortSignal.timeout(10_000) });
+      nodeId = String(((await res.json()) as { data?: { node_id?: unknown } }).data?.node_id ?? '');
+    } catch (e) {
+      console.warn(`  The node did not say its id (${(e as Error).message}); connecting without proof that this is the same agent.`);
+      return undefined;
+    }
   }
   if (!nodeId) return undefined;
   const signedAt = new Date().toISOString();
@@ -111,7 +147,12 @@ async function main(): Promise<void> {
     if (tk.status === 200 && tk.json?.access_token) {
       token = tk.json.access_token; gaii = tk.json.gaii;
       writePrivate(tokenFile(), token);
-      if (typeof tk.json.privateKey === 'string' && tk.json.privateKey) writePrivate(keyFile(), tk.json.privateKey);
+      if (typeof tk.json.privateKey === 'string' && tk.json.privateKey) {
+        writePrivate(keyFile(), tk.json.privateKey);
+        // The node that gave the key: its origin, and the id it sends with the key (keep_your_key).
+        const givenId = tk.json.next_steps?.keep_your_key?.node_id;
+        writePrivate(nodeFile(), JSON.stringify({ origin: originOf(BASE), node_id: typeof givenId === 'string' ? givenId : '' }));
+      }
       console.log(`  Approved. GAII = ${gaii}`);
       console.log(`  Scopes = ${(tk.json.scopes ?? []).join(', ')}`);
       break;

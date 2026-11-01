@@ -19,14 +19,23 @@
  *   or validation data (/DSS), and a change of content otherwise. The scan classifies the appended
  *   bytes by the object types they declare; a deep object-by-object comparison of revisions is out
  *   of scope and the report says so.
- * @structure PdfSignatureField · extractPdfSignatures · classifyAppended
+ * @structure PdfSignatureField · extractPdfSignatures · classifyAppended · scanAppendedObjects
  * @usage const sigs = extractPdfSignatures(buffer);
  * @version-history
+ *   2026-11-01 — classifyAppended: an all-zero placeholder /ByteRange is not a later signature;
+ *     validation data comes only from a /DSS an updated Catalog names (or a rewrite of the signed
+ *     revision's DSS), not from the characters /DSS anywhere; an object the signed revision had,
+ *     rewritten as anything but its Catalog, AcroForm, pages, annotations, signatures, Info,
+ *     metadata or DSS, is a change; and an update that only validation data explains holds only
+ *     validation data. Objects inside object streams are read (pdf-objects.ts). Content changed
+ *     after a signature read NOT_WHOLE_FILE before (secaudit2026oct31w2 round 11).
  *   2026-10-27 — extractPdfSignatures takes maxFields and refuses a file with more distinct signature
  *     fields (TOO_MANY_SIGNATURES) before reading any of them, and a field's signedBytes is made when
  *     read instead of held, so memory no longer grows with fields x file size (secaudit2026oct26).
  *   v1.0.0 — 2026-10-09 — Initial (wish-virallisen-dokumentin-allekirjoitus-ja-allekirjoituksen-tark).
  */
+
+import { PdfObjects, canonical, topLevelRef, typeOf, type PdfValue } from './pdf-objects.js';
 
 export interface PdfSignatureField {
   /** Zero-based position of this signature among the ones found, in file order. */
@@ -193,17 +202,26 @@ export function pdfDateToIso(value: string | null): string | null {
   return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
+/** An all-zero /ByteRange is an unsigned signature field's placeholder, not a signature. */
+const isPlaceholder = (m: RegExpMatchArray) => m[2] === '0' && m[3] === '0' && m[4] === '0';
+
 /**
  * What an incremental update appended. Object types are read from `/Type /X` declarations; a
  * signature revision normally adds a Sig dictionary, a signature field (an Annot with /FT /Sig),
  * an updated AcroForm and catalog, and an xref. Anything else is a change of content.
+ *
+ * A later signature counts only when its /ByteRange is not the all-zero placeholder, and validation
+ * data only when an updated Catalog names a /DSS or the signed revision's /DSS is rewritten; an
+ * object the signed revision already had, rewritten as anything but what scanAppendedObjects allows,
+ * is a change whatever else the update holds (secaudit2026oct31w2 round 11).
  */
-export function classifyAppended(text: string, from: number): AppendedContent {
+export function classifyAppended(text: string, from: number, objects: PdfObjects = new PdfObjects(text)): AppendedContent {
   const tail = text.slice(from);
   const types = new Set<string>();
   for (const m of tail.matchAll(/\/Type\s*\/([A-Za-z]+)/g)) types.add(m[1]!);
-  const laterSignatures = [...tail.matchAll(BYTE_RANGE_RE)].length;
-  const validationData = /\/DSS\b/.test(tail) || types.has('DSS');
+  const laterSignatures = [...tail.matchAll(BYTE_RANGE_RE)].filter((m) => !isPlaceholder(m)).length;
+  const scan = scanAppendedObjects(text, from, objects, laterSignatures > 0);
+  const validationData = scan.validationData;
   // A signature revision rewrites the catalog, the AcroForm, the page carrying the widget, and adds
   // the widget annotation, an appearance XObject and the xref. Those are expected around a later
   // signature; new pages, content streams or annotations of other kinds are not.
@@ -217,9 +235,129 @@ export function classifyAppended(text: string, from: number): AppendedContent {
     laterSignatures,
     validationData,
     otherChanges: unusual.length > 0 || annotsNotWidgets || pageWithoutSignature
+      || scan.rewritten
+      // An update that only validation data explains holds only validation data.
+      || (laterSignatures === 0 && validationData && (scan.notValidationData || scan.unreadable))
       || (laterSignatures === 0 && !validationData && /\bobj\b/.test(tail)),
     types: [...types].sort(),
   };
+}
+
+/** Object types a validation-data update (PAdES-B-LT, no later signature) writes. */
+const VALIDATION_TYPES = new Set(['Catalog', 'DSS', 'VRI', 'XRef', 'ObjStm', 'Metadata', 'Extensions', 'DeveloperExtensions']);
+/** Catalog entries a validation-data update may change; every other entry stays as signed. */
+const VALIDATION_CATALOG_KEYS = new Set(['DSS', 'Extensions', 'Metadata']);
+/** What a later signature's revision may rewrite in place: the form, its pages and annotations. */
+const SIGNATURE_REWRITES = new Set(['catalog', 'page', 'annot', 'acroform', 'refs', 'sig', 'metadata', 'dss']);
+
+type Kind = 'catalog' | 'page' | 'annot' | 'acroform' | 'refs' | 'sig' | 'metadata' | 'dss' | 'other';
+
+function kindOf(v: PdfValue | null | undefined): Kind {
+  const t = typeOf(v);
+  if (t === 'Catalog') return 'catalog';
+  if (t === 'Page' || t === 'Pages') return 'page';
+  if (t === 'Annot') return 'annot';
+  if (t === 'AcroForm') return 'acroform';
+  if (t === 'Sig' || t === 'DocTimeStamp') return 'sig';
+  if (t === 'Metadata') return 'metadata';
+  if (t === 'DSS' || t === 'VRI') return 'dss';
+  if (!t && v?.k === 'dict') {
+    const sub = v.entries.get('Subtype');
+    if (v.entries.has('FT') || (sub?.k === 'name' && sub.v === 'Widget')) return 'annot';
+    if (v.entries.has('Fields')) return 'acroform';
+  }
+  if (v?.k === 'array' && v.items.every((i) => i.k === 'ref')) return 'refs';
+  return 'other';
+}
+
+/** Does `after` keep every entry of the signed Catalog `before` except the validation-data ones? */
+function catalogKeepsSigned(before: PdfValue | null | undefined, after: PdfValue | null): boolean {
+  if (before?.k !== 'dict' || after?.k !== 'dict') return false;
+  for (const key of new Set([...before.entries.keys(), ...after.entries.keys()])) {
+    if (VALIDATION_CATALOG_KEYS.has(key)) continue;
+    if (canonical(before.entries.get(key)) !== canonical(after.entries.get(key))) return false;
+  }
+  return true;
+}
+
+/** A new object a validation-data update may write: its typed objects, and untyped data such as certificates. */
+function fitsValidationData(v: PdfValue | null): boolean {
+  const t = typeOf(v);
+  if (t) return VALIDATION_TYPES.has(t);
+  if (v?.k !== 'dict') return true;
+  const sub = v.entries.get('Subtype');
+  return !v.entries.has('FT') && (!sub || (sub.k === 'name' && sub.v === 'XML'));
+}
+
+/**
+ * Every object number the signed revision reaches from `root` through dictionaries and arrays,
+ * bounded. Read in the signed revision only, so an update cannot widen it by naming an object.
+ */
+function signedReach(objects: PdfObjects, from: number, root: number | null): Set<number> {
+  const seen = new Set<number>();
+  const queue = root === null ? [] : [root];
+  const visit = (v: PdfValue | null | undefined, depth: number): void => {
+    if (!v || depth > 8) return;
+    if (v.k === 'ref') { if (!seen.has(v.num)) queue.push(v.num); return; }
+    if (v.k === 'dict') for (const x of v.entries.values()) visit(x, depth + 1);
+    if (v.k === 'array') for (const x of v.items) visit(x, depth + 1);
+  };
+  while (queue.length && seen.size < 4096) {
+    const n = queue.shift()!;
+    if (seen.has(n)) continue;
+    seen.add(n);
+    visit(objects.valueBefore(n, from), 0);
+  }
+  return seen;
+}
+
+/**
+ * The object-level read of an update: whether it carries validation data, whether it rewrites an
+ * object the signed revision had as something no signature or validation revision writes, and,
+ * for an update that no later signature explains, whether it writes anything but validation data.
+ */
+function scanAppendedObjects(text: string, from: number, objects: PdfObjects, signatureRevision: boolean) {
+  const { objects: added, unreadable } = objects.appendedAfter(from);
+  const signedText = text.slice(0, from);
+  const lastRef = (key: string): number | null => {
+    let n: number | null = null;
+    for (const m of signedText.matchAll(new RegExp(`/${key}\\s+(\\d+)\\s+\\d+\\s+R\\b`, 'g'))) n = Number(m[1]);
+    return n;
+  };
+  const rootNum = lastRef('Root');
+  const signedCatalog = rootNum === null ? undefined : objects.valueBefore(rootNum, from);
+  const signedDss = topLevelRef(signedCatalog, 'DSS');
+  const infoNum = lastRef('Info');
+  const named = new Set([topLevelRef(signedCatalog, 'AcroForm'), topLevelRef(signedCatalog, 'Metadata')].filter((n): n is number => n !== null));
+
+  const latest = new Map<number, PdfValue | null>();
+  for (const o of added) latest.set(o.num, o.value);
+  const catalogs = added.filter((o) => kindOf(o.value) === 'catalog');
+  const validationData = catalogs.some((c) => c.value?.k === 'dict' && c.value.entries.has('DSS'))
+    || (signedDss !== null && latest.has(signedDss));
+  // A later validation round rewrites the signed revision's DSS and what it holds, and nothing else.
+  const validationObjects = signedReach(objects, from, signedDss);
+
+  let rewritten = false;
+  let notValidationData = false;
+  for (const o of added) {
+    const before = objects.valueBefore(o.num, from);
+    const kind = kindOf(o.value);
+    if (!signatureRevision && kind === 'catalog' && !catalogKeepsSigned(signedCatalog, o.value)) notValidationData = true;
+    if (before === undefined) {
+      if (!signatureRevision && !fitsValidationData(o.value)) notValidationData = true;
+      continue;
+    }
+    // A rewrite of an object the signed revision had.
+    if (validationObjects.has(o.num)) continue;
+    if (o.num === infoNum && o.value?.k === 'dict' && !typeOf(o.value)) continue;
+    if (kind === 'metadata' && kindOf(before) === 'metadata') continue;
+    if (kind === 'catalog' && kindOf(before) === 'catalog' && (signatureRevision || catalogKeepsSigned(before, o.value))) continue;
+    if (signatureRevision && named.has(o.num) && o.value?.k === 'dict') continue;
+    if (signatureRevision && kind === kindOf(before) && SIGNATURE_REWRITES.has(kind)) continue;
+    rewritten = true;
+  }
+  return { validationData, rewritten, notValidationData, unreadable };
 }
 
 /**
@@ -247,6 +385,8 @@ export function extractPdfSignatures(pdf: Buffer, opts: { maxFields?: number } =
   }
   const out: PdfSignatureField[] = [];
   const seen = new Set<string>();
+  // One object read per file, shared by every signature's classification.
+  let objects: PdfObjects | null = null;
   for (const m of text.matchAll(BYTE_RANGE_RE)) {
     const br = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[4])] as [number, number, number, number];
     const key = br.join(',');
@@ -281,7 +421,7 @@ export function extractPdfSignatures(pdf: Buffer, opts: { maxFields?: number } =
       location: stringField(dict, 'Location'),
       contactInfo: stringField(dict, 'ContactInfo'),
       coversWholeFile,
-      appended: coversWholeFile ? null : classifyAppended(text, c + d),
+      appended: coversWholeFile ? null : classifyAppended(text, c + d, objects ??= new PdfObjects(text)),
     });
   }
   return out;
