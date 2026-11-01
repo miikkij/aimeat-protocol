@@ -12,13 +12,22 @@
  *   The card draws nothing until the offer is open, while the node has no queue, or when the read
  *   fails, so an older node without the route shows the home as it was.
  *
+ *   THE BUILD CODE (1.11, after Jouni turned down the queue submit agent at 18.18): when the node
+ *   holds a code for the order (`buildCode`, AIMEAT_SITE_BUILD_CODE), the person's own AI sends the
+ *   request from their own aimeat.io account, and the card shows the code and the three steps
+ *   instead of the form. The form and the queue states stay for a node that still has a queue.
+ *
  *   NO TIME PROMISES. The queue's position and length are shown as numbers, and the state as a word;
  *   nothing on the card says when the work will be done.
  *
  *   Composed from library components only; it has no sheet of its own.
- * @structure BuildWithYou() · internal: OfferForm, QueueStatus, InvitedGuide, Finished, SpecRows
+ * @structure BuildWithYou() · internal: BuildCodeCard, OfferForm, QueueStatus, InvitedGuide, Finished,
+ *   SpecRows
  * @usage html`<${BuildWithYou} />` (views/home/index.js, under the buyer's welcome)
  * @version-history
+ *   v1.1.0 — 2026-11-01 — BuildCodeCard: the build code and three steps, shown when the node has a
+ *     code and no request (commercial-1c and aimeat-protocol-4e, the new model); aimeat.io is the
+ *     node's queueOrigin, and the place's chat is the second way in when the node has it.
  *   v1.0.1 — 2026-11-01 — The first state names the operator: the operator's agent takes the request
  *     to the queue, not the place. The node calls it 'waiting-for-operator' ('received' before).
  *   v1.0.0 — 2026-11-01 — Initial (Jouni, 1.11 16.22, via Grok and commercial-1c; the node's routes
@@ -39,12 +48,15 @@ import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
 import { TextField, TextArea } from '/components/TextField.js';
 import { Fields, FormActions } from '/components/Field.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.split(`{${k}}`).join(String(v)), s);
 
 const KEY = 'build-with-you';
 const PATH = '/v1/build-with-you/request';
+/** Where the build request is sent when the node has no queue address (the store's own node). */
+const AIMEAT_ORIGIN = 'https://aimeat.io';
 
 /** The four parts of the request, in the order the person fills them. */
 const SPEC = [
@@ -85,13 +97,62 @@ export function BuildWithYou() {
   if (!enabled || !data) return null;
   const { offer, request } = data;
   const queueOrigin = typeof data.queueOrigin === 'string' ? data.queueOrigin : '';
+  const buildCode = typeof data.buildCode === 'string' ? data.buildCode.trim() : '';
 
+  if (!request && buildCode) {
+    return html`<${BuildCodeCard} code=${buildCode} aimeatOrigin=${queueOrigin || AIMEAT_ORIGIN}
+      chatPath=${!!queueOrigin} />`;
+  }
   if (!request) return offer?.available ? html`<${OfferForm} />` : null;
   if (request.state === 'done') return html`<${Finished} />`;
   if (request.state === 'invited' || (request.organismInviteSent && request.state !== 'declined')) {
     return html`<${InvitedGuide} request=${request} queueOrigin=${queueOrigin} />`;
   }
   return html`<${QueueStatus} request=${request} />`;
+}
+
+/**
+ * The build code and the three steps: the person's own AI, connected to aimeat.io and to this place,
+ * sends the request from their own aimeat.io account with the code; the work is followed in the
+ * request's workspace there. The words follow the store panel's (commercial-1c, 1.11). `chatPath`:
+ * the node has the queue's address, so Access and security offers "Connect to aimeat.io" for the
+ * place's own chat, the second way in.
+ */
+function BuildCodeCard({ code, aimeatOrigin, chatPath }) {
+  const host = hostOf(aimeatOrigin) || 'aimeat.io';
+  const say = fill(tr('home.buildWithYou.codeSay', 'Send my build request to {host} with the code {code}.'), { host, code });
+  return html`
+    <${Band} title=${title()}>
+      <${Note} kind="lead">${tr('home.buildWithYou.promise', 'We build your first complete piece of work with you.')}<//>
+      <${BandNote}>${tr('home.buildWithYou.scope', 'Tell us with your AI what you need: one agent or one small app. Bigger work is priced separately.')}<//>
+      <${NamedRow} label=${tr('home.buildWithYou.codeLabel', 'Your build code')}>
+        <code>${code}</code> <${CopyButton} text=${code} label=${tr('home.buildWithYou.codeCopy', 'Copy the code')} />
+      <//>
+      <${IndexList} steps>
+        <${IndexStep}>
+          ${fill(tr('home.buildWithYou.codeStepConnect', 'Connect your own AI (Claude, ChatGPT or Grok) to {host} and to this place.'), { host })}
+          <${Actions}>
+            <${Action} small href=${`${aimeatOrigin}/v1/profile?tab=mcp`} newTab>${fill(tr('home.buildWithYou.codeConnectThere', 'Connect to {host}'), { host })} →<//>
+            <${Action} small href="/v1/profile?tab=mcp">${tr('home.buildWithYou.codeConnectHere', 'Connect to this place')} →<//>
+          <//>
+          ${chatPath && html`
+            <${Note} kind="hint">${fill(tr('home.buildWithYou.codeChatPath', 'You can also use this place\'s chat: connect it to {host} under Access and security.'), { host })}<//>
+            <${Actions}>
+              <${Action} small soft href="/v1/profile?tab=access">${fill(tr('home.buildWithYou.codeChatButton', 'Connect the chat to {host}'), { host })} →<//>
+            <//>`}
+        <//>
+        <${IndexStep}>
+          ${tr('home.buildWithYou.codeStepAsk', 'Ask your AI to send your build request with this code.')}
+          <${Note} kind="hint">${fill(tr('home.buildWithYou.codeSayHint', 'You can say, for example: "{say}"'), { say })}<//>
+        <//>
+        <${IndexStep}>
+          ${fill(tr('home.buildWithYou.codeStepFollow', 'When your request is taken on, you get an invitation to its own workspace on {host}. You follow the work there.'), { host })}
+        <//>
+      <//>
+      <${Actions}>
+        <${Action} small soft href="/v1/home?trail=1">${tr('home.buildWithYou.trailLink', 'Everything done in your place')} →<//>
+      <//>
+    <//>`;
 }
 
 /** The offer: the promise, what it covers, and the four-part request sent with one button. */
