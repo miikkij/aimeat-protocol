@@ -11,6 +11,8 @@
  *   levelWords · keyRows · crumb · pageLinks
  * @usage import { x, keyRows, rightsInWords } from './frame.js';
  * @version-history
+ *   v1.3.0 — 2026-11-01 — On a node the store sold the rail has no Security (operator) link: the
+ *     owner there is a customer, not the node's operator (Grok's first-timer review 1.11 b).
  *   v1.2.0 — 2026-11-01 — x() reads a `<key>Place` variant on a node the store sold: no "key" words
  *     and no password warning for a buyer who signs in by emailed link (Jouni's review, Access page).
  *   v1.1.0 — 2026-09-26 — The crumb and the rail's page links are data for SettingsPage (the steps,
@@ -205,12 +207,13 @@ export function crumb() {
   return [t('nav.profile'), t('profile.landing.menuAccount'), t('profile.tabs.access')];
 }
 
-/** The sibling pages in the rail, each a Settings tab (→ … →); Security is the operator's only. */
+/** The sibling pages in the rail, each a Settings tab (→ … →); Security is the operator's only,
+ *  and a node the store sold has no operator page in the rail: its owner is a customer. */
 export function pageLinks(isOperator) {
   return [
     { tab: 'fleet', label: t('profile.tabs.fleet') },
     { tab: 'dataWallet', label: t('profile.tabs.dataWallet') },
     { tab: 'mcp', label: t('profile.tabs.mcp') },
-    isOperator ? { tab: 'security', label: t('profile.tabs.security'), count: x('operatorOnly') } : null,
+    isOperator && !customerNode() ? { tab: 'security', label: t('profile.tabs.security'), count: x('operatorOnly') } : null,
   ];
 }
