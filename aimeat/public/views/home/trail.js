@@ -15,6 +15,10 @@
  *   CODE_PHRASE, FAMILY_PHRASE, ROUTINE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.3.0 — 2026-11-02 — The Home's own record writes (home.visits, home.offers and the like, which
+ *     the page makes while the person only looks) are routine; "Pidä tämä" on home.made-for-you stays
+ *     in view as "kept the work made for them". Needs the record key as the target, which POST
+ *     /v1/memory records since aimeat-protocol-4e's 1ca286ecd.
  *   v1.2.0 — 2026-11-01 — Families of codes an agent's run writes (notes, tasks, documents, messages)
  *     have phrases; housekeeping (a live stream ticket, a task plan's steps, reports) waits with the
  *     reads; an unknown row says "made a change", and the target is a plain name or nothing, never a
@@ -110,9 +114,18 @@ const ROUTINE = [
   /heartbeat|telemetry|runtime|capabilities_report|_report$/,
 ];
 
+/** A write of a record (REST or MCP): its target is the record's key (middleware/trail-recorder.ts). */
+const MEMORY_WRITE = /^(POST|PUT|PATCH) \/v1\/memory(\/:key)?$|^aimeat_memory_write$/;
+/** The Home's own records, written by the page while the person only looks (visit counters, offers). */
+const HOME_RECORD = /^home\./;
+/** The one Home record a person writes on purpose: "Pidä tämä" on work made for them. */
+const KEPT_WORK = 'home.made-for-you';
+
 /** True for a row that is housekeeping rather than an action on the place. */
 export function isRoutine(entry) {
   const code = String(entry.code || '');
+  const target = String(entry.target || '');
+  if (MEMORY_WRITE.test(code) && HOME_RECORD.test(target) && target !== KEPT_WORK) return true;
   return ROUTINE.some((re) => re.test(code));
 }
 
@@ -122,6 +135,7 @@ const EVENT_PHRASE = { 'app.published': 'publishedApp', 'agent.approved': 'appro
 /** The phrase id for a code: its own entry, then its family, then the event the node named. */
 function phraseOf(entry) {
   const code = String(entry.code || '');
+  if (MEMORY_WRITE.test(code) && entry.target === KEPT_WORK) return 'keptWork';
   return CODE_PHRASE[code] || FAMILY_PHRASE.find(([re]) => re.test(code))?.[1] || EVENT_PHRASE[entry.event] || '';
 }
 

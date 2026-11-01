@@ -14526,7 +14526,8 @@
         "sentMessage": "envió un mensaje",
         "readData": "consultó datos",
         "openedPage": "abrió una página",
-        "madeChange": "hizo un cambio"
+        "madeChange": "hizo un cambio",
+        "keptWork": "conservó el trabajo terminado"
       }
     },
     "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
