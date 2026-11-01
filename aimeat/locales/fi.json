@@ -16123,7 +16123,20 @@
       "someone": "Joku",
       "used": "käytti toimintoa {code}",
       "line": "{who} {what}",
-      "lineTarget": "{who} {what}: {target}"
+      "lineTarget": "{who} {what}: {target}",
+      "failed": "(ei onnistunut)",
+      "showReads": "Näytä myös tietojen lukemiset",
+      "did": {
+        "sentRequest": "lähetti Rakennamme kanssasi -pyynnön",
+        "checkedRequest": "tarkisti Rakennamme kanssasi -pyynnön tilan",
+        "readTrail": "luki toimintalokin",
+        "publishedApp": "julkaisi sovelluksen",
+        "approvedAgent": "hyväksyi agentin",
+        "askedChat": "kysyi chatissa",
+        "savedNote": "tallensi muistiinpanon",
+        "wroteDoc": "kirjoitti dokumentin työtilaan",
+        "uploadedFile": "latasi tiedoston"
+      }
     },
     "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",
     "signInTitle": "Astu kotiisi",

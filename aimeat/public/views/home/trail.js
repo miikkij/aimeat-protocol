@@ -8,11 +8,14 @@
  *   (history.js): the same day groups and timeline rows.
  *
  *   THE NODE WRITES THE ACTION IN ENGLISH AND KEEPS THE TOOL OR ROUTE NAME IN `code`. The phrase in
- *   the page's language comes from the `home.trail.code.<code>` keys; a code without one says which
- *   tool or route was used, so no row is dropped and no row is in a language the page is not in.
- * @structure default HomeTrailView; trailLine(entry) · internal: Day, byDay
+ *   the page's language comes from CODE_PHRASE and the `home.trail.did.<phrase>` keys; a code without
+ *   one says which tool or route was used, so no row is dropped and no row is in a language the page
+ *   is not in.
+ * @structure default HomeTrailView; trailLine(entry) · internal: CODE_PHRASE, EVENT_PHRASE, Day, byDay
  * @usage routed at /v1/home?trail=1 by spa.html
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The phrase table for the codes 4e named; reads (readOnly) hidden behind a
+ *     tick; a failed action says so; older pages read with `before`, as the route pages.
  *   v1.0.0 — 2026-11-01 — Initial (the trail route is aimeat-protocol-4e's).
  */
 import { h } from 'preact';
@@ -35,6 +38,7 @@ import { BackLink } from '/components/BackLink.js';
 import { DayGroup, DayList, DayEmpty } from '/components/DayGroup.js';
 import { ArchiveMore } from '/components/ArchiveSection.js';
 import { TimelineRow } from '/components/Timeline.js';
+import { Check } from '/components/Check.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const fill = (s, vars) => Object.entries(vars).reduce((out, [k, v]) => out.split(`{${k}}`).join(String(v)), s);
@@ -43,8 +47,35 @@ const PATH = '/v1/build-with-you/trail';
 /** One read; the node's own default. */
 const PAGE = 100;
 
-/** The dot's colour on the timeline by who acted: the person, an AI or agent, the operator. */
-const KIND_CATEGORY = { person: 'made', agent: 'agent', ai: 'agent', operator: 'access' };
+/** The dot's colour on the timeline by who acted: the person, an AI, agent or app, the operator. */
+const KIND_CATEGORY = { person: 'made', agent: 'agent', ai: 'agent', app: 'agent', operator: 'access' };
+
+/**
+ * The codes with a phrase of their own (aimeat-protocol-4e's list of 2026-11-01). `code` is an MCP
+ * tool name or "METHOD /route/template", an open set; a code not here keeps the fallback. The value
+ * names a `home.trail.did.<phrase>` key, so several codes for one action share one phrase.
+ */
+const CODE_PHRASE = {
+  aimeat_build_request_submit: 'sentRequest',
+  'POST /v1/build-with-you/request': 'sentRequest',
+  aimeat_build_request_status: 'checkedRequest',
+  aimeat_trail_list: 'readTrail',
+  aimeat_app_publish: 'publishedApp',
+  aimeat_app_draft_publish: 'publishedApp',
+  'POST /v1/apps': 'publishedApp',
+  'POST /v1/apps/:owner/:filename/publish-draft': 'publishedApp',
+  'POST /v1/agents': 'approvedAgent',
+  'POST /v1/agents/v2/agent-proposals/:id/approve': 'approvedAgent',
+  'POST /v1/agents/verify': 'approvedAgent',
+  'POST /v1/agents/device-authorize': 'approvedAgent',
+  'POST /v1/chat/threads/:id/turn': 'askedChat',
+  aimeat_memory_write: 'savedNote',
+  'PUT /v1/memory/:key': 'savedNote',
+  aimeat_workspace_write: 'wroteDoc',
+  aimeat_storage_upload: 'uploadedFile',
+};
+/** An entry's `event`, for a code the table does not name. */
+const EVENT_PHRASE = { 'app.published': 'publishedApp', 'agent.approved': 'approvedAgent' };
 
 /**
  * Who did it. Always a third person, never "you": the verb phrase is one form per language, and a
@@ -58,21 +89,23 @@ function who(entry) {
 }
 
 /**
- * The row's sentence: who, what, and on what. The verb phrase comes from the code's own key; without
- * one, English pages keep the node's phrase and other pages name the tool or route that was used.
+ * The row's sentence: who, what, and on what. The verb phrase comes from the code's phrase key; without
+ * one, English pages keep the node's phrase and other pages name the tool or route that was used. A
+ * failed action says so after the sentence.
  */
 export function trailLine(entry) {
   const code = String(entry.code || '');
-  const keyed = code ? t(`home.trail.code.${code}`) : '';
-  const phrase = keyed && keyed !== `home.trail.code.${code}`
-    ? keyed
-    : getLocale() === 'en' && entry.action
+  const phraseId = CODE_PHRASE[code] || EVENT_PHRASE[entry.event];
+  const keyed = phraseId ? tr(`home.trail.did.${phraseId}`, '') : '';
+  const phrase = keyed
+    || (getLocale() === 'en' && entry.action
       ? String(entry.action)
-      : fill(tr('home.trail.used', 'used {code}'), { code: code || String(entry.action || '') });
+      : fill(tr('home.trail.used', 'used {code}'), { code: code || String(entry.action || '') }));
   const target = String(entry.target || '').trim();
-  return target
+  const line = target
     ? fill(tr('home.trail.lineTarget', '{who} {what}: {target}'), { who: who(entry), what: phrase, target })
     : fill(tr('home.trail.line', '{who} {what}'), { who: who(entry), what: phrase });
+  return entry.outcome === 'error' ? `${line} ${tr('home.trail.failed', '(did not succeed)')}` : line;
 }
 
 function byDay(entries) {
@@ -111,6 +144,9 @@ export default function HomeTrailView({ navigate }) {
   const [next, setNext] = useState(null);
   const [busy, setBusy] = useState(false);
   const [loadError, setLoadError] = useState('');
+  // An MCP tool that only reads (readOnly) is hidden until asked for: an AI reads far more often than
+  // it changes anything, and the reads would bury what was done.
+  const [showReads, setShowReads] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -134,7 +170,7 @@ export default function HomeTrailView({ navigate }) {
     if (!next) return;
     setBusy(true);
     try {
-      const res = await apiGet(`${PATH}?limit=${PAGE}&since=${encodeURIComponent(next)}`);
+      const res = await apiGet(`${PATH}?limit=${PAGE}&before=${encodeURIComponent(next)}`);
       setEntries((prev) => [...(prev || []), ...(res?.data?.entries ?? [])]);
       setNext(res?.data?.next ?? null);
     } catch (e) {
@@ -161,6 +197,9 @@ export default function HomeTrailView({ navigate }) {
 
   if (!entries) return html`<${PageFrame} loading=${true}><${Spinner} /><//>`;
 
+  const shown = showReads ? entries : entries.filter((entry) => !entry.readOnly);
+  const hasReads = entries.some((entry) => entry.readOnly);
+
   return html`
     <${PageFrame} width="narrow">
       <${BackLink} href="/v1/home" onClick=${(e) => { e.preventDefault(); navigate('/v1/home'); }}>
@@ -168,9 +207,13 @@ export default function HomeTrailView({ navigate }) {
       <//>
       <${PageIntro} title=${tr('home.trail.title', 'Activity log')}
         sub=${tr('home.trail.sub', 'Everything done in your place: what, on what, who did it and when. Newest first.')} />
-      ${entries.length === 0
+      ${hasReads && html`
+        <${Check} checked=${showReads} onChange=${setShowReads}>
+          ${tr('home.trail.showReads', 'Show reads too')}
+        <//>`}
+      ${shown.length === 0
         ? html`<${DayEmpty}>${tr('home.trail.empty', 'Nothing has been done here yet.')}<//>`
-        : html`<${DayList}>${byDay(entries).map((group) => html`<${Day} group=${group} key=${group.day} />`)}<//>`}
+        : html`<${DayList}>${byDay(shown).map((group) => html`<${Day} group=${group} key=${group.day} />`)}<//>`}
       ${next && html`
         <${ArchiveMore} disabled=${busy} onClick=${loadMore}>
           ${busy ? tr('home.history.reading', 'Reading…') : tr('home.trail.more', 'Show older')}
