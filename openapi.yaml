@@ -24469,8 +24469,8 @@ paths:
         queueLength (no time estimate), and the organism and invitation address once the builders invited
         the person. A status older than a minute is asked again from the queue. On a place the store sold,
         `buildCode` is the store's code for the one request (site.build_code, RK-XXXX-XXXX-XXXX) and `send`
-        says where the person's own AI sends it with the person's own account: the MCP server `send.mcp`,
-        the tool `send.tool`, the arguments `send.arguments`; the offer is then open. The code is never on a
+        describes how POST sends it with the person's own account: the MCP server `send.mcp`, the tool
+        `send.tool`, the arguments `send.arguments`; the offer is then open. The code is never on a
         page a visitor loads. The owner, or the owner's agent with `memory:read`. Live domain
         `build-with-you`, also when a setting changes. MCP: aimeat_build_request_status.
       security:
@@ -24484,10 +24484,13 @@ paths:
       summary: Send the place's one build request
       tags: [Build With You]
       description: >
-        Stores the place's one build request for the operator to take to the build queue: one agent or one
-        small app. A second request is refused. A place with a build code refuses it with
-        BUILD_REQUEST_ELSEWHERE: there the request goes with the person's own account, as GET says in `send`.
-        The owner, or the owner's agent with `memory:write`. MCP: aimeat_build_request_submit.
+        The place's one build request: one agent or one small app. A second request is refused. Without a
+        build code it is stored for the operator to take to the build queue. On a place with a build code
+        the place sends it at once, with the person's own account on the builders' node: through the MCP
+        server the person attached for that node's address, calling the queue's app tool as GET's `send`
+        describes, and it keeps the queue's answer. 409 BUILD_CONNECT_FIRST when no such server is attached
+        or it needs a new sign-in; 502 BUILD_SEND_FAILED when that node did not take it, and nothing is
+        stored. The owner, or the owner's agent with `memory:write`. MCP: aimeat_build_request_submit.
       security:
         - BearerAuth: []
       requestBody:
@@ -24510,6 +24513,7 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/AimeatError' }
 
   /v1/build-with-you/trail:
     get:

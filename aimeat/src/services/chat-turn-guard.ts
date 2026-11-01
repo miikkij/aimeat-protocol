@@ -32,6 +32,10 @@
  *   - progressText(locale, step) / stoppedText(locale) / appReadyText(locale, url) — the person's
  *     language, from locales/
  * @version-history
+ *   v1.2.8 — 2026-11-01 — The build request sentence moves ahead of the new-agent one and names one call,
+ *     aimeat_build_request_submit, which now sends it itself: on the test lane the chat proposed a local
+ *     agent for a build request, then passed the address where aimeat_mcp_call wants a short name
+ *     (aimeat-commercial-1c, crew54).
  *   v1.2.7 — 2026-11-01 — One added sentence: a build request goes through the attached server the
  *     build status's `send` names, with the place's build code (commercial, after Jouni 1.11 18.18).
  *   v1.2.6 — 2026-10-31 — The sentences between steps are in the person's language too. On crew36 the
@@ -117,12 +121,12 @@ export function turnNote(): string {
         'Write one short sentence to the person before your first tool call, and one between steps, so they see what you are doing while you work. Write these sentences in the person\'s language too, never in English when they wrote in another.',
         'Keep this turn to about a minute and a few rounds of tool calls. After that the node asks you to answer with what you have.',
         'Speak to the person in plain words in their language: say "shared place" for an organism and "workspace" for a workspace, call the person by their name, and never write an identity such as name@node-id, a key or an id to them.',
+        'When the person speaks of their build request, the builders, a build code (RK-…) or "Rakennamme kanssasi", they want something built BY the builders, not an agent of this place: read aimeat_build_request_status, take what, forWhom, use and readyWhen from their words and ask only for what is missing, then call aimeat_build_request_submit once with those four. That one call sends it with their own account. When it answers BUILD_CONNECT_FIRST, tell them its sentence in their language.',
         'When the person asks for a new agent: read their organisms with aimeat_organism_list (the handbook is not needed for this), and the workspaces of the organism the job needs with aimeat_workspace_list, which takes that organism\'s id. One step of reading is enough; when they have no organisms, go straight on. Then call aimeat_agent_propose in the next step, with a crew_def in the smallest shape its description gives. Propose also when the data the agent needs does not exist yet: then name what is missing in `purpose` and in your answer. Give them the approval address from the answer.',
         'An agent can read the web: give a news agent the tools ["news", "article_fetch", "notify"] (Finnish publishers\' feeds; topics politiikka, kotimaa, paauutiset) and any other subject ["web", "article_fetch", "notify"]. When it works on a clock, send `schedule` with the proposal as a five-field cron ("0 7 * * *" every morning at 7), so their one press starts it on that clock. Its result goes to them by email unless they said otherwise: its last task sends the result with the notify tool, and the proposal\'s scopes include notifications:send. Tell them that, and that they can ask for it in their AIMEAT instead.',
         'When the person asks for an app: finish it in this turn, with their sentence as the whole brief and no interview. Read the build specification once, aimeat_handbook_get with tier "build-app-atelier", and no other part unless the app cannot work without it. Then take a genre with aimeat_app_template_get, one that comes whole in one answer: id "genre-receipt" for a list, "genre-almanac" for a calendar or a log, "genre-departures" for a board of items. Every AIMEAT ships these, so one is always there. When an answer says it has more parts, do not fetch them: build on the first part. Build the page from its `content` and keep every script tag it has, and publish with aimeat_app_publish. A template you did not find is never a reason to stop: write the page yourself from the specification and publish it. Give them `url` from the answer.',
         'When aimeat_app_publish has answered, the app is done: give them its `url` in your next words and end the turn. Their own data is not part of building it, so do not read it after the publish.',
         'The person is signed in here, and an app of their own signs them in by itself when they open it, so never ask them to sign in.',
-        'When the person wants to send their build request to the builders ("Rakennamme kanssasi"): read aimeat_build_request_status, fill the four fields in with them, and send it through the attached server its `send.mcp` names, with aimeat_mcp_call calling `send.tool` with `send.arguments` and the code from the status; when aimeat_mcp_list shows no such server, tell them to connect it on the Access page first.',
     ].join('\n');
 }
 

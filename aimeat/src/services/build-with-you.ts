@@ -9,7 +9,12 @@
  *   routes (routes/build-with-you.ts) and the MCP tools aimeat_build_request_submit and
  *   aimeat_build_request_status (mcp/build-with-you.ts) call the operations here, so who may do what exists once.
  *
- *   THE PLACE DOES NOT SUBMIT. The queue's write key reaches every extension of the operator's account,
+ *   A STORE PLACE SENDS IT WITH THE PERSON'S OWN ACCOUNT. With the store's build code (site.build_code)
+ *   the place calls the queue's app tool through the MCP server the person attached for the builders'
+ *   node, with their own sign-in there (sendWithOwnAccount, build-with-you-send.ts), and keeps the
+ *   queue's answer. No key of the operator's is involved.
+ *
+ *   WITHOUT A CODE THE PLACE DOES NOT SUBMIT. The queue's write key reaches every extension of the operator's account,
  *   so it never sits on a customer's place. The request waits here as `waiting-for-operator`; the
  *   operator's fleet service reads it (GET /v1/operator/build-request), submits it from where the key
  *   lives, and writes the queue's answer back (PUT /v1/operator/build-request). From then on the node
@@ -28,6 +33,12 @@
  *   startBuildWithYou · stopBuildWithYou
  * @usage res.json(success(nodeId, await submitOp(deps, callerOf(req, nodeId, storage), req.body)));
  * @version-history
+ *   v1.2.0 — 2026-11-01 — With the build code the PLACE sends the request (sendWithOwnAccount), through
+ *     the server the person attached for the builders' node and with their own sign-in there, and keeps
+ *     the queue's answer as the operator's hand-back did; BUILD_REQUEST_ELSEWHERE is gone, and a place
+ *     not yet connected answers BUILD_CONNECT_FIRST. The `send` block for the person's AI to fill in
+ *     failed on the test lane: the chat named the address where aimeat_mcp_call wants the short name
+ *     (aimeat-commercial-1c, crew54). A request in `sending` is never the operator's to take.
  *   v1.1.0 — 2026-11-01 — The store's build code (site.build_code). Jouni rejected the queue submit
  *     agent (1.11 18.18), so the request goes with the person's OWN aimeat.io account: a place with a
  *     code answers buildCode and `send` (the queue's app tool submitRequest, called through aimeat.io's
@@ -47,6 +58,8 @@ import { readJson } from '../utils/read-capped.js';
 import { INPUT_LIMITS } from '../models/input-limits.js';
 import { BUILD_CODE } from '../utils/build-code.js';
 import { logger } from '../utils/logger.js';
+import { callRemoteTool, statusForRemoteRefusal } from './mcp-client/invoke.js';
+import { attachedQueueServer, queueAnswerOf, answerText } from './build-with-you-send.js';
 
 export const BUILD_DOMAIN = 'build-with-you';
 const KEY = 'build-with-you.request';
@@ -60,6 +73,8 @@ const SWEEP_MS = 10 * 60_000;
 const TERMINAL = new Set(['done', 'declined']);
 /** The state of a request the operator has not taken to the queue yet. */
 const WAITING = 'waiting-for-operator';
+/** The state of a request the place is sending with the person's own account, until the far side answers. */
+const SENDING = 'sending';
 const SPEC_FIELDS = ['what', 'forWhom', 'use', 'readyWhen'] as const;
 
 export class BuildError extends Error {
@@ -197,13 +212,14 @@ function specOf(body: Record<string, unknown>): Spec {
   return spec;
 }
 
-/** Store the place's one request for the operator to take to the queue. */
+/**
+ * The place's one request. With the store's build code the place sends it at once, through the server
+ * the person attached for the builders' node and with their own sign-in there (sendWithOwnAccount);
+ * without one it is stored for the operator to take to the queue.
+ */
 export async function submitOp(deps: Deps, caller: CallerContext, body: Record<string, unknown>) {
   access(caller, 'write');
   const spec = specOf(body);
-  if (buildCodeOf(deps.config)) {
-    throw new BuildError(409, 'BUILD_REQUEST_ELSEWHERE', 'This place sends its build request with your own account on the builders\' node: read aimeat_build_request_status (GET /v1/build-with-you/request) for the build code and where to send it.');
-  }
   if (!queueBase(deps.config)) throw new BuildError(409, 'BUILD_WITH_YOU_OFF', 'This node has no build queue, so a build request cannot be sent from here.');
   // The account's language and notification address are defaults only; without them the request still goes.
   const ghii = await deps.storage.getGHII(caller.ownerGhii).catch((e: Error) => {
@@ -213,6 +229,8 @@ export async function submitOp(deps: Deps, caller: CallerContext, body: Record<s
   const wanted = typeof body.lang === 'string' && ['en', 'fi', 'es'].includes(body.lang) ? body.lang : '';
   const lang = wanted || ghii?.locale || deps.config.siteLinks?.defaultLocale || 'en';
   const email = (typeof body.email === 'string' ? body.email.trim() : '') || ghii?.notificationEmail || '';
+  const code = buildCodeOf(deps.config);
+  if (code) return sendWithOwnAccount(deps, caller, { spec, lang, email, code });
   const now = new Date().toISOString();
   const rec = await write(deps, (cur) => {
     if (cur.request) throw new BuildError(409, 'BUILD_REQUEST_EXISTS', 'This place has already sent its build request. Read its status instead.');
@@ -229,12 +247,71 @@ export async function submitOp(deps: Deps, caller: CallerContext, body: Record<s
   return view(deps.config, rec);
 }
 
+const CALLER_KIND = { owner: 'owner', agent: 'agent', app: 'app', ecosystem: 'eco' } as const;
+
+/**
+ * Send the request with the person's own account: the queue's app tool submitRequest, called through the
+ * server they attached for the builders' node (aimeat_app_tool_invoke on that node's MCP), with the grants
+ * and the sign-in that server row carries. The place's one request is claimed BEFORE the call, so two
+ * sends at once make one call, and released again when the far side did not take it, so the person can
+ * send it again.
+ */
+async function sendWithOwnAccount(deps: Deps, caller: CallerContext, req: { spec: Spec; lang: string; email: string; code: string }) {
+  const via = sendVia(deps.config, queueBase(deps.config), req.code);
+  if (!via) throw new BuildError(409, 'BUILD_WITH_YOU_OFF', 'This node\'s build queue setting names no queue extension, so the request has nowhere to go.');
+  const host = new URL(via.mcp).host;
+  const where = '/v1/profile?tab=access&section=ac-mcp';
+  const row = await attachedQueueServer(deps.storage, caller.ownerGhii, via.mcp);
+  if (!row) {
+    throw new BuildError(409, 'BUILD_CONNECT_FIRST', `Connect this place to ${host} first, with your own account there: Settings & Controls, Access, MCP servers, "Connect to ${host}" (${where}). Then send the request again.`);
+  }
+  if (row.status === 'needs_reauth') {
+    throw new BuildError(409, 'BUILD_CONNECT_FIRST', `Sign in to ${host} again first: Settings & Controls, Access, MCP servers, "${row.slug}" (${where}). Then send the request again.`);
+  }
+  const id = randomUUID();
+  const now = new Date().toISOString();
+  await write(deps, (cur) => {
+    if (cur.request) throw new BuildError(409, 'BUILD_REQUEST_EXISTS', 'This place has already sent its build request. Read its status instead.');
+    return {
+      ...cur,
+      offeredAt: cur.offeredAt ?? now, via: cur.via ?? 'mcp',
+      request: {
+        id, state: SENDING, spec: req.spec, submittedAt: now, submittedBy: caller.ownerGhii, lang: req.lang, email: req.email,
+        position: null, queueLength: null, organismInviteSent: false, organism: null, inviteEmail: null, note: '',
+      },
+    };
+  });
+  const result = await callRemoteTool({
+    storage: deps.storage, config: deps.config, server: row, tool: via.tool,
+    args: { ...via.arguments, input: { code: req.code, nodeId: deps.config.nodeId, lang: req.lang, spec: req.spec } },
+    caller: caller.principal, callerKind: CALLER_KIND[caller.kind as keyof typeof CALLER_KIND] ?? 'agent',
+    scopes: [...caller.scopes], ownerInPerson: caller.inPerson,
+  });
+  if (!result.ok || result.isError) {
+    await write(deps, (cur) => (cur.request?.id === id && !cur.request.requestId ? { ...cur, request: undefined } : UNCHANGED));
+    const said = (!result.ok ? result.message : answerText(result.content)).slice(0, 300);
+    // A refusal on this side keeps its own status (403 for a grant that does not cover the call);
+    // the far side saying no is 502.
+    throw new BuildError(result.ok ? 502 : statusForRemoteRefusal(result.code), 'BUILD_SEND_FAILED', `${host} did not take the build request: ${said || 'no reason given'}`);
+  }
+  // Taken. Without a requestId in the answer the request is still the queue's, so it stays sent.
+  const answer = queueAnswerOf(result.content, result.structuredContent);
+  if (!answer) logger.warn(`[build-with-you] ${host} took the build request but its answer named no requestId`);
+  const rec = await write(deps, (cur) => (cur.request?.id === id
+    ? { ...cur, request: { ...fold(cur.request, { ...(answer ?? {}), state: str(answer?.state) || 'queued' }, ''), checkedAt: undefined } }
+    : UNCHANGED));
+  emitChange(BUILD_DOMAIN, caller.ownerGhii);
+  return view(deps.config, rec);
+}
+
 // ── The operator's half: take the request to the queue, and bring the answer back ──────────────────
 
 /** The request the operator has not taken to the queue yet, or the queue's id and token once it has. */
 export async function operatorPendingOp(deps: Deps) {
   const r = (await readRecord(deps)).request;
   if (!r) return { pending: null };
+  // A request the place is sending itself (a store place's build code) is never the operator's to send.
+  if (!r.requestId && r.state !== WAITING) return { pending: null, state: r.state };
   if (r.requestId) return { pending: null, requestId: r.requestId, statusToken: r.statusToken ?? null, state: r.state };
   return {
     pending: {
