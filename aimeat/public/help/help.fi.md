@@ -31,7 +31,7 @@ Jos käytät jo ChatGPT:tä, Claudea tai Grokia, yhdistä se tänne, niin siitä
 <!--store-->
 Ostokseesi kuuluu tekoälysaldoa. Tekoälysaldo on euromäärä, jolla maksetaan tekoälyn työ täällä. Näet jäljellä olevan saldon Kodin yläreunassa, chatissa ja [Tekoälysaldo-sivulla](/v1/profile?tab=ai).
 
-Saldo kuluu, kun tekoäly vastaa tai tekee työtä. Lisää tekoälyä saat painamalla Kodissa saldon vieressä Osta lisää tekoälyä. Se on kertamaksu, eikä uutta tilausta tarvita. Voit ostaa milloin tahansa.
+Saldo kuluu sen mukaan, mitä mallia ja kuinka paljon käytät – eri mallit kuluttavat eri tahtiin. Voit ostaa lisää milloin vain: paina Kodissa saldon vieressä Osta lisää tekoälyä. Se on kertamaksu, eikä uutta tilausta tarvita.
 
 Kun saldo loppuu, saat ilmoituksen Kodissa ja chatissa. Voit silloin ostaa lisää tekoälyä tai ottaa käyttöön oman tekoälytilin.
 
