@@ -18,5 +18,6 @@ from the admin page and by an operator's AI with the `aimeat_admin_*` tools; the
 | Watch it with metrics | [Observability guide](../../aimeat/docs/observability-guide.md) |
 | Run a node for one person | [Personal node setup](../personal-node-setup-guide.md) |
 | Run a node for a company and its partners | [Organisation node sign-in](../organisation-node-sign-in.md) |
+| Keep AI calls in Europe or the United States, or let each person choose | [Where AI calls are processed](openrouter-region.md) |
 | Know what the node promises about people's data | [Data ownership](../data-ownership.md), [data classification](../data-classification.md) |
 | Respond to an incident | [Incident response](../security/incident-response.md) |

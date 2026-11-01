@@ -29,6 +29,8 @@
  *   - GET /v1/odata/:owner/:name/:resource  the entity set
  * @usage app.use(odataRouter(config, storage))
  * @version-history
+ *   2026-11-01 -- A withdrawn package answers 410 Gone (OData error shape) to a reader its audience
+ *     admits, 404 to anyone else (services/datapackage/withdraw.ts; plan doc-mvwxcas3dom3, D0.3).
  *   2026-10-31 -- A pinned answer is `Cache-Control: public` only when anyone opens that version; a
  *     members, organism or private package answers `private` with `Vary: Authorization`
  *     (secaudit2026oct31w2 round 10, odata:pinned-feed-public-cache-on-audience-gated-response).
@@ -50,6 +52,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { openPackage, readAllRows, parseRef } from '../services/datapackage/store.js';
 import { lacksPackageReadScope, ownerAuthOf } from '../services/datapackage/audience.js';
+import { withdrawalOfRef, withdrawnMessage } from '../services/datapackage/withdraw.js';
 import { toCsdl, parseQuery, applyQueryPaged, nextLinkFor, edmName, ODATA_SUPPORTED } from '../services/datapackage/odata.js';
 import type { Descriptor } from '../services/datapackage/contract.js';
 
@@ -103,6 +106,9 @@ export function odataRouter(config: AimeatConfig, storage: Storage): Router {
      * package does.
      */
     const notOpened = async (req: Request, res: Response, ref: string): Promise<void> => {
+        // A withdrawn package: 410 to a reader its audience admits, 404 to anyone else (services/datapackage/withdraw.ts).
+        const withdrawn = await withdrawalOfRef(store, ref, config.nodeId, req.auth);
+        if (withdrawn) { odataError(res, 410, 'Gone', withdrawnMessage(ref, withdrawn.withdrawnAt)); return; }
         const parsed = parseRef(ref, config.nodeId);
         if (parsed && lacksPackageReadScope(parsed.ownerGhii, req.auth)
             && await openPackage(store, ref, config.nodeId, ownerAuthOf(parsed.ownerGhii))) {

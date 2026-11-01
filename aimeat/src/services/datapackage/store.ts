@@ -28,6 +28,12 @@
  *   const out = await publishPackage({ storage, config }, ownerGhii, input, producedBy);
  *   if (!out.ok) return out.issues;
  * @version-history
+ *   2026-11-01 — openPackage answers null for a withdrawn package (./withdraw.ts), so every read path
+ *     refuses it; a publish of the same bytes after a withdrawal writes the catalogue entry back, and
+ *     any publish writes a pointer without the withdrawal (plan doc-mvwxcas3dom3, D0.3).
+ *   2026-11-01 — A publish stores no odps.yaml: the product sheet is projected when it is read, from the
+ *     version's audience (./odps-read.ts). The stored one said public and "No authentication" for every
+ *     package (plan doc-mvwxcas3dom3, D0.1).
  *   2026-10-31 — The reads decide on the audience the service recorded (./audience-record.ts), not on
  *     the pointer's or the tag's own word, which the generic storage routes write; openPackage answers
  *     openToAnyone for the OData cache header; the rows of a resource pass the classification
@@ -82,7 +88,6 @@ import {
 } from './contract.js';
 import { inferSchema, toCsv, fromCsv, validateRows, type ValidationIssue } from './table.js';
 import { linkSourceImages } from './images.js';
-import { descriptorToOdps, odpsToYamlDocument, odpsYamlKey } from './odps.js';
 import { checkAudienceWrite } from '../audience-write.js';
 import {
     DATAPACKAGE_LEVELS, fileVisibilityOf, datapackageReadable, versionOpenTo, withAudienceTag, type DatapackageReader,
@@ -321,8 +326,10 @@ export async function publishPackage(
         // The same bytes under another audience: the version's files, the pointer and (when the
         // audience changed) the catalogue entry take the one asked for. Only the pointer moved
         // before, so the files kept the tier they were first written at (./version-audience.ts).
+        // A withdrawn package lost its catalogue entry, so publishing it again writes the entry back.
         const moved = await setVersionAudience({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, visibility, {
-            catalogue: ((await readTrustedVisibility(deps, ownerGhii, input.name)) ?? 'public') !== visibility,
+            catalogue: ((await readTrustedVisibility(deps, ownerGhii, input.name)) ?? 'public') !== visibility
+                || previous?.status === 'withdrawn',
         });
         if (!moved.ok) return { ok: false, code: 'INVALID_INPUT', message: moved.message, issues: [] };
         // Nothing new was written, so nothing is pruned: retention trims what a NEW version pushed
@@ -363,20 +370,9 @@ export async function publishPackage(
     }
     await storeHeldProvenance(storage, held);
 
-    // The product sheet, projected from the descriptor and stored beside it. Generated rather than
-    // authored: every field traces to something the descriptor already holds, so it cannot drift from
-    // the package and needs no mapping layer to maintain. It rides with the version, so a buyer
-    // reading a pinned version reads the sheet that describes THAT one.
-    const odpsDoc = descriptorToOdps({
-        descriptor, ownerGhii, baseUrl: config.baseUrl, descriptorUrl,
-        resourceUrls: Object.fromEntries(resourceUrls.map(r => [r.name, r.url])),
-    });
-    await writeStorageFile({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, {
-        key: odpsYamlKey(input.name, contentHash),
-        data: Buffer.from(odpsToYamlDocument(odpsDoc), 'utf8'),
-        mimeType: 'text/yaml; charset=utf-8',
-        visibility: fileVisibility,
-    });
+    // The product sheet is NOT stored: it is projected from the descriptor and the version's audience
+    // when it is read (./odps-read.ts, GET /v1/datapackages/{owner}/{name}/odps), so it states the
+    // audience the version has now. A sheet stored at publish said public for every package.
 
     await writeLatest({ storage, config, emitResourceUpdated, emitResourceListChanged }, ownerGhii, input.name, contentHash, descriptorUrl, now, visibility);
     // Retention, if the owner asked for any. AFTER the new version is live and the pointer moves,
@@ -542,6 +538,8 @@ export async function openPackage(
     const pointer = pointerFile ? JSON.parse(pointerFile.data.toString('utf8')) as LatestPointer : undefined;
     const trusted = await trustedAudienceOf(deps.storage, deps.config.nodeId, ownerGhii, name, pointer);
     if (!(await datapackageReadable(deps.storage, ownerGhii, trusted.visibility, reader))) return null;
+    // A withdrawn package opens for nobody, its owner included (./withdraw.ts); a route answers 410.
+    if (pointer?.status === 'withdrawn') return null;
 
     let hash = contentHash;
     let latest: LatestPointer | undefined;

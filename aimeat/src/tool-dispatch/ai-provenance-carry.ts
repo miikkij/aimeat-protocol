@@ -57,6 +57,7 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.3.7 — 2026-10-31 — toDeclareBody carries `rules_followed` as `rulesFollowed`.
  *   v1.3.6 — 2026-10-21 — aimeat_dm_group_create: recorded-by-route, POST /v1/messages/groups.
  *   v1.3.5 — 2026-10-08 — aimeat_storage_upload: recorded-by-route, POST /v1/storage.
  *   v1.3.6 — 2026-10-08 — aimeat_board_post, aimeat_board_reply, aimeat_dm_ask, aimeat_dm_send,
@@ -255,7 +256,7 @@ export function carrierAttach(
 export function parseDeclarationInput(raw: unknown): AiProvenanceToolInput | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, provider?, media_kind?, media_type?, resembles_real?, sources?, notes? }');
+    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, provider?, media_kind?, media_type?, resembles_real?, rules_followed?, sources?, notes? }');
   }
   const parsed = AiProvenanceBlockSchema.safeParse(raw);
   if (!parsed.success) {
@@ -312,6 +313,7 @@ export function toDeclareBody(
     ...(declared.media_kind ? { mediaKind: declared.media_kind } : {}),
     ...(declared.media_type ? { mediaType: declared.media_type } : {}),
     ...(declared.resembles_real ? { resemblesReal: declared.resembles_real } : {}),
+    ...(declared.rules_followed?.length ? { rulesFollowed: declared.rules_followed } : {}),
     content,
     ...(attachToMemoryKey ? { attachToMemoryKey } : {}),
   };

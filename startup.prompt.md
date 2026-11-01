@@ -128,6 +128,14 @@ is `AIMEAT_ENCRYPTION_KEY`, or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is no
 with the key file `~/.aimeat/nodes/<node id>/node-key.json`: the database alone does not restore
 the node's identity, and a changed data key makes every stored secret unreadable.
 
+**AI on the node's own key** (optional): with `AIMEAT_OPENROUTER_INSTANCE_KEY` set, every account
+can use AI on the day it arrives, metered per person. Ask the person where those calls may be
+processed, and set `AIMEAT_AI_OPENROUTER_REGION`: `eu` keeps them on model servers in the EU or the
+EEA, the United Kingdom and Switzerland, `us` in the United States, `any` (the default) lets them go
+to any country. `eu` and `us` need OpenRouter's Business plan on the key, and the EU offers fewer
+models. Read `docs/operations/openrouter-region.md` with them before choosing `eu`: it says which
+default models to check and what to record in the privacy records.
+
 > Opening the node to the public later? The operator fields (`AIMEAT_OPERATOR_*` in `.env.example`,
 > also on the admin Config page) are required for the privacy and terms pages; until they are set,
 > `/v1/privacy` answers 503 and names the missing fields. Skip this for a local node.
