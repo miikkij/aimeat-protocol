@@ -26436,6 +26436,8 @@
     "structure.next.visibility": "Päätä ennen julkaisua, kuka näkee sovelluksen.",
     "structure.next.requirements": "Kirjoita oikeudelliset sivut ja vastaa avoimiin kysymyksiin sovelluksen sivulla katalogissa.",
     "structure.next.none": "Mikään ei odota sinua. Tekoälysi jatkaa työtä.",
+    "structure.next.done": "Kaikki vaiheet ovat valmiit, ja sovellus on julkaistu.",
+    "structure.door.app": "Avaa sovellus",
     "structure.optional": "Tämä sivu on apu, ei pakko. Voit sanoa tekoälyllesi \"tee vain sovellus\". Se päättää silloin itse, ja tämä sivu näyttää, mitä se päätti.",
     "structure.parts": "Mistä sovellus koostuu",
     "structure.part.view": "näkymä",
