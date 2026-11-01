@@ -8,8 +8,8 @@
  *   share), the version (always the newest, or one pinned), and the three sentences that say what a
  *   share is. The press is POST /v1/parties/share, the call aimeat_party "share" makes; the answer's
  *   connection file, with the key in it once, stays in the dialog until it is closed. The e-mailed
- *   link goes through sendShareLink (js/services/dataproducts.js), the one call site WP9b fills; until
- *   it sends, the dialog says the link was not sent and hands over the file.
+ *   link goes through sendShareLink (js/services/dataproducts.js): the node mails a one-time link, and
+ *   when it sends no mail the dialog shows the link for the owner to pass on (LinkResult).
  *
  *   The dialog is the site's Modal: the X, Escape and a click outside close it only while nothing has
  *   been typed. "From another AIMEAT" shares with a person by their own account on their own server
@@ -17,9 +17,11 @@
  *   says whether this server takes sign-ins from theirs (WP9c). Every sentence the dialog shows is
  *   made from the answer's facts in the page's language (data-model.js shareSentence, keyNote,
  *   errText); the node's English `say` stays for an AI.
- * @structure ShareDialog · partyNameOf · VisitorRead · SHARE_HOWS · isAccount
+ * @structure ShareDialog · partyNameOf · VisitorRead · LinkResult · SHARE_HOWS · isAccount
  * @usage html`<${ShareDialog} open=${o} onClose=${close} product=${{ name, title }} versions=${versions} onShared=${reload} />`
  * @version-history
+ *   v1.2.0 — 2026-11-01 — LinkResult: the e-mailed one-time link sent, or shown to pass on, and that the
+ *     key in the file stops working when the recipient opens it (WP9b).
  *   v1.1.0 — 2026-11-01 — "From another AIMEAT" (a share to a person's own account on another node, the
  *     sign-in state and the addresses they read); the sentences and refusals in the page's language (WP9c).
  *   v1.0.0 — 2026-11-01 — Initial (WP9a, plan doc-mvwxcas3dom3 D3.3, D3.4, D3.6).
@@ -69,11 +71,28 @@ export function VisitorRead({ out }) {
     ].filter((row) => row.v)} />`;
 }
 
+/**
+ * What became of the e-mailed link (sendShareLink's answer): sent to the address, or not sent because
+ * this server sends no mail, with the link to pass on; a refusal in words. Says too that the key above
+ * stops working when the recipient opens the link, because the link makes their own key.
+ */
+export function LinkResult({ link, email }) {
+  if (!link) return null;
+  if (link.error && !link.link) return html`<${Note} kind="message" error>${d('share.linkFailed', { email })}<//>`;
+  return html`
+    <${Note} kind="aside" size="small">${link.sent
+      ? d('share.linkSent', { email: link.to || email, date: link.expires_at ? fmtDate(link.expires_at) : '' })
+      : d('share.linkManual', { email: link.to || email })}<//>
+    ${link.sent ? null : html`<${Code} block scroll>${link.link}<//>
+      <${Actions}><${Action} small copy=${link.link}>${d('share.copyLink')}<//><//>`}
+    <${Note} kind="quiet">${d('share.linkKey')}<//>`;
+}
+
 /** The party's name from what the owner typed: lowercase letters, digits and dashes, at most 40. */
 export function partyNameOf(words) {
   const base = String(words || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '');
-  return ['me', 'token', 'share'].includes(base) ? `${base}-1` : base;
+  return ['me', 'token', 'share', 'invites'].includes(base) ? `${base}-1` : base;
 }
 
 export function ShareDialog({ open, onClose, product, versions = [], showToast, onShared }) {
@@ -140,7 +159,7 @@ export function ShareDialog({ open, onClose, product, versions = [], showToast, 
   return html`<${Modal} open=${open} onClose=${close} size="md" title=${done ? d('share.doneTitle') : d('share.title')} titleRef=${product?.title || product?.name} footer=${footer}>
     ${done ? html`
       <${Note} kind="lead">${shareSentence(done, who.trim())}<//>
-      ${sent && !sent.sent ? html`<${Note} kind="aside" size="small">${d('share.notSent', { email })}<//>` : null}
+      <${LinkResult} link=${sent} email=${email} />
       ${done.recipient_kind === 'visitor' ? html`<${VisitorRead} out=${done} />` : html`
         <${Note}>${keyNote(done, who.trim())}<//>
         <${Code} block scroll>${file}<//>

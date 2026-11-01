@@ -13,18 +13,20 @@
  * @structure announcePublicDataset · datasetLandingOf
  * @usage announcePublicDataset({ storage, config }, descriptor.aimeat.packageId);
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The public page is /v1/dataset/{owner}/{name}, read from the package id (WP9b).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D1.4).
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { submitToIndexNow } from '../indexnow.js';
 import { signedInOnly } from '../../config-visibility.js';
-import { datasetLandingUrl, catalogueKeyRoot } from './catalogue-facts.js';
+import { datasetLandingUrl } from './catalogue-facts.js';
 import { logger } from '../../utils/logger.js';
 
-/** The public page of a package, from its package id. */
+/** The public page of a package, from its package id `pkg:<owner>/<name>`. */
 export function datasetLandingOf(baseUrl: string, packageId: string): string {
-  return datasetLandingUrl(baseUrl, catalogueKeyRoot(packageId).slice('packages/'.length));
+  const m = /^pkg:([^/]+)\/([^/@]+)/.exec(packageId);
+  return datasetLandingUrl(baseUrl, m?.[1] ?? '', m?.[2] ?? '');
 }
 
 /** Send the package's public page to IndexNow, in the background. Returns at once. */

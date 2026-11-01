@@ -17,6 +17,7 @@
  *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-package-compose-holder.ts joins the list (not the guard tier): compose packages only a cortex the composer holds (secaudit2026oct31w2 round 11).
  *   2026-11-01 -- e2e-dsp.ts joins the list (not the guard tier): the Dataspace Protocol provider (plan doc-mvwxcas3dom3, D8).
+ *   2026-11-01 -- e2e-party-invite.ts joins the list (not the guard tier): the one-time share link and the engine reads as a party (WP9b).
  *   2026-11-01 -- e2e-app-parties.ts joins the list (not the guard tier): an app's users as outside parties (plan doc-mvwxcas3dom3, D4).
  *   2026-11-01 -- e2e-exchange-datapackage.ts joins the list (not the guard tier): a data package on EXCHANGE (plan doc-mvwxcas3dom3, D5).
  *   2026-11-01 -- e2e-data-lifecycle.ts and e2e-data-intermediation.ts join the list (not the guard tier):
@@ -1283,6 +1284,8 @@ const ALL_SUITES = [
     'test/e2e-exchange-datapackage.ts',
     // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.
     'test/e2e-app-parties.ts',
+    // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
+    'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).
     'test/e2e-dsp.ts',
     // What of a person someone outside can read, and how to close each (plan doc-mvcn6c7e4e5q, V6.3).

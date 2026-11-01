@@ -17,6 +17,8 @@
  *   BreachSchema · DpiaSchema · FrameworkAnswersSchema · DOC_SCHEMAS · the inferred types
  * @usage const parsed = DOC_SCHEMAS.registers.safeParse(body);
  * @version-history
+ *   v1.4.1 — 2026-11-01 — A review's id takes a colon: it is the finding's id, and a finding about one
+ *     organism or one owner names it after a colon, so those findings could not be reviewed (WP9b).
  *   v1.4.0 — 2026-11-01 — The document `intermediation` (Data Governance Act 2022/868): the provider's
  *     notification record and a person's review of each data intermediation finding (plan
  *     doc-mvwxcas3dom3, D7.2, D7.3).
@@ -203,9 +205,12 @@ export const IntermediationNotificationSchema = z.object({
  * D7.3: a person's decision on one data intermediation finding of the compliance report: the finding's
  * id, accepted (it is intermediation and is handled) or dismissed (it is not, with the reason). A finding
  * without a review reads source `proposed`: the node matched it by rule, and nobody has decided.
+ * The id is the finding's own, and a finding about one thing names it after a colon
+ * (`open_organism_with_data:<organism>`, `person_party_contact:<owner>`), so this id takes a colon too.
  */
+const findingId = z.string().min(1).max(120).regex(/^[A-Za-z0-9][A-Za-z0-9._:-]*$/, 'letters, digits, dot, colon, dash and underscore');
 export const IntermediationReviewSchema = z.object({
-  id, type: z.literal('review'),
+  id: findingId, type: z.literal('review'),
   decision: z.enum(['accepted', 'dismissed']),
   note: text().optional(),
   reviewedAt: iso.optional(),

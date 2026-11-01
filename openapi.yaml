@@ -28803,8 +28803,10 @@ paths:
                 allow_url_key: { type: boolean }
                 terms_required: { type: boolean }
                 new_key: { type: boolean }
+                email: { type: string, description: 'Send the share''s one-time link to this address too (POST /v1/parties/{name}/invite). Checked before the share is written; not with recipient or a dataspace party.' }
+                locale: { type: string, enum: [en, fi, es], description: The language of the mail. }
       responses:
-        '201': { description: '`{ party, party_created, share, connection, key_note, key_shown, package_title, say }`, or for a recipient on another node the answer above' }
+        '201': { description: '`{ party, party_created, share, connection, key_note, key_shown, package_title, say }`, with `link` (the answer of POST /v1/parties/{name}/invite) when `email` was given, or for a recipient on another node the answer above' }
         '400': { description: INVALID_INPUT, INVALID_RECIPIENT or SHARE_TOO_LONG }
         '403': { description: 'SCOPE_DENIED (party:manage, consent:manage) or FORBIDDEN' }
         '404': { description: NOT_FOUND (the package) or VERSION_NOT_FOUND }
@@ -29301,6 +29303,98 @@ paths:
         '200': { description: '`{ deleted, name, uid, shares_ended }`' }
         '403': { description: SCOPE_DENIED or FORBIDDEN }
         '404': { description: NOT_FOUND }
+  /v1/parties/{name}/invite:
+    post:
+      operationId: sendPartyShareLink
+      summary: Send a share's one-time link to the party's e-mail
+      description: |
+        `{ share?, email?, locale? }`. Mints a one-time link to one live share of the party (the newest
+        live one when `share` is absent) and mails it to `email`, else the party's contact (a party with
+        no contact keeps `email` as its contact), in `locale` (en, fi, es; default en). The recipient
+        opens it with no account (the page /v1/shared-data?invite=…), accepts the terms and takes a key
+        made at that moment (POST /v1/parties/invites/redeem). The link works once, until the share
+        ends or 14 days pass, whichever is first; a new link for the same share replaces an unused one.
+        Only the SHA-256 of the code is stored. Answers `{ sent, to, link, invite_id, share, expires_at,
+        note }`: `sent` is false when this node sends no mail, and the owner passes `link` on another
+        way. Same as aimeat_party action send_link.
+      tags: [Parties]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                share: { type: string, description: The share (consent id). }
+                email: { type: string }
+                locale: { type: string, enum: [en, fi, es] }
+      responses:
+        '201': { description: '`{ sent, to, link, invite_id, share, expires_at, note }`' }
+        '400': { description: EMAIL_REQUIRED or INVALID_INPUT }
+        '403': { description: 'SCOPE_DENIED (party:manage) or FORBIDDEN' }
+        '404': { description: NOT_FOUND (the party or the share) }
+        '409': { description: 'PARTY_STOPPED, SHARE_ENDED, or INVALID_INPUT for a data space participant' }
+  /v1/parties/invites/preview:
+    post:
+      operationId: previewPartyInvite
+      summary: The recipient page reads a one-time share link
+      description: |
+        `{ code }`, no credential. Answers what the recipient sees before accepting anything: `{ owner,
+        owner_name, party: { name, display_name, kind, party_ref }, share, package: { name, title,
+        description, licence, resources, freshness: { state, schedule, timezone, on_change,
+        last_success_at } }, link_expires_at, terms }`. Changes nothing. The code is never a read
+        credential: the data package reads, OData and the CSV refuse it.
+      tags: [Parties]
+      security: [{}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+      responses:
+        '200': { description: The share as the recipient reads it }
+        '403': { description: PARTY_STOPPED }
+        '404': { description: INVITE_NOT_FOUND (a code no party holds, or another owner's name on it) }
+        '410': { description: 'INVITE_USED, INVITE_EXPIRED or SHARE_ENDED (revoked, expired or declined)' }
+  /v1/parties/invites/redeem:
+    post:
+      operationId: redeemPartyInvite
+      summary: The recipient redeems a one-time share link
+      description: |
+        `{ code, accept_terms? }`, no credential, once. A share whose terms are not yet accepted needs
+        `accept_terms: true` (400 TERMS_NOT_ACCEPTED, before anything is written). Makes a NEW key for
+        the party and retires the keys it held that were never used and are older than the link (the
+        key the owner saw when sharing) and the key an earlier link of this share made, so the owner
+        never held the key the recipient uses. Marks the link used in the same write, so a second
+        redemption is 410 INVITE_USED. Answers the preview's fields with `terms_accepted`, `key`
+        (shown once), `key_id`, `retired_key_ids`, `basic_user`, `connection` (the connection file with
+        the key), and a party token `access_token` / `token_type` / `expires_in` for the page's next
+        calls to /v1/parties/me.
+      tags: [Parties]
+      security: [{}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string }
+                accept_terms: { type: boolean }
+      responses:
+        '200': { description: The share, the key, the connection file and a party token }
+        '400': { description: TERMS_NOT_ACCEPTED }
+        '403': { description: PARTY_STOPPED }
+        '404': { description: INVITE_NOT_FOUND }
+        '409': { description: TOO_MANY_KEYS }
+        '410': { description: 'INVITE_USED, INVITE_EXPIRED or SHARE_ENDED' }
   /v1/parties/{name}/keys:
     post:
       operationId: createPartyKey

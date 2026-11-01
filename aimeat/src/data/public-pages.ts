@@ -34,6 +34,7 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   2026-11-01 - PublicPage.jsonLd: a built page's own structured data (the public dataset page; WP9b).
  *   2026-10-08 - /v1/how-it-works: the description says what the page covers; it promised memory
  *     visibility rules and federation, which the page never mentions.
  *   2026-09-17 - TARGET-078: align homepage metadata and Markdown with the ownership promise.
@@ -111,6 +112,11 @@ export interface PublicPage {
   markdown?: string;
   /** Build-generated HTML from the same repository source as markdown, never caller-supplied. */
   generatedHtml?: string;
+  /**
+   * The structured data of the one thing a built page is about, written into the head as its own
+   * ld+json block: the public dataset page's schema.org Dataset (services/datapackage/landing-page.ts).
+   */
+  jsonLd?: Record<string, unknown>;
 }
 
 /**

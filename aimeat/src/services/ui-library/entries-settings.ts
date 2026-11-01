@@ -8,6 +8,7 @@
  * @structure SETTINGS_ENTRIES
  * @usage import { SETTINGS_ENTRIES } from './entries-settings.js';
  * @version-history
+ *   v1.91.0 — 2026-11-01 — PageSection step: a numbered step of a procedure on a page (WP9b).
  *   v1.90.0 — 2026-10-11 — PageSection ends: a section that shows where it stops (the home's agent pages).
  *   v1.89.0 — 2026-09-27 — What appcat added: the Rail's ink tone; the crumb sheet's dashed, inline and file
  *     Action tones; PageHead line, low, thing and picture; PageSection list, chapter and part, and its sheet's
@@ -274,7 +275,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
         summary: 'An open section of a page: the heavy rule on top (or the section title\'s own), the ink section title with a small coral mono number or count beside it, the section\'s actions at the right, and the body. The plain cut has no head, only the rule and the body. A list\'s headline is the dark slab across the column with the count in the slab\'s letters and can fold the list; a chapter of a long page of one thing has its coral "03 / 19" over the slab, its doors on the slab and much air above; a part of a dialog\'s body has a smaller slab title.',
         module: '/components/PageSection.js', sheet: '/css/components/page-section.css',
         data: {
-            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, children })',
+            shape: 'PageSection({ id, num, title, count, doors, first, plain, band, group, ends, chapter, list, onFold, folded, foldLabel, foot, spaced, part, step, children })',
             fields: {
                 id: 'the section\'s anchor, which the rail scrolls to', num: 'the small number beside the title', title: 'the section\'s name',
                 count: 'a count instead of the number; on a list, the count on the slab', doors: 'the section\'s actions at the right of its head (Action links); on a chapter, on the slab in the slab\'s own colour',
@@ -287,6 +288,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
                 'onFold, folded, foldLabel': 'with list: a press on the headline or its arrow folds the list; folded hides it (the arrow turns and says aria-expanded); foldLabel names the arrow',
                 foot: 'with list: a small grey line under the list', spaced: 'with list: 6px between the headline and the list',
                 part: 'a part of a dialog\'s body: a section with its slab title, which the dialog\'s sheet sizes and spaces (the slab a size smaller)',
+                step: 'one numbered step of a procedure a person follows on the page: `num` in the ink square before the bold title, the body under the title, no rule on top',
                 children: 'the body',
             },
         },
@@ -306,6 +308,7 @@ export const SETTINGS_ENTRIES: UiEntryWritten[] = [
             { name: 'list spaced', class: 'og-sec-h--spaced', prop: 'list spaced', when: 'a little air between a list\'s headline and its first row' },
             { name: 'chapter', class: 'og-sec--chapter', prop: 'chapter="03 / 19"', when: 'a chapter of a long page of one thing (an app\'s detail): the big air above says the previous one ended' },
             { name: 'dialog part', prop: 'part', when: 'a part of a dialog\'s body under its own slab title (the app catalogue\'s Settings and Help dialogs)' },
+            { name: 'step', class: 'og-sec--step', prop: 'step num="1"', when: 'one of the numbered steps a person takes in order on one page, each with its own controls (the share link page: accept the terms, take the key, connect)' },
             { name: 'chapter doors', class: 'og-doors--chapter', prop: 'Actions chapter (Action.js)', when: 'the door row of a chapter: its words and slabs a step smaller and 24px apart, a door that cannot be pressed at half strength' },
             { name: 'doors apart', class: 'og-doors--apart', prop: 'Actions apart (Action.js)', when: 'a row of one door with 10px of air above and below it' },
             { name: 'doors tight', class: 'og-doors--tight', prop: 'Actions tight (Action.js)', when: 'a picker\'s row of a door, a choice and a door, 8px apart' },
