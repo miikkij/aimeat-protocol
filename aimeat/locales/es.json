@@ -14271,7 +14271,20 @@
       "someone": "Alguien",
       "used": "usó {code}",
       "line": "{who} {what}",
-      "lineTarget": "{who} {what}: {target}"
+      "lineTarget": "{who} {what}: {target}",
+      "failed": "(no se completó)",
+      "showReads": "Mostrar también las consultas",
+      "did": {
+        "sentRequest": "envió la solicitud de «Lo construimos contigo»",
+        "checkedRequest": "consultó el estado de la solicitud de «Lo construimos contigo»",
+        "readTrail": "consultó el registro de actividad",
+        "publishedApp": "publicó una aplicación",
+        "approvedAgent": "aprobó un agente",
+        "askedChat": "preguntó en el chat",
+        "savedNote": "guardó una nota",
+        "wroteDoc": "escribió un documento en el espacio de trabajo",
+        "uploadedFile": "subió un archivo"
+      }
     },
     "welcomeSub": "Antes de que este sitio pueda hacer algo por ti, hay un par de cosas que hacer.",
     "signInTitle": "Entra en tu hogar",

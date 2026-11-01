@@ -15930,7 +15930,20 @@
       "someone": "Someone",
       "used": "used {code}",
       "line": "{who} {what}",
-      "lineTarget": "{who} {what}: {target}"
+      "lineTarget": "{who} {what}: {target}",
+      "failed": "(did not succeed)",
+      "showReads": "Show reads too",
+      "did": {
+        "sentRequest": "sent the build request",
+        "checkedRequest": "checked the build request",
+        "readTrail": "read the activity log",
+        "publishedApp": "published an app",
+        "approvedAgent": "approved an agent",
+        "askedChat": "asked in the chat",
+        "savedNote": "saved a note",
+        "wroteDoc": "wrote a workspace document",
+        "uploadedFile": "uploaded a file"
+      }
     },
     "welcomeSub": "Before the place can do anything for you, there are a couple of things to do.",
     "signInTitle": "Step into your home",
