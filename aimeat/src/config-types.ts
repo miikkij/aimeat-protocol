@@ -199,6 +199,12 @@ export interface AimeatConfig extends AiCapabilityConfig, SecurityDoorConfig, Se
   /** Home room 3 (monetising). Default OFF — see services/home-rooms.ts for why it is a flag. */
   homeRoomMonetise: boolean;
   /**
+   * The store's build code for this place (site.build_code, RK-XXXX-XXXX-XXXX), or ''. The owner and
+   * their AI read it to send the place's one build request with their own account
+   * (services/build-with-you.ts). Kept out of siteLinks, which every visitor's page carries.
+   */
+  buildCode: string;
+  /**
    * Send the fortnight-of-silence nudge email. Default OFF: it is UNSOLICITED mail to real
    * people, so switching it on has to be a decision somebody made, not a deploy side effect.
    * See services/inactivity-nudge.ts.

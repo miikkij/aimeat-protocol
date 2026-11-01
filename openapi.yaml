@@ -198,6 +198,8 @@ tags:
     description: Task queue for AI agents — create, track, and complete structured work items
   - name: Agent Goals
     description: A goal the owner gives their agents; agents take its open work, leave the next work for each other, and the person answers the steps that wait for them
+  - name: Build With You
+    description: The place's one build request to the operator's builders, the place's trail of what was done on it, and the operator's relay and notices
   - name: Agent Integration
     description: Agent inbox, integration kit, and long-poll task endpoints
   - name: Agent Directives
@@ -24459,6 +24461,201 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/build-with-you/request:
+    get:
+      operationId: getBuildRequest
+      summary: The place's build offer and request
+      tags: [Build With You]
+      description: >
+        Whether the place's one "build it with you" offer is open (offer.available; offer.reason is off when
+        the node has no build queue, not-yet before an outside AI or the chat was used, used once a request
+        was sent), the queue's origin, and the request as it stands: state (waiting-for-operator until the
+        operator takes it to the queue, then queued, building, invited, done or declined), position and
+        queueLength (no time estimate), and the organism and invitation address once the builders invited
+        the person. A status older than a minute is asked again from the queue. On a place the store sold,
+        `buildCode` is the store's code for the one request (site.build_code, RK-XXXX-XXXX-XXXX) and `send`
+        describes how POST sends it with the person's own account: the MCP server `send.mcp`, the tool
+        `send.tool`, the arguments `send.arguments`; the offer is then open. The code is never on a
+        page a visitor loads. The owner, or the owner's agent with `memory:read`. Live domain
+        `build-with-you`, also when a setting changes. MCP: aimeat_build_request_status.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: submitBuildRequest
+      summary: Send the place's one build request
+      tags: [Build With You]
+      description: >
+        The place's one build request: one agent or one small app. A second request is refused. Without a
+        build code it is stored for the operator to take to the build queue. On a place with a build code
+        the place sends it at once, with the person's own account on the builders' node: through the MCP
+        server the person attached for that node's address, calling the queue's app tool as GET's `send`
+        describes, and it keeps the queue's answer. 409 BUILD_CONNECT_FIRST when no such server is attached
+        or it needs a new sign-in; 502 BUILD_SEND_FAILED when that node did not take it, and nothing is
+        stored. The owner, or the owner's agent with `memory:write`. MCP: aimeat_build_request_submit.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: The four fields are needed, flat or under `spec` (a flat one wins); a missing one is refused by name.
+              properties:
+                what: { type: string, maxLength: 2048, description: What to build. }
+                forWhom: { type: string, maxLength: 2048, description: Who it is for. }
+                use: { type: string, maxLength: 2048, description: What it is used for. }
+                readyWhen: { type: string, maxLength: 2048, description: When it is ready, as a sentence the person can check. }
+                spec:
+                  type: object
+                  description: The same four fields as one object, the shape GET's `send` shows.
+                  properties:
+                    what: { type: string, maxLength: 2048 }
+                    forWhom: { type: string, maxLength: 2048 }
+                    use: { type: string, maxLength: 2048 }
+                    readyWhen: { type: string, maxLength: 2048 }
+                lang: { type: string, enum: [en, fi, es], description: The builders' language; the person's own when omitted. }
+                email: { type: string, description: Where the builders write; the notification address when omitted. }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/build-with-you/trail:
+    get:
+      operationId: getPlaceTrail
+      summary: What was done on this account
+      tags: [Build With You]
+      description: >
+        Every action on the caller's account, newest first, from the usage stream: each MCP tool call and
+        each authenticated REST change, with at, actor, actorName, actorKind (person, ai, agent, app,
+        operator), action (an English phrase), code (the tool or METHOD and route), target, readOnly,
+        outcome, and event (agent.approved, agent.ran, app.published) on the entries that carry one.
+        `next` is the `before` of the following page. The owner, or the owner's agent with `memory:read`.
+        MCP: aimeat_trail_list.
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time }, description: Entries at or after this time. }
+        - { name: before, in: query, required: false, schema: { type: string, format: date-time }, description: Entries before this time. }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/operator/activity:
+    get:
+      operationId: getOperatorActivity
+      summary: The whole node's trail, for the operator
+      tags: [Build With You]
+      description: >
+        The trail of GET /v1/build-with-you/trail for every account on the node: what the store's fleet
+        service reads per place, and keys its first-build gift on (event agent.ran after agent.approved, or
+        app.published). An operator JWT, or the node's admin password in the `X-Admin-Password` header
+        (rate-limited like the admin sign-in).
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: since, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: before, in: query, required: false, schema: { type: string, format: date-time } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/operator/build-request:
+    get:
+      operationId: getOperatorBuildRequest
+      summary: The build request waiting for the operator
+      tags: [Build With You]
+      description: >
+        The place's build request while it waits for the operator to take it to the build queue
+        (`pending`: id, node, nodeId, customerEmail, lang, spec, at), or, once taken, the queue's
+        requestId, statusToken and state. The place never submits to the queue itself: the queue's write
+        key stays with the operator. An operator JWT, or the admin password in `X-Admin-Password`.
+      security:
+        - BearerAuth: []
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+    put:
+      operationId: putOperatorBuildRequest
+      summary: The queue's answer to the operator's submit
+      tags: [Build With You]
+      description: >
+        Writes the queue's answer onto the place's request; from then on the place asks the queue's public
+        getStatus itself. Taken once: the same requestId again answers already true and changes nothing,
+        another requestId is refused. An operator JWT, or the admin password in `X-Admin-Password`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [requestId, statusToken]
+              properties:
+                requestId: { type: string }
+                statusToken: { type: string }
+                position: { type: integer, nullable: true }
+                queueLength: { type: integer, nullable: true }
+                state: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+
+  /v1/operator/notify-owner:
+    post:
+      operationId: operatorNotifyOwner
+      summary: One notice to the owners, once per code
+      tags: [Build With You]
+      description: >
+        Tells the named owner once per code: the bell, and push
+        and mail as each owner's notification settings say. The same code again answers 200 with already
+        true and tells nobody. An operator JWT, or the admin password in `X-Admin-Password`.
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, title, owner]
+              properties:
+                code: { type: string, pattern: '^[a-z0-9][a-z0-9._-]{0,63}$', description: 'Stable, e.g. gift.first-build.' }
+                title: { type: string, maxLength: 160 }
+                body: { type: string, maxLength: 1000 }
+                owner: { type: string, maxLength: 200, description: The account to tell, as the trail entry that earned the notice names it. }
+                link: { type: string, description: A path on this node starting with /v1/. }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '502': { description: NOTIFICATION_NOT_STORED, nobody was told and the code is free to send again. }
+
   /v1/goals:
     get:
       operationId: listGoals
@@ -25965,7 +26162,11 @@ paths:
         (`stats: { activeContracts, totalContracts, totalCalls, totalSettledUnits, consumers, listedAt, lastUsedAt }`)
         into each listing. Cheapest base price first. Returns `{ offerings, count }`. Every offering
         carries `toll_morsels`, its pacing per call. An offering stored with `unit: 'morsels'` is free,
-        and until release 4.0.0 it keeps `unit` and `basePrice` as deprecated mirrors.
+        and until release 4.0.0 it keeps `unit` and `basePrice` as deprecated mirrors. A `datapackage`
+        offering carries `freshness: { state, reason, reason_code, due_at, stale_at, last_success_at,
+        limited_by? } | null`: the package's state against its producer's schedule (`fresh`, `late`,
+        `stale` or `unscheduled`), read on the version the node recorded. It is updated when the package
+        changes and when the hourly freshness check sees the state change.
       tags: [Commerce]
       parameters:
         - { name: ext, in: query, schema: { type: string } }
@@ -26016,9 +26217,10 @@ paths:
         '401': { description: INVALID_PARTY_CREDENTIAL }
         '403': { description: FORBIDDEN. The party credential belongs to another provider }
         '404': { description: No such listed offering }
-        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price) or USE_YOUR_ACCOUNT' }
-        '422': { description: UNKNOWN_PAYMENT_HANDLER }
+        '409': { description: 'NOT_SOLD_TO_PARTIES (not a data package, or no money price), USE_YOUR_ACCOUNT, or PROVIDER_TAKES_NO_CARD (`com.stripe.checkout` asked and the provider has connected no Stripe account; nothing is kept, and the message names the other handlers this node offers, if any)' }
+        '422': { description: 'UNKNOWN_PAYMENT_HANDLER, or Stripe refused to open the card page (its own code; the purchase is not kept)' }
         '429': { description: TOO_MANY_PURCHASES }
+        '502': { description: "The card payment provider failed on the seller's side or its own (the purchase is not kept)" }
   /v1/exchange/purchases/{id}/complete:
     post:
       operationId: exchangePartyPurchaseComplete
@@ -26076,7 +26278,9 @@ paths:
         `pacing.source` is `capability` when the
         provider declared it (`tollMorsels` on the tool/action/offer) and `node` when the node default
         applies. `odps` points at the same listing
-        rendered as an Open Data Product Specification v4.1 document.
+        rendered as an Open Data Product Specification v4.1 document. A `datapackage` offering carries
+        `offering.freshness` (`state` fresh, late, stale or unscheduled, `reason`, `reason_code`,
+        `due_at`, `stale_at`, `last_success_at`), as the browse answer states it.
       tags: [Commerce]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
@@ -39540,6 +39744,46 @@ paths:
       responses:
         '200': { description: '`{ removed: true, name, uid, data_deleted }`' }
         '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/parties/{name}/stop:
+    post:
+      operationId: appPartyStop
+      summary: Stop one registered person
+      description: The app's owner (app:manage, or the app's own token). Every request with the person's sign-in answers 403 PARTY_STOPPED from now on and no new sign-in link is mailed; the roster row and the person's data stay, so resume puts them back. MCP aimeat_app_manage action party_stop.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200': { description: '`{ name, uid, status: "stopped" }`' }
+        '403': { description: 'FORBIDDEN (not the owner) or SCOPE_DENIED' }
+        '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/parties/{name}/resume:
+    post:
+      operationId: appPartyResume
+      summary: Let a stopped registered person in again
+      description: The app's owner (app:manage, or the app's own token). The person signs in again with the role and the data they had. A person who never opened the mailed link stays `pending`. MCP aimeat_app_manage action party_resume.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { type: object, additionalProperties: false }
+      responses:
+        '200': { description: '`{ name, uid, status: "active" | "pending" }`' }
+        '403': { description: 'FORBIDDEN (not the owner) or SCOPE_DENIED' }
+        '404': { description: No such registered person }
   /v1/apps/{owner}/{filename}/party-data/{key}:
     get:
       operationId: appPartyDataGet
@@ -39941,9 +40185,17 @@ paths:
         `requested` is the caller's own ask, `{ at, state, note, retryAt? }`, with state `pending`
         or `declined`; `retryAt` is when a declined person may ask again, present only while they
         must wait. Answers 404 when the app does not exist, and then records no visit.
+
+        A person registered to the app without an account calls it with the app party token
+        (`aimeat-iam.js` does when `aimeat-parties.js` holds a sign-in) and gets the same shape for
+        itself: `kind: 'party'`, `identity` (`party:<owner>/ap-…@<node>`), `member` (its roster row),
+        `role`, `displayName`, `party` (its own view), and `isOwner` and `canManage` false. The token
+        is checked as on `parties/me`: another app's token 401, an ended sign-in 401, a stopped person
+        403 PARTY_STOPPED, an Origin that is neither the app's nor the node's 403 ORIGIN_MISMATCH.
       tags: [Apps]
       security:
         - BearerAuth: []
+        - PartyTokenAuth: []
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
@@ -54001,9 +54253,21 @@ paths:
         (`alice%2Fweather`), is the exact address. A bare name is the bare record when there is one,
         else the signed-in caller's own `<caller>/<name>`, else the one account that holds that name
         under its own account; two such accounts answer 409 AMBIGUOUS_NAME, naming both.
+
+        A person registered to an app without an account (the app party token from
+        `/v1/apps/{owner}/{filename}/parties/verify`) calls here the IAM extension of THAT app: the
+        extension whose `config.app` names the app the token was made for. Any other extension, and
+        one that does not exist, answers 403 PARTY_NOT_FOR_EXTENSION; a priced action 403
+        PARTY_CANNOT_PAY; a token of another kind 401 INVALID_PARTY_CREDENTIAL; an ended sign-in 401,
+        a stopped person 403 PARTY_STOPPED. The run sees `ctx.caller.gaii` and `ctx.caller.owner` as
+        the person's identity `party:<owner>/ap-…@<node>`, `ctx.caller.party` with its name and app,
+        and `ctx.caller.member` as its row on the app's roster; it is never the app's owner. The
+        capabilities that act for an account are absent. The instance form of this path refuses the
+        token (401).
       tags: [Extensions]
       security:
         - BearerAuth: []
+        - PartyTokenAuth: []
         - {}
       parameters:
         - name: extName

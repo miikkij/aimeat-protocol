@@ -16,6 +16,8 @@
  *   entry that no longer differs.
  * @usage pnpm test -- tool-route-scopes
  * @version-history
+ *   v1.3.1 — 2026-11-01 — The guard arrays come from guardArraysFor (scripts/inventory/doors.ts), the
+ *     resolver check:open-writes uses, instead of a copy of its old tree-wide map keyed by the bare name.
  *   v1.3.0 — 2026-10-18 — aimeat_portfolio_publish is listed: `access` alone goes to the config route (V3.10).
  *   v1.2.0 — 2026-10-12 — Thirty tools got a dispatch definition and are paired for the first time.
  *     Three pairs differed: aimeat_organism_invitations_email now asks organism:invite as its route
@@ -36,8 +38,8 @@ import { describe, it, expect } from 'vitest';
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
-import { guardArraysIn, collectRestRoutes } from '../../scripts/inventory/entries.js';
-import type { GuardCall } from '../../scripts/inventory/principals.js';
+import { collectRestRoutes } from '../../scripts/inventory/entries.js';
+import { guardArraysFor } from '../../scripts/inventory/doors.js';
 import { TOOL_SCOPES, toolScopeWords } from '../../src/tool-catalog/scopes.js';
 import { scopeIsCovered } from '../../src/utils/scope-coverage.js';
 
@@ -58,9 +60,8 @@ interface Route { verb: string; pattern: RegExp; literals: number; id: string; w
 
 function routes(): Route[] {
   const sources = walk(path.join(ROOT, 'src', 'routes')).map(parse);
-  const arrays = new Map<string, GuardCall[]>();
-  for (const s of sources) for (const [k, v] of guardArraysIn(s)) arrays.set(k, v);
-  return sources.flatMap((s) => collectRestRoutes(s, ROOT, arrays)).map((r) => {
+  const arraysFor = guardArraysFor(sources);
+  return sources.flatMap((s) => collectRestRoutes(s, ROOT, arraysFor(s))).map((r) => {
     const [verb, p] = r.id.split(' ') as [string, string];
     const segs = p.split('/');
     return {

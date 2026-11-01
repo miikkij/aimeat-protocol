@@ -10,6 +10,9 @@
  * @structure STRINGS · t(lang, key, vars) · pickLang(explicit)
  * @usage import { t, pickLang } from './i18n.js';
  * @version-history
+ *   v1.2.1 — 2026-11-01 — Spanish second read: "Personas registradas sin cuenta", "aplicación"
+ *     for app, "detenida" to agree with "persona" (WP10a).
+ *   v1.2.0 — 2026-11-01 — The strings of the registered people section, in en, fi and es (WP9d).
  *   v1.1.0 — 2026-10-01 — Spanish (es-419). Strings for a refusal's reason, the switch, the node
  *     roster's stranger line and approve help, and the join form's pending and declined states. The
  *     Finnish no longer uses "solmu".
@@ -72,6 +75,25 @@ export const STRINGS = {
     on: 'On',
     off: 'Off',
     loading: 'Loading…',
+    partiesTitle: 'Registered without an account: {n}',
+    partiesLead: 'These people signed up with an e-mail address and sign in with a link the server mails them. They have no account here, and their sign-in works in this app only.',
+    partiesNone: 'Nobody has registered yet.',
+    partiesRegOff: 'This server does not let people register without an account. Its operator decides that.',
+    partiesRegOpen: 'The signup is open. A new person gets the role "{role}".',
+    partiesRegClosed: 'The signup is closed.',
+    partiesRegRequested: 'You asked to open the signup. The operator of this server decides.',
+    partiesRegRefused: 'The operator of this server did not approve opening the signup.',
+    partiesRegAsk: 'On this server the operator approves the signup first.',
+    partiesOpen: 'Open the signup',
+    partiesClose: 'Close the signup',
+    partiesRoleNew: 'Role for new people',
+    partiesJoined: 'joined {d}',
+    partiesSeen: 'last seen {d}',
+    partiesPending: 'has not opened the link yet',
+    partiesStopped: 'stopped',
+    partiesStop: 'Stop',
+    partiesResume: 'Let in again',
+    partiesRemoveConfirm: 'Remove {name}? Their sign-in ends, and everything they kept in the app is deleted.',
   },
   fi: {
     whoTitle: 'Ketkä saavat käyttää',
@@ -127,6 +149,25 @@ export const STRINGS = {
     on: 'Päällä',
     off: 'Pois',
     loading: 'Ladataan…',
+    partiesTitle: 'Rekisteröityneet ilman tiliä: {n}',
+    partiesLead: 'Nämä ihmiset rekisteröityivät sähköpostiosoitteella ja kirjautuvat linkillä, jonka palvelin lähettää heille. Heillä ei ole tiliä täällä, ja heidän kirjautumisensa toimii vain tässä sovelluksessa.',
+    partiesNone: 'Kukaan ei ole vielä rekisteröitynyt.',
+    partiesRegOff: 'Tämä palvelin ei päästä ihmisiä rekisteröitymään ilman tiliä. Sen päättää palvelimen ylläpitäjä.',
+    partiesRegOpen: 'Rekisteröityminen on avoin. Uusi ihminen saa roolin "{role}".',
+    partiesRegClosed: 'Rekisteröityminen on suljettu.',
+    partiesRegRequested: 'Pyysit avaamaan rekisteröitymisen. Palvelimen ylläpitäjä päättää.',
+    partiesRegRefused: 'Palvelimen ylläpitäjä ei hyväksynyt rekisteröitymisen avaamista.',
+    partiesRegAsk: 'Tällä palvelimella ylläpitäjä hyväksyy rekisteröitymisen ensin.',
+    partiesOpen: 'Avaa rekisteröityminen',
+    partiesClose: 'Sulje rekisteröityminen',
+    partiesRoleNew: 'Uuden ihmisen rooli',
+    partiesJoined: 'liittyi {d}',
+    partiesSeen: 'kävi viimeksi {d}',
+    partiesPending: 'ei ole vielä avannut linkkiä',
+    partiesStopped: 'pysäytetty',
+    partiesStop: 'Pysäytä',
+    partiesResume: 'Päästä takaisin',
+    partiesRemoveConfirm: 'Poistetaanko {name}? Hänen kirjautumisensa päättyy, ja kaikki, mitä hän tallensi sovellukseen, poistetaan.',
   },
   es: {
     whoTitle: 'Quién puede usar esto',
@@ -182,6 +223,25 @@ export const STRINGS = {
     on: 'Activado',
     off: 'Desactivado',
     loading: 'Cargando…',
+    partiesTitle: 'Personas registradas sin cuenta: {n}',
+    partiesLead: 'Estas personas se registraron con un correo electrónico y entran con un enlace que el servidor les envía. No tienen cuenta aquí, y su acceso funciona solo en esta aplicación.',
+    partiesNone: 'Todavía no se ha registrado nadie.',
+    partiesRegOff: 'Este servidor no permite registrarse sin cuenta. Eso lo decide su operador.',
+    partiesRegOpen: 'El registro está abierto. Una persona nueva recibe el rol "{role}".',
+    partiesRegClosed: 'El registro está cerrado.',
+    partiesRegRequested: 'Pediste abrir el registro. El operador de este servidor decide.',
+    partiesRegRefused: 'El operador de este servidor no aprobó abrir el registro.',
+    partiesRegAsk: 'En este servidor, el operador aprueba primero el registro.',
+    partiesOpen: 'Abrir el registro',
+    partiesClose: 'Cerrar el registro',
+    partiesRoleNew: 'Rol para personas nuevas',
+    partiesJoined: 'se unió el {d}',
+    partiesSeen: 'última visita el {d}',
+    partiesPending: 'todavía no abrió el enlace',
+    partiesStopped: 'detenida',
+    partiesStop: 'Detener',
+    partiesResume: 'Dejar entrar de nuevo',
+    partiesRemoveConfirm: '¿Quitar a {name}? Su acceso termina y se borra todo lo que guardó en la aplicación.',
   },
 };
 

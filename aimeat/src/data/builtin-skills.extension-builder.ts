@@ -27,6 +27,8 @@
  * @structure EXTENSION_BUILDER_SKILL_ENTRY
  * @usage import { EXTENSION_BUILDER_SKILL_ENTRY } from './builtin-skills.extension-builder.js';
  * @version-history
+ *   2026-11-01 — Section 4: an extension that gates an app answers the people registered to it
+ *     without an account, with ctx.caller.party (WP9d).
  *   2026-11-01 — Section 8: `commercial.deliversData`, and the node's proposal from the output schema (plan D5.5).
  *   2026-10-30 — Section 9: a file linked from a workspace record opens to the members; ctx.files.read
  *     answers visibility and workspaceRef.
@@ -54,6 +56,8 @@
  *     to store a key "for host X" (secaudit 2026-10, v58 and v59 follow-up).
  *   2026-10-25 — A call past the operator's run slots answers 503 EXTENSION_RUNS_BUSY with Retry-After
  *     (secaudit2026oct22, lead 817).
+ *   2026-11-01 — ctx.email's body: a `[Label](https://…)` line is a button and a bare https line a link
+ *     (services/email-text-links.ts).
  *   2026-10-25 — ctx.email takes one recipient per call, within the account's hourly allowance
  *     (extensions.email_per_hour; secaudit2026oct22, lead 325).
  *   2026-10-25 — The operator's limits on one namespace's data and on the copies of one extension
@@ -151,6 +155,8 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   limits \`ctx.fetch\` to those hosts. \`ctx.email(to, subject, body)\` takes one address per call
   (several recipients: one call each), and one account's extensions send at most
   \`extensions.email_per_hour\` (200 by default) in an hour; past it the call throws naming it.
+  The body is plain text and shows as text: a line that is only \`[Label](https://…)\` becomes a
+  button, and a line that is only an https address a link.
 - \`workspace: { read: true, write: true }\` gives \`ctx.workspace\`, which acts on the caller's
   organism workspace as the caller.
 - Write it in YAML **block style**. A flow mapping with a comma inside a value breaks the value and
@@ -201,6 +207,12 @@ name answers 409 AMBIGUOUS_NAME and the full name is the one to use.
   also answers a visitor with no account, read-only: \`ctx.caller.anonymous\` is true, memory writes
   throw VISITOR_READ_ONLY, and the capabilities that act for a person are absent. It takes no price
   and no \`tollMorsels\`. Use it for what a stranger may read: a catalogue, a free episode.
+- An extension that gates an app (\`config.app\`) also answers the people registered to that app
+  without an account (aimeat-parties), when they call it with the app's sign-in: \`ctx.caller.party\`
+  names the person (\`ref\`, \`name\`, \`displayName\`, \`app\`), \`gaii\` and \`owner\` are their identity
+  \`party:<owner>/ap-…@<node>\`, \`ctx.caller.member\` is their row on the app's roster, and
+  \`isAppOwner\` is false. Memory writes work; the capabilities that act for an account are absent,
+  and a priced action refuses them. Decide on \`ctx.caller.member.role\` as for everybody else.
 
 ## 5. What an extension cannot do
 

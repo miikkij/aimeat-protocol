@@ -38,6 +38,7 @@
  * @usage
  *   await recordAppAudit(storage, { ownerGhii, filename, by: actorGhii, action: 'legal.set', detail: { kind: 'terms' } });
  * @version-history
+ *   2026-11-01 — `party.stopped`, `party.resumed`: a person registered to the app stopped or let in again (WP9d).
  *   2026-10-31 — `screenshot_public`: the owner's "show the screenshot to everyone" (secaudit2026oct31w2 round 10, W2-12).
  *   v1.11.1 — 2026-10-31 — A move between the active record and the archive (the roll on append, the
  *     owner's archive-before and limit actions) writes the active record's compare-and-swap first and
@@ -111,6 +112,8 @@ export type AppAuditAction =
   | 'request.declined' | 'visitor.dismissed'
   | 'invite.sent' | 'invite.cancelled'
   | 'plan.changed' | 'roster.swept'
+  // A person registered to the app without an account, stopped or let in again (services/app-parties/owner.ts).
+  | 'party.stopped' | 'party.resumed'
   // The permissions the app kept when the node moved to 4.0 (services/app-scope-allowance.ts), and
   // each word its owner took away.
   | 'scope_allowance.kept' | 'scope_allowance.removed'

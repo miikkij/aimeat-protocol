@@ -7,6 +7,7 @@
  *   v1.20.0 -- 2026-11-01 -- dataspaceCliTools: aimeat_dataspace (plan doc-mvwxcas3dom3, D8.3).
  *   v1.19.0 -- 2026-11-01 -- datapackageSellCliTools: aimeat_datapackage_sell (plan doc-mvwxcas3dom3, D5.1).
  *   v1.18.0 -- 2026-11-01 -- partyCliTools: aimeat_party (plan doc-mvwxcas3dom3, D2, D3.4).
+ *   v1.18.0 -- 2026-11-01 -- buildWithYouCliTools: aimeat_build_request_submit, _status and aimeat_trail_list.
  *   v1.17.0 -- 2026-11-01 -- dataProductCliTools: aimeat_dataproduct (plan doc-mvwxcas3dom3, D9).
  *   v1.16.0 -- 2026-10-29 -- fileStoreCliTools: where stored files keep their bytes (eight tools).
  *   v1.15.0 -- 2026-10-25 -- internetOpeningCliTools: an app opened to the internet on a closed node (six tools).
@@ -67,6 +68,7 @@ import { visibilityCliTools } from './tool-call-defs-visibility.js';
 import { docsignCliTools } from './tool-call-defs-docsign.js';
 import { complianceAgreementCliTools } from './tool-call-defs-compliance-agreements.js';
 import { goalCliTools } from './tool-call-defs-goals.js';
+import { buildWithYouCliTools } from './tool-call-defs-build-with-you.js';
 import { contactCliTools } from './tool-call-defs-contacts.js';
 import { companyCliTools } from './tool-call-defs-companies.js';
 import { beneficiaryCliTools } from './tool-call-defs-beneficiaries.js';
@@ -124,6 +126,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...docsignCliTools,
     ...complianceAgreementCliTools,
     ...goalCliTools,
+    ...buildWithYouCliTools,
     ...contactCliTools,
     ...companyCliTools,
     ...beneficiaryCliTools,

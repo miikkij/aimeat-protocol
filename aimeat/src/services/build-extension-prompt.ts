@@ -18,6 +18,8 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.7.8 — 2026-11-01 — ADDITIVE: ctx.email's body is text, and a `[Label](https://…)` line or a bare
+ *     https line becomes a button or a link (services/email-text-links.ts).
  *   v1.7.7 — 2026-10-25 — ADDITIVE: the owner is part of an extension's address too (`owner`,
  *     `full_name`, `<account>%2F<name>`) and every bare address keeps working; with install role operator
  *     only the operator's account installs (owner namespaces wish and lead 128, secaudit2026oct22;
@@ -191,7 +193,7 @@ function sandboxSection(): string {
     '| `ctx.now()` | The run\'s ISO timestamp, FIXED for the whole run |',
     '| `ctx.hash(s)` | FNV-1a 64-bit, 16 hex chars |',
     '| `ctx.notify(message, {title, link, to})` | Notify the caller\'s owner (on an unattended run, the installer). With `to`, another owner, delivered only when they consented. Returns whether it was delivered |',
-    '| `ctx.email(to, subject, body)` | Send mail. Allowed to the owner\'s own verified address, or to anyone once that owner has granted this extension an `extension_email` consent. Returns false when it is not allowed or the node has no mail. `to` is one address: for several recipients, call it once per recipient. Past the operator\'s hourly allowance per account (`extensions.email_per_hour`, 200 by default) it throws a message naming that setting |',
+    '| `ctx.email(to, subject, body)` | Send mail. Allowed to the owner\'s own verified address, or to anyone once that owner has granted this extension an `extension_email` consent. Returns false when it is not allowed or the node has no mail. `to` is one address: for several recipients, call it once per recipient. `body` is plain text and is shown as text; a line that is only `[Label](https://…)` shows as a button, and a line that is only an https address as a link. Past the operator\'s hourly allowance per account (`extensions.email_per_hour`, 200 by default) it throws a message naming that setting |',
     '',
     'Every argument a call needs has to be there. An `undefined` or `null` one makes the call throw',
     '(`ctx.files.write: argument 1 is undefined`) instead of reaching the node as the text "undefined",',

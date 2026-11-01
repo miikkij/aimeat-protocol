@@ -5,6 +5,7 @@
  *   path is walked. The profile comes first, and the interview's answers reach the handbook.
  * @usage cd aimeat && pnpm exec vitest run test/unit/journey-state.test.ts
  * @version-history
+ *   v1.4.0 — 2026-11-01 — The place's own chat agent does not count as a connected AI (isOutsideMcpAgent).
  *   v1.3.0 — 2026-10-31 — "Agents at work" needs an agent that has done work (workersRun, v31 K27).
  *   v1.2.0 — 2026-10-31 — The basic agents do not count as the person's workers (isOwnWorker).
  *   v1.1.0 — 2026-10-03 — The profile is the first stage; the interview's answers are read and shown.
@@ -12,7 +13,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-    deriveJourney, parseJourneyRecord, journeyHandbookSection, isWorker, isOwnWorker, JOURNEY_STAGES, type JourneySignals,
+    deriveJourney, parseJourneyRecord, journeyHandbookSection, isWorker, isOwnWorker, isOutsideMcpAgent, JOURNEY_STAGES, type JourneySignals,
 } from '../../src/services/journey-state.js';
 
 const nothing: JourneySignals = {
@@ -118,6 +119,16 @@ describe('the journey', () => {
         expect(isOwnWorker({ mode: 'task-runner', runMode: 'spawn', tags: ['news'] })).toBe(true);
         expect(isOwnWorker({ mode: 'autonomous' })).toBe(true);
         expect(isOwnWorker({ mode: 'interactive' })).toBe(false);
+    });
+
+    // commercial's check of crew52 (2026-11-01): the place's own chat ticked "Yhdistä tekoälysi".
+    it('an agent of the person that used MCP is an outside connection; the place\'s own chat agent is not', () => {
+        expect(isOutsideMcpAgent({ gaii: 'claude#alice@node', mcpLastSeen: '2026-11-01T10:00:00Z' })).toBe(true);
+        expect(isOutsideMcpAgent({ gaii: 'chat#alice@node', mcpLastSeen: '2026-11-01T10:00:00Z' })).toBe(false);
+        expect(isOutsideMcpAgent({ gaii: 'x#alice@node', name: 'chat', mcpLastSeen: '2026-11-01T10:00:00Z' })).toBe(false);
+        expect(isOutsideMcpAgent({ gaii: 'concierge#alice@node', tags: ['crew.basic'], mcpLastSeen: '2026-11-01T10:00:00Z' })).toBe(false);
+        expect(isOutsideMcpAgent({ gaii: 'claude#alice@node', mcpLastSeen: null })).toBe(false);
+        expect(isOutsideMcpAgent({ gaii: 'claude#alice@node' })).toBe(false);
     });
 
     it('a record written by hand is read defensively', () => {

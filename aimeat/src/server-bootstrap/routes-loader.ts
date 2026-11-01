@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   2026-11-01 — buildWithYouRouter (routes/build-with-you.ts): "Rakennamme kanssasi", the place's trail and the operator's relay.
  *   2026-11-01 — The data package and OData mounts moved to routes-loader-data.ts, which mounts the data product routes beside them (plan doc-mvwxcas3dom3, D9).
  *   2026-10-29 — fileStoreRouter (routes/file-store.ts): where stored files keep their bytes, the node's and a person's own.
  *   2026-10-25 — internetOpeningRouter (routes/internet-opening.ts): one app opened to the internet on a closed node.
@@ -215,6 +216,7 @@ import { complianceRouter } from '../routes/compliance.js';
 import { complianceDocsRouter } from '../routes/compliance-docs.js';
 import { complianceAgreementsRouter } from '../routes/compliance-agreements.js';
 import { goalsRouter } from '../routes/goals.js';
+import { buildWithYouRouter } from '../routes/build-with-you.js';
 import { capabilitiesRouter } from '../routes/capabilities.js';
 import { adminCapabilitiesRouter } from '../routes/admin-capabilities.js';
 import { adminExtensionsRouter } from '../routes/admin-extensions.js';
@@ -749,6 +751,7 @@ export async function mountRoutes(
   // its customers, their signing in four ways and the notices each step sends.
   app.use(complianceAgreementsRouter(config, storage));
   app.use(goalsRouter(config, storage)); // agent goals: open work, the next work, a person's steps
+  app.use(buildWithYouRouter(config, storage)); // the place's one build request, its trail, the operator's relay
 
   // Bundled extensions admin routes
   app.use(adminExtensionsRouter(config, storage, scheduler));

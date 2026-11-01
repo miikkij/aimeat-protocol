@@ -16,6 +16,8 @@
  * @structure GUIDED_JOURNEY_SKILL_ENTRY
  * @usage import { GUIDED_JOURNEY_SKILL_ENTRY } from './builtin-skills.guided-journey.js';
  * @version-history
+ *   v2.0.4 — 2026-11-01 — Stage 3 stays open for the node's own chat and the basic agents until an AI
+ *     of the person's from outside connects (journey-state.ts isOutsideMcpAgent).
  *   v2.0.3 — 2026-10-31 — Stage 6 is done when an agent the person made has finished a task other
  *     than its onboarding test (journey-state.ts workersRun; Jouni, v31 K27).
  *   v2.0.2 — 2026-10-31 — Stage 6 says when it is done as journey-state.ts decides it: an agent the
@@ -180,8 +182,10 @@ says which is theirs (write it as \`road\`):
 
 ### 3. That AI connected
 
-Done if you can call this node. If they use a second AI, the connection steps are on the Connect
-page, /v1/profile?tab=mcp . Experience Center: layer L0, Basics.
+Done if you can call this node. If you are this node's own chat, or one of the basic agents made
+with the account, this stage stays open until an AI of theirs from outside connects: offer it, and
+the connection steps are on the Connect page, /v1/profile?tab=mcp . If they use a second AI, the
+steps are on the same page. Experience Center: layer L0, Basics.
 
 ### 4. An organism, where their work lives between conversations
 

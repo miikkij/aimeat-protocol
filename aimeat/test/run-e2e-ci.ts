@@ -12,6 +12,7 @@
  *   node --import tsx test/run-e2e-ci.ts --guards --production-settings   (the guard tier's lane)
  *   node --import tsx test/run-e2e-ci.ts --purpose --production-settings  (the purpose tier, same lane)
  * @version-history
+ *   2026-11-01 -- e2e-iam-parties.ts joins the list (not the guard tier): a person registered to an app as a member AIMEAT.iam reads (WP9d).
  *   2026-11-01 -- e2e-datapackage-pointer-forgery.ts joins the list (not the guard tier): the withdrawal, a share, a data product source, the EXCHANGE sale and the Dataspace catalogue decide on the service's record, not latest.json (WP9e).
  *   2026-11-01 -- e2e-dataproduct-canvas.ts and e2e-data-share-visitor.ts join the list (not the guard tier): the canvas capabilities WP9c built (plan doc-mvwxcas3dom3, D9, D3).
  *   2026-11-01 -- e2e-company-page-key.ts joins the list (not the guard tier): the bytes a company's address serves change only for a caller that may change the company page, on every upload route (secaudit2026oct31w2 round 11).
@@ -1126,6 +1127,12 @@ const ALL_SUITES = [
     // Agent goals: open work two agents race for, the chain and its limit, a reaction, a person's step,
     // asking a result again, pause, and the refusals (session cc-jouni-goals).
     'test/e2e-goals.ts',
+    // "Build it with you": the place's one build request, the operator's relay with the admin password,
+    // the queue's public status, the place's trail, and the once-per-code notice (Jouni, 1.11 16.22).
+    'test/e2e-build-with-you.ts',
+    // A store place sends that request itself, with the person's own account on the builders' node,
+    // through the MCP server they attached (aimeat-commercial-1c, crew54).
+    'test/e2e-build-with-you-send.ts',
     // The TL and NATO label packs: switching, the markings they recognise, and content that only a
     // model on this machine reads (plan doc-mvlftkh9zmc9, C3).
     'test/e2e-classification-packs.ts',
@@ -1284,6 +1291,8 @@ const ALL_SUITES = [
     'test/e2e-exchange-datapackage.ts',
     // An app's own users as outside parties: the setting, signup by mail, data isolation, the roster (plan doc-mvwxcas3dom3, D4). Runs its own node with mail on.
     'test/e2e-app-parties.ts',
+    // A person registered to an app as a member AIMEAT.iam reads: members/me and the app's IAM extension with the app's sign-in, every refusal, stop and resume (WP9d). Runs its own node with mail on (28572).
+    'test/e2e-iam-parties.ts',
     // The one-time share link: the mail, preview, redeem once with a new key, the refusals, and DuckDB and pandas reading as a party (WP9b). Runs its own node with mail on (28566).
     'test/e2e-party-invite.ts',
     // The Eclipse Dataspace Protocol provider: version, catalog, negotiation with approval and autoAgree, pull transfer, termination (plan doc-mvwxcas3dom3, D8).

@@ -15,6 +15,8 @@
  * @structure buyerSteps(journey) · BuyerSteps({ journey })
  * @usage html`<${BuyerSteps} journey=${journey} />`
  * @version-history
+ *   v1.2.0 — 2026-11-01 — While the place's chat answers (ai-credit.js chatWorks), an unconnected
+ *     outside AI does not lock step 2, which is done in that chat.
  *   v1.1.0 — 2026-11-01 — A step after the next one is plain quiet text with "Aukeaa, kun edellinen on
  *     tehty", not a link (Jouni's review of v34).
  *   v1.0.0 — 2026-10-31 — Initial (v31 K27).
@@ -26,6 +28,8 @@ import { Chooser } from '/components/Chooser.js';
 import { IndexList, IndexStep } from '/components/NumberedIndex.js';
 import { Action, Actions, Loud } from '/components/Action.js';
 import { Note } from '/components/Note.js';
+import { useShared } from '/views/surface/shared-read.js';
+import { chatWorks } from '/js/ai-credit.js';
 
 const html = htm.bind(h);
 
@@ -45,10 +49,16 @@ export function buyerSteps(journey) {
 
 /** @param {{ journey: any }} props */
 export function BuyerSteps({ journey }) {
+  const { data: chatStatus } = useShared('chat-status', '/v1/chat/status', ['chat']);
   const steps = buyerSteps(journey);
   const count = steps.filter((s) => s.done).length;
   const next = steps.find((s) => !s.done);
-  const nextAt = next ? steps.indexOf(next) : steps.length;
+  // While the place's own chat answers, connecting an outside AI does not hold back the steps after
+  // it: the profile is made in that chat (commercial's crew52 check: step 2 looked locked although
+  // the chat worked). The next action still names the first step not done.
+  const holds = (s) => !s.done && !(s.id === 'connect' && chatWorks(chatStatus));
+  const held = steps.find(holds);
+  const nextAt = held ? steps.indexOf(held) : steps.length;
   return html`
     <${Chooser} titleId="home-journey-title"
       title=${t('buyerSteps.title', { done: count, total: steps.length })}

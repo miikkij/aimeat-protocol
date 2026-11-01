@@ -1157,6 +1157,12 @@
       },
       "why": "Reviewed 2026-10-11: the latest finished result of the caller's own agent, read to describe its STRUCTURE in the build instructions. The record goes through presentMemory with the caller's classification reader before anything is derived from it, so a result the caller may not read is not described; what is derived is field names and value types only, with no text of the value."
     },
+    "src/services/build-with-you.ts": {
+      "reads": {
+        "getMemory": 1
+      },
+      "why": "Reviewed 2026-11-01: the node's own record of the place's one build request, under system@<node> (build-with-you.request), which only this file writes. It holds the request's four fields as the owner sent them and the queue's answer; it is no person's content read for another reader, and no model reads it."
+    },
     "src/services/cache-cleanup.ts": {
       "reads": {
         "getMemory": 1,
@@ -2025,10 +2031,9 @@
     "src/services/home-state.ts": {
       "reads": {
         "listMemoryForOwners": 1,
-        "getStorageFile": 1,
-        "getOwnerScopeMemory": 1
+        "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: Onboarding markers and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts."
     },
     "src/services/hook-log.ts": {
       "reads": {
@@ -2291,6 +2296,12 @@
       },
       "why": "Reviewed 2026-09-29 (TARGET-082 V4), the node's own read: API key presence and AI settings."
     },
+    "src/services/node-resident-agent.ts": {
+      "reads": {
+        "getOwnerScopeMemory": 1
+      },
+      "why": "Reviewed 2026-11-01, the node's own read: an existence check of the owner's onboarding.hello_mcp proof key for home-state and open-items (moved here from both). Only true or false leaves the function; no content is shown to anyone."
+    },
     "src/services/notebook-classify.ts": {
       "reads": {
         "listAllMemory": 1
@@ -2347,10 +2358,9 @@
     "src/services/open-items.ts": {
       "reads": {
         "getMemory": 2,
-        "getOwnerScopeMemory": 1,
         "getStorageFile": 1
       },
-      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks."
+      "why": "Reviewed 2026-09-29 (TARGET-082 V4), checked: Items reach callers through showItems; the other reads are read-modify-write and existence checks. 2026-11-01: the hello_mcp read moved to services/node-resident-agent.ts."
     },
     "src/services/openrouter-settings-migration.ts": {
       "reads": {

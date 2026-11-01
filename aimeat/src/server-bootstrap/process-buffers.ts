@@ -18,6 +18,7 @@
  *   const { webhookDispatcher, stats } = await initProcessBuffers(config, storage);
  *   await flushProcessBuffers(); // at shutdown
  * @version-history
+ *   2026-11-01 — startBuildWithYou: the usage listener that opens the build offer, and the status sweep.
  *   2026-10-31 — The refusal listener passes the refused call on (secaudit2026oct31w2 round 10).
  *   2026-10-25 — The usage and tally buffers take their flush intervals from the config, and the usage
  *     settings are bound (services/usage/usage-settings.ts), so the admin Config tab reaches them.
@@ -53,6 +54,7 @@ import { initClassificationAudit } from '../services/classification/audit.js';
 import { initAgentRefusals } from '../services/agent-refusals.js';
 import { sendPermissionAsk } from '../services/permission-ask-notice.js';
 import { initScopeUse } from '../services/scope-use.js';
+import { startBuildWithYou } from '../services/build-with-you.js';
 
 export interface ProcessBuffers {
   webhookDispatcher: ReturnType<typeof createWebhookDispatcher>;
@@ -86,6 +88,9 @@ export async function initProcessBuffers(config: AimeatConfig, storage: Storage)
   // Which permissions each `*` agent uses, for the narrowing its owner is offered and for when `*`
   // starts to hold its tasks (services/scope-use.ts). Like the tally, it fills only from now on.
   initScopeUse(storage);
+  // "Build it with you": the usage listener that opens the place's one build offer on an outside AI's
+  // first MCP call, and the sweep that asks the build queue where the request stands.
+  startBuildWithYou(storage, config);
 
   // Off-request-path buffer for consent-audit writes (denials + grant/revoke mutations).
   initConsentAuditBuffer(storage);

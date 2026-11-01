@@ -14,13 +14,17 @@
  *   FIRST CONTACT. The chat-instance row (per tool, the id every production row is addressed by),
  *   the onboarding funnel's first-MCP-call signal and the agent's own MCP-use mark. A session does
  *   them when it opens; the modern path does them at most once a minute per agent and platform
- *   (recordMcpContactThrottled), since every one of its requests would otherwise write.
+ *   (recordMcpContactThrottled), since every one of its requests would otherwise write. The
+ *   first-MCP-call signal counts only an AI from outside the node (node-resident-agent.ts).
  * @structure McpAdmission · admitMcpAgent(storage, gaii) · recordMcpContact(deps, who) ·
  *   recordMcpContactThrottled(deps, who) · MCP_CONTACT_THROTTLE_MS
  * @usage
  *   const admitted = await admitMcpAgent(storage, verified.sub);
  *   if (!admitted.ok) return res.status(admitted.status).json({ jsonrpc: '2.0', error: { code: admitted.code, message: admitted.message }, id });
  * @version-history
+ *   v1.1.0 — 2026-11-01 — The place's own chat agent and the basic agents no longer write the
+ *     first-MCP-call marker, which had ticked "connect your AI" on a place where no outside AI was
+ *     connected (aimeat-commercial-1c, test lane).
  *   v1.0.0 — 2026-10-20 — Moved out of the MCP session code unchanged in what it decides and writes,
  *     so the 2026-07-28 path shares it (MCP SDK v2 migration step 5).
  */
@@ -29,6 +33,7 @@ import type { AimeatConfig } from '../config.js';
 import { logger } from '../utils/logger.js';
 import { registerChatInstance } from './chat-instance-write.js';
 import { markAgentMcpUse } from './agent-mcp-touch.js';
+import { isNodeResidentAgent } from './node-resident-agent.js';
 
 export type McpAdmission =
     | { ok: true; owner: string }
@@ -79,9 +84,18 @@ export async function recordMcpContact(deps: { storage: Storage; config: AimeatC
     }
 
     // Onboarding funnel: the owner's FIRST MCP session is the activation signal the
-    // rescue email keys off. Fire-and-forget; must never delay or break the session.
-    const { recordFirstMcpCall } = await import('./onboarding-funnel.js');
-    void recordFirstMcpCall(storage, config, who.owner, who.platform);
+    // rescue email keys off, and the journey's "connect your AI" step. Only an AI from outside
+    // counts: the node's own chat and basic agents call MCP from the start, and they ticked the
+    // step on a place nobody had connected anything to. Fire-and-forget; must never delay or
+    // break the session.
+    const agent = await storage.getAgent(who.gaii).catch((err: Error) => {
+        logger.warn('first MCP call not recorded: the agent could not be read', { gaii: who.gaii, error: err.message });
+        return null;
+    });
+    if (agent && !isNodeResidentAgent(agent)) {
+        const { recordFirstMcpCall } = await import('./onboarding-funnel.js');
+        void recordFirstMcpCall(storage, config, who.owner, who.platform);
+    }
 
     // The agent itself learns it was used over MCP, from which tool, and when. The session
     // row above is per TOOL and keeps the first agent that ever opened it; this is the

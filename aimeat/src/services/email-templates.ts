@@ -9,6 +9,8 @@
  * @structure i18n string table + wrapHtml() layout + per-template builder functions.
  * @usage import { inviteEmailHtml, inviteEmailSubject } from './email-templates.js';
  * @version-history
+ *   2026-11-01 — textNotificationEmailHtml(): a `[Label](https://…)` line is a button and a bare https line a link
+ *     (email-text-links.ts); the rest of the body stays escaped text.
  *   2026-10-27 — operator.email_footer: the operator's own line replaces "Sent by AIMEAT Protocol" and the profile
  *     note in every template, HTML and text (setNodeEmailFooter, wired by email.ts to the live config).
  *   2026-10-25 — textNotificationEmailHtml(): the notification template for text from anyone but the operator, escaped, with line breaks kept (secaudit2026oct22).
@@ -33,6 +35,7 @@
  *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
 import { escapeHtml as esc } from '../utils/html-escape.js';
+import { linkedTextHtml, linkedTextPlain } from './email-text-links.js';
 
 // ── i18n strings ─────────────────────────────────────────
 
@@ -722,15 +725,15 @@ export function notificationEmailHtml(subject: string, body: string, locale?: st
  * The notification template for plain text that a principal other than the node supplies: an
  * extension's ctx.email subject and body, an automation report, a workflow's end mail. Both are
  * escaped before they enter the node's branded HTML, and a line break in the body shows as one
- * (secaudit2026oct22). The plain-text part is the text as written. EmailService.sendNotification
- * renders through this.
+ * (secaudit2026oct22). A line that is only `[Label](https://…)` shows as a button, and a line that is
+ * only an https address as a link (email-text-links.ts). The plain-text part is the text as written,
+ * a button line as `Label: https://…`. EmailService.sendNotification renders through this.
  */
 export function textNotificationEmailHtml(subject: string, body: string, locale?: string): { html: string; text: string } {
-  const bodyHtml = esc(body).replace(/\r?\n/g, '<br>');
   const html = wrapHtml(esc(subject), `
-    <p>${bodyHtml}</p>
+    ${linkedTextHtml(body)}
   `, locale);
-  const text = [subject, '', body, '', `-- ${t(locale, 'footer')}`].join('\n');
+  const text = [subject, '', linkedTextPlain(body), '', `-- ${t(locale, 'footer')}`].join('\n');
   return { html, text };
 }
 

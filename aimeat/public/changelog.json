@@ -4,6 +4,160 @@
     {
       "date": "2026-11-01",
       "kind": "feature",
+      "id": "2026-11-01-offer-your-data-as-a-table-others-can-open",
+      "highlight": true,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Offer your data as a table others can open",
+        "fi": "Tarjoa dataasi taulukkona, jonka muut voivat avata"
+      },
+      "summary": {
+        "en": "Ask your AI, or use six steps on the Offers page: a table from your records, files and apps.",
+        "fi": "Pyydä tekoälyltäsi tai käytä kuutta vaihetta: taulukko tietueistasi, tiedostoistasi ja sovelluksistasi."
+      },
+      "body": {
+        "en": "A data product is a table made from your own records, files, app data or the results of your agents and extensions, from one source or several joined together. Say it to your AI in one sentence, or go through six steps on the Offers page: sources, columns, preview, how often it updates, who may use it, and the addresses. Columns your data map marks as personal stay out unless you choose otherwise. The node runs it on a schedule or when a source changes, makes a new version only when the rows change, and your AI can draft its description. Excel, Power BI, DuckDB and Python open it through OData or CSV.",
+        "fi": "Datatuote on taulukko, jonka teet omista tietueistasi, tiedostoistasi, sovellustesi datasta tai agenttiesi ja laajennustesi tuloksista. Lähteitä voi olla yksi tai monta yhdistettynä. Sano se tekoälyllesi yhdellä lauseella tai käy läpi kuusi vaihetta Tarjoama-sivulla: lähteet, sarakkeet, esikatselu, päivitystahti, kuka saa käyttää ja osoitteet. Sarakkeet, jotka datakarttasi merkitsee henkilötiedoiksi, jäävät pois, ellet itse valitse toisin. Node päivittää taulukon ajastuksen mukaan tai kun lähde muuttuu, ja tekee uuden version vain, kun rivit muuttuvat. Tekoälysi voi kirjoittaa kuvauksen luonnoksen. Excel, Power BI, DuckDB ja Python avaavat taulukon ODatana tai CSV:nä."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-share-a-table-with-someone-who-has-no-account",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Share a table with someone who has no account",
+        "fi": "Jaa taulukko ihmiselle, jolla ei ole tiliä"
+      },
+      "summary": {
+        "en": "They get a link by e-mail, take their own key and read it in Excel or Power BI until you end it.",
+        "fi": "Hän saa linkin sähköpostiin, ottaa oman avaimen ja lukee Excelissä tai Power BI:ssä, kunnes perut."
+      },
+      "body": {
+        "en": "Share one data product with a named person or program for a purpose and until a date. They need no AIMEAT account: the e-mail link opens a page where they accept the terms, take their own key once and download a connection file for Excel, Power BI or DuckDB. A person on another AIMEAT reads it with their own account. You see every read, and when you end the share the next read is refused at once; copies already taken stay with them. Your outside parties, their keys and their reads are in the Data Wallet, and What others can see lists every share.",
+        "fi": "Jaa yksi datatuote nimetylle ihmiselle tai ohjelmalle tiettyyn käyttötarkoitukseen ja päivämäärään asti. Hän ei tarvitse AIMEAT-tiliä. Sähköpostilinkki avaa sivun, jolla hän hyväksyy ehdot, ottaa oman avaimensa talteen ja lataa yhteystiedoston Exceliin, Power BI:hin tai DuckDB:hen. Toisen AIMEATin käyttäjä lukee jaon omalla tilillään. Näet jokaisen luvun. Kun perut jaon, seuraava luku hylätään heti, mutta jo ladatut kopiot jäävät hänelle. Ulkopuoliset osapuolet, heidän avaimensa ja lukunsa ovat Tietolompakossa, ja Mitä muut näkevät -sivu listaa jokaisen jaon."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-a-public-page-for-every-public-table",
+      "highlight": false,
+      "audience": [
+        "user",
+        "developer"
+      ],
+      "title": {
+        "en": "A public page for every public table",
+        "fi": "Jokaiselle julkiselle taulukolle julkinen sivu"
+      },
+      "summary": {
+        "en": "Search engines, open data portals and people find your public tables and open them with one address.",
+        "fi": "Hakukoneet, avoimen datan portaalit ja ihmiset löytävät julkiset taulukkosi ja avaavat ne yhdellä osoitteella."
+      },
+      "body": {
+        "en": "A public data product has its own page with its columns, freshness, licence, how it was made and the steps for Excel, Power BI, DuckDB, Python and your own AI. The node also lists public tables in a DCAT catalogue that open data portals such as avoindata.fi and data.europa.eu can read, in its sitemap and in search, and its ODPS description says who may read it.",
+        "fi": "Julkisella datatuotteella on oma sivu. Siinä ovat sarakkeet, tuoreus, lisenssi, tieto siitä, miten taulukko tehtiin, ja ohjeet Exceliin, Power BI:hin, DuckDB:hen, Pythoniin ja omalle tekoälylle. Node listaa julkiset taulukot myös DCAT-katalogiin, jonka avoimen datan portaalit kuten avoindata.fi ja data.europa.eu voivat lukea, sekä sivukarttaan ja hakuun. ODPS-kuvaus kertoo, kuka taulukkoa saa lukea."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-sell-a-table-on-exchange",
+      "highlight": false,
+      "audience": [
+        "user",
+        "agent"
+      ],
+      "title": {
+        "en": "Sell a table on EXCHANGE",
+        "fi": "Myy taulukko EXCHANGEssa"
+      },
+      "summary": {
+        "en": "Buyers pay per month or per read; a buyer with no account pays by card and gets their own key.",
+        "fi": "Ostaja maksaa kuukaudelta tai luvulta. Ostaja ilman tiliä maksaa kortilla ja saa oman avaimen."
+      },
+      "body": {
+        "en": "Put a data product on EXCHANGE with a price and usage terms. A buyer with an account accepts it like any other offering and pays per read or per month; a buyer with no account pays in advance by card and becomes your outside party with a key of its own. A contract covers the versions with the same columns, so a change of columns never charges anyone for a table they did not buy, and a reader your audience already admits is never charged.",
+        "fi": "Laita datatuote EXCHANGEen hinnan ja käyttöehtojen kanssa. Ostaja, jolla on tili, hyväksyy sen kuten minkä tahansa tarjouksen ja maksaa luvulta tai kuukaudelta. Ostaja ilman tiliä maksaa etukäteen kortilla, ja hänestä tulee ulkopuolinen osapuolesi, jolla on oma avain. Sopimus kattaa versiot, joissa on samat sarakkeet, joten sarakkeiden muutos ei koskaan veloita taulukosta, jota ostaja ei ostanut. Lukijalta, jonka yleisö jo päästää lukemaan, ei veloiteta."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-is-your-data-up-to-date",
+      "highlight": false,
+      "audience": [
+        "user",
+        "operator"
+      ],
+      "title": {
+        "en": "Is your data up to date?",
+        "fi": "Onko datasi ajan tasalla?"
+      },
+      "summary": {
+        "en": "Each table says whether it keeps its schedule, and the Compliance page tracks data intermediation.",
+        "fi": "Jokainen taulukko kertoo, pitääkö se ajastuksensa, ja Compliance-sivu seuraa datanvälitystä."
+      },
+      "body": {
+        "en": "Each data product is up to date, late, out of date or without a schedule, measured against what it promised, and a product is as fresh as its oldest source; its EXCHANGE listing and public page show the same state. You get one notice when one goes out of date, and a reader gets an e-mail when a table they read is withdrawn. A version someone still reads under a share is never removed. For the operator, a new setting says whether this node runs a data intermediation service under the EU Data Governance Act, and section 12 of the Compliance page lists what could count as one, the Article 12 conditions and the notification record.",
+        "fi": "Jokainen datatuote on ajan tasalla, myöhässä, vanhentunut tai ilman ajastusta sen mukaan, mitä se lupasi, ja tuote on yhtä tuore kuin sen vanhin lähde. EXCHANGE-tarjous ja julkinen sivu näyttävät saman tilan. Saat yhden ilmoituksen, kun tuote vanhentuu, ja lukija saa sähköpostin, kun hänen lukemansa taulukko vedetään pois. Versiota, jota joku vielä lukee jaon kautta, ei poisteta. Ylläpitäjälle tuli uusi asetus: välittääkö tämä node dataa EU:n datanhallinta-asetuksen mukaisena datanvälityspalveluna. Compliance-sivun osio 12 näyttää, mikä voisi olla välitystä, 12 artiklan ehdot ja ilmoituksen tiedot."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-your-app-s-users-without-an-aimeat-account",
+      "highlight": false,
+      "audience": [
+        "developer",
+        "operator"
+      ],
+      "title": {
+        "en": "Your app's users without an AIMEAT account",
+        "fi": "Sovelluksesi käyttäjät ilman AIMEAT-tiliä"
+      },
+      "summary": {
+        "en": "People register to your app with an e-mail address and are members with roles, when the operator allows it.",
+        "fi": "Ihmiset rekisteröityvät sovellukseesi sähköpostilla ja ovat jäseniä rooleineen, kun ylläpitäjä sallii sen."
+      },
+      "body": {
+        "en": "When the operator allows it, a person registers to an app with an e-mail address and signs in with a mailed link, without an account on this node. They keep their own data in the app and are members of its one member list: AIMEAT.iam gives them a role, the app's own IAM extension sees who they are, and the owner can change the role, stop them or remove them from the app's members panel or its page in the App Catalog. The operator chooses off, ask me, or on.",
+        "fi": "Kun ylläpitäjä sallii sen, ihminen rekisteröityy sovellukseen sähköpostiosoitteella ja kirjautuu sähköpostiin tulevalla linkillä ilman tiliä tällä palvelimella. Hän pitää omaa dataansa sovelluksessa ja on sen ainoan jäsenlistan jäsen. AIMEAT.iam antaa hänelle roolin, sovelluksen oma IAM-laajennus tietää, kuka hän on, ja omistaja voi vaihtaa roolin, pysäyttää hänet tai poistaa hänet sovelluksen jäsenpaneelista tai sen sivulta Sovelluskatalogissa. Ylläpitäjä valitsee: pois, kysy minulta tai päällä."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
+      "id": "2026-11-01-your-tables-in-eu-data-spaces",
+      "highlight": false,
+      "audience": [
+        "operator",
+        "developer"
+      ],
+      "title": {
+        "en": "Your tables in EU data spaces",
+        "fi": "Taulukkosi EU:n data-avaruuksiin"
+      },
+      "summary": {
+        "en": "Data space connectors read your catalogue, ask for a table and fetch it after you approve.",
+        "fi": "Data-avaruuksien liittimet lukevat katalogisi, pyytävät taulukkoa ja noutavat sen, kun hyväksyt."
+      },
+      "body": {
+        "en": "When the operator turns it on, the node speaks the Eclipse Dataspace Protocol 2025-1 as a provider. A partner's connector reads the catalogue of what it may see, asks for a table under the terms you published, and fetches it after you approve, or at once if you set that table to agree by itself. The access ends when the agreement ends. The node passed all 34 provider tests of the protocol's official test kit. It is off by default.",
+        "fi": "Kun ylläpitäjä kytkee sen päälle, node toimii Eclipse Dataspace Protocol 2025-1:n tarjoajana. Kumppanin liitin lukee katalogin siitä, mitä se saa nähdä, pyytää taulukkoa julkaisemillasi ehdoilla ja noutaa sen, kun hyväksyt. Jos asetat taulukon hyväksymään itse, nouto alkaa heti. Pääsy päättyy, kun sopimus päättyy. Node läpäisi protokollan virallisen testisarjan kaikki 34 tarjoajan testiä. Oletuksena se on pois päältä."
+      }
+    },
+    {
+      "date": "2026-11-01",
+      "kind": "feature",
       "id": "2026-11-01-choose-once-where-your-aimeat-s-ai-runs",
       "highlight": true,
       "audience": [

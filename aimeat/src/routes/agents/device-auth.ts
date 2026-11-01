@@ -4,6 +4,8 @@
  * SPDX-License-Identifier: MIT
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines. The approve step the authorize and verify routes share lives in device-auth-approve.ts, extracted for the same reason.
  * @version-history
+ *   2026-11-01 — An approval on POST /v1/agents/verify writes the trail line with event agent.approved
+ *     (services/place-trail.ts), which the store's fleet service keys its first-build gift on.
  *   2026-11-01 -- keep_your_key adds that a client keeps node_id and this node's address with the key
  *     and sends a proof only to that address, because a server at another address can report any node
  *     id (secaudit2026oct31w2 round 11, device-return-proof.ts:return-proof-binds-only-public-node-id).
@@ -139,6 +141,7 @@ import { DEVICE_AUTH_EXPIRY_MS, DEVICE_AUTH_EXPIRY_SECONDS, VALID_MODES } from '
 import { uncoveredScopes, scopeIsCovered } from '../../utils/scope-coverage.js';
 import { approveDeviceAuth, scopesExceedNodeMax } from './device-auth-approve.js';
 import { proofVerifies, spendReturnProof, markReturnProven, returnProven } from '../../services/device-return-proof.js';
+import { recordTrailEvent } from '../../services/place-trail.js';
 
 /**
  * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
@@ -390,6 +393,8 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
           return;
         }
         autoApproved = true;
+        recordTrailEvent({ actor: principal.kind === 'agent' ? req.auth!.sub : `${ownerName}@${config.nodeId}`, code: 'POST /v1/agents/device-authorize', target: result.gaii, event: 'agent.approved' });
+        res.locals.trailRecorded = true;
       }
     }
 
@@ -698,6 +703,10 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       return;
     }
 
+    // The trail line, with the event the store's fleet service keys on (services/place-trail.ts). The
+    // owner's token arrived in the body, where the trail middleware does not look, so it is written here.
+    recordTrailEvent({ actor: `${ownerPayload.owner}@${config.nodeId}`, code: 'POST /v1/agents/verify', target: result.gaii, event: 'agent.approved' });
+    res.locals.trailRecorded = true;
     res.json(success(config.nodeId, {
       status: 'approved',
       gaii: result.gaii,

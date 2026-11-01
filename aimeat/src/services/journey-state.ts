@@ -34,6 +34,9 @@
  * @usage
  *   const journey = await readJourney(storage, config, owner, homeState);
  * @version-history
+ *   v1.5.0 — 2026-11-01 — "Connect your AI" is ticked by an agent of the person's own that used MCP
+ *     (isOutsideMcpAgent), never by the place's own chat agent or a basic agent, which also call over MCP; the
+ *     first-MCP-call marker counts only when it predates the agents' own MCP mark.
  *   v1.4.0 — 2026-10-31 — "Agents at work" is done when an agent the person made has finished a task
  *     other than its onboarding test (workersRun), not when it merely exists (Jouni, v31 K27).
  *   v1.3.0 — 2026-10-31 — The "agents at work" stage counts the workers the person made (isOwnWorker):
@@ -53,6 +56,7 @@ import type { Storage } from '../storage/interface.js';
 import { getOwnerScopeMemory } from './owner-memory.js';
 import { readHomeState, type HomeState } from './home-state.js';
 import { FIRST_MCP_CALL_KEY } from './onboarding-funnel.js';
+import { CHAT_AGENT_NAME } from './chat-agent.js';
 import { getOwnerUsageSummary } from './usage-summary.js';
 import { loadOwnerAgents } from './db/owner-identity.js';
 import { writeMemoryRecord } from './memory-write.js';
@@ -105,7 +109,7 @@ export interface JourneyRecord {
 
 /** The account's facts that decide the stages. */
 export interface JourneySignals {
-    /** An AI of theirs has called this node over MCP, or written the connection proof. */
+    /** An AI of theirs, not the place's own chat, has called this node over MCP, or written the connection proof. */
     connected: boolean;
     /** They keep their own AI key here. */
     ownKey: boolean;
@@ -219,6 +223,33 @@ export function isOwnWorker(a: { mode?: string; runMode?: string | null; tags?: 
     return isWorker(a) && !(Array.isArray(a.tags) && a.tags.includes('crew.basic'));
 }
 
+/**
+ * An AI of the person's own that has called this node over MCP. The place's own chat agent
+ * (`chat#<owner>@<node>`) calls over MCP too, on every chat turn, and so do the basic agents made
+ * with the account (tag `crew.basic`), so the first-MCP-call marker alone ticked "connect your AI"
+ * for a buyer who had only used the place's chat (commercial's check of crew52, 2026-11-01). The
+ * agent row's mcpLastSeen names the agent, so those agents are left out by name and tag: the same
+ * two conditions as aimeat-protocol-4e's node-resident-agent rule on the write side.
+ */
+export function isOutsideMcpAgent(a: { gaii?: string; name?: string; mcpLastSeen?: string | null; tags?: readonly string[] | null }): boolean {
+    if (!a.mcpLastSeen) return false;
+    const chat = a.name === CHAT_AGENT_NAME || String(a.gaii ?? '').startsWith(`${CHAT_AGENT_NAME}#`);
+    const basic = Array.isArray(a.tags) && a.tags.includes('crew.basic');
+    return !chat && !basic;
+}
+
+/** The day agent-mcp-touch.ts began writing mcpLastSeen; before it the marker was the only record. */
+const AGENT_MCP_MARK_SINCE = '2026-09-02';
+
+/**
+ * The first-MCP-call marker, counted only when it was written before agents carried their own MCP
+ * mark: such a marker cannot come from the place's chat, and its agent may have no mark of its own.
+ */
+function markedBeforeAgentMcpMark(marker: { value?: unknown } | null | undefined): boolean {
+    const at = (marker?.value as { at?: unknown } | undefined)?.at;
+    return typeof at === 'string' && at < AGENT_MCP_MARK_SINCE;
+}
+
 /** The account's facts. `home` is passed when the caller already read it. */
 export async function readJourneySignals(
     storage: Storage, config: AimeatConfig, owner: string, home?: HomeState,
@@ -237,7 +268,7 @@ export async function readJourneySignals(
     const apps = usage.counts.apps.used + usage.counts.extensions.used + usage.counts.cortexes;
     const own = agents.filter(isOwnWorker);
     return {
-        connected: state.helloMcp || !!firstCall,
+        connected: state.helloMcp || agents.some(isOutsideMcpAgent) || markedBeforeAgentMcpMark(firstCall),
         ownKey: usage.ai.own_key,
         // The first result is the profile card, and the card is the welcome page (one file, read by
         // home-state). A note, an app or a shared place no longer counts: a person who has those
