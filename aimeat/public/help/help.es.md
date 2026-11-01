@@ -49,7 +49,7 @@ Todo lo que guardas es privado al principio. Solo tú lo ves.
 
 Tú decides lo que compartes. Puedes invitar a personas a un lugar compartido y compartir con ellas sus espacios de trabajo. También puedes publicar algo para todos. Lo que compartes solo lo ven aquellos con quienes lo compartiste.
 
-Un agente o una IA conectada solo puede hacer lo que tú le permites. Ves cada permiso, y puedes retirarlo, en la [página de Acceso y seguridad](/v1/profile?tab=access).
+Un agente o una IA conectada solo puede hacer lo que tú le permites. Tus agentes y las IA conectadas están en la [página de Agentes](/v1/profile?tab=agents), y allí puedes cambiar o retirar su acceso. Los permisos de las aplicaciones y los identificadores de acceso están en la [página de Acceso y seguridad](/v1/profile?tab=access).
 
 Puedes exportar todos tus datos y borrar tu cuenta en Ajustes.
 
@@ -60,6 +60,23 @@ Un agente es una IA que hace un trabajo por ti, también cuando no estás.
 Di en una frase en el [chat](/v1/chat) o en tu [Inicio](/v1/home) lo que quieres. AIMEAT crea el agente y te lo muestra antes de que empiece. Si el trabajo se repite, dilo: por ejemplo "cada mañana de lunes a viernes a las 8". Así el agente hace el trabajo con ese horario.
 
 Apruebas el agente una vez. Después, sus ejecuciones aparecen en el [Programador](/v1/profile?tab=scheduler), donde ves cuándo trabaja cada agente la próxima vez. Ves el trabajo terminado en tu Inicio, en Lo que ha pasado. Si quieres, el agente también te lo envía por correo. Puedes detener un agente cuando quieras.
+
+<!--store-->
+## IA y agentes de fuera {#outside}
+
+Puedes traer a tu AIMEAT IA y agentes de otros sitios. Usan la misma memoria, los mismos agentes y las mismas aplicaciones que tú. Cuantas más IA trabajan contigo, más consigue tu AIMEAT.
+
+**Una IA que ya usas.** Claude, ChatGPT, Grok y Cursor se conectan por MCP. Abre [Conecta tu IA](/v1/profile?tab=mcp) y elige tu IA: la página te muestra los pasos. Al final tu AIMEAT te pregunta qué puede hacer la IA, y tú apruebas la conexión.
+
+**Un agente que funciona en otro sitio**, por ejemplo un bot de Grok o un agente de CrewAI. Las instrucciones están en la [página de Agentes](/v1/profile?tab=agents), en Conecta la IA que ya usas. El agente pide acceso, y la solicitud aparece en la misma página, en Solicitudes de agentes pendientes. Tú la apruebas.
+
+Al aprobar, eliges qué puede hacer la IA o el agente: Solo lectura, Estándar, Acceso total o A medida. Con acceso total puede hacer en tu AIMEAT casi todo lo que haces tú: escribir en la memoria, crear agentes y aplicaciones, y hacer trabajo por ti. La seguridad de tu cuenta, los secretos, los pagos, lo que compartes y los cambios de permisos siguen siendo tuyos, salvo que los permitas uno a uno en A medida.
+
+Puedes cambiar o retirar el acceso cuando quieras, y el cambio vale al momento:
+
+- Una IA conectada se desconecta en la [página Conecta tu IA](/v1/profile?tab=mcp) con el botón Desconectar.
+- El acceso de un agente se cambia en la [página de Agentes](/v1/profile?tab=agents): abre el agente y cambia su acceso, o pulsa Eliminar el agente. Las IA conectadas también aparecen allí como agentes.
+<!--/store-->
 
 ## Aplicaciones {#apps}
 
