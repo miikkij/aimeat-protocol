@@ -66,7 +66,7 @@ You approve the agent once. After that its runs show in the [Scheduler](/v1/prof
 
 You can bring AIs and agents from elsewhere into your AIMEAT. They use the same memory, the same agents and the same apps as you. The more AIs work with you, the more your AIMEAT gets done.
 
-**An AI you already use.** Claude, ChatGPT, Grok and Cursor connect over MCP. Open [Connect your AI](/v1/profile?tab=mcp) and pick your AI, and the page shows the steps. At the end your AIMEAT asks what the AI may do, and you approve the connection.
+**An AI you already use.** Claude, ChatGPT, Grok and Cursor connect over MCP. MCP (Model Context Protocol) is an open standard that lets an AI connect to other services. Read more at [modelcontextprotocol.io](https://modelcontextprotocol.io). Open [Connect your AI](/v1/profile?tab=mcp) and pick your AI, and the page shows the steps. At the end your AIMEAT asks what the AI may do, and you approve the connection.
 
 **An agent that runs elsewhere**, for example a Grok bot or a CrewAI agent. The instructions are on the [Agents page](/v1/profile?tab=agents), under Connect the AI you already use. The agent asks for access, and the request shows on the same page under Pending Agent Requests. You approve it.
 
@@ -75,7 +75,7 @@ When you approve, you choose what the AI or agent may do: Read only, Standard, F
 You can change or take back access at any time, and the change takes effect at once:
 
 - You disconnect a connected AI on the [Connect your AI page](/v1/profile?tab=mcp) with the Disconnect button.
-- You change an agent's access on the [Agents page](/v1/profile?tab=agents): open the agent and change its access, or press Delete agent. Connected AIs show there as agents too.
+- You change an agent's access on the [Agents page](/v1/profile?tab=agents): open the agent and change its access, or press Delete agent. An AI you connected shows on the Agents page as a row of its own.
 <!--/store-->
 
 ## Apps {#apps}

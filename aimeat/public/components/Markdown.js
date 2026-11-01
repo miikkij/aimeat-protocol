@@ -46,6 +46,8 @@
  *     scrolls inside after 60% of the window (.md-body--scroll; was agents-detail.css .pf-agd-readme).
  *   v1.8.1 -- 2026-10-25 -- secaudit2026oct22: sanitizeHref and sanitizeImgSrc decide the scheme on the
  *     text the URL parser reads (tabs and newlines removed, C0 controls trimmed).
+ *   v1.8.2 -- 2026-11-01 -- A bare URL or host inside a link's label stays text: it was autolinked into a
+ *     second <a> nested in the first.
  */
 import { h } from 'preact';
 import { Mermaid } from './Mermaid.js';
@@ -130,7 +132,9 @@ function matchBareHost(text, i) {
 
 // ── Inline parsing: code, bold, italic, links. Returns an array of vnodes/strings.
 // Order matters: inline code is extracted first so markup inside it is literal.
-function parseInline(text, onWikiLink) {
+// `inLink` is set while parsing a link's label: a bare URL or host there is the label's text, and
+// autolinking it nested a second <a> inside the first ([modelcontextprotocol.io](https://…)).
+function parseInline(text, onWikiLink, inLink = false) {
   const out = [];
   let i = 0;
   let buf = '';
@@ -192,8 +196,8 @@ function parseInline(text, onWikiLink) {
           flush();
           out.push(
             href
-              ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, parseInline(label, onWikiLink))
-              : h('span', null, parseInline(label, onWikiLink)),
+              ? h('a', { href, target: '_blank', rel: 'noopener noreferrer nofollow' }, parseInline(label, onWikiLink, true))
+              : h('span', null, parseInline(label, onWikiLink, inLink)),
           );
           i = paren + 1;
           continue;
@@ -206,7 +210,7 @@ function parseInline(text, onWikiLink) {
       const end = text.indexOf('**', i + 2);
       if (end > i) {
         flush();
-        out.push(h('strong', null, parseInline(text.slice(i + 2, end), onWikiLink)));
+        out.push(h('strong', null, parseInline(text.slice(i + 2, end), onWikiLink, inLink)));
         i = end + 2;
         continue;
       }
@@ -217,7 +221,7 @@ function parseInline(text, onWikiLink) {
       const end = text.indexOf('*', i + 1);
       if (end > i) {
         flush();
-        out.push(h('em', null, parseInline(text.slice(i + 1, end), onWikiLink)));
+        out.push(h('em', null, parseInline(text.slice(i + 1, end), onWikiLink, inLink)));
         i = end + 1;
         continue;
       }
@@ -233,7 +237,7 @@ function parseInline(text, onWikiLink) {
       }
       if (j >= 0) {
         flush();
-        out.push(h('em', null, parseInline(text.slice(i + 1, j), onWikiLink)));
+        out.push(h('em', null, parseInline(text.slice(i + 1, j), onWikiLink, inLink)));
         i = j + 1;
         continue;
       }
@@ -242,7 +246,7 @@ function parseInline(text, onWikiLink) {
     // Bare URL autolink (http/https only) — turn a raw https://… into a clickable link. Only at a
     // boundary (start, or after whitespace / an opening bracket) so a scheme glued inside a token, or
     // the url in an existing [label](url) link (consumed above), is left alone.
-    if ((c === 'h' || c === 'H') && (i === 0 || /\s|[([{<]/.test(text[i - 1]))) {
+    if (!inLink && (c === 'h' || c === 'H') && (i === 0 || /\s|[([{<]/.test(text[i - 1]))) {
       const url = matchAutolinkUrl(text, i);
       if (url) {
         const href = sanitizeHref(url);
@@ -257,7 +261,7 @@ function parseInline(text, onWikiLink) {
 
     // A bare host, at a token boundary, when nothing above claimed it. After the URL branch, so
     // `https://x.io` is still matched as a URL with its scheme rather than as a host.
-    if (/[a-z0-9]/i.test(c) && (i === 0 || /[\s([{<>"']/.test(text[i - 1]))) {
+    if (!inLink && /[a-z0-9]/i.test(c) && (i === 0 || /[\s([{<>"']/.test(text[i - 1]))) {
       const host = matchBareHost(text, i);
       if (host) {
         flush();

@@ -7,6 +7,9 @@
  * @usage Linked from public/spa.html right after theme.css, in the order theme.css held these rules
  *   (the shell block), and from every standalone page that links theme.css.
  * @version-history
+ *   v1.7.0 — 2026-11-01 — A store-sold place's sign-in button keeps one line and shows its short form
+ *     under 420px (.topnav-sign-full / .topnav-sign-short, Jouni 1.11 13.50); under 640px its light/dark
+ *     and palette controls leave that bar, so the button stays inside the screen.
  *   v1.6.0 — 2026-10-31 — The home button (.topnav-home, a cabin) beside the burger, drawn where the
  *     burger is: the home in one press while the links are folded into the menu. The phone bar
  *     tightens to make room for it (under 640px and again under 380px).
@@ -409,4 +412,20 @@
 /* Phone (formerly theme.css "Responsive"). */
 @media (max-width: 480px) {
   .topnav { padding: 0 0.4rem; }
+}
+
+/* A store-sold place's sign-in button (spa.html mountAuth): one line always, and under 420px the
+   short form, so "Kirjaudu sisään" neither wraps nor reaches the screen edge (Jouni, 1.11 13.50). */
+.header-auth-slot .aimeat-sign-btn { white-space: nowrap; }
+.topnav-sign-short { display: none; }
+/* Beside it the light/dark and palette controls pushed it 20px past the edge at 390px and 40px at
+   360px (measured 2026-11-01), so on a phone they leave this bar; the light/dark switch alone does
+   not fit at 360px either. A signed-out visitor here is the owner on the way in, and the look follows
+   the device until the sign-in. Other nodes' signed-out bars keep the controls. */
+@media (max-width: 640px) {
+  .aimeat-auth-out:has(.topnav-sign-short) .aimeat-ctl { display: none !important; }
+}
+@media (max-width: 420px) {
+  .topnav-sign-full { display: none; }
+  .topnav-sign-short { display: inline; }
 }
