@@ -5,6 +5,7 @@
  *   (e), each citing the regulation, proposed until reviewed, an open organism with the proposal to
  *   require approval), and which offering delivers data.
  * @version-history
+ *   v1.1.0 — 2026-11-01 — Finding (d) with apps whose party signup is open and that sell (plan D4.5).
  *   v1.0.0 — 2026-11-01 — Initial (plan doc-mvwxcas3dom3, D7.3, D7.4, D7.6).
  */
 import { describe, it, expect } from 'vitest';
@@ -75,6 +76,17 @@ describe('buildFindings', () => {
         expect(a.reason).toContain('listed to everyone');
         expect(a.regulation.map(r => r.ref)).toContain('recital 28');
         expect(out.find(f => f.kind === 'contract_outside_buyer')!.items[0]).toMatchObject({ buyer: 'bob' });
+    });
+    it('(d) counts the apps whose party signup is open and that sell (plan D4.5)', () => {
+        const none = buildFindings(facts({ appRegistrationSettingPresent: true })).find(f => f.kind === 'app_open_registration_commerce')!;
+        expect(none.count).toBe(0);
+        expect(none.reason).toBe('No app lets outside parties register and sell to them.');
+        const d = buildFindings(facts({ appRegistrationSettingPresent: true, appsOpenRegistration: [{ app: 'alice/market.html', owner: 'alice' }] }))
+            .find(f => f.kind === 'app_open_registration_commerce')!;
+        expect(d.count).toBe(1);
+        expect(d.items[0]).toEqual({ app: 'alice/market.html', owner: 'alice' });
+        expect(d.reason).toContain('register and sell');
+        expect(d.regulation.map(r => r.ref)).toContain('recital 28');
     });
     it('proposes approval for an open organism with data, and does not change it', () => {
         const out = buildFindings(facts({ openOrganisms: [{ id: 'org-1', name: 'Open club', packages: ['pkg:alice/club'] }] }));

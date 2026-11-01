@@ -15,6 +15,8 @@
  *   import { dataAccessDefaults } from './config-data-access.js';
  *   const config = { ...dataAccessDefaults(), ... };
  * @version-history
+ *   v1.5.0 — 2026-11-01 — partySelfRegistration (AIMEAT_PARTY_SELF_REGISTRATION: off, the default |
+ *     apps-ask | on; plan doc-mvwxcas3dom3, D4.3).
  *   v1.4.0 — 2026-11-01 — dataIntermediation (AIMEAT_DATA_INTERMEDIATION: report, the code default |
  *     none | node | owners; plan doc-mvwxcas3dom3, D7.1).
  *   v1.3.0 — 2026-11-01 — shareMaxDays (AIMEAT_SHARE_MAX_DAYS, 365) and partyReadsPerMinute
@@ -77,7 +79,23 @@ export function dataAccessDefaults() {
     // Whether this node runs a data intermediation service (EU 2022/868), and who provides it
     // (services/data-intermediation/). report, the code default, refuses nothing.
     dataIntermediation: parseDataIntermediationMode(process.env.AIMEAT_DATA_INTERMEDIATION),
+    // Whether an app's own users may register as outside parties of its owner (services/app-parties/).
+    // off, the default, refuses every signup; a node that shows its content to signed-in accounts only forces off.
+    partySelfRegistration: parsePartySelfRegistration(process.env.AIMEAT_PARTY_SELF_REGISTRATION),
   };
+}
+
+/**
+ * Whether people register to an app as its outside parties (plan doc-mvwxcas3dom3, D4.3). off: no
+ * signup. apps-ask: an app's owner asks, and the operator approves each app. on: an app's owner
+ * opens its signup.
+ */
+export type PartySelfRegistration = 'off' | 'apps-ask' | 'on';
+export const PARTY_SELF_REGISTRATION_MODES: readonly PartySelfRegistration[] = ['off', 'apps-ask', 'on'];
+
+/** An unknown value is `off`, the one that lets nobody register. */
+export function parsePartySelfRegistration(v: unknown): PartySelfRegistration {
+  return PARTY_SELF_REGISTRATION_MODES.find(m => m === v) ?? 'off';
 }
 
 /**

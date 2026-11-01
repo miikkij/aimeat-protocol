@@ -38811,6 +38811,256 @@ paths:
         '403': { description: Lifecycle moves belong to the operator (retiring your own part excepted) }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/apps/{owner}/{filename}/parties/signup:
+    post:
+      operationId: appPartySignup
+      summary: A person without an account registers to an app
+      description: |
+        Plan doc-mvwxcas3dom3, D4.2. Refused 403 PARTY_REGISTRATION_OFF unless the node's
+        AIMEAT_PARTY_SELF_REGISTRATION lets people register (and never on a node that shows its
+        content to signed-in accounts only), and 403 PARTY_REGISTRATION_CLOSED unless the app's owner
+        opened the signup (under apps-ask, and the operator approved it). 503 MAIL_NOT_CONFIGURED on a
+        node that sends no mail. A new address makes a pending person party of the app's owner,
+        `party:<owner>/ap-<hex>@<node>`, and mails a link to the app's address with
+        `?aimeat_party_link=`, good for 30 minutes and once. The answer is the same 202 for an address
+        already registered, so it says nothing about who is. Browser: AIMEAT.parties.signUp(email).
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string }, display_name: { type: string }, lang: { type: string, enum: [en, fi, es] } } }
+      responses:
+        '202': { description: '`{ sent: true, note }`' }
+        '400': { description: INVALID_INPUT }
+        '403': { description: 'PARTY_REGISTRATION_OFF or PARTY_REGISTRATION_CLOSED' }
+        '404': { description: No such app }
+        '429': { description: TOO_MANY_PARTIES }
+        '503': { description: MAIL_NOT_CONFIGURED }
+  /v1/apps/{owner}/{filename}/parties/signin:
+    post:
+      operationId: appPartySignin
+      summary: A registered person asks for a new sign-in link
+      description: The same 202 whether or not the address is registered. 403 PARTY_REGISTRATION_OFF when the node lets nobody register.
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [email], properties: { email: { type: string }, lang: { type: string } } }
+      responses:
+        '202': { description: '`{ sent: true, note }`' }
+        '403': { description: PARTY_REGISTRATION_OFF }
+        '503': { description: MAIL_NOT_CONFIGURED }
+  /v1/apps/{owner}/{filename}/parties/verify:
+    post:
+      operationId: appPartyVerify
+      summary: Open a mailed link and receive the session
+      description: |
+        Activates a pending person, puts them on the app's roster with the signup's role (no grant), and
+        answers a purpose token (`aimeat_party_…`, `typ: party`) that names this app: it opens this
+        app's party endpoints only, never a node session and never another app (lead decision L2). It
+        lasts 7 days and ends at a sign-out or a removal. A used, expired or unknown link is 401
+        LINK_INVALID. A later passkey sign-in is an extension point, not built.
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        '200': { description: '`{ token, token_type, expires_in, party, role }`' }
+        '401': { description: LINK_INVALID }
+        '403': { description: PARTY_REGISTRATION_OFF }
+  /v1/apps/{owner}/{filename}/parties/me:
+    get:
+      operationId: appPartyMe
+      summary: The signed-in person's own standing in the app
+      description: With the app party token. Every request re-reads the party; a token of another app is 401, a stopped party 403, an Origin that is neither the app's nor the node's 403 ORIGIN_MISMATCH.
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ party, role, app }`' }
+        '401': { description: 'AUTH_REQUIRED or INVALID_PARTY_CREDENTIAL' }
+        '403': { description: 'PARTY_STOPPED, PARTY_REGISTRATION_OFF or ORIGIN_MISMATCH' }
+  /v1/apps/{owner}/{filename}/parties/signout:
+    post:
+      operationId: appPartySignout
+      summary: End every session of the signed-in person in the app
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ signed_out: true }`' }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+  /v1/apps/{owner}/{filename}/parties/registration:
+    get:
+      operationId: appPartyRegistrationGet
+      summary: Whether people may register to the app now
+      tags: [Apps]
+      security: [{}]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ open, effective }`: effective is the node setting as it stands (off, apps-ask, on)' }
+    put:
+      operationId: appPartyRegistrationSet
+      summary: The owner opens or closes the app's signup
+      description: |
+        The app's owner (app:manage, or the app's own token). Under the node setting `on` it opens at
+        once; under `apps-ask` opening files a request (state `requested`) the operator approves at
+        POST /v1/admin/app-party-registrations/{owner}/{filename}; closing needs nobody. 403
+        PARTY_REGISTRATION_OFF under `off` or on a node that shows its content to signed-in accounts
+        only. `role` is the roster role a registered person gets (default member). MCP: aimeat_app_manage
+        action party_registration_set.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [open], properties: { open: { type: boolean }, role: { type: string } } }
+      responses:
+        '200': { description: '`{ registration: { node_setting, effective, state, open, role }, note? }`' }
+        '403': { description: 'FORBIDDEN (not the owner), SCOPE_DENIED or PARTY_REGISTRATION_OFF' }
+  /v1/apps/{owner}/{filename}/parties:
+    get:
+      operationId: appPartiesList
+      summary: The people without an account who registered to the app
+      description: The app's owner (app:write). Each person's e-mail address, state, role and dates, and the signup setting. MCP aimeat_app_manage action parties.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ registration, parties, total, personal_data }`' }
+        '403': { description: 'FORBIDDEN or SCOPE_DENIED' }
+  /v1/apps/{owner}/{filename}/parties/{name}:
+    delete:
+      operationId: appPartyRemove
+      summary: Remove one registered person
+      description: The app's owner (app:manage). Their token answers 401 on the next request, they leave the roster, and every collection they kept in the app is deleted. MCP aimeat_app_manage action party_remove.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ removed: true, name, uid, data_deleted }`' }
+        '404': { description: No such registered person }
+  /v1/apps/{owner}/{filename}/party-data/{key}:
+    get:
+      operationId: appPartyDataGet
+      summary: One collection the signed-in person keeps in the app
+      description: With the app party token. `shared=true` reads a collection the app shares to every person registered to it. Stored under the app owner, one record per person per collection; a person reaches only their own.
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+        - { name: shared, in: query, required: false, schema: { type: boolean } }
+      responses:
+        '200': { description: '`{ key, shared, value, version, updated_at }` (value null when nothing is kept)' }
+        '400': { description: INVALID_INPUT }
+        '401': { description: INVALID_PARTY_CREDENTIAL }
+    put:
+      operationId: appPartyDataPut
+      summary: Replace one collection of the signed-in person
+      description: '`{ value }`, any JSON of at most 64 kB; at most 20 collections per person per app.'
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { value: {} } }
+      responses:
+        '200': { description: '`{ key, stored, version, updated_at }`' }
+        '413': { description: 'TOO_LARGE or QUOTA_EXCEEDED' }
+    delete:
+      operationId: appPartyDataDelete
+      summary: Delete one collection of the signed-in person
+      tags: [Apps]
+      security: [{ PartyTokenAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: '`{ key, deleted }`' }
+  /v1/apps/{owner}/{filename}/party-data-shared/{key}:
+    put:
+      operationId: appPartyDataSharedPut
+      summary: Write a collection the app shares to every registered person
+      description: The app's owner (app:write) or the app's own token. `{ value }`; a null value deletes it.
+      tags: [Apps]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: key, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, properties: { value: {} } }
+      responses:
+        '200': { description: '`{ key, shared, stored, version }`' }
+        '403': { description: FORBIDDEN }
+  /v1/admin/app-party-registrations:
+    get:
+      operationId: adminAppPartyRegistrations
+      summary: The apps that let, or asked to let, people register without an account
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { description: '`{ setting, effective, apps: [{ owner, state, open, role, parties, ... }], total }`' }
+        '403': { description: Not the operator }
+  /v1/admin/app-party-registrations/{owner}/{filename}:
+    post:
+      operationId: adminAppPartyRegistrationDecide
+      summary: The operator approves or refuses an app's request (apps-ask)
+      tags: [Admin]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [decision], properties: { decision: { type: string, enum: [approve, refuse] }, reason: { type: string } } }
+      responses:
+        '200': { description: '`{ app, registration }`' }
+        '409': { description: 'NOT_REQUESTED or PARTY_REGISTRATION_OFF' }
   /v1/apps/{owner}/{filename}/members:
     get:
       operationId: appMembersList
@@ -38877,7 +39127,11 @@ paths:
         member's own profile language (en, fi or es). `since` survives a role change. The owner
         cannot be a member of their own app. Body:
         `{ account, role, level?, note?, offerings?, days?, expiresAt? }` or
-        `{ email, role, note?, locale?, level?, days?, expiresAt? }`. Returns
+        `{ email, role, note?, locale?, level?, days?, expiresAt? }` or
+        `{ party, role, note? }`, where `party` is an outside party of the app's owner,
+        `party:<owner>/<name>@<node>` (a person registered to the app, or a party of the owner): it
+        joins the roster with the role and no grant, because a party holds no account (plan
+        doc-mvwxcas3dom3, D4.1). Returns
         `{ member, created, access }`, where `access` reports which grants were issued, withdrawn or
         left alone - an approval that only set a role would be a sentence with nothing behind it.
         Every approval and role change writes a row to the roster's audit trail (`.../members/audit`).
