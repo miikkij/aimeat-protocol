@@ -25,6 +25,7 @@
  *   if (keyScope === 'node' && isNoCreditFailure(err)) markNodeKeySpent();
  *   if (await nodeKeySpent(config)) { … refuse with the balance notice … }
  * @version-history
+ *   v1.1.1 — 2026-11-01 — The key is nodeOpenRouterKey: none on the own-key choice (ai.region_mode own).
  *   v1.1.0 — 2026-10-31 — markNodeKeyUsed(): a call the node's key paid for drops the cached balance,
  *     so the chat status and the AI page show the same number after a turn (v28 finding 9).
  *   v1.0.0 — 2026-10-29 — Initial (UX review 2026-10-29, A1: the balance the owner bought ran out).
@@ -34,6 +35,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { readJson } from '../../utils/read-capped.js';
 import { logger } from '../../utils/logger.js';
 import { fixedBaseUrlOf } from './providers.js';
+import { nodeOpenRouterKey } from './node-openrouter-key.js';
 
 /** The key's money as OpenRouter keeps it, in US dollars. `limitUsd` null: the key has no limit. */
 export interface NodeKeyBalance { limitUsd: number | null; usageUsd: number; remainingUsd: number | null; checkedAt: string }
@@ -88,7 +90,7 @@ export async function nodeKeySpent(config: AimeatConfig): Promise<boolean> {
 
 /** The node's key's money, from OpenRouter's GET /key; null when the node has no key or the question failed. */
 export async function readNodeKeyBalance(config: AimeatConfig, opts: { fresh?: boolean } = {}): Promise<NodeKeyBalance | null> {
-  const key = (config.openrouterInstanceKey ?? '').trim();
+  const key = nodeOpenRouterKey(config);
   if (!key) return null;
   if (!opts.fresh && cached && cached.key === key && Date.now() - cached.at < BALANCE_TTL_MS) return cached.value;
   try {

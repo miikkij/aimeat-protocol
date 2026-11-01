@@ -29,6 +29,7 @@
  *   setOwnerProviderKey · deleteOwnerProviderKey · ownerKeyIds · setAgentProviderKey ·
  *   agentProviderKeys · aiProvidersView · knownProviderIds · persistHealth
  * @version-history
+ *   v1.4.1 — 2026-11-01 — free_model reads freeModelOf/freeLastResortOf: none in eu-only (ai.region_mode); openrouter_region carries the mode.
  *   v1.4.0 — 2026-10-31 — aiProvidersView carries openrouter_region: the operator's region, what the
  *     person may choose and what applies to them now (ai/openrouter-region.ts regionView).
  *   v1.3.1 — 2026-10-25 — An extension provider's view finds the owner's own extension first
@@ -62,7 +63,7 @@ import { recordAccountEvent } from '../account-events.js';
 import { readAgentKey } from '../agent-ai-keys.js';
 import { resolveModelFor, type ModelRole } from '../ai-model-defaults.js';
 import { logger } from '../../utils/logger.js';
-import { regionView } from './openrouter-region.js';
+import { freeLastResortOf, freeModelOf, regionView } from './openrouter-region.js';
 import { isValidAgentName, localAccountName } from '../../utils/gaii.js';
 import { findExtension } from '../component-address.js';
 import { isObj, isLoopbackHost, providerIdOf, PROVIDER_ID_PROBLEM } from '../ai-provider-common.js';
@@ -79,6 +80,7 @@ import { servesCapability } from './catalog/price.js';
 import { assertOwnExtensionProvider } from './extension-provider.js';
 import { aiProviderDeclarationOf } from '../extension-ai-provider-declaration.js';
 import { FIXED_BASE_URLS, isFixedType, type AiCapability } from './types.js';
+import { nodeOpenRouterKey } from './node-openrouter-key.js';
 
 export const PROVIDER_KEY_PREFIX = 'ai.apikey.provider.';
 const AGENT_KEY_PREFIX = 'ai.apikey.agent.';
@@ -502,10 +504,11 @@ export async function aiProvidersView(storage: Storage, config: AimeatConfig, ow
     // The free model as the last resort on the node's key (route-plan.ts): whether this node has a
     // key and a free model for it, the operator's default, and what applies to this account now.
     free_model: {
-      available: !!(config.openrouterInstanceKey ?? '').trim() && !!config.modelFreeFallback,
-      model: config.modelFreeFallback || null,
-      node_default: config.aiFreeModelLastResort !== false,
-      in_effect: routing.owner.rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false),
+      // In eu-only (ai.region_mode) there is none: the free router does not run in the EU.
+      available: !!nodeOpenRouterKey(config) && !!freeModelOf(config),
+      model: freeModelOf(config) || null,
+      node_default: freeLastResortOf(config),
+      in_effect: !!freeModelOf(config) && (routing.owner.rules.freeModelLastResort ?? freeLastResortOf(config)),
     },
     // Where OpenRouter calls are processed: eu, us or any (ai/openrouter-region.ts).
     openrouter_region: regionView(config, routing.owner.rules),

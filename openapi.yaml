@@ -20384,7 +20384,7 @@ paths:
         - BearerAuth: []
       responses:
         '200':
-          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }, data.openrouter_region { hosts, node_key, node { region, fallback, allowed, person_may_choose }, in_effect { node_key, own_key }, note }.
+          description: data.providers, data.routing { defaults, rules, agent_defaults? }, data.limits, data.free_model { available, model, node_default, in_effect }, data.openrouter_region { hosts, node_key, mode { id, limits } | null, node { region, fallback, allowed, person_may_choose }, in_effect { node_key, own_key }, note }. mode is the AI region choice made when the node was bought (ai.region_mode eu, eu-only or own); while one is set, node follows it.
           content:
             application/json:
               schema:
@@ -20589,7 +20589,9 @@ paths:
             processed (eu.openrouter.ai, us.openrouter.ai or openrouter.ai), the operator's choice
             (ai.openrouter_region, ai.openrouter_region_fallback, ai.openrouter_regions,
             ai.openrouter_region_person_choice) and what applies to this account now, on the node's
-            key and on its own OpenRouter key.
+            key and on its own OpenRouter key. Its `mode` is the AI region choice made when the node
+            was bought (ai.region_mode: eu, eu-only or own, with `limits`), null when none was made;
+            while one is set the four settings follow it.
           content:
             application/json:
               schema:
@@ -22914,8 +22916,14 @@ paths:
         that this node does not watermark text - it does not sample the tokens, and that layer
         belongs to whoever runs the model.
 
-        Response `data`: `{ node_id, operator, supervisory_authority, marking, detection, labelling,
-        code_of_practice, posture }`.
+        Response `data`: `{ node_id, operator, supervisory_authority, ai_processing_region, marking,
+        detection, labelling, code_of_practice, posture }`.
+
+        `ai_processing_region` is where the node's own AI key has prompts processed: `{ mode,
+        mode_limits?, node_key, region?, host?, fallback?, regions_in_use?, note }`. `mode` is the AI
+        region choice made when the node was bought (`ai.region_mode`: `eu`, `eu-only`, `own`, or null
+        when none was made) and `mode_limits` what it switches off; the region fields appear when the
+        node holds its own key.
 
         `code_of_practice` reports the EU Code of Practice on Transparency of AI-generated Content
         signature of THIS node's operator, from `AIMEAT_AI_COP_SECTIONS` / `_SIGNED_ON` - the

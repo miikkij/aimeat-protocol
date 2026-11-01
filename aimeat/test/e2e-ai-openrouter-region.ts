@@ -18,7 +18,11 @@
  *   - R7 the provider list states the node's region, the person's choice and what applies now;
  *   - R8 the privacy page states the region, the fallback and the choice, in English and Finnish;
  *   - R9 a person who does not run the node is refused (403) when they try to change the node's
- *     region, and another person's choice does not reach them.
+ *     region, and another person's choice does not reach them;
+ *   - R10 a chat call with tools passes over an EU endpoint listed without tool calling;
+ *   - R11 the buyer's choice eu-only (ai.region_mode), set by the operator and by nobody else, moves the
+ *     chat to the EU model in the EU, refuses a named model the EU lacks, and the provider list, the
+ *     privacy page and the transparency statement say so.
  *
  *   NOTHING INSIDE THE NODE IS MOCKED. The provider is test/helpers/fake-ai-provider.ts on loopback;
  *   the node's three OpenRouter addresses point at it (AIMEAT_AI_FIXED_BASEURL_OVERRIDES with
@@ -26,6 +30,7 @@
  * @usage
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-openrouter-region
  * @version-history
+ *   v1.1.0 -- 2026-11-01 -- R10, R11: tool calling in the region's list, and the buyer's choice eu-only (Jouni, 2026-11-01).
  *   v1.0.0 -- 2026-10-31 -- Initial (Jouni, 2026-10-31).
  */
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -47,6 +52,10 @@ const EU_MODEL = 'mistralai/mistral-large-4-0';
 const US_MODEL = 'deepseek/deepseek-v4-pro-0813';
 const BOTH_MODEL = 'openai/gpt-oss-120b';
 const NOWHERE_MODEL = 'openai/whisper-large-v3-turbo';
+/** services/ai/openrouter-region.ts EU_ONLY_TEXT_MODEL. */
+const EU_ONLY_TEXT_MODEL = 'mistralai/mistral-small-2603';
+/** The first owner runs the node (the operator); set by owner(). */
+let operatorToken = '';
 
 let passed = 0, failed = 0;
 async function test(name: string, fn: () => Promise<void>) {
@@ -113,8 +122,19 @@ async function owner(label: string): Promise<string> {
   assert(reg.status === 201, `ghii ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
   const tok = await ownerSignIn(BASE, name, 'Region12345678');
   assert(tok.status === 200, `auth/token ${tok.status}`);
+  operatorToken ||= tok.body.data.token as string;
   return tok.body.data.token as string;
 }
+
+/** A chat call on the node route, as the node's own chat makes it: tools sent, no model named. */
+const chatWithTools = (t: string, marker: string) => json('/v1/llm/chat/completions', {
+  method: 'POST', headers: auth(t),
+  body: JSON.stringify({ messages: [{ role: 'user', content: `${marker} hello` }], max_tokens: 16,
+    tools: [{ type: 'function', function: { name: 'noop', description: 'Does nothing.', parameters: { type: 'object', properties: {} } } }] }),
+});
+/** The model each chat request carrying this marker asked the provider for. */
+const modelsAsked = (stub: FakeAiProvider, marker: string) =>
+  stub.requestsFor('chat').filter(marked(marker)).map(r => (JSON.parse(r.body) as { model?: string }).model);
 
 const complete = (t: string, body: Record<string, unknown>) =>
   json('/v1/ai/complete', { method: 'POST', headers: auth(t), body: JSON.stringify({ max_tokens: 16, ...body }) });
@@ -129,9 +149,11 @@ const arrivals = (stub: FakeAiProvider, marker: string) =>
   console.log('\n── Where an OpenRouter call is processed: eu, us or any (Jouni, 2026-10-31) ──');
   const stub = await startFakeAiProvider(0);
   // Each region's model list, as OpenRouter answers GET <region>/models.
+  // The EU lists BOTH_MODEL without tool calling, as eu.openrouter.ai listed openai/gpt-oss-120b on
+  // 2026-11-01; the EU-only stand-in has it.
   stub.setDefault('models', (req: RecordedRequest) => req.pathname.includes('/eu/')
-    ? modelsJson([{ id: EU_MODEL }, { id: BOTH_MODEL }])
-    : req.pathname.includes('/us/') ? modelsJson([{ id: US_MODEL }, { id: BOTH_MODEL }]) : modelsJson([]));
+    ? modelsJson([{ id: EU_MODEL }, { id: BOTH_MODEL, supported_parameters: ['temperature'] }, { id: EU_ONLY_TEXT_MODEL, supported_parameters: ['tools'] }])
+    : req.pathname.includes('/us/') ? modelsJson([{ id: US_MODEL }, { id: BOTH_MODEL, supported_parameters: ['tools'] }]) : modelsJson([]));
   const server = await startServer(stub);
   try {
     await test('R1. a model the EU offers is processed at the EU address, and the answer says eu', async () => {
@@ -218,6 +240,49 @@ const arrivals = (stub: FakeAiProvider, marker: string) =>
       assert(en.includes('Standard Contractual Clauses') && !en.includes('{{aiRegionNotice}}'), 'English: the transfer basis, and no placeholder left');
       const fi = await fetch(`${BASE}/v1/privacy/fi`).then(r => r.text());
       assert(fi.includes('osoitteessa eu.openrouter.ai') && fi.includes('Voit valita alueen'), 'Finnish: region and choice');
+    });
+
+    await test('R10. a chat call with tools passes over an EU endpoint without tool calling and runs in the US, recorded', async () => {
+      // The source was broken: the region list held ids only, so the call went to the EU endpoint,
+      // which has no tool calling for this model (crew36, openai/gpt-oss-120b, 2026-11-01).
+      const t = await owner('r10');
+      stub.queue('chat', chatJson('from the us', { model: BOTH_MODEL }), marked('R10TOOLS'));
+      const r = await chatWithTools(t, 'R10TOOLS');
+      assert(r.status === 200, `${r.status} ${JSON.stringify(r.body?.error ?? r.body)}`);
+      assert(JSON.stringify(arrivals(stub, 'R10TOOLS')) === '["us"]', `arrived at ${JSON.stringify(arrivals(stub, 'R10TOOLS'))}`);
+    });
+
+    await test('R11. the operator sets the buyer\'s choice eu-only, and the node follows it everywhere; nobody else may set it', async () => {
+      const other = await owner('r11');
+      const refused = await json('/v1/admin/config', { method: 'PUT', headers: auth(other), body: JSON.stringify({ changes: [{ path: 'ai.region_mode', value: 'any' }] }) });
+      assert(refused.status === 403, `a non-operator setting ai.region_mode: ${refused.status} ${JSON.stringify(refused.body?.error)}`);
+      const set = await json('/v1/admin/config', { method: 'PUT', headers: auth(operatorToken), body: JSON.stringify({ changes: [{ path: 'ai.region_mode', value: 'eu-only' }] }) });
+      assert(set.status === 200 && set.body.data?.applied?.[0]?.new_value === 'eu-only', `operator: ${set.status} ${JSON.stringify(set.body?.error ?? set.body?.data)}`);
+      try {
+        // What the person reads: the choice, the region in effect, no free model.
+        const view = (await json('/v1/ai/providers', { headers: auth(other) })).body.data;
+        assert(view?.openrouter_region?.mode?.id === 'eu-only' && /speech-to-text/.test(view.openrouter_region.mode.limits ?? ''), `mode: ${JSON.stringify(view?.openrouter_region?.mode)}`);
+        assert(view.openrouter_region.node?.fallback === 'off' && JSON.stringify(view.openrouter_region.node.allowed) === '["eu"]', `node: ${JSON.stringify(view.openrouter_region.node)}`);
+        assert(view.free_model?.available === false, `free model: ${JSON.stringify(view.free_model)}`);
+        // The chat's call with tools stays in the EU, on the EU model, though the person asked for the US.
+        await setRules(other, { openrouterRegion: 'us', openrouterRegionFallback: 'any' });
+        stub.queue('chat', chatJson('from the eu', { model: EU_ONLY_TEXT_MODEL }), marked('R11CHAT'));
+        const chat = await chatWithTools(other, 'R11CHAT');
+        assert(chat.status === 200, `chat: ${chat.status} ${JSON.stringify(chat.body?.error ?? chat.body)}`);
+        assert(JSON.stringify(arrivals(stub, 'R11CHAT')) === '["eu"]', `arrived at ${JSON.stringify(arrivals(stub, 'R11CHAT'))}`);
+        assert(JSON.stringify(modelsAsked(stub, 'R11CHAT')) === JSON.stringify([EU_ONLY_TEXT_MODEL]), `model: ${JSON.stringify(modelsAsked(stub, 'R11CHAT'))}`);
+        // A model the caller names that the EU lacks is refused with the reason, and nothing is sent.
+        const named = await complete(other, { prompt: 'R11US hello', model: US_MODEL });
+        assert(named.status === 400 && named.body.error?.code === 'AI_MODEL_NOT_IN_REGION' && /EU only/.test(named.body.error.message), `named: ${named.status} ${JSON.stringify(named.body?.error)}`);
+        assert(arrivals(stub, 'R11US').length === 0, `sent to ${JSON.stringify(arrivals(stub, 'R11US'))}`);
+        // The privacy page and the transparency statement say the same.
+        const privacy = await fetch(`${BASE}/v1/privacy`).then(r => r.text());
+        assert(privacy.includes('use AI in the EU only') && privacy.includes('is refused'), 'privacy: EU only and no fallback');
+        const tr = (await json('/v1/ai-transparency')).body.data?.ai_processing_region;
+        assert(tr?.mode === 'eu-only' && tr.fallback === 'off' && JSON.stringify(tr.regions_in_use?.map((x: { region: string }) => x.region)) === '["eu"]', `transparency: ${JSON.stringify(tr)}`);
+      } finally {
+        await json('/v1/admin/config', { method: 'PUT', headers: auth(operatorToken), body: JSON.stringify({ changes: [{ path: 'ai.region_mode', value: '' }] }) });
+      }
     });
   } finally {
     await stopServer(server);

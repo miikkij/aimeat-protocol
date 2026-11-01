@@ -28,6 +28,7 @@
  *   const standing = await nodeKeyStanding(storage, config, gaii);
  *   if (!standing.mayPay) { … the free model for a call that named none, or refuse with standing.message … }
  * @version-history
+ *   v1.5.2 — 2026-11-01 — The node's key is nodeOpenRouterKey: on the own-key choice (ai.region_mode own) no shared key pays.
  *   v1.5.1 — 2026-10-31 — debitAllowance drops the cached balance of the node's key
  *     (markNodeKeyUsed), so a page after the call shows what the call left (v28 finding 9).
  *   v1.5.0 — 2026-10-29 — nodeKeyStanding asks first whether the node's key itself has money left
@@ -59,6 +60,7 @@ import { DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { readSystem, updateSystem } from './classification/system-record.js';
 import { nodeKeySpent, markNodeKeyUsed } from './ai/node-key-balance.js';
 import { logger } from '../utils/logger.js';
+import { nodeOpenRouterKey } from './ai/node-openrouter-key.js';
 
 /**
  * One person's standing on the node's key. Lives under the reserved `ai-usage.` prefix, so an
@@ -282,7 +284,7 @@ export async function resolveAiKey(
     };
   }
 
-  const instanceKey = (config.openrouterInstanceKey || '').trim();
+  const instanceKey = nodeOpenRouterKey(config);
   if (instanceKey && provider === 'openrouter' && opts.nodeKey !== false) {
     // The node's key goes to OpenRouter's own host and nowhere else. The address comes from the
     // person's saved settings, and a person with no key of their own saved an address they
