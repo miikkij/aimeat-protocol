@@ -33,6 +33,9 @@
  * @structure startMcpOAuth · finishMcpOAuth · refreshMcpOAuth · McpOAuthProvider
  * @usage const r = await startMcpOAuth({ storage, config, server, ownerGhii });
  * @version-history
+ *   2026-11-01 — A finished round writes the row's auth mode as 'oauth' with the token. A row attached
+ *     to sign in afterwards was stored as `none`, so the token was kept and never sent, and every
+ *     call to aimeat.io answered 401 (aimeat-commercial-1c, test lane).
  *   2026-10-31 — The round stores which cookie carries its binding (`bindCookie`), and finishMcpOAuth
  *     reads the `__Host-` cookie for a round bound over https (roundBindingHeld) (secaudit2026oct31w2
  *     round 10, W2-19).
@@ -453,7 +456,9 @@ async function sealAndStore(
     ? new Date(Date.now() + tokens.expires_in * 1000).toISOString()
     : null;
 
-  await storage.updateMcpServerCredential(server.id, sealMcpCredential(credential, key), expiresAt);
+  // 'oauth' with it: a row attached to sign in afterwards, or one stored before 2026-11-01 as
+  // `none`, would otherwise hold the token and never send it (invoke.ts resolveCredential).
+  await storage.updateMcpServerCredential(server.id, sealMcpCredential(credential, key), expiresAt, 'oauth');
   // The pooled client is holding the OLD credential in its headers. Without this the next call
   // still presents the token the far side just replaced.
   await mcpClientPool.invalidate(server.id);

@@ -33,6 +33,8 @@
  *     test/run-e2e-ci.ts --test=mcp-proxy
  *
  * @version-history
+ *   2026-11-01 — The OAuth far side serves an MCP endpoint that answers only the token it issued, and
+ *     the confirmed sign-in lists its tools: a row attached as `none` kept the token and never sent it.
  *   2026-10-31 — Over https a sign-in round's cookie is one a same-site page cannot write: the binding
  *     value under the plain name seals nothing, at the owner's start and at the confirmation of an
  *     agent's round, and the owner's own browser finishes both (secaudit2026oct31w2 round 10, W2-19).
@@ -424,8 +426,30 @@ const oauthUpstream = http.createServer(async (req, res) => {
   if (url.pathname === '/token' && req.method === 'POST') {
     return send({ access_token: 'e2e-oauth-token', token_type: 'Bearer', expires_in: 3600 });
   }
+  // The MCP endpoint answers only the token the round issued, as a server behind OAuth does, so a
+  // node that keeps the token and sends none is refused here (aimeat-commercial-1c, 2026-11-01).
+  if (url.pathname === '/mcp') {
+    if (req.headers.authorization !== 'Bearer e2e-oauth-token') {
+      res.writeHead(401, { 'WWW-Authenticate': `Bearer resource_metadata="${OAUTH_BASE}/.well-known/oauth-protected-resource"` });
+      return res.end();
+    }
+    const sid = req.headers['mcp-session-id'] as string | undefined;
+    let transport = sid ? oauthTransports.get(sid) : undefined;
+    if (!transport) {
+      const srv = new McpServer({ name: 'e2e-oauth-upstream', version: '1.0.0' });
+      srv.registerTool('whoami', { description: 'Says the caller signed in.', inputSchema: z.object({}), annotations: { readOnlyHint: true } }, async () => ({ content: [{ type: 'text', text: 'signed-in' }] }));
+      const created = new NodeStreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+        onsessioninitialized: (id: string) => oauthTransports.set(id, created),
+      });
+      transport = created;
+      await srv.connect(created);
+    }
+    return transport.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
+  }
   return send({ error: 'not_found' }, 404);
 });
+const oauthTransports = new Map<string, NodeStreamableHTTPServerTransport>();
 
 // ─── State ───
 const ownerName = `mcpproxy${Date.now()}`;
@@ -758,10 +782,14 @@ await test('an agent\'s sign-in waits for the owner to confirm it in their own b
   // The agent named no page to come back to, so the owner's browser lands on the one that says so.
   assert(ok.status === 302 && ok.headers.get('location') === '/connection-done.html',
     `the confirmed sign-in did not finish: ${ok.status} → ${ok.headers.get('location')}`);
-  // The far side here has no tools to list, so the status says unreachable; the sealed credential
-  // is what proves the sign-in landed.
   const signedIn = await storedServer(attached.body.data.server.id);
   assert(!!signedIn.credential && !JSON.stringify(signedIn).includes('e2e-oauth-token'), 'the confirmed sign-in sealed no credential');
+  // The token is SENT, not only kept: the row was attached as `none` and stayed so after the round
+  // until 2026-11-01, and every call then went out without it and answered 401.
+  assert(signedIn.auth === 'oauth', `the signed-in row says auth ${signedIn.auth}`);
+  const tools = await json('/v1/mcp-servers/agentround/tools?refresh=1', { headers: ownerAuth() });
+  assert(tools.status === 200 && JSON.stringify(tools.body.data.tools).includes('whoami'),
+    `a call after the sign-in: ${tools.status} ${JSON.stringify(tools.body)}`);
 
   const removed = await json('/v1/mcp-servers/agentround', { method: 'DELETE', headers: ownerAuth() });
   assert(removed.status === 200, `clean up: ${removed.status}`);
