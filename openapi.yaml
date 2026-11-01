@@ -24499,12 +24499,20 @@ paths:
           application/json:
             schema:
               type: object
-              required: [what, forWhom, use, readyWhen]
+              description: The four fields are needed, flat or under `spec` (a flat one wins); a missing one is refused by name.
               properties:
                 what: { type: string, maxLength: 2048, description: What to build. }
                 forWhom: { type: string, maxLength: 2048, description: Who it is for. }
                 use: { type: string, maxLength: 2048, description: What it is used for. }
                 readyWhen: { type: string, maxLength: 2048, description: When it is ready, as a sentence the person can check. }
+                spec:
+                  type: object
+                  description: The same four fields as one object, the shape GET's `send` shows.
+                  properties:
+                    what: { type: string, maxLength: 2048 }
+                    forWhom: { type: string, maxLength: 2048 }
+                    use: { type: string, maxLength: 2048 }
+                    readyWhen: { type: string, maxLength: 2048 }
                 lang: { type: string, enum: [en, fi, es], description: The builders' language; the person's own when omitted. }
                 email: { type: string, description: Where the builders write; the notification address when omitted. }
       responses:

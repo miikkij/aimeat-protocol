@@ -201,10 +201,13 @@ export async function readOp(deps: Deps, caller: CallerContext) {
 
 // ── Sending the request ──────────────────────────────────────────────────────────────────────────
 
+/** The four fields, flat or under `spec` (the shape the status's `send` shows); a flat field wins. */
 function specOf(body: Record<string, unknown>): Spec {
+  const nested = body.spec && typeof body.spec === 'object' && !Array.isArray(body.spec) ? body.spec as Record<string, unknown> : {};
   const spec = {} as Spec;
   for (const f of SPEC_FIELDS) {
-    const v = typeof body[f] === 'string' ? (body[f] as string).trim() : '';
+    const raw = typeof body[f] === 'string' && (body[f] as string).trim() ? body[f] : nested[f];
+    const v = typeof raw === 'string' ? raw.trim() : '';
     if (!v) throw new BuildError(400, 'VALIDATION_ERROR', `${f} is required: ${f === 'what' ? 'what to build' : f === 'forWhom' ? 'who it is for' : f === 'use' ? 'what it is used for' : 'when it is ready, in a sentence'}.`);
     if (v.length > FIELD_MAX) throw new BuildError(400, 'VALIDATION_ERROR', `${f} is at most ${FIELD_MAX} characters.`);
     spec[f] = v;
@@ -218,6 +221,17 @@ function specOf(body: Record<string, unknown>): Spec {
  * without one it is stored for the operator to take to the queue.
  */
 export async function submitOp(deps: Deps, caller: CallerContext, body: Record<string, unknown>) {
+  try {
+    return await submit(deps, caller, body);
+  } catch (err) {
+    // A refusal is the answer the caller gets, and the log is where the person running the place sees
+    // why an AI's send did not go (the test lane's chat failed with nothing in the log).
+    if (err instanceof BuildError) logger.warn(`[build-with-you] the build request was refused for ${caller.principal}: ${err.code}: ${err.message}`);
+    throw err;
+  }
+}
+
+async function submit(deps: Deps, caller: CallerContext, body: Record<string, unknown>) {
   access(caller, 'write');
   const spec = specOf(body);
   if (!queueBase(deps.config)) throw new BuildError(409, 'BUILD_WITH_YOU_OFF', 'This node has no build queue, so a build request cannot be sent from here.');
