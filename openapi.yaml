@@ -26145,7 +26145,11 @@ paths:
         (`stats: { activeContracts, totalContracts, totalCalls, totalSettledUnits, consumers, listedAt, lastUsedAt }`)
         into each listing. Cheapest base price first. Returns `{ offerings, count }`. Every offering
         carries `toll_morsels`, its pacing per call. An offering stored with `unit: 'morsels'` is free,
-        and until release 4.0.0 it keeps `unit` and `basePrice` as deprecated mirrors.
+        and until release 4.0.0 it keeps `unit` and `basePrice` as deprecated mirrors. A `datapackage`
+        offering carries `freshness: { state, reason, reason_code, due_at, stale_at, last_success_at,
+        limited_by? } | null`: the package's state against its producer's schedule (`fresh`, `late`,
+        `stale` or `unscheduled`), read on the version the node recorded. It is updated when the package
+        changes and when the hourly freshness check sees the state change.
       tags: [Commerce]
       parameters:
         - { name: ext, in: query, schema: { type: string } }
@@ -26256,7 +26260,9 @@ paths:
         `pacing.source` is `capability` when the
         provider declared it (`tollMorsels` on the tool/action/offer) and `node` when the node default
         applies. `odps` points at the same listing
-        rendered as an Open Data Product Specification v4.1 document.
+        rendered as an Open Data Product Specification v4.1 document. A `datapackage` offering carries
+        `offering.freshness` (`state` fresh, late, stale or unscheduled, `reason`, `reason_code`,
+        `due_at`, `stale_at`, `last_success_at`), as the browse answer states it.
       tags: [Commerce]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:

@@ -19,6 +19,7 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   2026-11-01 — A datapackage offering carries its `freshness` (plan D6).
  *   2026-11-01 — A fourth kind, `datapackage` (a data package sold as a metered feed, priced from its
  *     listing by resolveDatapackagePricing), and `deliversData` on every offering (plan D5.1, D5.5).
  *   2026-10-27 — Offerings, needs and bids are read only from the namespace of the party they name
@@ -67,6 +68,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { createEntitlement, readContractForCall, listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
+import type { FreshnessBrief } from './datapackage/freshness.js';
 import { readCallTiming } from './call-timing.js';
 import { resolvePacingToll } from './metered-settlement.js';
 import { legacyMorselFieldsLive, MORSEL_PRICE_DEPRECATION } from '../config-pacing.js';
@@ -132,6 +134,13 @@ export interface Offering {
    * The data intermediation setting and its findings read it. Absent on a listing made before it existed.
    */
   deliversData?: boolean;
+  /**
+   * A datapackage listing's freshness against its producer's promise (plan doc-mvwxcas3dom3, D6): the
+   * state (fresh, late, stale, unscheduled), why, and both deadlines, read on the version the service
+   * recorded. The projection writes it, and again when the freshness check sees the state change.
+   * Absent on other kinds and on a listing projected before it existed.
+   */
+  freshness?: FreshnessBrief | null;
   title: string;
   description: string;
   unit: EntitlementUnit;
