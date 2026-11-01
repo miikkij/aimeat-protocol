@@ -748,6 +748,8 @@ await test('a sign-in callback from a browser that did not start it is refused a
   assert(removed.status === 200, `clean up: ${removed.status}`);
 });
 
+/** The agent sign-in's server, kept for the test after it. */
+let agentRoundId = '';
 await test('an agent\'s sign-in waits for the owner to confirm it in their own browser', async () => {
   const attached = await json('/v1/mcp-servers', {
     method: 'POST', headers: ownerAuth(),
@@ -784,8 +786,15 @@ await test('an agent\'s sign-in waits for the owner to confirm it in their own b
     `the confirmed sign-in did not finish: ${ok.status} → ${ok.headers.get('location')}`);
   const signedIn = await storedServer(attached.body.data.server.id);
   assert(!!signedIn.credential && !JSON.stringify(signedIn).includes('e2e-oauth-token'), 'the confirmed sign-in sealed no credential');
-  // The token is SENT, not only kept: the row was attached as `none` and stayed so after the round
-  // until 2026-11-01, and every call then went out without it and answered 401.
+  agentRoundId = attached.body.data.server.id;
+});
+
+// The token is SENT, not only kept: a row attached to sign in afterwards was stored as `none` and
+// stayed so after the round until 2026-11-01, and every call then went out without it and answered
+// 401 (aimeat-commercial-1c, test lane). The far side answers only the token it issued.
+await test('a confirmed sign-in sends its token: the server\'s tools list after it', async () => {
+  assert(!!agentRoundId, 'the sign-in above did not finish');
+  const signedIn = await storedServer(agentRoundId);
   assert(signedIn.auth === 'oauth', `the signed-in row says auth ${signedIn.auth}`);
   const tools = await json('/v1/mcp-servers/agentround/tools?refresh=1', { headers: ownerAuth() });
   assert(tools.status === 200 && JSON.stringify(tools.body.data.tools).includes('whoami'),

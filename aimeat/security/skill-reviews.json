@@ -387,7 +387,7 @@
       "note": "aimeat/src/mcp/organisms.ts because the skill says leaving through aimeat_organism_leave leaves the agents and roles behind; re-read when that changes."
     },
     "node:aimeat-mcp-servers": {
-      "reviewedOn": "2026-10-27",
+      "reviewedOn": "2026-11-01",
       "watches": [
         "aimeat/src/tool-catalog/definitions/mcp-proxy.ts",
         "aimeat/src/services/mcp-client/grants.ts",
@@ -395,7 +395,7 @@
         "aimeat/src/services/mcp-client/invoke.ts",
         "aimeat/src/mcp/mcp-proxy.ts"
       ],
-      "digest": "sha256:945b6e6f6a658a1fc0cdf4df"
+      "digest": "sha256:fdaa6bd5ac02571584d225d0"
     },
     "node:aimeat-workflow-decisions": {
       "reviewedOn": "2026-10-27",
@@ -777,7 +777,7 @@
     "node:aimeat-mcp-servers": {
       "aimeat/src/tool-catalog/definitions/mcp-proxy.ts": "095fdb4fbeb06409",
       "aimeat/src/services/mcp-client/grants.ts": "1652c22f0c53e827",
-      "aimeat/src/services/mcp-client/registry.ts": "804ea44a9115d001",
+      "aimeat/src/services/mcp-client/registry.ts": "518aaf36f74a6637",
       "aimeat/src/services/mcp-client/invoke.ts": "2c19276ca1c8fdd1",
       "aimeat/src/mcp/mcp-proxy.ts": "9b3ef4f1de84a597"
     },
