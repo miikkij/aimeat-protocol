@@ -16379,7 +16379,8 @@
         "sentMessage": "lähetti viestin",
         "readData": "luki tietoja",
         "openedPage": "avasi sivun",
-        "madeChange": "teki muutoksen"
+        "madeChange": "teki muutoksen",
+        "keptWork": "otti talteen valmiin työn"
       }
     },
     "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",
