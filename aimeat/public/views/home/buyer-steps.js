@@ -58,7 +58,7 @@ export function BuyerSteps({ journey }) {
           // A step after the next one is not pressed yet: no link and no arrow, and it says when it
           // opens (Jouni's review of v34: steps 3 and 4 looked like links).
           ? html`
-            <${IndexStep} key=${s.id} line=${t('buyerSteps.locked')}>
+            <${IndexStep} key=${s.id} locked line=${t('buyerSteps.locked')}>
               <${Note} kind="quiet" inline>${t('buyerSteps.' + s.id)}<//>
             <//>`
           : html`
