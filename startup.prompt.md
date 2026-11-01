@@ -128,6 +128,21 @@ is `AIMEAT_ENCRYPTION_KEY`, or `AIMEAT_TOTP_ENCRYPTION_KEY` when the first is no
 with the key file `~/.aimeat/nodes/<node id>/node-key.json`: the database alone does not restore
 the node's identity, and a changed data key makes every stored secret unreadable.
 
+**Where the node's AI runs is one choice; ask the person, do not pick for them.** It matters only
+when the node gets a shared OpenRouter key (`AIMEAT_OPENROUTER_INSTANCE_KEY`). Set
+`AIMEAT_AI_REGION_MODE` to their answer and tell them its limits in their words:
+
+- `eu`: the EU first. A model the EU does not offer runs in the United States or elsewhere, and
+  each answer records where.
+- `eu-only`: nothing leaves the EU. Speech-to-text, read-aloud, image generation, embeddings and
+  the free models are off, because the EU region offers none of them.
+- `own`: no shared key. Each person adds their own OpenRouter key on the AI settings page and
+  answers for it under their own agreement with OpenRouter.
+
+Left empty, the four `AIMEAT_AI_OPENROUTER_REGION*` settings decide (default: any country). The
+privacy page, the records of processing and `/v1/ai-transparency` follow the choice, and the
+operator can change it later on the Config tab (`ai.region_mode`).
+
 > Opening the node to the public later? The operator fields (`AIMEAT_OPERATOR_*` in `.env.example`,
 > also on the admin Config page) are required for the privacy and terms pages; until they are set,
 > `/v1/privacy` answers 503 and names the missing fields. Skip this for a local node.

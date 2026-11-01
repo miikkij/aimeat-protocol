@@ -11,6 +11,7 @@
  * @structure AiCapabilityConfig — extended by AimeatConfig in config-types.ts
  * @usage config.modelDefaultChat, config.openrouterInstanceKey, … (unchanged; the split is invisible)
  * @version-history
+ *   2026-11-01 — aiRegionMode: the buyer's AI region choice (Jouni, 2026-11-01).
  *   2026-10-31 — aiOpenrouterRegion, aiOpenrouterRegionFallback, aiOpenrouterRegions,
  *     aiOpenrouterRegionPersonChoice: where the node's OpenRouter calls are processed (Jouni, 2026-10-31).
  *   2026-10-25 — aiFreeModelLastResort (secaudit2026oct22 follow-up, the developer's ruling on the free model).
@@ -130,6 +131,12 @@ export interface AiCapabilityConfig extends DecideConfig {
   aiOpenrouterRegions: string;
   /** Whether a person may choose their own region and fallback for the node's key in their routing rules. AIMEAT_AI_OPENROUTER_REGION_PERSON_CHOICE, default true. */
   aiOpenrouterRegionPersonChoice: boolean;
+  /**
+   * The buyer's AI region choice (services/ai/openrouter-region.ts RegionMode): eu, eu-only or own.
+   * While set it decides the four settings above, the free model and what eu-only switches off.
+   * AIMEAT_AI_REGION_MODE, default '' (no mode: the four settings decide).
+   */
+  aiRegionMode: string;
   /**
    * Instance-level model defaults, one per role. Read only when the OWNER has not chosen a model of
    * their own: owner setting, then this, then a refusal that names what to set. Empty (the default)

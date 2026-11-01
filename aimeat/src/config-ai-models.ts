@@ -15,6 +15,7 @@
  *   import { aiModelDefaults } from './config-ai-models.js';
  *   const config = { ...aiModelDefaults(), ... };
  * @version-history
+ *   2026-11-01 — The buyer's AI region choice (AIMEAT_AI_REGION_MODE: eu, eu-only, own; Jouni, 2026-11-01).
  *   2026-10-31 — The OpenRouter region (AIMEAT_AI_OPENROUTER_REGION, _REGION_FALLBACK, _REGIONS,
  *     _REGION_PERSON_CHOICE; Jouni, 2026-10-31).
  *   2026-10-25 — aiFreeModelLastResort (AIMEAT_AI_FREE_MODEL_LAST_RESORT, default true; secaudit2026oct22
@@ -58,7 +59,7 @@ export function aiLegacySettingsRoutesAllowed(
 type AiModelSettings = Pick<AiCapabilityConfig,
   'openrouterInstanceKey' | 'chatFreeAllowanceUsd' | 'modelFreeFallback' | 'aiFreeModelLastResort'
   | 'aiOpenrouterRegion' | 'aiOpenrouterRegionFallback' | 'aiOpenrouterRegions' | 'aiOpenrouterRegionPersonChoice'
-  | 'aiNodeKeyWhenSpent' | 'aiNodeKeyAccountDailyUsd' | 'aiNodeKeyNodeDailyUsd' | 'aiNodeKeyMaxOutputTokens'
+  | 'aiRegionMode' | 'aiNodeKeyWhenSpent' | 'aiNodeKeyAccountDailyUsd' | 'aiNodeKeyNodeDailyUsd' | 'aiNodeKeyMaxOutputTokens'
   | 'modelDefaultChat' | 'modelDefaultReasoning' | 'modelDefaultExecution'
   | 'modelDefaultVision' | 'modelDefaultStt' | 'modelDefaultImage' | 'sttLanguageDefault'
   | 'modelDefaultTts' | 'modelDefaultEmbed' | 'ttsVoiceDefault'
@@ -85,6 +86,7 @@ export function aiModelDefaults(): AiModelSettings {
       ? process.env.AIMEAT_AI_OPENROUTER_REGION_FALLBACK : 'us',
     aiOpenrouterRegions: process.env.AIMEAT_AI_OPENROUTER_REGIONS ?? 'eu,us,any',
     aiOpenrouterRegionPersonChoice: process.env.AIMEAT_AI_OPENROUTER_REGION_PERSON_CHOICE !== 'false',
+    aiRegionMode: ['eu', 'eu-only', 'own'].includes(process.env.AIMEAT_AI_REGION_MODE ?? '') ? process.env.AIMEAT_AI_REGION_MODE! : '',
     aiNodeKeyWhenSpent: process.env.AIMEAT_AI_NODE_KEY_WHEN_SPENT === 'limits' ? 'limits' : 'refuse',
     aiNodeKeyAccountDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_ACCOUNT_DAILY_USD, 1),
     aiNodeKeyNodeDailyUsd: nonNegative(process.env.AIMEAT_AI_NODE_KEY_NODE_DAILY_USD, 10),

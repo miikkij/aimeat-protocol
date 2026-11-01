@@ -21,6 +21,7 @@
  *   import { completeForOwner, AiCompletionError } from './completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v3.16.0 -- 2026-11-01 -- `requires.tools` reaches the route plan, so a region whose endpoint has no tool calling is passed over (ai.region_mode).
  *   v3.15.1 -- 2026-10-27 -- prepareAiCall tells the owner once when a bare allowlist entry lets another author's app in (ai/app-name-notice.ts; secaudit2026oct26).
  *   v3.15.0 -- 2026-10-27 -- completeForOwner records and debits the text attempts that answered nothing, and prices a node-key
  *     call by its pictures and files too (estimate.inputTokens); AiCallOutcome and AiCallSettlement moved to ai/call-outcome.ts (secaudit2026oct26).
@@ -341,7 +342,8 @@ export interface PrepareAiCallOptions {
   /** The call's own word on moving to the next provider; the owner's rules decide when it says nothing. */
   fallback?: boolean;
   /** Only a provider on this machine. */
-  requires?: { local?: boolean };
+  /** `tools`: the call sends tools (ai/route-plan.ts RoutePlanInput.requires). */
+  requires?: { local?: boolean; tools?: boolean };
   /**
    * The AI role the call runs as (services/ai/roles.ts): one of the owner's role ids, or for an app a
    * role it declares, which runs only once the owner bound it. A named model or provider wins over it.

@@ -31,6 +31,10 @@
  * @structure
  *   ChosenBy · AiCandidate · RejectedCandidate · RoutePlanInput · planRoute · refusalFor
  * @version-history
+ *   v1.12.0 — 2026-11-01 — `requires.tools`: a call that sends tools does not go to a region whose
+ *     endpoint for the model has no tool calling; in eu-only (ai.region_mode) a model the node chose
+ *     that the EU does not offer becomes EU_ONLY_TEXT_MODEL before it is priced, and the free model
+ *     is off (freeModelOf, freeLastResortOf).
  *   v1.11.0 — 2026-10-31 — An OpenRouter candidate's target is its region's address (eu, us or any;
  *     ai/openrouter-region.ts), decided from the model and the key that pays; a model no allowed
  *     region offers is rejected with reason 'region' (AI_MODEL_NOT_IN_REGION). Jouni, 2026-10-31.
@@ -91,7 +95,8 @@ import { textPricePerMtok, uncataloguedTextCost } from './catalog/price.js';
 import { canonicalModelKey, equivalentModels } from './catalog/equivalence.js';
 import { extensionRunner } from './extension-provider.js';
 import { nodeKeyOutputCap, nodeKeyRoomUsd, tooCostlyMessage, type NodeKeyHold } from './node-key-hold.js';
-import { decideRegion, regionChoiceFor, type OpenRouterRegion } from './openrouter-region.js';
+import { decideRegion, euOnlyModelFor, freeLastResortOf, freeModelOf, regionChoiceFor, type OpenRouterRegion } from './openrouter-region.js';
+import { nodeOpenRouterKey } from './node-openrouter-key.js';
 
 export type ChosenBy = 'call-model' | 'call-provider' | 'role' | 'app-prefer' | 'agent-default' | 'owner-default' | 'pool' | 'node-default';
 
@@ -156,7 +161,8 @@ export interface RoutePlanInput {
   namedProvider?: string;
   /** The caller's own word on fallback; the rules decide when it says nothing. */
   fallback?: boolean;
-  requires?: { local?: boolean };
+  /** `tools`: the call sends tools, so a region whose endpoint for the model has no tool calling does not take it. */
+  requires?: { local?: boolean; tools?: boolean };
   agent?: string;
   /**
    * The model the owner's legacy setting and the node's defaults give this capability: what a
@@ -422,8 +428,12 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     const agentKey = input.agent ? await readAgentProviderKey(storage, config, gaii, input.agent, p) : null;
     if (agentKey) { key = agentKey; keyScope = 'agent'; }
     else if (p.auth.type === 'node') {
-      key = (config.openrouterInstanceKey ?? '').trim() || undefined;
+      key = nodeOpenRouterKey(config) || undefined;
       keyScope = 'node';
+      // EU only (ai.region_mode eu-only): a model the node chose that the EU does not offer for this
+      // call becomes the EU's own default here, before it is priced; a model the caller named is kept,
+      // and the region below refuses it.
+      if (p.type === 'openrouter') model = await euOnlyModelFor(config, model, capability, { tools: !!input.requires?.tools }, !!input.requested);
       allowance ??= await input.nodeAllowance();
       allowanceRemainingUsd = allowance.remainingUsd;
       // When the node's key may not pay any more (ai-allowance.ts nodeKeyStanding: a spent allowance
@@ -452,7 +462,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
       const est = unpriced !== undefined ? Math.min(unpriced, Math.max(0, room)) : priced;
       const tooCostly = unpriced !== undefined ? !(room > 0) : est !== undefined && est > room;
       if (!allowance.mayPay || tooCostly) {
-        const free = config.modelFreeFallback;
+        const free = freeModelOf(config);
         const freeAllowed = input.op === 'text' && !!free && freeModelAllowed(input.policy, free, p.type);
         // The free model is the last resort, and the account's rule (or the node's default) may
         // switch it off (Jouni, 2026-10-25).
@@ -460,7 +470,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
         // the notice that tells them (Jouni, 2026-10-29): the node's default does not make it for them.
         const keySpent = allowance.reason === 'node-key-spent';
         const lastResortOn = keySpent ? rules.freeModelLastResort === true
-          : rules.freeModelLastResort ?? (config.aiFreeModelLastResort !== false);
+          : rules.freeModelLastResort ?? freeLastResortOf(config);
         if (freeAllowed && !input.requested && lastResortOn) {
           model = free; degradedToFree = true;
         } else if (!(freeAllowed && model === free)) {
@@ -487,7 +497,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     } else if (p.auth.type === 'key') {
       key = (await readOwnerProviderKey(storage, config, gaii, p.id)) ?? undefined;
       if (!key) {
-        const nodeHost = p.legacy?.provider === 'openrouter' && p.type !== 'openrouter' && !!(config.openrouterInstanceKey ?? '').trim();
+        const nodeHost = p.legacy?.provider === 'openrouter' && p.type !== 'openrouter' && !!nodeOpenRouterKey(config);
         if (nodeHost) {
           const message = 'This node\'s shared AI key is sent only to OpenRouter. To use another address, add your own API key in your AI settings.';
           reject(p, 'node-key-host', message, { error: new AiCompletionError('NODE_KEY_HOST', 403, message) });
@@ -520,7 +530,7 @@ export async function planRoute(input: RoutePlanInput): Promise<RoutePlan> {
     // ── where an OpenRouter call is processed: eu, us or any, for this model and this key ──
     let region: { used: OpenRouterRegion; wanted: OpenRouterRegion; baseUrl: string } | undefined;
     if (p.type === 'openrouter') {
-      const decided = await decideRegion(config, regionChoiceFor(config, rules, keyScope), model);
+      const decided = await decideRegion(config, regionChoiceFor(config, rules, keyScope), model, { tools: !!input.requires?.tools });
       if (!decided.ok) {
         reject(p, 'region', decided.message, { model, error: new AiCompletionError('AI_MODEL_NOT_IN_REGION', 400, decided.message, { region: decided.wanted, offered: decided.offered }) });
         continue;
