@@ -22,6 +22,8 @@
  *   on for every owner, and turns it off and restores the policy at the end.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=classification-audience-cap
  * @version-history
+ *   2026-11-01 — A page or a space whose share end has passed and whose label rose since is held to
+ *     its label when it is opened again; an unlabelled one opens (secaudit2026oct31w2 round 12).
  *   v1.1.0 — 2026-10-18 — A whole space shared is held to each published page's label, naming the page
  *     (the space, then the whole workspace widened); a rise on an app lowers the files in the app's own
  *     namespace, with the audit row and the notification. The setup takes Internal's own cap off,
@@ -194,6 +196,58 @@ await test('WHOLE SPACE: sharing a space whole is refused (409) when one of its 
     assert(String(wider.body.error.message).includes('item/r1'), `the refusal names the page: ${wider.body.error.message}`);
     const after = await call('GET', `/v1/organisms/${orgId}/workspace/share?${q({ ws: sws })}`, alice.token);
     assert(after.body?.data?.share?.access === 'organism', `the access changed: ${JSON.stringify(after.body?.data?.share)}`);
+});
+
+await test('ENDED SHARE: a page or a space whose end has passed and whose label rose since is held to its label when it is opened again (409); an unlabelled one opens', async () => {
+    // A passed end reads as not shared (isDocPublicAt), so opening it again is held to the label as a
+    // page never shared is (secaudit2026oct31w2 round 12).
+    const make = async (name: string): Promise<string> => {
+        const w = await call('POST', `/v1/organisms/${orgId}/workspaces`, alice.token, { name, manifest: {
+            manifestVersion: '1', name, kind: 'project',
+            objectTypes: [{ name: 'item', namespace: 'shared.items', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:item@1' }],
+        } });
+        assert(w.status === 201 && typeof w.body?.data?.ws === 'string', `workspace ${name}: ${w.status} ${JSON.stringify(w.body?.error)}`);
+        const p = await call('POST', `/v1/organisms/${orgId}/workspace/records/publish`, alice.token, { ws: w.body.data.ws, namespace: 'shared.items', records: [{ id: 'r1', value: { name: 'secret' } }, { id: 'r2', value: { name: 'plain' } }, { id: 'r3', value: { name: 'later' } }] });
+        assert(p.status === 200 && p.body.data.published === 3, `publish ${name}: ${p.status} ${JSON.stringify(p.body?.data ?? p.body?.error)}`);
+        return w.body.data.ws as string;
+    };
+    const pws = await make('Ended pages');
+    const sws = await make('Ended space');
+    const put = (w: string, body: Record<string, unknown>) => call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws: w })}`, alice.token, body);
+    const soon = new Date(Date.now() + 4000).toISOString();
+    const pages = await put(pws, { access: 'open', docs: { 'item/r1': true, 'item/r2': true, 'item/r3': true }, until: { 'item/r1': soon, 'item/r2': soon, 'item/r3': soon } });
+    assert(pages.status === 200, `share the pages: ${pages.status} ${JSON.stringify(pages.body?.error)}`);
+    const space = await put(sws, { access: 'open', spaces: { item: true }, until: { 'space:item': soon } });
+    assert(space.status === 200, `share the space: ${space.status} ${JSON.stringify(space.body?.error)}`);
+    await new Promise(r => setTimeout(r, 5000));
+    for (const w of [pws, sws]) {
+        const l = await setLabel(alice.token, { kind: 'memory', key: `organism.${orgId}.w.${w}.shared.items.r1` }, CONF);
+        assert(l.status === 200 && l.body.data.applied === true, `label: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
+    }
+    capped(await put(pws, { docs: { 'item/r1': true }, until: { 'item/r1': null } }), 'open the ended Confidential page again');
+    const kept = await call('GET', `/v1/organisms/${orgId}/workspace/share?${q({ ws: pws })}`, alice.token);
+    assert(Date.parse(kept.body?.data?.share?.until?.['item/r1']) <= Date.now(), `the passed end changed: ${JSON.stringify(kept.body?.data?.share)}`);
+    const plain = await put(pws, { docs: { 'item/r2': true }, until: { 'item/r2': null } });
+    assert(plain.status === 200, `POSITIVE CONTROL, the unlabelled ended page opens again: ${plain.status} ${JSON.stringify(plain.body?.error)}`);
+    const whole = await put(sws, { spaces: { item: true }, until: { 'space:item': null } });
+    capped(whole, 'open the ended space again');
+    assert(String(whole.body.error.message).includes('item/r1'), `the refusal names the page: ${whole.body.error.message}`);
+    // An agent's request to remove the passed end of an unlabelled page, approved after the page's
+    // label rose: the approval is held to the label (cap-recheck merges the request's end dates).
+    const g = await setGate('agents-and-apps');
+    assert(g.status === 200, `gate: ${g.status} ${JSON.stringify(g.body?.error)}`);
+    try {
+        const sharer = await makeAgent(BASE, alice, ['organism:read', 'organism:write', 'memory:read', 'memory:write'], `cacshr${stamp % 100000}`);
+        const r = await call('PUT', `/v1/organisms/${orgId}/workspace/share?${q({ ws: pws })}`, sharer.token, { docs: { 'item/r3': true }, until: { 'item/r3': null } });
+        assert(r.status === 202 && r.body.data.publish_request?.request_id, `ask: ${r.status} ${JSON.stringify(r.body?.error ?? r.body?.data)}`);
+        const l = await setLabel(alice.token, { kind: 'memory', key: `organism.${orgId}.w.${pws}.shared.items.r3` }, CONF);
+        assert(l.status === 200 && l.body.data.applied === true, `label r3: ${l.status} ${JSON.stringify(l.body?.error ?? l.body?.data)}`);
+        capped(await call('POST', `/v1/publish-requests/${r.body.data.publish_request.request_id}/decision`, alice.token, { decision: 'approve' }), 'approve after the label rose');
+        const after = await call('GET', `/v1/organisms/${orgId}/workspace/share?${q({ ws: pws })}`, alice.token);
+        assert(Date.parse(after.body?.data?.share?.until?.['item/r3']) <= Date.now(), `the page was opened: ${JSON.stringify(after.body?.data?.share)}`);
+    } finally {
+        await setGate('off');
+    }
 });
 
 await test('BOARD: a Highly confidential board cannot be made public (409); it stays shared', async () => {
